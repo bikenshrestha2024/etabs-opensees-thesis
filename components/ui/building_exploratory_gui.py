@@ -1,6 +1,6 @@
 """Explicit literature-informed route on the selected building."""
 from pathlib import Path
-import json,sys,subprocess,threading,queue,datetime,importlib.util
+import json,sys,subprocess,threading,queue,datetime,importlib.util,re
 
 def resolve_runner():
     """Resolve the installed facade, whether this code is imported or exec-loaded."""
@@ -15,17 +15,32 @@ def launch(parent,model_folder,output_folder=None):
     import tkinter as tk
     from tkinter import ttk,filedialog,messagebox
     from OpenSees_Input_Records_V130 import LTH_DEFAULT_PEER_PAIRS
+    from components.inputs.project_workbooks import analysis_output_folder
     win=tk.Toplevel(parent);win.title('Building nonlinear research history - frames / FSAM walls');win.geometry('1150x800')
     ttk.Label(win,text='CURRENT BUILDING | SELECT LITERATURE MATERIAL BASIS AND WALL FORMULATION',font=('Segoe UI',12,'bold')).pack(anchor='w',padx=8,pady=6)
     ttk.Label(win,text='Uses the selected building geometry, loads and mass in an isolated copy. Full-wall route assigns nonlinear E-SFI-MVLEM-3D and unconfined FSAM web regions, with per-property ratios from the available wall layout. Published constitutive references and M30/Fe500 sensitivity are distinct. Frame bar schedules remain template assumptions. No automatic calibration or design approval.',wraplength=1100).pack(anchor='w',padx=8)
     form=ttk.Frame(win,padding=8);form.pack(fill='x');form.columnconfigure(1,weight=1)
-    folder=tk.StringVar(value=str(model_folder));out=tk.StringVar(value=str(output_folder or Path(model_folder)/'OpenSees_Analysis_Results'));x=tk.StringVar();y=tk.StringVar();pair=tk.StringVar(value='RSN1120_KOBE_TAK000');dt=tk.StringVar(value='.005');duration=tk.StringVar(value='0');orientation=tk.StringVar(value='XY + YX');ls=tk.StringVar(value='Both');scale=tk.StringVar(value='1.0')
+    source_folder=Path(model_folder)
+    if output_folder is None or Path(output_folder).name=='OpenSees_Analysis_Results':
+        initial_output=analysis_output_folder(source_folder,'ULS')
+    else:
+        initial_output=Path(output_folder)
+    folder=tk.StringVar(value=str(source_folder));out=tk.StringVar(value=str(initial_output));x=tk.StringVar();y=tk.StringVar();pair=tk.StringVar(value='RSN1120_KOBE_TAK000');dt=tk.StringVar(value='.005');duration=tk.StringVar(value='0');orientation=tk.StringVar(value='XY + YX');ls=tk.StringVar(value='ULS');scale=tk.StringVar(value='1.0')
+    output_is_automatic=(
+        output_folder is None
+        or Path(output_folder).name=='OpenSees_Analysis_Results'
+        or Path(output_folder).name.startswith(
+            ('ULS_Floor_','SLS_Floor_','ULS_SLS_Floor_'))
+    )
     entries=[('Assembled export folder',folder,'dir'),('Output base folder',out,'dir'),('X component record',x,'file'),('Y component record',y,'file')]
     for i,(label,var,mode) in enumerate(entries):
         ttk.Label(form,text=label).grid(row=i,column=0,sticky='w');ttk.Entry(form,textvariable=var).grid(row=i,column=1,sticky='ew')
         def choose(v=var,m=mode):
+            nonlocal output_is_automatic
             path=filedialog.askdirectory(parent=win) if m=='dir' else filedialog.askopenfilename(parent=win)
-            if path:v.set(path)
+            if path:
+                v.set(path)
+                if v is out:output_is_automatic=False
         ttk.Button(form,text='Browse',command=choose).grid(row=i,column=2)
     catalogue={r['pair_id']:r for r in LTH_DEFAULT_PEER_PAIRS};bar=ttk.Frame(win);bar.pack(fill='x',padx=8)
     ttk.Label(bar,text='Earthquake').pack(side='left');box=ttk.Combobox(bar,textvariable=pair,values=list(catalogue),state='readonly',width=33);box.pack(side='left')
@@ -34,6 +49,22 @@ def launch(parent,model_folder,output_folder=None):
     box.bind('<<ComboboxSelected>>',select);select()
     for label,var,values,width in [('State',ls,['Both','ULS','SLS'],6),('Orientation',orientation,['XY + YX','XY','YX'],10)]:
         ttk.Label(bar,text=label).pack(side='left');ttk.Combobox(bar,textvariable=var,values=values,state='readonly',width=width).pack(side='left')
+    source_edb=''
+    topology=source_folder/'OpenSees_Element_Connectivity.json'
+    if topology.is_file():
+        try:source_edb=str(json.loads(topology.read_text(encoding='utf-8-sig')).get('source_edb') or '')
+        except (OSError,ValueError):pass
+    source_description=(
+        'Linked source EDB: '+(source_edb or 'not recorded in the export manifest')+'. '
+        'ULS and SLS selections rebuild from this same exported geometry, assignments, mass, gravity profile, and selected motions. '
+        'The state selector does not load a second ETABS model or derive service-load combinations. '
+        'With only a ULS export, an SLS-labelled run is exploratory and is not independent SLS validation; use a matched SLS export and verify service-state loads, stiffness, and motion/scaling basis before comparison.'
+    )
+    ttk.Label(win,text=source_description,wraplength=1100,foreground='#9a3412',justify='left').pack(anchor='w',padx=8,pady=4)
+    def state_changed(*_):
+        if output_is_automatic:
+            out.set(str(analysis_output_folder(source_folder,ls.get())))
+    ls.trace_add('write',state_changed)
     settings=ttk.LabelFrame(win,text='Analysis settings');settings.pack(fill='x',padx=8,pady=(4,0))
     for label,var in [('dt (s)',dt),('Trial duration (s); 0=full record',duration),('Motion scale (units handled separately)',scale)]:ttk.Label(settings,text=label).pack(side='left');ttk.Entry(settings,textvariable=var,width=8).pack(side='left')
     transient_system=tk.StringVar(value='UmfPack')
@@ -62,11 +93,35 @@ def launch(parent,model_folder,output_folder=None):
     sensitivity=ttk.Frame(win);sensitivity.pack(fill='x',padx=8,pady=(2,0))
     sensitivity_parameter=tk.StringVar(value='brace.fy_mpa')
     sensitivity_values=tk.StringVar(value='310.5, 345, 379.5')
-    from components.nonlinear_time_history.research_building_materials import MATERIAL_OVERRIDE_BOUNDS
-    ttk.Label(sensitivity,text='One-factor parameter').pack(side='left')
+    from components.nonlinear_time_history.research_building_materials import (
+        MATERIAL_OVERRIDE_BOUNDS,MATERIAL_PARAMETER_REFERENCES,
+    )
+    ttk.Label(sensitivity,text='One-at-a-time parameter').pack(side='left')
     ttk.Combobox(sensitivity,textvariable=sensitivity_parameter,values=list(MATERIAL_OVERRIDE_BOUNDS),state='readonly',width=23).pack(side='left')
-    ttk.Label(sensitivity,text='Candidate values (MPa, ratio, strain, etc.; use parameter units)').pack(side='left',padx=(8,2))
+    ttk.Label(sensitivity,text='Candidate values (parameter units)').pack(side='left',padx=(8,2))
     ttk.Entry(sensitivity,textvariable=sensitivity_values,width=36).pack(side='left')
+    parameter_note=tk.StringVar()
+    parameter_explanation=ttk.Label(win,textvariable=parameter_note,wraplength=1100,foreground='#174a7e',justify='left')
+    parameter_explanation.pack(anchor='w',padx=8,pady=3)
+    def update_parameter_note(*_):
+        key=sensitivity_parameter.get()
+        if key in MATERIAL_PARAMETER_REFERENCES:
+            card=MATERIAL_PARAMETER_REFERENCES[key]
+            citations='; '.join(ref['title']+': '+ref['url'] for ref in card['references'])
+            if key=='brace.fy_mpa':
+                parameter_note.set(
+                    card['meaning']+' Baseline 345 MPa: '+card['baseline_basis']+' '
+                    +card['candidate_basis']+' References: '+citations)
+            else:
+                parameter_note.set(card['meaning']+' '+card['baseline_basis']+' '
+                                   +card['candidate_basis']+' References: '+citations)
+        else:
+            parameter_note.set(
+                f'{key}: varies only this selected material input; every other model/input value is held fixed. '
+                'The candidate list is investigator-selected, not automatically taken from the paper. '
+                'Check the applicable source card in Research_Material_Assignment_V161.json and the material-basis references before interpreting results.')
+    sensitivity_parameter.trace_add('write',update_parameter_note)
+    update_parameter_note()
     ttk.Label(win,text='Device history uses localForce component 1 and projected axial extension; check the selected element axis in the exported element map. Results are exploratory, not material calibration or design approval.',wraplength=1100,foreground='#444').pack(anchor='w',padx=8,pady=3)
     def show_parameters():
         target=state.get('last')
@@ -91,8 +146,13 @@ def launch(parent,model_folder,output_folder=None):
     ttk.Button(materialbar,text='Prepare wall material + FSAM draft',command=make_material_draft).pack(side='left')
     status=tk.StringVar(value='Short trial recommended to inspect numerical behavior. No readiness approval is auto-created.');ttk.Label(win,textvariable=status,wraplength=1100).pack(anchor='w',padx=8,pady=5)
     from tkinter.scrolledtext import ScrolledText
-    log=ScrolledText(win,height=15,wrap='word');log.pack(fill='both',expand=True,padx=8);messages=queue.Queue();state={'running':False,'last':None,'proc':None}
+    from components.shared.case_status import panel
+    case_board=panel(win)
+    log=ScrolledText(win,height=12,wrap='word');log.pack(fill='both',expand=True,padx=8);messages=queue.Queue();state={'running':False,'last':None,'proc':None}
+    progress_context={'state':None,'candidate':None,'case':None}
+    config_orientations=[]
     def start(run_sensitivity=False):
+        nonlocal config_orientations
         if state['running']:return
         try:
             runner=resolve_runner()
@@ -101,11 +161,34 @@ def launch(parent,model_folder,output_folder=None):
             dest=Path(out.get())/('EXPLORATORY_FRAME_NL_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S'));dest.mkdir(parents=True,exist_ok=False)
             extra_tags=[int(value.strip()) for value in tracked_members.get().split(',') if value.strip()]
             config=dict(model_folder=str(source),output_dir=str(dest),x_path=x.get(),y_path=y.get(),dt_s=float(dt.get()),duration_s=float(duration.get()) or None,scale=float(scale.get()),orientations=['XY','YX'] if orientation.get()=='XY + YX' else [orientation.get()],limit_state=ls.get(),tracked_frame_tag=int(tracked.get()),tracked_element_tags=extra_tags,nonlinear_walls=full.get(),material_basis=basis.get(),steelmpf_transition=steel_transition.get(),gravity_system=gravity_system.get(),transient_system=transient_system.get(),material_overrides={'brace.fy_mpa':float(brace_fy.get()),'brace.b':float(brace_b.get())})
+            run_states=('ULS','SLS') if ls.get()=='Both' else (ls.get(),)
             if run_sensitivity:
                 values=[float(value.strip()) for value in sensitivity_values.get().split(',') if value.strip()]
-                if len(values)<2:raise ValueError('Enter at least two comma-separated sensitivity candidate values.')
+                if not 2<=len(values)<=12:raise ValueError('Enter 2 through 12 comma-separated sensitivity candidate values.')
+                from components.nonlinear_time_history.research_building_materials import validate_material_overrides
+                values=[validate_material_overrides({sensitivity_parameter.get():value})[sensitivity_parameter.get()] for value in values]
+                if len(set(values))!=len(values):raise ValueError('Sensitivity candidate values must be unique.')
                 config['sensitivity_parameter']=sensitivity_parameter.get()
                 config['sensitivity_values']=values
+            from components.shared.case_status import CaseLedger
+            orientations=config['orientations']
+            config_orientations=list(orientations)
+            if run_sensitivity:
+                case_ids=[
+                    f"candidate {index}/{len(values)} {sensitivity_parameter.get()}={value:g} | {run_state}/{case_orientation}"
+                    for index,value in enumerate(values,1)
+                    for run_state in run_states for case_orientation in orientations
+                ]
+            else:
+                case_ids=[f'{run_state}/{case_orientation}'
+                          for run_state in run_states for case_orientation in orientations]
+            case_board['ledger']=CaseLedger(dest/'Exploratory_Case_Status_V151.json',case_ids)
+            case_board['process']=None
+            progress_context.update(
+                state=run_states[0] if len(run_states)==1 else None,
+                candidate=None,
+                case=None,
+            )
             configpath=dest/'Requested_Config.json';configpath.write_text(json.dumps(config,indent=2),encoding='utf-8');state.update(running=True,last=dest);button.configure(state='disabled');status.set('Running exploratory model in separate process. Outputs: '+str(dest))
             if run_sensitivity:
                 sensitivity_button.configure(state='disabled')
@@ -120,12 +203,15 @@ def launch(parent,model_folder,output_folder=None):
                 messages.put(('line','[RUNNER] '+str(runner)+'\n'))
                 proc=subprocess.Popen([sys.executable,'-u',str(runner),'--config',str(configpath)],cwd=str(runner.parent),stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace')
                 state['proc']=proc
+                case_board['process']=proc
                 with log_path.open('w',encoding='utf-8') as stream:
                     stream.write('[RUN START] '+started_at.isoformat()+'\n')
                     stream.write('[CONFIG] '+str(configpath)+'\n')
                     stream.flush()
                     for line in proc.stdout:stream.write(line);stream.flush();messages.put(('line',line))
                 code=proc.wait()
+                case_board['ledger'].finish_pending(
+                    'Runner exited with code '+str(code)+' without an orientation completion report.')
                 completed_at=datetime.datetime.now().astimezone()
                 summary_exists=expected.is_file()
                 status='COMPLETED' if code==0 and summary_exists else 'PROCESS_EXIT_NONZERO' if code!=0 else 'SUMMARY_MISSING'
@@ -135,6 +221,7 @@ def launch(parent,model_folder,output_folder=None):
                     messages.put(('error','Native process exited without a completion summary; inspect log and last committed state.'))
                 else:messages.put(('done',code))
             except Exception as e:
+                case_board['ledger'].finish_pending('Runner/logging failure: '+str(e))
                 completed_at=datetime.datetime.now().astimezone()
                 execution_report=dict(status='RUNNER_START_OR_LOGGING_FAILURE',error_type=type(e).__name__,error=str(e),started_at=started_at.isoformat(),finished_at=completed_at.isoformat(),elapsed_seconds=(completed_at-started_at).total_seconds(),config_path=str(configpath),run_log=str(log_path))
                 (dest/'Process_Exit.json').write_text(json.dumps(execution_report,indent=2),encoding='utf-8')
@@ -168,12 +255,70 @@ def launch(parent,model_folder,output_folder=None):
             messagebox.showinfo('Saved history report recovered',str(len(result['cases']))+' orientation reports recovered. Original data unchanged.',parent=win)
         except Exception as exc:messagebox.showerror('Report recovery',str(exc),parent=win)
     ttk.Button(secondary,text='Recover report from saved trial',command=recover).pack(side='left')
+    def track_exploratory_line(line):
+        ledger=case_board.get('ledger')
+        if ledger is None:return
+        candidate_match=re.search(r'\[MATERIAL SENSITIVITY\]\s+(\d+)/(\d+)\s+(.+)',line)
+        if candidate_match:
+            progress_context['candidate']=(
+                f"candidate {candidate_match.group(1)}/{candidate_match.group(2)} "
+                f"{candidate_match.group(3).strip()}")
+        state_match=re.search(r'\[RESEARCH STATE START\]\s+(ULS|SLS)',line)
+        if state_match:
+            progress_context['state']=state_match.group(1)
+            prefix=(progress_context['candidate']+' | ') if progress_context['candidate'] else ''
+            for case_orientation in config_orientations:
+                case=prefix+progress_context['state']+'/'+case_orientation
+                if case in ledger.rows:
+                    ledger.set(case,'RUNNING','State-specific model rebuild and gravity preload')
+        start_match=re.search(r'\[EXPLORATORY START\]\s+(XY|YX)',line)
+        if start_match:
+            case_orientation=start_match.group(1)
+            prefix=(progress_context['candidate']+' | ') if progress_context['candidate'] else ''
+            progress_context['case']=prefix+(progress_context['state'] or 'ULS')+'/'+case_orientation
+            if progress_context['case'] in ledger.rows:
+                ledger.set(progress_context['case'],'RUNNING','Model build, gravity, modal check, then transient response')
+        progress_match=re.search(
+            r'\[EXPLORATORY PROGRESS\]\s+(XY|YX):\s+t=([\d.eE+-]+)/([\d.eE+-]+)s',line)
+        if progress_match:
+            case_orientation=progress_match.group(1)
+            prefix=(progress_context['candidate']+' | ') if progress_context['candidate'] else ''
+            case=prefix+(progress_context['state'] or 'ULS')+'/'+case_orientation
+            current=float(progress_match.group(2));duration=float(progress_match.group(3))
+            percent=100.*current/duration if duration>0 else 0.
+            if case in ledger.rows:
+                ledger.set(case,'RUNNING',
+                           f'Transient physical time {current:g}/{duration:g} s ({percent:.1f}%)')
+        complete_match=re.search(r'\[EXPLORATORY COMPLETE\]\s+(\{.*\})\s*$',line)
+        if complete_match:
+            result=json.loads(complete_match.group(1))
+            case_orientation=result.get('orientation')
+            prefix=(progress_context['candidate']+' | ') if progress_context['candidate'] else ''
+            case=prefix+(progress_context['state'] or 'ULS')+'/'+str(case_orientation)
+            physical=float(result.get('physical_time_s',0.))
+            record=float(result.get('full_record_duration_s',0.))
+            if case in ledger.rows:
+                if result.get('status')=='COMPLETED_TRUNCATED_TRIAL' or physical+1e-8<record:
+                    ledger.set(case,'TRUNCATED',
+                               f'Solver finished {physical:g}/{record:g} s; record truncated, no full-history completion')
+                elif result.get('status')=='COMPLETED_EXPLORATORY_RECORD':
+                    ledger.set(case,'COMPLETED',
+                               f'Full exploratory record {physical:g}/{record:g} s completed; not design acceptance')
+                else:
+                    ledger.set(case,'REVIEW',
+                               f'Orientation run ended with status {result.get("status","unknown")}')
+                progress_context['case']=None
+        if '[FAILED' in line and progress_context.get('case') in ledger.rows:
+            ledger.set(progress_context['case'],'FAILED',line.strip()[:500])
+
     def poll():
         try:
             while True:
                 kind,value=messages.get_nowait()
-                if kind=='line':log.insert('end',value);log.see('end')
-                elif kind=='error':state['running']=False;button.configure(state='normal');sensitivity_button.configure(state='normal');status.set('Runner/logging failure: '+str(value)+'; inspect Process_Exit.json.')
+                if kind=='line':
+                    track_exploratory_line(value)
+                    log.insert('end',value);log.see('end')
+                elif kind=='error':case_board['ledger'].finish_pending('Runner/logging failure: '+str(value));state['running']=False;button.configure(state='normal');sensitivity_button.configure(state='normal');status.set('Runner/logging failure: '+str(value)+'; inspect Process_Exit.json.')
                 else:state['running']=False;button.configure(state='normal');sensitivity_button.configure(state='normal');status.set('Exploratory trial finished; inspect assumptions and truncated/full-record status.' if kind=='done' and value==0 else 'Trial incomplete: '+str(value)+'; inspect Run.log and Process_Exit.json. No completion claimed.')
         except queue.Empty:pass
         if win.winfo_exists():win.after(200,poll)

@@ -634,12 +634,15 @@ class NonlinearTimeHistoryGUI:
             if var is self.ls: ttk.Combobox(grid, textvariable=var, values=("ULS", "SLS"), state="readonly", width=11).grid(row=i // 3, column=(i % 3) * 2 + 1, sticky="ew", padx=(0, 12))
             else: ttk.Entry(grid, textvariable=var, width=12).grid(row=i // 3, column=(i % 3) * 2 + 1, sticky="ew", padx=(0, 12))
         for c in range(6): grid.columnconfigure(c, weight=1 if c % 2 else 0)
+        ttk.Label(params,text="The ULS/SLS context is passed to the selected builder (which may apply implemented state-specific stiffness modifiers) and labels outputs; it does not load a second ETABS model or derive service-load combinations. With only a ULS export, an SLS-labelled run is not independently validated. Verify service loads, effective stiffness, periods and motion/scaling basis before treating it as an SLS result.",wraplength=1060,foreground="#9a3412").pack(anchor="w",fill="x",pady=(4,2))
         ttk.Checkbutton(params, text="Torsionally sensitive 3D structure (requires at least 3 orthogonal motion pairs)", variable=self.torsion).pack(anchor="w", pady=(5, 0))
         ttk.Label(params, text="T1 is from NBC §5.1 (lesser adopted period); Tn is the highest mode needed for 90% mass participation in each axis. Obtain/verify these in the Modal Analysis GUI. The chosen Rayleigh calibration periods and checked modal damping must keep all inspected modes ≤5%.", wraplength=1060, foreground="#8a3412").pack(anchor="w", pady=(5, 0))
         ttk.Label(root, text="Readiness is intentionally strict: the nonlinear model must already contain the reviewed ETABS geometry, wall opening mesh and coupling beams, calibrated wall/frame materials, compatible slab/diaphragm representation, reconciled area/frame loads and seismic mass, completed gravity/P-Delta, modal checks, and the selected SHS/FVD/BRB scenario. This tool freezes that completed gravity state with loadConst(time=0) and runs nonlinear Newmark. It cannot make a missing ETABS-to-OpenSees subsystem complete. The manifest is an explicit user checklist, not an automatic certification.", wraplength=1060, foreground="#8a3412").pack(anchor="w", pady=(0, 8))
         ttk.Button(root, text="NBC site spectrum + optional X/Y scale diagnostic (A–D)", command=self._open_spectrum_tool).pack(anchor="w", pady=(0, 6))
         ttk.Checkbutton(root, text="RUN_NONLINEAR_TIME_HISTORY = True  —  enable execution (default False)", variable=self.execute).pack(anchor="w", pady=(0, 4))
         ttk.Button(root, text="Run NBC Nonlinear Time-History Cases", command=self._run).pack(anchor="w", pady=(0, 8))
+        from components.shared.case_status import panel
+        self.case_board=panel(root)
         ttk.Button(root,text='Performance objectives / component acceptance',command=lambda:__import__('components.validation.nonlinear_performance',fromlist=['launch']).launch(self.win,self.output.get())).pack(anchor='w',pady=4)
         ttk.Button(root,text='Completed run graphs / Excel / unit audit',command=lambda:__import__('OpenSees_History_Results_V134').launch(self.win,self.output.get())).pack(anchor='w',pady=4)
         tabs = ttk.Notebook(root); tabs.pack(fill="both", expand=True)
@@ -706,7 +709,7 @@ class NonlinearTimeHistoryGUI:
             if values["damping_ratio_percent"] > 5.0: raise ValueError("NBC 105:2025 §8.1.1: viscous damping cannot exceed 5%; avoid double-counting explicit FVD damping.")
             if values["modes_to_check"] < 1: raise ValueError("Check at least one eigenmode.")
             # Validate CSV and motion metadata before starting a long analysis.
-            _read_inputs(values)
+            motions,_stories = _read_inputs(values)
             _require_nonlinear_readiness(values)
             out = Path(values["output_dir"]); out.mkdir(parents=True, exist_ok=True)
             from datetime import datetime
@@ -714,6 +717,12 @@ class NonlinearTimeHistoryGUI:
             kind='NLTH' if 'Nonlinear' in type(self).__name__ else 'LTH'
             out=out/f"{kind}_{values['limit_state']}_{scope}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
             out.mkdir(parents=True,exist_ok=True);values['output_dir']=str(out)
+            from components.shared.case_status import CaseLedger
+            orientations=('X_ONLY',) if x_only else ('XY','YX')
+            self.case_board['ledger']=CaseLedger(
+                out/'Time_History_Case_Status_V151.json',
+                [f"{motion['pair_id']}_{orientation}"
+                 for motion in motions for orientation in orientations])
             cfg = out / "NBC105_Nonlinear_Time_History_RunConfig_V116.json"
             from OpenSees_Timing_V130 import StageTimer
             timer=StageTimer(cfg.parent,"Time-history configuration export")
@@ -724,19 +733,28 @@ class NonlinearTimeHistoryGUI:
         except Exception as exc: messagebox.showerror("Input needs review", str(exc), parent=self.win)
 
     def _worker(self, python, cfg):
+        from components.shared.case_status import update_history_case
+        current_case=None
+        ledger=self.case_board.get('ledger')
         try:
             proc = subprocess.Popen([python, str(Path(__file__).resolve()), "--run", str(cfg)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1, env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
+            self.case_board['process']=proc
             log_path = Path(json.loads(cfg.read_text(encoding="utf-8"))["output_dir"]) / "NBC105_Nonlinear_Time_History_Run_V116.log"
             with log_path.open("w", encoding="utf-8") as logfile:
                 for line in proc.stdout:
                     logfile.write(line); logfile.flush()
+                    current_case=update_history_case(ledger,line,current_case)
                     self.win.after(0, self._append_log, line)
                 code = proc.wait()
+                if ledger:ledger.finish_pending(
+                    'Runner exited with code '+str(code)+' without a confirmed [OK] record-completion line.')
                 end_line = f"\n{'[SUCCESS]' if code == 0 else '[FAILED]'} Process exit code {code}. Persistent log: {log_path}\n"
                 logfile.write(end_line); logfile.flush()
             self.win.after(0, self._append_log, end_line)
             if code==0:self.win.after(0,lambda:__import__("OpenSees_History_Results_V134").launch(self.win,log_path.parent))
-        except Exception as exc: self.win.after(0, self._append_log, f"[FAILED] {exc}\n")
+        except Exception as exc:
+            if ledger:ledger.finish_pending('Runner/logging failure: '+str(exc))
+            self.win.after(0, self._append_log, f"[FAILED] {exc}\n")
         finally: self.running = False
 
     def _append_log(self, line):

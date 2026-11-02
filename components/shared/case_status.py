@@ -1,6 +1,14 @@
 """Thread-safe analysis case ledger and live GUI view; no inferred completion."""
-import json,time,threading,datetime
+import json,time,threading,datetime,re
 from pathlib import Path
+
+
+_CASE_START=re.compile(r'^\[START\]\s+([^:]+):')
+_CASE_PROGRESS=re.compile(
+    r'^\[PROGRESS\]\s+([^:]+):\s+(\d+)/(\d+)\s+steps,\s+t=([\d.eE+-]+)s')
+_CASE_COMPLETE=re.compile(r'^\[OK\]\s+([^:]+):')
+
+
 class CaseLedger:
  def __init__(self,path,ids):
   self.path=Path(path);self.lock=threading.RLock();self.rows={i:dict(case=i,status='QUEUED',stage='Waiting',elapsed_s=0.) for i in ids};self.save()
@@ -20,12 +28,43 @@ class CaseLedger:
  def finish_pending(self,reason):
   for key,row in self.rows.items():
    if row['status'] in ('QUEUED','RUNNING','PREPARING'):self.set(key,'NOT COMPLETED',reason)
+
+
+def update_history_case(ledger,line,current_case=None):
+ """Update an LTH/NLTH case from its structured stdout progress messages."""
+ if ledger is None:return current_case
+ match=_CASE_START.search(line)
+ if match:
+  case=match.group(1).strip()
+  if case in ledger.rows:
+   ledger.set(case,'RUNNING','Building model, completing gravity, and preparing transient analysis')
+   return case
+ match=_CASE_PROGRESS.search(line)
+ if match:
+  case=match.group(1).strip()
+  if case in ledger.rows:
+   step,total=int(match.group(2)),int(match.group(3))
+   percent=100.*step/total if total else 0.
+   ledger.set(case,'RUNNING',
+              f'Transient steps {step}/{total} ({percent:.1f}%), physical time {match.group(4)} s')
+   return case
+ match=_CASE_COMPLETE.search(line)
+ if match:
+  case=match.group(1).strip()
+  if case in ledger.rows:
+   ledger.set(case,'COMPLETED','Configured record/orientation completed; inspect summary for full-record coverage')
+   return None
+ return current_case
+
+
 def panel(parent):
  from tkinter import ttk
- box=ttk.LabelFrame(parent,text='Selected batch: case status (elapsed wall time, not solver percent)');box.pack(fill='x',pady=4)
+ box=ttk.LabelFrame(parent,text='Record / orientation completion (physical-step progress; elapsed is wall time)');box.pack(fill='x',pady=4)
  tree=ttk.Treeview(box,columns=('case','status','stage','elapsed'),show='headings',height=5)
- for c,w in [('case',150),('status',120),('stage',580),('elapsed',100)]:tree.heading(c,text=c);tree.column(c,width=w,stretch=c=='stage')
- tree.pack(fill='x');holder={'ledger':None,'process':None,'cancelled':False}
+ for c,w in [('case',190),('status',125),('stage',600),('elapsed',100)]:tree.heading(c,text=c);tree.column(c,width=w,stretch=c=='stage')
+ scrollbar=ttk.Scrollbar(box,orient='vertical',command=tree.yview);tree.configure(yscrollcommand=scrollbar.set)
+ tree.pack(side='left',fill='x',expand=True);scrollbar.pack(side='right',fill='y')
+ holder={'ledger':None,'process':None,'cancelled':False}
  def stop():
   holder['cancelled']=True
   proc=holder.get('process')
