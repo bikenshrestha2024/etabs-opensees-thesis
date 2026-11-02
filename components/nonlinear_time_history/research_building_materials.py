@@ -58,6 +58,45 @@ MATERIAL_OVERRIDE_BOUNDS = {
     'wall.fsam_alpha': (0., 1.),
 }
 
+MATERIAL_PARAMETER_REFERENCES = {
+    'brace.fy_mpa': {
+        'meaning': 'Nominal yield stress used by the Steel01 uniaxial law for the 112 ordinary axial SHS brace idealizations.',
+        'baseline_mpa': 345.,
+        'baseline_basis': 'User-specified assumed steel grade; not extracted from a research paper or a certified mill test report.',
+        'candidate_basis': '310.5, 345, and 379.5 MPa are an analyst-selected ±10% sensitivity bracket, not literature-reported test bounds.',
+        'references': [
+            {
+                'title': 'OpenSees Steel01 Material documentation',
+                'url': 'https://opensees.berkeley.edu/wiki/index.php/Steel01_Material',
+                'supports': 'Meaning and role of Fy, E0, and b in the implemented material law.',
+            },
+            {
+                'title': 'ASTM A500/A500M, Cold-Formed Welded and Seamless Carbon Steel Structural Tubing',
+                'url': 'https://www.astm.org/a0500_a0500m-23.html',
+                'supports': 'Product specification to check if the project SHS is specified as ASTM A500 tubing; confirm grade and thickness from project documents.',
+            },
+            {
+                'title': 'AISC Hollow Structural Sections (HSS)',
+                'url': 'https://www.aisc.org/aisc/solutions-center/hss/',
+                'supports': 'HSS material/product context and applicable specification families.',
+            },
+        ],
+    },
+    'brace.b': {
+        'meaning': 'Steel01 post-yield hardening ratio b=Esh/E0; it is a constitutive model input, not a steel grade property.',
+        'baseline_basis': 'Default 0.01 is an explicit modeling assumption; replace it with a coupon-calibrated value when test data are available.',
+        'candidate_basis': 'Sensitivity candidates are user-selected and are not represented as a paper-derived interval.',
+        'references': [
+            {
+                'title': 'OpenSees Steel01 Material documentation',
+                'url': 'https://opensees.berkeley.edu/wiki/index.php/Steel01_Material',
+                'supports': 'Steel01 hardening parameter definition and implementation.',
+            },
+        ],
+    },
+}
+
+
 FRAME_OVERRIDE_TARGETS = {
     'frame.cover_fc_mpa': 'cover_fc_mpa',
     'frame.cover_epsc0': 'cover_epsc0',
@@ -221,7 +260,8 @@ def define_building_materials(ops,data,folder,material_overrides=None):
                          fy_kN_m2=brace['fy_kN_m2'],
                          E_mpa_override=brace['E_mpa'],
                          hardening_ratio=brace['hardening_ratio'],
-                         basis='User-specified 345 MPa structural-steel baseline; confirm grade certificate. Does not represent BRB core qualification.'),
+                         parameter_references=MATERIAL_PARAMETER_REFERENCES,
+                         basis='User-specified 345 MPa structural-steel baseline; confirm the SHS product standard, grade, thickness, and certificate. Does not represent BRB core qualification.'),
         steelmpf_transition_profile=transition_profile,
         steelmpf_transition_basis=transition['basis'],
         frame_sections=frame,frame_concrete_source='https://opensees.berkeley.edu/OpenSees/OpenSeesExamples1.1.pdf',

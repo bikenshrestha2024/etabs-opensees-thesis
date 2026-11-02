@@ -53,7 +53,8 @@ def run_model_spectrum(folder,config,output_dir):
             output_dir=out/('Modal_'+axis),
             story_nodes=modal_response_nodes(data))
         modal.update(limit_state=state,model_sha256=model_signature,implementation_sha256=source_signature,modal_numeric_sha256=numeric_signature)
-        cache=folder/'OpenSees_Analysis_Results'/('Modal_'+state+('' if __import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')=='AS_CONFIGURED' else '_'+__import__('os').environ['OPENSEES_GRAVITY_PROFILE']));cache.mkdir(parents=True,exist_ok=True)
+        from components.inputs.project_workbooks import analysis_output_folder
+        cache=analysis_output_folder(folder,state)/('Modal_'+state+('' if __import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')=='AS_CONFIGURED' else '_'+__import__('os').environ['OPENSEES_GRAVITY_PROFILE']));cache.mkdir(parents=True,exist_ok=True)
         from OpenSees_Timing_V130 import StageTimer
         cache_timer=StageTimer(cache,'MRSM modal reference cache export')
         (cache/'NBC105_Modal_V111.json').write_text(json.dumps(modal,indent=2),encoding='utf-8')
@@ -226,10 +227,11 @@ def launch(parent,folder):
             def worker():
                 try:
                     append('[BATCH PLAN] '+', '.join(states)+'; each state runs X and Y, centered and +/-5% eccentricity.\n')
+                    from components.inputs.project_workbooks import analysis_output_folder
                     for state in states:
                         if board.get("cancelled"):break
                         append('[STATE START] '+state+' | gravity/preload, eigenanalysis, modal RSA, CQC, force scaling, drift and export.\n')
-                        current=dict(cfg,limit_state=state,gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'));out=output/('MRSM_'+state+('' if current['gravity_profile']=='AS_CONFIGURED' else '_'+current['gravity_profile']));out.mkdir(parents=True,exist_ok=True);path=out/'MRSM_Config_V132.json';path.write_text(json.dumps(current,indent=2),encoding='utf-8')
+                        current=dict(cfg,limit_state=state,gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'));out=analysis_output_folder(folder,state)/('MRSM_'+state+('' if current['gravity_profile']=='AS_CONFIGURED' else '_'+current['gravity_profile']));out.mkdir(parents=True,exist_ok=True);path=out/'MRSM_Config_V132.json';path.write_text(json.dumps(current,indent=2),encoding='utf-8')
                         script="import sys,json;sys.path.insert(0,"+repr(str(root))+");from OpenSees_Model_Response_Spectrum_V132 import run_model_spectrum;run_model_spectrum("+repr(str(Path(folder).resolve()))+",json.load(open("+repr(str(path.resolve()))+",encoding='utf-8')),"+repr(str(out.resolve()))+")"
                         with (out/'MRSM_Run_V132.log').open('w',encoding='utf-8') as stream:
                             proc=subprocess.Popen([sys.executable,'-u','-c',script],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})

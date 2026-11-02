@@ -8,12 +8,44 @@ __release__ = '134'
 from pathlib import Path
 import json
 import math
+import re
 
 CALCULATOR='NBC105_2025_Seismic_Calculator_ETABS_Direct Interaction - Copy.xlsx'
 SCALING='ULTIMATE LOAD  - NEPAL - 3 - BELT TRUSS, OUTRIGGER CAP TRUSS_NBC105_RS_Scaling.xlsx'
 
 
 SERVICE_SCALING='SERVICE LOAD  - NEPAL - 3 - BELT TRUSS, OUTRIGGER CAP TRUSS_NBC105_RS_Scaling_2.xlsx'
+
+def _source_edb_path(export_dir):
+    folder=Path(export_dir)
+    for name in ('OpenSees_Element_Connectivity.json','OpenSees_Section_Assignment_Audit.json'):
+        path=folder/name
+        if path.is_file():
+            value=json.loads(path.read_text(encoding='utf-8-sig')).get('source_edb')
+            if value:return str(value)
+    return ''
+
+
+def _model_floor(export_dir,source_edb=''):
+    for value in (Path(source_edb).stem,Path(export_dir).name):
+        match=re.search(r'(?i)(?:^|[-_\s])(\d{1,2})(?=[-_\s]+(?:BELT\s+TRUSS|OUTRIGGER))',value)
+        if match:return match.group(1)
+    return ''
+
+
+def analysis_output_folder(export_dir,limit_state='ULS'):
+    """Return a separate, source-identifiable result folder inside the shared results root."""
+    folder=Path(export_dir)
+    source_edb=_source_edb_path(folder)
+    stem=Path(source_edb).stem if source_edb else folder.name
+    floor=_model_floor(folder,source_edb)
+    state=str(limit_state).strip().upper()
+    state='ULS_SLS' if state in ('BOTH','ULS/SLS','ULS_SLS') else state
+    if state not in ('ULS','SLS','ULS_SLS'):raise ValueError('limit_state must be ULS, SLS, or Both')
+    slug=re.sub(r'[^A-Za-z0-9]+','_',stem).strip('_')[:72].rstrip('_') or 'ETABS_Model'
+    floor_label='Floor_'+floor if floor else 'Floor_Unspecified'
+    return folder/'OpenSees_Analysis_Results'/f'{state}_{floor_label}_{slug}'
+
 
 def _wall_aw_from_lines(height_m, lines):
     height=float(height_m)
@@ -44,13 +76,83 @@ def _wall_aw_from_lines(height_m, lines):
 
 def source_workbooks(root, export_dir,limit_state='ULS'):
     root=Path(root);export_dir=Path(export_dir)
-    search=[export_dir/'Project_Input_Workbooks',root/'Project_Input_Workbooks',Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
+    state=str(limit_state).strip().upper()
+    if state=='BOTH':state='ULS'
+    if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
+    search=[export_dir/'Project_Input_Workbooks',export_dir,root/'Project_Input_Workbooks',Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
     selected=export_dir/'NBC105_Workbook_Source.json'
     if selected.is_file():
         names=json.loads(selected.read_text(encoding='utf-8-sig'))
-        return [Path(p) for p in names.get('workbooks',[]) if Path(p).is_file()]
-    # Named files only: never take the newest workbook from another scenario.
-    return [next((d/name for d in search if (d/name).is_file()),None) for name in (CALCULATOR,SERVICE_SCALING if str(limit_state).upper()=='SLS' else SCALING)]
+        explicit=[Path(p) for p in names.get('workbooks',[]) if Path(p).is_file()]
+    else:explicit=[]
+
+    candidates=[]
+    for directory in search:
+        if directory.is_dir():
+            candidates.extend(path for path in directory.glob('*.xlsx') if path.is_file())
+    candidates=list(dict.fromkeys(explicit+candidates))
+    if explicit:
+        candidates=explicit
+    expected_edb=Path(_source_edb_path(export_dir)).stem.casefold()
+    expected_floor=_model_floor(export_dir,expected_edb)
+    state_tokens=('service','sls') if state=='SLS' else ('ultimate','uls')
+
+    def workbook_info(path):
+        try:
+            from openpyxl import load_workbook
+            wb=load_workbook(path,data_only=True,read_only=True)
+            sheets=set(wb.sheetnames)
+            source=''
+            if 'SCALING SUMMARY' in sheets:
+                source=str(wb['SCALING SUMMARY']['B4'].value or '').casefold()
+            wb.close()
+            return sheets,source
+        except (OSError,ValueError,KeyError):
+            return set(),''
+
+    records=[]
+    for path in candidates:
+        sheets,source=workbook_info(path)
+        if sheets:records.append((path,sheets,source))
+
+    calculator=next((path for path,sheets,_ in records
+                     if 'NBC Calculator' in sheets and
+                     (path.name==CALCULATOR or path in explicit)),None)
+    if calculator is None:
+        calculator=next((path for path,sheets,_ in records if 'NBC Calculator' in sheets),None)
+
+    scaling=[record for record in records if 'SCALING SUMMARY' in record[1]]
+    def score(record):
+        path,_,source=record
+        name=(path.stem+' '+source).casefold()
+        has_sls=any(token in name for token in ('service','sls'))
+        has_uls=any(token in name for token in ('ultimate','uls'))
+        if state=='SLS' and has_uls and not has_sls:
+            return -1
+        if state=='ULS' and has_sls and not has_uls:
+            return -1
+        if expected_floor and not re.search(
+                rf'(?i)(?:^|[-_\s]){re.escape(expected_floor)}(?=[-_\s.]|$)',name):
+            return -1
+        exact=int(bool(expected_edb) and expected_edb in source)
+        config_tokens=[token for token in ('belt','truss','outrigger','cap') if token in Path(expected_edb).stem.casefold()]
+        config_matches=sum(token in name for token in config_tokens)
+        return exact*100+config_matches*10+int(any(token in path.name.casefold() for token in state_tokens))
+
+    ranked=sorted(((score(record),record) for record in scaling),key=lambda item:item[0],reverse=True)
+    scaling_book=None
+    if ranked and ranked[0][0]>=0:
+        best=ranked[0][0]
+        matches=[record[0] for value,record in ranked if value==best]
+        if len(matches)==1:
+            scaling_book=matches[0]
+        elif explicit:
+            scaling_book=next((path for path in explicit if path in matches),None)
+    if scaling_book is None:
+        default_name=SERVICE_SCALING if state=='SLS' else SCALING
+        scaling_book=next((directory/default_name for directory in search
+                           if (directory/default_name).is_file()),None)
+    return [calculator,scaling_book]
 
 
 def import_project_inputs(root, export_dir,limit_state='ULS'):
@@ -94,6 +196,15 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                 from OpenSees_Complete_Export_V118 import _area_property
                 assignments=json.loads((folder/'OpenSees_Section_Assignment_Audit.json').read_text(encoding='utf-8-sig'))
                 area_rows={str(r.get('etabs_area_object')):r for r in assignments['area_assignments']}
+                assembled=folder/'OpenSees_Complete_Model_Data_V118.json'
+                shell_thickness={}
+                if assembled.is_file():
+                    model=json.loads(assembled.read_text(encoding='utf-8-sig'))
+                    for shell in model.get('shells',[]):
+                        if shell.get('category')=='SHEAR WALL':
+                            thickness=shell.get('properties',{}).get('thickness')
+                            if thickness is not None:
+                                shell_thickness.setdefault(str(shell.get('object')),float(thickness))
                 coords={n['opensees_node_tag']:n['coordinates_m'] for n in topo['node_map']}
                 base=min(p[2] for p in xyz);roof=max(p[2] for p in xyz);H=roof-base
                 levels=sorted({g['master_xyz'][2] for g in topo['rigid_diaphragm_groups'] if g['master_xyz'][2]>base+1e-6})
@@ -110,7 +221,13 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                     if dx>1e-6 and dy<1e-6:axis='X';along=0;across=1
                     elif dy>1e-6 and dx<1e-6:axis='Y';along=1;across=0
                     else:raise ValueError('Non-axis-aligned wall: directional projected properties need separate review.')
-                    thickness=_area_property(area_rows[str(e['etabs_object'])],{})['thickness']
+                    assignment=area_rows.get(str(e['etabs_object']),{})
+                    try:
+                        thickness=_area_property(assignment,{})['thickness']
+                    except (KeyError,TypeError,ValueError):
+                        thickness=shell_thickness.get(str(e['etabs_object']))
+                        if thickness is None or not math.isfinite(thickness) or thickness<=0:
+                            raise ValueError(f"Wall {e['etabs_object']} has no positive thickness in the source audit or assembled shell model.")
                     lines.setdefault((axis,round(q[0][across],6),thickness),[]).append((min(p[along] for p in q),max(p[along] for p in q)))
                 aw,segments=_wall_aw_from_lines(H,lines)
                 if not all(v>0 for v in aw.values()):raise ValueError('Both directions need recognized first-story walls.')
@@ -141,7 +258,9 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
             except Exception as exc:
                 notes.append('Live wall Aw reconstruction unavailable; imported workbook Aw remains a review input: '+str(exc))
     ray_name='NBC105_Rayleigh_Preliminary_V123'+('_SLS' if state=='SLS' else '')+'.json'
-    ray=folder/'OpenSees_Analysis_Results'/ray_name
+    ray=analysis_output_folder(folder,state)/ray_name
+    if not ray.is_file():
+        ray=folder/'OpenSees_Analysis_Results'/ray_name
     data=folder/'OpenSees_Complete_Model_Data_V118.json'
     if ray.is_file() and data.is_file():
         import hashlib
@@ -172,7 +291,10 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
 def populate(gui, root, folder):
     state=getattr(gui,'ls',getattr(gui,'limit_state',getattr(gui,'state',None)))
     state=state.get() if state is not None else 'ULS'
-    data=import_project_inputs(root,folder,state);v=data['values']
+    import_state='ULS' if str(state).strip().upper()=='BOTH' else state
+    data=import_project_inputs(root,folder,import_state);v=data['values']
+    if str(state).strip().upper()=='BOTH':
+        data['notes'].append('Both ULS and SLS selected; shared project/workbook inputs are sourced from the ULS case. State-specific Rayleigh results remain separate.')
     for key in ('soil','Z','I','awx','awy','rmu','omegau','omegas','period_factor','rayleigh_tx','rayleigh_ty'):
         var=getattr(gui,key,None)
         if var is not None and key in v:var.set(str(v[key]))

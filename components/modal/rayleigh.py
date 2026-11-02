@@ -28,7 +28,11 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     folder=Path(folder)
     state=str(limit_state).strip().upper()
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
-    out=Path(output_dir) if output_dir is not None else folder/'OpenSees_Analysis_Results'
+    if output_dir is not None:
+        out=Path(output_dir)
+    else:
+        from components.inputs.project_workbooks import analysis_output_folder
+        out=analysis_output_folder(folder,state)
     out.mkdir(parents=True,exist_ok=True)
     reference_fraction=float(reference_fraction)
     if not math.isfinite(reference_fraction) or reference_fraction<=0:raise ValueError('Reference fraction must be finite and positive.')

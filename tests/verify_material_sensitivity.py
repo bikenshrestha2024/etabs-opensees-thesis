@@ -22,10 +22,12 @@ from components.nonlinear_time_history.building_exploratory import (
 )
 from components.nonlinear_time_history.research_building_materials import (
     FRAME_OVERRIDE_TARGETS,
+    MATERIAL_PARAMETER_REFERENCES,
     brace_steel_parameters,
     validate_material_overrides,
     validate_frame_section_parameters,
 )
+from components.shared.case_status import CaseLedger, update_history_case
 
 
 class MaterialSensitivityTests(unittest.TestCase):
@@ -110,6 +112,35 @@ class MaterialSensitivityTests(unittest.TestCase):
             profile_for_config({"nonlinear_walls": False}),
             "LITERATURE_FRAME_NL_ELASTIC_WALL_V138",
         )
+
+    def test_brace_sensitivity_reference_disclaims_assumed_baseline(self):
+        fy = MATERIAL_PARAMETER_REFERENCES["brace.fy_mpa"]
+        self.assertEqual(fy["baseline_mpa"], 345.0)
+        self.assertIn("User-specified assumed", fy["baseline_basis"])
+        self.assertIn("not literature-reported", fy["candidate_basis"])
+        self.assertIn(
+            "OpenSees Steel01 Material documentation",
+            [reference["title"] for reference in fy["references"]],
+        )
+
+    def test_history_case_ledger_tracks_progress_and_only_confirms_logged_cases(self):
+        with tempfile.TemporaryDirectory() as folder:
+            ledger = CaseLedger(Path(folder) / "case-status.json",
+                                ["RSN001_XY", "RSN001_YX"])
+            case = update_history_case(
+                ledger, "[START] RSN001_XY: preparing transient analysis")
+            self.assertEqual(case, "RSN001_XY")
+            update_history_case(
+                ledger, "[PROGRESS] RSN001_XY: 5/10 steps, t=0.500s", case)
+            rows = {row["case"]: row for row in ledger.snapshot()}
+            self.assertEqual(rows["RSN001_XY"]["status"], "RUNNING")
+            self.assertIn("5/10", rows["RSN001_XY"]["stage"])
+            update_history_case(ledger, "[OK] RSN001_XY: steps=10, dt=0.1s")
+            ledger.finish_pending("Runner exited without completion")
+            rows = {row["case"]: row for row in ledger.snapshot()}
+            self.assertEqual(rows["RSN001_XY"]["status"], "COMPLETED")
+            self.assertIn("full-record coverage", rows["RSN001_XY"]["stage"])
+            self.assertEqual(rows["RSN001_YX"]["status"], "NOT COMPLETED")
 
     def test_explicit_building_overrides_accept_345_mpa_and_reject_bad_inputs(self):
         self.assertEqual(

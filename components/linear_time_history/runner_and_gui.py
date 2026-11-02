@@ -441,6 +441,7 @@ class LinearTimeHistoryGUI:
         self.damping = tk.StringVar(value="5.0"); self.p1 = tk.StringVar(); self.p2 = tk.StringVar()
         self.t1x = tk.StringVar(); self.t1y = tk.StringVar(); self.tnx = tk.StringVar(); self.tny = tk.StringVar()
         self.nmodes = tk.StringVar(value="20"); self.ls = tk.StringVar(value="ULS")
+        self._output_is_automatic=True
         self.torsion = tk.BooleanVar(value=True); self.running = False
         self.motion_mode = tk.StringVar(value=LTH_DEFAULT_MODE)
         self.x_scale = tk.StringVar(value="1.0")
@@ -461,7 +462,9 @@ class LinearTimeHistoryGUI:
         if not Path(self.model.get()).is_file():return
         try:
             from OpenSees_Linear_Autofill_V124 import populate_linear
-            if not self.output.get():self.output.set(str(Path(self.model.get()).parent/'OpenSees_Analysis_Results'))
+            if self._output_is_automatic:
+                from components.inputs.project_workbooks import analysis_output_folder
+                self.output.set(str(analysis_output_folder(Path(self.model.get()).parent,self.ls.get())))
             data=populate_linear(self,Path(self.model.get()).parent)
             self.log.insert('end','Project inputs refreshed: '+' '.join(data['notes'])+'\n')
         except Exception as exc:self.log.insert('end','Project autofill needs review: '+str(exc)+'\n')
@@ -470,7 +473,9 @@ class LinearTimeHistoryGUI:
         if kind == "file": value = filedialog.askopenfilename(title=title, parent=self.win, filetypes=[("CSV files", "*.csv"), ("Python files", "*.py"), ("All files", "*.*")])
         elif kind == "python": value = filedialog.askopenfilename(title=title, parent=self.win, filetypes=[("Python executable", "python.exe"), ("All files", "*.*")])
         else: value = filedialog.askdirectory(title=title, parent=self.win)
-        if value: variable.set(value)
+        if value:
+            variable.set(value)
+            if variable is self.output:self._output_is_automatic=False
 
     def _entry(self, parent, label, variable, browse=None):
         row = ttk.Frame(parent); row.pack(fill="x", pady=3)
@@ -518,6 +523,7 @@ class LinearTimeHistoryGUI:
             if var is self.ls: ttk.Combobox(grid, textvariable=var, values=("ULS", "SLS"), state="readonly", width=11).grid(row=i // 3, column=(i % 3) * 2 + 1, sticky="ew", padx=(0, 12))
             else: ttk.Entry(grid, textvariable=var, width=12).grid(row=i // 3, column=(i % 3) * 2 + 1, sticky="ew", padx=(0, 12))
         for c in range(6): grid.columnconfigure(c, weight=1 if c % 2 else 0)
+        ttk.Label(params,text="The ULS/SLS context is passed to the selected builder (which may apply implemented state-specific stiffness modifiers) and labels outputs; it does not load a second ETABS model or derive service-load combinations. With only a ULS export, an SLS-labelled run is not independently validated. Verify service loads, effective stiffness, periods and motion/scaling basis before treating it as an SLS result.",wraplength=1060,foreground="#9a3412").pack(anchor="w",fill="x",pady=(4,2))
         ttk.Checkbutton(params, text="Torsionally sensitive 3D structure (requires at least 3 orthogonal motion pairs)", variable=self.torsion).pack(anchor="w", pady=(5, 0))
         ttk.Label(params, text="T1 is from NBC §5.1 (lesser adopted period); Tn is the highest mode needed for 90% mass participation in each axis. Obtain/verify these in the Modal Analysis GUI. The chosen Rayleigh calibration periods and checked modal damping must keep all inspected modes ≤5%.", wraplength=1060, foreground="#8a3412").pack(anchor="w", pady=(5, 0))
         ttk.Label(root, text="Model requirement: use a 3D linear model with NBC §3.4 effective stiffness. `algorithm('Linear')` does not convert Concrete02/Steel02/forceBeamColumn fiber elements into linear elastic elements. Build walls (including openings), frame, diaphragms, supports, seismic mass, P-Delta effects, inherent mass eccentricity and completed NBC §5.2 gravity preload in the selected script. This runner freezes gravity with `ops.loadConst('-time', 0.0)`. It does not spectrum-match motions; scale factors must be checked against NBC §9.3.2.2 (0.33–3.0, same factor on both pair components). Your paired records are already matched; use 1.0 to retain them unchanged unless your verified matching workflow specifies otherwise. X-only mode is directional screening, not a substitute for paired 3D analysis.", wraplength=1060, foreground="#8a3412").pack(anchor="w", pady=(0, 8))
@@ -525,6 +531,8 @@ class LinearTimeHistoryGUI:
         ttk.Button(root,text='Refresh known project / modal parameters',command=self._refresh_known).pack(anchor='w',pady=(0,6))
         ttk.Checkbutton(root, text="RUN_LINEAR_TIME_HISTORY = True  —  enable execution (default False)", variable=self.execute).pack(anchor="w", pady=(0, 4))
         ttk.Button(root, text="Run NBC Linear Time-History Cases", command=self._run).pack(anchor="w", pady=(0, 8))
+        from components.shared.case_status import panel
+        self.case_board=panel(root)
         from OpenSees_Results_UI_V127 import history_viewer
         ttk.Button(root,text='Completed run graphs / Excel / unit audit',command=lambda:__import__('OpenSees_History_Results_V134').launch(self.win,self.output.get())).pack(anchor='w',pady=4)
         ttk.Button(root,text='Inspect all saved input records, responses and run logs',command=lambda:history_viewer(self.win,self.output.get())).pack(anchor='w',pady=4)
@@ -587,13 +595,19 @@ class LinearTimeHistoryGUI:
             if values["damping_ratio_percent"] > 5.0: raise ValueError("NBC 105:2025 §8.1.1: linear viscous damping cannot exceed 5%.")
             if values["modes_to_check"] < 1: raise ValueError("Check at least one eigenmode.")
             # Validate CSV and motion metadata before starting a long analysis.
-            _read_inputs(values)
+            motions,_stories = _read_inputs(values)
             out = Path(values["output_dir"]); out.mkdir(parents=True, exist_ok=True)
             from datetime import datetime
             scope='Trial' if values.get('preliminary_selection') else 'Suite'
             kind='NLTH' if 'Nonlinear' in type(self).__name__ else 'LTH'
             out=out/f"{kind}_{values['limit_state']}_{scope}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
             out.mkdir(parents=True,exist_ok=True);values['output_dir']=str(out)
+            from components.shared.case_status import CaseLedger
+            orientations=('X_ONLY',) if x_only else ('XY','YX')
+            self.case_board['ledger']=CaseLedger(
+                out/'Time_History_Case_Status_V151.json',
+                [f"{motion['pair_id']}_{orientation}"
+                 for motion in motions for orientation in orientations])
             cfg = out / "NBC105_Linear_Time_History_RunConfig_V115.json"
             from OpenSees_Timing_V130 import StageTimer
             timer=StageTimer(cfg.parent,"Time-history configuration export")
@@ -604,19 +618,28 @@ class LinearTimeHistoryGUI:
         except Exception as exc: messagebox.showerror("Input needs review", str(exc), parent=self.win)
 
     def _worker(self, python, cfg):
+        from components.shared.case_status import update_history_case
+        current_case=None
+        ledger=self.case_board.get('ledger')
         try:
             proc = subprocess.Popen([python, str(Path(__file__).resolve()), "--run", str(cfg)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1, env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
+            self.case_board['process']=proc
             log_path = Path(json.loads(cfg.read_text(encoding="utf-8"))["output_dir"]) / "NBC105_Linear_Time_History_Run_V115.log"
             with log_path.open("w", encoding="utf-8") as logfile:
                 for line in proc.stdout:
                     logfile.write(line); logfile.flush()
+                    current_case=update_history_case(ledger,line,current_case)
                     self.win.after(0, self._append_log, line)
                 code = proc.wait()
+                if ledger:ledger.finish_pending(
+                    'Runner exited with code '+str(code)+' without a confirmed [OK] record-completion line.')
                 end_line = f"\n{'[SUCCESS]' if code == 0 else '[FAILED]'} Process exit code {code}. Persistent log: {log_path}\n"
                 logfile.write(end_line); logfile.flush()
             self.win.after(0, self._append_log, end_line)
             if code==0:self.win.after(0,lambda:__import__("OpenSees_History_Results_V134").launch(self.win,log_path.parent))
-        except Exception as exc: self.win.after(0, self._append_log, f"[FAILED] {exc}\n")
+        except Exception as exc:
+            if ledger:ledger.finish_pending('Runner/logging failure: '+str(exc))
+            self.win.after(0, self._append_log, f"[FAILED] {exc}\n")
         finally: self.running = False
 
     def _append_log(self, line):

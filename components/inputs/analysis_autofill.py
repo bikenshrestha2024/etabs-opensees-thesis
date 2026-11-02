@@ -25,7 +25,8 @@ def populate_linear(gui, folder):
             if 'aw'+axis in v and 'rayleigh_t'+axis in v:
                 period=min(v.get('period_factor',1.25)*.075*H**.75/math.sqrt(v['aw'+axis]),v['rayleigh_t'+axis])
                 getattr(gui,'t1'+axis).set(f'{period:.9g}')
-    bases=[folder/'OpenSees_Analysis_Results',Path(gui.output.get())]
+    from components.inputs.project_workbooks import analysis_output_folder
+    bases=[analysis_output_folder(folder,gui.ls.get()),folder/'OpenSees_Analysis_Results',Path(gui.output.get())]
     candidates=[base/('Modal_'+gui.ls.get())/'NBC105_Modal_V111.json' for base in bases]+[base/f'NBC105_Modal_{gui.ls.get()}_V127.json' for base in bases]+[base/'NBC105_Modal_V111.json' for base in bases]
     existing=[path for path in candidates if path.is_file()]
     model_sha=hashlib.sha256(datafile.read_bytes()).hexdigest() if datafile.is_file() else None
@@ -82,9 +83,13 @@ def populate_available(gui,folder=None,role='linear_model_script'):
     folder=Path(folder or (Path(gui.model.get()).parent if hasattr(gui,'model') and gui.model.get() else r'D:/Thesis Opensees/Etabs Nodes Export'))
     try:
         old_output=gui.output.get() if hasattr(gui,'output') else ''
+        output_is_automatic=bool(getattr(gui,'_output_is_automatic',False))
+        if output_is_automatic and hasattr(gui,'output'):
+            from components.inputs.project_workbooks import analysis_output_folder
+            gui.output.set(str(analysis_output_folder(folder,gui.ls.get())))
         if not autoselect_inputs(gui,folder,role):
             if hasattr(gui,'model') and gui.model.get():populate_linear(gui,folder)
-        if old_output and hasattr(gui,'output'):gui.output.set(old_output)
+        if old_output and hasattr(gui,'output') and not output_is_automatic:gui.output.set(old_output)
         if hasattr(gui,'log') and hasattr(gui.log,'insert'):
             notes=getattr(gui,'project_input_audit',{}).get('notes',[])
             if role=='nonlinear_model_script':notes=notes+['Imported modal values are elastic baseline references; validate nonlinear initial stiffness and retain the calibration/readiness gate.']
@@ -99,7 +104,10 @@ def populate_site(app,folder=None):
     if hasattr(app,'omegas') and 'omegas' in v:app.omegas.set(str(v['omegas']))
     for target,source in [('soil','soil'),('z','Z'),('imp','I'),('rmu','rmu'),('omega','omegau'),('t1x','workbook_adopted_tx'),('t1y','workbook_adopted_ty')]:
         if source in v:getattr(app,target).set(str(v[source]))
-    state='ULS';modal=folder/'OpenSees_Analysis_Results'/('Modal_'+state)/'NBC105_Modal_V111.json'
+    state='ULS'
+    from components.inputs.project_workbooks import analysis_output_folder
+    modal=analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
+    if not modal.is_file():modal=folder/'OpenSees_Analysis_Results'/('Modal_'+state)/'NBC105_Modal_V111.json'
     if modal.is_file():
         result=json.loads(modal.read_text(encoding='utf-8-sig'))
         for axis in ('X','Y'):
