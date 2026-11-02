@@ -12,11 +12,50 @@ from openpyxl import Workbook
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 
-from components.inputs.project_workbooks import _wall_aw_from_lines, import_project_inputs
+from components.inputs.project_workbooks import (
+    _wall_aw_from_lines, analysis_output_folder, import_project_inputs, populate,
+)
 from components.modal.analysis import nbc105_period_estimate
 
 
 class NBC105PeriodTests(unittest.TestCase):
+    def test_analysis_output_folder_identifies_source_state_and_floor(self):
+        with tempfile.TemporaryDirectory(dir=ROOT/'tests',prefix='output_folder_fixture_') as tmp:
+            folder=Path(tmp)/'OpenSees_Export'
+            folder.mkdir()
+            (folder/'OpenSees_Element_Connectivity.json').write_text(json.dumps({
+                'source_edb':r'D:\Thesis\ETABS\ULTIMATE LOAD - NEPAL - 3 - BELT TRUSS, OUTRIGGER CAP TRUSS.EDB'
+            }),encoding='utf-8')
+            self.assertEqual(
+                analysis_output_folder(folder,'ULS'),
+                folder/'OpenSees_Analysis_Results'/'ULS_Floor_3_ULTIMATE_LOAD_NEPAL_3_BELT_TRUSS_OUTRIGGER_CAP_TRUSS',
+            )
+            self.assertIn('SLS_Floor_3_',str(analysis_output_folder(folder,'SLS')))
+
+    def test_both_state_populates_shared_inputs_from_uls_workbook(self):
+        with tempfile.TemporaryDirectory(dir=ROOT/'tests',prefix='both_workbook_fixture_') as tmp:
+            folder=Path(tmp)
+            workbook_path=folder/'scaling.xlsx'
+            workbook=Workbook()
+            workbook.active.title='SCALING SUMMARY'
+            workbook['SCALING SUMMARY']['B14']=1.25
+            workbook['SCALING SUMMARY']['B15']=1.5
+            workbook.save(workbook_path)
+            (folder/'NBC105_Workbook_Source.json').write_text(
+                json.dumps({'workbooks':[str(workbook_path)]}),encoding='utf-8')
+
+            class Variable:
+                def __init__(self,value):self.value=value
+                def get(self):return self.value
+                def set(self,value):self.value=value
+
+            gui=types.SimpleNamespace(state=Variable('Both'),direction=Variable('X'))
+            result=populate(gui,ROOT,folder)
+            self.assertEqual(result['values']['awx'],1.25)
+            self.assertEqual(result['values']['awy'],1.5)
+            self.assertTrue(any('shared project/workbook inputs are sourced from the ULS case' in note
+                                for note in result['notes']))
+
     def test_wall_aw_uses_each_contiguous_net_segment_length(self):
         area,segments=_wall_aw_from_lines(10.,{
             ('X',2.,.3):[(0.,1.),(1.,2.),(4.,7.)],
@@ -130,9 +169,6 @@ class NBC105PeriodTests(unittest.TestCase):
             ledger.write_text('story,height_m\\n1,3\\n',encoding='utf-8')
             model_hash=hashlib.sha256(model.read_bytes()).hexdigest()
             ledger_hash=hashlib.sha256(ledger.read_bytes()).hexdigest()
-            output=folder/'OpenSees_Analysis_Results'
-            output.mkdir()
-
             def save(state,period,aw_x=2.,aw_y=3.):
                 payload={
                     'method_version':125,'limit_state':state,
@@ -141,6 +177,8 @@ class NBC105PeriodTests(unittest.TestCase):
                     'Y':{'period_s':period+1.,'Aw_m2':aw_y},
                 }
                 name='NBC105_Rayleigh_Preliminary_V123'+('_SLS' if state=='SLS' else '')+'.json'
+                output=analysis_output_folder(folder,state)
+                output.mkdir(parents=True,exist_ok=True)
                 (output/name).write_text(json.dumps(payload),encoding='utf-8')
 
             save('ULS',1.1)

@@ -151,6 +151,7 @@ class ModalAuditGUI:
         self.model = tk.StringVar()
         self.python = tk.StringVar(value=sys.executable)
         self.output = tk.StringVar(value=str(Path.cwd()))
+        self._output_is_automatic=True
         self.nmodes = tk.StringVar(value="40")
         self.solver = tk.StringVar(value="PythonSparse")
         self.limit_state=tk.StringVar(value='ULS')
@@ -266,7 +267,7 @@ class ModalAuditGUI:
 
     def _pick_output(self):
         p = filedialog.askdirectory(parent=self.root)
-        if p: self.output.set(p)
+        if p:self._output_is_automatic=False;self.output.set(p)
 
     def _run(self):
         try:
@@ -292,6 +293,7 @@ class ModalAuditGUI:
         except Exception as exc:
             messagebox.showerror("Modal audit inputs", str(exc), parent=self.root); return
         states=('ULS','SLS') if self.limit_state.get()=='Both' else (self.limit_state.get(),)
+        from components.inputs.project_workbooks import analysis_output_folder
         from components.shared.case_status import CaseLedger
         ledger=CaseLedger(output/"Modal_Batch_Status_V151.json",states);self.case_board["ledger"]=ledger;self.case_board["cancelled"]=False
         base_output=output
@@ -303,7 +305,8 @@ class ModalAuditGUI:
                 for state in states:
                     if self.case_board.get("cancelled"):break
                     ledger.set(state,"RUNNING","Stage 1/3: model and gravity preload")
-                    output=base_output/('Modal_'+state);output.mkdir(parents=True,exist_ok=True)
+                    state_output=analysis_output_folder(model.parent,state) if self._output_is_automatic else base_output
+                    output=state_output/('Modal_'+state);output.mkdir(parents=True,exist_ok=True)
                     self.root.after(0,lambda state=state,output=output:self.status.set(f'Running {state} stiffness case: stage 1/3: rebuild + gravity preload; stage 2/3: solve {n} modes with {solver}; stage 3/3: mass participation, period comparison and export. Results: {output}'))
                     source=_runner_source(model,output,n,solver,period_inputs,mode_x,mode_y,state)
                     runner=output/'_run_nbc105_modal_v111.py'
@@ -329,9 +332,9 @@ class ModalAuditGUI:
                         (output/'NBC105_Modal_V111.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
                         export_warnings = _export_plot_and_excel(result, output)
                         import shutil
-                        shutil.copy2(output/'NBC105_Modal_V111.json',base_output/f'NBC105_Modal_{state}_V127.json')
+                        shutil.copy2(output/'NBC105_Modal_V111.json',state_output/f'NBC105_Modal_{state}_V127.json')
                         # Keep legacy latest-result readers working, with explicit case metadata.
-                        shutil.copy2(output/'NBC105_Modal_V111.json',base_output/'NBC105_Modal_V111.json')
+                        shutil.copy2(output/'NBC105_Modal_V111.json',state_output/'NBC105_Modal_V111.json')
                         msg = (f"Finished {state}: {len(result.get('rows',[]))} eigenmodes. UX cumulative={result['cumulative_UX_percent']:.3f}%; UY cumulative={result['cumulative_UY_percent']:.3f}%. Modal mass coverage is not a section design PASS. "
                                f"Review CSV/JSON/TXT outputs and log in {output}.")
                         if export_warnings:

@@ -16,6 +16,7 @@ class MappingGUI:
         outer=scrollable_form(self.win,min_width=1180)
         ttk.Label(outer,text='ETABS properties and individual OpenSees elements',font=('Segoe UI',15,'bold')).pack(anchor='w')
         ttk.Label(outer,text='Select a property group, source object or individual solver segment. Candidate device selections preserve the elastic baseline until the scenario is activated.').pack(anchor='w')
+        ttk.Label(outer,text='Mapping meaning: KEEP_SOURCE_ELASTIC uses the exported ETABS E, G, A, Iy, Iz and J in an OpenSees elasticBeamColumn (with the configured stiffness modifiers); it does not create an OpenSees nonlinear material. RC fiber mappings are candidate overrides and take effect only in a rebuilt nonlinear model with the mapped scenario active. Nonlinear wall materials are configured separately in the wall-material/model settings.',wraplength=1150,foreground='#8a3412',justify='left').pack(anchor='w',pady=(3,5))
         tools=ttk.Frame(outer);tools.pack(fill='x',pady=5)
         self.category=tk.StringVar(value='All');self.search=tk.StringVar();self.target=tk.StringVar(value='KEEP_SOURCE_ELASTIC')
         ttk.Combobox(tools,textvariable=self.category,values=('All','BRACE','SHEAR WALL','FLOOR','BEAM','COLUMN'),state='readonly',width=17).pack(side='left')
@@ -134,8 +135,26 @@ class MappingGUI:
             owner=next((r['key'] for r in self.data['solver_elements'] if key==f"SOLVER:{r['solver_tag']}"),key)
             r=self.bykey.get(owner,{})
             prop=next((p for p in self.data['properties'] if p['property']==r.get('property') and p['category']==r.get('category')), {})
-            self.details.insert('end',json.dumps(dict(element=r,source_properties=prop),indent=2,ensure_ascii=False)+'\n')
-        self.details.insert('end','\nNumeric source properties are imported. RC template confinement and device parameters are not automatically calibrated. Select a formulation and open its reference; see Excel Library parameters for value-level status.')
+            target=r.get('target','KEEP_SOURCE_ELASTIC')
+            active=bool(self.data.get('selections',{}).get('active'))
+            if r.get('dimension')=='line_2_node' and target=='KEEP_SOURCE_ELASTIC':
+                implementation=('Elastic run: source E/G/A/Iy/Iz/J are passed directly to elasticBeamColumn; '
+                                'there is no uniaxial material tag. Nonlinear run: this target supplies no fiber '
+                                'section, so a separate nonlinear section mapping is required.')
+            elif r.get('dimension')=='line_2_node' and target in ('FVD_MAXWELL','BRB_STEEL02'):
+                implementation=('Candidate device replacement. It is consumed only by a nonlinear build when '
+                                'the mapped scenario is active and calibrated device parameters pass validation.')
+            elif r.get('dimension')=='line_2_node':
+                implementation=('Nonlinear fiber-section candidate: '+('active' if active else 'saved but inactive')+
+                                '. It does not change the elastic ETABS-source beam-column.')
+            elif r.get('category')=='SHEAR WALL':
+                implementation=('Wall shell material/element assignment is controlled by the separate nonlinear '
+                                'wall configuration; this element-map target is not a wall material assignment.')
+            else:
+                implementation='Elastic shell properties are taken from the assembled source payload; this mapping target does not assign a nonlinear material.'
+            self.details.insert('end',json.dumps(dict(element=r,source_properties=prop,effective_builder=implementation,
+                                                       mapped_scenario_active=active),indent=2,ensure_ascii=False)+'\n')
+        self.details.insert('end','\nETABS section names/properties are source identifiers, not automatic nonlinear constitutive materials. Review the exported material/section mapping and rebuild the intended model before analysis.')
 
     def draw_source(self):
         from mpl_toolkits.mplot3d.art3d import Line3DCollection

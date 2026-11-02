@@ -17,6 +17,7 @@ def prepare(model_script,template=None):
 def available_evidence(model_script):
     """Inventory saved facts; presence never certifies review or calibration."""
     model=Path(model_script).resolve();folder=model.parent;out=folder/'OpenSees_Analysis_Results';result={}
+    from components.inputs.project_workbooks import analysis_output_folder
     def add(key,paths,note):
         found=[str(p.resolve()) for p in paths if p.is_file()]
         if found:result[key]='AVAILABLE FOR REVIEW: '+note+' | '+'; '.join(found)
@@ -26,7 +27,11 @@ def available_evidence(model_script):
     add('seismic_mass_reconciled_to_etabs_by_storey',[folder/'OpenSees_Complete_Model_Data_V118.json'],'nodal mass inventory; independent ETABS reconciliation required')
     add('support_conditions_and_foundation_assumptions_reviewed',[folder/'OpenSees_Source_Model_Metadata_V118.json'],'exported restraints; foundation assumptions not certified')
     add('p_delta_and_gravity_preload_completed',[folder/'OpenSees_Complete_Gravity_Check_V118.json'],'saved gravity result; verify nonlinear model identity and P-Delta basis')
-    add('modal_periods_modes_and_mass_participation_reviewed',[out/'Modal_ULS/NBC105_Modal_V111.json',out/'Modal_SLS/NBC105_Modal_V111.json'],'saved elastic modal results; not nonlinear initial-stiffness validation')
+    add('modal_periods_modes_and_mass_participation_reviewed',[
+        analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
+        for state in ('ULS','SLS')
+    ]+[out/'Modal_ULS/NBC105_Modal_V111.json',out/'Modal_SLS/NBC105_Modal_V111.json'],
+        'saved elastic modal results; not nonlinear initial-stiffness validation')
     add('brace_fvd_brb_case_matches_selected_scenario',[folder/'OpenSees_Complete_Model_Config_V118.json'],'configuration available; scenario needs review')
     add('slab_and_diaphragm_idealization_compatible',[folder/'OpenSees_Complete_Model_Config_V118.json',folder/'LOAD_PATH_AND_DIAPHRAGM_AUDIT_V130.json'],'configured slab modifiers and constraints; compatibility needs engineering review')
     add('is16700_initial_pdelta_plus_minus_cases_completed',list(out.glob('*PDelta*.json')),'saved files only; verify both signed cases and convergence')

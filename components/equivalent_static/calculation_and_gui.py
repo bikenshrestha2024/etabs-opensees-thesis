@@ -18,6 +18,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 HERE=Path(__file__).resolve().parent
+from components.inputs.project_workbooks import analysis_output_folder
 try:
     from NBC105_Analysis_Settings_V109 import (
         NBC105_ESM_SYSTEM_FACTORS, calculate_esm,
@@ -298,7 +299,9 @@ class ESMGui:
         export_dir=Path(sys.argv[1]) if len(sys.argv)>1 and Path(sys.argv[1]).is_dir() else Path(r"D:\Thesis Opensees\Etabs Nodes Export")
         self.export_dir=export_dir
         story_csv=export_dir/"NBC105_ESM_Story_Weights_Input_V108.csv"
-        self.path=tk.StringVar(value=str(story_csv) if story_csv.is_file() else ""); self.outdir=tk.StringVar(value=str(export_dir if export_dir.is_dir() else HERE))
+        self.path=tk.StringVar(value=str(story_csv) if story_csv.is_file() else "")
+        self.outdir=tk.StringVar(value=str(analysis_output_folder(export_dir,'Both')))
+        self._output_is_automatic=True
         self.state=tk.StringVar(value="Both"); self.soil=tk.StringVar(value="D")
         self.T=tk.StringVar(value=""); self.Z=tk.StringVar(value="")
         self.location=tk.StringVar(value=""); self.z_source=tk.StringVar(value="Annex C municipality table")
@@ -323,6 +326,7 @@ class ESMGui:
         from OpenSees_Complete_Export_V118 import autoselect_inputs
         autoselect_inputs(self, export_dir, 'modal_model_script')
         self._load_project_inputs()
+        self.state.trace_add('write',lambda *_:self._state_changed())
         self.direction.trace_add('write',lambda *_: self._direction_changed())
         self.root.after(250,lambda:self._read_etabs_periods(show_error=False))
 
@@ -408,7 +412,7 @@ class ESMGui:
         ttk.Button(runbox,text="Browse…",command=self._browse_python).grid(row=1,column=2,padx=4)
         runbox.columnconfigure(1,weight=1)
         ttk.Label(runbox,text="The runner starts a fresh Python process and builds the model. Before NBC ESM it requires the model builder to attest that both IS 16700:2023 §7.2(d) initial P-Delta cases converged and were reviewed (1.2DL + 0.5IL ± 1.5EL/WL). It then freezes the reviewed gravity state, checks diaphragm masters, applies NBC floor forces/torsion, and reports reactions, drift and storey stiffness. This prerequisite does not replace NBC §3.6 combinations; a partial topology exporter is not a complete analysis model.",foreground="#8a341c",wraplength=1100).grid(row=2,column=0,columnspan=3,sticky="w",padx=5,pady=4)
-        out=ttk.LabelFrame(top,text="6. Output folder (same folder as ETABS exports by default)",padding=8); out.pack(fill="x",pady=5)
+        out=ttk.LabelFrame(top,text="6. Output folder (model/state/floor-specific default under OpenSees_Analysis_Results)",padding=8); out.pack(fill="x",pady=5)
         ttk.Entry(out,textvariable=self.outdir).pack(side="left",fill="x",expand=True,padx=4); ttk.Button(out,text="Browse…",command=self._browse_out).pack(side="left",padx=4)
         from OpenSees_Research_UI_V123 import copyable_log
         self.run_log=copyable_log(top,self.status)
@@ -430,8 +434,14 @@ class ESMGui:
             window=tk.Toplevel(self.root);window.title('NBC force profiles | Matplotlib');window.geometry('1250x850');window._esm_output_folder=self.outdir.get();__import__('OpenSees_Case_Selection_V134').profiles(window,figures)
         except Exception as exc:messagebox.showerror('Result plots',str(exc))
 
+    def _state_changed(self):
+        if self._output_is_automatic:
+            self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get())))
+        self._load_project_inputs()
+
     def _load_project_inputs(self):
         try:
+            self.rayleigh_tx.set('');self.rayleigh_ty.set('')
             from OpenSees_Project_Inputs_V123 import populate
             data=populate(self,HERE,self.export_dir)
             from OpenSees_ETABS_Periods_V125 import populate as period_references
@@ -440,7 +450,8 @@ class ESMGui:
             for key,r in refs.items():
                 if isinstance(r,dict) and 'value' in r:data['audit'].append(dict(field='period_reference_'+key,value=r['value'],source=r['source'],sheet=r['sheet'],cell=r['cell']))
             from openpyxl import Workbook
-            out=Path(self.outdir.get());out.mkdir(exist_ok=True,parents=True)
+            out=analysis_output_folder(self.export_dir,rayleigh_state) if self._output_is_automatic else Path(self.outdir.get())
+            out.mkdir(exist_ok=True,parents=True)
             (out/'NBC105_Input_Provenance_V123.json').write_text(json.dumps(data,indent=2),encoding='utf-8')
             wb=Workbook();ws=wb.active;ws.title='Imported inputs';ws.append(['Field','Value','Workbook/result file','Sheet','Cell'])
             for row in data['audit']:ws.append([row[k] for k in ['field','value','source','sheet','cell']])
@@ -490,7 +501,8 @@ class ESMGui:
             awx=float(self.awx.get());awy=float(self.awy.get())
             if min(awx,awy)<=0:raise ValueError('Import and review positive directional wall indices first.')
             script=HERE/'OpenSees_Rayleigh_Preliminary_V123.py'
-            command=[self.python_exe.get(),str(script),str(self.export_dir),str(awx),str(awy)]
+            rayleigh_state='ULS' if self.state.get()=='Both' else self.state.get()
+            command=[self.python_exe.get(),str(script),str(self.export_dir),str(awx),str(awy),'.01',rayleigh_state]
             out=Path(self.outdir.get());out.mkdir(parents=True,exist_ok=True)
             self.status.set('Running empirical-shape reference loads and Rayleigh calculations for X and Y…')
             def worker():
@@ -512,10 +524,13 @@ class ESMGui:
             self.rmu.set(str(factors[0])); self.omegau.set(str(factors[1])); self.omegas.set(str(factors[2]))
     def _browse(self):
         p=filedialog.askopenfilename(title="Select a verified NBC 105 story-weight CSV",initialdir=self.outdir.get(),filetypes=[("CSV","*.csv"),("All files","*.*")])
-        if p: self.path.set(p); self.outdir.set(str(Path(p).parent)); self._load_story_metadata(p)
+        if p:
+            self.path.set(p);self._output_is_automatic=True
+            self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get())))
+            self._load_story_metadata(p)
     def _browse_out(self):
         p=filedialog.askdirectory(title="Select output folder",initialdir=self.outdir.get())
-        if p: self.outdir.set(p)
+        if p:self._output_is_automatic=False;self.outdir.set(p)
     def _browse_model(self):
         p=filedialog.askopenfilename(title="Select complete OpenSeesPy model builder",initialdir=self.outdir.get(),filetypes=[("Python script","*.py"),("All files","*.*")])
         if p: self.model_script.set(p)
@@ -686,7 +701,8 @@ class ESMGui:
                     for polarity in polarities:
                         for ecc_sign in ecc_signs:
                             breadth=(bdim,ecc_sign)
-                            output_paths=write_outputs(self.path.get(),rows,result,self.direction.get(),polarity,self.include_torsion.get(),breadth,self.outdir.get(),self.model_script.get())
+                            state_outdir=analysis_output_folder(self.export_dir,state) if self._output_is_automatic else Path(self.outdir.get())
+                            output_paths=write_outputs(self.path.get(),rows,result,self.direction.get(),polarity,self.include_torsion.get(),breadth,state_outdir,self.model_script.get())
                             made.extend(output_paths); self.last_runners.append(str(output_paths[2]))
                             summaries.append(f"{state} {self.direction.get()}{'+' if polarity>0 else '-'} E{('+' if ecc_sign>0 else '-') if self.include_torsion.get() and ecc_sign else '0'}: V={result['base_shear_kN']:.3f} kN, k={result['period_exponent_k']:.4f}")
                 except Exception as state_exc:
@@ -737,6 +753,3 @@ class ESMGui:
 def main():
     root=tk.Tk(); ESMGui(root); root.mainloop()
 if __name__=="__main__": main()
-
-
-

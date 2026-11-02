@@ -6,10 +6,12 @@ GUIDE='Export ETABS tables for the SAME model, mass source, effective stiffness,
 
 def collect(folder):
  folder=Path(folder);root=folder/'OpenSees_Analysis_Results';rows=[]
+ from components.inputs.project_workbooks import analysis_output_folder
  def add(method,state,case,axis,loc,metric,unit,basis,value,file):
   if value is not None and math.isfinite(float(value)):rows.append(dict(method=method,limit_state=state,case=case,axis=axis,location=str(loc),metric=metric,unit=unit,basis=basis,value=float(value),source_file=str(file)))
  for state in ('ULS','SLS'):
-  p=root/('Modal_'+state)/'NBC105_Modal_V111.json'
+  p=analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
+  if not p.is_file():p=root/('Modal_'+state)/'NBC105_Modal_V111.json'
   if p.exists():
    d=json.loads(p.read_text(encoding='utf-8-sig'))
    for r in d.get('rows',[]):add('MODAL',state,'MODAL','',r['mode'],'period','s','eigen',r['period_s'],p)

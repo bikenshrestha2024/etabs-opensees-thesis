@@ -738,6 +738,7 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
         for n,vector in values.items(): ops.load(int(n),*vector)
     if preload:
         from OpenSees_Analysis_Stack_V110 import run_gravity_stage
+        from components.inputs.project_workbooks import analysis_output_folder
         gravity_system_options = ('-piv',) if gravity_system == 'SparseGeneral' else ()
         diagnostic_path = folder / ('Gravity_Failure_Diagnostics_' + limit_state + '.json')
         print('[GRAVITY SOLVER]', gravity_system,
@@ -752,7 +753,7 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             diagnostic_path=diagnostic_path,
             element_labels=element_labels,
             adaptive=research_profile=='LITERATURE_BUILDING_NL_V161',
-            response_output_dir=folder/'OpenSees_Analysis_Results'/(
+            response_output_dir=analysis_output_folder(folder,limit_state)/(
                 'Gravity_Response_'+limit_state+'_'+mode+'_'+
                 str(research_profile or 'STANDARD')),
             story_masters=[
@@ -780,9 +781,18 @@ def autoselect_inputs(gui, export_dir, role):
     if not model.is_file(): return False
     variable=getattr(gui,'model_var',None) or getattr(gui,'model',None) or getattr(gui,'model_script',None)
     if getattr(variable,'get',lambda:None)()!=str(model):variable.set(str(model))
+    state='ULS'
+    for attr in ('ls','limit_state','state'):
+        variable=getattr(gui,attr,None)
+        if variable is not None:
+            value=str(variable.get()).strip().upper()
+            state='ULS' if value=='BOTH' else value
+            break
+    from components.inputs.project_workbooks import analysis_output_folder
+    output_folder=analysis_output_folder(folder,state)
     for attr in ('output_var','output','outdir'):
         var=getattr(gui,attr,None)
-        if var is not None: var.set(str(folder/'OpenSees_Analysis_Results'))
+        if var is not None: var.set(str(output_folder))
     for attr,key in (('stories','story_master_csv'),('readiness','readiness_manifest')):
         var=getattr(gui,attr,None); target=folder/manifest.get(key,'')
         draft=folder/('OpenSees_Model_Readiness_Draft_'+model.stem+'_V134.json')

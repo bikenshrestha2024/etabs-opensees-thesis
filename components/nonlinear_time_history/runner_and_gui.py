@@ -553,6 +553,7 @@ class NonlinearTimeHistoryGUI:
         self.damping = tk.StringVar(value="5.0"); self.p1 = tk.StringVar(); self.p2 = tk.StringVar()
         self.t1x = tk.StringVar(); self.t1y = tk.StringVar(); self.tnx = tk.StringVar(); self.tny = tk.StringVar()
         self.nmodes = tk.StringVar(value="20"); self.ls = tk.StringVar(value="ULS")
+        self._output_is_automatic=True
         self.torsion = tk.BooleanVar(value=True); self.running = False
         self.motion_mode = tk.StringVar(value=LTH_DEFAULT_MODE)
         self.x_scale = tk.StringVar(value="1.0")
@@ -571,7 +572,9 @@ class NonlinearTimeHistoryGUI:
         if kind == "file": value = filedialog.askopenfilename(title=title, parent=self.win, filetypes=[("CSV files", "*.csv"), ("Python files", "*.py"), ("All files", "*.*")])
         elif kind == "python": value = filedialog.askopenfilename(title=title, parent=self.win, filetypes=[("Python executable", "python.exe"), ("All files", "*.*")])
         else: value = filedialog.askdirectory(title=title, parent=self.win)
-        if value: variable.set(value)
+        if value:
+            variable.set(value)
+            if variable is self.output:self._output_is_automatic=False
 
     def _entry(self, parent, label, variable, browse=None):
         row = ttk.Frame(parent); row.pack(fill="x", pady=3)

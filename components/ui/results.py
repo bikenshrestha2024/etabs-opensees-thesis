@@ -71,13 +71,38 @@ def modal_classification(row):
 def modal_results(parent,folder):
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg,NavigationToolbar2Tk
-    folder=Path(folder);win=tk.Toplevel(parent);win.title('Modal audit results — ULS / SLS');win.geometry('1160x760')
+    folder=Path(folder)
+    from components.inputs.project_workbooks import analysis_output_folder
+    export_folder=next((path for path in (folder,*folder.parents)
+                        if (path/'OpenSees_Element_Connectivity.json').is_file()),None)
+    def modal_path(state):
+        candidates=[]
+        if export_folder is not None:
+            state_folder=analysis_output_folder(export_folder,state)
+            candidates.extend((state_folder/('Modal_'+state)/'NBC105_Modal_V111.json',
+                               state_folder/f'NBC105_Modal_{state}_V127.json',
+                               state_folder/'NBC105_Modal_V111.json'))
+        candidates.extend((folder/('Modal_'+state)/'NBC105_Modal_V111.json',
+                           folder/f'NBC105_Modal_{state}_V127.json',
+                           folder/'NBC105_Modal_V111.json'))
+        legacy_root=(export_folder or folder)/'OpenSees_Analysis_Results'
+        candidates.extend((legacy_root/('Modal_'+state)/'NBC105_Modal_V111.json',
+                           legacy_root/f'NBC105_Modal_{state}_V127.json',
+                           legacy_root/'NBC105_Modal_V111.json'))
+        for path in candidates:
+            if path.is_file():
+                if path.name=='NBC105_Modal_V111.json' and path.parent==legacy_root:
+                    if json.loads(path.read_text(encoding='utf-8-sig')).get('limit_state','ULS')!=state:
+                        continue
+                return path
+        return candidates[0]
+    win=tk.Toplevel(parent);win.title('Modal audit results — ULS / SLS');win.geometry('1160x760')
     ttk.Button(win,text='Open ULS / SLS comparison chart',command=lambda:modal_comparison(win,folder)).pack(anchor='w')
     tabs=ttk.Notebook(win);tabs.pack(fill='both',expand=True)
     compare_frame=ttk.Frame(tabs);tabs.add(compare_frame,text='ULS / SLS comparison')
     compare_fig=Figure(figsize=(11,5),layout='constrained');compare_axes=compare_fig.subplots(1,2)
     for state,style in [('ULS','-'),('SLS','--')]:
-        reference=folder/('Modal_'+state)/'NBC105_Modal_V111.json'
+        reference=modal_path(state)
         if reference.is_file():
             records=json.loads(reference.read_text(encoding='utf-8-sig')).get('rows',[]);modes=[r['mode'] for r in records]
             compare_axes[0].plot(modes,[r['period_s'] for r in records],ls=style,label=state)
@@ -90,11 +115,7 @@ def modal_results(parent,folder):
     ttk.Button(compare_frame,text='Export comparison PNG',command=lambda:compare_fig.savefig(folder/'Modal_Comparison_V146.png',dpi=180)).pack(anchor='w')
     for state in ('ULS','SLS'):
         frame=ttk.Frame(tabs);tabs.add(frame,text=state+' modal audit')
-        path=folder/('Modal_'+state)/'NBC105_Modal_V111.json'
-        if not path.is_file():path=folder/f'NBC105_Modal_{state}_V127.json'
-        if not path.is_file():
-            legacy=folder/'NBC105_Modal_V111.json'
-            if legacy.is_file() and json.loads(legacy.read_text(encoding='utf-8-sig')).get('limit_state')==state:path=legacy
+        path=modal_path(state)
         if not path.is_file():ttk.Label(frame,text=f'No saved {state} modal result. Run this stiffness case to populate the tab.').pack();continue
         result=json.loads(path.read_text(encoding='utf-8-sig'));rows=result['rows']
         ttk.Label(frame,text=f'{state} | '+str(path)).pack(anchor='w')
