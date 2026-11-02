@@ -7,6 +7,7 @@ _CASE_START=re.compile(r'^\[START\]\s+([^:]+):')
 _CASE_PROGRESS=re.compile(
     r'^\[PROGRESS\]\s+([^:]+):\s+(\d+)/(\d+)\s+steps,\s+t=([\d.eE+-]+)s')
 _CASE_COMPLETE=re.compile(r'^\[OK\]\s+([^:]+):')
+_CASE_TRUNCATED=re.compile(r'^\[TRUNCATED\]\s+([^:]+):\s+analyzed\s+([\d.eE+-]+)s\s+of\s+([\d.eE+-]+)s')
 
 
 class CaseLedger:
@@ -48,6 +49,13 @@ def update_history_case(ledger,line,current_case=None):
    ledger.set(case,'RUNNING',
               f'Transient steps {step}/{total} ({percent:.1f}%), physical time {match.group(4)} s')
    return case
+ match=_CASE_TRUNCATED.search(line)
+ if match:
+  case=match.group(1).strip()
+  if case in ledger.rows:
+   ledger.set(case,'TRUNCATED',
+              f'Diagnostic interval {match.group(2)} s of {match.group(3)} s; not a full-record result')
+   return None
  match=_CASE_COMPLETE.search(line)
  if match:
   case=match.group(1).strip()

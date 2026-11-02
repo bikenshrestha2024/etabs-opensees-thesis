@@ -27,5 +27,15 @@ class V134Checks(unittest.TestCase):
         from OpenSees_Nonlinear_Time_History_NBC105_V116 import _require_nonlinear_readiness
         with tempfile.TemporaryDirectory(dir=ROOT/'tests') as t:
             f=Path(t);model=f/'model.py';model.write_text('# fixture',encoding='utf-8');path=prepare(model);d=json.loads(path.read_text());self.assertFalse(d['approved_for_nltha']);self.assertTrue(all(v is False for v in d['checks'].values()));d.update(model_script='model.py',approved_for_nltha=True,checks=dict.fromkeys(d['checks'],True));path.write_text(json.dumps(d));r=_require_nonlinear_readiness(dict(model_script=str(model),model_readiness_json=str(path)));self.assertEqual(r['model_script'],str(model.resolve()))
+    def test_nonlinear_trial_duration_is_capped_and_labeled(self):
+        from OpenSees_Nonlinear_Time_History_NBC105_V116 import _analysis_duration_s
+        motion={"x":[0.0]*101,"dt_x":0.01,"y":[0.0]*81,"dt_y":0.01}
+        self.assertEqual(_analysis_duration_s(motion,"XY",0.1),(0.1,1.0,"COMPLETED_TRUNCATED_TRIAL"))
+        self.assertEqual(_analysis_duration_s(motion,"YX",0.0),(1.0,1.0,"COMPLETED_FULL_RECORD"))
+        self.assertEqual(_analysis_duration_s(motion,"XY",5.0),(1.0,1.0,"COMPLETED_FULL_RECORD"))
+        self.assertEqual(_analysis_duration_s(motion,"X_ONLY",0.25),(0.25,1.0,"COMPLETED_TRUNCATED_TRIAL"))
+        for invalid in (-0.1,float("nan"),float("inf"),"bad"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                _analysis_duration_s(motion,"XY",invalid)
 
 if __name__=='__main__':unittest.main()
