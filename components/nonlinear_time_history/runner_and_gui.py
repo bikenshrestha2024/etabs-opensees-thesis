@@ -97,6 +97,28 @@ def _require_nonlinear_readiness(config):
     return {"path": str(path), "model_script": str(model), "check_count": len(keys)}
 
 
+def _analysis_duration_s(motion, orientation, requested_duration_s):
+    """Return analyzed and full record durations for a bounded diagnostic trial."""
+    try:
+        requested = float(requested_duration_s)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("trial_duration_s must be a finite number; use 0 for the full record.") from exc
+    if not math.isfinite(requested) or requested < 0:
+        raise ValueError("trial_duration_s must be finite and non-negative; use 0 for the full record.")
+    x_duration = (len(motion["x"]) - 1) * float(motion["dt_x"])
+    if orientation == "X_ONLY":
+        full_duration = x_duration
+    else:
+        y_duration = (len(motion["y"]) - 1) * float(motion["dt_y"])
+        full_duration = max(x_duration, y_duration)
+    if full_duration <= 0:
+        raise ValueError("Selected record has no positive duration.")
+    duration = full_duration if requested == 0 else min(requested, full_duration)
+    status = ("COMPLETED_TRUNCATED_TRIAL"
+              if duration < full_duration - 1e-10 else "COMPLETED_FULL_RECORD")
+    return duration, full_duration, status
+
+
 def _configure_nonlinear_transient(ops, algorithm="Newton", tolerance=1.0e-7, max_iterations=40,
                                    linear_solver="UmfPack"):
     if linear_solver not in LINEAR_SYSTEMS:
@@ -317,7 +339,8 @@ def _run_analysis(config):
                 # NBC §9.3.2.4 lists T1/100, Tn, and 0.01 s as independent
                 # upper bounds; the Tn term is not divided by 100.
                 dt = min(dt_record, t1 / 100.0, tn, 0.01)
-                duration = (len(motion["x"]) - 1) * motion["dt_x"] if orientation == "X_ONLY" else max((len(motion["x"]) - 1) * motion["dt_x"], (len(motion["y"]) - 1) * motion["dt_y"])
+                duration, full_record_duration, case_status = _analysis_duration_s(
+                    motion, orientation, config.get("trial_duration_s", 0.0))
                 nsteps = int(math.ceil(duration / dt))
                 # SECTION 18.4 — Nonlinear Newmark. NBC §9.3.2.4 keeps Tn as
                 # an independent step bound; it is not Tn/100.
@@ -366,6 +389,7 @@ def _run_analysis(config):
                 edge_peaks=export_history_checks(lines,stories,out,case,config['limit_state'],config['model_script'])
                 drift_limit = 0.025 if config["limit_state"] == "ULS" else 0.006
                 peak = {"case": case, "pair_id": motion["pair_id"], "field_type": motion.get("field_type", "Custom"), "orientation": orientation,
+                    "status": case_status, "full_record_duration_s": full_record_duration,
                     "scale_factor": motion["scale"], "acceleration_units": motion["units"], "record_dt_min_s": dt_record,
                     "analysis_dt_max_s": dt, "duration_s": duration, "requested_steps": nsteps,
                     "peak_roof_UX_m": max(abs(r[f"{stories[-1]['story_name']}_UX_m"]) for r in lines),
@@ -396,7 +420,10 @@ def _run_analysis(config):
                 profiler.add('case_exports_and_drift',phase_clock)
                 peak['performance']=profiler.finish()
                 records.append(peak)
-                print(f"[OK] {case}: steps={nsteps}, dt={dt:.6g}s, peak drifts X/Y={peak['peak_story_drift_X']:.6g}/{peak['peak_story_drift_Y']:.6g}", flush=True)
+                if case_status == "COMPLETED_TRUNCATED_TRIAL":
+                    print(f"[TRUNCATED] {case}: analyzed {duration:.6g}s of {full_record_duration:.6g}s; diagnostic only, not a full-record result", flush=True)
+                else:
+                    print(f"[OK] {case}: steps={nsteps}, dt={dt:.6g}s, full record={full_record_duration:.6g}s, peak drifts X/Y={peak['peak_story_drift_X']:.6g}/{peak['peak_story_drift_Y']:.6g}", flush=True)
             finally:
                 if stream is not None:stream.close()
                 if not profiler.complete:
@@ -462,6 +489,11 @@ def _run_analysis(config):
         "damping_target_percent": config["damping_ratio_percent"], "time_step_rule": "min(record digitization interval, T1/100, Tn, 0.01 s)",
         "member_action_rule": "Nonlinear inelastic deformation demands require material-standard limits under NBC 9.3.3.2. Do not divide nonlinear response actions by Rmu using the elastic-history rule. Component capacities and acceptance remain separately reviewed.",
         "records": records, "elapsed_seconds": time.perf_counter() - start}
+    summary["analysis_completion"] = (
+        "TRUNCATED_DIAGNOSTIC_TRIAL — not a completed record suite or design assessment"
+        if any(record["status"] == "COMPLETED_TRUNCATED_TRIAL" for record in records)
+        else "FULL_RECORDS_COMPLETED — model validation and design acceptance remain separate")
+    summary["trial_duration_requested_s"] = float(config.get("trial_duration_s", 0.0))
     (out / "NBC105_Nonlinear_Time_History_Summary_V116.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     # Optional overview plot and workbook; raw histories remain in CSV regardless.
     warnings = []
@@ -477,7 +509,9 @@ def _run_analysis(config):
             axes[i,1].bar(labels,[r['peak_story_drift_'+axis] for r in records],color='#bb4a55')
             axes[i,1].set(title='Peak interstorey drift '+axis,ylabel='drift ratio')
             for ax in axes[i]:ax.tick_params(axis='x',rotation=25,labelsize=7);ax.grid(axis='y',alpha=.25)
-        scope='PRELIMINARY' if config.get('preliminary_selection') else 'Selected suite'
+        scope=('TRUNCATED DIAGNOSTIC TRIAL' if any(
+            record["status"] == "COMPLETED_TRUNCATED_TRIAL" for record in records)
+            else 'PRELIMINARY' if config.get('preliminary_selection') else 'Selected suite')
         fig.suptitle(f"{config['limit_state']} | Nonlinear time history | {scope} | XY / YX")
         fig.savefig(out / "NBC105_Nonlinear_Time_History_V116.png", dpi=170); plt.close(fig)
         if config.get("motion_mode") == "X_ONLY_SCREENING":
@@ -533,7 +567,10 @@ def _run_analysis(config):
     except Exception as exc: warnings.append(f"Excel workbook unavailable: {exc}")
     summary['selected_pair_ids']=config.get('selected_pair_ids')
     summary['preliminary_selection']=bool(config.get('preliminary_selection',False))
-    summary['assessment_scope']='PRELIMINARY SETUP CHECK — not a completed suite assessment' if config.get('preliminary_selection') else 'Selected suite; review record-set adequacy independently'
+    if any(record["status"] == "COMPLETED_TRUNCATED_TRIAL" for record in records):
+        summary['assessment_scope']='TRUNCATED DIAGNOSTIC TRIAL — not a completed time-history assessment'
+    else:
+        summary['assessment_scope']='PRELIMINARY SETUP CHECK — not a completed suite assessment' if config.get('preliminary_selection') else 'Selected suite; review record-set adequacy independently'
     if warnings: summary["output_warnings"] = warnings
     (out / "NBC105_Nonlinear_Time_History_Summary_V116.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"[COMPLETE] {len(records)} motion/orientation cases; elapsed={summary['elapsed_seconds']:.2f}s; output={out}", flush=True)
@@ -553,6 +590,7 @@ class NonlinearTimeHistoryGUI:
         self.damping = tk.StringVar(value="5.0"); self.p1 = tk.StringVar(); self.p2 = tk.StringVar()
         self.t1x = tk.StringVar(); self.t1y = tk.StringVar(); self.tnx = tk.StringVar(); self.tny = tk.StringVar()
         self.nmodes = tk.StringVar(value="20"); self.ls = tk.StringVar(value="ULS")
+        self.trial_duration = tk.StringVar(value="0")
         self._output_is_automatic=True
         self.torsion = tk.BooleanVar(value=True); self.running = False
         self.motion_mode = tk.StringVar(value=LTH_DEFAULT_MODE)
@@ -618,6 +656,10 @@ class NonlinearTimeHistoryGUI:
         self._entry(inputs, "One-folder output directory", self.output, lambda: self._browse(self.output, "dir", "Select output folder"))
         ttk.Button(inputs, text="Write CSV templates", command=self._templates).pack(anchor="e", pady=(5, 0))
         params = ttk.LabelFrame(root, text="2. NBC period, damping and time-step checks", padding=8); params.pack(fill="x", pady=8)
+        trial_row=ttk.Frame(params);trial_row.pack(fill="x",pady=(0,4))
+        ttk.Label(trial_row,text="Maximum history interval (s; 0 = full record)").pack(side="left")
+        ttk.Entry(trial_row,textvariable=self.trial_duration,width=10).pack(side="left",padx=6)
+        ttk.Label(trial_row,text="Example: 0.1 runs only the first 0.1 s for a numerical diagnostic; it is not a full-record result. The nonlinear model and readiness checks are still required.",foreground="#9a3412",wraplength=790).pack(side="left",padx=4)
         damping_row=ttk.Frame(params);damping_row.pack(fill='x')
         ttk.Label(damping_row,text='Nonlinear viscous damping model').pack(side='left')
         ttk.Combobox(damping_row,textvariable=self.damping_model,values=['Rayleigh committed','Modal (initial eigenbasis)'],state='readonly',width=30).pack(side='left')
@@ -689,6 +731,7 @@ class NonlinearTimeHistoryGUI:
             if missing:raise ValueError('Missing inputs: '+', '.join(missing)+'. Refresh project inputs or rerun Modal audit for the selected export and stiffness state.')
             values = {"modal_input_reference_status": getattr(self,"modal_reference_status",{}), "model_script": self.model.get().strip(), "python": self.python.get().strip(), "model_length_unit": self.model_length_unit.get(), "motion_manifest": self.manifest.get().strip(),
                 "story_nodes_csv": self.stories.get().strip(), "model_readiness_json": self.readiness.get().strip(), "output_dir": self.output.get().strip(), "limit_state": self.ls.get(),
+                "trial_duration_s": float(self.trial_duration.get()),
                 "damping_ratio_percent": float(self.damping.get()), "damping_period_1_s": float(self.p1.get()), "damping_period_2_s": float(self.p2.get()),
                 "linear_solver": self.linear_solver.get(),
                 "T1_x_s": float(self.t1x.get()), "T1_y_s": float(self.t1y.get()) if self.t1y.get().strip() else None,
@@ -710,6 +753,10 @@ class NonlinearTimeHistoryGUI:
             if values["modes_to_check"] < 1: raise ValueError("Check at least one eigenmode.")
             # Validate CSV and motion metadata before starting a long analysis.
             motions,_stories = _read_inputs(values)
+            for motion in motions:
+                for trial_orientation in (("X_ONLY",) if motion.get("mode") == "X_ONLY" else ("XY", "YX")):
+                    _analysis_duration_s(
+                        motion, trial_orientation, values["trial_duration_s"])
             _require_nonlinear_readiness(values)
             out = Path(values["output_dir"]); out.mkdir(parents=True, exist_ok=True)
             from datetime import datetime

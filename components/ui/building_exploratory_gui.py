@@ -93,12 +93,36 @@ def launch(parent,model_folder,output_folder=None):
     sensitivity=ttk.Frame(win);sensitivity.pack(fill='x',padx=8,pady=(2,0))
     sensitivity_parameter=tk.StringVar(value='brace.fy_mpa')
     sensitivity_values=tk.StringVar(value='310.5, 345, 379.5')
+    sensitivity_units=tk.StringVar(value='Candidate values (MPa)')
+    candidates_by_parameter={'brace.fy_mpa':'310.5, 345, 379.5'}
+    last_sensitivity_parameter={'value':sensitivity_parameter.get()}
+    parameter_units={
+        'brace.fy_mpa':'MPa','brace.E_mpa':'MPa','brace.b':'ratio',
+        'frame.cover_fc_mpa':'MPa','frame.cover_epsc0':'strain',
+        'frame.cover_fcu_mpa':'MPa','frame.cover_epsU':'strain',
+        'frame.core_fcc_mpa':'MPa','frame.core_epsc0':'strain',
+        'frame.core_fpcu_mpa':'MPa','frame.core_epsU':'strain',
+        'frame.rebar_fy_mpa':'MPa','frame.E0_mpa':'MPa',
+        'frame.steel_b':'ratio','frame.steel_R0':'dimensionless',
+        'frame.steel_cR1':'dimensionless','frame.steel_cR2':'dimensionless',
+        'wall.fpcc_mpa':'MPa','wall.epcc':'strain','wall.Ec_mpa':'MPa',
+        'wall.rc':'dimensionless','wall.xcrn':'dimensionless',
+        'wall.ft_mpa':'MPa','wall.et':'strain','wall.rt':'dimensionless',
+        'wall.xcrp':'dimensionless','wall.fyp_mpa':'MPa',
+        'wall.fyn_mpa':'MPa','wall.E0_mpa':'MPa','wall.bp':'ratio',
+        'wall.bn':'ratio','wall.R0':'dimensionless','wall.cR1':'dimensionless',
+        'wall.cR2':'dimensionless','wall.a1':'dimensionless',
+        'wall.a2':'dimensionless','wall.a3':'dimensionless',
+        'wall.a4':'dimensionless','wall.rho_x':'reinforcement ratio',
+        'wall.rho_y':'reinforcement ratio','wall.fsam_nu':'dimensionless',
+        'wall.fsam_alpha':'dimensionless',
+    }
     from components.nonlinear_time_history.research_building_materials import (
         MATERIAL_OVERRIDE_BOUNDS,MATERIAL_PARAMETER_REFERENCES,
     )
     ttk.Label(sensitivity,text='One-at-a-time parameter').pack(side='left')
     ttk.Combobox(sensitivity,textvariable=sensitivity_parameter,values=list(MATERIAL_OVERRIDE_BOUNDS),state='readonly',width=23).pack(side='left')
-    ttk.Label(sensitivity,text='Candidate values (parameter units)').pack(side='left',padx=(8,2))
+    ttk.Label(sensitivity,textvariable=sensitivity_units).pack(side='left',padx=(8,2))
     ttk.Entry(sensitivity,textvariable=sensitivity_values,width=36).pack(side='left')
     parameter_note=tk.StringVar()
     parameter_explanation=ttk.Label(win,textvariable=parameter_note,wraplength=1100,foreground='#174a7e',justify='left')
@@ -120,7 +144,17 @@ def launch(parent,model_folder,output_folder=None):
                 f'{key}: varies only this selected material input; every other model/input value is held fixed. '
                 'The candidate list is investigator-selected, not automatically taken from the paper. '
                 'Check the applicable source card in Research_Material_Assignment_V161.json and the material-basis references before interpreting results.')
-    sensitivity_parameter.trace_add('write',update_parameter_note)
+    def sensitivity_parameter_changed(*_):
+        previous=last_sensitivity_parameter['value']
+        selected=sensitivity_parameter.get()
+        if previous!=selected:
+            candidates_by_parameter[previous]=sensitivity_values.get()
+            sensitivity_values.set(candidates_by_parameter.get(selected,''))
+            last_sensitivity_parameter['value']=selected
+        sensitivity_units.set(
+            'Candidate values ('+parameter_units.get(selected,'parameter units')+')')
+        update_parameter_note()
+    sensitivity_parameter.trace_add('write',sensitivity_parameter_changed)
     update_parameter_note()
     ttk.Label(win,text='Device history uses localForce component 1 and projected axial extension; check the selected element axis in the exported element map. Results are exploratory, not material calibration or design approval.',wraplength=1100,foreground='#444').pack(anchor='w',padx=8,pady=3)
     def show_parameters():
@@ -237,7 +271,7 @@ def launch(parent,model_folder,output_folder=None):
     def response_plots():
         from OpenSees_Building_Response_V144 import launch as show
         show(win,state['last'] or Path(out.get()))
-    actions=ttk.Frame(win);actions.pack(fill='x',padx=8,pady=4);button=ttk.Button(actions,text='Run selected building exploratory case',command=start);button.pack(side='left')
+    actions=ttk.Frame(win);actions.pack(fill='x',padx=8,pady=4,before=log);button=ttk.Button(actions,text='Run selected building exploratory case',command=start);button.pack(side='left')
     sensitivity_button=ttk.Button(actions,text='Run material sensitivity sweep',command=lambda:messagebox.askyesno('Run sensitivity cases',f'Run {len([v for v in sensitivity_values.get().split(",") if v.strip()])} candidates serially for the selected state/orientations and duration? A duration of 0 means the full record; a full sweep may take a long time.',parent=win) and start(True));sensitivity_button.pack(side='left',padx=(6,0))
     ttk.Button(actions,text='Inspect saved histories / playback',command=inspect).pack(side='left');ttk.Button(actions,text='Open latest output folder',command=lambda:__import__('os').startfile(str(state['last'] or out.get()))).pack(side='left')
     secondary=ttk.Frame(win);secondary.pack(fill='x',padx=8,pady=4)

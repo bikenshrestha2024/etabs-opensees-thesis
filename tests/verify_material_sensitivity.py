@@ -141,6 +141,13 @@ class MaterialSensitivityTests(unittest.TestCase):
             self.assertEqual(rows["RSN001_XY"]["status"], "COMPLETED")
             self.assertIn("full-record coverage", rows["RSN001_XY"]["stage"])
             self.assertEqual(rows["RSN001_YX"]["status"], "NOT COMPLETED")
+            update_history_case(
+                ledger,
+                "[TRUNCATED] RSN001_YX: analyzed 0.1s of 40.94s; diagnostic only",
+            )
+            rows = {row["case"]: row for row in ledger.snapshot()}
+            self.assertEqual(rows["RSN001_YX"]["status"], "TRUNCATED")
+            self.assertIn("not a full-record result", rows["RSN001_YX"]["stage"])
 
     def test_explicit_building_overrides_accept_345_mpa_and_reject_bad_inputs(self):
         self.assertEqual(
