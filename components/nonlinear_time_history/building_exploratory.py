@@ -225,7 +225,8 @@ def _run(config):
     from OpenSees_Step13_Analysis_Basis_V115 import rayleigh_coefficients
     from OpenSees_Response_Checks_V132 import export_history_checks
     from components.shared.response_recorders import (
-    append_base_shear, frame_solver_tag_catalog, selected_member_response,
+    active_device_catalog, append_base_shear, device_energy_step,
+    frame_solver_tag_catalog, selected_device_response, selected_member_response,
     support_resultants, write_base_shear_roof_curve,
         write_recorder_index, write_rows,
     )
@@ -256,6 +257,12 @@ def _run(config):
                  'OpenSees_Complete_Element_Map_V118.json'):
         if (source/name).is_file():shutil.copy2(source/name,model/name)
     data=json.loads((model/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding='utf-8-sig'));start=time.perf_counter();unit_factor={'g':9.80665,'m/s2':1.};records=[]
+    device_assignment_path=model/'OpenSees_Element_Overrides_V125.json'
+    device_scenario=(
+        json.loads(device_assignment_path.read_text(encoding='utf-8-sig'))
+        if device_assignment_path.is_file() else {}
+    )
+    device_elements=active_device_catalog(data['frames'],device_scenario)
     write_rows(out/'Frame_Solver_Tag_Catalog.csv',frame_solver_tag_catalog(data['frames']))
     for key in ('x_path','y_path'):
         values,step,units=_read_peer_text_record(config[key]);records.append((np.asarray(values),step,units))
@@ -320,7 +327,7 @@ def _run(config):
             'element_map_path':str(model/'OpenSees_Complete_Element_Map_V118.json'),
             'efficient_recovery':True,
             'max_subdivision_depth':max_subdivision_depth,
-        };rows=[];last=time.perf_counter();case_start=last
+        };rows=[];device_rows=[];device_energy_states={};last=time.perf_counter();case_start=last
         stories=[dict(node=g['master_tag'],story_name='Storey_'+str(g['storey_number']),height=g['master_xyz'][2]-(groups[i-1]['master_xyz'][2] if i else data['base_z_m'])) for i,g in enumerate(groups)]
         wall_tags=[100001+len(data['frames'])+i for i,e in enumerate(data['shells']) if e['category']=='SHEAR WALL']
         tracked_wall=int(config.get('tracked_wall_tag',wall_tags[0])) if wall_tags else None
@@ -339,6 +346,10 @@ def _run(config):
         tracked_baseline={
             node: list(ops.nodeDisp(node))
             for nodes in tracked_nodes.values() for node in nodes
+        }
+        device_baseline={
+            int(node):list(ops.nodeDisp(int(node)))
+            for device in device_elements for node in device['node_tags']
         }
         tracked_element_rows=[]
         def capture():
@@ -382,6 +393,35 @@ def _run(config):
                     axial_force_kN=forces[0],
                     local_force_vector_json=json.dumps(forces,separators=(',',':')),
                 ))
+            for device in device_elements:
+                tag=device['element_tag']
+                response=selected_device_response(
+                    ops,tag,device['node_tags'],data['nodes'],device_baseline,
+                    device['device_type'],device['parameters'],
+                )
+                previous=device_energy_states.get(tag)
+                energy=device_energy_step(
+                    previous,row['time_s'],response['axial_force_kN'],
+                    response['relative_displacement_m'],
+                    response['dashpot_velocity_m_s'],
+                )
+                device_energy_states[tag]=energy
+                device_rows.append({
+                    'time_s':row['time_s'],
+                    'device_tag':tag,
+                    'source_object':device['source_object'],
+                    'device_type':device['device_type'],
+                    'parameters_json':json.dumps(
+                        device['parameters'],sort_keys=True,separators=(',',':')),
+                    'parameter_citation':device['citation'],
+                    'axial_force_kN':response['axial_force_kN'],
+                    'relative_displacement_m':response['relative_displacement_m'],
+                    'assembly_axial_velocity_m_s':response['assembly_axial_velocity_m_s'],
+                    'dashpot_velocity_m_s':response['dashpot_velocity_m_s'],
+                    'dashpot_power_kW':energy['dashpot_power_kW'],
+                    'cumulative_device_work_kNm':energy['cumulative_device_work_kNm'],
+                    'cumulative_dashpot_dissipation_kNm':energy['cumulative_dashpot_dissipation_kNm'],
+                })
             rows.append(row)
         history=case/'Building_Nonlinear_history.csv'
         _set_run_stage('transient_analysis',orientation=orientation,case_output_dir=str(case),
@@ -480,13 +520,41 @@ def _run(config):
         recorder_files.append((tracked_element_path.name,[
             'selected frame/brace/device tag axial force and gravity-relative projected axial extension',
             'local force vector retained as JSON in native OpenSees local-end ordering']))
+        if device_rows:
+            device_response_path=write_rows(
+                case/'Device_Response_History.csv',device_rows)
+            device_metadata_path=case/'Device_Response_Metadata.json'
+            device_metadata_path.write_text(json.dumps({
+                'scope':assumptions['scope'],
+                'devices':[
+                    {key:value for key,value in device.items() if key!='node_tags'}
+                    for device in device_elements
+                ],
+                'kinematics':'End-node distance change and relative velocity along the current device axis, referenced to the gravity-equilibrated state.',
+                'fvd_dashpot_velocity':'sign(F)*(abs(F)/Cd)^(1/alpha), from the mapped Maxwell constitutive law; not total assembly velocity.',
+                'device_work':'Signed trapezoidal integral of axial force against total end-to-end extension; not labelled as dissipated energy.',
+                'fvd_dissipation':'Trapezoidal integral of F times inferred Maxwell dashpot velocity.',
+                'brb_energy':'Cumulative signed device work; a standalone estimate of cumulative plastic/hysteretic dissipation is not claimed.',
+            },indent=2),encoding='utf-8')
+            recorder_files.append((device_response_path.name,[
+                'all active mapped FVD/BRB device tags at every accepted adaptive transient state',
+                'axial force and gravity-relative change in device-end distance',
+                'relative axial assembly velocity; FVD dashpot velocity inferred from its Maxwell force law',
+                'signed cumulative device force-displacement work',
+                'FVD cumulative dashpot dissipation integrated from force times inferred dashpot velocity']))
+            recorder_files.append((device_metadata_path.name,[
+                'active device tags, exact mapped parameters and citations',
+                'kinematic, work and Maxwell dashpot velocity definitions']))
         write_recorder_index(
             case,'nonlinear_time_history',
             recorder_files,
             notes=[
                 'Support reactions and base shear are incremental relative to the gravity-frozen state.',
                 'The base-shear/roof-displacement file preserves synchronized accepted states and can be plotted as a hysteresis history.',
-                'Selected member channels are controlled by tracked_frame_tag and tracked_element_tags; confirm each selected device local axis aligns with its member axis.',
+                'Selected member channels are controlled by tracked_frame_tag and tracked_element_tags; every active mapped FVD/BRB device is additionally recorded by solver tag.',
+                'FVD dashpot velocity is calculated from the Maxwell law v_d=sign(F)*(abs(F)/Cd)^(1/alpha); it is not the total assembly velocity.',
+                'Cumulative device work is signed trapezoidal integral of force versus total device extension and is not, by itself, dissipated energy. FVD dashpot dissipation is separately estimated by integrating F*v_d.',
+                'Device axis is reconstructed from end-node geometry; verify the mapped component uses that line of action and the parameter units are consistent.',
                 'The final frame-action table is a final-state snapshot, not an all-elements time history.',
             ],
         )

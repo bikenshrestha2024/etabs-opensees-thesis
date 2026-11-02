@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from pathlib import Path
 
 
@@ -32,6 +33,31 @@ def frame_solver_tag_catalog(frames):
         }
         for index, element in enumerate(frames)
     ]
+
+
+def active_device_catalog(frames, scenario):
+    """Return all active FVD/BRB frame assignments with their stable solver tags."""
+    if not scenario.get("active"):
+        return []
+    assignments = scenario.get("assignments", {})
+    devices = []
+    for index, element in enumerate(frames):
+        tag = FRAME_SOLVER_TAG_BASE + index
+        selection = assignments.get(
+            "SOLVER:" + str(tag),
+            assignments.get("FRAME:" + str(element.get("object", "")), {}),
+        )
+        if selection.get("target") not in ("FVD_MAXWELL", "BRB_STEEL02"):
+            continue
+        devices.append({
+            "element_tag": tag,
+            "source_object": str(element.get("object", "")),
+            "device_type": selection["target"],
+            "parameters": selection.get("parameters", {}),
+            "citation": str(selection.get("citation", "")),
+            "node_tags": element["nodes"],
+        })
+    return devices
 
 
 def support_resultants(ops, support_nodes):
@@ -67,8 +93,9 @@ def write_recorder_index(output_dir, analysis, files, notes=(),
         "files": [dict(name=str(name), channels=list(channels))
                   for name, channels in files],
         "notes": list(notes),
-        "units": {"displacement": "m", "rotation": "rad", "force": "kN",
-                  "moment": "kN m", "time": "s", "drift": "dimensionless"},
+        "units": {"displacement": "m", "velocity": "m/s", "rotation": "rad",
+                  "force": "kN", "moment": "kN m", "energy": "kN m",
+                  "power": "kN m/s", "time": "s", "drift": "dimensionless"},
     }
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -149,4 +176,152 @@ def selected_member_response(ops, element_tag, node_tags, node_coordinates,
         "element_tag": int(element_tag),
         "axial_extension_m": extension,
         "local_end_forces_kN_kNm": forces,
+    }
+
+
+def selected_device_response(ops, element_tag, node_tags, node_coordinates,
+                             baseline_displacements, device_type, parameters):
+    """Capture axial device force and gravity-relative kinematics at one accepted state."""
+    i_node, j_node = (int(node) for node in node_tags)
+
+    def position(node, displacement):
+        xyz = node_coordinates.get(str(node), node_coordinates.get(node))
+        if xyz is None or len(displacement) < 3:
+            raise ValueError(f"Device {element_tag} node {node} lacks 3D coordinates/displacements.")
+        return [float(xyz[index]) + float(displacement[index]) for index in range(3)]
+
+    initial_i = position(i_node, baseline_displacements[i_node])
+    initial_j = position(j_node, baseline_displacements[j_node])
+    current_i = position(i_node, ops.nodeDisp(i_node))
+    current_j = position(j_node, ops.nodeDisp(j_node))
+    initial_axis = [b - a for a, b in zip(initial_i, initial_j)]
+    initial_length = sum(value * value for value in initial_axis) ** .5
+    current_axis = [b - a for a, b in zip(current_i, current_j)]
+    current_length = sum(value * value for value in current_axis) ** .5
+    if initial_length <= 0 or current_length <= 0:
+        raise ValueError(f"Device {element_tag} has zero current or gravity-state length.")
+    extension = current_length - initial_length
+    current_axis = [value / current_length for value in current_axis]
+    velocity_i = [float(value) for value in ops.nodeVel(i_node)[:3]]
+    velocity_j = [float(value) for value in ops.nodeVel(j_node)[:3]]
+    if len(velocity_i) < 3 or len(velocity_j) < 3:
+        raise ValueError(f"Device {element_tag} node velocity has fewer than three translational DOFs.")
+    axial_velocity = sum(
+        (velocity_j[index] - velocity_i[index]) * current_axis[index]
+        for index in range(3)
+    )
+
+    kind = str(device_type).upper()
+    if kind == "FVD_MAXWELL":
+        queries = (("basicForce",), ("material", 1, "stress"), ("axialForce",))
+    elif kind == "BRB_STEEL02":
+        queries = (("axialForce",), ("basicForce",), ("material", 1, "stress"))
+    else:
+        raise ValueError(f"Unsupported device type {device_type!r}.")
+
+    force = None
+    errors = []
+    for query in queries:
+        try:
+            response = ops.eleResponse(int(element_tag), *query)
+        except Exception as exc:
+            errors.append(f"{query!r}: {exc}")
+            continue
+        if response is None:
+            continue
+        try:
+            values = [float(response)] if isinstance(response, (int, float)) else [
+                float(value) for value in response
+            ]
+        except (TypeError, ValueError):
+            continue
+        if not values:
+            continue
+        force = values[0]
+        if query == ("material", 1, "stress") and kind == "BRB_STEEL02":
+            area = float(parameters["core_area"])
+            if not area > 0:
+                raise ValueError(f"Device {element_tag} BRB core_area must be positive.")
+            force *= area
+        break
+    if force is None:
+        detail = "; ".join(errors) if errors else "all supported force responses were empty"
+        raise RuntimeError(f"Device {element_tag} force response unavailable: {detail}")
+    if not math.isfinite(force) or not math.isfinite(extension) or not math.isfinite(axial_velocity):
+        raise ValueError(f"Device {element_tag} returned a non-finite force or kinematic response.")
+
+    dashpot_velocity = None
+    if kind == "FVD_MAXWELL":
+        coefficient = float(parameters["Cd"])
+        exponent = float(parameters["alpha"])
+        if not coefficient > 0 or not 0 < exponent <= 1:
+            raise ValueError(f"Device {element_tag} requires Cd > 0 and 0 < alpha <= 1.")
+        dashpot_velocity = (
+            0.0 if force == 0
+            else math.copysign((abs(force) / coefficient) ** (1.0 / exponent), force)
+        )
+    return {
+        "element_tag": int(element_tag),
+        "axial_force_kN": force,
+        "relative_displacement_m": extension,
+        "assembly_axial_velocity_m_s": axial_velocity,
+        "dashpot_velocity_m_s": dashpot_velocity,
+    }
+
+
+def device_energy_step(previous, time_s, force_kN, displacement_m,
+                       dashpot_velocity_m_s=None):
+    """Integrate signed device work and, for an FVD, its Maxwell dashpot work."""
+    time_s, force_kN, displacement_m = (
+        float(time_s), float(force_kN), float(displacement_m)
+    )
+    if not all(math.isfinite(value) for value in (time_s, force_kN, displacement_m)):
+        raise ValueError("Device energy integration inputs must be finite.")
+    if previous is None:
+        return {
+            "cumulative_device_work_kNm": 0.0,
+            "dashpot_power_kW": (
+                None if dashpot_velocity_m_s is None
+                else force_kN * float(dashpot_velocity_m_s)
+            ),
+            "cumulative_dashpot_dissipation_kNm": (
+                None if dashpot_velocity_m_s is None else 0.0
+            ),
+            "time_s": time_s,
+            "force_kN": force_kN,
+            "displacement_m": displacement_m,
+            "dashpot_velocity_m_s": (
+                None if dashpot_velocity_m_s is None
+                else float(dashpot_velocity_m_s)
+            ),
+        }
+
+    dt = time_s - float(previous["time_s"])
+    if dt < -1e-12:
+        raise ValueError("Device recorder time must be nondecreasing.")
+    work = 0.5 * (float(previous["force_kN"]) + force_kN) * (
+        displacement_m - float(previous["displacement_m"])
+    )
+    cumulative_work = float(previous["cumulative_device_work_kNm"]) + work
+    power = None
+    cumulative_dissipation = None
+    dashpot_velocity = None
+    if dashpot_velocity_m_s is not None:
+        dashpot_velocity = float(dashpot_velocity_m_s)
+        if not math.isfinite(dashpot_velocity):
+            raise ValueError("FVD dashpot velocity must be finite.")
+        power = force_kN * dashpot_velocity
+        prior_power = previous["dashpot_power_kW"]
+        cumulative_dissipation = (
+            float(previous["cumulative_dashpot_dissipation_kNm"])
+            + 0.5 * (float(prior_power) + power) * dt
+        )
+    return {
+        "cumulative_device_work_kNm": cumulative_work,
+        "dashpot_power_kW": power,
+        "cumulative_dashpot_dissipation_kNm": cumulative_dissipation,
+        "time_s": time_s,
+        "force_kN": force_kN,
+        "displacement_m": displacement_m,
+        "dashpot_velocity_m_s": dashpot_velocity,
     }

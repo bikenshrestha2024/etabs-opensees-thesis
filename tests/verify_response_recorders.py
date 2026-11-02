@@ -12,8 +12,11 @@ from components.modal.analysis import (
     modal_response_nodes,
 )
 from components.shared.response_recorders import (
+    active_device_catalog,
     append_base_shear,
+    device_energy_step,
     frame_solver_tag_catalog,
+    selected_device_response,
     selected_member_response,
     support_resultants,
     write_base_shear_roof_curve,
@@ -196,6 +199,91 @@ class ResponseRecorderTests(unittest.TestCase):
         self.assertEqual(catalog[0]["source_object"], "ETABS-1")
         self.assertEqual(catalog[1]["solver_tag"], 100002)
         self.assertEqual(catalog[1]["release_i"], False)
+
+    def test_active_device_catalog_includes_every_mapped_device_by_solver_tag(self):
+        frames = [
+            {"object": "FVD-1", "nodes": [1, 2]},
+            {"object": "BRB-1", "nodes": [3, 4]},
+        ]
+        inactive = {"active": False, "assignments": {
+            "FRAME:FVD-1": {"target": "FVD_MAXWELL", "parameters": {"Cd": 3.}}
+        }}
+        self.assertEqual(active_device_catalog(frames, inactive), [])
+        devices = active_device_catalog(frames, {
+            "active": True,
+            "assignments": {
+                "FRAME:FVD-1": {
+                    "target": "FVD_MAXWELL",
+                    "parameters": {"K": 10., "Cd": 3., "alpha": .5},
+                },
+                "SOLVER:100002": {
+                    "target": "BRB_STEEL02",
+                    "parameters": {"core_area": .2},
+                },
+            },
+        })
+        self.assertEqual([device["element_tag"] for device in devices],
+                         [100001, 100002])
+        self.assertEqual(devices[0]["device_type"], "FVD_MAXWELL")
+        self.assertEqual(devices[1]["source_object"], "BRB-1")
+
+    def test_selected_fvd_response_separates_assembly_and_dashpot_velocity(self):
+        class DeviceOps:
+            def nodeDisp(self, node):
+                return {1: [0., 0., 0., 0., 0., 0.],
+                        2: [.2, 0., 0., 0., 0., 0.]}[node]
+
+            def nodeVel(self, node):
+                return {1: [0., 0., 0., 0., 0., 0.],
+                        2: [.3, 0., 0., 0., 0., 0.]}[node]
+
+            def eleResponse(self, tag, *response):
+                return [4.] if response == ("basicForce",) else []
+
+        response = selected_device_response(
+            DeviceOps(), 100001, [1, 2],
+            {"1": [0., 0., 0.], "2": [2., 0., 0.]},
+            {1: [0., 0., 0., 0., 0., 0.],
+             2: [.1, 0., 0., 0., 0., 0.]},
+            "FVD_MAXWELL", {"Cd": 2., "alpha": 1.},
+        )
+        self.assertAlmostEqual(response["relative_displacement_m"], .1)
+        self.assertAlmostEqual(response["assembly_axial_velocity_m_s"], .3)
+        self.assertAlmostEqual(response["dashpot_velocity_m_s"], 2.)
+        self.assertEqual(response["axial_force_kN"], 4.)
+
+    def test_selected_brb_response_reports_axial_force_without_dashpot_channel(self):
+        class BraceOps:
+            def nodeDisp(self, node):
+                return [0., 0., 0., 0., 0., 0.]
+
+            def nodeVel(self, node):
+                return [0., 0., 0., 0., 0., 0.]
+
+            def eleResponse(self, tag, *response):
+                return [85.] if response == ("axialForce",) else []
+
+        response = selected_device_response(
+            BraceOps(), 100002, [1, 2],
+            {"1": [0., 0., 0.], "2": [0., 3., 0.]},
+            {1: [0., 0., 0., 0., 0., 0.],
+             2: [0., 0., 0., 0., 0., 0.]},
+            "BRB_STEEL02", {"core_area": .2},
+        )
+        self.assertEqual(response["axial_force_kN"], 85.)
+        self.assertEqual(response["relative_displacement_m"], 0.)
+        self.assertIsNone(response["dashpot_velocity_m_s"])
+
+    def test_device_energy_integrates_signed_work_and_fvd_dashpot_dissipation(self):
+        first = device_energy_step(None, 0., 2., 0., 1.)
+        second = device_energy_step(first, 1., 4., 1., 2.)
+        self.assertAlmostEqual(second["cumulative_device_work_kNm"], 3.)
+        self.assertAlmostEqual(second["dashpot_power_kW"], 8.)
+        self.assertAlmostEqual(second["cumulative_dashpot_dissipation_kNm"], 5.)
+        brb_first = device_energy_step(None, 0., 2., 0.)
+        brb_second = device_energy_step(brb_first, 1., 4., 1.)
+        self.assertAlmostEqual(brb_second["cumulative_device_work_kNm"], 3.)
+        self.assertIsNone(brb_second["cumulative_dashpot_dissipation_kNm"])
 
 
 if __name__ == "__main__":

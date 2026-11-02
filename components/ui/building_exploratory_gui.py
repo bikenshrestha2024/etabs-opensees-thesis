@@ -78,6 +78,7 @@ def launch(parent,model_folder,output_folder=None):
     tracked_members=tk.StringVar(value='')
     ttk.Label(settings,text='Additional brace/device tags (comma-separated)').pack(side='left',padx=(8,2))
     ttk.Entry(settings,textvariable=tracked_members,width=22).pack(side='left')
+    ttk.Label(win,text='All active mapped FVD/BRB devices are recorded automatically to Device_Response_History.csv at each accepted step; FVD dashpot velocity is distinct from assembly velocity.',wraplength=1100,foreground='#174a7e',justify='left').pack(anchor='w',padx=8,pady=3)
     full=tk.BooleanVar(value=True);basis=tk.StringVar(value='PUBLISHED_REFERENCE')
     steel_transition=tk.StringVar(value='OPENSEES_DOCUMENTED')
     brace_fy=tk.StringVar(value='345');brace_b=tk.StringVar(value='.01')
