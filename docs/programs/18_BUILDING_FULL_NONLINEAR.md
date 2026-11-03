@@ -1,35 +1,3 @@
-# 18 — Exploratory full nonlinear building route
+# Legacy guide for 18_BUILDING_FULL_NONLINEAR.py
 
-**Entry point:** [`18_BUILDING_FULL_NONLINEAR.py`](../../18_BUILDING_FULL_NONLINEAR.py)  
-**Category:** Research materials and components  
-**Status:** Documentation and route guide only; runtime execution not performed by this change.
-
-## Purpose
-Exploratory full nonlinear building route. This launcher is an entry point, not necessarily the implementation itself. See the exact imported calls in the linked Python file before changing the backend.
-
-## Required inputs
-Reviewed export, wall/column/beam/device parameters and earthquake pair. Confirm paths, units, configuration assumptions and project-specific datasets in the active script/GUI. Do not assume a file from another release is compatible.
-
-## Main implementation references
-- `components/nonlinear_time_history/building_exploratory.py`
-- `components/nonlinear_time_history/runner_and_gui.py`
-
-## How to run
-1. Work from the complete repository in the configured Windows Python/OpenSeesPy environment; keep component directories together.
-2. Open `18_BUILDING_FULL_NONLINEAR.py` in Spyder and run it, or invoke `python 18_BUILDING_FULL_NONLINEAR.py` from the repository root where suitable. For this diagnostic launcher, inspect its command-line arguments and usage before running.
-3. Select/provide the appropriate export and input files when the script requests them; verify report paths before assuming output files were created.
-4. Preserve a copy of inputs, commit ID, parameter register, OpenSeesPy version, and complete solver log.
-
-## Expected results
-Diagnostic logs and transient response only if complete. Exact filenames and behavior depend on the current implementation and selected case. Check output existence, finite values and completion status independently.
-
-## Validation / stop gate
-**Known first-step transient failure is unresolved; check non-finite localForce and element 110280 mapping.** Record pass, fail, skipped, and unresolved separately. A GUI launch, gravity pass, or partial transient step is not a completed calibrated NLTHA.
-
-## Known limitations and improvement backlog
-- Trace launcher -> backend function -> imported modules -> output file with an automated, versioned dependency manifest.
-- Add reproducible command-line smoke tests and validate the user-selected folders before launching heavyweight analyses.
-- Report executable version, input hashes, units, runtime configuration, exceptions, and solver termination reason per run.
-- Keep historical evidence read-only; do not silently rewrite or delete results when organizing folders.
-
-[Program index](00_PROGRAM_INDEX.md) · [Project handoff](../../START_HERE_V167.md) · [Modeling basis](../../Research_Components/02_MODELLING_BASIS.md)
+Renamed for work-order navigation to [`17_BUILDING_FULL_NONLINEAR.py`](../../17_BUILDING_FULL_NONLINEAR.py). Read its [current guide](17_BUILDING_FULL_NONLINEAR.md). The original launcher name continues to forward to the current file.

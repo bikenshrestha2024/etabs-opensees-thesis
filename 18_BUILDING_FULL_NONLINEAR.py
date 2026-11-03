@@ -1,10 +1,5 @@
-"""Open cited building research setup; does not approve the production model."""
+"""Legacy compatibility alias: run 17_BUILDING_FULL_NONLINEAR.py instead."""
 from pathlib import Path
-import sys, tkinter as tk
-ROOT=Path(__file__).resolve().parent
-sys.path.insert(0,str(ROOT))
-from components.ui.building_exploratory_gui import launch
-root=tk.Tk();root.withdraw()
-win=launch(root,ROOT/'Saved_Project_V156')
-win.protocol('WM_DELETE_WINDOW',root.destroy)
-root.mainloop()
+import runpy
+_namespace=runpy.run_path(str(Path(__file__).resolve().with_name("17_BUILDING_FULL_NONLINEAR.py")),run_name=__name__)
+globals().update(_namespace)

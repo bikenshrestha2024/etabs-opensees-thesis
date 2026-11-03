@@ -1,36 +1,30 @@
-# 00 — Program index and execution map
+# 00 — Numbered program index
 
-This numbered catalog documents the existing V167 launchers **without renaming or moving any executable**. Numeric identifiers sort workflows; they do **not** mean every program must run in sequence. The current building NLTHA first-step transient failure remains unresolved.
+All **20 root program launchers** have work-order names. Material/component validation precedes nonlinear building work. The program numbers are navigational and do not certify structural validity.
 
-| ID | Entry point | Individual guide |
-|---|---|---|
-| 01 | [`01_START_ETABS_TO_OPENSEES.py`](../../01_START_ETABS_TO_OPENSEES.py) | [01 guide](01_START_ETABS_TO_OPENSEES.md) |
-| 02 | [`02_MODEL_INPUTS_AND_READINESS.py`](../../02_MODEL_INPUTS_AND_READINESS.py) | [02 guide](02_MODEL_INPUTS_AND_READINESS.md) |
-| 03 | [`03_GRAVITY.py`](../../03_GRAVITY.py) | [03 guide](03_GRAVITY.md) |
-| 04 | [`04_MODAL_ULS_SLS.py`](../../04_MODAL_ULS_SLS.py) | [04 guide](04_MODAL_ULS_SLS.md) |
-| 05 | [`05_EQUIVALENT_STATIC.py`](../../05_EQUIVALENT_STATIC.py) | [05 guide](05_EQUIVALENT_STATIC.md) |
-| 06 | [`06_RESPONSE_SPECTRUM.py`](../../06_RESPONSE_SPECTRUM.py) | [06 guide](06_RESPONSE_SPECTRUM.md) |
-| 07 | [`07_LINEAR_TIME_HISTORY.py`](../../07_LINEAR_TIME_HISTORY.py) | [07 guide](07_LINEAR_TIME_HISTORY.md) |
-| 08 | [`08_BUILDING_NONLINEAR_TRIAL.py`](../../08_BUILDING_NONLINEAR_TRIAL.py) | [08 guide](08_BUILDING_NONLINEAR_TRIAL.md) |
-| 09 | [`09_NONLINEAR_REVIEWED_MODEL.py`](../../09_NONLINEAR_REVIEWED_MODEL.py) | [09 guide](09_NONLINEAR_REVIEWED_MODEL.md) |
-| 10 | [`10_WALL_VALIDATION.py`](../../10_WALL_VALIDATION.py) | [10 guide](10_WALL_VALIDATION.md) |
-| 11 | [`11_MATERIAL_DEVICE_VALIDATION.py`](../../11_MATERIAL_DEVICE_VALIDATION.py) | [11 guide](11_MATERIAL_DEVICE_VALIDATION.md) |
-| 12 | [`12_NONLINEAR_PERFORMANCE.py`](../../12_NONLINEAR_PERFORMANCE.py) | [12 guide](12_NONLINEAR_PERFORMANCE.md) |
-| 13 | [`13_STEEL02_CALIBRATION.py`](../../13_STEEL02_CALIBRATION.py) | [13 guide](13_STEEL02_CALIBRATION.md) |
-| 14 | [`14_MATERIAL_PARAMETER_SETUP.py`](../../14_MATERIAL_PARAMETER_SETUP.py) | [14 guide](14_MATERIAL_PARAMETER_SETUP.md) |
-| 15 | [`15_LITERATURE_MATERIAL_PROFILES.py`](../../15_LITERATURE_MATERIAL_PROFILES.py) | [15 guide](15_LITERATURE_MATERIAL_PROFILES.md) |
-| 16 | [`16_COMPONENT_RESULTS.py`](../../16_COMPONENT_RESULTS.py) | [16 guide](16_COMPONENT_RESULTS.md) |
-| 17 | [`17_LITERATURE_COMPONENT_DEMO.py`](../../17_LITERATURE_COMPONENT_DEMO.py) | [17 guide](17_LITERATURE_COMPONENT_DEMO.md) |
-| 18 | [`18_BUILDING_FULL_NONLINEAR.py`](../../18_BUILDING_FULL_NONLINEAR.py) | [18 guide](18_BUILDING_FULL_NONLINEAR.md) |
-| 20 | [`20_AUDIT_LOAD_CONNECTIONS.py`](../../20_AUDIT_LOAD_CONNECTIONS.py) | [20 guide](20_AUDIT_LOAD_CONNECTIONS.md) |
-| 21 | [`21_TRACE_FAILED_ELEMENT.py`](../../21_TRACE_FAILED_ELEMENT.py) | [21 guide](21_TRACE_FAILED_ELEMENT.md) |
+| Step | Launcher | Guide | Function |
+|---|---|---|---|
+| 01 | [`01_WORKFLOW_START.py`](../../01_WORKFLOW_START.py) | [Guide](01_WORKFLOW_START.md) | Main ETABS-to-OpenSees GUI |
+| 02 | [`02_INPUT_READINESS.py`](../../02_INPUT_READINESS.py) | [Guide](02_INPUT_READINESS.md) | Input and export reconciliation |
+| 03 | [`03_MATERIAL_PARAMETER_SETUP.py`](../../03_MATERIAL_PARAMETER_SETUP.py) | [Guide](03_MATERIAL_PARAMETER_SETUP.md) | Material parameter configuration |
+| 04 | [`04_LITERATURE_MATERIAL_PROFILES.py`](../../04_LITERATURE_MATERIAL_PROFILES.py) | [Guide](04_LITERATURE_MATERIAL_PROFILES.md) | Published specimen parameters |
+| 05 | [`05_STEEL02_CALIBRATION.py`](../../05_STEEL02_CALIBRATION.py) | [Guide](05_STEEL02_CALIBRATION.md) | Steel02 experimental calibration |
+| 06 | [`06_MATERIAL_DEVICE_VALIDATION.py`](../../06_MATERIAL_DEVICE_VALIDATION.py) | [Guide](06_MATERIAL_DEVICE_VALIDATION.md) | Materials, FVD and BRB benchmark tests |
+| 07 | [`07_WALL_VALIDATION.py`](../../07_WALL_VALIDATION.py) | [Guide](07_WALL_VALIDATION.md) | Shear wall numerical and experimental checks |
+| 08 | [`08_COMPONENT_RESULTS.py`](../../08_COMPONENT_RESULTS.py) | [Guide](08_COMPONENT_RESULTS.md) | Component result inspection |
+| 09 | [`09_LITERATURE_COMPONENT_DEMO.py`](../../09_LITERATURE_COMPONENT_DEMO.py) | [Guide](09_LITERATURE_COMPONENT_DEMO.md) | Literature component demonstrations |
+| 10 | [`10_GRAVITY.py`](../../10_GRAVITY.py) | [Guide](10_GRAVITY.md) | Gravity equilibrium and reactions |
+| 11 | [`11_MODAL_ULS_SLS.py`](../../11_MODAL_ULS_SLS.py) | [Guide](11_MODAL_ULS_SLS.md) | Modal ULS and SLS analysis |
+| 12 | [`12_EQUIVALENT_STATIC.py`](../../12_EQUIVALENT_STATIC.py) | [Guide](12_EQUIVALENT_STATIC.md) | NBC 105 equivalent static forces |
+| 13 | [`13_RESPONSE_SPECTRUM.py`](../../13_RESPONSE_SPECTRUM.py) | [Guide](13_RESPONSE_SPECTRUM.md) | MRSM response spectrum analysis |
+| 14 | [`14_LINEAR_TIME_HISTORY.py`](../../14_LINEAR_TIME_HISTORY.py) | [Guide](14_LINEAR_TIME_HISTORY.md) | Linear ground-motion analysis |
+| 15 | [`15_BUILDING_NONLINEAR_TRIAL.py`](../../15_BUILDING_NONLINEAR_TRIAL.py) | [Guide](15_BUILDING_NONLINEAR_TRIAL.md) | Short nonlinear diagnostic trial |
+| 16 | [`16_NONLINEAR_REVIEWED_MODEL.py`](../../16_NONLINEAR_REVIEWED_MODEL.py) | [Guide](16_NONLINEAR_REVIEWED_MODEL.md) | Reviewed nonlinear building model |
+| 17 | [`17_BUILDING_FULL_NONLINEAR.py`](../../17_BUILDING_FULL_NONLINEAR.py) | [Guide](17_BUILDING_FULL_NONLINEAR.md) | Full nonlinear history (unresolved first-step failure) |
+| 18 | [`18_NONLINEAR_PERFORMANCE.py`](../../18_NONLINEAR_PERFORMANCE.py) | [Guide](18_NONLINEAR_PERFORMANCE.md) | Performance criteria and results |
+| 19 | [`19_AUDIT_LOAD_CONNECTIONS.py`](../../19_AUDIT_LOAD_CONNECTIONS.py) | [Guide](19_AUDIT_LOAD_CONNECTIONS.md) | Load-path and connectivity audit |
+| 20 | [`20_TRACE_FAILED_ELEMENT.py`](../../20_TRACE_FAILED_ELEMENT.py) | [Guide](20_TRACE_FAILED_ELEMENT.md) | Trace failed solver element |
 
-**Reserved:** 19 is deliberately vacant; do not create a fake launcher. 00 is reserved for navigation, conventions and release handoff.
+Legacy filenames remain functional as launch aliases. Underlying components, external records and saved outputs have not been renamed. The nonlinear transient failure is still an open issue.
 
-## Run progression
-Export reconciliation -> gravity -> modal -> equivalent static -> response spectrum -> linear histories -> isolated material, device and wall benchmarks -> short nonlinear diagnostics -> complete nonlinear records -> postprocessing and model-to-model comparisons. Skip progression when a verification gate fails.
-
-## Important compatibility files
-`RUN_ETABS_TO_OPENSEES.py` backs launcher 01; `RUN_LITERATURE_DEMO.py` backs launcher 17. The `OpenSees_*_V###.py` files and `components/` modules may be dynamically imported. Their names and paths remain unchanged until imports, relative paths, and regression runs have been audited.
-
-[Organization policy](../00_REPOSITORY_ORGANIZATION.md) · [Existing run order](../../00_READ_FIRST_RUN_ORDER.md) · [V167 baseline](../../START_HERE_V167.md)
+[File migration map](../00_WORK_ORDER_RENAME_MAP.md) · [Organization policy](../00_REPOSITORY_ORGANIZATION.md)

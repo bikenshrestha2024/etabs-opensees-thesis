@@ -1,6 +1,5 @@
+"""Legacy compatibility alias: run 02_INPUT_READINESS.py instead."""
 from pathlib import Path
-import sys,runpy,os
-ROOT=Path(__file__).resolve().parent
-sys.path.insert(0,str(ROOT))
-from OpenSees_Workflow_V144 import launch
-launch()
+import runpy
+_namespace=runpy.run_path(str(Path(__file__).resolve().with_name("02_INPUT_READINESS.py")),run_name=__name__)
+globals().update(_namespace)

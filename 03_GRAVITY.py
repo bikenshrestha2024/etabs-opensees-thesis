@@ -1,5 +1,5 @@
+"""Legacy compatibility alias: run 10_GRAVITY.py instead."""
 from pathlib import Path
-import sys,runpy,os
-ROOT=Path(__file__).resolve().parent
-sys.path.insert(0,str(ROOT))
-runpy.run_path(str(ROOT/'OpenSees_Gravity_GUI_V110.py'),run_name='__main__')
+import runpy
+_namespace=runpy.run_path(str(Path(__file__).resolve().with_name("10_GRAVITY.py")),run_name=__name__)
+globals().update(_namespace)

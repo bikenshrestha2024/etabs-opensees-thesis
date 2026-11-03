@@ -1,5 +1,5 @@
-import tkinter as tk
+"""Legacy compatibility alias: run 18_NONLINEAR_PERFORMANCE.py instead."""
 from pathlib import Path
-from components.validation.nonlinear_performance import launch
-if __name__=='__main__':
- root=tk.Tk();root.withdraw();win=launch(root,Path(__file__).resolve().parent);win.protocol('WM_DELETE_WINDOW',root.destroy);root.mainloop()
+import runpy
+_namespace=runpy.run_path(str(Path(__file__).resolve().with_name("18_NONLINEAR_PERFORMANCE.py")),run_name=__name__)
+globals().update(_namespace)

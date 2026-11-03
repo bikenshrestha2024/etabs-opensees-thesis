@@ -1,43 +1,28 @@
-# Ordered entry points — V167
+# 00 — OpenSeesPy work order
 
-Run `01_START_ETABS_TO_OPENSEES.py` for the integrated workflow. The numbered
-files below are direct launchers or focused utilities, not a script that must
-be run from top to bottom. Keep the complete package together; component
-modules and versioned `OpenSees_*.py` files are imported by the launchers and
-should not be renamed.
+Primary launchers are now numbered from 01 through 20 in the following recommended verification-first order. They are **not** one compulsory sequential batch; use stand-alone diagnostics when needed. The previous filenames remain forwarding aliases.
 
-| Order | Entry point | Purpose |
-|---|---|---|
-| 01 | `01_START_ETABS_TO_OPENSEES.py` | Start the main ETABS-to-OpenSeesPy GUI. |
-| 02 | `02_MODEL_INPUTS_AND_READINESS.py` | Review model inputs and readiness evidence. |
-| 03 | `03_GRAVITY.py` | Inspect gravity loads and reactions. |
-| 04 | `04_MODAL_ULS_SLS.py` | Run and compare modal ULS/SLS cases. |
-| 05 | `05_EQUIVALENT_STATIC.py` | Calculate and run equivalent-static cases. |
-| 06 | `06_RESPONSE_SPECTRUM.py` | Run response-spectrum analysis and review. |
-| 07 | `07_LINEAR_TIME_HISTORY.py` | Run linear time-history analysis. |
-| 08 | `08_BUILDING_NONLINEAR_TRIAL.py` | Exploratory nonlinear frames with elastic walls; short trial first. |
-| 09 | `09_NONLINEAR_REVIEWED_MODEL.py` | Reviewed nonlinear workflow; readiness and calibrated inputs are required. |
-| 10 | `10_WALL_VALIDATION.py` | Run the wall-validation workflow. |
-| 11 | `11_MATERIAL_DEVICE_VALIDATION.py` | Review nonlinear material and device validation. |
-| 12 | `12_NONLINEAR_PERFORMANCE.py` | Review nonlinear performance criteria and outputs. |
-| 13 | `13_STEEL02_CALIBRATION.py` | Open Steel02 calibration. |
-| 14 | `14_MATERIAL_PARAMETER_SETUP.py` | Configure material parameter studies. |
-| 15 | `15_LITERATURE_MATERIAL_PROFILES.py` | Inspect literature material profiles and their limits. |
-| 16 | `16_COMPONENT_RESULTS.py` | View component-validation results. |
-| 17 | `17_LITERATURE_COMPONENT_DEMO.py` | Launch the independent published-parameter component demo. |
-| 18 | `18_BUILDING_FULL_NONLINEAR.py` | Run the exploratory full-wall building trial; not design acceptance. |
-| 20 | `20_AUDIT_LOAD_CONNECTIONS.py <export-folder>` | Write read-only load/connectivity evidence for an assembled export. |
+01. [`01_WORKFLOW_START.py`](01_WORKFLOW_START.py) — Main ETABS-to-OpenSees GUI
+02. [`02_INPUT_READINESS.py`](02_INPUT_READINESS.py) — Input and export reconciliation
+03. [`03_MATERIAL_PARAMETER_SETUP.py`](03_MATERIAL_PARAMETER_SETUP.py) — Material parameter configuration
+04. [`04_LITERATURE_MATERIAL_PROFILES.py`](04_LITERATURE_MATERIAL_PROFILES.py) — Published specimen parameters
+05. [`05_STEEL02_CALIBRATION.py`](05_STEEL02_CALIBRATION.py) — Steel02 experimental calibration
+06. [`06_MATERIAL_DEVICE_VALIDATION.py`](06_MATERIAL_DEVICE_VALIDATION.py) — Materials, FVD and BRB benchmark tests
+07. [`07_WALL_VALIDATION.py`](07_WALL_VALIDATION.py) — Shear wall numerical and experimental checks
+08. [`08_COMPONENT_RESULTS.py`](08_COMPONENT_RESULTS.py) — Component result inspection
+09. [`09_LITERATURE_COMPONENT_DEMO.py`](09_LITERATURE_COMPONENT_DEMO.py) — Literature component demonstrations
+10. [`10_GRAVITY.py`](10_GRAVITY.py) — Gravity equilibrium and reactions
+11. [`11_MODAL_ULS_SLS.py`](11_MODAL_ULS_SLS.py) — Modal ULS and SLS analysis
+12. [`12_EQUIVALENT_STATIC.py`](12_EQUIVALENT_STATIC.py) — NBC 105 equivalent static forces
+13. [`13_RESPONSE_SPECTRUM.py`](13_RESPONSE_SPECTRUM.py) — MRSM response spectrum analysis
+14. [`14_LINEAR_TIME_HISTORY.py`](14_LINEAR_TIME_HISTORY.py) — Linear ground-motion analysis
+15. [`15_BUILDING_NONLINEAR_TRIAL.py`](15_BUILDING_NONLINEAR_TRIAL.py) — Short nonlinear diagnostic trial
+16. [`16_NONLINEAR_REVIEWED_MODEL.py`](16_NONLINEAR_REVIEWED_MODEL.py) — Reviewed nonlinear building model
+17. [`17_BUILDING_FULL_NONLINEAR.py`](17_BUILDING_FULL_NONLINEAR.py) — Full nonlinear history (unresolved first-step failure)
+18. [`18_NONLINEAR_PERFORMANCE.py`](18_NONLINEAR_PERFORMANCE.py) — Performance criteria and results
+19. [`19_AUDIT_LOAD_CONNECTIONS.py`](19_AUDIT_LOAD_CONNECTIONS.py) — Load-path and connectivity audit
+20. [`20_TRACE_FAILED_ELEMENT.py`](20_TRACE_FAILED_ELEMENT.py) — Trace failed solver element
 
-There is no step 19 in this release. `RUN_ETABS_TO_OPENSEES.py` remains the
-compatibility target of launcher 01. `RUN_LITERATURE_DEMO.py` remains a
-compatibility alias for launcher 17. Do not mix the preserved runtime under
-`Saved_Project_V156/` with modules from another release; refresh/rebuild an
-export from the complete current package before new analyses.
+**Important:** Keep the package intact. No new numerical analysis was run by this renaming. The full-building nonlinear first-step transient failure remains unresolved.
 
-Suggested analysis progression: reconcile the ETABS export and input inventory;
-check gravity/load paths and modal behavior; compare equivalent-static, response
-spectrum, and linear histories; then run short nonlinear diagnostic trials.
-Only treat nonlinear results as research evidence after component/material
-benchmarks, model-specific readiness review, full-record convergence, and
-response checks are complete. A literature template or a successful short
-solver trial does not validate the building.
+[Full program guides](docs/programs/00_PROGRAM_INDEX.md) · [Old/new path map](docs/00_WORK_ORDER_RENAME_MAP.md)

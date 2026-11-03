@@ -1,10 +1,5 @@
+"""Legacy compatibility alias: run 13_RESPONSE_SPECTRUM.py instead."""
 from pathlib import Path
-import sys,tkinter as tk
-from tkinter import filedialog
-ROOT=Path(__file__).resolve().parent
-sys.path.insert(0,str(ROOT))
-root=tk.Tk();root.withdraw()
-folder=filedialog.askdirectory(title='Select assembled export folder')
-if folder:
- from OpenSees_Model_Response_Spectrum_V132 import launch
- launch(root,folder);root.mainloop()
+import runpy
+_namespace=runpy.run_path(str(Path(__file__).resolve().with_name("13_RESPONSE_SPECTRUM.py")),run_name=__name__)
+globals().update(_namespace)
