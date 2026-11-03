@@ -121,10 +121,18 @@ def audit(folder, model_script=None):
             "The X-only first-step instability remains unresolved until native solver evidence confirms a fix."
         ],
     }
-    all_signed = bool(draft and draft.get("approved_for_nltha") is True
-                      and isinstance(draft.get("checks"), dict)
-                      and bool(draft["checks"])
-                      and all(value is True for value in draft["checks"].values()))
+    all_signed = bool(
+        draft and draft.get("approved_for_nltha") is True
+        and isinstance(draft.get("checks"), dict)
+        and bool(draft["checks"])
+        and all(value is True for value in draft["checks"].values())
+        and isinstance(draft.get("evidence"), dict)
+        and all(isinstance(draft["evidence"].get(key), str)
+                and draft["evidence"][key].strip()
+                and not draft["evidence"][key].startswith(
+                    ("INPUT / REVIEW REQUIRED:", "AVAILABLE FOR REVIEW:"))
+                for key in draft["checks"])
+    )
     # A human sign-off is reported as a claim, never as verified solver readiness.
     report["approved_for_nltha"] = all_signed
     if all_signed:

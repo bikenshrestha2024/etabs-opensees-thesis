@@ -59,6 +59,22 @@ class ReadinessTests(unittest.TestCase):
             self.assertEqual(result["readiness_level"],
                 "MODEL_BOUND_SIGNOFF_RECORDED_NOT_AUTOMATICALLY_VERIFIED")
 
+    def test_checkbox_without_real_evidence_is_not_signoff(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            model = root / "model.py"
+            model.write_text("pass\\n")
+            draft = root / "OpenSees_Model_Readiness_Draft_model_V134.json"
+            draft.write_text(json.dumps(dict(
+                model_script=str(model),
+                model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),
+                approved_for_nltha=True, checks={"frame_concrete_and_rebar_materials_reviewed": True},
+                evidence={"frame_concrete_and_rebar_materials_reviewed":
+                          "AVAILABLE FOR REVIEW: example material file"})))
+            result = audit(root, model)
+            self.assertFalse(result["approved_for_nltha"])
+            self.assertEqual(result["readiness_level"], "DIAGNOSTIC_ONLY")
+
     def test_export_does_not_write_to_original_model(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
