@@ -58,7 +58,7 @@ def launch(parent=None):
  import tkinter as tk
  from tkinter import ttk,messagebox,filedialog
  from components.validation.visual_materials import SOURCES,figure,SCOPE
- win=tk.Toplevel(parent) if parent else tk.Tk();win.title('Visual material/device validation - Concrete01 / Steel02 / FVD / BRB / walls');win.geometry('1250x850');output=tk.StringVar(value=str(ROOT/'Material_Validation_Results_V149'));status=tk.StringVar(value=SCOPE);bar=ttk.Frame(win);bar.pack(fill='x');ttk.Entry(bar,textvariable=output,width=85).pack(side='left',fill='x',expand=True)
+ win=tk.Toplevel(parent) if parent else tk.Tk();win.title('Visual NLTHA materials - Concrete01/02/CM, Steel02/MPF, FVD, BRB, walls');win.geometry('1250x850');output=tk.StringVar(value=str(ROOT/'Material_Validation_Results_V149'));status=tk.StringVar(value=SCOPE);bar=ttk.Frame(win);bar.pack(fill='x');ttk.Entry(bar,textvariable=output,width=85).pack(side='left',fill='x',expand=True)
  def choose():
   f=filedialog.askdirectory(parent=win)
   if f:output.set(f);load()
@@ -69,6 +69,9 @@ def launch(parent=None):
   frame=ttk.Frame(book);book.add(frame,text=name);frames[name]=frame
  notes=tk.Text(frames['Steps and citations'],wrap='word');sy=ttk.Scrollbar(frames['Steps and citations'],command=notes.yview);notes.configure(yscrollcommand=sy.set);sy.pack(side='right',fill='y');notes.pack(fill='both',expand=True);notes.insert('end',STEPS+'\n\n'+json.dumps(SOURCES,indent=2));notes.configure(state='disabled')
  log=tk.Text(frames['Run log'],wrap='word');ls=ttk.Scrollbar(frames['Run log'],command=log.yview);log.configure(yscrollcommand=ls.set);ls.pack(side='right',fill='y');log.pack(fill='both',expand=True)
+ # Additional catalog-backed material models share this original window.
+ from components.validation.expanded_workbench_tabs import install_extra_tabs
+ expanded_panels=install_extra_tabs(book,frames,win,output,status.set)
  def append(text):log.insert('end',text);log.see('end')
  def load():
   from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg,NavigationToolbar2Tk
