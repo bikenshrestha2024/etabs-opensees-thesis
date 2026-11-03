@@ -50,6 +50,7 @@ jobs:
           python -m compileall -q components/nonlinear_time_history components/model/reinforcement_mapping.py components/sections/devices.py
       - name: Run non-native NLTHA and device quality checks
         run: |
+          export PYTHONPATH="$PWD"
           python tests/verify_thesis_nltha_quality.py
           python tests/verify_device_parameter_finiteness.py
           python tests/verify_documentation_coverage.py
