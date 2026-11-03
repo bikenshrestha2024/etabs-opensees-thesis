@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0.0",
+  "purpose": "Exact listed B.3 SFI-MVLEM benchmark materials, not design parameters for asymmetric high-rise",
+  "source": {
+    "report": "PEER 2015/12 Kolozvari Orakcal Wallace",
+    "appendix": "B.3",
+    "printed_pages": "89–91",
+    "pdf_pages": "102–104",
+    "url": "https://peer.berkeley.edu/sites/default/files/webpeer-2015-12-kristijan_kolozvari_kutay_orakcal_john_wallace.pdf"
+  },
+  "specimen": "RW-A15-P10-S78",
+  "units": "kip-in-sec-ksi",
+  "wall": {
+    "height_in": 72,
+    "thickness_in": 6,
+    "width_in": 48,
+    "axial_kips": 149,
+    "vertical_node_elevations_in": [
+      0,
+      12,
+      24,
+      40,
+      56,
+      72
+    ],
+    "fibers_width_in": [
+      9,
+      10,
+      10,
+      10,
+      9
+    ],
+    "fiber_regions": [
+      "boundary",
+      "web",
+      "web",
+      "web",
+      "boundary"
+    ],
+    "height_elements": 5
+  },
+  "steel_mpf": {
+    "steelX": {
+      "fy_ksi": 58.4103,
+      "E_ksi": 29000,
+      "b": 0.02
+    },
+    "steelY_web": {
+      "fy_ksi": 58.4103,
+      "E_ksi": 29000,
+      "b": 0.02
+    },
+    "steelY_boundary": {
+      "fy_ksi": 69,
+      "E_ksi": 29000,
+      "b": 0.005
+    },
+    "transition": {
+      "R0": 20,
+      "cR1": 18.5,
+      "cR2": 0.0015,
+      "note": "Appendix B.3 exact values, not SteelMPF default cR1=0.925"
+    }
+  },
+  "concrete_cm": {
+    "web_unconfined": {
+      "fpcc_ksi": -8.09,
+      "epcc": -0.002371,
+      "Ec_ksi": 5403.2172,
+      "rc": 15,
+      "xcrn": 1.022,
+      "ft_ksi": 0.335798,
+      "et": 0.00008,
+      "rt": 1.2,
+      "xcrp": 10000
+    },
+    "confined_boundary": {
+      "fpcc_ksi": -10.479723,
+      "epcc": -0.005873,
+      "Ec_ksi": 5953.9187,
+      "rc": 12.072964,
+      "xcrn": 1.023,
+      "ft_ksi": 0.335798,
+      "et": 0.00008,
+      "rt": 1.2,
+      "xcrp": 10000
+    }
+  },
+  "fsam": {
+    "web": {
+      "rho_x": 0.0074,
+      "rho_y": 0.0074,
+      "concrete": "web_unconfined",
+      "steel_x": "steelX",
+      "steel_y": "steelY_web"
+    },
+    "boundary": {
+      "rho_x": 0.0082,
+      "rho_y": 0.0587,
+      "concrete": "confined_boundary",
+      "steel_x": "steelX",
+      "steel_y": "steelY_boundary"
+    },
+    "nu": 0.8,
+    "dowel_alpha": 0.01
+  },
+  "scope": "2D SFI-MVLEM cyclic measured specimen reproduction only",
+  "paper_transverse_hoop_detail_verified": false,
+  "building_rebar_approved": false,
+  "building_confinement_approved": false,
+  "experimentally_reproduced_in_this_repo": false,
+  "important_note": "The fitted confined strength and failure strain are those reported for this test specimen, not transferable to the 25-storey building. Exact hoop spacings/crossties and specimen measurement comparison still need source verification."
+}

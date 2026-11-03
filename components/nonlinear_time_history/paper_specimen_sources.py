@@ -42,3 +42,45 @@ def specimen_benchmark_only(specimen):
             "reinforcement_note":specimen["boundary_reinforcement"],
             "project_section_overwrite_allowed":False,
             "numerical_validation":"NOT_RUN"}
+
+
+def appendix_b3_material_inputs(path):
+    """Load EXACT PEER B.3 benchmark values and convert ksi→kN/m² once.
+
+    These remain test specimen cards. They cannot update building fiber
+    materials unless an independent approved project calibration exists.
+    """
+    import math
+    data=json.loads(Path(path).read_text(encoding="utf-8"))
+    if data.get("specimen")!="RW-A15-P10-S78" or data.get("units")!="kip-in-sec-ksi":
+        raise ValueError("Wrong PEER B.3 benchmark specimen/units")
+    if data.get("building_rebar_approved") is not False or data.get("building_confinement_approved") is not False:
+        raise ValueError("PEER specimen data must not assert project approval")
+    wall=data["wall"]
+    widths=wall["fibers_width_in"]
+    if len(widths)!=5 or sum(widths)!=wall["width_in"] or (
+        wall.get("fiber_regions")!=["boundary","web","web","web","boundary"]):
+        raise ValueError("B.3 confined boundary fiber arrangement was changed")
+    if len(wall["vertical_node_elevations_in"])!=6:
+        raise ValueError("B.3 requires five wall elements")
+    for name,card in data["concrete_cm"].items():
+        if card["fpcc_ksi"]>=0 or card["epcc"]>=0:
+            raise ValueError("ConcreteCM compression must be negative")
+        for k in ("fpcc_ksi","Ec_ksi","ft_ksi"):
+            if not math.isfinite(float(card[k])):
+                raise ValueError("Nonfinite concrete parameter")
+    converted={}
+    ksi_to_kN_m2=KSI_TO_MPA*1000.0
+    for region,parameters in data["concrete_cm"].items():
+        values=dict(parameters)
+        for key in ("fpcc_ksi","Ec_ksi","ft_ksi"):
+            values[key.replace("_ksi","_kN_m2")]=values.pop(key)*ksi_to_kN_m2
+        converted[region]=values
+    return dict(
+        status="PAPER_B3_EXACT_VALUES_ONLY_NOT_PROJECT_VERIFIED",
+        specimen=data["specimen"],
+        boundary_vs_web_concrete=converted,
+        fsam=data["fsam"],
+        steel_mpf=data["steel_mpf"],
+        source=data["source"],
+        apply_to_building_allowed=False)
