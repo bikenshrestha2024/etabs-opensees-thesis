@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0.0",
+  "purpose": "Source-extracted experimental specimen evidence for separate validation, not a building input default.",
+  "source": {
+    "report": "Kolozvari, Orakcal, Wallace, PEER Report 2015/12",
+    "url": "https://peer.berkeley.edu/sites/default/files/webpeer-2015-12-kristijan_kolozvari_kutay_orakcal_john_wallace.pdf",
+    "section": "3.2.1 and 3.2.2; Appendices B.2 and B.3",
+    "extraction_status": "REVIEWED_NARRATIVE_FACTS_NOT_FULL_APPENDIX_REPRODUCTION"
+  },
+  "specimens": [
+    {
+      "specimen_id": "RW-A15-P10-S78",
+      "reference_test": "Tran and Wallace (2012)",
+      "model_family": "2D SFI-MVLEM",
+      "width_in": 48,
+      "thickness_in": 6,
+      "height_in": 72,
+      "aspect_ratio": 1.5,
+      "boundary_reinforcement": "four #5 and four #6 bars, A706 Grade 60",
+      "web_reinforcement": "Grade 60 #3 bars at 5 inch spacing vertically and horizontally",
+      "concrete_test_fc_ksi": 8.09,
+      "axial_load_ratio_approx": 0.10,
+      "discretization": {"height_elements": 5, "base_element_height_in": 12,
+                           "section_macrofibers": 5, "confined_boundary_macrofibers": 2,
+                           "unconfined_web_macrofibers": 3},
+      "source_locator": "PEER 2015/12 Section 3.2.2, Figure 3.8, Appendix B.3",
+      "validation_state": "PAPER_SPECIMEN_DATA_ONLY",
+      "project_transfer_approved": false
+    },
+    {
+      "specimen_id": "RW2",
+      "reference_test": "Thomsen and Wallace (1995)",
+      "model_family": "2D MVLEM (flexural benchmark)",
+      "width_in": 48, "thickness_in": 4, "height_in": 144,
+      "aspect_ratio": 3.0,
+      "boundary_reinforcement": "eight #3 bars, Grade 60, reported fy=60 ksi",
+      "web_reinforcement": "two curtains of deformed #2 bars, reported fy=65 ksi; check specimen drawing for spacing",
+      "axial_load_ratio_approx": 0.07,
+      "concrete_design_fc_ksi": 4.0,
+      "concrete_test_fc_range_ksi": [4.16, 8.47],
+      "concrete_test_fc_base_mean_ksi": 6.21,
+      "discretization": {"height_elements": 16,"cross_section_uniaxial_fibers": 8},
+      "benchmark_limitation": "MVLEM flexural component was benchmarked with large shear stiffness and filtered flexural displacement history; do not treat as an independent nonlinear 3D shear-wall core test.",
+      "source_locator": "PEER 2015/12 Section 3.2.1, Figure 3.3, Appendix B.2",
+      "validation_state": "PAPER_SPECIMEN_DATA_ONLY",
+      "project_transfer_approved": false
+    }
+  ],
+  "missing_for_building": [
+    "Actual ETABS or drawing-based beam/column/wall rebar location and cage detailing",
+    "Boundary hoop pitch, hoop legs, cross-ties and effective confined-core dimensions",
+    "Measured project steel stress-strain and concrete compression cylinders",
+    "Wall pier axial-force histories and confinement mapping",
+    "Native experimental specimen response reproduction and calibration residuals"
+  ],
+  "notice": "Published tested specimen cage dimensions and bar labels are NOT applicable to a 25-storey asymmetric project core without independent mechanical justification."
+}
