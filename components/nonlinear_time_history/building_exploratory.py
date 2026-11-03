@@ -276,6 +276,17 @@ def _run(config):
     # Stage 01: audit source wall geometry before expensive gravity and transient solves.
     from components.nonlinear_time_history.wall_diagnostics import write_wall_audit
     write_wall_audit(data, out/'NLTHA_Wall_Geometry_Preflight.json')
+    # Stage 03: compare declared ETABS wall openings against actual quad occupancy.
+    # No manifest is not approval; the absence is made explicit in the results.
+    from components.nonlinear_time_history.wall_topology import write_opening_report
+    opening_manifest=config.get('wall_openings_manifest')
+    if opening_manifest:
+        write_opening_report(data,opening_manifest,out/'NLTHA_Wall_Opening_Preflight.json')
+    else:
+        (out/'NLTHA_Wall_Opening_Preflight.json').write_text(json.dumps(dict(
+            status='UNVERIFIED_NO_MANIFEST',
+            warning='No independently checked ETABS opening schedule supplied'),indent=2),
+            encoding='utf-8')
     write_rows(out/'Frame_Solver_Tag_Catalog.csv',frame_solver_tag_catalog(data['frames']))
     for key in ('x_path','y_path'):
         values,step,units=_read_peer_text_record(config[key]);records.append((np.asarray(values),step,units))
