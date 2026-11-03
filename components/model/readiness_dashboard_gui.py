@@ -212,6 +212,58 @@ def launch(parent, folder):
         else:
             webbrowser.open(folder_path.as_uri())
 
+    # Open corresponding safe tools without marking the current model ready.
+    # These start isolated diagnostics and save their own logs and outputs.
+    def _spawn_tool(args, description):
+        from tkinter import messagebox
+        root = Path(__file__).resolve().parents[2]
+        script = root / args[0]
+        if not script.is_file():
+            raise FileNotFoundError("Required launcher is missing: " + str(script))
+        destination = Path(project_var.get()).resolve() / "OpenSees_Analysis_Results" / "Readiness_Diagnostics"
+        destination.mkdir(parents=True, exist_ok=True)
+        logfile = destination / (script.stem + ".log")
+        # The log remains attached to the child until it exits; no fabricated
+        # success and no accidental reuse of the selected project's source.
+        with logfile.open("w", encoding="utf-8") as handle:
+            subprocess.Popen(
+                [sys.executable, str(script), *args[1:]], cwd=str(root),
+                stdout=handle, stderr=subprocess.STDOUT,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        messagebox.showinfo(
+            description,
+            "Started a separate diagnostic process. Inspect its actual log and "
+            "output before assessing readiness.\\n" + str(logfile),
+            parent=win)
+
+    def open_materials():
+        try:
+            _spawn_tool(["06_MATERIAL_DEVICE_VALIDATION.py"], "Material and device validation")
+        except Exception as exc:
+            messagebox.showerror("Material workbench", str(exc), parent=win)
+
+    def generate_wall_probes():
+        try:
+            source = filedialog.askopenfilename(
+                parent=win, title="Choose actual exploratory RunConfig JSON",
+                filetypes=[("JSON", "*.json")])
+            if not source:
+                return
+            destination = Path(project_var.get()).resolve() / "OpenSees_Analysis_Results" / "Wall_Probes"
+            _spawn_tool(["21_NLTHA_TRIAGE.py", "--config", source,
+                         "--output", str(destination)],
+                        "Wall first-step diagnostic configurations")
+        except Exception as exc:
+            messagebox.showerror("Wall diagnostics", str(exc), parent=win)
+
+    def run_device_benchmark():
+        try:
+            destination = Path(project_var.get()).resolve() / "OpenSees_Analysis_Results" / "Native_Device_Benchmark"
+            _spawn_tool(["29_NATIVE_DEVICE_BENCHMARK.py", "--output", str(destination)],
+                        "Isolated native FVD/BRB benchmark")
+        except Exception as exc:
+            messagebox.showerror("Device diagnostics", str(exc), parent=win)
+
     buttons = ttk.Frame(outer)
     buttons.pack(fill="x", pady=(10, 0))
     for caption, callback in (
@@ -221,6 +273,14 @@ def launch(parent, folder):
         ("Open project", open_project)
     ):
         ttk.Button(buttons, text=caption, command=callback).pack(side="left", padx=3)
+    actions = ttk.Frame(outer)
+    actions.pack(fill="x", pady=(7, 0))
+    for caption, callback in (
+        ("Material validation", open_materials),
+        ("Generate wall X/Y probes", generate_wall_probes),
+        ("Native FVD/BRB test", run_device_benchmark)
+    ):
+        ttk.Button(actions, text=caption, command=callback).pack(side="left", padx=3)
     ttk.Button(buttons, text="Close", command=win.destroy).pack(side="right", padx=3)
 
     refresh()

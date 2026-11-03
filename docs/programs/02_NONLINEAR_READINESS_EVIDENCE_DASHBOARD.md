@@ -22,3 +22,7 @@ Open the existing GUI and select **OpenSees nonlinear readiness / calibration st
 - Test: `python tests/verify_readiness_dashboard.py`.
 - Launch through the existing root application button; no separate window program is required.
 - Official NBC seismic context: https://dudbc.gov.np/pages/24231978/ ; paper wall basis PEER 2015/12 and Kolozvari et al. (2023) DOI 10.1016/j.engstruct.2023.116700. No paper source is treated as project approval.
+
+### Direct diagnostic tools
+
+The dashboard includes action buttons to launch the eight-material visual validation interface, generate separate ZERO/X/Y/XY wall diagnostic RunConfig files, and execute an isolated native FVD/BRB recorder test. Child-process console logs go to `OpenSees_Analysis_Results/Readiness_Diagnostics`; case outputs are written to distinct diagnostic directories. These buttons never run the building's full nonlinear time history automatically and never promote a case to thesis-qualified status.
