@@ -126,3 +126,75 @@ define_brb_core_material(ops, material_tag=802, Fy=FY_CORE, E0=E_STEEL,
 add_brb_corot_truss(ops, element_tag=8802, i_node=903, j_node=904,
                     core_area=A_CORE, material_tag=802)
 '''
+
+
+# -----------------------------------------------------------------------------
+# THESIS DEVICE RESPONSE METRICS (independent of OpenSees executable)
+# R05: Korkmaz & Kircil (2026), DOI 10.3390/buildings16040711 (FVD).
+# R07: Guerrero Bobadilla et al. (2025), SDEE 199, 109700 (BRB fatigue).
+# These expressions are bookkeeping diagnostics; they do NOT reproduce specimen
+# failure, manufacturer stroke capacity or validate a nonlinear device model.
+# -----------------------------------------------------------------------------
+
+def convert_fvd_cd_mm_to_m(Cd_kN_per_mm_per_s_alpha, alpha):
+    """Convert Cd in kN*(s/mm)^alpha to kN*(s/m)^alpha for kN-m-s models.
+
+    For F=Cd*sign(v)*abs(v)**alpha, v_mm=1000*v_m and
+    Cd_(kN,m,s)=Cd_(kN,mm,s)*1000**alpha.
+    Convert exactly once, not repeatedly after loading a converted register.
+    See Korkmaz & Kircil (2026), DOI 10.3390/buildings16040711.
+    """
+    Cd=float(Cd_kN_per_mm_per_s_alpha)
+    alpha=float(alpha)
+    if not all(math.isfinite(x) for x in (Cd, alpha)) or Cd<=0 or not 0<alpha<=1:
+        raise ValueError("FVD Cd must be finite positive and 0 < alpha <= 1.")
+    return Cd*(1000.0**alpha)
+
+
+def summarize_fvd_history(time_s, relative_displacement_m,
+                          relative_velocity_m_s, device_force_kN):
+    """Report independent FVD response demand metrics from recorded histories.
+
+    The work integral sum(F*v*dt) is SIGNED, not automatically positive
+    dissipation. OpenSees recorder direction and force sign must be verified
+    before labeling it physical dissipated energy. No capacity is assumed.
+    All time samples must be strictly increasing, finite and equal-length.
+    """
+    vectors=[time_s,relative_displacement_m,relative_velocity_m_s,device_force_kN]
+    if any(len(v)<2 for v in vectors) or len(set(map(len,vectors)))!=1:
+        raise ValueError("FVD histories must have equal lengths >=2.")
+    t,u,v,f=([float(z) for z in values] for values in vectors)
+    if any(not math.isfinite(x) for arr in (t,u,v,f) for x in arr):
+        raise ValueError("FVD history contains nonfinite values.")
+    if any(b<=a for a,b in zip(t,t[1:])):
+        raise ValueError("FVD time values must be strictly increasing.")
+    signed_work=sum(0.5*(f[i-1]*v[i-1]+f[i]*v[i])*(t[i]-t[i-1])
+                    for i in range(1,len(t)))
+    path_work=sum(0.5*(f[i-1]+f[i])*(u[i]-u[i-1])
+                  for i in range(1,len(t)))
+    return dict(samples=len(t),duration_s=t[-1]-t[0],
+        peak_abs_force_kN=max(map(abs,f)),
+        peak_abs_relative_velocity_m_s=max(map(abs,v)),
+        peak_abs_relative_displacement_m=max(map(abs,u)),
+        maximum_relative_stroke_range_m=max(u)-min(u),
+        signed_force_velocity_work_kN_m=signed_work,
+        signed_force_displacement_work_kN_m=path_work,
+        energy_sign_convention='UNVERIFIED; check force and velocity directions and hysteresis loop',
+        qualification_status='NOT_ESTABLISHED')
+
+
+def brb_cumulative_plastic_ductility(plastic_deformation_m, yield_displacement_m):
+    """Compute total absolute *plastic* displacement travel divided by yield displacement.
+
+    Input must be actual isolated plastic deformation of the BRB core.
+    Total element extension is NOT a substitute without an elastic/plastic
+    decomposition. The value is a demand measure, not a fatigue-life verdict.
+    Context: Guerrero Bobadilla et al. (2025), SDEE 199, 109700.
+    """
+    uy=float(yield_displacement_m)
+    values=[float(x) for x in plastic_deformation_m]
+    if not math.isfinite(uy) or uy<=0 or len(values)<2:
+        raise ValueError("BRB needs positive finite yield displacement and >=2 plastic samples.")
+    if any(not math.isfinite(x) for x in values):
+        raise ValueError("BRB plastic displacement history must be finite.")
+    return sum(abs(b-a) for a,b in zip(values,values[1:]))/uy

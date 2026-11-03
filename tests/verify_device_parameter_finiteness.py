@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from components.sections.devices import (
     add_brb_corot_truss, define_brb_core_material, define_fvd_material,
+    convert_fvd_cd_mm_to_m, summarize_fvd_history, brb_cumulative_plastic_ductility,
 )
 
 class RecordingOpenSees:
@@ -77,6 +78,32 @@ class DeviceNumericalGuards(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     define_brb_core_material(ops, **bad)
         self.assertEqual(ops.calls, [])
+
+class DeviceDemandHistoryChecks(unittest.TestCase):
+    def test_fvd_coefficient_conversion(self):
+        self.assertAlmostEqual(convert_fvd_cd_mm_to_m(700.0, 0.3),
+                               700.0 * 1000.0**0.3, places=9)
+        with self.assertRaisesRegex(ValueError, "finite"):
+            convert_fvd_cd_mm_to_m(float("nan"), 0.3)
+
+    def test_fvd_work_unit_and_signed_status(self):
+        # Two points: resisting force -10 kN, positive 0.1 m/s for 1 s.
+        result = summarize_fvd_history([0, 1], [0, 0.1], [0.1, 0.1], [-10, -10])
+        self.assertAlmostEqual(result["signed_force_velocity_work_kN_m"], -1.0)
+        self.assertEqual(result["qualification_status"], "NOT_ESTABLISHED")
+
+    def test_reject_unsorted_or_invalid_time_history(self):
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            summarize_fvd_history([0, 0], [0, 0.1], [0.1, 0.1], [1, 1])
+        with self.assertRaisesRegex(ValueError, "nonfinite"):
+            summarize_fvd_history([0, 1], [0, 0.1], [float("nan"), 0.1], [1, 1])
+
+    def test_brb_uses_actual_plastic_history(self):
+        self.assertAlmostEqual(
+            brb_cumulative_plastic_ductility([0, 0.01, -0.01, 0], 0.005),8.0)
+        with self.assertRaisesRegex(ValueError,"finite"):
+            brb_cumulative_plastic_ductility([0,float("nan")],0.005)
+
 
 if __name__ == "__main__":
     unittest.main()
