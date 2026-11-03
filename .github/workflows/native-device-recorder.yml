@@ -1,0 +1,35 @@
+name: Native OpenSees recorder benchmark (conda-forge)
+on:
+  push:
+    branches: [main]
+    paths:
+      - tests/native_device_recorders.tcl
+      - tests/audit_native_device_recorders.py
+      - .github/workflows/native-device-recorder.yml
+  workflow_dispatch:
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: native-opensees
+          create-args: >-
+            -c conda-forge
+            python=3.12
+            opensees
+          cache-environment: true
+      - name: Native OpenSees FVD and BRB recorder checks
+        shell: micromamba-shell {0}
+        run: |
+          OpenSees tests/native_device_recorders.tcl native_device_results
+          python tests/audit_native_device_recorders.py native_device_results
+      - name: Archive device recorder evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-device-test-evidence
+          path: native_device_results/
+          if-no-files-found: warn
