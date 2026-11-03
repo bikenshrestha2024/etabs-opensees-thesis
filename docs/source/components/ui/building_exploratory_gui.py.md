@@ -1,23 +1,23 @@
-# building_exploratory_gui.py — source documentation
+# building_exploratory_gui.py — Building NLTHA graphical control and research-run safety
 
 **Python source:** [components/ui/building_exploratory_gui.py](../../../../components/ui/building_exploratory_gui.py)
-**Git baseline content SHA:** 6bf4179a76cfc1597309807715693f74205a93e0
-**Subsystem:** Modern GUI and data display
-**Priority:** P0 — critical NLTHA dependent source
+**Current Git blob SHA:** 6bf4179a76cfc1597309807715693f74205a93e0
+**Review status:** Source content was inspected for these specific behaviors. Physical/numerical validation not executed.
 
-## Responsibilities and contracts
-Part of the ui implementation subsystem. Check the exact classes/functions, argument names, return structures and imported callers in the linked source before altering its interface. This guide documents engineering verification obligations, not an already-completed API test.
+## What this file currently implements
+Controls research building material selection, wall configuration, transient system, output folder, diagnostic toggles and presentation of logs/results through GUI execution.
 
-## Source, inputs, units
-Document original ETABS export path/SHA, declared kN-m-s model units, stress conversion, local axes, accepted coordinate/section mapping and any third-party scientific input. Do not substitute nominal reinforcement, material grade or a literature benchmark for tested project data.
+## Explicit assumptions and known deficiencies
+Provide visible grouping for assumed versus calibrated inputs and for short probe versus full record. UI can display analysis outcomes but cannot independently establish solver convergence or specimen calibration.
 
-## Outputs and failure conditions
-Capture source commit SHA, model/ground-motion fingerprint, ULS/SLS, record orientation, completed physical duration, solver diagnostics, exception traceback and linked reports. Mark failed or truncated runs and do not include them in thesis rankings.
+## Required thesis engineering changes
+Add explicit preview of input model/record hashes, ULS/SLS, XY/YX and damping; provide cancel, safe run folder selection, progress updates, selected test evidence and links to file-specific validation reports. Avoid silent exceptions.
 
-## Research and standards
-Relevant register IDs: See module's underlying computational dependencies. Consult [research reference register](../../../00_RESEARCH_REFERENCES.md). These identify potentially applicable publications, not proof of parameter calibration or test reproduction.
+## Cited scientific context
+R01, R02, R05, R10; documents for literature-based controls, not a GUI physics benchmark.
+References are indexed in [the research source register](../../../00_RESEARCH_REFERENCES.md). Paper citations establish appropriate model context, not code validation.
 
-## Regression acceptance
-Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
+## Required regression output
+Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.
 
-[Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+[Source module index](../../00_SOURCE_GUIDE_INDEX.md) · [G00–G10 acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md)

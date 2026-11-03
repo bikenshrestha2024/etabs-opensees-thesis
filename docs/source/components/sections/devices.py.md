@@ -1,23 +1,23 @@
-# devices.py — source documentation
+# devices.py — FVD and BRB nonlinear mechanics and demand helpers
 
 **Python source:** [components/sections/devices.py](../../../../components/sections/devices.py)
-**Git baseline content SHA:** 5d4a9847b7e35cf1d95e511d22f65eabb52ae005
-**Subsystem:** Sections, nonlinear walls, FVD/BRB devices
-**Priority:** P0 — critical NLTHA dependent source
+**Current Git blob SHA:** 288e8ee7cec49f9521dd1d70e9d96789b4df5ba7
+**Review status:** Source content was inspected for these specific behaviors. Physical/numerical validation not executed.
 
-## Responsibilities and contracts
-Part of the sections implementation subsystem. Check the exact classes/functions, argument names, return structures and imported callers in the linked source before altering its interface. This guide documents engineering verification obligations, not an already-completed API test.
+## What this file currently implements
+Implements Maxwell ViscousDamper with twoNodeLink (local axis 1, Rayleigh optional), Steel02 BRB core with corotTruss, and experimental-data-only response helpers. The new convert_fvd_cd_mm_to_m(Cd, alpha) returns Cd multiplied by 1000 raised to alpha. summarize_fvd_history returns peak relative force, velocity, displacement, travel and two signed work integrations. brb_cumulative_plastic_ductility requires an ACTUAL plastic deformation history and a separately established positive yield displacement.
 
-## Source, inputs, units
-Document original ETABS export path/SHA, declared kN-m-s model units, stress conversion, local axes, accepted coordinate/section mapping and any third-party scientific input. Do not substitute nominal reinforcement, material grade or a literature benchmark for tested project data.
+## Explicit assumptions and known deficiencies
+All parameters must be finite and unit consistent, with FVD K in force/length and Cd in force*(time/length)^alpha. The two signed work integrals are NOT labeled positive dissipated energy until recorder force/velocity sign conventions have been verified. Steel02 corotTruss does not by itself qualify a BRB under cyclic fatigue, fracture, connection eccentricity, casing or brace-core slip.
 
-## Outputs and failure conditions
-Capture source commit SHA, model/ground-motion fingerprint, ULS/SLS, record orientation, completed physical duration, solver diagnostics, exception traceback and linked reports. Mark failed or truncated runs and do not include them in thesis rankings.
+## Required thesis engineering changes
+Validate a full FVD hysteresis curve with test K/Cd/alpha and connection rigidity; verify BRB hysteretic strength, tensile/compressive asymmetry, cumulative plastic ductility, local eccentricity and fatigue against experimental protocols. Add native unit tests for twoNodeLink axis, force sign and multi-step integration before using metrics in the M0–M6 suite.
 
-## Research and standards
-Relevant register IDs: R01 R02 R07 R08 R09 R13. Consult [research reference register](../../../00_RESEARCH_REFERENCES.md). These identify potentially applicable publications, not proof of parameter calibration or test reproduction.
+## Cited scientific context
+R05, R06, R07, R08; OpenSees ViscousDamper and Steel02 reference manuals.
+References are indexed in [the research source register](../../../00_RESEARCH_REFERENCES.md). Paper citations establish appropriate model context, not code validation.
 
-## Regression acceptance
-Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
+## Required regression output
+Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.
 
-[Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+[Source module index](../../00_SOURCE_GUIDE_INDEX.md) · [G00–G10 acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md)

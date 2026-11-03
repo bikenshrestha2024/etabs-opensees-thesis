@@ -1,23 +1,23 @@
-# building_exploratory.py — source documentation
+# building_exploratory.py — Research full-building nonlinear runner
 
 **Python source:** [components/nonlinear_time_history/building_exploratory.py](../../../../components/nonlinear_time_history/building_exploratory.py)
-**Git baseline content SHA:** 7c7141c691ac44906b60837b4b2d95876f6121a7
-**Subsystem:** Nonlinear transient model and research constitutive laws
-**Priority:** P0 — critical NLTHA dependent source
+**Current Git blob SHA:** 7c7141c691ac44906b60837b4b2d95876f6121a7
+**Review status:** Source content was inspected for these specific behaviors. Physical/numerical validation not executed.
 
-## Responsibilities and contracts
-Part of the nonlinear_time_history implementation subsystem. Check the exact classes/functions, argument names, return structures and imported callers in the linked source before altering its interface. This guide documents engineering verification obligations, not an already-completed API test.
+## What this file currently implements
+Copies source export to isolated_model, reads paired PEER histories, creates ULS/SLS cases and fresh XY/YX models, performs gravity preload and initial modal analysis, applies UniformExcitation, records accepted transient histories and separate failure evidence.
 
-## Source, inputs, units
-Document original ETABS export path/SHA, declared kN-m-s model units, stress conversion, local axes, accepted coordinate/section mapping and any third-party scientific input. Do not substitute nominal reinforcement, material grade or a literature benchmark for tested project data.
+## Explicit assumptions and known deficiencies
+Materials are explicitly research assumptions. It supports ZERO, X, Y, XY first-step diagnostics, optional Rayleigh overrides and UmfPack/SparseGeneral. A completed 0.005 s trial must be distinguished from full record; post-failure element localForce can be contaminated. Status COMPLETED_EXPLORATORY_RECORD is not accepted by the separate performance assessor as COMPLETED_FULL_RECORD.
 
-## Outputs and failure conditions
-Capture source commit SHA, model/ground-motion fingerprint, ULS/SLS, record orientation, completed physical duration, solver diagnostics, exception traceback and linked reports. Mark failed or truncated runs and do not include them in thesis rankings.
+## Required thesis engineering changes
+Require identical model and record hash for each orientation; record first accepted state, dt sensitivity, solver retry changes, complete earthquake duration and finite response. Verify wall/beam/column plastic states and device outputs. Fix X-only AREA:354/482 diagnostics before M0-M6 ranking.
 
-## Research and standards
-Relevant register IDs: R01 R02 R03 R04 R05 R06. Consult [research reference register](../../../00_RESEARCH_REFERENCES.md). These identify potentially applicable publications, not proof of parameter calibration or test reproduction.
+## Cited scientific context
+R01, R02, R03, R10, R12, R13.
+References are indexed in [the research source register](../../../00_RESEARCH_REFERENCES.md). Paper citations establish appropriate model context, not code validation.
 
-## Regression acceptance
-Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
+## Required regression output
+Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.
 
-[Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+[Source module index](../../00_SOURCE_GUIDE_INDEX.md) · [G00–G10 acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md)

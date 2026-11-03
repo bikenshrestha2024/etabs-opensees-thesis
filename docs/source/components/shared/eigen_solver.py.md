@@ -1,23 +1,23 @@
-# eigen_solver.py — source documentation
+# eigen_solver.py — Modal eigensolver quality and large-model numerical control
 
 **Python source:** [components/shared/eigen_solver.py](../../../../components/shared/eigen_solver.py)
-**Git baseline content SHA:** e6470dfd8bdbdf54397fd905f189121a07d27de0
-**Subsystem:** Solver, logging and response numerical utilities
-**Priority:** P0 — critical NLTHA dependent source
+**Current Git blob SHA:** e6470dfd8bdbdf54397fd905f189121a07d27de0
+**Review status:** Source content was inspected for these specific behaviors. Physical/numerical validation not executed.
 
-## Responsibilities and contracts
-Part of the shared implementation subsystem. Check the exact classes/functions, argument names, return structures and imported callers in the linked source before altering its interface. This guide documents engineering verification obligations, not an already-completed API test.
+## What this file currently implements
+Supports PythonSparse matrices and attempts native eigen backends with a PythonSparse fallback when a solver fails or returns incomplete eigenpairs; dense fullGenLapack is skipped above a model-size guard.
 
-## Source, inputs, units
-Document original ETABS export path/SHA, declared kN-m-s model units, stress conversion, local axes, accepted coordinate/section mapping and any third-party scientific input. Do not substitute nominal reinforcement, material grade or a literature benchmark for tested project data.
+## Explicit assumptions and known deficiencies
+A hanging native eigen call is not interrupted merely by fallback exception handling; use subprocess process isolation and cancellation. Reported modal mass participation alone does not validate nonlinear section/element behavior.
 
-## Outputs and failure conditions
-Capture source commit SHA, model/ground-motion fingerprint, ULS/SLS, record orientation, completed physical duration, solver diagnostics, exception traceback and linked reports. Mark failed or truncated runs and do not include them in thesis rankings.
+## Required thesis engineering changes
+Include modal residual and Rayleigh damping sensitivity; log wall time and backend; compare actual ULS/SLS mode shapes and mass to ETABS; constrain native eigensolver runtime via a separate cancelable worker process.
 
-## Research and standards
-Relevant register IDs: See subject-specific source citations. Consult [research reference register](../../../00_RESEARCH_REFERENCES.md). These identify potentially applicable publications, not proof of parameter calibration or test reproduction.
+## Cited scientific context
+R10 and independent numerical eigenvalue verification; no paper citation is a substitute for checking assembled matrices.
+References are indexed in [the research source register](../../../00_RESEARCH_REFERENCES.md). Paper citations establish appropriate model context, not code validation.
 
-## Regression acceptance
-Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
+## Required regression output
+Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.
 
-[Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+[Source module index](../../00_SOURCE_GUIDE_INDEX.md) · [G00–G10 acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md)
