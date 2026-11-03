@@ -101,3 +101,5 @@ All **90 active Python modules** have individual source guides (with source blob
 | [components/nonlinear_time_history/device_recording.py](../../components/nonlinear_time_history/device_recording.py) | [Guide](components/nonlinear_time_history/device_recording.py.md) | New active staged engineering module | P0 |
 | [components/nonlinear_time_history/full_record_gate.py](../../components/nonlinear_time_history/full_record_gate.py) | [Guide](components/nonlinear_time_history/full_record_gate.py.md) | New active staged engineering module | P0 |
 | [components/nonlinear_time_history/variant_comparison.py](../../components/nonlinear_time_history/variant_comparison.py) | [Guide](components/nonlinear_time_history/variant_comparison.py.md) | New active staged engineering module | P0 |
+
+| [components/validation/expanded_workbench_tabs.py](../../components/validation/expanded_workbench_tabs.py) | [Guide](components/validation/expanded_workbench_tabs.py.md) | Integrated material/device workbench GUI | P1 |

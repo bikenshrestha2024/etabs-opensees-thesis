@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
     paths:
+      - 'components/validation/expanded_workbench_tabs.py'
+      - 'components/validation/visual_workbench.py'
+      - 'tests/verify_expanded_workbench_tabs.py'
       - 'components/nonlinear_time_history/thesis_quality.py'
       - 'components/nonlinear_time_history/wall_diagnostics.py'
       - 'components/model/reinforcement_mapping.py'
@@ -47,7 +50,7 @@ jobs:
           python-version: '3.12'
       - name: Syntax-check key NLTHA files
         run: |
-          python -m compileall -q components/nonlinear_time_history components/model/reinforcement_mapping.py components/sections/devices.py
+          python -m compileall -q components/nonlinear_time_history components/model/reinforcement_mapping.py components/sections/devices.py components/validation/expanded_workbench_tabs.py components/validation/visual_workbench.py
       - name: Run non-native NLTHA and device quality checks
         run: |
           export PYTHONPATH="$PWD"
@@ -60,3 +63,4 @@ jobs:
           python tests/verify_device_recording.py
           python tests/verify_full_record_gate.py
           python tests/verify_variant_comparison.py
+          python tests/verify_expanded_workbench_tabs.py

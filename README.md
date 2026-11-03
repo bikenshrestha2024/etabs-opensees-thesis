@@ -30,3 +30,6 @@ The exploratory runner now includes physical wall geometry preflight (stage 01),
 ## Historical version organization
 
 Superseded root versioned reports, manifests and logs are stored under [archive/previous_versions](archive/previous_versions/README.md), grouped by filename family. Only the latest version in each family stays at root, except two older Python compatibility facades still consumed by the GUI. The archive manifest documents those exceptions and exact original hashes.
+
+
+The [expanded visual material workbench](docs/programs/06_MATERIAL_DEVICE_VALIDATION_EXPANDED.md) retains V149 Concrete01/Steel02/FVD/BRB plots and adds Concrete02/ConcreteCM/SteelMPF/E-SFI panels plus full research catalog and calibration tools.
