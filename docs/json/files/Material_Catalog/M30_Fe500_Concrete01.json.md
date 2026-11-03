@@ -1,0 +1,95 @@
+# Material_Catalog/M30_Fe500_Concrete01.json
+
+**Source:** [Material_Catalog/M30_Fe500_Concrete01.json](../../../../Material_Catalog/M30_Fe500_Concrete01.json)
+**Classification:** MATERIAL_PROFILE
+**SHA-256 (source bytes):** c996844bbc263c7878ef33562ef6f66edf798fee6146f9582867f12d52980dd1
+**Size:** 3675 bytes
+**Root JSON type:** object
+**Content inspection:** Directly parsed from checkout; value units and validation status are NOT inferred.
+
+## Fields actually present
+
+| JSON path | Observed type |
+|---|---|
+| $.model | str |
+| $.parameters | object |
+| $.parameters.fpc_MPa | number |
+| $.parameters.epsc0 | number |
+| $.parameters.fpcu_MPa | number |
+| $.parameters.epsU | number |
+| $.parameter_basis | str |
+| $.specimen_id | str |
+| $.citation | str |
+| $.source | str |
+| $.protocol_csv | str |
+| $.measured_csv | str |
+| $.fit_bounds | object(empty) |
+| $.train_fraction | number |
+| $.scope | str |
+| $.wall_formulation | str |
+| $.targets | array |
+| $.targets[] | number |
+| $.samples_per_leg | integer |
+| $.dt_s | number |
+| $.sources | object |
+| $.sources.Mander_theory_1988 | str |
+| $.sources.Mander_experiment_1988 | str |
+| $.sources.Concrete02 | str |
+| $.sources.ConcreteCM | str |
+| $.sources.Steel02 | str |
+| $.sources.SteelMPF | str |
+| $.sources.FSAM | str |
+| $.sources.E_SFI_2023 | str |
+| $.sources.E_SFI_authors | str |
+| $.sources.PEER_2015 | str |
+| $.sources.FVD | str |
+| $.sources.BRB | str |
+| $.sources.Outrigger_optimization_2021 | str |
+| $.sources.Outrigger_2010 | str |
+| $.sources.NBC2025 | str |
+| $.sources.Diaphragm | str |
+| $.project_transfer_approved | boolean |
+| $.profile_id | str |
+| $.provenance | object |
+| $.provenance.fpc_MPa | object |
+| $.provenance.fpc_MPa.value | number |
+| $.provenance.fpc_MPa.unit | str |
+| $.provenance.fpc_MPa.basis | str |
+| $.provenance.fpc_MPa.source | str |
+| $.provenance.fpc_MPa.locator | str |
+| $.provenance.epsc0 | object |
+| $.provenance.epsc0.value | number |
+| $.provenance.epsc0.unit | str |
+| $.provenance.epsc0.basis | str |
+| $.provenance.epsc0.source | str |
+| $.provenance.epsc0.locator | str |
+| $.provenance.fpcu_MPa | object |
+| $.provenance.fpcu_MPa.value | number |
+| $.provenance.fpcu_MPa.unit | str |
+| $.provenance.fpcu_MPa.basis | str |
+| $.provenance.fpcu_MPa.source | str |
+| $.provenance.fpcu_MPa.locator | str |
+| $.provenance.epsU | object |
+| $.provenance.epsU.value | number |
+| $.provenance.epsU.unit | str |
+| $.provenance.epsU.basis | str |
+| $.provenance.epsU.source | str |
+| $.provenance.epsU.locator | str |
+
+## Interpretation and provenance
+
+- Source of truth: the original JSON file at the path above. This generated reference never changes original data.
+- This is an OBSERVED FIELD INVENTORY, not a formal JSON Schema or proof every nested record has identical keys.
+- Original units, code edition, specimen/ETABS source, record ID, solver version and experimental status must be checked within the source file or linked manifest.
+- A value without documented units/source must be classified UNVERIFIED, not automatically assumed kN-m-s.
+- For historical outputs do not use to populate current run configuration or calibrated material parameters.
+- Material/source specimens are not project-approved RC bar schedules or manufacturer-qualified dampers.
+- External data may be private. This script runs offline and does not upload file contents.
+
+## Validation requirements
+
+- Confirm valid UTF-8 JSON and expected field/type/units against the producing program.
+- Verify hashes, compare input and output manifests, and preserve experiment/case identity.
+- For nonlinear runs check G00–G10 acceptance gates and explicit failure/incomplete statuses.
+
+[All JSON files](../../00_ALL_JSON_FILES.md) · [Research citations](../../../00_RESEARCH_REFERENCES.md)
