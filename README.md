@@ -10,3 +10,12 @@ The 20 primary executable entry points now use work-order numbers 01–20. The p
 
 
 **V169 nonlinear diagnostic enhancement:** [21 — NLTHA triage](docs/programs/21_NLTHA_TRIAGE.md) generates isolated ZERO/X/Y/XY probes, validates accelerogram quality and records explicit full-record evidence gates. Existing first-step failure is not resolved.
+
+## Research source documentation
+
+- [Guides for all 84 active Python modules](docs/source/00_SOURCE_GUIDE_INDEX.md)
+- [Scientific reference and citation register](docs/00_RESEARCH_REFERENCES.md)
+- [Thesis NLTHA acceptance gates](docs/00_THESIS_ACCEPTANCE_GATES.md)
+- [Contributor / ChatGPT / Codex instructions](AGENTS.md)
+
+This documentation does not certify native solver convergence or project-specific material calibration.
