@@ -14,6 +14,18 @@ python 21_NLTHA_TRIAGE.py --config "D:\\Existing_Run\\RunConfig.json" --output "
 
 The four files `Probe_ZERO.json`, `Probe_X.json`, `Probe_Y.json` and `Probe_XY.json` are written, **but they are not executed**. Use the V168 exploratory nonlinear runner on each config in a fresh process / independently rebuilt model. All probes use ULS, XY orientation, first 0.005 s, zero Rayleigh damping and separate output directories. Do not change multiple mechanical assumptions between probes. Do not overwrite earlier evidence.
 
+
+Execute each generated configuration from the repository root with the exploratory runner, for example:
+
+```powershell
+python -m components.nonlinear_time_history.building_exploratory --config "D:\\NLTHA_Probes\\Probe_ZERO.json"
+python -m components.nonlinear_time_history.building_exploratory --config "D:\\NLTHA_Probes\\Probe_X.json"
+python -m components.nonlinear_time_history.building_exploratory --config "D:\\NLTHA_Probes\\Probe_Y.json"
+python -m components.nonlinear_time_history.building_exploratory --config "D:\\NLTHA_Probes\\Probe_XY.json"
+```
+
+Run serially in separate processes, recording the exact active environment and source commit. If the first configuration fails before writing a report, preserve its console log. These commands are intentionally **not** executed in CI because a calibrated model/export and a native OpenSeesPy installation are required.
+
 After running, review:
 
 ```powershell
