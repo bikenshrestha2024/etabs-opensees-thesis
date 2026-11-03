@@ -56,6 +56,7 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
     validate_variant_manifest(payload)
     if set(summaries)!=set(VARIANTS):
         raise ValueError("All M0–M6 case collections are required")
+    variant_manifest={r["variant"]:r for r in payload["variants"]}
     grouped={}
     for variant,cases in summaries.items():
         if not isinstance(cases,list) or not cases:raise ValueError(variant+" has no completed cases")
@@ -70,6 +71,10 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
                 raise ValueError(f"{variant} case {key} not a full-duration numerical screen")
             if gate.get("accepted_channels_finite") is not True:
                 raise ValueError(f"{variant} case {key} has unverified finite channels")
+            if c.get("variant_id")!=variant:
+                raise ValueError(f"{variant} case {key} reports a different variant ID")
+            if c.get("model_sha256")!=variant_manifest[variant]["model_file_sha256"]:
+                raise ValueError(f"{variant} case {key} source export hash differs from manifest")
             if c.get("record_sha256") is None:
                 raise ValueError(f"{variant} case {key} has no ground motion hash")
             for name in METRICS:

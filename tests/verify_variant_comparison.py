@@ -13,7 +13,8 @@ def suite():
         for limit in ("ULS","SLS"):
             for pair in ("P1","P2","P3"):
                 for axis in ("XY","YX"):
-                    cases.append(dict(limit_state=limit,pair_id=pair,
+                    cases.append(dict(variant_id=model,model_sha256="a"*64,
+                        limit_state=limit,pair_id=pair,
                         orientation=axis,record_sha256=pair,
                         completion_gate=dict(status="FULL_DURATION_NUMERIC_SCREEN",
                             full_record_completed=True,accepted_channels_finite=True),
@@ -32,6 +33,11 @@ class CompareTests(unittest.TestCase):
     def test_reject_missing_motion(self):
         data=suite();data["M2"].pop()
         with self.assertRaisesRegex(ValueError,"missing/extra"):
+            compare_completed_cases(manifest(),data)
+    def test_reject_wrong_variant_source(self):
+        data=suite()
+        data["M2"][0]["variant_id"]="M1"
+        with self.assertRaisesRegex(ValueError,"variant ID"):
             compare_completed_cases(manifest(),data)
     def test_reject_trial(self):
         data=suite();data["M3"][0]["completion_gate"]["full_record_completed"]=False
