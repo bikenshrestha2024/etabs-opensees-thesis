@@ -19,3 +19,7 @@ The 20 primary executable entry points now use work-order numbers 01–20. The p
 - [Contributor / ChatGPT / Codex instructions](AGENTS.md)
 
 This documentation does not certify native solver convergence or project-specific material calibration.
+
+## Stage 01–06 NLTHA implementation (Nov 2026)
+
+The exploratory runner now includes physical wall geometry preflight (stage 01), opt-in source-approved frame reinforcement mapping (02), declared wall opening occupancy checks (03), accepted-step FVD/BRB recorder demand channels (04), chronological full-duration evidence gates (05), and a fail-closed M0–M6 research comparison executable (06). See docs/programs/22_WALL_FAILURE_AUDIT.md through 27_M0_M6_OUTRIGGER_COMPARISON.md. These are engineering validation capabilities **not** a claim that the first-step X wall solver failure is resolved or that all seismic records and variants converged.

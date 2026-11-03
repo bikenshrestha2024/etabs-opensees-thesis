@@ -292,6 +292,14 @@ def _run(config):
         values,step,units=_read_peer_text_record(config[key]);records.append((np.asarray(values),step,units))
     from components.nonlinear_time_history.thesis_quality import audit_ground_motion_pair
     input_quality=audit_ground_motion_pair(records,[config['x_path'],config['y_path']])
+    # Pair fingerprint is constant across XY/YX and binds the input files,
+    # sampling, units and selected scale. This is NOT spectrum-match proof.
+    record_pair_sha256=hashlib.sha256(json.dumps(dict(
+        x=input_quality['records'][0]['sha256'],
+        y=input_quality['records'][1]['sha256'],
+        dt=input_quality['records'][0]['dt_s'],
+        units=[r['source_units'] for r in input_quality['records']],
+        scale=scale),sort_keys=True).encode('utf-8')).hexdigest()
     (out/'NLTHA_Input_Quality.json').write_text(json.dumps(input_quality,indent=2,allow_nan=False),encoding='utf-8')
     print('[NLTHA INPUT QUALITY] finite records, matching sampling and file hashes verified',flush=True)
     if abs(records[0][1]-records[1][1])>1e-10 or len(records[0][0])!=len(records[1][0]):raise ValueError('Pair duration/digitization mismatch; reconcile records explicitly')
@@ -568,6 +576,12 @@ def _run(config):
         result=dict(
             completion_gate=completion_gate,
             orientation=orientation,
+            # Case-matrix evidence fields are explicit, not inferred from folder names.
+            pair_id=str(config.get('pair_id','UNSPECIFIED')),
+            variant_id=str(config.get('variant_id','UNASSIGNED')),
+            limit_state=config.get('limit_state','ULS'),
+            record_sha256=record_pair_sha256,
+            model_sha256=assumptions['source_model_sha256'],
             wall_model='E_SFI_MVLEM_3D' if full_wall else 'ELASTIC',
             frame_model='LITERATURE_CONCRETE01_NOMINAL_FE500' if full_wall else 'NONLINEAR_ILLUSTRATIVE_RC_FIBERS',
             gravity_system=gravity_system,transient_system=transient_system,

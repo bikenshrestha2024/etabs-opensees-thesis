@@ -1,6 +1,6 @@
 # 00 — Active Python module documentation index
 
-All **84 active Python modules** have individual source guides (with source blob SHA and domain-specific verification obligations). This is guidance rather than execution of native tests or an exhaustive line-by-line correction of the historical repository.
+All **90 active Python modules** have individual source guides (with source blob SHA and domain-specific verification obligations). This is guidance rather than execution of native tests or an exhaustive line-by-line correction of the historical repository.
 
 | Source module | Individual guide | Role | Priority |
 |---|---|---|---|
@@ -90,3 +90,14 @@ All **84 active Python modules** have individual source guides (with source blob
 | [components/validation/wall_validation.py](../../components/validation/wall_validation.py) | [Guide](components/validation/wall_validation.py.md) | Code criteria, benchmark comparison and experimental evidence | P1 |
 
 [Research citation register](../00_RESEARCH_REFERENCES.md) · [Thesis acceptance gates](../00_THESIS_ACCEPTANCE_GATES.md) · [Full tracked-file audit ledger](../audit/00_ALL_FILES_AUDIT.tsv)
+
+## Newly implemented Stage 01–06 modules
+
+| Source | Documentation | Workstream | Priority |
+|---|---|---|---|
+| [components/nonlinear_time_history/wall_diagnostics.py](../../components/nonlinear_time_history/wall_diagnostics.py) | [Guide](components/nonlinear_time_history/wall_diagnostics.py.md) | New active staged engineering module | P0 |
+| [components/model/reinforcement_mapping.py](../../components/model/reinforcement_mapping.py) | [Guide](components/model/reinforcement_mapping.py.md) | New active staged engineering module | P0 |
+| [components/nonlinear_time_history/wall_topology.py](../../components/nonlinear_time_history/wall_topology.py) | [Guide](components/nonlinear_time_history/wall_topology.py.md) | New active staged engineering module | P0 |
+| [components/nonlinear_time_history/device_recording.py](../../components/nonlinear_time_history/device_recording.py) | [Guide](components/nonlinear_time_history/device_recording.py.md) | New active staged engineering module | P0 |
+| [components/nonlinear_time_history/full_record_gate.py](../../components/nonlinear_time_history/full_record_gate.py) | [Guide](components/nonlinear_time_history/full_record_gate.py.md) | New active staged engineering module | P0 |
+| [components/nonlinear_time_history/variant_comparison.py](../../components/nonlinear_time_history/variant_comparison.py) | [Guide](components/nonlinear_time_history/variant_comparison.py.md) | New active staged engineering module | P0 |

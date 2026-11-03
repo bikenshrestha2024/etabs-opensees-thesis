@@ -5,6 +5,18 @@ on:
     branches: [main]
     paths:
       - 'components/nonlinear_time_history/thesis_quality.py'
+      - 'components/nonlinear_time_history/wall_diagnostics.py'
+      - 'components/model/reinforcement_mapping.py'
+      - 'components/nonlinear_time_history/wall_topology.py'
+      - 'components/nonlinear_time_history/device_recording.py'
+      - 'components/nonlinear_time_history/full_record_gate.py'
+      - 'components/nonlinear_time_history/variant_comparison.py'
+      - 'tests/verify_wall_geometry_preflight.py'
+      - 'tests/verify_reinforcement_mapping.py'
+      - 'tests/verify_wall_openings.py'
+      - 'tests/verify_device_recording.py'
+      - 'tests/verify_full_record_gate.py'
+      - 'tests/verify_variant_comparison.py'
       - 'components/nonlinear_time_history/building_exploratory.py'
       - '21_NLTHA_TRIAGE.py'
       - 'tests/verify_thesis_nltha_quality.py'
@@ -35,9 +47,15 @@ jobs:
           python-version: '3.12'
       - name: Syntax-check key NLTHA files
         run: |
-          python -m py_compile components/nonlinear_time_history/thesis_quality.py components/nonlinear_time_history/building_exploratory.py components/sections/devices.py 21_NLTHA_TRIAGE.py tests/verify_thesis_nltha_quality.py
+          python -m compileall -q components/nonlinear_time_history components/model/reinforcement_mapping.py components/sections/devices.py
       - name: Run non-native NLTHA and device quality checks
         run: |
           python tests/verify_thesis_nltha_quality.py
           python tests/verify_device_parameter_finiteness.py
           python tests/verify_documentation_coverage.py
+          python tests/verify_wall_geometry_preflight.py
+          python tests/verify_reinforcement_mapping.py
+          python tests/verify_wall_openings.py
+          python tests/verify_device_recording.py
+          python tests/verify_full_record_gate.py
+          python tests/verify_variant_comparison.py
