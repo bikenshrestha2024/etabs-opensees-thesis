@@ -185,8 +185,22 @@ def define_building_materials(ops,data,folder,material_overrides=None):
     wall_file='PEER_Web_ESFI_Patch.json' if basis=='PUBLISHED_REFERENCE' else 'M30_Fe500_SFI_MVLEM_3D.json'
     wall=json.loads((ROOT/'Material_Catalog'/wall_file).read_text(encoding='utf8'))
     cover=json.loads((ROOT/'Material_Catalog'/'Official_Concrete01.json').read_text(encoding='utf8'))['parameters']
+    # Stage 02 — use an approved source register only when explicitly supplied.
+    # No hard-coded bar layout is promoted to project verified by this feature.
+    from components.model.reinforcement_mapping import (
+        read_approved_frame_register, apply_approved_frame_register)
+    approved_register=os.environ.get('OPENSEES_APPROVED_REINFORCEMENT_REGISTER','').strip()
+    reinforcement_evidence={}
+    if approved_register:
+        reinforcement_evidence=read_approved_frame_register(
+            approved_register,sections.RC_SECTION_CONFIG)
     saved=copy.deepcopy(sections.RC_SECTION_CONFIG)
     try:
+        if reinforcement_evidence:
+            adopted=apply_approved_frame_register(sections.RC_SECTION_CONFIG,
+                                                   reinforcement_evidence)
+            sections.RC_SECTION_CONFIG.clear()
+            sections.RC_SECTION_CONFIG.update(adopted)
         for q in sections.RC_SECTION_CONFIG.values():
             # Retain the existing explicit bar-layout TEMPLATE; do not invent
             # measured project reinforcement or infer it from section dimensions.
@@ -271,7 +285,9 @@ def define_building_materials(ops,data,folder,material_overrides=None):
         steelmpf_transition_basis=transition['basis'],
         frame_sections=frame,frame_concrete_source='https://opensees.berkeley.edu/OpenSees/OpenSeesExamples1.1.pdf',
         frame_steel_basis='Nominal Fe500 plus documented Steel02 defaults; b=0.01 assumed, not an experimental Fe500 fit',
-        frame_reinforcement_basis='Existing section-layout templates; not verified project bar schedules',
+        frame_reinforcement_basis=('APPROVED_REGISTER_GEOMETRY_ONLY: no independently measured confined concrete law'
+                                   if reinforcement_evidence else 'Existing section-layout templates; not verified project bar schedules'),
+        frame_reinforcement_evidence=reinforcement_evidence,
         element_source='https://doi.org/10.1016/j.engstruct.2023.116700',
         stress_units='kN/m2 = MPa*1000 exactly once',approval=False)
     Path(folder,'Research_Material_Assignment_V161.json').write_text(json.dumps(report,indent=2),encoding='utf8')

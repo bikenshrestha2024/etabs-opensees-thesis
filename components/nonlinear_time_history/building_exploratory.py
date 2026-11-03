@@ -257,6 +257,18 @@ def _run(config):
     _set_run_stage('reading_records_and_model_inputs')
     for name in ('OpenSees_Complete_Model_Data_V118.json','OpenSees_Complete_Model_Config_V118.json','OpenSees_Complete_Export_Report_V118.json','OpenSees_Load_Conversion_Audit.json','OpenSees_Source_Model_Metadata_V118.json'):shutil.copy2(source/name,model/name)
     if (source/'OpenSees_Complete_Story_Masters_V118.csv').exists():shutil.copy2(source/'OpenSees_Complete_Story_Masters_V118.csv',model/'OpenSees_Complete_Story_Masters_V118.csv')
+    # An explicitly selected source register must be copied into the isolated model
+    # and its SHA and reviewer kept with each case. Never auto-approve bar schedules.
+    register=config.get('approved_frame_reinforcement_csv')
+    if register:
+        source_register=Path(register).resolve()
+        if not source_register.is_file():
+            raise FileNotFoundError(source_register)
+        target_register=model/'Approved_ETABS_Frame_Reinforcement.csv'
+        shutil.copy2(source_register,target_register)
+        os.environ['OPENSEES_APPROVED_REINFORCEMENT_REGISTER']=str(target_register)
+    else:
+        os.environ.pop('OPENSEES_APPROVED_REINFORCEMENT_REGISTER',None)
     for name in ('OpenSees_Element_Overrides_V125.json',
                  'OpenSees_Complete_Element_Map_V118.json'):
         if (source/name).is_file():shutil.copy2(source/name,model/name)
