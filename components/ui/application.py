@@ -2438,31 +2438,9 @@ class App:
         return device_guide(self.root,self.out.get())
 
     def _open_nonlinear_readiness(self):
-        """Show explicit prerequisites; this window does not falsely enable analysis."""
-        win=tk.Toplevel(self.root)
-        win.title("Nonlinear Analysis Readiness — Calibration Gate")
-        win.geometry("850x600"); win.minsize(700,480); win.transient(self.root)
-        outer=ttk.Frame(win,padding=18); outer.pack(fill="both",expand=True)
-        ttk.Label(outer,text="NONLINEAR ANALYSIS: BLOCKED PENDING VALIDATION",font=("Segoe UI",15,"bold")).pack(anchor="w")
-        ttk.Label(outer,text="The program deliberately does not run nonlinear analysis from incomplete or uncalibrated section templates.",wraplength=800).pack(anchor="w",pady=(5,12))
-        checks=[
-            "Complete fiber-section geometry and material parameters for every nonlinear frame section.",
-            "Enter reinforcing-bar coordinates, bar areas, and steel-material assignments from verified drawings / ETABS data.",
-            "Check cover/core boundaries, patch overlap, bar placement, section tags, material tags, and consistent kN–m units.",
-            "Calibrate concrete and steel constitutive parameters against a cited experimental or otherwise justified reference.",
-            "Validate section response (at minimum axial force–moment behavior and expected strength/stiffness) before mapping to members.",
-            "Review ETABS-to-OpenSeesPy mapping compatibility; do not map an RC fiber section to an SHS or incompatible member.",
-            "Run and record both IS 16700:2023 §7.2(d) initial P-Delta cases (1.2DL+0.5IL±1.5EL/WL) before NBC ESM; use the required conventional-slab stiffness input rather than a flat-slab factor.",
-            "Complete geometry/load/mass checks: verify every core opening, wall pier, spandrel/coupling beam, floor opening, diaphragm constraint, ETABS story weight, area/frame load, and no-double-counted self-weight.",
-            "Only then implement and verify element formulations, gravity preload, modal checks, FVD/BRB case assignments, and nonlinear analysis controls. The NLTHA readiness manifest checks these items."
-        ]
-        for item in checks:
-            row=ttk.Frame(outer); row.pack(fill="x",anchor="w",pady=5)
-            ttk.Label(row,text="☐",font=("Segoe UI",12,"bold")).pack(side="left",anchor="n",padx=(0,8))
-            ttk.Label(row,text=item,wraplength=760,justify="left").pack(side="left",fill="x",expand=True)
-        ttk.Separator(outer).pack(fill="x",pady=12)
-        ttk.Label(outer,text="Generated audit templates are written to the selected output folder: OpenSees_Nonlinear_Fiber_Section_Input_Template.csv and OpenSees_Nonlinear_Reinforcing_Bar_Coordinates_Template.csv. Completing these files alone does not prove calibration; review evidence and checks are required.",wraplength=800).pack(anchor="w")
-        ttk.Button(outer,text="Close",command=win.destroy).pack(anchor="e",pady=(12,0))
+        """Inspect actual project evidence; do not interpret static checklists as PASS."""
+        from components.model.readiness_dashboard_gui import launch
+        return launch(self.root, self.out.get())
 
     def _open_material_values(self):
         from OpenSees_Results_UI_V127 import library_window
