@@ -9,6 +9,8 @@ on:
       - '21_NLTHA_TRIAGE.py'
       - 'tests/verify_thesis_nltha_quality.py'
       - '.github/workflows/nltha-quality.yml'
+      - 'components/sections/devices.py'
+      - 'tests/verify_device_parameter_finiteness.py'
   pull_request:
     paths:
       - 'components/nonlinear_time_history/thesis_quality.py'
@@ -30,6 +32,7 @@ jobs:
       - name: Syntax-check key NLTHA files
         run: |
           python -m py_compile components/nonlinear_time_history/thesis_quality.py components/nonlinear_time_history/building_exploratory.py 21_NLTHA_TRIAGE.py tests/verify_thesis_nltha_quality.py
-      - name: Run non-native NLTHA quality checks
+      - name: Run non-native NLTHA and device quality checks
         run: |
           python tests/verify_thesis_nltha_quality.py
+          python tests/verify_device_parameter_finiteness.py

@@ -27,6 +27,10 @@ def define_fvd_material(ops, *, material_tag, K, Cd, alpha,
     an arbitrary time; derive it from brace/device axial stiffness.
     """
     tag, K, Cd, alpha, gap_length = int(material_tag), float(K), float(Cd), float(alpha), float(gap_length)
+    # IEEE NaN defeats ordinary <= and > comparisons; fail closed before OpenSees.
+    # Units: K [force/length], Cd [force*(time/length)^alpha], alpha [-], gap [length].
+    if not all(math.isfinite(v) for v in (K, Cd, alpha, gap_length)):
+        raise ValueError("FVD K, Cd, alpha and gap_length must all be finite.")
     if tag <= 0 or K <= 0 or Cd <= 0 or not 0 < alpha <= 1 or gap_length < 0:
         raise ValueError("FVD needs positive tag/K/Cd, 0 < alpha <= 1 and gap_length >= 0.")
     ops.uniaxialMaterial("ViscousDamper", tag, K, Cd, alpha, gap_length)
@@ -87,6 +91,9 @@ def add_brb_corot_truss(ops, *, element_tag, i_node, j_node,
     """Add an axial corotTruss BRB idealization using core area (not casing area)."""
     ele, ni, nj, mat = map(int, (element_tag, i_node, j_node, material_tag))
     area = float(core_area)
+    # A NaN core area passes `area <= 0`; never send nonfinite geometry to the solver.
+    if not math.isfinite(area):
+        raise ValueError("BRB core_area must be finite.")
     if min(ele, ni, nj, mat) <= 0 or ni == nj or area <= 0:
         raise ValueError("BRB needs positive tags/area and distinct end nodes.")
     ops.element("corotTruss", ele, ni, nj, area, mat)

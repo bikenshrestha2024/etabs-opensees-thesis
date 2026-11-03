@@ -1,7 +1,7 @@
 """Read-only diagnostic for a reported OpenSees solver element tag.
 
 Usage:
-    python 21_TRACE_FAILED_ELEMENT.py "D:\\Thesis Opensees\\Etabs Nodes Export\\OpenSees_Analysis_Results\\RUN_FOLDER" --tag 110280
+    python 20_TRACE_FAILED_ELEMENT.py "D:\\Thesis Opensees\\Etabs Nodes Export\\OpenSees_Analysis_Results\\RUN_FOLDER" --tag 110280
 
 Run against the *same isolated_model directory* that generated the failure.
 Does not run, modify or approve structural analysis.
