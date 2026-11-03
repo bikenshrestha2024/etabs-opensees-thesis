@@ -375,6 +375,12 @@ def _run(config):
             node: list(ops.nodeDisp(node))
             for nodes in tracked_nodes.values() for node in nodes
         }
+        from components.nonlinear_time_history.device_recording import (
+            active_device_catalog,baseline_axial_projection,device_sample,summarize_device_demands)
+        active_devices=active_device_catalog(model,data['frames'])
+        device_initial={d['tag']:baseline_axial_projection(ops,d,data['nodes'])
+                        for d in active_devices}
+        device_rows=[]
         tracked_element_rows=[]
         def capture():
             row={'time_s':ops.getTime()};previous=[0.]*6
@@ -417,6 +423,8 @@ def _run(config):
                     axial_force_kN=forces[0],
                     local_force_vector_json=json.dumps(forces,separators=(',',':')),
                 ))
+            for device in active_devices:
+                device_rows.append(device_sample(ops,device,data['nodes'],device_initial[device['tag']]))
             rows.append(row)
         history=case/'Building_Nonlinear_history.csv'
         _set_run_stage('transient_analysis',orientation=orientation,case_output_dir=str(case),
@@ -492,6 +500,11 @@ def _run(config):
         tracked_element_path=write_rows(
             case/'Tracked_Element_Force_Displacement.csv',
             tracked_element_rows)
+        if device_rows:
+            write_rows(case/'Device_Accepted_Step_History.csv',device_rows)
+            demands=summarize_device_demands(device_rows)
+            write_rows(case/'Device_Demand_Summary.csv',demands)
+            (case/'Device_Demand_Summary.json').write_text(json.dumps(demands,indent=2,allow_nan=False),encoding='utf-8')
         recorder_files=[
             (history.name,[
                 'accepted adaptive substep time','all-story Ux/Uy/Uz/Rx/Ry/Rz',
@@ -515,6 +528,11 @@ def _run(config):
         recorder_files.append((tracked_element_path.name,[
             'selected frame/brace/device tag axial force and gravity-relative projected axial extension',
             'local force vector retained as JSON in native OpenSees local-end ordering']))
+        if device_rows:
+            recorder_files.append(('Device_Accepted_Step_History.csv',
+                ['active FVD/BRB basicForce or axialForce, relative displacement/velocity']))
+            recorder_files.append(('Device_Demand_Summary.csv',
+                ['peak device demand and signed work; not qualified energy/fatigue']))
         write_recorder_index(
             case,'nonlinear_time_history',
             recorder_files,
