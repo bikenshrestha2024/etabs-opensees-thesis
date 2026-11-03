@@ -25,8 +25,9 @@ All **20 root program launchers** have work-order names. Material/component vali
 | 19 | [`19_AUDIT_LOAD_CONNECTIONS.py`](../../19_AUDIT_LOAD_CONNECTIONS.py) | [Guide](19_AUDIT_LOAD_CONNECTIONS.md) | Load-path and connectivity audit |
 | 20 | [`20_TRACE_FAILED_ELEMENT.py`](../../20_TRACE_FAILED_ELEMENT.py) | [Guide](20_TRACE_FAILED_ELEMENT.md) | Trace failed solver element |
 
+| 21 | [`21_NLTHA_TRIAGE.py`](../../21_NLTHA_TRIAGE.py) | [Guide](21_NLTHA_TRIAGE.md) | NLTHA isolated diagnostic configuration and evidence review |
+
 Legacy filenames remain functional as launch aliases. Underlying components, external records and saved outputs have not been renamed. The nonlinear transient failure is still an open issue.
 
 [File migration map](../00_WORK_ORDER_RENAME_MAP.md) · [Organization policy](../00_REPOSITORY_ORGANIZATION.md)
 
-| 21 | [`21_NLTHA_TRIAGE.py`](../../21_NLTHA_TRIAGE.py) | [Guide](21_NLTHA_TRIAGE.md) | NLTHA isolated diagnostic configuration and evidence review |
