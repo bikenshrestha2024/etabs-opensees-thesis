@@ -561,7 +561,12 @@ def _run(config):
         deformation={str(n):list(ops.nodeDisp(int(n))) for n in data['nodes']}
         (case/('Deformation_EXPLORATORY_'+orientation+'_V132.json')).write_text(json.dumps(dict(nodes=data['nodes'],elements=[e['nodes'] for e in data['frames']+data['shells']],displacements=deformation,dof_availability=[True]*6,note='EXPLORATORY assumed literature materials; total final response at t='+str(ops.getTime())+' s. Not design acceptance.')),encoding='utf-8')
         roof=stories[-1]['story_name']
+        # Stage 05: accept only finite, chronological histories through the
+        # requested physical time; no automatic promotion to design approval.
+        from components.nonlinear_time_history.full_record_gate import write_accepted_history_gate
+        completion_gate=write_accepted_history_gate(case,rows,record_end,end)
         result=dict(
+            completion_gate=completion_gate,
             orientation=orientation,
             wall_model='E_SFI_MVLEM_3D' if full_wall else 'ELASTIC',
             frame_model='LITERATURE_CONCRETE01_NOMINAL_FE500' if full_wall else 'NONLINEAR_ILLUSTRATIVE_RC_FIBERS',
