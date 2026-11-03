@@ -54,8 +54,8 @@ MATERIAL_OVERRIDE_BOUNDS = {
     'wall.a4': (0., 10.),
     'wall.rho_x': (.0001, .1),
     'wall.rho_y': (.0001, .1),
-    'wall.fsam_nu': (0., 1.),
-    'wall.fsam_alpha': (0., 1.),
+    'wall.fsam_nu': (0., 1.5),
+    'wall.fsam_alpha': (0., .05),
 }
 
 MATERIAL_PARAMETER_REFERENCES = {
@@ -91,6 +91,30 @@ MATERIAL_PARAMETER_REFERENCES = {
                 'title': 'OpenSees Steel01 Material documentation',
                 'url': 'https://opensees.berkeley.edu/wiki/index.php/Steel01_Material',
                 'supports': 'Steel01 hardening parameter definition and implementation.',
+            },
+        ],
+    },
+    'wall.fsam_nu': {
+        'meaning': 'FSAM concrete friction coefficient nu; a constitutive input, not a reinforcement or concrete material property.',
+        'baseline_basis': 'Current exploratory baseline 0.8 is an analyst assumption; it is not experimentally calibrated for this wall.',
+        'candidate_basis': 'The OpenSeesPy command documentation gives the admissible open interval 0 < nu < 1.5; sensitivity candidates within that interval remain analyst-selected.',
+        'references': [
+            {
+                'title': 'OpenSeesPy FSAM material documentation',
+                'url': 'https://openseespydoc.readthedocs.io/en/latest/src/FSAM.html',
+                'supports': 'FSAM friction coefficient definition and documented admissible interval.',
+            },
+        ],
+    },
+    'wall.fsam_alpha': {
+        'meaning': 'FSAM reinforcement dowel-action stiffness coefficient alfadow.',
+        'baseline_basis': 'Current exploratory baseline 0.01 is an analyst assumption; it is not experimentally calibrated for this wall.',
+        'candidate_basis': 'The OpenSeesPy command documentation gives the admissible open interval 0 < alfadow < 0.05; values outside it are rejected.',
+        'references': [
+            {
+                'title': 'OpenSeesPy FSAM material documentation',
+                'url': 'https://openseespydoc.readthedocs.io/en/latest/src/FSAM.html',
+                'supports': 'FSAM reinforcement dowel-action coefficient definition and documented admissible interval.',
             },
         ],
     },
@@ -144,6 +168,10 @@ def validate_material_overrides(values):
         low, high = MATERIAL_OVERRIDE_BOUNDS[key]
         if not math.isfinite(value) or not low <= value <= high:
             raise ValueError(f'{key} must be finite and between {low:g} and {high:g}')
+        if key == 'wall.fsam_nu' and not 0. < value < 1.5:
+            raise ValueError('wall.fsam_nu must be strictly between 0 and 1.5 per the OpenSeesPy FSAM documentation.')
+        if key == 'wall.fsam_alpha' and not 0. < value < 0.05:
+            raise ValueError('wall.fsam_alpha must be strictly between 0 and 0.05 per the OpenSeesPy FSAM documentation.')
         result[key] = value
     return result
 

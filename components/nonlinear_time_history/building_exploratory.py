@@ -306,13 +306,23 @@ def _run(config):
         from components.shared.eigen_solver import solve_eigen
         eigenvalues=solve_eigen(ops,20);periods=[2*math.pi/math.sqrt(v) for v in eigenvalues if v>0]
         if len(periods)!=20:raise ValueError('Inspected nonlinear modes incomplete')
-        bound=min(records[0][1],.01,periods[0]/100.,periods[-1])
+        record_dt=records[0][1]
+        t1_inspected=periods[0]
+        tn_inspected=periods[-1]
+        dt_bounds={
+            'record_digitization_s':record_dt,
+            'T1_over_100_s':t1_inspected/100.,
+            'Tn_literal_s':tn_inspected,
+            'Tn_over_10_project_safeguard':tn_inspected/10.,
+            'fixed_0p01_s':.01,
+        }
+        bound=min(dt_bounds.values())
         if dt>bound:raise ValueError(f'Chosen dt {dt} exceeds inspected-mode screen {bound:g}s; reduce dt')
         alpha,beta=rayleigh_coefficients(max(periods),min(periods),.05)
         if config.get('diagnostic_mass_damping'):alpha,beta=2*.05*min(math.sqrt(v) for v in eigenvalues),0.
         if config.get('diagnostic_zero_damping'):alpha,beta=0.,0.
         print('[TRANSIENT PROBE]', 'excitation='+excitation, 'zero_damping='+str(bool(config.get('diagnostic_zero_damping'))), 'system='+transient_system, flush=True)
-        (case/'Initial_Modal_Damping.json').write_text(json.dumps(dict(eigenvalues=eigenvalues,periods_s=periods,alphaM=alpha,betaKcomm=beta,dt_screen_s=bound),indent=2))
+        (case/'Initial_Modal_Damping.json').write_text(json.dumps(dict(eigenvalues=eigenvalues,periods_s=periods,alphaM=alpha,betaKcomm=beta,dt_screen_s=bound,dt_screen_bounds_s=dt_bounds,dt_screen_basis='NBC limits plus a separate project-imposed Tn/10 safeguard; not an NBC requirement'),indent=2))
         ops.rayleigh(alpha,0.,0.,beta)
         _set_run_stage('transient_setup',orientation=orientation,case_output_dir=str(case))
         for direction,r in enumerate(diagnostic_record_inputs(records,orientation,excitation),1):

@@ -37,5 +37,13 @@ class V134Checks(unittest.TestCase):
         for invalid in (-0.1,float("nan"),float("inf"),"bad"):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 _analysis_duration_s(motion,"XY",invalid)
+    def test_nonlinear_dt_uses_separate_tn_over_ten_safeguard(self):
+        from OpenSees_Nonlinear_Time_History_NBC105_V116 import _nonlinear_time_step_bound
+        self.assertAlmostEqual(_nonlinear_time_step_bound(.01, 1., .05), .005)
+        self.assertAlmostEqual(_nonlinear_time_step_bound(.01, 1., .2), .01)
+        self.assertAlmostEqual(_nonlinear_time_step_bound(.01, .5, 1.), .005)
+        for values in ((0., 1., 1.), (.01, float("nan"), 1.), (.01, 1., float("inf"))):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                _nonlinear_time_step_bound(*values)
 
 if __name__=='__main__':unittest.main()

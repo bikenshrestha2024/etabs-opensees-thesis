@@ -184,6 +184,25 @@ class MaterialSensitivityTests(unittest.TestCase):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 validate_material_overrides(values)
 
+    def test_fsam_override_validation_uses_documented_strict_ranges(self):
+        self.assertEqual(
+            validate_material_overrides({"wall.fsam_nu": 1.2, "wall.fsam_alpha": .049}),
+            {"wall.fsam_nu": 1.2, "wall.fsam_alpha": .049},
+        )
+        for values in (
+            {"wall.fsam_nu": 0.},
+            {"wall.fsam_nu": 1.5},
+            {"wall.fsam_alpha": 0.},
+            {"wall.fsam_alpha": .05},
+            {"wall.fsam_alpha": .5},
+        ):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                validate_material_overrides(values)
+        self.assertIn("0 < nu < 1.5",
+                      MATERIAL_PARAMETER_REFERENCES["wall.fsam_nu"]["candidate_basis"])
+        self.assertIn("0 < alfadow < 0.05",
+                      MATERIAL_PARAMETER_REFERENCES["wall.fsam_alpha"]["candidate_basis"])
+
     def test_building_sensitivity_batch_exports_comparable_case_metrics(self):
         def fake_run(config):
             value = config["material_overrides"]["brace.fy_mpa"]

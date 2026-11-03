@@ -119,6 +119,17 @@ def _analysis_duration_s(motion, orientation, requested_duration_s):
     return duration, full_duration, status
 
 
+def _nonlinear_time_step_bound(record_dt, t1, tn):
+    """Apply NBC §9.3.2.4 limits plus a distinct project Tn/10 safeguard."""
+    try:
+        record_dt, t1, tn = float(record_dt), float(t1), float(tn)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Record interval, T1 and Tn must be finite positive numbers.") from exc
+    if not all(math.isfinite(value) and value > 0 for value in (record_dt, t1, tn)):
+        raise ValueError("Record interval, T1 and Tn must be finite positive numbers.")
+    return min(record_dt, t1 / 100.0, tn, tn / 10.0, 0.01)
+
+
 def _configure_nonlinear_transient(ops, algorithm="Newton", tolerance=1.0e-7, max_iterations=40,
                                    linear_solver="UmfPack"):
     if linear_solver not in LINEAR_SYSTEMS:
@@ -336,9 +347,9 @@ def _run_analysis(config):
                     t1 = min(float(config["T1_x_s"]), float(config["T1_y_s"]))
                     tn = min(float(config["Tn_x_s"]), float(config["Tn_y_s"]))
                 if min(t1, tn) <= 0: raise ValueError("Enter positive NBC directional T1 and Tn values.")
-                # NBC §9.3.2.4 lists T1/100, Tn, and 0.01 s as independent
-                # upper bounds; the Tn term is not divided by 100.
-                dt = min(dt_record, t1 / 100.0, tn, 0.01)
+                # Keep the literal NBC Tn bound and add Tn/10 as a separate
+                # project safeguard for high-frequency modes.
+                dt = _nonlinear_time_step_bound(dt_record, t1, tn)
                 duration, full_record_duration, case_status = _analysis_duration_s(
                     motion, orientation, config.get("trial_duration_s", 0.0))
                 nsteps = int(math.ceil(duration / dt))
@@ -486,7 +497,7 @@ def _run_analysis(config):
         "response_aggregation_by_record_set": aggregation, "pair_level_orientation_envelopes": pair_demands,
         "X_only_screening_envelope": x_envelope,
         "T1_x_s": config["T1_x_s"], "T1_y_s": config["T1_y_s"], "Tn_x_s": config["Tn_x_s"], "Tn_y_s": config["Tn_y_s"],
-        "damping_target_percent": config["damping_ratio_percent"], "time_step_rule": "min(record digitization interval, T1/100, Tn, 0.01 s)",
+        "damping_target_percent": config["damping_ratio_percent"], "time_step_rule": "NBC §9.3.2.4: min(record digitization interval, T1/100, Tn, 0.01 s); additional project safeguard: Tn/10",
         "member_action_rule": "Nonlinear inelastic deformation demands require material-standard limits under NBC 9.3.3.2. Do not divide nonlinear response actions by Rmu using the elastic-history rule. Component capacities and acceptance remain separately reviewed.",
         "records": records, "elapsed_seconds": time.perf_counter() - start}
     summary["analysis_completion"] = (
@@ -546,7 +557,7 @@ def _run_analysis(config):
                     ("Rayleigh formulation", "C = alphaM*M + betaKcommitted*Kcommitted"),
                     ("Rayleigh coefficients", "alphaM=2*zeta*w1*w2/(w1+w2); betaKcommitted=2*zeta/(w1+w2)"),
                     ("Damping cap", "Rayleigh damping checked at selected modes; <=5% per NBC §8.1.1; FVD device damping is explicit and must not be double-counted"),
-                    ("Time step", "min(record digitization interval, T1/100, Tn, 0.01 s)"),
+                    ("Time step", "NBC §9.3.2.4: min(record digitization interval, T1/100, Tn, 0.01 s); additional project safeguard: Tn/10"),
                     ("Ground motion scaling", "User-supplied; target matching is not performed by this utility"),
                     ("Gravity state", "Model-builder must complete gravity first; runner then calls ops.loadConst('-time',0.0)"),
                     ("Relative response", "UniformExcitation node response is relative to ground motion"),
@@ -690,7 +701,7 @@ class NonlinearTimeHistoryGUI:
         tabs = ttk.Notebook(root); tabs.pack(fill="both", expand=True)
         self.log = tk.Text(tabs, bg="#0b1220", fg="#dbeafe", insertbackground="white", font=("Cascadia Mono", 9), wrap="word")
         tabs.add(self.log, text="Run log")
-        notes = tk.Text(tabs, wrap="word", font=("Segoe UI", 10)); notes.insert("1.0", "NBC 105:2025 nonlinear time-history guide\n\n• §9.3: nonlinear response-history analysis needs a 3D nonlinear model, gravity/P-Delta state, damping, compatible wall/brace material laws, and documented ground-motion scaling.\n• §9.3.2.2: use the ULS target C(T)/Ωu over Tn through √Rμ × T1; each scale factor is 0.33–3.0; a 3D pair uses the lower of X/Y factors for both components. Pre-matched SeismoMatch records are passed unchanged at factor 1.0 unless the verified project workflow says otherwise.\n• §9.3.2.4: Δt ≤ record digitization interval, T1/100, Tn and 0.01 s. Tn is its own upper bound (not Tn/100).\n• §9.3.2.3 / 9.3.3: run both horizontal component orientations within each record pair and apply the code response statistic to pair-level envelopes.\n• Soil spectra: §4.1.2, Eq. 4.1(2), Table 4-1. Select site class from geotechnical evidence under §4.1.3.3; Kirtipur Ward 10 is listed as D in Table 4-3, subject to site investigation.\n• Damping: two-term Rayleigh coefficients are calculated at user-entered periods; the five-percent limit is checked on selected modes. Explicit FVD dissipation must not be counted again as Rayleigh damping. Nonlinear model material damping is separate from record scaling.\n• Drift screen: NBC §5.5.3 states 0.025 ULS and 0.006 SLS; review the NBC §9.3.3.1 cross-reference discrepancy before treating the screen as design acceptance. This runner reports drift and histories only; no member design is performed.\n• Solver recovery: Newton, NewtonLineSearch, KrylovNewton and ModifiedNewton are attempted; only then is the requested step recursively divided, within a bounded subdivision depth. A failed case remains a failure; convergence recovery does not establish model validity.\n\nReadiness gate: the JSON sign-off manifest must be complete for wall openings/coupling beams, frame and wall material calibration, area loads, total floor seismic mass, slab/diaphragm representation, gravity/P-Delta, modal checks, brace/device scenario, and independent benchmark checks. This is a user review record, not automated verification.\n\nReferences\n• NBC 105:2025 §§4.1.1–4.1.3, 5.1, 5.2, 5.5.3, 8.1.1–8.1.3, 9.3.2–9.3.3. DUDBC: https://www.dudbc.gov.np/pages/building-code/\n• OpenSeesPy Path TimeSeries: https://openseespydoc.readthedocs.io/en/latest/src/pathTs.html\n• OpenSeesPy UniformExcitation: https://openseespydoc.readthedocs.io/en/latest/src/uniformExcitation.html\n• OpenSeesPy Newmark: https://openseespydoc.readthedocs.io/en/latest/src/newmark.html\n• E-SFI-MVLEM-3D: Kolozvari, Lopez & Massone (2023), Eng. Struct. 294, 116700, doi:10.1016/j.engstruct.2023.116700; https://github.com/kkolozvari/E-SFI-MVLEM-3D\n\nMatched SeismoMatch/PEER input values, sampling intervals and units are read from the records and preserved. g-to-model-unit conversion is separate from spectrum scaling.")
+        notes = tk.Text(tabs, wrap="word", font=("Segoe UI", 10)); notes.insert("1.0", "NBC 105:2025 nonlinear time-history guide\n\n• §9.3: nonlinear response-history analysis needs a 3D nonlinear model, gravity/P-Delta state, damping, compatible wall/brace material laws, and documented ground-motion scaling.\n• §9.3.2.2: use the ULS target C(T)/Ωu over Tn through √Rμ × T1; each scale factor is 0.33–3.0; a 3D pair uses the lower of X/Y factors for both components. Pre-matched SeismoMatch records are passed unchanged at factor 1.0 unless the verified project workflow says otherwise.\n• §9.3.2.4: the implementation applies Δt ≤ record digitization interval, T1/100, Tn and 0.01 s. In addition, the project applies a separate Tn/10 safeguard; that extra limit is not presented as an NBC requirement.\n• §9.3.2.3 / 9.3.3: run both horizontal component orientations within each record pair and apply the code response statistic to pair-level envelopes.\n• Soil spectra: §4.1.2, Eq. 4.1(2), Table 4-1. Select site class from geotechnical evidence under §4.1.3.3; Kirtipur Ward 10 is listed as D in Table 4-3, subject to site investigation.\n• Damping: two-term Rayleigh coefficients are calculated at user-entered periods; the five-percent limit is checked on selected modes. Explicit FVD dissipation must not be counted again as Rayleigh damping. Nonlinear model material damping is separate from record scaling.\n• Drift screen: NBC §5.5.3 states 0.025 ULS and 0.006 SLS; review the NBC §9.3.3.1 cross-reference discrepancy before treating the screen as design acceptance. This runner reports drift and histories only; no member design is performed.\n• Solver recovery: Newton, NewtonLineSearch, KrylovNewton and ModifiedNewton are attempted; only then is the requested step recursively divided, within a bounded subdivision depth. A failed case remains a failure; convergence recovery does not establish model validity.\n\nReadiness gate: the JSON sign-off manifest must be complete for wall openings/coupling beams, frame and wall material calibration, area loads, total floor seismic mass, slab/diaphragm representation, gravity/P-Delta, modal checks, brace/device scenario, and independent benchmark checks. This is a user review record, not automated verification.\n\nReferences\n• NBC 105:2025 §§4.1.1–4.1.3, 5.1, 5.2, 5.5.3, 8.1.1–8.1.3, 9.3.2–9.3.3. DUDBC: https://www.dudbc.gov.np/pages/building-code/\n• OpenSeesPy Path TimeSeries: https://openseespydoc.readthedocs.io/en/latest/src/pathTs.html\n• OpenSeesPy UniformExcitation: https://openseespydoc.readthedocs.io/en/latest/src/uniformExcitation.html\n• OpenSeesPy Newmark: https://openseespydoc.readthedocs.io/en/latest/src/newmark.html\n• E-SFI-MVLEM-3D: Kolozvari, Lopez & Massone (2023), Eng. Struct. 294, 116700, doi:10.1016/j.engstruct.2023.116700; https://github.com/kkolozvari/E-SFI-MVLEM-3D\n\nMatched SeismoMatch/PEER input values, sampling intervals and units are read from the records and preserved. g-to-model-unit conversion is separate from spectrum scaling.")
         notes.configure(state="disabled"); tabs.add(notes, text="NBC clauses + citations")
 
     def _templates(self):
