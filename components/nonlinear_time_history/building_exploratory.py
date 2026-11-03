@@ -261,6 +261,9 @@ def _run(config):
                  'OpenSees_Complete_Element_Map_V118.json'):
         if (source/name).is_file():shutil.copy2(source/name,model/name)
     data=json.loads((model/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding='utf-8-sig'));start=time.perf_counter();unit_factor={'g':9.80665,'m/s2':1.};records=[]
+    # Stage 01: audit source wall geometry before expensive gravity and transient solves.
+    from components.nonlinear_time_history.wall_diagnostics import write_wall_audit
+    write_wall_audit(data, out/'NLTHA_Wall_Geometry_Preflight.json')
     write_rows(out/'Frame_Solver_Tag_Catalog.csv',frame_solver_tag_catalog(data['frames']))
     for key in ('x_path','y_path'):
         values,step,units=_read_peer_text_record(config[key]);records.append((np.asarray(values),step,units))
