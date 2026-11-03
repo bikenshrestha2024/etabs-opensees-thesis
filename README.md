@@ -1,10 +1,11 @@
 # OpenSeesPy seismic research project — V167
 
-**Current handoff:** [START_HERE_V167.md](START_HERE_V167.md)<br>
-**Ordered launchers:** [00_READ_FIRST_RUN_ORDER.md](00_READ_FIRST_RUN_ORDER.md)<br>
-**Release notes:** [RELEASE_NOTES_V167.md](RELEASE_NOTES_V167.md)<br>
-**Material-specific validation gates:** [Research_Components/02_MODELLING_BASIS.md](Research_Components/02_MODELLING_BASIS.md)
+**Start here:** [V167 project handoff](START_HERE_V167.md) · [Run order](00_READ_FIRST_RUN_ORDER.md) · [Numbered program catalog](docs/programs/00_PROGRAM_INDEX.md) · [Organization and migration policy](docs/00_REPOSITORY_ORGANIZATION.md)
 
-This is an exploratory ETABS-to-OpenSeesPy research package for a high-rise RC frame/core with conventional, BRB, and fluid-viscous-damper outrigger alternatives. Historical versions and verification evidence are retained for traceability. No building configuration is certified or ranked as a validated optimum.
+**Key reference:** [Modeling and material validation basis](Research_Components/02_MODELLING_BASIS.md) · [Release notes](RELEASE_NOTES_V167.md)
 
-Start with `START_HERE_V167.md` before running any analysis. The current nonlinear earthquake-history route has an unresolved first-step transient failure; successful gravity convergence, component examples, and short probes do not validate a complete earthquake history.
+This repository is an exploratory ETABS-to-OpenSeesPy research package for an asymmetric high-rise reinforced-concrete frame/core with conventional, BRB, and fluid-viscous-damper outrigger variants. Numbered root entry points have matching individual Markdown guides. Historical versions and evidence are retained for traceability.
+
+**Known blocker:** the full-building nonlinear earthquake-history route has an unresolved first-step transient failure. A passing gravity step, a standalone component test or a short numerical trial does not establish full-history convergence or experimental validation. No building variant is certified or ranked here as a validated optimum.
+
+The documentation reorganization keeps executable paths unchanged for compatibility; see the proposed phased migration before attempting bulk file moves.
