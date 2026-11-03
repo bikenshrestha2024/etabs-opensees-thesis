@@ -1,3 +1,7 @@
+# NATIVE SOLVER SAFETY NOTE: a Python exception handler does not interrupt a native hang.
+# Large eigensolves need process-level cancel/timeout and complete stdout/stderr capture.
+# Modal mass coverage/residuals are input quality gates, not nonlinear design approval.
+# See docs/00_THESIS_ACCEPTANCE_GATES.md G03 and G07.
 """Sparse generalized eigenanalysis; OpenSees PythonSparse interface, SciPy shift-invert.
 Reference: https://opensees.github.io/OpenSeesDocumentation/user/manual/analysis/eigen.html
 No mass/stiffness perturbation or dense fallback. Retains massless DOFs.

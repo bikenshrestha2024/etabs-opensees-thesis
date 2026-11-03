@@ -1,3 +1,8 @@
+# THESIS STATUS NOTE: production and exploratory cases have DIFFERENT evidence tiers.
+# A full record requires accepted integration steps, finite response, complete duration,
+# model/record hashes and independent component calibration before performance ranking.
+# Literature parameters and generic IO/LS/CP thresholds must not be treated as verified.
+# See docs/00_THESIS_ACCEPTANCE_GATES.md and NBC 105:2025 (DUDBC).
 # -*- coding: utf-8 -*-
 """NBC 105:2025 nonlinear paired-component time-history analysis GUI and runner.
 

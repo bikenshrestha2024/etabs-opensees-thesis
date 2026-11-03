@@ -1,3 +1,7 @@
+# NLTHA GUI REVIEW NOTE: user-selected research inputs must be visible and logged.
+# Preserve separate exploratory/production labels and original source export integrity.
+# Never label 0.005-s diagnostic, nominal material profile or partial Kobe run VALIDATED.
+# Reference docs/00_THESIS_ACCEPTANCE_GATES.md and docs/programs/21_NLTHA_TRIAGE.md.
 """Explicit literature-informed route on the selected building."""
 from pathlib import Path
 import json,sys,subprocess,threading,queue,datetime,importlib.util,re

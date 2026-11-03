@@ -11,6 +11,10 @@ on:
       - '.github/workflows/nltha-quality.yml'
       - 'components/sections/devices.py'
       - 'tests/verify_device_parameter_finiteness.py'
+      - 'docs/source/**'
+      - 'docs/00_RESEARCH_REFERENCES.md'
+      - 'docs/00_THESIS_ACCEPTANCE_GATES.md'
+      - 'tests/verify_documentation_coverage.py'
   pull_request:
     paths:
       - 'components/nonlinear_time_history/thesis_quality.py'
@@ -36,3 +40,4 @@ jobs:
         run: |
           python tests/verify_thesis_nltha_quality.py
           python tests/verify_device_parameter_finiteness.py
+          python tests/verify_documentation_coverage.py

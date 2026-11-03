@@ -1,3 +1,8 @@
+# WALL FORMULATION NOTE: this source handles physical shell/wall element interfaces.
+# E-SFI-MVLEM-3D per-panel construction alone does not prove core-opening compatibility,
+# junction bending, re-entrant torsion, experimental calibration or mesh convergence.
+# Kolozvari, Lopez and Massone (2023): DOI:10.1016/j.engstruct.2023.116700.
+# Alternative comparison only: Tura et al. (2026), DOI:10.1007/s10518-025-02165-2.
 # -*- coding: utf-8 -*-
 """ETABS area-object integration for OpenSeesPy (V116).
 

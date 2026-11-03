@@ -1,3 +1,8 @@
+# NBC 105:2025 AUDIT NOTE: 5.5.3 contains the 0.025 ULS/0.006 SLS drift limits.
+# Clause 9.3.3.1 references 5.6, which describes accidental eccentricity; retain a
+# transparent cross-reference warning rather than silently inventing a correction.
+# Performance checks require actual element-specific criteria and complete-record evidence.
+# Source: DUDBC NBC105:2025, https://dudbc.gov.np/pages/24231978/.
 """Explicit nonlinear performance criteria and complete-suite assessment (V151)."""
 from pathlib import Path
 import csv,json,math,datetime,webbrowser

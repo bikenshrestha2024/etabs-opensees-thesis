@@ -1,3 +1,8 @@
+# THESIS NLTHA NOTE: This runner is EXPLORATORY until independently verified.
+# 0.005-s diagnostic success is not completion of a paired full earthquake history.
+# Ensure separate fresh runs, input hash, accepted-step log, XY/YX and dt refinement.
+# Model-physics benchmark: PEER 2015/12; E-SFI formulation DOI:10.1016/j.engstruct.2023.116700.
+# Never infer initiation of failure solely from post-failure nonfinite element forces.
 """Own building geometry with explicitly assumed research constitutive models.
 This does not approve or modify the calibrated production-model workflow.
 """

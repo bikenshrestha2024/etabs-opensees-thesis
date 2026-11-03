@@ -1,3 +1,8 @@
+# THESIS MODEL-AUDIT NOTE (2026-11-03; see docs/00_THESIS_ACCEPTANCE_GATES.md).
+# ETABS export geometry/loads alone do not establish project reinforcement or material calibration.
+# Nonlinear wall quad -> E-SFI mapping requires local axis, node-order and opening tests.
+# Sources: Kolozvari et al. (2023), DOI:10.1016/j.engstruct.2023.116700;
+# PEER 2015/12. Model-specific calibration and full-record convergence remain unverified.
 """Assemble ETABS source audits into one connected model and role-specific entries.
 
 Units: kN, m, s. Source audits remain immutable. The elastic model is a

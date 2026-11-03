@@ -1,3 +1,8 @@
+# RESEARCH MATERIAL TRANSFER NOTE: nominal Fe500/Concrete01 and PEER FSAM cards
+# are literature/assumption inputs; they are NOT project-confirmed reinforcement schedules.
+# Web/core/boundary confinement, actual axial load and cyclic protocols require calibration.
+# Primary benchmark: Kolozvari, Orakcal and Wallace, PEER Report 2015/12.
+# Model family: Kolozvari, Lopez and Massone (2023), DOI:10.1016/j.engstruct.2023.116700.
 """Literature-informed building parameters. Research assignment, not calibration.
 
 PEER 2015/12 Appendix B.3 supplies the ConcreteCM/SteelMPF web card.
