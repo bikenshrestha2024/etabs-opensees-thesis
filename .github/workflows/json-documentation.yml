@@ -1,0 +1,45 @@
+name: Complete JSON content documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/build_json_documentation.py
+      - .github/workflows/json-documentation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Parse all JSON files and generate complete guides
+        run: |
+          python tools/build_json_documentation.py
+          python tools/build_json_documentation.py --check
+      - uses: actions/upload-artifact@v4
+        with:
+          name: all-json-field-guides
+          path: docs/json/
+          retention-days: 30
+      - name: Commit generated JSON reference documentation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/json/
+          if git diff --cached --quiet; then
+            echo "JSON documentation already current"
+          else
+            git commit -m "docs(json): generated field-by-field guides for all tracked JSON sources [skip ci]"
+            git push origin HEAD:main
+          fi

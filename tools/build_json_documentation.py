@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -70,10 +71,14 @@ def content_doc(root, path, obj):
     hashval=hashlib.sha256(raw).hexdigest()
     role=group(rel)
     fields=describe_fields(obj)
+    doc_dir=root/DOCS/(rel+".md")
+    source_href=Path(os.path.relpath(path,doc_dir.parent)).as_posix()
+    register_href=Path(os.path.relpath(root/"docs/00_RESEARCH_REFERENCES.md",doc_dir.parent)).as_posix()
+    index_href=Path(os.path.relpath(root/"docs/json/00_ALL_JSON_FILES.md",doc_dir.parent)).as_posix()
     out=[
       "# "+rel,
       "",
-      "**Source:** ["+rel+"](../../../../"+rel+")",
+      "**Source:** ["+rel+"]("+source_href+")",
       "**Classification:** "+role,
       "**SHA-256 (source bytes):** "+hashval,
       "**Size:** "+str(len(raw))+" bytes",
@@ -103,7 +108,7 @@ def content_doc(root, path, obj):
       "- Verify hashes, compare input and output manifests, and preserve experiment/case identity.",
       "- For nonlinear runs check G00–G10 acceptance gates and explicit failure/incomplete statuses.",
       "",
-      "[All JSON files](../../00_ALL_JSON_FILES.md) · [Research citations](../../../00_RESEARCH_REFERENCES.md)"
+      "[All JSON files]("+index_href+") · [Research citations]("+register_href+")"
     ]
     return "\n".join(out)+"\n"
 
