@@ -7,3 +7,6 @@ The 20 primary executable entry points now use work-order numbers 01–20. The p
 **Open blocker:** The full-building nonlinear time history still has an unresolved first-step transient failure; no complete validated NLTHA or certified optimum is claimed. The rename itself has not been validated by a native solver run.
 
 [Research modeling basis](Research_Components/02_MODELLING_BASIS.md) · [Organization policy](docs/00_REPOSITORY_ORGANIZATION.md)
+
+
+**V169 nonlinear diagnostic enhancement:** [21 — NLTHA triage](docs/programs/21_NLTHA_TRIAGE.md) generates isolated ZERO/X/Y/XY probes, validates accelerogram quality and records explicit full-record evidence gates. Existing first-step failure is not resolved.

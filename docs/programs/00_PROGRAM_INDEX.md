@@ -28,3 +28,5 @@ All **20 root program launchers** have work-order names. Material/component vali
 Legacy filenames remain functional as launch aliases. Underlying components, external records and saved outputs have not been renamed. The nonlinear transient failure is still an open issue.
 
 [File migration map](../00_WORK_ORDER_RENAME_MAP.md) · [Organization policy](../00_REPOSITORY_ORGANIZATION.md)
+
+| 21 | [`21_NLTHA_TRIAGE.py`](../../21_NLTHA_TRIAGE.py) | [Guide](21_NLTHA_TRIAGE.md) | NLTHA isolated diagnostic configuration and evidence review |

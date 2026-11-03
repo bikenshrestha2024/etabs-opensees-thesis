@@ -259,6 +259,10 @@ def _run(config):
     write_rows(out/'Frame_Solver_Tag_Catalog.csv',frame_solver_tag_catalog(data['frames']))
     for key in ('x_path','y_path'):
         values,step,units=_read_peer_text_record(config[key]);records.append((np.asarray(values),step,units))
+    from components.nonlinear_time_history.thesis_quality import audit_ground_motion_pair
+    input_quality=audit_ground_motion_pair(records,[config['x_path'],config['y_path']])
+    (out/'NLTHA_Input_Quality.json').write_text(json.dumps(input_quality,indent=2,allow_nan=False),encoding='utf-8')
+    print('[NLTHA INPUT QUALITY] finite records, matching sampling and file hashes verified',flush=True)
     if abs(records[0][1]-records[1][1])>1e-10 or len(records[0][0])!=len(records[1][0]):raise ValueError('Pair duration/digitization mismatch; reconcile records explicitly')
     record_end=(len(records[0][0])-1)*records[0][1];end=record_end if not config.get('duration_s') else min(float(config['duration_s']),record_end)
     if end<=0:raise ValueError('Duration must be positive')
@@ -544,6 +548,8 @@ def _run(config):
         from OpenSees_Building_Response_V144 import plot_response
         plot_response(history,case,tracked)
         (case/'Case_Summary.json').write_text(json.dumps(result,indent=2));summary.append(result);print('[EXPLORATORY COMPLETE]',json.dumps(result),flush=True);ops.wipe()
+    from components.nonlinear_time_history.thesis_quality import write_quality_report
+    write_quality_report(out,summary)
     result=dict(cases=summary,elapsed_s=time.perf_counter()-start,scope=assumptions['scope']);(out/'Exploratory_Summary.json').write_text(json.dumps(result,indent=2));_set_run_stage('completed',output_dir=str(out));return result
 
 def recover_saved_report(folder,output_dir):

@@ -26,3 +26,5 @@ Primary launchers are now numbered from 01 through 20 in the following recommend
 **Important:** Keep the package intact. No new numerical analysis was run by this renaming. The full-building nonlinear first-step transient failure remains unresolved.
 
 [Full program guides](docs/programs/00_PROGRAM_INDEX.md) · [Old/new path map](docs/00_WORK_ORDER_RENAME_MAP.md)
+
+21. [`21_NLTHA_TRIAGE.py`](21_NLTHA_TRIAGE.py) — generate/review isolated first-step failure probes (no solver execution).
