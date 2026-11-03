@@ -103,3 +103,10 @@ All **90 active Python modules** have individual source guides (with source blob
 | [components/nonlinear_time_history/variant_comparison.py](../../components/nonlinear_time_history/variant_comparison.py) | [Guide](components/nonlinear_time_history/variant_comparison.py.md) | New active staged engineering module | P0 |
 
 | [components/validation/expanded_workbench_tabs.py](../../components/validation/expanded_workbench_tabs.py) | [Guide](components/validation/expanded_workbench_tabs.py.md) | Integrated material/device workbench GUI | P1 |
+
+## Readiness dashboard source additions
+
+| Source module | Individual guide | Responsibility | Priority |
+|---|---|---|---|
+| [components/model/readiness_dashboard.py](../../components/model/readiness_dashboard.py) | [Guide](components/model/readiness_dashboard.py.md) | Read-only model-bound source evidence and report export | P1 |
+| [components/model/readiness_dashboard_gui.py](../../components/model/readiness_dashboard_gui.py) | [Guide](components/model/readiness_dashboard_gui.py.md) | Integrated project-specific readiness review window | P1 |

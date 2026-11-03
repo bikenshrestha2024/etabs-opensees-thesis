@@ -33,3 +33,7 @@ Superseded root versioned reports, manifests and logs are stored under [archive/
 
 
 The [expanded visual material workbench](docs/programs/06_MATERIAL_DEVICE_VALIDATION_EXPANDED.md) retains V149 Concrete01/Steel02/FVD/BRB plots and adds Concrete02/ConcreteCM/SteelMPF/E-SFI panels plus full research catalog and calibration tools.
+
+## Evidence-based nonlinear model readiness
+
+The main ETABS workflow **OpenSees nonlinear readiness / calibration status** button opens the [model-bound readiness dashboard](docs/programs/02_NONLINEAR_READINESS_EVIDENCE_DASHBOARD.md) instead of a static nine-item warning. Evidence presence, reviewer sign-off and numerical validation are different categories; no automatic analysis approval is granted.
