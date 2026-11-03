@@ -1,23 +1,23 @@
-# transient_runtime.py — source module guide
+# transient_runtime.py — source documentation
 
-**Code:** [`components/shared/transient_runtime.py`](../../../components/shared/transient_runtime.py)  
-**Baseline blob:** `8cf48f360c378d72ed6e6c042ae7d3d15596895d`  
-**Role:** Solver and response utilities  
-**Review priority:** P1; documentation is NOT a native solver test.
+**Python source:** [components/shared/transient_runtime.py](../../../../components/shared/transient_runtime.py)
+**Git baseline content SHA:** 8cf48f360c378d72ed6e6c042ae7d3d15596895d
+**Subsystem:** Solver, logging and response numerical utilities
+**Priority:** P1 — verify with unit/integration tests
 
-## Responsibilities
-This file is part of the shared subsystem. Verify actual callable functions and imported dependencies in the linked source before refactoring. Do not infer an API solely from the module name.
+## Responsibilities and contracts
+Part of the shared implementation subsystem. Check the exact classes/functions, argument names, return structures and imported callers in the linked source before altering its interface. This guide documents engineering verification obligations, not an already-completed API test.
 
-## Engineering input checks
-Check deterministic finite-value guards, exceptions, resource management and recorded solver metadata. Record input file SHA256, SI base-unit system (kN–m–s for OpenSees), material/reference grade, source ETABS export and expected model configuration.
+## Source, inputs, units
+Document original ETABS export path/SHA, declared kN-m-s model units, stress conversion, local axes, accepted coordinate/section mapping and any third-party scientific input. Do not substitute nominal reinforcement, material grade or a literature benchmark for tested project data.
 
-## Output and failure checks
-Record full output path, model/record/orientation/ULS-SLS identifiers, solver version, accepted analysis duration, complete logs, nonfinite response checks and independent benchmark comparisons. Distinguish nominal inputs from calibrated experiment values.
+## Outputs and failure conditions
+Capture source commit SHA, model/ground-motion fingerprint, ULS/SLS, record orientation, completed physical duration, solver diagnostics, exception traceback and linked reports. Mark failed or truncated runs and do not include them in thesis rankings.
 
-## Source and validation references
-Refer only to applicable source in register. The IDs are registered in [00_RESEARCH_REFERENCES.md](../../00_RESEARCH_REFERENCES.md). These are relevant research directions and not proof that the file's numerical model is validated.
+## Research and standards
+Relevant register IDs: See subject-specific source citations. Consult [research reference register](../../../00_RESEARCH_REFERENCES.md). These identify potentially applicable publications, not proof of parameter calibration or test reproduction.
 
-## Done criteria
-Document required parameters and default units in implementation docstrings, add deterministic tests and explicit errors, then perform applicable OpenSeesPy benchmark, gravity/modal or complete NLTHA regression. A smoke test must not imply experimental or design approval.
+## Regression acceptance
+Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
-[Source index](../00_SOURCE_GUIDE_INDEX.md) · [Thesis gates](../../00_THESIS_ACCEPTANCE_GATES.md)
+[Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
