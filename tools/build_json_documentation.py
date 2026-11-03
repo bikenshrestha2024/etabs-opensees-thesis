@@ -141,6 +141,16 @@ def generate(root,*,check=False):
             dest.parent.mkdir(parents=True,exist_ok=True)
             dest.write_text(page,encoding="utf-8")
         index.append("| "+rel+" | [Schema](files/"+rel+".md) | "+group(rel)+" | "+state+" |")
+    # Remove obsolete guide paths when a source JSON was moved to the archive.
+    # The corresponding new guide is generated at the new source-relative path.
+    expected={root/DOCS/(p.relative_to(root).as_posix()+".md") for p in paths}
+    existing=set((root/DOCS).rglob("*.json.md")) if (root/DOCS).exists() else set()
+    stale=sorted(existing-expected)
+    if check:
+        failures.extend("Stale guide: "+str(p.relative_to(root)) for p in stale)
+    else:
+        for p in stale:
+            p.unlink()
     summary="\n".join(index)+"\n"
     ix=root/"docs/json/00_ALL_JSON_FILES.md"
     if check:

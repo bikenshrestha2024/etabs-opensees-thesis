@@ -26,3 +26,7 @@ The exploratory runner now includes physical wall geometry preflight (stage 01),
 
 
 [Six-stage NLTHA implementation and validation guide](docs/00_NLTHA_SIX_STAGE_EXECUTION_GUIDE.md) covers executed code changes, source inputs and unsolved physical validation tasks.
+
+## Historical version organization
+
+Superseded root versioned reports, manifests and logs are stored under [archive/previous_versions](archive/previous_versions/README.md), grouped by filename family. Only the latest version in each family stays at root, except two older Python compatibility facades still consumed by the GUI. The archive manifest documents those exceptions and exact original hashes.
