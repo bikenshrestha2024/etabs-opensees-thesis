@@ -235,6 +235,25 @@ def _run(config):
         write_recorder_index, write_rows,
     )
     full_wall=bool(config.get('nonlinear_walls',False))
+    thesis_intent=config.get('analysis_intent')=='THESIS_NLTHA'
+    # Explicit thesis-level job intent must not silently use elastic core walls,
+    # nominal reference rebars, zero damping or a short diagnostic excitation.
+    # These are necessary input gates only, NOT an approval of the FSAM model.
+    if thesis_intent:
+        if not config.get('soil_c_primary_nltha',False):
+            raise ValueError('THESIS_NLTHA requires soil_c_primary_nltha=true')
+        if not full_wall:
+            raise ValueError('THESIS_NLTHA requires calibrated nonlinear core-wall elements')
+        if not config.get('approved_frame_reinforcement_csv'):
+            raise ValueError('THESIS_NLTHA requires source-reviewed frame reinforcement CSV')
+        if excitation!='XY' or sorted(config.get('orientations',['XY','YX']))!=['XY','YX']:
+            raise ValueError('THESIS_NLTHA requires simultaneous XY and YX in separate domains')
+        if config.get('diagnostic_zero_damping') or config.get('diagnostic_mass_damping'):
+            raise ValueError('THESIS_NLTHA cannot use a diagnostic damping override')
+        if not config.get('nbc105_2025_design_evidence'):
+            raise ValueError('THESIS_NLTHA requires independently reviewed modal and SeismoMatch evidence')
+        if config.get('duration_s'):
+            raise ValueError('THESIS_NLTHA must use full record duration, not a diagnostic truncation')
     profile=profile_for_config(config)
     _RUN_CONTEXT.update(profile=profile,diagnostic_excitation=excitation,
                         transient_system=transient_system,gravity_system=gravity_system,
@@ -290,8 +309,43 @@ def _run(config):
     write_rows(out/'Frame_Solver_Tag_Catalog.csv',frame_solver_tag_catalog(data['frames']))
     for key in ('x_path','y_path'):
         values,step,units=_read_peer_text_record(config[key]);records.append((np.asarray(values),step,units))
+    # Soil-C research suite is hash-bound to the verified 16 matched exports.
+    # Requires opt-in, so unrelated pre-existing exploratory workflows are
+    # not silently forced onto the Soil-C thesis record catalogue.
+    suite_mode=bool(config.get('soil_c_primary_nltha',False))
+    source_pair_audit=None
+    endpoint_policy=dict(status='AS_ORIGINALLY_EXPORTED',added_samples=0)
+    if suite_mode:
+        from components.nonlinear_time_history.soil_c_nltha_suite import (
+            verify_runner_pair, reconcile_loma_runtime_pair)
+        if config.get('source_records_already_scaled') is not True:
+            raise ValueError('Soil-C thesis matched inputs require source_records_already_scaled=true')
+        if float(config.get('scale',1.))!=1.:
+            raise ValueError('Already matched Soil-C records must have OpenSees scale=1.0')
+        if str(config.get('soil_type','C')).upper()!='C':
+            raise ValueError('Soil-C primary suite cannot be relabeled as Soil D')
+        source_pair_audit=verify_runner_pair(
+            config['x_path'],config['y_path'],
+            registered_event=config.get('earthquake_event'),
+            gorkha_processing_approved=config.get('gorkha_processing_reviewed') is True,
+            reviewer=config.get('engineering_reviewer'),
+            loma_end_policy=config.get('loma_end_policy','reject'))
+        if source_pair_audit['event']=='Loma Prieta':
+            records,endpoint_policy=reconcile_loma_runtime_pair(
+                records, policy=config.get('loma_end_policy','reject'),
+                reviewer=config.get('engineering_reviewer'))
+        # Keep numeric arrays for existing OpenSees time-series use.
+        records=[(np.asarray(values),dt,unit) for values,dt,unit in records]
+        (out/'Soil_C_Matched_Source_Gate.json').write_text(json.dumps(dict(
+            input_source=source_pair_audit,runtime_endpoint=endpoint_policy,
+            source_model_requires_independent_material_verification=True),
+            indent=2,allow_nan=False),encoding='utf-8')
     from components.nonlinear_time_history.thesis_quality import audit_ground_motion_pair
     input_quality=audit_ground_motion_pair(records,[config['x_path'],config['y_path']])
+    if suite_mode:
+        input_quality['reviewed_runtime_extension']=endpoint_policy
+        input_quality['original_input_source_sha256']=[
+            source_pair_audit['source_sha256_A'],source_pair_audit['source_sha256_B']]
     # Read the selected scale BEFORE computing the paired source fingerprint.
     # Previous versions referenced 'scale' before assignment here.
     scale=float(config.get('scale',1.))
@@ -379,8 +433,11 @@ def _run(config):
         from components.shared.eigen_solver import solve_eigen
         eigenvalues=solve_eigen(ops,20);periods=[2*math.pi/math.sqrt(v) for v in eigenvalues if v>0]
         if len(periods)!=20:raise ValueError('Inspected nonlinear modes incomplete')
-        bound=min(records[0][1],.01,periods[0]/100.,periods[-1])
-        if dt>bound:raise ValueError(f'Chosen dt {dt} exceeds inspected-mode screen {bound:g}s; reduce dt')
+        # The last of 20 computed eigenmodes is NOT synonymous with Tn90.
+        # The complete NBC §9.3.2.4 bound uses reviewer-supplied true Tn90
+        # from 90% cumulative effective modal mass in BOTH axes.
+        bound=min(records[0][1],.01,periods[0]/100.)
+        if dt>bound:raise ValueError(f'Chosen dt {dt} exceeds preliminary first-mode screen {bound:g}s; reduce dt')
         alpha,beta=rayleigh_coefficients(max(periods),min(periods),.05)
         if config.get('diagnostic_mass_damping'):alpha,beta=2*.05*min(math.sqrt(v) for v in eigenvalues),0.
         if config.get('diagnostic_zero_damping'):alpha,beta=0.,0.
