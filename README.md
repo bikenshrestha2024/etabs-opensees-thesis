@@ -89,3 +89,8 @@ For new Codex, ChatGPT and GitHub coding tasks, use the [numbered RTFC (ROLE–T
 ## Engineering review and safe work-order navigation (2026-11)
 
 For the asymmetric high-rise RCC-core/damped-outrigger thesis, use [the active-source engineering review](docs/review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md) and [canonical 00–09 verification order](docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md) instead of sorting the duplicate numbered legacy launchers. A [static AST source-audit utility](tools/audit_active_repository.py) inventories active code, symbol lines, SHA, syntax status, missing source guides and numbered alias collisions. It **does not** claim native solver convergence or a line-by-line semantic review of all archived files.
+
+
+### P0 RCC core wall / nonlinear material source review
+
+The [first-step wall orientation, opening geometry and material qualification review](docs/review/01_WALL_GEOMETRY_MATERIALS_FIRST_STEP.md) now tests E-SFI bottom-edge width versus vertical edge height in both assembled geometry and the model preflight. Production-labelled `THESIS_NLTHA` is explicitly **blocked** while the existing PEER-web/M30 research templates remain the active concrete/FSAM/Fe500 constitutive implementation, or while the user has no verified wall opening schedule. This protects against treating assumed materials and passing source geometry as calibrated project physics. The earlier X-only first-step wall failure remains unresolved; diagnostic probes and numerical experiments are still available.

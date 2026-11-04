@@ -1,3 +1,5 @@
+> **Progress 2026-11-04:** P0 source changes have now been implemented: [wall orientation / openings / uncalibrated-material gate](01_WALL_GEOMETRY_MATERIALS_FIRST_STEP.md). Synthetic Python regression tests passed in CI; **native 3D wall response and actual ETABS assembly remain unverified**. Do not interpret this progress as resolution of the Kobe X first-step failure.
+
 # 00 — Independent engineering code review: asymmetric RCC high-rise damped outrigger
 
 **Review stage:** source structure and selected active modules only; **not a completed line-by-line review of all 2,700+ repository entries**. This is an initial, reproducible engineering baseline and explicit backlog for progressive full review. Source survey undertaken 2026-11-04. Historical archives, backups and older V1xx snapshots remain retained but are **not authoritative implementation**.
