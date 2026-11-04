@@ -297,6 +297,11 @@ def _run(config):
     scale=float(config.get('scale',1.))
     if not math.isfinite(scale) or scale<=0:
         raise ValueError('Scale must be finite and positive')
+    # This runner expects unscaled native record ordinates. If the source was
+    # already multiplied by a prior matching scale, require a clean original.
+    if config.get('source_records_already_scaled') is True:
+        raise ValueError('Original unscaled source records required: avoid duplicate spectral scaling')
+
 
     # Pair fingerprint is constant across XY/YX and binds the input files,
     # sampling, units and selected scale. This is NOT spectrum-match proof.
@@ -369,10 +374,25 @@ def _run(config):
         (case/'Initial_Modal_Damping.json').write_text(json.dumps(dict(eigenvalues=eigenvalues,periods_s=periods,alphaM=alpha,betaKcomm=beta,dt_screen_s=bound),indent=2))
         ops.rayleigh(alpha,0.,0.,beta)
         _set_run_stage('transient_setup',orientation=orientation,case_output_dir=str(case))
-        for direction,r in enumerate(diagnostic_record_inputs(records,orientation,excitation),1):
+        from components.nonlinear_time_history.nbc105_horizontal_input import (
+            write_manifest,unit_and_scale)
+        input_manifest=write_manifest(
+            case/'OpenSees_Bidirectional_Input_Commands.json',
+            orientation=orientation,record_a=config['x_path'],record_b=config['y_path'],
+            dt_s=records[0][1],units_a=records[0][2],units_b=records[1][2],
+            pair_scale=scale,already_scaled=config.get('source_records_already_scaled',False))
+        # Diagnostic X/Y/ZERO runs remain independent failure-isolation probes,
+        # NOT complete paired-code analyses. For the real case, X and Y each
+        # receive one original source component, and YX interchanges them.
+        for mapping,r in zip(input_manifest['commands'],
+                             diagnostic_record_inputs(records,orientation,excitation)):
             values,step,units=r
-            tag=900000+direction
-            ops.timeSeries('Path',tag,'-dt',step,'-values',*values.tolist(),'-factor',unit_factor[units]*scale)
+            direction=mapping['dof']
+            tag=mapping['path_series_tag']
+            factor=unit_and_scale(units,scale)
+            if not math.isclose(factor,mapping['path_factor_m_s2'],rel_tol=1e-12):
+                raise ValueError('Source unit/rotation mapping mismatch')
+            ops.timeSeries('Path',tag,'-dt',step,'-values',*values.tolist(),'-factor',factor)
             ops.pattern('UniformExcitation',tag,direction,'-accel',tag)
         _configure_nonlinear_transient(ops)
         configure_transient_system(ops,transient_system)
