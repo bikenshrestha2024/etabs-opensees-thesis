@@ -14,11 +14,11 @@ from components.equivalent_static.calculation_and_gui import ESMGui, resolve_esm
 
 class Value:
     def __init__(self, value=""):
-        self.value = str(value)
+        self.value = value
     def get(self):
         return self.value
     def set(self, value):
-        self.value = str(value)
+        self.value = value
 
 
 class ESMProvenanceTests(unittest.TestCase):
