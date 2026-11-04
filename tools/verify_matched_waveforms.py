@@ -45,7 +45,7 @@ def parse_matched(path):
     # could shift duration, change peak acceleration or corrupt XY/YX pairing.
     column_header = next(
         (i for i, line in enumerate(lines) if
-         re.search(r"time\\s*\\(\\s*sec\\s*\\).*acc\\s*\\(\\s*g\\s*\\)", line, re.I)),
+         re.search(r"time\s*\(\s*sec\s*\).*acc\s*\(\s*g\s*\)", line, re.I)),
         None)
     if column_header is None:
         raise ValueError(f"Missing Time(sec) Acc(g) columns: {source.name}")
