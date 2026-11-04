@@ -20,12 +20,31 @@ def verify_accepted_history(rows, record_end_s, requested_end_s, *,
     if any(not math.isfinite(v) or v<=0 for v in (end,requested)):
         raise ValueError("Nonpositive/nonfinite record duration")
     times=[]
+    expected_columns = set(rows[0])
+    if "time_s" not in expected_columns or len(expected_columns) < 2:
+        raise ValueError("Accepted history must have time_s and recorded response channels")
     for i,row in enumerate(rows):
-        t=float(row["time_s"])
-        if not math.isfinite(t):raise ValueError(f"Nonfinite history time {i}")
+        if not isinstance(row, dict) or set(row) != expected_columns:
+            raise ValueError(f"Accepted response channels missing or inconsistent at row {i}")
+        try:
+            t=float(row["time_s"])
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise ValueError(f"Nonfinite/invalid history time {i}") from exc
+        if not math.isfinite(t):
+            raise ValueError(f"Nonfinite history time {i}")
         for name,v in row.items():
-            if name=="time_s":continue
-            if isinstance(v,(float,int)) and not math.isfinite(float(v)):
+            if name=="time_s":
+                continue
+            # CSV/JSON postprocessors often deliver numeric responses as
+            # strings. The previous gate silently accepted "nan"/"inf" and
+            # arbitrary text, potentially marking invalid records complete.
+            if isinstance(v, bool) or v is None:
+                raise ValueError(f"Invalid accepted response {name} at row {i}")
+            try:
+                value=float(v)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError(f"Invalid accepted response {name} at row {i}") from exc
+            if not math.isfinite(value):
                 raise ValueError(f"Nonfinite accepted response {name} at row {i}")
         times.append(t)
     if len(times)<2:raise ValueError("History lacks post-start accepted steps")
@@ -52,6 +71,7 @@ def verify_accepted_history(rows, record_end_s, requested_end_s, *,
 def write_accepted_history_gate(output_dir,rows,record_end_s,requested_end_s):
     result=verify_accepted_history(rows,record_end_s,requested_end_s)
     out=Path(output_dir)/"Accepted_History_Completion_Gate.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result,indent=2,allow_nan=False),encoding="utf-8")
     return result
 
@@ -63,6 +83,30 @@ def compare_time_step_results(coarse,fine,*,max_relative_difference=None):
             raise ValueError("Time-step comparison requires two full-duration screens")
         if r.get("model_sha256")!=coarse.get("model_sha256") or r.get("record_sha256")!=coarse.get("record_sha256"):
             raise ValueError("Time-step comparison model or motion inputs differ")
+    # Missing source hashes used to compare equal (None == None); such
+    # comparisons had no provenance and must not support timestep selection.
+    for key in ("model_sha256", "record_sha256"):
+        digest=coarse.get(key)
+        if not isinstance(digest,str) or len(digest)!=64 or any(c not in "0123456789abcdefABCDEF" for c in digest):
+            raise ValueError("Time-step comparison requires verified 64-digit " + key)
+    if max_relative_difference is not None:
+        try:
+            tol=float(max_relative_difference)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("Invalid time-step comparison tolerance") from exc
+        if not math.isfinite(tol) or tol < 0:
+            raise ValueError("Time-step comparison tolerance must be finite and nonnegative")
+        max_relative_difference=tol
+    for name,report in (("coarse",coarse),("fine",fine)):
+        for key in ("min_accepted_step_s","max_accepted_step_s"):
+            try:
+                value=float(report[key])
+            except (KeyError,TypeError,ValueError,OverflowError) as exc:
+                raise ValueError(f"{name} time-step evidence missing/invalid {key}") from exc
+            if not math.isfinite(value) or value<=0:
+                raise ValueError(f"{name} time-step evidence {key} must be finite and positive")
+    if not fine["max_accepted_step_s"] < coarse["max_accepted_step_s"]:
+        raise ValueError("Fine analysis must have a smaller maximum accepted step than coarse analysis")
     fields=("peak_roof_UX_m","peak_roof_UY_m","max_story_drift_X","max_story_drift_Y")
     values={}
     for key in fields:
