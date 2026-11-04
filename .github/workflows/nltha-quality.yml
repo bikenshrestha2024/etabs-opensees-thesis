@@ -17,6 +17,8 @@ on:
       - 'components/response_spectrum/nbc_pair_spectrum_audit.py'
       - '32_NBC105_PAIR_SPECTRUM_AUDIT.py'
       - 'tests/verify_nbc105_pair_spectrum_audit.py'
+      - 'components/inputs/records.py'
+      - 'tests/verify_matched_records_no_rescale.py'
       - 'components/nonlinear_time_history/soil_c_nltha_suite.py'
       - '35_SOIL_C_NLTHA_PREFLIGHT.py'
       - 'tests/verify_soil_c_nltha_suite.py'
@@ -92,6 +94,7 @@ jobs:
           python tests/verify_nbc105_horizontal_input.py
           python tests/verify_seismomatch_audit.py
           python tests/verify_soil_c_nltha_suite.py
+          python tests/verify_matched_records_no_rescale.py
           python tests/verify_matched_waveform_register.py
           python tests/verify_original_matched_pairs.py
           python tests/verify_nbc105_pair_spectrum_audit.py
