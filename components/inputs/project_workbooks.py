@@ -104,7 +104,7 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     candidates=list(dict.fromkeys(explicit+candidates))
     if explicit:
         candidates=explicit
-    expected_edb=Path(_source_edb_path(export_dir)).stem.casefold()
+    expected_edb=_portable_source_stem(_source_edb_path(export_dir)).casefold()
     expected_floor=_model_floor(export_dir,expected_edb)
     state_tokens=('service','sls') if state=='SLS' else ('ultimate','uls')
 
@@ -135,6 +135,10 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     scaling=[record for record in records if 'SCALING SUMMARY' in record[1]]
     def score(record):
         path,_,source=record
+        # An explicit stored EDB path for a different building is a hard
+        # mismatch even when the scaling workbook has a plausible filename.
+        if expected_edb and source and _portable_source_stem(source).casefold()!=expected_edb:
+            return -1
         name=(path.stem+' '+source).casefold()
         has_sls=any(token in name for token in ('service','sls'))
         has_uls=any(token in name for token in ('ultimate','uls'))
@@ -161,8 +165,13 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
             scaling_book=next((path for path in explicit if path in matches),None)
     if scaling_book is None:
         default_name=SERVICE_SCALING if state=='SLS' else SCALING
-        scaling_book=next((directory/default_name for directory in search
-                           if (directory/default_name).is_file()),None)
+        # Do not bypass the source/floor/limit-state identity check through a
+        # hard-coded filename fallback. This previously selected wrong-model
+        # ESM Aw and adopted-period reference cells without warning.
+        fallback_candidates=[record for record in scaling if record[0].name==default_name]
+        valid_fallbacks=[record for record in fallback_candidates if score(record)>=0]
+        if len(valid_fallbacks)==1:
+            scaling_book=valid_fallbacks[0][0]
     return [calculator,scaling_book]
 
 
