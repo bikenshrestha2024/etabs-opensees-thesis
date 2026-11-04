@@ -27,6 +27,42 @@ except Exception as exc:
     raise RuntimeError("Keep NBC105_Analysis_Settings_V109.py beside this GUI.") from exc
 
 
+def recommended_story_weight_input(export_dir):
+    """Choose a complete story ledger only when tags match the current model.
+
+    This verifies import consistency, NOT seismic mass or NBC compliance.
+    Original exports are never modified.
+    """
+    export_dir=Path(export_dir)
+    manual=export_dir/'NBC105_ESM_Story_Weights_Input_V108.csv'
+    assembled=export_dir/'NBC105_ESM_Story_Weights_Assembled_V118.csv'
+    model_path=export_dir/'OpenSees_Complete_Model_Data_V118.json'
+    if not (assembled.is_file() and model_path.is_file()):
+        return (manual if manual.is_file() else None,
+                'No complete model-linked ledger; select verified story weights')
+    try:
+        with assembled.open(newline='',encoding='utf-8-sig') as f:
+            rows=[r for r in csv.DictReader(f) if str(r.get('story_number','')).strip()]
+        data=json.loads(model_path.read_text(encoding='utf-8-sig'))
+        diaphragms=data['diaphragms']
+        if not rows or len(rows)!=len(diaphragms):
+            raise ValueError('assembled ledger story count differs from current model')
+        current={(int(r['story_number']),int(r['master_node_tag'])) for r in rows}
+        source={(int(d['storey_number']),int(d['master_tag'])) for d in diaphragms}
+        if len(current)!=len(rows) or current!=source:
+            raise ValueError('assembled ledger diaphragm tags differ from current model')
+        for i,r in enumerate(rows,2):
+            for k in ('height_m','dead_load_kN','storage_live_load_kN','other_live_load_kN'):
+                v=float(r[k])
+                if not math.isfinite(v) or v<0:
+                    raise ValueError(f'invalid {k} at assembled ledger row {i}')
+        return assembled,('Assembled story-weight ledger selected: model diaphragm tags match; '
+            'independently review ETABS gravity/live-load components and seismic mass')
+    except (OSError,ValueError,TypeError,KeyError,OverflowError) as exc:
+        return (manual if manual.is_file() else None,
+                'Assembled ledger rejected ('+str(exc)+'); regenerate/review export')
+
+
 def read_story_csv(path):
     rows=[]
     with open(path, newline="", encoding="utf-8-sig") as f:
@@ -298,8 +334,9 @@ class ESMGui:
         self.export_dir=None  # initialized after locating the selected export
         export_dir=Path(sys.argv[1]) if len(sys.argv)>1 and Path(sys.argv[1]).is_dir() else Path(r"D:\Thesis Opensees\Etabs Nodes Export")
         self.export_dir=export_dir
-        story_csv=export_dir/"NBC105_ESM_Story_Weights_Input_V108.csv"
-        self.path=tk.StringVar(value=str(story_csv) if story_csv.is_file() else "")
+        story_csv,story_source_note=recommended_story_weight_input(export_dir)
+        self.path=tk.StringVar(value=str(story_csv) if story_csv and story_csv.is_file() else "")
+        self.story_source_note=story_source_note
         self.outdir=tk.StringVar(value=str(analysis_output_folder(export_dir,'Both')))
         self._output_is_automatic=True
         self.state=tk.StringVar(value="Both"); self.soil=tk.StringVar(value="D")
@@ -418,6 +455,7 @@ class ESMGui:
         self.run_log=copyable_log(top,self.status)
         ttk.Label(top,text="Workflow: ETABS exports provide story weights, elevations and diaphragm tags. This dialog calculates NBC actions and can execute a complete user-selected OpenSeesPy model-builder script. It does not directly open an ETABS EDB; ETABS API periods can be read when ETABS is open and its modal case has been run.",foreground="#8a341c",wraplength=1100).pack(anchor="w",pady=5)
         if self.path.get(): self._load_story_metadata(self.path.get())
+        if self.story_source_note:self.status.set(self.story_source_note)
 
     def _view_plots(self):
         from OpenSees_Results_UI_V127 import esm_comparison
