@@ -43,6 +43,9 @@ GROUPS = (
     ("nbc105", "NBC 105:2025 nonlinear motion compliance screening",
      "Site spectrum C(T)/Omega_u, 0.33..3 component factors, common lower pair factor, Tn90/T1 timestep, XY/YX and reviewed period evidence",
      ("NBC105_2025_NLTHA_Input_Screen.json", "Kobe_Pair_NBC105.json")),
+    ("seismomatch", "Eight matched SeismoMatch earthquake pairs",
+     "All sixteen matched source fingerprints and conditional PSA matching report; Gorkha duration and Loma Prieta end-time review, original X/Y scaling logs missing",
+     ("Matched_Source_Integrity.json", "SeismoMatch_Source_Provenance.json")),
     ("motions", "Paired ground motions and full-duration cases",
      "Record pairing, dt, units, source SHA, ULS/SLS XY/YX and complete duration",
      ("Accepted_History_Completion_Gate.json",)),
@@ -68,6 +71,7 @@ REVIEW_KEYS = {
     "transient": ("single_element_and_wall_benchmark_checks_passed",),
     "vertical": ("etabs_topology_and_story_mapping_reviewed",),
     "nbc105": ("record_pair_units_scales_and_nbc_limits_reviewed",),
+    "seismomatch": ("record_pair_units_scales_and_nbc_limits_reviewed",),
     "motions": ("record_pair_units_scales_and_nbc_limits_reviewed",),
 }
 

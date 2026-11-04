@@ -52,3 +52,10 @@ The main ETABS workflow **OpenSees nonlinear readiness / calibration status** bu
 
 
 [2026-11-04 SeismoMatch numeric source double-verification](docs/00_SEISMOMATCH_MATCHED_RECORDS_AUDIT_20261104.md): six original Library matched X records checked against thesis PGAs, one unresolved Gorkha mismatch, scale1.0 import and missing original component scaling logs documented.
+
+
+## All eight SeismoMatch earthquake pairs verified at input-file level
+
+The latest [16-component, eight-pair SeismoMatch record audit](docs/ground_motions/seismomatch_20261104/README.md) supersedes the preliminary six-X-component document. It includes matched sample intervals, PGAs, source SHA256 fingerprints, conditional 5%-damped response-spectrum discrepancy statistics, source processing anomalies, and NBC 105:2025 clause checks. See the [16-file register](docs/ground_motions/seismomatch_20261104/matched_component_register.csv) and [offline reproducible source verifier](tools/verify_matched_waveforms.py).
+
+**No original or matched earthquake waveforms are committed.** The original SeismoMatch initial component scaling-factor logs remain unavailable. Matched files already in `Acc(g)` are imported with `scale=1.0` and a unit-conversion Path factor of `9.80665`, not a second spectral scale.

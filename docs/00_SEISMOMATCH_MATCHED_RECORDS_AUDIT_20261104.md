@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-11-04:** This is the historical six-X-file preliminary audit. All **eight complete pairs / sixteen matched component files** are now audited. See [current complete verification](ground_motions/seismomatch_20261104/README.md). Earlier statements below that Y components or Hector Mine/Loma Prieta exports are unavailable are no longer true.
+
 # SeismoMatch ground-motion double verification — 2026-11-04
 
 **Status:** PARTIALLY VERIFIED / SOURCE SCALE FACTORS AND EIGHT COMPLETE XY PAIRS NOT AVAILABLE TO THIS AUDIT.
