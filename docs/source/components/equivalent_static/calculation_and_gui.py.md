@@ -21,3 +21,8 @@ Relevant register IDs: R10. Consult [research reference register](../../../00_RE
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+
+## 2026-11-04 missing-value diagnosis
+
+The ESM initialization previously referenced an undefined `rayleigh_state`; now validates and uses the actual GUI state. The `_show_empirical` display must tolerate unavailable Aw and leave periods pending rather than aborting the whole project input load. `recommended_story_weight_input` prefers a populated assembled ledger only when current diaphragm IDs match the model. Existing manually reviewed CSV choices remain supported. [Full ESM blank-input diagnosis and tests](../../../00_ESM_INPUT_IMPORT_BLANK_FIX.md).

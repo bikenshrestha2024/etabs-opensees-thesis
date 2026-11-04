@@ -79,6 +79,12 @@ on:
       - 'components/modal/gui_and_reports.py'
       - 'components/shared/case_status.py'
       - 'tests/verify_modal_cancel_status.py'
+      - 'components/equivalent_static/calculation_and_gui.py'
+      - 'components/inputs/project_workbooks.py'
+      - 'tests/verify_nbc105_periods.py'
+      - 'tests/verify_esm_input_loader.py'
+      - 'tests/verify_esm_partial_input.py'
+      - 'tests/verify_esm_source_selection.py'
       - 'tools/run_native_wall_probes.py'
       - 'tests/verify_native_wall_probe_preparation.py'
       - 'tools/audit_component_experiments.py'
@@ -120,6 +126,10 @@ jobs:
           python tests/verify_active_repository_audit.py
           python tests/verify_review_ledger.py
           python tests/verify_modal_cancel_status.py
+          python tests/verify_nbc105_periods.py
+          python tests/verify_esm_input_loader.py
+          python tests/verify_esm_partial_input.py
+          python tests/verify_esm_source_selection.py
           python tests/verify_native_wall_probe_preparation.py
           python tests/verify_component_experiment_evidence.py
           python tests/verify_soil_c_case_completion.py
