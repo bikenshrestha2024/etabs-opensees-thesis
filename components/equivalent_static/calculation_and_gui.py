@@ -450,7 +450,13 @@ class ESMGui:
             for key,r in refs.items():
                 if isinstance(r,dict) and 'value' in r:data['audit'].append(dict(field='period_reference_'+key,value=r['value'],source=r['source'],sheet=r['sheet'],cell=r['cell']))
             from openpyxl import Workbook
-            out=analysis_output_folder(self.export_dir,rayleigh_state) if self._output_is_automatic else Path(self.outdir.get())
+            # The ESM dialog is initialized with state='Both'; unlike a
+            # preliminary Rayleigh run there was no rayleigh_state local here.
+            # The earlier NameError aborted source-provenance export silently.
+            selected_state=self.state.get().strip().upper()
+            if selected_state not in ('BOTH','ULS','SLS'):
+                raise ValueError('ESM state must be Both, ULS or SLS')
+            out=analysis_output_folder(self.export_dir,selected_state) if self._output_is_automatic else Path(self.outdir.get())
             out.mkdir(exist_ok=True,parents=True)
             (out/'NBC105_Input_Provenance_V123.json').write_text(json.dumps(data,indent=2),encoding='utf-8')
             wb=Workbook();ws=wb.active;ws.title='Imported inputs';ws.append(['Field','Value','Workbook/result file','Sheet','Cell'])
@@ -466,7 +472,19 @@ class ESMGui:
             self.period_note.set('Excel/project inputs loaded with cell-level provenance. Rayleigh values populate only from a matching preliminary run. Regularity remains unconfirmed.')
             self._show_empirical()
             self._direction_changed()
-        except Exception as exc:self.status.set('Project input import needs review: '+str(exc))
+        except Exception as exc:
+            # Never suppress the reason for an empty input field. Keep the
+            # dialog open for manual/reviewed inputs and report the precise
+            # failure in the status line as well as the user-visible dialog.
+            self.status.set('Project input import failed: '+str(exc))
+            self.period_note.set('Automatic Excel/project import failed: '+str(exc)
+                +' | Use Excel sources… to select the exact current model workbooks.')
+            if getattr(self,'_show_import_failure_dialog',True):
+                messagebox.showwarning('ESM input import incomplete',
+                    'Verified project inputs could not be imported. '
+                    'The dialog remains usable, but blank values must not be '
+                    'interpreted as zero or calculated defaults.\n\n'+str(exc),
+                    parent=self.root)
 
     def _show_empirical(self):
         rows=read_story_csv(self.path.get());H=max(float(r['height_m']) for r in rows)
