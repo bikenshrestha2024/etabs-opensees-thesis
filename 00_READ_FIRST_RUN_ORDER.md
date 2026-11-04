@@ -1,3 +1,5 @@
+**First Windows test after merge:** [safe setup, launchers, checks and error reporting](docs/00_TEST_MAIN_AFTER_MERGE.md). The first full nonlinear RCC core analysis remains explicitly research-only until native and material validation.
+
 # 00 — OpenSeesPy work order
 
 Primary launchers are now numbered from 01 through 20 in the following recommended verification-first order. They are **not** one compulsory sequential batch; use stand-alone diagnostics when needed. The previous filenames remain forwarding aliases.
