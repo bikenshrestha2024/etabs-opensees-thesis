@@ -76,6 +76,12 @@ on:
       - 'docs/review/**'
       - 'tools/validate_review_ledger.py'
       - 'tests/verify_review_ledger.py'
+      - 'tools/run_native_wall_probes.py'
+      - 'tests/verify_native_wall_probe_preparation.py'
+      - 'tools/audit_component_experiments.py'
+      - 'tests/verify_component_experiment_evidence.py'
+      - 'tools/audit_soil_c_case_completion.py'
+      - 'tests/verify_soil_c_case_completion.py'
   pull_request:
     paths:
       - 'docs/review/ledger/**'
@@ -110,6 +116,9 @@ jobs:
           python tests/verify_documentation_coverage.py
           python tests/verify_active_repository_audit.py
           python tests/verify_review_ledger.py
+          python tests/verify_native_wall_probe_preparation.py
+          python tests/verify_component_experiment_evidence.py
+          python tests/verify_soil_c_case_completion.py
           python tests/verify_rtfc_prompt_contract.py
           python tests/verify_wall_geometry_preflight.py
           python tests/verify_reinforcement_mapping.py
