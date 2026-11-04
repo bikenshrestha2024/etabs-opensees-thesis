@@ -18,6 +18,7 @@ on:
       - 'tests/verify_seismomatch_audit.py'
       - 'tools/verify_matched_waveforms.py'
       - 'tests/verify_matched_waveform_register.py'
+      - 'docs/ground_motions/seismomatch_20261104/**'
       - 'components/nonlinear_time_history/nbc105_horizontal_input.py'
       - '33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py'
       - 'tests/verify_nbc105_horizontal_input.py'
