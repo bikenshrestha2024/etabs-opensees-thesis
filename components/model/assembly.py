@@ -84,8 +84,17 @@ def _wall_panel_nodes(points, object_id):
     if (bottom[0]+1)%4 not in bottom:
         points=list(reversed(points))
         bottom=[i for i,q in enumerate(points) if abs(q[2]-low)<1e-7]
-    start=next(i for i in bottom if (i+1)%4 in bottom)
+    candidates=[i for i in bottom if (i+1)%4 in bottom]
+    if not candidates:
+        raise ValueError(f'Wall {object_id}: bottom nodes are not adjacent in quad ordering')
+    start=candidates[0]
     points=points[start:]+points[:start]
+    # Code conservatively represents strictly vertical wall panels. Width
+    # is assigned by i-j in E_SFI_MVLEM_3D (not by member diagonal).
+    bottom_vector=_sub(points[1],points[0])
+    height_vector=_sub(points[3],points[0])
+    if abs(bottom_vector[2])>1e-7 or math.hypot(height_vector[0],height_vector[1])>1e-7 or height_vector[2]<=1e-7:
+        raise ValueError(f'Wall {object_id}: E-SFI quad must have horizontal i-j width and vertical i-l height')
     normal=_cross(_sub(points[1],points[0]),_sub(points[3],points[0]))
     dominant=max(range(3),key=lambda i:abs(normal[i]))
     if normal[dominant]<0:
@@ -204,6 +213,8 @@ def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=
     No source opening is filled; each mesh cell belongs to an existing polygon.
     """
     nodes=dict(source_nodes); lookup={tuple(round(x,8) for x in p):n for n,p in nodes.items()}
+    if not nodes:
+        raise ValueError("Cannot mesh ETABS area panels without source nodes")
     next_node=max(nodes)+1000; shells=[]; by_object={}
     original=list(source_nodes.values())
     floor_subdivisions=int(floor_subdivisions)

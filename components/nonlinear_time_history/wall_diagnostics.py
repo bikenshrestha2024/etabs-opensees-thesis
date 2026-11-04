@@ -60,6 +60,19 @@ def inspect_wall_geometry(model_data, *, tolerance_m=1e-7):
                 raise ValueError("Degenerate wall quad has near-zero area")
             width = _norm(a)
             height = _norm(b)
+            # Source-specific E-SFI-MVLEM-3D panel orientation gate:
+            # i->j must be the HORIZONTAL bottom wall width and i->l
+            # the VERTICAL height. Otherwise the assembled solver uses
+            # length(i,j) as the macro-fiber width, even if geometry is a
+            # mathematically valid vertical quadrilateral.
+            horizontal_edge_dz = abs(a[2])
+            vertical_edge_plan_m = math.hypot(b[0], b[1])
+            if horizontal_edge_dz > tolerance_m:
+                raise ValueError("E-SFI wall i-j bottom width edge must be horizontal")
+            if vertical_edge_plan_m > tolerance_m or b[2] <= tolerance_m:
+                raise ValueError("E-SFI wall i-l height edge must rise vertically")
+            if width <= tolerance_m or height <= tolerance_m:
+                raise ValueError("E-SFI panel has zero or near-zero fiber width/height")
             close = _norm(_sub(points[2],
                               tuple(points[1][k]+points[3][k]-points[0][k] for k in range(3))))
             if close > tolerance_m:
@@ -71,6 +84,8 @@ def inspect_wall_geometry(model_data, *, tolerance_m=1e-7):
             if not math.isfinite(thickness) or thickness <= 0:
                 raise ValueError("Nonpositive wall thickness")
             record.update(area_m2=area, edge01_m=width, edge03_m=height,
+                          esfi_panel_bottom_width_m=width,
+                          esfi_panel_vertical_height_m=height,
                           thickness_m=thickness, normal=normal,
                           z_extent_m=max(p[2] for p in points)-min(p[2] for p in points),
                           status="GEOMETRY_SCREEN_PASSED")
@@ -84,6 +99,7 @@ def inspect_wall_geometry(model_data, *, tolerance_m=1e-7):
             "suspect_source_areas": list(SUSPECT_SOURCE_OBJECTS),
             "panels": rows,
             "limitations": [
+                "E-SFI macrofibers use i-j horizontal wall width; i-l vertical height, verified geometrically in this audit.",
                 "A geometry screen is not a material convergence test.",
                 "Wall openings, adjacent mesh continuity, connected coupling beams, axial load and reinforcement require separate verification.",
                 "Estimated element tags are only valid for the unchanged assembly tag ordering.",
