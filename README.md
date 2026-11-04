@@ -94,3 +94,8 @@ For the asymmetric high-rise RCC-core/damped-outrigger thesis, use [the active-s
 ### P0 RCC core wall / nonlinear material source review
 
 The [first-step wall orientation, opening geometry and material qualification review](docs/review/01_WALL_GEOMETRY_MATERIALS_FIRST_STEP.md) now tests E-SFI bottom-edge width versus vertical edge height in both assembled geometry and the model preflight. Production-labelled `THESIS_NLTHA` is explicitly **blocked** while the existing PEER-web/M30 research templates remain the active concrete/FSAM/Fe500 constitutive implementation, or while the user has no verified wall opening schedule. This protects against treating assumed materials and passing source geometry as calibrated project physics. The earlier X-only first-step wall failure remains unresolved; diagnostic probes and numerical experiments are still available.
+
+
+### Software-error remediation
+
+See [the current fix-and-open-issues register](docs/review/02_SOFTWARE_ERROR_REMEDIATION.md). Both active NLTHA response-history paths now reject nonfinite accepted recorder values before writing outputs, and time-step comparisons require matching source hashes and true finer accepted steps. Project-specific E-SFI wall instability and experimental reinforcement/material calibration remain P0 open issues, not CI-passing software bugs.

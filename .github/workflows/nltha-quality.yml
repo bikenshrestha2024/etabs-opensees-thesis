@@ -56,6 +56,7 @@ on:
       - 'tests/verify_full_record_gate.py'
       - 'tests/verify_variant_comparison.py'
       - 'components/nonlinear_time_history/building_exploratory.py'
+      - 'components/nonlinear_time_history/runner_and_gui.py'
       - '21_NLTHA_TRIAGE.py'
       - 'tests/verify_thesis_nltha_quality.py'
       - '.github/workflows/nltha-quality.yml'

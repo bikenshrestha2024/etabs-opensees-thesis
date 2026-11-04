@@ -21,3 +21,8 @@ References are indexed in [the research source register](../../../00_RESEARCH_RE
 Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.
 
 [Source module index](../../00_SOURCE_GUIDE_INDEX.md) · [G00–G10 acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md)
+
+
+## Nonfinite accepted-step safety (2026-11-04)
+
+`record_accepted` calls `full_record_gate.verify_numeric_accepted_row` before `HistoryStream.append`. This guards against generating a supposedly successful history with `NaN`, infinite or missing numeric response channels even when OpenSees returns 0. This is a **recorder** check, not proof that every constitutive integration point is finite or calibrated. CI covers the utility and compiles this module; native transient is still required.

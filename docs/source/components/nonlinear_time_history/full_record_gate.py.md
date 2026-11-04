@@ -17,3 +17,10 @@ NBC 105:2025 is governing seismic basis (DUDBC). Wall model formulation: Kolozva
 Unit test: tests/verify_full_record_gate.py. This is a solver-free input/response behavior check. A successful test cannot establish true nonlinear wall convergence, experimental calibration, structural performance or device approval. Native OpenSeesPy and source ETABS comparisons must still be run.
 
 [Guide index](../../00_SOURCE_GUIDE_INDEX.md) · [Thesis gates](../../../00_THESIS_ACCEPTANCE_GATES.md)
+
+
+## Accepted-state falsifiability improvement (2026-11-04)
+
+`verify_numeric_accepted_row` now raises on nonfinite/missing or textual response channels **before** either NLTHA runner writes an accepted row to CSV. `verify_accepted_history` rejects inconsistent channel schemas across time samples. A solver's successful return code does not certify finite responses. `compare_time_step_results` requires genuine 64-character input fingerprints and accepted-step evidence before comparing response metrics; full-duration source hashes and smaller fine time steps are necessary but not experimental validation.
+
+[Error register](../../../review/02_SOFTWARE_ERROR_REMEDIATION.md).

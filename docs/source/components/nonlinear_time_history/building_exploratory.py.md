@@ -21,3 +21,8 @@ References are indexed in [the research source register](../../../00_RESEARCH_RE
 Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.
 
 [Source module index](../../00_SOURCE_GUIDE_INDEX.md) · [G00–G10 acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md)
+
+
+## Accepted-state early failure and source provenance (2026-11-04)
+
+During every accepted nonlinear step, `capture` validates each recorded numeric channel with `verify_numeric_accepted_row` before appending response rows. The full-duration history gate then checks timestamps, schema stability, provenance and completeness. A malformed/nonfinite row now stops a diagnostic immediately instead of being stored as a valid nonlinear result. The 0.005s X-only wall failure remains an independent native-model issue.
