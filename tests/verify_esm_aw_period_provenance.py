@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from openpyxl import Workbook
-from components.inputs.project_workbooks import source_workbooks
+from components.inputs.project_workbooks import source_workbooks, _wall_aw_from_patches
 from components.equivalent_static.calculation_and_gui import ESMGui, resolve_esm_state_periods
 
 
@@ -89,6 +89,27 @@ class ESMProvenanceTests(unittest.TestCase):
                                             "workbook_adopted_ty":2.1}}
         with self.assertRaisesRegex(ValueError,"Aw"):
             gui._adopted_axis_period("X",95)
+
+    def test_partial_height_wall_opening_does_not_overstate_aw(self):
+        walls=[
+            ("X",0.,.3,0.,2.,0.,1.5),
+            ("X",0.,.3,0.,1.,1.5,3.),
+            ("Y",5.,.2,0.,2.,0.,3.),
+        ]
+        with self.assertRaisesRegex(ValueError,"footprint changes"):
+            _wall_aw_from_patches(95.,0.,3.,walls)
+
+    def test_vertically_meshed_wall_preserves_consistent_aw(self):
+        walls=[
+            ("X",0.,.3,0.,2.,0.,1.5),
+            ("X",0.,.3,0.,1.,1.5,3.),
+            ("X",0.,.3,1.,2.,1.5,3.),
+            ("Y",5.,.2,0.,2.,0.,3.),
+        ]
+        area,segments=_wall_aw_from_patches(95.,0.,3.,walls)
+        expected_x=.3*2.*(.2+(2./95.)**2)
+        self.assertAlmostEqual(area["X"],expected_x)
+        self.assertEqual(len(segments),2)
 
     def test_uls_sls_periods_are_not_shared(self):
         periods=resolve_esm_state_periods(
