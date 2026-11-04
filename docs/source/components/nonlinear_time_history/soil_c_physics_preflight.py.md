@@ -1,6 +1,6 @@
 # Soil C NLTHA — additional required source and solver evidence
 
-The following arguments are **new strict research data fields**, not automatic certification. See [Stage 37](../../docs/programs/37_SOIL_C_NLTHA_PARAMETER_AND_COMMAND_AUDIT.md) for all parameters and full NBC clause matrix.
+The following arguments are **new strict research data fields**, not automatic certification. See [Stage 37](../../../programs/37_SOIL_C_NLTHA_JSON_SCHEMA.md) for all parameters and full NBC clause matrix.
 
 - `damping_reference_modes`: exactly two **1-based positive eigenmode IDs**, e.g. `[1, 4]` for a sensitivity **example only**, selected after reviewing modal mass, coupled torsion and actual structural frequencies. No fixed indices are prescribed by NBC; the model reports actual selected modal periods and 5% Rayleigh coefficients `alphaM` and `betaKcomm`.
 - `rayleigh_device_exclusion_reviewed`: verified reviewer flag for nonlinear wall, FVD and BRB element Rayleigh damping and potential double-counted energy; mandatory only for `THESIS_NLTHA`. This flag documents a reviewer declaration, not an automatic element inspection.
