@@ -2,7 +2,7 @@
 
 **Starting Git commit:** `82080acc44c9b66cc2d2ec6b26e1f283d1dcd831` (`main` when this work began; 2026-11-04 17:08:19 UTC). **Review branch:** `review/current-head-ledger-20261104`.
 
-This is an **incremental, evidence-limited review checkpoint**, not a complete code or engineering verification. The frozen 275-Python-file ledger at `66c5c971ea297dc9d7fb0499b871a6204297913d` remains authoritative **only for that baseline**: [baseline CSV](REVIEW_LEDGER_BASELINE_20261104.csv). It listed 10 files with explicitly bounded source inspection and 265 `NOT_REVIEWED`. The present head contains more or changed files, so these numbers must **not** be presented as current-head coverage.
+This is an **incremental, evidence-limited review checkpoint**, not a complete code or engineering verification. The frozen 275-Python-file ledger at `66c5c971ea297dc9d7fb0499b871a6204297913d` remains authoritative **only for that baseline**: [baseline CSV](REVIEW_LEDGER_BASELINE_20261104.csv). It listed 10 files with explicitly bounded source inspection and 265 `NOT_REVIEWED`. The [current-head inventory CSV](REVIEW_LEDGER_HEAD_82080ACC_20261104.csv) records **287 active Python files**: 267 unchanged Git blobs relative to the frozen ledger, 8 changed blobs, and 12 new files. **All 287 have NOT_REVIEWED for this checkpoint**, because Git-tree metadata inspection is not a semantic source review. Historical status and blob equivalence are separately retained in the CSV.
 
 ## PR overlap and architecture
 
@@ -21,7 +21,7 @@ Read `AGENTS.md`, `docs/review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md`, and `docs/
 | `docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md` | `6b04203f2317f8623c103a6136a54c7e24864d88` | Full returned source | Numbered aliases must be preserved and reviewed against canonical run order | NOT RUN | DOCUMENTATION_INSPECTED |
 | `README.md` | `0196a1974cc018d91748913334d38d59f09d634c` | Beginning and engineering-status sections returned by GitHub | Explicit unresolved first-step NLTHA and incomplete experimental validation | NOT RUN | PARTIAL_DOCUMENT_INSPECTION |
 
-**No numerical/physics source module was freshly inspected line-by-line in this checkpoint.** Earlier baseline inspection records are not new current-head inspections. The Git recursive tree was fetched for **automated inventory only**, with 2,736 entries including non-source artifacts; these are not 2,736 reviewed files. Exact source-file-by-source-file current-head enumeration and blob reconciliation remain pending.
+**No numerical/physics source module was freshly inspected line-by-line in this checkpoint.** Earlier baseline inspection records are not new current-head inspections. The Git recursive tree was fetched for **automated inventory only**, with 2,736 entries including non-source artifacts; these are not 2,736 reviewed files. The current-head 287-file blob inventory and baseline reconciliation are now captured in the separate CSV; actual line review remains pending.
 
 ## Engineering validation matrix
 
@@ -29,7 +29,7 @@ Read `AGENTS.md`, `docs/review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md`, and `docs/
 |---|---|---|
 | Repository starting SHA and PR #5 merge | PASS | GitHub branch and PR API queried |
 | Existing frozen ledger and validator source read | PASS | GitHub source retrieved; validator not executed |
-| Current-head complete Python blob ledger | NOT RUN | Run a fresh `git ls-tree -r -l HEAD` snapshot and reconcile each active file; never overwrite baseline |
+| Current-head complete scoped Python blob ledger | PASS | GitHub recursive tree at fixed commit; 287 active Python files inventoried in current CSV (267 unchanged, 8 changed, 12 new), no semantic-review claims |
 | Full semantic line review of active source | NOT EVALUATED | Review individual source ranges in batches and include deterministic test evidence |
 | Native ZERO/X/Y/XY first-step wall failure | REQUIRES PROJECT EVIDENCE | Exact exported model, paired record, native OpenSeesPy environment, failed-state mapping and logs |
 | ETABS gravity/mass/loads/reinforcement equivalence | REQUIRES PROJECT EVIDENCE | Actual ETABS exports and matched load combinations |
@@ -45,7 +45,7 @@ Use `NOT_REVIEWED` with `NOT_INSPECTED` and `NOT_EVALUATED` for all newly invent
 
 ## Workflow for the next batches
 
-1. Checkout a fixed SHA and run `python tools/audit_active_repository.py --output audit/active_inventory.json --fail-on-missing-canonical` followed by `python tools/validate_review_ledger.py` for the *frozen* baseline (requires full Git history).
+1. Checkout a fixed SHA, independently recheck [the current-head inventory CSV](REVIEW_LEDGER_HEAD_82080ACC_20261104.csv) against the exact tree, and run `python tools/audit_active_repository.py --output audit/active_inventory.json --fail-on-missing-canonical` followed by `python tools/validate_review_ledger.py` for the *frozen* baseline (requires full Git history).
 2. Reconcile current `git ls-tree -r -l HEAD` to the frozen baseline and mark new/modified code `NOT_REVIEWED`; examine `tests/`, `components/model/` and `components/nonlinear_time_history/` first.
 3. Review geometry/mass/load-source transfer, then 3D E-SFI wall orientation and material mapping, then isolated native fresh-domain ZERO/X/Y/XY solver diagnostics.
 4. Add a failing regression before each verified code fix; report exact input hashes, executed commands, traceback and local environment.
