@@ -37,6 +37,9 @@ GROUPS = (
     ("transient", "Nonlinear step stability",
      "ZERO/X/Y/XY first-step diagnostics and finite accepted state, including X-only failure",
      ("Accepted_History_Completion_Gate.json", "NLTHA_Wall_Geometry_Preflight.json")),
+    ("vertical", "NBC 105:2025 vertical acceleration applicability",
+     "Clause 4.3: >=20m spans, >5m cantilevers, prestressed horizontal members, beams supporting columns and base isolation",
+     ("NBC105_Vertical_Applicability.json",)),
     ("nbc105", "NBC 105:2025 nonlinear motion compliance screening",
      "Site spectrum C(T)/Omega_u, 0.33..3 component factors, common lower pair factor, Tn90/T1 timestep, XY/YX and reviewed period evidence",
      ("NBC105_2025_NLTHA_Input_Screen.json", "Kobe_Pair_NBC105.json")),
@@ -63,6 +66,7 @@ REVIEW_KEYS = {
                       "modal_periods_modes_and_mass_participation_reviewed",
                       "is16700_initial_pdelta_plus_minus_cases_completed"),
     "transient": ("single_element_and_wall_benchmark_checks_passed",),
+    "vertical": ("etabs_topology_and_story_mapping_reviewed",),
     "nbc105": ("record_pair_units_scales_and_nbc_limits_reviewed",),
     "motions": ("record_pair_units_scales_and_nbc_limits_reviewed",),
 }

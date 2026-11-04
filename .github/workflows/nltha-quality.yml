@@ -14,6 +14,9 @@ on:
       - 'components/response_spectrum/nbc_pair_spectrum_audit.py'
       - '32_NBC105_PAIR_SPECTRUM_AUDIT.py'
       - 'tests/verify_nbc105_pair_spectrum_audit.py'
+      - 'components/nonlinear_time_history/nbc105_horizontal_input.py'
+      - '33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py'
+      - 'tests/verify_nbc105_horizontal_input.py'
       - 'components/nonlinear_time_history/nbc105_2025_audit.py'
       - 'tests/verify_nbc105_2025_nltha.py'
       - 'components/nonlinear_time_history/thesis_quality.py'
@@ -59,7 +62,7 @@ jobs:
           python-version: '3.12'
       - name: Syntax-check key NLTHA files
         run: |
-          python -m compileall -q components/nonlinear_time_history components/response_spectrum/nbc_pair_spectrum_audit.py 32_NBC105_PAIR_SPECTRUM_AUDIT.py components/model/reinforcement_mapping.py components/sections/devices.py components/validation/expanded_workbench_tabs.py components/validation/visual_workbench.py components/model/readiness_dashboard.py components/model/readiness_dashboard_gui.py components/ui/application.py
+          python -m compileall -q components/nonlinear_time_history 33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py components/response_spectrum/nbc_pair_spectrum_audit.py 32_NBC105_PAIR_SPECTRUM_AUDIT.py components/model/reinforcement_mapping.py components/sections/devices.py components/validation/expanded_workbench_tabs.py components/validation/visual_workbench.py components/model/readiness_dashboard.py components/model/readiness_dashboard_gui.py components/ui/application.py
       - name: Run non-native NLTHA and device quality checks
         run: |
           export PYTHONPATH="$PWD"
@@ -73,6 +76,7 @@ jobs:
           python tests/verify_full_record_gate.py
           python tests/verify_variant_comparison.py
           python tests/verify_nbc105_2025_nltha.py
+          python tests/verify_nbc105_horizontal_input.py
           python tests/verify_nbc105_pair_spectrum_audit.py
           python tests/verify_expanded_workbench_tabs.py
           python tests/verify_readiness_dashboard.py

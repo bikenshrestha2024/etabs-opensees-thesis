@@ -43,3 +43,6 @@ The main ETABS workflow **OpenSees nonlinear readiness / calibration status** bu
 
 
 [Stage 32: NBC 105:2025 paired accelerogram spectrum scaling audit](docs/programs/32_NBC105_PAIR_SPECTRUM_AUDIT.md) screens actual records, computes separate X/Y spectral candidate factors, and selects the smaller when valid; this is research screening only.
+
+
+**Bidirectional earthquake setup:** [NBC 105:2025 XY/YX, vertical-action scope and exact OpenSees acceleration scaling](docs/programs/33_NBC105_XY_YX_VERTICAL_AND_SCALE_GUIDE.md). Horizontal XY/YX inputs remain 3D structural NLTHA; §4.3 vertical triggers require separate documented review.
