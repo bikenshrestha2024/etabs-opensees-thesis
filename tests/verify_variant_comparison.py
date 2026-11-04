@@ -48,6 +48,30 @@ class CompareTests(unittest.TestCase):
         self.assertIn("REVIEW_REQUIRED",
             seven["nbc105_2025_response_aggregation_by_limit_state"]["ULS"])
 
+    def test_eight_pair_mean_differs_from_worst_case(self):
+        data=suite()
+        for variant in data:
+            for limit in ("ULS","SLS"):
+                for orientation in ("XY","YX"):
+                    for pair in ("P4","P5","P6","P7","P8"):
+                        template=next(x for x in data[variant]
+                           if x["limit_state"]==limit and x["orientation"]==orientation)
+                        fresh=dict(template,pair_id=pair,record_sha256=pair)
+                        data[variant].append(fresh)
+        # One huge pair P8 should influence the AVERAGE but not replace it
+        # with an unlabelled pooled maximum.
+        for case in data["M1"]:
+            if case["limit_state"]=="ULS" and case["pair_id"]=="P8":
+                case["peak_roof_UX_m"]=17.
+        report=compare_completed_cases(manifest(),data)
+        u=report["by_limit_state"]["ULS"]["M1"]["peak_roof_UX_m"]
+        self.assertEqual(report["nbc105_2025_response_aggregation_by_limit_state"]["ULS"],"AVERAGE")
+        self.assertAlmostEqual(u["maximum"],17.)
+        self.assertAlmostEqual(u["nbc105_aggregate"],3.)
+        self.assertAlmostEqual(u["M0_nbc105_aggregate"],1.)
+        self.assertAlmostEqual(u["nbc105_aggregate_reduction_percent"],-200.)
+        self.assertFalse(u["aggregate_is_code_approval"])
+
     def test_reject_changed_mass(self):
         p=manifest();p["variants"][3]["mass_basis_sha256"]="c"*64
         with self.assertRaisesRegex(ValueError,"mass_basis"):

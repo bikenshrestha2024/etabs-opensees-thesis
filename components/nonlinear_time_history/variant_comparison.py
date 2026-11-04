@@ -112,9 +112,39 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
             for metric in METRICS:
                 maximum=max(float(case[metric]) for case in subset.values())
                 base=max(float(case[metric]) for case in base_subset.values())
+                # For 8 pairs the response aggregation rule is AVERAGE.
+                # Within each pair, report the larger XY/YX demand as a
+                # CONSERVATIVE ENGINEERING ORIENTATION RULE, explicitly
+                # distinguished from the wording of NBC §9.3.3.
+                # This never includes a failed or missing response-history case.
+                pair_ids=sorted({key[1] for key in subset})
+                pair_governing={
+                    pair:max(float(subset[(limit,pair,orientation)][metric])
+                             for orientation in ("XY","YX"))
+                    for pair in pair_ids}
+                m0_pair_governing={
+                    pair:max(float(base_subset[(limit,pair,orientation)][metric])
+                             for orientation in ("XY","YX"))
+                    for pair in pair_ids}
+                rule=aggregation_by_state[limit]
+                code_aggregate=(sum(pair_governing.values())/len(pair_ids)
+                     if rule=="AVERAGE" else
+                     max(pair_governing.values()) if rule=="MAXIMUM" else None)
+                m0_code_aggregate=(sum(m0_pair_governing.values())/len(pair_ids)
+                     if rule=="AVERAGE" else
+                     max(m0_pair_governing.values()) if rule=="MAXIMUM" else None)
                 by_limit_state[limit][variant][metric]=dict(
                     maximum=maximum,M0_maximum=base,
-                    reduction_percent=100*(base-maximum)/base if base>0 else None)
+                    reduction_percent=100*(base-maximum)/base if base>0 else None,
+                    conservative_pair_orientation_rule="MAX_OF_XY_AND_YX",
+                    nbc105_aggregation_rule=rule,
+                    response_per_pair_governing=pair_governing,
+                    nbc105_aggregate=code_aggregate,
+                    M0_nbc105_aggregate=m0_code_aggregate,
+                    nbc105_aggregate_reduction_percent=(
+                      100*(m0_code_aggregate-code_aggregate)/m0_code_aggregate
+                      if m0_code_aggregate and code_aggregate is not None else None),
+                    aggregate_is_code_approval=False)
     results={}
     for variant,by in grouped.items():
         results[variant]={}
