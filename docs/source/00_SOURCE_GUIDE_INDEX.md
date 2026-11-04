@@ -120,3 +120,5 @@ All **90 active Python modules** have individual source guides (with source blob
 | [nbc105_horizontal_input.py](../../components/nonlinear_time_history/nbc105_horizontal_input.py) | [Guide](components/nonlinear_time_history/nbc105_horizontal_input.py.md) | NBC §4.3 applicability and XY/YX OpenSees commands | P0 |
 
 | [seismomatch_audit.py](../../components/nonlinear_time_history/seismomatch_audit.py) | [Guide](components/nonlinear_time_history/seismomatch_audit.py.md) | Matched SeismoMatch input, no-double-scaling and NBC period interval | P0 |
+
+| [soil_c_nltha_suite.py](../../components/nonlinear_time_history/soil_c_nltha_suite.py) | [Guide](components/nonlinear_time_history/soil_c_nltha_suite.py.md) | Soil C 16 matched records and nonlinear XY/YX preflight, source hashes, explicit exceptions | P0 |
