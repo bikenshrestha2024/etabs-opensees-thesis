@@ -1,7 +1,7 @@
 """Numerical evidence gate tests independent of OpenSeesPy."""
 import unittest
 from components.nonlinear_time_history.full_record_gate import (
-verify_accepted_history,compare_time_step_results)
+verify_accepted_history,compare_time_step_results,verify_numeric_accepted_row)
 class GateTests(unittest.TestCase):
     def test_full_record(self):
         r=verify_accepted_history([dict(time_s=0.,drift=0.),
@@ -18,6 +18,13 @@ class GateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"Nonfinite"):
             verify_accepted_history([dict(time_s=0.,drift=0.),
                                      dict(time_s=1.,drift=float("nan"))],1.,1.)
+    def test_first_invalid_accepted_state_is_not_logged(self):
+        row=dict(time_s=.005,wall_panel_stress_kN_m2_1=float("nan"))
+        with self.assertRaisesRegex(ValueError,"Nonfinite accepted response"):
+            verify_numeric_accepted_row(row,row_index=1)
+        valid=dict(time_s=.005,roof_UX_m=".012")
+        self.assertIs(verify_numeric_accepted_row(valid),valid)
+
     def test_reject_string_nan_and_inf_from_csv(self):
         for bad in ("NaN", "inf", "-Infinity"):
             with self.subTest(bad=bad):

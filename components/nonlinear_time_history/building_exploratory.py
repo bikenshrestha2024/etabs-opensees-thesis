@@ -568,6 +568,8 @@ def _run(config):
                         for d in active_devices}
         device_rows=[]
         tracked_element_rows=[]
+        from components.nonlinear_time_history.full_record_gate import (
+            verify_numeric_accepted_row)
         def capture():
             row={'time_s':ops.getTime()};previous=[0.]*6
             ground_xy=applied_ground_acceleration(
@@ -620,6 +622,10 @@ def _run(config):
                 ))
             for device in active_devices:
                 device_rows.append(device_sample(ops,device,data['nodes'],device_initial[device['tag']]))
+            # Check every accepted step immediately, not only after an entire
+            # record has consumed hours of CPU time. A zero solver return
+            # code does NOT imply every recorder response is finite.
+            verify_numeric_accepted_row(row, row_index=len(rows))
             rows.append(row)
         history=case/'Building_Nonlinear_history.csv'
         _set_run_stage('transient_analysis',orientation=orientation,case_output_dir=str(case),

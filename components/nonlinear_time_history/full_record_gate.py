@@ -8,6 +8,27 @@ import json
 import math
 from pathlib import Path
 
+def verify_numeric_accepted_row(row, *, row_index=None):
+    """Fail closed before writing a solver-accepted row to the CSV output.
+
+    A solver return code of zero does not guarantee finite displacements,
+    forces, wall stresses, or accelerations in every configured recorder.
+    """
+    where=f" at row {row_index}" if row_index is not None else ""
+    if not isinstance(row, dict) or "time_s" not in row or len(row)<2:
+        raise ValueError("Accepted history requires time_s and response channels" + where)
+    for name, value in row.items():
+        if isinstance(value, bool) or value is None:
+            raise ValueError(f"Invalid accepted response {name}{where}")
+        try:
+            number=float(value)
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise ValueError(f"Invalid accepted response {name}{where}") from exc
+        if not math.isfinite(number):
+            raise ValueError(f"Nonfinite accepted response {name}{where}")
+    return row
+
+
 def verify_accepted_history(rows, record_end_s, requested_end_s, *,
                             time_tolerance_s=1e-7):
     """Validate accepted, finite monotonic history and full/truncated duration.
@@ -32,20 +53,7 @@ def verify_accepted_history(rows, record_end_s, requested_end_s, *,
             raise ValueError(f"Nonfinite/invalid history time {i}") from exc
         if not math.isfinite(t):
             raise ValueError(f"Nonfinite history time {i}")
-        for name,v in row.items():
-            if name=="time_s":
-                continue
-            # CSV/JSON postprocessors often deliver numeric responses as
-            # strings. The previous gate silently accepted "nan"/"inf" and
-            # arbitrary text, potentially marking invalid records complete.
-            if isinstance(v, bool) or v is None:
-                raise ValueError(f"Invalid accepted response {name} at row {i}")
-            try:
-                value=float(v)
-            except (TypeError, ValueError, OverflowError) as exc:
-                raise ValueError(f"Invalid accepted response {name} at row {i}") from exc
-            if not math.isfinite(value):
-                raise ValueError(f"Nonfinite accepted response {name} at row {i}")
+        verify_numeric_accepted_row(row, row_index=i)
         times.append(t)
     if len(times)<2:raise ValueError("History lacks post-start accepted steps")
     if any(b<=a for a,b in zip(times,times[1:])):
