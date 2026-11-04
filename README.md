@@ -88,6 +88,8 @@ For new Codex, ChatGPT and GitHub coding tasks, use the [numbered RTFC (ROLE–T
 
 ## Engineering review and safe work-order navigation (2026-11)
 
+Start with the [thesis engineering evidence and workflow review](docs/review/03_THESIS_REVIEW_2026_11_04.md) for the distinction between modal coverage, numerical screening and validated nonlinear response.
+
 For the asymmetric high-rise RCC-core/damped-outrigger thesis, use [the active-source engineering review](docs/review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md) and [canonical 00–09 verification order](docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md) instead of sorting the duplicate numbered legacy launchers. A [static AST source-audit utility](tools/audit_active_repository.py) inventories active code, symbol lines, SHA, syntax status, missing source guides and numbered alias collisions. It **does not** claim native solver convergence or a line-by-line semantic review of all archived files.
 
 
@@ -99,3 +101,4 @@ The [first-step wall orientation, opening geometry and material qualification re
 ### Software-error remediation
 
 See [the current fix-and-open-issues register](docs/review/02_SOFTWARE_ERROR_REMEDIATION.md). Both active NLTHA response-history paths now reject nonfinite accepted recorder values before writing outputs, and time-step comparisons require matching source hashes and true finer accepted steps. Project-specific E-SFI wall instability and experimental reinforcement/material calibration remain P0 open issues, not CI-passing software bugs.
+

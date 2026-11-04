@@ -42,6 +42,7 @@ class GateTests(unittest.TestCase):
 
     def test_timestep_compare_requires_evidence(self):
         fields=dict(status="FULL_DURATION_NUMERIC_SCREEN",
+            orientation="XY", limit_state="ULS", diagnostic_excitation="XY",
             peak_roof_UX_m=.1,peak_roof_UY_m=.1,
             max_story_drift_X=.01,max_story_drift_Y=.01,
             min_accepted_step_s=.005,max_accepted_step_s=.01)
@@ -61,4 +62,23 @@ class GateTests(unittest.TestCase):
         b=dict(a,model_sha256="b")
         with self.assertRaisesRegex(ValueError,"differ"):
             compare_time_step_results(a,b)
+
+    def test_timestep_comparison_uses_numeric_not_string_order(self):
+        coarse=dict(status='FULL_DURATION_NUMERIC_SCREEN', model_sha256='a'*64,
+                    orientation='XY', limit_state='ULS', diagnostic_excitation='XY',
+                    record_sha256='b'*64, min_accepted_step_s='0.02',
+                    max_accepted_step_s='0.1', peak_roof_UX_m=1, peak_roof_UY_m=1,
+                    max_story_drift_X=.01, max_story_drift_Y=.01)
+        fine=dict(coarse, min_accepted_step_s='0.001', max_accepted_step_s='1e-2')
+        self.assertIsNone(compare_time_step_results(coarse, fine)['within_user_supplied_tolerance'])
+
+    def test_timestep_comparison_rejects_different_case_identity(self):
+        coarse=dict(status='FULL_DURATION_NUMERIC_SCREEN',model_sha256='a'*64,
+                    record_sha256='b'*64,orientation='XY',limit_state='ULS',
+                    diagnostic_excitation='XY',min_accepted_step_s=.01,max_accepted_step_s=.02,
+                    peak_roof_UX_m=1,peak_roof_UY_m=1,max_story_drift_X=.01,max_story_drift_Y=.01)
+        fine=dict(coarse,orientation='YX',max_accepted_step_s=.01)
+        with self.assertRaisesRegex(ValueError,'case identity'):
+            compare_time_step_results(coarse,fine)
 if __name__=="__main__":unittest.main()
+

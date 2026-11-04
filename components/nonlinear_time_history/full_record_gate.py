@@ -97,6 +97,11 @@ def compare_time_step_results(coarse,fine,*,max_relative_difference=None):
         digest=coarse.get(key)
         if not isinstance(digest,str) or len(digest)!=64 or any(c not in "0123456789abcdefABCDEF" for c in digest):
             raise ValueError("Time-step comparison requires verified 64-digit " + key)
+    # The same paired record hash can describe both XY and YX.  Stiffness
+    # state and excitation also affect the response and must be identical.
+    for key in ("limit_state", "orientation", "diagnostic_excitation"):
+        if not isinstance(coarse.get(key), str) or not coarse[key].strip() or coarse[key] != fine.get(key):
+            raise ValueError("Time-step comparison case identity missing or differs: " + key)
     if max_relative_difference is not None:
         try:
             tol=float(max_relative_difference)
@@ -113,7 +118,7 @@ def compare_time_step_results(coarse,fine,*,max_relative_difference=None):
                 raise ValueError(f"{name} time-step evidence missing/invalid {key}") from exc
             if not math.isfinite(value) or value<=0:
                 raise ValueError(f"{name} time-step evidence {key} must be finite and positive")
-    if not fine["max_accepted_step_s"] < coarse["max_accepted_step_s"]:
+    if not float(fine["max_accepted_step_s"]) < float(coarse["max_accepted_step_s"]):
         raise ValueError("Fine analysis must have a smaller maximum accepted step than coarse analysis")
     fields=("peak_roof_UX_m","peak_roof_UY_m","max_story_drift_X","max_story_drift_Y")
     values={}
@@ -128,3 +133,4 @@ def compare_time_step_results(coarse,fine,*,max_relative_difference=None):
                 prescribed_tolerance=max_relative_difference,
                 within_user_supplied_tolerance=passed,
                 metrics=values)
+
