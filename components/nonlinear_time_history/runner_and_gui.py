@@ -372,6 +372,12 @@ def _run_analysis(config):
                             below = row[f"{stories[i-1]['story_name']}_{col}_m"] if i else 0.0
                             row[f"{story['story_name']}_drift_{axis}"] = (current - below) / story["height"]
                     row["accepted_internal_substeps"] = 1
+                    # A successful Newton return code cannot by itself certify
+                    # finite accepted-state response. Detect corrupt rows before
+                    # writing a misleading completed NLTHA history.
+                    from components.nonlinear_time_history.full_record_gate import (
+                        verify_numeric_accepted_row)
+                    verify_numeric_accepted_row(row, row_index=len(lines))
                     lines.append(row)
                     stream.append(row)
                     profiler.internal_steps+=1
