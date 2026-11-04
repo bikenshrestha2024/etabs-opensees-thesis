@@ -244,6 +244,12 @@ def _run(config):
             raise ValueError('THESIS_NLTHA requires soil_c_primary_nltha=true')
         if not full_wall:
             raise ValueError('THESIS_NLTHA requires calibrated nonlinear core-wall elements')
+        # Fail closed before constructing a domain: the current research
+        # builder still defines PEER-web/M30 sensitivity FSAM and nominal
+        # frame materials. A truthful materials banner is NOT calibration.
+        from components.nonlinear_time_history.research_building_materials import (
+            check_project_material_qualification)
+        check_project_material_qualification(config)
         if not config.get('approved_frame_reinforcement_csv'):
             raise ValueError('THESIS_NLTHA requires source-reviewed frame reinforcement CSV')
         # Project has RCC core openings. Requiring an independently reviewed

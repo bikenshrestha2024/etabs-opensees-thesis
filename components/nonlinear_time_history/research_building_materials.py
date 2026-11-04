@@ -174,6 +174,28 @@ def _steelmpf_transition(profile):
                     basis='PEER 2015/12 Appendix B.3 web card, exact printed transition values')
     raise ValueError('Unknown SteelMPF transition profile')
 
+def check_project_material_qualification(config):
+    """P0 thesis gate: reject benchmark material cards as project calibration.
+
+    Current active implementation defines PEER_WEB or M30 sensitivity
+    assignments, 20mm@200mm assumed core reinforcement and a nominal Fe500
+    law. Neither route is approved actual building confinement/FSAM input.
+    The production calibrated-material path remains UNIMPLEMENTED.
+    """
+    if config.get("analysis_intent") == "THESIS_NLTHA":
+        raise ValueError(
+            "THESIS_NLTHA material BLOCKED: active frame/FSAM wall assignments "
+            "remain literature/sensitivity templates. Implement and validate "
+            "actual project boundary/web reinforcement, confinement, axial "
+            "load and cyclic material evidence before enabling production.")
+    return dict(
+        status="LITERATURE_MATERIALS_RESEARCH_ONLY",
+        source_basis=config.get("material_basis", "PUBLISHED_REFERENCE"),
+        project_calibrated=False,
+        native_wall_benchmark_verified=False,
+    )
+
+
 def define_building_materials(ops,data,folder,material_overrides=None):
     import Define_Section_V109 as sections
     material_overrides=validate_material_overrides(material_overrides or {})
