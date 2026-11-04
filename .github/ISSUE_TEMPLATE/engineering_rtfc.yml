@@ -1,0 +1,37 @@
+name: Engineering change (RTFC)
+description: Reproducible RTFC request for nonlinear OpenSeesPy/NBC 105 code
+title: "[NLTHA] "
+labels: []
+body:
+  - type: textarea
+    id: role
+    attributes:
+      label: ROLE
+      description: Define the specialist expertise required.
+      value: "Structural earthquake engineer and OpenSeesPy maintainer"
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: TASK
+      description: Name the exact file(s), observed defect and acceptance outcome.
+      placeholder: "Fix first-step X nonlinear core-wall failure in components/..."
+    validations:
+      required: true
+  - type: textarea
+    id: format
+    attributes:
+      label: FORMAT
+      description: Specify expected code diff, documentation, test evidence and comparison output.
+      value: "Small code patch, per-file .py.md guide, executable regression test, status and blocker report"
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: CONSTRAINTS
+      description: List physical, file-integrity, unit and NBC restrictions.
+      value: "Soil C matched Acc(g): additional scale 1.0; Path factor 9.80665; no invented material data; maintain XY/YX; preserve old versions and input hashes."
+    validations:
+      required: true
