@@ -26,7 +26,9 @@ def nbc105_time_step_limit(*,record_dt_s,t1_x_s,t1_y_s,tn90_x_s,tn90_y_s):
     Tn90 is the modal period at >=90% effective participation in EACH axis,
     not necessarily the period of the 20th computed eigenmode.
     """
-    values={k:positive(v,k) for k,v in locals().items()}
+    inputs={"record_dt_s":record_dt_s,"t1_x_s":t1_x_s,"t1_y_s":t1_y_s,
+            "tn90_x_s":tn90_x_s,"tn90_y_s":tn90_y_s}
+    values={k:positive(v,k) for k,v in inputs.items()}
     for axis in ("x","y"):
         if values["tn90_"+axis+"_s"]>values["t1_"+axis+"_s"]:
             raise ValueError("Tn90 cannot exceed T1 for axis "+axis)

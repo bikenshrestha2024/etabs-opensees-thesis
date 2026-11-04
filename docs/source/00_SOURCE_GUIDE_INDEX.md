@@ -110,3 +110,9 @@ All **90 active Python modules** have individual source guides (with source blob
 |---|---|---|---|
 | [components/model/readiness_dashboard.py](../../components/model/readiness_dashboard.py) | [Guide](components/model/readiness_dashboard.py.md) | Read-only model-bound source evidence and report export | P1 |
 | [components/model/readiness_dashboard_gui.py](../../components/model/readiness_dashboard_gui.py) | [Guide](components/model/readiness_dashboard_gui.py.md) | Integrated project-specific readiness review window | P1 |
+
+## NBC 105:2025 nonlinear time-history audit
+
+| Source module | Individual guide | Domain | Priority |
+|---|---|---|---|
+| [nbc105_2025_audit.py](../../components/nonlinear_time_history/nbc105_2025_audit.py) | [Guide](components/nonlinear_time_history/nbc105_2025_audit.py.md) | §9.3.2 ground motions, §9.3.3 ambiguity | P0 |

@@ -37,3 +37,6 @@ The [expanded visual material workbench](docs/programs/06_MATERIAL_DEVICE_VALIDA
 ## Evidence-based nonlinear model readiness
 
 The main ETABS workflow **OpenSees nonlinear readiness / calibration status** button opens the [model-bound readiness dashboard](docs/programs/02_NONLINEAR_READINESS_EVIDENCE_DASHBOARD.md) instead of a static nine-item warning. Evidence presence, reviewer sign-off and numerical validation are different categories; no automatic analysis approval is granted.
+
+
+**2026-11 research update:** [Verified NBC 105:2025 NLTHA clauses, OpenSees implementation and recent research evidence](docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md). The new optional strict metadata precheck does not approve real model behavior or a completed earthquake analysis.

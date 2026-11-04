@@ -11,6 +11,8 @@ on:
       - 'components/validation/expanded_workbench_tabs.py'
       - 'components/validation/visual_workbench.py'
       - 'tests/verify_expanded_workbench_tabs.py'
+      - 'components/nonlinear_time_history/nbc105_2025_audit.py'
+      - 'tests/verify_nbc105_2025_nltha.py'
       - 'components/nonlinear_time_history/thesis_quality.py'
       - 'components/nonlinear_time_history/wall_diagnostics.py'
       - 'components/model/reinforcement_mapping.py'
@@ -67,5 +69,6 @@ jobs:
           python tests/verify_device_recording.py
           python tests/verify_full_record_gate.py
           python tests/verify_variant_comparison.py
+          python tests/verify_nbc105_2025_nltha.py
           python tests/verify_expanded_workbench_tabs.py
           python tests/verify_readiness_dashboard.py
