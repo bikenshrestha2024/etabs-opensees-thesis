@@ -43,18 +43,18 @@ class WaveformTests(unittest.TestCase):
     def test_malformed_after_header_is_not_silently_skipped(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "bad.txt"
-            p.write_text("Time Series matched accelerogram: x\\n"
-                         "Time Step: 0.005 s\\nTime(sec) Acc(g)\\n"
-                         "0.000 0.0\\n0.005 0.1\\nINVALID ROW OTHER\\n0.010 0.2\\n")
+            p.write_text("Time Series matched accelerogram: x\n"
+                         "Time Step: 0.005 s\nTime(sec) Acc(g)\n"
+                         "0.000 0.0\n0.005 0.1\nINVALID ROW OTHER\n0.010 0.2\n")
             with self.assertRaisesRegex(ValueError, "Malformed data"):
                 parse_matched(p)
 
     def test_no_nonnumeric_data_drop(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "bad.txt"
-            p.write_text("Time Series matched accelerogram: x\\n"
-                         "Time Step: 0.005 s\\nTime(sec) Acc(g)\\n"
-                         "0.000 0.0\\n0.005 wrong\\n0.010 0.2\\n")
+            p.write_text("Time Series matched accelerogram: x\n"
+                         "Time Step: 0.005 s\nTime(sec) Acc(g)\n"
+                         "0.000 0.0\n0.005 wrong\n0.010 0.2\n")
             with self.assertRaisesRegex(ValueError, "Non-numeric"):
                 parse_matched(p)
 
@@ -85,9 +85,9 @@ class WaveformTests(unittest.TestCase):
                 writer.writeheader()
                 for i in range(16):
                     n=3 if i != 15 else 4
-                    content=("Time Series matched accelerogram: x\\nTime Step: 0.005 s\\n"
-                             "Time(sec) Acc(g)\\n" +
-                             "".join(f"{j*.005:.3f} {j*.1:.2f}\\n" for j in range(n)))
+                    content=("Time Series matched accelerogram: x\nTime Step: 0.005 s\n"
+                             "Time(sec) Acc(g)\n" +
+                             "".join(f"{j*.005:.3f} {j*.1:.2f}\n" for j in range(n)))
                     filename=f"case_{i}.txt"
                     p=root/filename
                     p.write_text(content,encoding="utf-8")
