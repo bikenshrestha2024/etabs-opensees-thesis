@@ -324,6 +324,15 @@ class ModalAuditGUI:
                             if "[NBC105 MODAL]" in line:ledger.set(state,"RUNNING","Stage 3/3: reports and mass participation")
                             self.root.after(0,lambda text=line:self.status.set(text.rstrip()))
                     proc.wait()
+                    from components.shared.case_status import modal_exit_status
+                    exit_state=modal_exit_status(
+                        self.case_board.get("cancelled",False),proc.returncode)
+                    if exit_state=="CANCELLED":
+                        msg=(f"Operator cancelled {state}; solver process stopped. "
+                             f"Partial files in {output} must NOT be treated as modal PASS.")
+                        ledger.set(state,"CANCELLED",msg)
+                        messages.append(msg)
+                        break
                     if proc.returncode:
                         msg = f"Run failed (exit {proc.returncode}). See {log}"
                     else:
@@ -339,7 +348,7 @@ class ModalAuditGUI:
                                f"Review CSV/JSON/TXT outputs and log in {output}.")
                         if export_warnings:
                             msg += "\n" + "\n".join(export_warnings)
-                    ledger.set(state,"FAILED" if proc.returncode else "COMPLETED",msg)
+                    ledger.set(state,exit_state,msg)
                     messages.append(msg)
                 summary='\n'.join(messages)
                 self.root.after(0,lambda summary=summary:self.status.set(summary))
@@ -348,7 +357,8 @@ class ModalAuditGUI:
                 error_text=str(exc)
                 self.root.after(0,lambda error_text=error_text:self.status.set('Error: '+error_text))
             finally:
-                ledger.finish_pending("Batch interrupted before completion; inspect log")
+                self.case_board["process"]=None
+                ledger.finish_pending("Batch interrupted or cancelled; inspect log")
                 self.root.after(0,lambda:self.run_button.configure(state='normal'))
         threading.Thread(target=worker, daemon=True).start()
 

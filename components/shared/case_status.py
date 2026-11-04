@@ -89,3 +89,14 @@ def panel(parent):
     else:tree.insert('', 'end',iid=r['case'],values=vals)
   tree.after(1000,tick)
  tick();return holder
+
+
+def modal_exit_status(cancelled, exit_code):
+ """Map subprocess outcome to an honest modal case status.
+
+ An operator-terminated solver may return a nonzero process exit code, but
+ the outcome must be CANCELLED (not natural eigenanalysis failure).
+ """
+ if cancelled:
+  return "CANCELLED"
+ return "FAILED" if exit_code else "COMPLETED"

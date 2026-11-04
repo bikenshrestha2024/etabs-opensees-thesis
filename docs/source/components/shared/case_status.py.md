@@ -21,3 +21,8 @@ Relevant register IDs: See subject-specific source citations. Consult [research 
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+
+### Modal worker exit states
+
+`modal_exit_status(cancelled, exit_code)` returns `CANCELLED` if the GUI stop flag was set, even when process termination yields a nonzero operating-system exit code; otherwise `FAILED` for nonzero or `COMPLETED` for zero. `CaseLedger.finish_pending` marks queued work `NOT COMPLETED`. Test `tests/verify_modal_cancel_status.py` is solver-free.

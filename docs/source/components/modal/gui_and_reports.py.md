@@ -21,3 +21,8 @@ Relevant register IDs: R10. Consult [research reference register](../../../00_RE
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+
+## Modal GUI process cancellation (2026-11-04)
+
+The shared `panel` already has a **Stop selected batch** control; avoid duplicating it. In the worker, after `proc.wait()`, check the saved cancellation flag **before** reading any generated modal JSON or interpreting a nonzero exit code. Label an operator cancellation `CANCELLED` and skip queued ULS/SLS states; clear the process pointer in `finally`. `components.shared.case_status.modal_exit_status` is tested by `tests/verify_modal_cancel_status.py`. This is UI lifecycle integrity, not an eigenvalue validation or proof that an external executable terminated without child processes.

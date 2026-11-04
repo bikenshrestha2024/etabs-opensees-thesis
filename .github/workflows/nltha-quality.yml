@@ -76,6 +76,9 @@ on:
       - 'docs/review/**'
       - 'tools/validate_review_ledger.py'
       - 'tests/verify_review_ledger.py'
+      - 'components/modal/gui_and_reports.py'
+      - 'components/shared/case_status.py'
+      - 'tests/verify_modal_cancel_status.py'
       - 'tools/run_native_wall_probes.py'
       - 'tests/verify_native_wall_probe_preparation.py'
       - 'tools/audit_component_experiments.py'
@@ -116,6 +119,7 @@ jobs:
           python tests/verify_documentation_coverage.py
           python tests/verify_active_repository_audit.py
           python tests/verify_review_ledger.py
+          python tests/verify_modal_cancel_status.py
           python tests/verify_native_wall_probe_preparation.py
           python tests/verify_component_experiment_evidence.py
           python tests/verify_soil_c_case_completion.py
