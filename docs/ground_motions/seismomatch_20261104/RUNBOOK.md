@@ -138,3 +138,9 @@ CI executes synthetic controlled records with truncation, wrong units, malformed
 - [Previous detailed six-component preliminary audit](../../00_SEISMOMATCH_MATCHED_RECORDS_AUDIT_20261104.md) — superseded
 - OpenSees `Path`: https://opensees.github.io/OpenSeesDocumentation/user/manual/model/timeseries/pathTimeSeries.html
 - OpenSees `UniformExcitation`: https://opensees.github.io/OpenSeesDocumentation/user/manual/model/pattern/uniformExcitationPattern.html
+
+## 09 — Soil C versus Soil D: RC dual shear-wall system
+
+The recent clarification specifies **TWO independent Figure 4-2 targets**, one for Soil C and one for Soil D, for a reinforced-concrete **dual system with RC shear wall** (NBC 105:2025 Table 5-2: R_mu=3.5, Omega_u=1.4, Omega_s=1.2). They must not share the same target label or inherited spectral-fit error. The previously reported 3.06% conditional mean spectral deviation applies only to the assumed Soil C, 0.625g plateau test. **No independent Soil D matched-record spectral residual was calculated here.** Generate both target curves and verify each original SeismoMatch session against the appropriate source curve.
+
+Source implementation: `components/response_spectrum/nbc105_dual_target.py`. Run `python 34_NBC105_RC_DUAL_C_D_TARGETS.py --Z <actual_Z> --I <actual_I> --output <folder>` after site/geotechnical verification. For >40m projects NBC §4.1.3.1 requires measured Vs30. For a sample only, Z=.35 and I=1 give soil C plateau=.625g, D plateau=.5625g. Those values are NOT verified project site inputs.

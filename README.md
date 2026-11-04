@@ -62,3 +62,8 @@ The latest [16-component, eight-pair SeismoMatch record audit](docs/ground_motio
 
 
 [Complete eight-pair SeismoMatch source verification runbook](docs/ground_motions/seismomatch_20261104/RUNBOOK.md) now covers both original PEER AT2 and matched SeismoMatch source fingerprints, safe parsing, explicit pair synchronization, output schema, OpenSees scaling and NBC 105 evidence gates.
+
+
+### Two NBC105:2025 target spectra (RC shear-wall dual system)
+
+Do not treat conditional Soil-C-only SeismoMatch PSA residuals as Soil-D validation. The target spectra are now separately generated under [Stage 34](docs/programs/34_NBC105_RC_DUAL_SOIL_C_D_TARGETS.md) from Eq 4.1(2) and the RC dual-system Table 5-2 (R_mu=3.5, Omega_u=1.4, Omega_s=1.2). Soil C and D must be reviewed as distinct analysis cases with separately assigned actual site category, Z/I and matched record set. The code intentionally refuses unreviewed extrapolation beyond 6 s.

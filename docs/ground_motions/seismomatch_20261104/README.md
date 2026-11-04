@@ -1,3 +1,5 @@
+> **SOIL-C-ONLY CONDITIONAL COMPARISON.** This report's 3.06% mean PSA misfit is from a reconstructed **Soil C** spectrum with 0.625g plateau. It **does not** validate Soil D. The research now includes both Soil C/D source target types for an RC shear-wall dual system; see [Stage 34](../../programs/34_NBC105_RC_DUAL_SOIL_C_D_TARGETS.md). Before declaring a result, explicitly identify which soil target was used for each original SeismoMatch matching session.
+
 # Eight horizontal earthquake pairs: original vs SeismoMatch matched — audited 2026-11-04
 
 **Status: RECORD_STRUCTURE_AUDITED / CONDITIONAL_SPECTRAL_SHAPE_SUPPORT.**

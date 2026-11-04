@@ -11,6 +11,9 @@ on:
       - 'components/validation/expanded_workbench_tabs.py'
       - 'components/validation/visual_workbench.py'
       - 'tests/verify_expanded_workbench_tabs.py'
+      - 'components/response_spectrum/nbc105_dual_target.py'
+      - '34_NBC105_RC_DUAL_C_D_TARGETS.py'
+      - 'tests/verify_nbc105_dual_target.py'
       - 'components/response_spectrum/nbc_pair_spectrum_audit.py'
       - '32_NBC105_PAIR_SPECTRUM_AUDIT.py'
       - 'tests/verify_nbc105_pair_spectrum_audit.py'
@@ -88,5 +91,6 @@ jobs:
           python tests/verify_matched_waveform_register.py
           python tests/verify_original_matched_pairs.py
           python tests/verify_nbc105_pair_spectrum_audit.py
+          python tests/verify_nbc105_dual_target.py
           python tests/verify_expanded_workbench_tabs.py
           python tests/verify_readiness_dashboard.py
