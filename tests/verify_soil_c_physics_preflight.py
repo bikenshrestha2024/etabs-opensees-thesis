@@ -18,6 +18,26 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"scale"):audit_soil_c_analysis_config(d)
         d=cfg();d["soil_type"]="D"
         with self.assertRaisesRegex(ValueError,"Soil C"):audit_soil_c_analysis_config(d)
+    def test_undeclared_intent_cannot_bypass_strict_gates(self):
+        d=cfg()
+        d["analysis_intent"]="THESIS_NLHTA"  # previously bypassed thesis guards
+        with self.assertRaisesRegex(ValueError,"analysis_intent"):
+            audit_soil_c_analysis_config(d)
+
+    def test_wrong_spectrum_file_and_target_are_rejected(self):
+        d=cfg()
+        d["target_workbook_sha256"]="0"*64
+        with self.assertRaisesRegex(ValueError,"SHA256"):
+            audit_soil_c_analysis_config(d)
+        d=cfg()
+        d["target_spectrum_kind"]="SOIL_D_ULS_C_OVER_OMEGA_U"
+        with self.assertRaisesRegex(ValueError,"Soil C target"):
+            audit_soil_c_analysis_config(d)
+        d=cfg()
+        d["input_record_class"]="RAW_UNMATCHED"
+        with self.assertRaisesRegex(ValueError,"record class"):
+            audit_soil_c_analysis_config(d)
+
     def test_sls_requires_its_input_basis_for_thesis(self):
         d=cfg();d.update(limit_state="SLS",analysis_intent="THESIS_NLTHA")
         with self.assertRaisesRegex(ValueError,"SLS"):audit_soil_c_analysis_config(d)

@@ -55,6 +55,21 @@ def audit_soil_c_analysis_config(config):
     """
     if not isinstance(config, dict):
         raise TypeError("run configuration must be a JSON object")
+    # RTFC audit 2026-11: a misspelled intent must not bypass thesis-only
+    # guards for the actual 25-storey nonlinear building.
+    intent = config.get("analysis_intent")
+    if intent not in ("RESEARCH_DIAGNOSTIC", "THESIS_NLTHA"):
+        raise ValueError("analysis_intent must be RESEARCH_DIAGNOSTIC or THESIS_NLTHA")
+    expected_hash = SOIL_C_INPUT_BASIS["target_workbook_sha256"]
+    declared_hash = config.get("target_workbook_sha256")
+    if declared_hash is not None and declared_hash.lower() != expected_hash:
+        raise ValueError("Target workbook SHA256 differs from verified Soil C source")
+    declared_target = config.get("target_spectrum_kind")
+    if declared_target is not None and declared_target != "SOIL_C_ULS_C_OVER_OMEGA_U":
+        raise ValueError("Soil C target must be the declared ULS C(T)/Omega_u curve")
+    if config.get("input_record_class") not in (
+        None, "MATCHED_SEISMOMATCH_SOIL_C"):
+        raise ValueError("Soil C input record class must not be relabeled")
     if str(config.get("soil_type", "")).upper() != "C":
         raise ValueError("Primary research run requires Soil C, not relabeled D")
     if config.get("soil_c_primary_nltha") is not True:
