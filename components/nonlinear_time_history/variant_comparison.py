@@ -97,6 +97,24 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
             raise ValueError(f"{limit}: fewer than {require_pairs} pairs")
         if any((limit,p,o) not in keys for p in pairs for o in ("XY","YX")):
             raise ValueError(f"{limit}: both XY and YX must exist for each pair")
+    # The existing pooled maxima are research-only summaries. For actual
+    # comparison, do not mix ULS and SLS into one governing demand.
+    from components.nonlinear_time_history.nbc105_2025_audit import response_aggregation_rule
+    aggregation_by_state={}
+    by_limit_state={"ULS":{}, "SLS":{}}
+    for limit in ("ULS","SLS"):
+        count=len({key[1] for key in keys if key[0]==limit})
+        aggregation_by_state[limit]=response_aggregation_rule(count)
+        for variant,by in grouped.items():
+            subset={key:case for key,case in by.items() if key[0]==limit}
+            base_subset={key:case for key,case in reference.items() if key[0]==limit}
+            by_limit_state[limit][variant]={}
+            for metric in METRICS:
+                maximum=max(float(case[metric]) for case in subset.values())
+                base=max(float(case[metric]) for case in base_subset.values())
+                by_limit_state[limit][variant][metric]=dict(
+                    maximum=maximum,M0_maximum=base,
+                    reduction_percent=100*(base-maximum)/base if base>0 else None)
     results={}
     for variant,by in grouped.items():
         results[variant]={}
@@ -109,6 +127,10 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
     return dict(status="RESEARCH_SCREEN_ONLY_NOT_THESIS_VALIDATION",
                 compared_variants=list(VARIANTS),
                 paired_case_keys=len(keys),results=results,
+                by_limit_state=by_limit_state,
+                nbc105_2025_response_aggregation_by_limit_state=aggregation_by_state,
+                exactly_seven_rule_requires_interpretation=any(
+                    value.startswith("REVIEW_REQUIRED") for value in aggregation_by_state.values()),
                 no_experimental_approval=True,
                 warning="Numerical comparative screens only; all model/component acceptance gates still required.")
 
