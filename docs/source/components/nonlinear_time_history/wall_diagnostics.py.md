@@ -1,19 +1,11 @@
-# wall_diagnostics.py — implementation guide
+# wall_diagnostics.py — audited E-SFI 3D wall geometry
 
-**Source:** [components/nonlinear_time_history/wall_diagnostics.py](../../../../components/nonlinear_time_history/wall_diagnostics.py)
-**Source blob SHA:** bd3f03f76ed3363b4cf692531d06ea18b04d40db
-**Workstream:** 01 X-only wall preflight.
+**Implementation:** [wall_diagnostics.py](../../../../components/nonlinear_time_history/wall_diagnostics.py) → `inspect_wall_geometry`, `write_wall_audit`.
 
-## Input contract and failure gate
+New physical input check: 3D quadrilateral is not sufficient. For OpenSees `E_SFI_MVLEM_3D`, the **i–j bottom edge is wall fiber width** (m) and the **i–l edge rises vertically** (m). The preflight blocks reversed/inclined/misoriented edges before they can be used by `build_complete_model` to allocate macrofiber width. Checks: 4 distinct nodes, finite 3D coordinates, quadrilateral parallelogram closure, positive area, vertical normal, positive thickness, correct i–j / i–l orientation. Actual source tags 110280/112778 are *suspects only*; solver tag mapping is dependent on current frame/shell assembly.
 
-Use the module's exact function docstrings and the corresponding stage guide under docs/programs. All data are kN-m-s model units unless source quantities explicitly say mm, MPa or g. Nonfinite, missing, mismatched or unapproved inputs must block the relevant analysis rather than be interpreted as zero.
+**Test:** [verify_wall_geometry_preflight.py](../../../../tests/verify_wall_geometry_preflight.py) includes valid, duplicate node, NaN thickness, vertical-edge-as-width and upside-down panel cases.
 
-## Provenance and cited method
+**Scientific basis:** OpenSees [E-SFI-MVLEM-3D](https://opensees.github.io/OpenSeesDocumentation/user/manual/model/elements/E_SFI_MVLEM_3D.html) (Kolozvari, Lopez & Massone, 2023, https://doi.org/10.1016/j.engstruct.2023.116700). The official command uses 4 counterclockwise nodes and per-fiber thicknesses/widths/nDMaterial tags. The added horizontal/vertical screening is an **implementation-specific geometric constraint** for the current strict vertical-panel mesher, not a claim that the published element cannot model other orientations.
 
-NBC 105:2025 is governing seismic basis (DUDBC). Wall model formulation: Kolozvari et al. (2023), https://doi.org/10.1016/j.engstruct.2023.116700. Research device context: Korkmaz & Kircil (2026), https://doi.org/10.3390/buildings16040711. Only cite the relevant physical domain: these papers do not validate this specific building.
-
-## Verification
-
-Unit test: tests/verify_wall_geometry_preflight.py. This is a solver-free input/response behavior check. A successful test cannot establish true nonlinear wall convergence, experimental calibration, structural performance or device approval. Native OpenSeesPy and source ETABS comparisons must still be run.
-
-[Guide index](../../00_SOURCE_GUIDE_INDEX.md) · [Thesis gates](../../../00_THESIS_ACCEPTANCE_GATES.md)
+[Complete P0 audit and native follow-up](../../../review/01_WALL_GEOMETRY_MATERIALS_FIRST_STEP.md).
