@@ -252,6 +252,16 @@ def _run(config):
             raise ValueError('THESIS_NLTHA cannot use a diagnostic damping override')
         if not config.get('nbc105_2025_design_evidence'):
             raise ValueError('THESIS_NLTHA requires independently reviewed modal and SeismoMatch evidence')
+        # Independent SeismoMatch logs must prove BOTH component factors and
+        # the original common factor. The applied OpenSees scale remains 1.0.
+        from components.nonlinear_time_history.soil_c_physics_preflight import (
+            evaluate_original_seismomatch_logs)
+        evaluate_original_seismomatch_logs(
+            config.get('seismomatch_original_pair_scale_evidence'))
+        if not config.get('damping_reference_modes'):
+            raise ValueError('THESIS_NLTHA requires two explicit damping reference modes')
+        if config.get('rayleigh_device_exclusion_reviewed') is not True:
+            raise ValueError('THESIS_NLTHA requires element/device Rayleigh damping exclusion audit')
         if config.get('duration_s'):
             raise ValueError('THESIS_NLTHA must use full record duration, not a diagnostic truncation')
     profile=profile_for_config(config)
@@ -313,6 +323,12 @@ def _run(config):
     # Requires opt-in, so unrelated pre-existing exploratory workflows are
     # not silently forced onto the Soil-C thesis record catalogue.
     suite_mode=bool(config.get('soil_c_primary_nltha',False))
+    if suite_mode:
+        from components.nonlinear_time_history.soil_c_physics_preflight import (
+            audit_soil_c_analysis_config)
+        source_config_gate=audit_soil_c_analysis_config(config)
+        (out/'Soil_C_Thesis_Input_Basis.json').write_text(
+            json.dumps(source_config_gate,indent=2,allow_nan=False),encoding='utf-8')
     source_pair_audit=None
     endpoint_policy=dict(status='AS_ORIGINALLY_EXPORTED',added_samples=0)
     if suite_mode:
@@ -433,12 +449,33 @@ def _run(config):
         from components.shared.eigen_solver import solve_eigen
         eigenvalues=solve_eigen(ops,20);periods=[2*math.pi/math.sqrt(v) for v in eigenvalues if v>0]
         if len(periods)!=20:raise ValueError('Inspected nonlinear modes incomplete')
-        # The last of 20 computed eigenmodes is NOT synonymous with Tn90.
-        # The complete NBC §9.3.2.4 bound uses reviewer-supplied true Tn90
-        # from 90% cumulative effective modal mass in BOTH axes.
+        # The last of 20 eigenmodes is NOT Tn90; cumulative effective mass
+        # must be obtained from independent reviewed X and Y participation.
         bound=min(records[0][1],.01,periods[0]/100.)
-        if dt>bound:raise ValueError(f'Chosen dt {dt} exceeds preliminary first-mode screen {bound:g}s; reduce dt')
-        alpha,beta=rayleigh_coefficients(max(periods),min(periods),.05)
+        if dt>bound:
+            raise ValueError(f'Chosen dt {dt} exceeds preliminary first-mode screen {bound:g}s; reduce dt')
+        damping_modes=config.get('damping_reference_modes')
+        if damping_modes is not None:
+            from components.nonlinear_time_history.soil_c_physics_preflight import (
+                assess_modal_damping_and_time_step)
+            selected_audit=assess_modal_damping_and_time_step(
+                config,periods,records[0][1])
+            (case/'Soil_C_Selected_Modal_Damping_and_Time_Step.json').write_text(
+                json.dumps(selected_audit,indent=2,allow_nan=False),encoding='utf-8')
+            # Same physical modes for both orientations; define two 5% targets
+            # instead of arbitrarily damping the first and 20th modes.
+            mode_a,mode_b=selected_audit['damping_reference_modes_1_based']
+            damping_periods=(periods[mode_a-1],periods[mode_b-1])
+        else:
+            if thesis_intent:
+                raise ValueError('Thesis requires audited damping reference modes')
+            damping_periods=(max(periods),min(periods))
+            (case/'Soil_C_Selected_Modal_Damping_and_Time_Step.json').write_text(
+                json.dumps(dict(status='EXPLORATORY_UNREVIEWED_FIRST_LAST_MODE_DAMPING',
+                    damping_reference_periods_s=damping_periods,
+                    note='Exploratory only: first/20th damping can distort nonlinear higher modes'),
+                    indent=2,allow_nan=False),encoding='utf-8')
+        alpha,beta=rayleigh_coefficients(*damping_periods,.05)
         if config.get('diagnostic_mass_damping'):alpha,beta=2*.05*min(math.sqrt(v) for v in eigenvalues),0.
         if config.get('diagnostic_zero_damping'):alpha,beta=0.,0.
         print('[TRANSIENT PROBE]', 'excitation='+excitation, 'zero_damping='+str(bool(config.get('diagnostic_zero_damping'))), 'system='+transient_system, flush=True)
