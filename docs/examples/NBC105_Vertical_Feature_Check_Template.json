@@ -1,0 +1,8 @@
+{
+  "_note": "ILLUSTRATIVE QUESTIONNAIRE. Replace null with true/false ONLY after actual drawing/ETABS verification. User has stated there is no cantilever projection; do not assume all other conditions false.",
+  "unsupported_horizontal_span_ge_20m": null,
+  "horizontal_cantilever_gt_5m": false,
+  "prestressed_horizontal_component": null,
+  "beam_supporting_column": null,
+  "base_isolation": null
+}
