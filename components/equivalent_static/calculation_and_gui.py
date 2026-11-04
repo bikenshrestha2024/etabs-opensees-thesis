@@ -469,9 +469,18 @@ class ESMGui:
                 for segment in segments:walls.append([segment[k] for k in headers])
                 walls.freeze_panes='A2';walls.auto_filter.ref=walls.dimensions
             wb.save(out/'NBC105_Input_Provenance_V123.xlsx')
-            self.period_note.set('Excel/project inputs loaded with cell-level provenance. Rayleigh values populate only from a matching preliminary run. Regularity remains unconfirmed.')
+            present=data['values']
+            missing=[k for k in ('awx','awy','Z','I','rmu','omegau','omegas')
+                     if k not in present or not str(present[k]).strip()]
             self._show_empirical()
             self._direction_changed()
+            if missing:
+                self.status.set('ESM workbook import incomplete: missing '+', '.join(missing)
+                    +'. Click Excel sources… to select the current model calculator/scaling workbooks; '
+                    'review the provenance Excel and wall geometry. Nothing is assumed zero.')
+            else:
+                self.status.set('ESM workbook inputs loaded. Rayleigh periods require a matching '
+                    'preliminary run; ETABS eigenperiods are reference-only. Review provenance.')
         except Exception as exc:
             # Never suppress the reason for an empty input field. Keep the
             # dialog open for manual/reviewed inputs and report the precise
@@ -487,15 +496,43 @@ class ESMGui:
                     parent=self.root)
 
     def _show_empirical(self):
-        rows=read_story_csv(self.path.get());H=max(float(r['height_m']) for r in rows)
+        """Show only periods supported by imported story height and real Aw.
+
+        A missing workbook or wall index is *not* a failure of the entire
+        Excel loader. The previous float('') raised ValueError, causing the
+        GUI to misreport a failed import and leaving both period fields blank.
+        """
+        try:
+            rows=read_story_csv(self.path.get())
+            H=max(float(r['height_m']) for r in rows)
+        except (OSError,ValueError,TypeError) as exc:
+            self.computed_x.set('');self.computed_y.set('')
+            self.period_note.set('Story-weight CSV not yet usable for ESM periods: '+str(exc))
+            return
         values=[]
         for axis,var in [('X',self.awx),('Y',self.awy)]:
-            empirical=.075*H**.75/math.sqrt(float(var.get()))
-            amplified=float(self.period_factor.get())*empirical
-            ray=(self.rayleigh_tx if axis=='X' else self.rayleigh_ty).get().strip()
-            adopted=f'{min(amplified,float(ray)):.9g}' if ray else 'pending Rayleigh run'
-            (self.computed_x if axis=='X' else self.computed_y).set(f'{empirical:.9g} / {amplified:.9g} / {adopted}')
-            values.append(f'{axis}: empirical={empirical:.6g} s; amplified={amplified:.6g} s; adopted={adopted}')
+            target=self.computed_x if axis=='X' else self.computed_y
+            raw=var.get().strip()
+            try:
+                aw=float(raw)
+                factor=float(self.period_factor.get())
+                if not (math.isfinite(aw) and aw>0 and math.isfinite(factor) and factor>0):
+                    raise ValueError('nonpositive/nonfinite input')
+                empirical=.075*H**.75/math.sqrt(aw)
+                amplified=factor*empirical
+                ray=(self.rayleigh_tx if axis=='X' else self.rayleigh_ty).get().strip()
+                if ray:
+                    ray_value=float(ray)
+                    if not math.isfinite(ray_value) or ray_value<=0:
+                        raise ValueError('invalid Rayleigh period')
+                    adopted=f'{min(amplified,ray_value):.9g}'
+                else:
+                    adopted='pending Rayleigh run'
+                target.set(f'{empirical:.9g} / {amplified:.9g} / {adopted}')
+                values.append(f'{axis}: empirical={empirical:.6g} s; amplified={amplified:.6g} s; adopted={adopted}')
+            except (TypeError,ValueError):
+                target.set('')
+                values.append(f'{axis}: needs reviewed wall Aw, period factor and Rayleigh input')
         self.period_note.set(' | '.join(values)+' | Rayleigh and ETABS modal are separate analysis results.')
 
     def _direction_changed(self):
