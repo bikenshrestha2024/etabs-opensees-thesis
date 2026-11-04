@@ -339,7 +339,7 @@ class ESMGui:
         self.story_source_note=story_source_note
         self.outdir=tk.StringVar(value=str(analysis_output_folder(export_dir,'Both')))
         self._output_is_automatic=True
-        self.state=tk.StringVar(value="Both"); self.soil=tk.StringVar(value="D")
+        self.state=tk.StringVar(value="Both"); self.soil=tk.StringVar(value="C")
         self.T=tk.StringVar(value=""); self.Z=tk.StringVar(value="")
         self.location=tk.StringVar(value=""); self.z_source=tk.StringVar(value="Annex C municipality table")
         self.I=tk.StringVar(value=""); self.vs30=tk.StringVar(value=""); self.n_spt=tk.StringVar(value=""); self.system=tk.StringVar(value="Select / determine from Table 5-2")

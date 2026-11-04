@@ -39,3 +39,8 @@ The GUI may show the expected review status of `pending Rayleigh run`. This is *
 **NBC 105:2025 §3.2.1 ESM eligibility must be independently checked for this ~95m asymmetric-plan building.** An ESM calculation can serve as a research check without proving ESM is an allowed final design analysis method. Loading/diaphragm matching and gravity reaction balance are necessary but not sufficient for source seismic weight accuracy.
 
 Neither the ESM GUI fix nor GitHub Python CI establishes native building validation, nonlinear stability or NBC compliance.
+
+
+## Default Soil C selection
+
+The ESM form now **initially displays Soil C** (not Soil D), reflecting the user's primary research case. A successfully imported, clearly attributed project workbook may override that selection. This is a **UI default**, not proof of actual geotechnical site classification. Confirm the adopted `Vs30`/soil category and the NBC target/hazard input before any ESM action. Soil D remains selectable for separately labeled sensitivity studies.
