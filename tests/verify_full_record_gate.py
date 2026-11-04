@@ -9,11 +9,11 @@ class GateTests(unittest.TestCase):
         self.assertTrue(r["full_record_completed"])
         self.assertFalse(r["model_verification_complete"])
     def test_truncated(self):
-        r=verify_accepted_history([dict(time_s=0.),dict(time_s=.005)],10.,.005)
+        r=verify_accepted_history([dict(time_s=0.,drift=0.),dict(time_s=.005,drift=.01)],10.,.005)
         self.assertEqual(r["status"],"TRUNCATED_DIAGNOSTIC")
     def test_bad_time(self):
         with self.assertRaisesRegex(ValueError,"increase strictly"):
-            verify_accepted_history([dict(time_s=0.),dict(time_s=0.)],1.,1.)
+            verify_accepted_history([dict(time_s=0.,drift=0.),dict(time_s=0.,drift=.01)],1.,1.)
     def test_nonfinite_channel(self):
         with self.assertRaisesRegex(ValueError,"Nonfinite"):
             verify_accepted_history([dict(time_s=0.,drift=0.),
