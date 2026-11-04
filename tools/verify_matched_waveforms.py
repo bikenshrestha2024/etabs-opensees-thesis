@@ -202,16 +202,78 @@ def audit(matched_dir, register=REGISTER):
         ]}
 
 
+
+def markdown_report(report):
+    """Human-readable review sheet; never labels a waveform check NBC PASS."""
+    lines = [
+        "# Matched earthquake input audit — source integrity",
+        "",
+        "**Overall source status:** " + report["status"],
+        "",
+        "**Source hashes:** " + report["source_integrity_status"],
+        "",
+        "**Pair synchronization:** " + report["pair_synchronization_status"],
+        "",
+        "All matching quality values remain conditional. No original SeismoMatch "
+        "scale-factor or modal interval approval is implied.",
+        "",
+        "| Earthquake pair | Both component hashes | Same dt | Same end time | Review |",
+        "|---|---|---|---|---|",
+    ]
+    for pair in report["pairs"]:
+        lines.append("| " + pair["event"] + " | " +
+          ("Yes" if pair["status"] not in
+           ("INCOMPLETE", "PAIR_DT_MISMATCH_OR_MISSING",
+            "PAIR_END_TIME_MISMATCH_OR_MISSING") else "Check component rows") +
+          " | " + ("Yes" if pair["same_sampling_interval"] else "No/unknown") +
+          " | " + ("Yes" if pair["same_end_time"] else "No/unknown") +
+          " | " + pair["status"] + " |")
+    lines += [
+        "", "## Per-component source verification", "",
+        "| Event | Component | Samples | dt (s) | PGA (g) | SHA and format status |",
+        "|---|---|---:|---:|---:|---|",
+    ]
+    for row in report["records"]:
+        lines.append("| " + row["event"] + " | " + row["component"] +
+          " | " + str(row.get("samples", "-")) +
+          " | " + str(row.get("dt_s", "-")) +
+          " | " + str(row.get("max_abs_acceleration_g", "-")) +
+          " | " + row["status"] + " |")
+    lines += [
+        "", "## Mandatory outstanding review", "",
+        "- NBC 105:2025 §9.3.2.2 original SeismoMatch X/Y factors and lower-of-two rule not verified.",
+        "- Verify the actual C(T)/Omega_u target normalization and Tn90 to sqrt(R_mu)*T1 interval.",
+        "- Gorkha matched 322.94s vs 120s original requires processing-trail review.",
+        "- Loma Prieta A/B 0.005s mismatch requires documented synchronization/end-time policy.",
+        "- Source waveform provenance is separate from gravity, wall, FVD, BRB and full-duration NLTHA approval.",
+        "", "## Import rules", "",
+        "- Already matched Acc(g): additional spectral scale 1.0; convert g to m/s2 with Path factor 9.80665.",
+        "- Two horizontal components simultaneously in both XY and YX, in fresh model domains.",
+        "- Never silently trim, pad, resample, interpolate or spectrum-rematch a registered file.",
+        "", "## Sources", "",
+        "- NBC 105:2025 official DUDBC PDF, §4.1 and §9.3.2.",
+        "- docs/ground_motions/seismomatch_20261104/README.md",
+        "- docs/ground_motions/seismomatch_20261104/matched_component_register.csv",
+        "",
+    ]
+    return "\\n".join(lines)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--matched-dir", type=Path, required=True)
     p.add_argument("--register", type=Path, default=REGISTER)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--markdown", type=Path,
+                   help="Optional independent Markdown review report")
     opts = p.parse_args(argv)
     report = audit(opts.matched_dir, opts.register)
     opts.output.parent.mkdir(parents=True, exist_ok=True)
     opts.output.write_text(json.dumps(report, indent=2, allow_nan=False),
                            encoding="utf-8")
+    if opts.markdown:
+        opts.markdown.parent.mkdir(parents=True, exist_ok=True)
+        opts.markdown.write_text(markdown_report(report), encoding="utf-8")
     print(json.dumps({"status": report["status"], "pairs": report["pair_count"],
                       "pairs_needing_review": report["pair_synchronization_review_count"],
                       "sources": report["record_count"],
