@@ -96,17 +96,17 @@ def create_configs(*,models_json,matched_dir,output_dir,dt_s=.005,
                     "source_evidence_not_yet_complete":True,
                 }
                 configurations.append((config_path,cfg,variant,state,event))
+    manifest=root/"00_SOIL_C_M0_M6_RUN_MATRIX.csv"
+    summary_path=root/"00_SOIL_C_RESEARCH_RUN_MATRIX.json"
     if not allow_existing:
         collisions=[str(p) for p,*_ in configurations if p.exists()]
+        collisions += [str(p) for p in (manifest,summary_path) if p.exists()]
         if collisions:
             raise FileExistsError("Refusing to overwrite existing analysis configs: "+collisions[0])
     root.mkdir(parents=True,exist_ok=True)
     for path,cfg,*_ in configurations:
         path.parent.mkdir(parents=True,exist_ok=True)
         path.write_text(json.dumps(cfg,indent=2,allow_nan=False),encoding="utf-8")
-    manifest=root/"00_SOIL_C_M0_M6_RUN_MATRIX.csv"
-    if manifest.exists() and not allow_existing:
-        raise FileExistsError("Refusing to overwrite existing run matrix: "+str(manifest))
     with manifest.open("w",newline="",encoding="utf-8") as fh:
         writer=csv.writer(fh)
         writer.writerow(["order","variant","limit_state","earthquake","orientations",
