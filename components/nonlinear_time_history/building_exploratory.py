@@ -292,6 +292,12 @@ def _run(config):
         values,step,units=_read_peer_text_record(config[key]);records.append((np.asarray(values),step,units))
     from components.nonlinear_time_history.thesis_quality import audit_ground_motion_pair
     input_quality=audit_ground_motion_pair(records,[config['x_path'],config['y_path']])
+    # Read the selected scale BEFORE computing the paired source fingerprint.
+    # Previous versions referenced 'scale' before assignment here.
+    scale=float(config.get('scale',1.))
+    if not math.isfinite(scale) or scale<=0:
+        raise ValueError('Scale must be finite and positive')
+
     # Pair fingerprint is constant across XY/YX and binds the input files,
     # sampling, units and selected scale. This is NOT spectrum-match proof.
     record_pair_sha256=hashlib.sha256(json.dumps(dict(
@@ -305,9 +311,21 @@ def _run(config):
     if abs(records[0][1]-records[1][1])>1e-10 or len(records[0][0])!=len(records[1][0]):raise ValueError('Pair duration/digitization mismatch; reconcile records explicitly')
     record_end=(len(records[0][0])-1)*records[0][1];end=record_end if not config.get('duration_s') else min(float(config['duration_s']),record_end)
     if end<=0:raise ValueError('Duration must be positive')
-    dt=float(config.get('dt_s',.005));scale=float(config.get('scale',1.))
+    dt=float(config.get('dt_s',.005))
     if not math.isfinite(dt) or dt<=0 or dt>min(.01,records[0][1]):raise ValueError('dt must be positive and no larger than record dt or 0.01 s')
-    if not math.isfinite(scale) or scale<=0:raise ValueError('Scale must be finite and positive')
+    # Optional strict NBC 105:2025 metadata gate. Exploratory trials without
+    # actual spectral evidence remain research diagnostics, NOT NBC passes.
+    from components.nonlinear_time_history.nbc105_2025_audit import write_preflight
+    nbc_evidence=config.get('nbc105_2025_design_evidence')
+    if nbc_evidence is not None:
+        write_preflight(out/'NBC105_2025_NLTHA_Input_Screen.json',nbc_evidence,
+            record_dt_s=records[0][1],integration_dt_s=dt,selected_scale=scale,
+            orientations=config.get('orientations',['XY','YX']))
+    else:
+        (out/'NBC105_2025_NLTHA_Input_Screen.json').write_text(json.dumps(dict(
+            status='NOT_EVALUATED_DESIGN_EVIDENCE_NOT_SUPPLIED',
+            scope='Research exploratory run only; spectral scaling, Tn90 and source selection unverified'
+        ),indent=2),encoding='utf-8')
     brace=brace_steel_parameters(material_overrides)
     brace_fy=brace['fy_mpa']
     brace_b=brace['hardening_ratio']
