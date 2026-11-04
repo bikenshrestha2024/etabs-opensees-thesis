@@ -22,6 +22,8 @@ class SoilCPreflightTests(unittest.TestCase):
                 content=("Time Series matched accelerogram: "+name+"\n"
                          "Time Step: 0.005 s\nTime(sec) Acc(g)\n"
                          "0.000 0.000\n0.005 0.100\n0.010 -0.200\n")
+                if event=="Loma Prieta" and comp=="B":
+                    content+="0.015 0.000\\n"
                 file=Path(folder)/name
                 file.write_text(content,encoding="utf-8")
                 rows.append(dict(event=event,component=comp,
