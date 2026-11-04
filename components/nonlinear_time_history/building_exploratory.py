@@ -246,6 +246,11 @@ def _run(config):
             raise ValueError('THESIS_NLTHA requires calibrated nonlinear core-wall elements')
         if not config.get('approved_frame_reinforcement_csv'):
             raise ValueError('THESIS_NLTHA requires source-reviewed frame reinforcement CSV')
+        # Project has RCC core openings. Requiring an independently reviewed
+        # manifest prevents a wall mesh from appearing valid merely because
+        # there were no hole declarations to check.
+        if not config.get('wall_openings_manifest'):
+            raise ValueError('THESIS_NLTHA requires independently reviewed wall_openings_manifest')
         if excitation!='XY' or sorted(config.get('orientations',['XY','YX']))!=['XY','YX']:
             raise ValueError('THESIS_NLTHA requires simultaneous XY and YX in separate domains')
         if config.get('diagnostic_zero_damping') or config.get('diagnostic_mass_damping'):
@@ -309,8 +314,16 @@ def _run(config):
     # No manifest is not approval; the absence is made explicit in the results.
     from components.nonlinear_time_history.wall_topology import write_opening_report
     opening_manifest=config.get('wall_openings_manifest')
+    if thesis_intent:
+        from components.nonlinear_time_history.wall_topology import (
+            verify_project_opening_manifest_required)
+        verify_project_opening_manifest_required(config)
     if opening_manifest:
-        write_opening_report(data,opening_manifest,out/'NLTHA_Wall_Opening_Preflight.json')
+        opening_report=write_opening_report(
+            data,opening_manifest,out/'NLTHA_Wall_Opening_Preflight.json')
+        if thesis_intent and opening_report['status']!='GEOMETRY_SCREEN_PASSED':
+            raise ValueError(
+                'THESIS_NLTHA wall openings require nonempty verified opening declarations')
     else:
         (out/'NLTHA_Wall_Opening_Preflight.json').write_text(json.dumps(dict(
             status='UNVERIFIED_NO_MANIFEST',

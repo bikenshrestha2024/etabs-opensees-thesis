@@ -73,6 +73,28 @@ def validate_openings(model_data, declarations, tol=1e-6):
                            "A wall core can contain holes not declared here. Zero declarations is not verification."]}
 
 
+def verify_project_opening_manifest_required(config):
+    """Thesis core-openings evidence: require a real declared source manifest.
+
+    Do not infer the absence of openings from an empty or absent file. This
+    function does not validate contents; write_opening_report does that after
+    the real model mesh has been assembled.
+    """
+    if config.get("analysis_intent") != "THESIS_NLTHA":
+        return {"status": "EXPLORATORY_MANIFEST_OPTIONAL"}
+    manifest = config.get("wall_openings_manifest")
+    if not isinstance(manifest, str) or not manifest.strip():
+        raise ValueError("THESIS_NLTHA requires wall_openings_manifest")
+    if not Path(manifest).is_file():
+        raise FileNotFoundError("ETABS-reviewed wall opening manifest not found: " + manifest)
+    with Path(manifest).open(encoding="utf-8-sig") as fh:
+        source = json.load(fh)
+    if not isinstance(source, dict) or not isinstance(source.get("wall_openings"), list) or not source["wall_openings"]:
+        raise ValueError("THESIS_NLTHA requires nonempty documented wall opening declarations")
+    return {"status": "OPENING_DECLARATIONS_PRESENT_GEOMETRY_STILL_UNVERIFIED",
+            "declared_count": len(source["wall_openings"])}
+
+
 def write_opening_report(model_data, input_manifest, output_path):
     with Path(input_manifest).open(encoding="utf-8-sig") as f:
         manifest=json.load(f)
