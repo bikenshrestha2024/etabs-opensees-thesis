@@ -79,6 +79,10 @@ def create_configs(*,models_json,matched_dir,output_dir,dt_s=.005,
                     "soil_type":"C",
                     "soil_c_primary_nltha":True,
                     "earthquake_event":event,
+                    # Output provenance: without these exact identifiers the
+                    # existing runner emits UNASSIGNED / UNSPECIFIED.
+                    "variant_id":variant,
+                    "pair_id":event,
                     "source_records_already_scaled":True,
                     "x_path":str(sources[event,"A"]),
                     "y_path":str(sources[event,"B"]),

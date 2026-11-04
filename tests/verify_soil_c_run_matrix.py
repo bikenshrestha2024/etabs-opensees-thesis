@@ -31,6 +31,11 @@ class RunMatrixTests(unittest.TestCase):
       p=dest/"configs"/"M0"/"ULS"/"Kobe.json"
       conf=json.loads(p.read_text())
       self.assertEqual(conf["orientations"],["XY","YX"])
+      # Source-to-result traceability: the native runner defaults to
+      # UNASSIGNED/UNSPECIFIED if the generator omits these case keys.
+      self.assertEqual(conf["variant_id"],"M0")
+      self.assertEqual(conf["pair_id"],"Kobe")
+      self.assertEqual(conf["earthquake_event"],"Kobe")
       self.assertEqual(conf["scale"],1.)
       self.assertEqual(conf["analysis_intent"],"RESEARCH_DIAGNOSTIC")
       self.assertTrue(conf["source_records_already_scaled"])
