@@ -26,3 +26,5 @@ Open the existing GUI and select **OpenSees nonlinear readiness / calibration st
 ### Direct diagnostic tools
 
 The dashboard includes action buttons to launch the eight-material visual validation interface, generate separate ZERO/X/Y/XY wall diagnostic RunConfig files, and execute an isolated native FVD/BRB recorder test. Child-process console logs go to `OpenSees_Analysis_Results/Readiness_Diagnostics`; case outputs are written to distinct diagnostic directories. These buttons never run the building's full nonlinear time history automatically and never promote a case to thesis-qualified status.
+
+NBC 105:2025 screening now appears as a distinct dashboard workstream; the presence of a spectrum-screen JSON remains **available for review only**, never a code pass. See docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md.

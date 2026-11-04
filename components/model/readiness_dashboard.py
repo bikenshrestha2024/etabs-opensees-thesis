@@ -37,6 +37,9 @@ GROUPS = (
     ("transient", "Nonlinear step stability",
      "ZERO/X/Y/XY first-step diagnostics and finite accepted state, including X-only failure",
      ("Accepted_History_Completion_Gate.json", "NLTHA_Wall_Geometry_Preflight.json")),
+    ("nbc105", "NBC 105:2025 nonlinear motion compliance screening",
+     "Site spectrum C(T)/Omega_u, 0.33..3 component factors, common lower pair factor, Tn90/T1 timestep, XY/YX and reviewed period evidence",
+     ("NBC105_2025_NLTHA_Input_Screen.json", "Kobe_Pair_NBC105.json")),
     ("motions", "Paired ground motions and full-duration cases",
      "Record pairing, dt, units, source SHA, ULS/SLS XY/YX and complete duration",
      ("Accepted_History_Completion_Gate.json",)),
@@ -60,6 +63,7 @@ REVIEW_KEYS = {
                       "modal_periods_modes_and_mass_participation_reviewed",
                       "is16700_initial_pdelta_plus_minus_cases_completed"),
     "transient": ("single_element_and_wall_benchmark_checks_passed",),
+    "nbc105": ("record_pair_units_scales_and_nbc_limits_reviewed",),
     "motions": ("record_pair_units_scales_and_nbc_limits_reviewed",),
 }
 
