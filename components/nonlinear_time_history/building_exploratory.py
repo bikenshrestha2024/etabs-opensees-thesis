@@ -492,6 +492,19 @@ def _run(config):
             node: list(ops.nodeDisp(node))
             for nodes in tracked_nodes.values() for node in nodes
         }
+        from components.nonlinear_time_history.ground_acceleration import (
+            applied_ground_acceleration,relative_to_absolute_floor_acceleration)
+        (case/'Ground_Acceleration_Recording_Method.json').write_text(json.dumps(dict(
+            source="https://opensees.github.io/OpenSeesDocumentation/user/manual/model/pattern/uniformExcitationPattern.html",
+            input_source_units=[r[2] for r in records],
+            conversion_factor_by_unit=unit_factor,
+            additional_spectral_scale=scale,
+            orientation=orientation,excitation=excitation,
+            source_record_end_time_s=record_end,
+            note="Relative node acceleration + interpolated support acceleration = horizontal absolute floor acceleration for uniform support excitation only.",
+            vertical_ground_motion_recorded=False,
+            absolute_acceleration_not_applicable_to_multi_support_excitations=True
+        ),indent=2),encoding='utf-8')
         from components.nonlinear_time_history.device_recording import (
             active_device_catalog,baseline_axial_projection,device_sample,summarize_device_demands)
         active_devices=active_device_catalog(model,data['frames'])
@@ -501,12 +514,21 @@ def _run(config):
         tracked_element_rows=[]
         def capture():
             row={'time_s':ops.getTime()};previous=[0.]*6
+            ground_xy=applied_ground_acceleration(
+                records,time_s=row['time_s'],orientation=orientation,
+                excitation=excitation,additional_spectral_scale=scale)
+            row['ground_AccelX_m_s2']=ground_xy[0]
+            row['ground_AccelY_m_s2']=ground_xy[1]
             for story,g in zip(stories,groups):
                 u=[a-b for a,b in zip(ops.nodeDisp(g['master_tag']),baseline[g['master_tag']])];name=story['story_name']
                 acceleration=list(ops.nodeAccel(g['master_tag']))
                 for j,axis in enumerate(('X','Y','Z')):row[name+'_U'+axis+'_m']=u[j]
                 row[name+'_UX_relative_accel_m_s2']=acceleration[0]
                 row[name+'_UY_relative_accel_m_s2']=acceleration[1]
+                absolute_xy=relative_to_absolute_floor_acceleration(
+                    acceleration,ground_xy)
+                row[name+'_UX_absolute_accel_m_s2']=absolute_xy[0]
+                row[name+'_UY_absolute_accel_m_s2']=absolute_xy[1]
                 for j,axis in enumerate(('X','Y','Z'),3):row[name+'_R'+axis+'_rad']=u[j]
                 row[name+'_RZ_rad']=u[5]
                 for j,axis in enumerate(('X','Y')):row[name+'_drift_'+axis]=(u[j]-previous[j])/story['height']
