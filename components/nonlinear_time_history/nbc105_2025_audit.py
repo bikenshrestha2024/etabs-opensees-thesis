@@ -46,7 +46,7 @@ def paired_ground_motion_scale(factor_x,factor_y):
 
 def scaling_period_range(tn90_s,t1_s,r_mu):
     """Clause 9.3.2.2(b): spectral fit between Tn and sqrt(R_mu)*T1."""
-    tn,t1,r=(positive(v,k) for k,v in
+    tn,t1,r=(positive(value,label) for value,label in
              ((tn90_s,"Tn90"),(t1_s,"T1"),(r_mu,"R_mu")))
     upper=math.sqrt(r)*t1
     if tn>upper: raise ValueError("Empty spectrum period matching window")
