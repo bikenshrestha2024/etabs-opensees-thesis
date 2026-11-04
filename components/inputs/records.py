@@ -127,6 +127,31 @@ def _read_manifest_component(path, manifest_dt, manifest_units):
         return values, dt, units
     return _numeric_record(path), manifest_dt, manifest_units
 
+def _requires_unit_only_path_scale(*paths):
+    """Already matched SeismoMatch exports MUST NOT receive a second spectrum multiplier.
+
+    The filename alone is insufficient: inspect the file header. The original
+    matching-session factors (0.33..3) are separate metadata, not OpenSees
+    Path scale for an exported matched waveform.
+    """
+    markers=[]
+    for path in paths:
+        head=Path(path).read_text(encoding="utf-8-sig",errors="replace")[:4096].lower()
+        markers.append("time series matched accelerogram" in head)
+    if any(markers) and not all(markers):
+        raise ValueError("Mixed original and matched waveform inputs in one earthquake pair")
+    return all(markers)
+
+
+def _enforce_matched_scale(scale, *paths):
+    """Return the unchanged scalar after rejecting accidental double scaling."""
+    if _requires_unit_only_path_scale(*paths) and not math.isclose(
+            float(scale),1.,rel_tol=0,abs_tol=1e-12):
+        raise ValueError("SeismoMatch matched Acc(g) outputs require extra scale=1.0; "
+                         "the prior 0.33..3 factors must NOT be reapplied")
+    return float(scale)
+
+
 def _read_inputs(config):
     if config.get("motion_mode", "PAIRED_3D") == "X_ONLY_SCREENING":
         parsed_motions = []
@@ -136,6 +161,7 @@ def _read_inputs(config):
         if not 0.33 <= scale <= 3.0: raise ValueError("Verified record scale factor must be within NBC §9.3.2.2 limits [0.33, 3.0].")
         for path in paths:
             p = Path(path).expanduser()
+            _enforce_matched_scale(scale,p)
             values, dt, units = _read_peer_text_record(p)
             parsed_motions.append({"pair_id": p.stem, "x_path": str(p.resolve()), "x": values, "dt_x": dt, "scale": scale, "units": units, "mode": "X_ONLY"})
     else:
@@ -150,6 +176,7 @@ def _read_inputs(config):
                 raise ValueError("NBC 105:2025 §9.3.2 requires at least three orthogonal pairs for this 3D analysis.")
             for pair in pair_paths:
                 px, py = Path(pair["x_path"]).expanduser(), Path(pair["y_path"]).expanduser()
+                _enforce_matched_scale(scale,px,py)
                 x, dx, ux = _read_peer_text_record(px)
                 y, dy, uy = _read_peer_text_record(py)
                 if ux != uy:
@@ -178,6 +205,7 @@ def _read_inputs(config):
                         raise ValueError("dt must be positive and the verified scale factor must be in [0.33, 3.0].")
                     if units not in ("g", "m/s2", "m/s^2"):
                         raise ValueError("units must be g or m/s2.")
+                    _enforce_matched_scale(scale,px,py)
                     x_values, dx_actual, ux = _read_manifest_component(px, dx, units)
                     y_values, dy_actual, uy = _read_manifest_component(py, dy, units)
                     if ux != uy:
