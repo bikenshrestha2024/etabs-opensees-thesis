@@ -297,10 +297,19 @@ def _run(config):
     scale=float(config.get('scale',1.))
     if not math.isfinite(scale) or scale<=0:
         raise ValueError('Scale must be finite and positive')
-    # This runner expects unscaled native record ordinates. If the source was
-    # already multiplied by a prior matching scale, require a clean original.
-    if config.get('source_records_already_scaled') is True:
-        raise ValueError('Original unscaled source records required: avoid duplicate spectral scaling')
+    # SeismoMatch outputs are ALREADY spectrum-matched. Their encoded
+    # accelerations must not be scaled again. The Path factor remains the
+    # acceleration UNIT conversion (g -> m/s2), and the applied pair scale is 1.
+    # File names/headers establish processing provenance, not proof that
+    # NBC 105 §9.3.2.2(c,d) scaling factors were within range/shared.
+    from components.nonlinear_time_history.seismomatch_audit import (
+        assess_preprocessed_sources)
+    matching_preflight=assess_preprocessed_sources(
+        config['x_path'],config['y_path'],open_sees_scale=scale,
+        declared_already_matched=config.get('source_records_already_scaled'))
+    (out/'SeismoMatch_Source_Provenance.json').write_text(json.dumps(
+        matching_preflight,indent=2,allow_nan=False),encoding='utf-8')
+    matched_source=matching_preflight['both_headers_identify_matched_outputs']
 
 
     # Pair fingerprint is constant across XY/YX and binds the input files,
@@ -310,7 +319,7 @@ def _run(config):
         y=input_quality['records'][1]['sha256'],
         dt=input_quality['records'][0]['dt_s'],
         units=[r['source_units'] for r in input_quality['records']],
-        scale=scale),sort_keys=True).encode('utf-8')).hexdigest()
+        scale=scale,source_processing=matching_preflight['status']),sort_keys=True).encode('utf-8')).hexdigest()
     (out/'NLTHA_Input_Quality.json').write_text(json.dumps(input_quality,indent=2,allow_nan=False),encoding='utf-8')
     print('[NLTHA INPUT QUALITY] finite records, matching sampling and file hashes verified',flush=True)
     if abs(records[0][1]-records[1][1])>1e-10 or len(records[0][0])!=len(records[1][0]):raise ValueError('Pair duration/digitization mismatch; reconcile records explicitly')
@@ -324,7 +333,12 @@ def _run(config):
     nbc_evidence=config.get('nbc105_2025_design_evidence')
     if nbc_evidence is not None:
         write_preflight(out/'NBC105_2025_NLTHA_Input_Screen.json',nbc_evidence,
-            record_dt_s=records[0][1],integration_dt_s=dt,selected_scale=scale,
+            record_dt_s=records[0][1],integration_dt_s=dt,
+            # For pre-matched waveforms, this verifies the claimed ORIGINAL
+            # lower factor, not an additional OpenSees Path multiplier.
+            selected_scale=(min(float(nbc_evidence['factor_x']),
+                                float(nbc_evidence['factor_y']))
+                            if matched_source else scale),
             orientations=config.get('orientations',['XY','YX']))
     else:
         (out/'NBC105_2025_NLTHA_Input_Screen.json').write_text(json.dumps(dict(
@@ -380,7 +394,7 @@ def _run(config):
             case/'OpenSees_Bidirectional_Input_Commands.json',
             orientation=orientation,record_a=config['x_path'],record_b=config['y_path'],
             dt_s=records[0][1],units_a=records[0][2],units_b=records[1][2],
-            pair_scale=scale,already_scaled=config.get('source_records_already_scaled',False))
+            pair_scale=scale,already_scaled=matched_source)
         # Diagnostic X/Y/ZERO runs remain independent failure-isolation probes,
         # NOT complete paired-code analyses. For the real case, X and Y each
         # receive one original source component, and YX interchanges them.
@@ -389,7 +403,7 @@ def _run(config):
             values,step,units=r
             direction=mapping['dof']
             tag=mapping['path_series_tag']
-            factor=unit_and_scale(units,scale)
+            factor=unit_and_scale(units,scale,already_scaled=matched_source)
             if not math.isclose(factor,mapping['path_factor_m_s2'],rel_tol=1e-12):
                 raise ValueError('Source unit/rotation mapping mismatch')
             ops.timeSeries('Path',tag,'-dt',step,'-values',*values.tolist(),'-factor',factor)

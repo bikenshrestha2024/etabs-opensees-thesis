@@ -62,8 +62,10 @@ def unit_and_scale(source_units,pair_scale,*,already_scaled=False):
         raise ValueError("Invalid pair scale") from exc
     if not math.isfinite(scale) or scale<=0:
         raise ValueError("Pair scale must be finite positive")
-    if already_scaled:
-        raise ValueError("Already scaled input: cannot apply pair scale a second time")
+    # A SeismoMatch-exported matched accelerogram already contains its
+    # amplitude changes. Only UNIT conversion is permissible at import.
+    if already_scaled and not math.isclose(scale,1.0,rel_tol=0,abs_tol=1e-12):
+        raise ValueError("Already matched/scaled source: OpenSees pair scale must be 1.0")
     return UNITS_TO_M_S2[units]*scale
 
 def applied_motion_manifest(*,orientation,record_a,record_b,dt_s,units_a,
@@ -93,7 +95,10 @@ def applied_motion_manifest(*,orientation,record_a,record_b,dt_s,units_a,
        clause="NBC105:2025 §§9.3.2.2(d),9.3.2.3(a–c)",
        model_ndm=3,directions=[1,2],vertical_dof_3_used=False,
        simultaneous_two_horizontal_inputs=True,orientation=orientation,
-       common_pair_scale_dimensionless=float(pair_scale),commands=commands,
+       common_pair_scale_dimensionless=float(pair_scale),
+       input_is_preprocessed_matched_record=bool(already_scaled),
+       seismomatch_original_factor_validation="NOT_CHECKED_FROM_WAVEFORM_ALONE",
+       commands=commands,
        response_reference="OpenSees UniformExcitation nodal displacement is relative to support",
        caveat="Inspect original record unit provenance and source hashes; do not apply pattern -fact additionally.")
 
