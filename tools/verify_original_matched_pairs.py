@@ -32,8 +32,8 @@ def parse_original_at2(path):
     if index is None:
         raise ValueError("PEER AT2 missing NPTS and DT")
     descriptor=lines[index]
-    npts=re.search(r"NPTS\\s*=\\s*(\\d+)",descriptor,re.I)
-    dt=re.search(r"DT\\s*=\\s*([.\\dEe+-]+)",descriptor,re.I)
+    npts=re.search(r"NPTS\s*=\s*(\d+)",descriptor,re.I)
+    dt=re.search(r"DT\s*=\s*([.\dEe+-]+)",descriptor,re.I)
     if not npts or not dt:
         raise ValueError("Invalid NPTS / DT descriptor")
     npts=int(npts.group(1))
