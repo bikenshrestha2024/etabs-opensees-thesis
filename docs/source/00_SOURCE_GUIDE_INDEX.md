@@ -118,3 +118,5 @@ All **90 active Python modules** have individual source guides (with source blob
 | [nbc105_2025_audit.py](../../components/nonlinear_time_history/nbc105_2025_audit.py) | [Guide](components/nonlinear_time_history/nbc105_2025_audit.py.md) | §9.3.2 ground motions, §9.3.3 ambiguity | P0 |
 
 | [nbc105_horizontal_input.py](../../components/nonlinear_time_history/nbc105_horizontal_input.py) | [Guide](components/nonlinear_time_history/nbc105_horizontal_input.py.md) | NBC §4.3 applicability and XY/YX OpenSees commands | P0 |
+
+| [seismomatch_audit.py](../../components/nonlinear_time_history/seismomatch_audit.py) | [Guide](components/nonlinear_time_history/seismomatch_audit.py.md) | Matched SeismoMatch input, no-double-scaling and NBC period interval | P0 |

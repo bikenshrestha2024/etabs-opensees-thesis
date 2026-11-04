@@ -46,3 +46,6 @@ The main ETABS workflow **OpenSees nonlinear readiness / calibration status** bu
 
 
 **Bidirectional earthquake setup:** [NBC 105:2025 XY/YX, vertical-action scope and exact OpenSees acceleration scaling](docs/programs/33_NBC105_XY_YX_VERTICAL_AND_SCALE_GUIDE.md). Horizontal XY/YX inputs remain 3D structural NLTHA; §4.3 vertical triggers require separate documented review.
+
+
+**Matched SeismoMatch waveform import:** already matched Acc(g) records use `scale=1.0` in OpenSees, with Path unit conversion `9.80665`. The source-header and source-hash audit prevents a second spectrum multiplier. This is NOT independent confirmation of original SeismoMatch component scale factors: see [input provenance guide](docs/source/components/nonlinear_time_history/seismomatch_audit.py.md).
