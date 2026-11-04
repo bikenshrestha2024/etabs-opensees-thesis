@@ -31,3 +31,7 @@ Legacy filenames remain functional as launch aliases. Underlying components, ext
 
 [File migration map](../00_WORK_ORDER_RENAME_MAP.md) · [Organization policy](../00_REPOSITORY_ORGANIZATION.md)
 
+
+## Current active-source review
+
+[Engineering P0–P2 source review](../review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md) and [canonical 00–09 execution map](../review/00_CANONICAL_RUN_ORDER_AND_NAMING.md) explain why root filenames with duplicate numbers must not be sorted as an executable research sequence. [Static analysis inventory](../../tools/audit_active_repository.py) is not physical or native solver validation.

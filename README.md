@@ -84,3 +84,8 @@ Use [Stage 35 preflight](35_SOIL_C_NLTHA_PREFLIGHT.py) to audit all 16 source ha
 ### RTFC AI engineering workflow
 
 For new Codex, ChatGPT and GitHub coding tasks, use the [numbered RTFC (ROLE–TASK–FORMAT–CONSTRAINTS) prompt library](docs/rtfc/README.md). The [engineering change issue form](.github/ISSUE_TEMPLATE/engineering_rtfc.yml), [pull request checklist](.github/pull_request_template.md) and [AGENTS.md](AGENTS.md) keep engineering assumptions, source data, NBC clauses, tests and deliverables consistent. The templates organize review but never certify a nonlinear analysis.
+
+
+## Engineering review and safe work-order navigation (2026-11)
+
+For the asymmetric high-rise RCC-core/damped-outrigger thesis, use [the active-source engineering review](docs/review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md) and [canonical 00–09 verification order](docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md) instead of sorting the duplicate numbered legacy launchers. A [static AST source-audit utility](tools/audit_active_repository.py) inventories active code, symbol lines, SHA, syntax status, missing source guides and numbered alias collisions. It **does not** claim native solver convergence or a line-by-line semantic review of all archived files.

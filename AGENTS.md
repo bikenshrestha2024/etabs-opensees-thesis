@@ -39,3 +39,7 @@ The study has exactly 8 matched Soil-C horizontal earthquake pairs: 6 research-c
 ## RTFC task briefing (new AI changes)
 
 Use [docs/rtfc/README.md](docs/rtfc/README.md) for concise **ROLE → TASK → FORMAT → CONSTRAINTS** prompts. Select a numbered prompt for the exact engineering task instead of pasting the entire repository or unrelated project memories. Preserve the hard invariants in this AGENTS file and the tested NBC/Soil C data rules. No RTFC prompt can waive source-validation or native solver checks.
+
+## Active repository engineering review and naming safety
+
+Read [physical engineering code-review register](docs/review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md) and [canonical work order](docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md) before any structural physics or repository organization change. Do not use root filename sorting as a work order: old aliases duplicate several 01–21 prefixes. Run `python tools/audit_active_repository.py --output audit/active_inventory.json --fail-on-missing-canonical` before moving modules; preserve import stability and data provenance. Every line-level review report must distinguish *inspected source lines* from static AST symbol discovery; never claim a whole-repo line-by-line audit without an actual ledger for each file.

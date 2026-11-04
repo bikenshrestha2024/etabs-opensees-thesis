@@ -39,4 +39,4 @@ The JSON contains **module names, code line counts, SHA256, top-level symbol/lin
 
 For each module, after the static index, add a review ledger item with: exact lines, structural hypothesis, unit conventions, source clause/DOI, native test, accepted model state, reviewer and remaining blocker.
 
-[Full physical code review](00_ACTIVE_CODE_ENGINEERING_REVIEW.md) · [RTFC prompt](../.github/prompts/soil-c-nltha-rtfc.prompt.md)
+[Full physical code review](00_ACTIVE_CODE_ENGINEERING_REVIEW.md) · [RTFC prompt](../../.github/prompts/soil-c-nltha-rtfc.prompt.md)
