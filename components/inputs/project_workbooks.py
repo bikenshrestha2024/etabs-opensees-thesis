@@ -85,6 +85,50 @@ def _wall_aw_from_lines(height_m, lines):
                                  wall_area_m2=area,Aw_contribution_m2=contribution))
     return aw,segments
 
+
+def _wall_aw_from_patches(height_m, first_base_m, first_top_m, patches):
+    """Conservatively audit first-storey projected Aw through its full height.
+
+    A partial-height opening may produce different effective wall segments at
+    distinct z slices. Combining their 2D projections would count wall
+    material that is missing at some elevations. In that case the automatic
+    estimate is unsafe; require an independently reviewed effective-wall Aw.
+    Each patch has (axis, plane, thickness, start, end, zmin, zmax).
+    """
+    base=float(first_base_m); top=float(first_top_m)
+    if not math.isfinite(base) or not math.isfinite(top) or top<=base:
+        raise ValueError("First storey has invalid base/top elevations.")
+    if not patches:
+        raise ValueError("No first-storey wall patches were found.")
+    cuts=sorted({base,top,*(float(p[5]) for p in patches),
+                *(float(p[6]) for p in patches)})
+    reference_signature=None
+    reference_result=None
+    for za,zb in zip(cuts,cuts[1:]):
+        if zb-za<=1e-8:
+            continue
+        mid=(za+zb)/2.
+        lines={}
+        for axis,plane,thickness,start,end,zmin,zmax in patches:
+            if zmin<=mid+1e-8 and zmax>=mid-1e-8:
+                lines.setdefault((axis,plane,thickness),[]).append((start,end))
+        area,segments=_wall_aw_from_lines(height_m,lines)
+        signature=tuple(sorted((row["axis"],round(row["plane_m"],6),
+                         round(row["thickness_m"],6),round(row["start_m"],6),
+                         round(row["end_m"],6)) for row in segments))
+        if reference_signature is None:
+            reference_signature=signature
+            reference_result=(area,segments)
+        elif signature!=reference_signature:
+            raise ValueError(
+                "First-storey wall footprint changes with elevation (possible "
+                "partial-height opening or discontinuity); automatic Aw cannot "
+                "merge these wall patches. Review effective first-storey wall "
+                "areas and openings against ETABS under NBC §5.1.2.")
+    if reference_result is None:
+        raise ValueError("No first-storey wall height intervals were available.")
+    return reference_result
+
 def source_workbooks(root, export_dir,limit_state='ULS'):
     root=Path(root);export_dir=Path(export_dir)
     state=str(limit_state).strip().upper()
@@ -229,7 +273,8 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                 base=min(p[2] for p in xyz);roof=max(p[2] for p in xyz);H=roof-base
                 levels=sorted({g['master_xyz'][2] for g in topo['rigid_diaphragm_groups'] if g['master_xyz'][2]>base+1e-6})
                 if not math.isfinite(H) or H<=0:raise ValueError('Source model has no positive base-to-roof height.')
-                first=levels[0];lines={}
+                if not levels:raise ValueError('No source first-storey diaphragm elevation.')
+                first=levels[0];lines={};patches=[]
                 for e in topo['elements']:
                     if e['category']!='SHEAR WALL':continue
                     q=[coords[n] for n in e['node_tags']]
@@ -248,8 +293,11 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                         thickness=shell_thickness.get(str(e['etabs_object']))
                         if thickness is None or not math.isfinite(thickness) or thickness<=0:
                             raise ValueError(f"Wall {e['etabs_object']} has no positive thickness in the source audit or assembled shell model.")
-                    lines.setdefault((axis,round(q[0][across],6),thickness),[]).append((min(p[along] for p in q),max(p[along] for p in q)))
-                aw,segments=_wall_aw_from_lines(H,lines)
+                    plane=round(q[0][across],6)
+                    start=min(p[along] for p in q);end=max(p[along] for p in q)
+                    lines.setdefault((axis,plane,thickness),[]).append((start,end))
+                    patches.append((axis,plane,thickness,start,end,zmin,zmax))
+                aw,segments=_wall_aw_from_patches(H,base,first,patches)
                 if not all(v>0 for v in aw.values()):raise ValueError('Both directions need recognized first-story walls.')
                 for axis in ('X','Y'):
                     key='aw'+axis.lower()
