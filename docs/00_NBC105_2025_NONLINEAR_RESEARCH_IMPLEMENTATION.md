@@ -88,3 +88,9 @@ Publisher content may be paywalled; bibliographic/abstract findings are not a li
 6. Compare M0–M6 under controlled source geometry/mass and source records, then apply engineering/member acceptance criteria. Distinguish research comparison from NBC design approval.
 
 **Testing status:** This update adds pure-Python checks and does not claim complete NLTHA convergence or test-calibrated structural acceptance.
+
+## 6. Native site spectrum and two-component pair screening
+
+[Stage 32, NBC 105 pair-spectrum audit](programs/32_NBC105_PAIR_SPECTRUM_AUDIT.md) calls the repository's existing 5%-damped Newmark response-spectrum calculator for actual PEER records, generates candidate factors separately for X and Y, checks 0.33–3, and selects the smaller common pair scale with source SHA256. It rejects invalid pairs and never labels a candidate spectrum computation as an independent NBC or experimental validation. The author/reviewer still must verify digitization, target/hazard/site input, matching criterion and actual transient scaling.
+
+This feature adds an independent research diagnostic; the building runner's optional strict metadata gate still requires the source-derived factor inputs, documentary evidence and checked model periods.

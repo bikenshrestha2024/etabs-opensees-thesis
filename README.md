@@ -40,3 +40,6 @@ The main ETABS workflow **OpenSees nonlinear readiness / calibration status** bu
 
 
 **2026-11 research update:** [Verified NBC 105:2025 NLTHA clauses, OpenSees implementation and recent research evidence](docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md). The new optional strict metadata precheck does not approve real model behavior or a completed earthquake analysis.
+
+
+[Stage 32: NBC 105:2025 paired accelerogram spectrum scaling audit](docs/programs/32_NBC105_PAIR_SPECTRUM_AUDIT.md) screens actual records, computes separate X/Y spectral candidate factors, and selects the smaller when valid; this is research screening only.
