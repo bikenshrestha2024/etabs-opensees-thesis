@@ -49,3 +49,6 @@ The main ETABS workflow **OpenSees nonlinear readiness / calibration status** bu
 
 
 **Matched SeismoMatch waveform import:** already matched Acc(g) records use `scale=1.0` in OpenSees, with Path unit conversion `9.80665`. The source-header and source-hash audit prevents a second spectrum multiplier. This is NOT independent confirmation of original SeismoMatch component scale factors: see [input provenance guide](docs/source/components/nonlinear_time_history/seismomatch_audit.py.md).
+
+
+[2026-11-04 SeismoMatch numeric source double-verification](docs/00_SEISMOMATCH_MATCHED_RECORDS_AUDIT_20261104.md): six original Library matched X records checked against thesis PGAs, one unresolved Gorkha mismatch, scale1.0 import and missing original component scaling logs documented.
