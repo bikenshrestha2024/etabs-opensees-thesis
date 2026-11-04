@@ -26,8 +26,19 @@ def _source_edb_path(export_dir):
     return ''
 
 
+def _portable_source_stem(path):
+    """Interpret ETABS .EDB filenames consistently on Windows and Linux CI.
+
+    A Windows source path stored inside a JSON export can otherwise be
+    interpreted as one literal filename on Posix, corrupting the ESM
+    result-folder name and source-model identity.
+    """
+    normalized=str(path).replace('\\','/').rstrip('/')
+    return Path(normalized).stem
+
+
 def _model_floor(export_dir,source_edb=''):
-    for value in (Path(source_edb).stem,Path(export_dir).name):
+    for value in (_portable_source_stem(source_edb),Path(export_dir).name):
         match=re.search(r'(?i)(?:^|[-_\s])(\d{1,2})(?=[-_\s]+(?:BELT\s+TRUSS|OUTRIGGER))',value)
         if match:return match.group(1)
     return ''
@@ -37,7 +48,7 @@ def analysis_output_folder(export_dir,limit_state='ULS'):
     """Return a separate, source-identifiable result folder inside the shared results root."""
     folder=Path(export_dir)
     source_edb=_source_edb_path(folder)
-    stem=Path(source_edb).stem if source_edb else folder.name
+    stem=_portable_source_stem(source_edb) if source_edb else folder.name
     floor=_model_floor(folder,source_edb)
     state=str(limit_state).strip().upper()
     state='ULS_SLS' if state in ('BOTH','ULS/SLS','ULS_SLS') else state
