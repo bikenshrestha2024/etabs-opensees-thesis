@@ -167,9 +167,10 @@ def audit_suite(matched_root, *, t1_x_s=None, t1_y_s=None, tn90_x_s=None,
                                         for v in dt_bound.values()),
             "current_modal_source_verified_by_this_program":False,
         }
-    checks_pass = not source_failures and not timing_review
+    checks_pass = bool(verify_waveforms and not source_failures and not timing_review)
     return {
-        "status":("SOURCE_FILES_NOT_VERIFIED" if source_failures else
+        "status":("SOURCE_WAVEFORMS_NOT_READ" if not verify_waveforms else
+                  "SOURCE_FILES_NOT_VERIFIED" if source_failures else
                   "SOURCE_INTEGRITY_REVIEW_REQUIRED" if timing_review else
                   "SOURCE_REGISTER_MATCH_NOT_NBC_APPROVAL"),
         "target":dict(soil=SOIL,system=SYSTEM,Z=Z,I=I,R_mu=R_MU,
@@ -206,3 +207,73 @@ def write_suite_report(destination, matched_root, **kwargs):
     p.parent.mkdir(parents=True,exist_ok=True)
     p.write_text(json.dumps(data,indent=2,allow_nan=False),encoding="utf-8")
     return data
+
+
+def verify_runner_pair(x_path, y_path, *, registered_event=None,
+                       gorkha_processing_approved=False, reviewer=None,
+                       loma_end_policy="reject"):
+    """Bind a REAL run to exactly one registered A/B pair by SHA256.
+
+    Filenames may have a browser's '(1)' suffix; hashes are canonical.
+    This check NEVER regards record source as proof of SeismoMatch source
+    scale logs or the approved target, merely the waveforms being used.
+    """
+    files = [Path(x_path).resolve(), Path(y_path).resolve()]
+    if not all(p.is_file() for p in files):
+        raise FileNotFoundError("Both registered Soil C matched components required")
+    sha = [hashlib.sha256(p.read_bytes()).hexdigest() for p in files]
+    entries = register_rows()
+    event = None
+    for name in EVENT_ORDER:
+        if (sha[0] == entries[name, "A"]["matched_sha256"] and
+                sha[1] == entries[name, "B"]["matched_sha256"]):
+            event = name
+            break
+    if event is None:
+        raise ValueError("Matched waveforms do not correspond to one approved-register A/B pair in their A/B order")
+    if registered_event is not None and registered_event != event:
+        raise ValueError("Selected event does not match source waveform SHA256")
+    if event == "Gorkha" and not gorkha_processing_approved:
+        raise ValueError("Gorkha source expands 120s to 322.94s; explicit project-source review required")
+    if event == "Loma Prieta" and loma_end_policy != "append_zero_reviewed":
+        raise ValueError("Loma Prieta original matched A/B differ by 0.005s; explicitly review zero-extension or revise source")
+    if event == "Loma Prieta" and not reviewer:
+        raise ValueError("A named engineering reviewer is required for the Loma Prieta 0.005s reconciliation")
+    if event == "Gorkha" and not reviewer:
+        raise ValueError("A named engineering reviewer is required for Gorkha provenance approval")
+    return {
+        "event":event, "target_soil":"C", "source_sha256_A":sha[0],
+        "source_sha256_B":sha[1], "additional_spectral_scale":1.,
+        "acceleration_source_units":"g", "opensees_path_unit_factor":9.80665,
+        "orientations_required":["XY","YX"],
+        "gorkha_provenance_reviewed":event=="Gorkha" and bool(gorkha_processing_approved),
+        "loma_end_policy":loma_end_policy if event=="Loma Prieta" else "as_recorded",
+        "reviewer":reviewer,
+        "seismomatch_source_scaling_logs_verified":False,
+    }
+
+
+def reconcile_loma_runtime_pair(records, *, policy="reject", reviewer=None):
+    """Opt-in one-sample numerical extension for Loma Prieta, never edit files.
+
+    Only accept exactly one timestep duration difference, identical dt and
+    a named reviewer. No scaling, interpolation or truncation is performed.
+    """
+    if len(records)!=2:
+        raise ValueError("Exactly two source component arrays required")
+    arrays=[(list(values),float(dt),unit) for values,dt,unit in records]
+    a,b=arrays
+    if a[1]!=b[1] or a[2]!=b[2]:
+        raise ValueError("Component sampling dt and units must match")
+    difference=abs(len(a[0])-len(b[0]))
+    if difference==0:
+        return records,dict(status="NO_EXTENSION_NEEDED",added_samples=0)
+    if difference!=1 or policy!="append_zero_reviewed" or not reviewer:
+        raise ValueError("Loma Prieta may be extended by exactly ONE zero sample only after explicit review")
+    shorter=0 if len(a[0])<len(b[0]) else 1
+    arrays[shorter][0].append(0.)
+    return arrays,dict(status="REVIEWED_IN_MEMORY_ZERO_END_EXTENSION",
+      component_extended="A" if shorter==0 else "B",
+      added_samples=1,extension_dt_s=a[1],reviewer=reviewer,
+      original_source_files_changed=False,
+      explicit_note="Numerical endpoint policy; not an alteration of SeismoMatch source bytes")
