@@ -67,3 +67,12 @@ The latest [16-component, eight-pair SeismoMatch record audit](docs/ground_motio
 ### Two NBC105:2025 target spectra (RC shear-wall dual system)
 
 Do not treat conditional Soil-C-only SeismoMatch PSA residuals as Soil-D validation. The target spectra are now separately generated under [Stage 34](docs/programs/34_NBC105_RC_DUAL_SOIL_C_D_TARGETS.md) from Eq 4.1(2) and the RC dual-system Table 5-2 (R_mu=3.5, Omega_u=1.4, Omega_s=1.2). Soil C and D must be reviewed as distinct analysis cases with separately assigned actual site category, Z/I and matched record set. The code intentionally refuses unreviewed extrapolation beyond 6 s.
+
+
+## Soil C primary full NLTHA research workflow (2026-11-04)
+
+**Start with the [Stage 35 complete NBC 105:2025 Soil C source and analysis runbook](docs/programs/35_SOIL_C_PRIMARY_NLTHA_RUNBOOK.md)**. All eight actual matched A/B earthquake pairs in Soil C are tracked by original uploaded SHA256 in [source register](docs/ground_motions/seismomatch_20261104/matched_component_register.csv); matches are **already spectral-matched Acc(g)**. Extra OpenSees spectrum scale is **1.0**, acceleration unit Path factor **9.80665** for kN-m-s. Run **both simultaneous XY and YX orientations** per pair, with full 3D model and a separate gravity/preload state. Six near-field and two far-field classifications follow study grouping and still need seismological source-distance evidence.
+
+Use [Stage 35 preflight](35_SOIL_C_NLTHA_PREFLIGHT.py) to audit all 16 source hashes and modal input limits. Use [Stage 36 run-matrix generator](36_SOIL_C_NLTHA_RUN_MATRIX.py) to **plan**, not execute, 112 research configs (M0–M6 × ULS/SLS × eight earthquakes), 224 intended XY/YX transient analyses. [Stage 36 instructions](docs/programs/36_SOIL_C_M0_M6_RUN_MATRIX.md) and [absolute vs relative acceleration recorder documentation](docs/source/components/nonlinear_time_history/ground_acceleration.py.md) describe corresponding code and output schemas.
+
+**Blocked/needs explicit review:** Gorkha export 322.94s versus 120s original; Loma Prieta one-sample A/B end difference; 0.05–6s matching interval versus verified current modal `sqrt(R_mu)*T1`; missing SeismoMatch original scaling factors (0.33..3 and paired lower rule), missing site Vs30, nonlinear RC core/opening/steel/device validation and unresolved X-direction first-step core-wall failure. All raw earthquake waveforms are intentionally kept out of this public repository.

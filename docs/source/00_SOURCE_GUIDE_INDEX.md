@@ -124,3 +124,5 @@ All **90 active Python modules** have individual source guides (with source blob
 | [soil_c_nltha_suite.py](../../components/nonlinear_time_history/soil_c_nltha_suite.py) | [Guide](components/nonlinear_time_history/soil_c_nltha_suite.py.md) | Soil C 16 matched records and nonlinear XY/YX preflight, source hashes, explicit exceptions | P0 |
 
 | [soil_c_run_matrix.py](../../components/nonlinear_time_history/soil_c_run_matrix.py) | [Guide](components/nonlinear_time_history/soil_c_run_matrix.py.md) | Soil C M0–M6 ULS/SLS eight-pair configuration matrix; 112 configs, 224 case slots | P0 |
+
+| [ground_acceleration.py](../../components/nonlinear_time_history/ground_acceleration.py) | [Guide](components/nonlinear_time_history/ground_acceleration.py.md) | UniformExcitation support relative versus absolute floor-acceleration recording | P0 |
