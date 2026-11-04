@@ -94,9 +94,9 @@ class ESMProvenanceTests(unittest.TestCase):
         periods=resolve_esm_state_periods(
             height_m=95,aw_by_axis={"X":3.6779,"Y":0.8019},
             factor=1.25,states=("ULS","SLS"),
-            rayleigh_by_state={"ULS":{"X":1.5,"Y":2.4},
+            rayleigh_by_state={"ULS":{"X":1.0,"Y":2.4},
                                "SLS":{"X":2.2,"Y":3.3}})
-        self.assertAlmostEqual(periods["ULS"]["X"],1.5)
+        self.assertAlmostEqual(periods["ULS"]["X"],1.0)
         self.assertAlmostEqual(periods["SLS"]["X"],min(
             2.2,1.25*0.075*95**0.75/math.sqrt(3.6779)))
         self.assertNotEqual(periods["ULS"]["X"],periods["SLS"]["X"])
