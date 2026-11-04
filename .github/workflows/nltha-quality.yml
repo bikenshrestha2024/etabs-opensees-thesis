@@ -18,6 +18,8 @@ on:
       - 'tests/verify_seismomatch_audit.py'
       - 'tools/verify_matched_waveforms.py'
       - 'tests/verify_matched_waveform_register.py'
+      - 'tools/verify_original_matched_pairs.py'
+      - 'tests/verify_original_matched_pairs.py'
       - 'docs/ground_motions/seismomatch_20261104/**'
       - 'components/nonlinear_time_history/nbc105_horizontal_input.py'
       - '33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py'
@@ -84,6 +86,7 @@ jobs:
           python tests/verify_nbc105_horizontal_input.py
           python tests/verify_seismomatch_audit.py
           python tests/verify_matched_waveform_register.py
+          python tests/verify_original_matched_pairs.py
           python tests/verify_nbc105_pair_spectrum_audit.py
           python tests/verify_expanded_workbench_tabs.py
           python tests/verify_readiness_dashboard.py

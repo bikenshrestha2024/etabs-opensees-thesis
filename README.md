@@ -59,3 +59,6 @@ The main ETABS workflow **OpenSees nonlinear readiness / calibration status** bu
 The latest [16-component, eight-pair SeismoMatch record audit](docs/ground_motions/seismomatch_20261104/README.md) supersedes the preliminary six-X-component document. It includes matched sample intervals, PGAs, source SHA256 fingerprints, conditional 5%-damped response-spectrum discrepancy statistics, source processing anomalies, and NBC 105:2025 clause checks. See the [16-file register](docs/ground_motions/seismomatch_20261104/matched_component_register.csv) and [offline reproducible source verifier](tools/verify_matched_waveforms.py).
 
 **No original or matched earthquake waveforms are committed.** The original SeismoMatch initial component scaling-factor logs remain unavailable. Matched files already in `Acc(g)` are imported with `scale=1.0` and a unit-conversion Path factor of `9.80665`, not a second spectral scale.
+
+
+[Complete eight-pair SeismoMatch source verification runbook](docs/ground_motions/seismomatch_20261104/RUNBOOK.md) now covers both original PEER AT2 and matched SeismoMatch source fingerprints, safe parsing, explicit pair synchronization, output schema, OpenSees scaling and NBC 105 evidence gates.
