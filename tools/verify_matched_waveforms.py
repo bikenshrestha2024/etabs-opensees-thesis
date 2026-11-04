@@ -40,18 +40,30 @@ def parse_matched(path):
     header_dt = float(dt_match.group(1))
     if not math.isfinite(header_dt) or header_dt <= 0:
         raise ValueError("Invalid header dt")
+    # Parse only after the verified time/acceleration column heading.
+    # Once data begin, malformed lines cannot be silently dropped: that
+    # could shift duration, change peak acceleration or corrupt XY/YX pairing.
+    column_header = next(
+        (i for i, line in enumerate(lines) if
+         re.search(r"time\\s*\\(\\s*sec\\s*\\).*acc\\s*\\(\\s*g\\s*\\)", line, re.I)),
+        None)
+    if column_header is None:
+        raise ValueError(f"Missing Time(sec) Acc(g) columns: {source.name}")
     time = []
     acceleration = []
-    for lineno, line in enumerate(lines, 1):
+    for lineno in range(column_header + 1, len(lines)):
+        line = lines[lineno].strip()
+        if not line:
+            continue
         fields = line.split()
         if len(fields) != 2:
-            continue
+            raise ValueError(f"Malformed data at line {lineno + 1}: expected exactly 2 columns")
         try:
             t, a = (float(fields[0]), float(fields[1]))
-        except ValueError:
-            continue
+        except ValueError as exc:
+            raise ValueError(f"Non-numeric waveform at line {lineno + 1}") from exc
         if not math.isfinite(t) or not math.isfinite(a):
-            raise ValueError(f"Nonfinite waveform value at line {lineno}")
+            raise ValueError(f"Nonfinite waveform value at line {lineno + 1}")
         time.append(t)
         acceleration.append(a)
     if len(time) < 3:
@@ -107,6 +119,15 @@ def audit(matched_dir, register=REGISTER):
     keys = [(r["event"], r["component"]) for r in rows]
     if len(keys) != len(set(keys)):
         raise ValueError("Duplicate event/component in register")
+    # Never permit a custom register to select files outside the chosen
+    # matched directory or to alias two registered components to one file.
+    names = [r["source_filename"] for r in rows]
+    if len(set(names)) != len(names):
+        raise ValueError("Two components share a source filename")
+    if any(not name or Path(name).name != name or
+           name in (".", "..") or "/" in name or "\\\\" in name
+           for name in names):
+        raise ValueError("Unsafe source filename in matched-record register")
     by_event = defaultdict(list)
     records = []
     for row in rows:
@@ -148,14 +169,24 @@ def audit(matched_dir, register=REGISTER):
                           same_end_time=duration_equal,
                           explicit_end_time_policy_required=not duration_equal))
     errors = [r for r in records if r["status"] != "SOURCE_REGISTER_MATCH"]
+    pair_warnings = [p for p in pairs if p["status"] != "COMPLETE"]
+    # SHA integrity, pair synchronization, and NBC design approval are three
+    # different statements. An expected one-sample Loma mismatch must remain
+    # visible rather than being reported as all eight pairs synchronized.
+    source_integrity = "MATCH" if not errors else "FAIL"
+    pair_integrity = "SYNCHRONIZED" if not pair_warnings else "REVIEW_REQUIRED"
     return {
         "audit_schema": "SEISMOMATCH_MATCHED_16_COMPONENT_REGISTER_V1",
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "record_count": len(records), "pair_count": len(pairs),
         "records": records, "pairs": pairs,
         "source_discrepancies": len(errors),
-        "status": "SOURCE_HASHES_AND_TIMING_MATCH" if not errors
-                  else "SOURCE_DISCREPANCIES",
+        "pair_synchronization_review_count": len(pair_warnings),
+        "source_integrity_status": source_integrity,
+        "pair_synchronization_status": pair_integrity,
+        "status": ("SOURCE_DISCREPANCIES" if errors else
+                   "SOURCE_INTEGRITY_PASSED_PAIR_REVIEW_REQUIRED" if pair_warnings
+                   else "SOURCE_AND_PAIR_INTEGRITY_PASSED"),
         "nbc105_scale_factor_033_to_3_verified": False,
         "nbc105_common_lower_factor_verified": False,
         "nbc105_modal_spectral_interval_verified": False,
@@ -182,9 +213,14 @@ def main(argv=None):
     opts.output.write_text(json.dumps(report, indent=2, allow_nan=False),
                            encoding="utf-8")
     print(json.dumps({"status": report["status"], "pairs": report["pair_count"],
+                      "pairs_needing_review": report["pair_synchronization_review_count"],
                       "sources": report["record_count"],
                       "output": str(opts.output)}, indent=2))
-    return 0 if report["status"] == "SOURCE_HASHES_AND_TIMING_MATCH" else 2
+    # Return 3 for physically inconsistent pair end times even when source
+    # hashes match. A caller must explicitly review and accept the policy.
+    if report["source_discrepancies"]:
+        return 2
+    return 3 if report["pair_synchronization_review_count"] else 0
 
 
 if __name__ == "__main__":
