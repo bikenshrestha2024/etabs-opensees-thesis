@@ -58,6 +58,11 @@ on:
       - '.github/workflows/nltha-quality.yml'
       - 'components/sections/devices.py'
       - 'tests/verify_device_parameter_finiteness.py'
+      - 'docs/rtfc/**'
+      - 'tests/verify_rtfc_prompt_contract.py'
+      - '.github/ISSUE_TEMPLATE/engineering_rtfc.yml'
+      - '.github/pull_request_template.md'
+      - 'AGENTS.md'
       - 'docs/source/**'
       - 'docs/00_RESEARCH_REFERENCES.md'
       - 'docs/00_THESIS_ACCEPTANCE_GATES.md'
@@ -89,6 +94,7 @@ jobs:
           python tests/verify_thesis_nltha_quality.py
           python tests/verify_device_parameter_finiteness.py
           python tests/verify_documentation_coverage.py
+          python tests/verify_rtfc_prompt_contract.py
           python tests/verify_wall_geometry_preflight.py
           python tests/verify_reinforcement_mapping.py
           python tests/verify_wall_openings.py

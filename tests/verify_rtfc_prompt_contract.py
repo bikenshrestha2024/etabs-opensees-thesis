@@ -21,7 +21,7 @@ class RTFCContractTests(unittest.TestCase):
                 p=PROMPTS/name
                 self.assertTrue(p.is_file(),name)
                 data=p.read_text(encoding="utf-8")
-                sections=re.findall(r"^## (ROLE|TASK|FORMAT|CONSTRAINTS)\\s*$",data,re.M)
+                sections=re.findall(r"^## (ROLE|TASK|FORMAT|CONSTRAINTS)\s*$",data,re.M)
                 self.assertEqual(sections,list(REQUIRED),name)
                 for section in REQUIRED:
                     self.assertGreater(len(data.split("## "+section,1)[-1].split("## ",1)[0].strip()),70)

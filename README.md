@@ -79,3 +79,8 @@ Use [Stage 35 preflight](35_SOIL_C_NLTHA_PREFLIGHT.py) to audit all 16 source ha
 
 
 **NLTHA JSON evidence schema:** [Stage 37: all Soil C motion, OpenSees recorder, source review and M0–M6 aggregation JSON fields](docs/programs/37_SOIL_C_NLTHA_JSON_SCHEMA.md). This documents actual units, code clauses, reviewer/source-hash evidence and the difference between source preflight, numerical screen and design acceptance.
+
+
+### RTFC AI engineering workflow
+
+For new Codex, ChatGPT and GitHub coding tasks, use the [numbered RTFC (ROLE–TASK–FORMAT–CONSTRAINTS) prompt library](docs/rtfc/README.md). The [engineering change issue form](.github/ISSUE_TEMPLATE/engineering_rtfc.yml), [pull request checklist](.github/pull_request_template.md) and [AGENTS.md](AGENTS.md) keep engineering assumptions, source data, NBC clauses, tests and deliverables consistent. The templates organize review but never certify a nonlinear analysis.
