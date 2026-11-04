@@ -13,7 +13,7 @@ class ESMValuesTest(unittest.TestCase):
  def test_missing_aw_is_pending_not_crash(self):
   with tempfile.TemporaryDirectory() as d:
    file=Path(d)/"weights.csv"
-   file.write_text("story_number,height_m,dead_load_kN,storage_live_load_kN,other_live_load_kN\\n1,95,100,0,0\\n")
+   file.write_text("story_number,master_node_tag,height_m,dead_load_kN,storage_live_load_kN,other_live_load_kN\n1,1234,95,100,0,0\n")
    g=object.__new__(ESMGui)
    g.path=Value(str(file));g.awx=Value("");g.awy=Value("2")
    g.period_factor=Value("1.25");g.rayleigh_tx=Value("");g.rayleigh_ty=Value("")
@@ -25,7 +25,7 @@ class ESMValuesTest(unittest.TestCase):
  def test_two_valid_indices_compute_without_inventing_rayleigh(self):
   with tempfile.TemporaryDirectory() as d:
    file=Path(d)/"weights.csv"
-   file.write_text("story_number,height_m,dead_load_kN,storage_live_load_kN,other_live_load_kN\\n1,95,100,0,0\\n")
+   file.write_text("story_number,master_node_tag,height_m,dead_load_kN,storage_live_load_kN,other_live_load_kN\n1,1234,95,100,0,0\n")
    g=object.__new__(ESMGui)
    g.path=Value(str(file));g.awx=Value("3.6779");g.awy=Value("0.8019")
    g.period_factor=Value("1.25");g.rayleigh_tx=Value("");g.rayleigh_ty=Value("")
