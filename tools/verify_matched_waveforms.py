@@ -256,7 +256,7 @@ def markdown_report(report):
         "- docs/ground_motions/seismomatch_20261104/matched_component_register.csv",
         "",
     ]
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def main(argv=None):
