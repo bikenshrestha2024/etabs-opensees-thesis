@@ -26,3 +26,14 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 ## 2026-11-04 missing-value diagnosis
 
 The ESM initialization previously referenced an undefined `rayleigh_state`; now validates and uses the actual GUI state. The `_show_empirical` display must tolerate unavailable Aw and leave periods pending rather than aborting the whole project input load. `recommended_story_weight_input` prefers a populated assembled ledger only when current diaphragm IDs match the model. Existing manually reviewed CSV choices remain supported. [Full ESM blank-input diagnosis and tests](../../../00_ESM_INPUT_IMPORT_BLANK_FIX.md).
+
+
+## Period adoption and GUI contract (2026-11-05)
+
+- `resolve_esm_state_periods(height_m,aw_by_axis,factor,states,rayleigh_by_state)`: selects the *matching limit-state* X and Y periods as min(calculated Rayleigh period, amplified `0.075H^.75/sqrt(Aw)`). Strict units: H [m], Aw [m²], period [s]. A `Both` state request fails if separate SLS Rayleigh evidence is absent, rather than silently reusing ULS stiffness-period values.
+- `ESMGui._adopted_axis_period`: workbook adopted-period reference is now *opt-in* and is never labelled a native Rayleigh result; verifies selected Aw against the imported workbook Aw and, when available, independent exported geometry. A mismatched workbook value or reference beyond 1.25 empirical is rejected.
+- `recommended_story_weight_input`: prefers model-tag-matched assembled story CSV, retaining the historical manual-CSV override. Story weights and effective wall areas are physical inputs requiring ETABS verification: source correctness is not implied by tag equality.
+- `ESMGui._calculate`: if Both ULS/SLS, retrieve separate hash-checked state periods and write `result.period_s` into per-case `period_selection`; preserve X/Y, ± sign and eccentricity cases. The ULS ESM for a tall irregular building is diagnostic only where §3.2.1 does not permit static design.
+- §6.5 Table 6-1 permits deflection factor 0.85 for 6+ storeys; it does **not** authorize scaling of MRSM drift/displacement by the §7.5 member-force factor.
+
+All automatic calculations must report source model hash, source wall opening interpretation, seismic base and load-path reconciliation. Do not claim native ETABS reproduction until outputs are independently compared. See [parameter manual](../../../review/20261105_PROFESSIONAL_STRUCTURAL_ENGINEERING_PROVENANCE_MANUAL.md).
