@@ -40,6 +40,9 @@ def run_model_review(folder,output_dir,states=('SLS','ULS'),review_file=None):
     from OpenSees_Complete_Export_V118 import build_complete_model
     from OpenSees_Response_Checks_V132 import irregularity,write_csv
     from OpenSees_Project_Inputs_V123 import import_project_inputs
+    from components.inputs.project_workbooks import require_source_state
+    for requested_state in states:
+        require_source_state(folder,requested_state)
     folder=Path(folder);out=Path(output_dir);out.mkdir(parents=True,exist_ok=True);source=folder/'OpenSees_Complete_Model_Data_V118.json';data=json.loads(source.read_text(encoding='utf-8-sig'));groups=sorted(data['diaphragms'],key=lambda g:g['master_xyz'][2]);review={}
     if review_file:
         path=Path(review_file)
@@ -103,8 +106,8 @@ def launch(parent,folder):
     import tkinter as tk
     from tkinter import ttk,filedialog,messagebox
     import subprocess,threading,sys
-    folder=Path(folder);out=folder/'OpenSees_Analysis_Results';win=tk.Toplevel(parent);win.title('NBC 5.4 — calculated geometry, soft-storey and torsion review');win.geometry('1250x850');states=tk.StringVar(value='Both');review=tk.StringVar();status=tk.StringVar(value='Run model review to calculate soft-storey and torsion; exterior geometry supplies re-entrant checks.')
-    controls=ttk.Frame(win);controls.pack(fill='x');ttk.Combobox(controls,textvariable=states,values=['Both','SLS','ULS'],state='readonly',width=12).pack(side='left');ttk.Entry(controls,textvariable=review,width=58).pack(side='left')
+    folder=Path(folder);out=folder/'OpenSees_Analysis_Results';win=tk.Toplevel(parent);win.title('NBC 5.4 — calculated geometry, soft-storey and torsion review');win.geometry('1250x850');from components.inputs.project_workbooks import source_limit_state; model_state,_=source_limit_state(folder); states=tk.StringVar(value=model_state or 'ULS');review=tk.StringVar();status=tk.StringVar(value='Run model review to calculate soft-storey and torsion; exterior geometry supplies re-entrant checks.')
+    controls=ttk.Frame(win);controls.pack(fill='x');ttk.Combobox(controls,textvariable=states,values=['ULS','SLS'],state='readonly',width=12).pack(side='left');ttk.Entry(controls,textvariable=review,width=58).pack(side='left')
     def browse():
         path=filedialog.askopenfilename(parent=win,title='Reviewed strengths or continuity evidence',filetypes=[('Reviewed CSV / JSON','*.csv *.json')])
         if path:review.set(path)
@@ -139,7 +142,7 @@ def launch(parent,folder):
         pending=[r for r in result['checks'] if r.get('status')=='NOT EVALUATED']
         status.set('Overall: '+result['overall']+' | '+str(len(pending))+' checks pending. Soft-storey/torsion: Calculate selected state(s). Weak storey: provide strength capacities. Discontinuities: provide reviewed load-path evidence. | '+result['scope']);win._irregularity_result=result
     def run():
-        button.configure(state='disabled');out.mkdir(parents=True,exist_ok=True);selected=['ULS','SLS'] if states.get()=='Both' else [states.get()];root=Path(__file__).parent
+        button.configure(state='disabled');out.mkdir(parents=True,exist_ok=True);selected=[states.get()];root=Path(__file__).parent
         script='import sys;sys.path.insert(0,'+repr(str(root))+');from OpenSees_Irregularity_Review_V134 import run_model_review;run_model_review('+repr(str(folder.resolve()))+','+repr(str(out.resolve()))+','+repr(selected)+','+repr(review.get().strip() or None)+')'
         def worker():
             try:
