@@ -14,7 +14,9 @@ The standalone `extract_torsion_data.py` uses **independently exported, already-
 6. Rejects inputs labelled time history/CQC envelopes/±5% eccentricity as automatic §5.4.2 evidence. These are relevant separate checks, but cannot substitute for the centered-CM code screening case.
 7. Produces `Floor_End_Pairs.csv`, `Floor_End_Governing.csv`, `Floor_End_Provenance.json`, with source hashes, input node IDs, actual coordinates, pair offset, ratio and verdict. Missing opposite-end matches become `NOT EVALUATED`, never PASS.
 
-**Restriction:** The provided CSV format is a required trusted source adapter. This module does not parse `.EDB` directly or automatically recover every response node from the OpenSees recorder binary. The current native ETABS COM application and OpenSees recorders still require actual source node/step mapping. It does *not* yet provide a native Windows end-to-end automatically verified ETABS-vs-OpenSees compliance comparison.
+**Current status:** The ETABS direct API adapter can obtain **signed joint displacements for an explicitly reviewed centered-CM static case and single ETABS step**, using an already-open source .EDB. It still requires reviewed physical perimeter geometry and actual ETABS point identifiers; it does **not** parse EDB binaries, automatically identify every physical floor edge from the EDB, or run analysis. OpenSees results can be read from exported/signed CSV (not raw recorder binary unless first mapped to the specified schema). The ETABS API adapter has **mocked CI tests**, not native Windows ETABS v23 tests. This is not a completed ETABS/OpenSees physical equivalence certification.
+
+**Excel:** The local extractor also writes `Floor_End_Torsion_Review.xlsx`, including status, every valid opposite-end pair, governing per-floor ratios, provenance and a plotted profile showing thresholds 1.5 and 2.5.
 
 ### Input CSV formats
 
@@ -39,6 +41,19 @@ D,25,ULS,X_CENTERED,X,FINAL,0.002,0.0,true,signed_centered_linear_increment
 ```
 
 **All numbers above are synthetic.** A single story named `25` is illustrative. Different ETABS and OpenSees node tags are allowed; run the extraction separately with each software's *own* geometry CSV and node-response CSV. Independent matching between ETABS/OpenSees spatial locations still requires a separate coordinate-matching audit. Local source EDB remains read-only.
+
+### Directly read an already-open ETABS EDB (optional Windows mode)
+
+1. Open the **identical original model** in ETABS v23 and run the **signed centered centre-of-mass static case**, without accidental eccentricity. Verify its actual load case and select **one real result step**.
+2. Use a reviewed ETABS geometry CSV (same `node_id` values as ETABS PointObj, with `is_perimeter=true` only for verified exterior floor-end nodes).
+3. Run from the repository root in Windows:
+```powershell
+python extract_torsion_data.py --geometry "D:\\YourData\\ETABS_Floor_Nodes.csv" --source ETABS --state ULS --etabs-api --edb "D:\\YourModels\\ULTIMATE_MODEL.EDB" --case "ACTUAL_CENTERED_STATIC_CASE" --axis X --step-type Step --step-number 1 --reviewed-centered-cm --output "D:\\YourData\\Torsion_ETABS_ULS"
+```
+
+**The `--reviewed-centered-cm` argument is a documented engineering assertion, not automatic verification** of the load's actual application through the center of mass. No results are accepted if a point is missing, a step differs, or the selected ETABS file differs from the active model. Initial static API `StepType`/step number should be checked from ETABS first; the example `Step/1` is not guaranteed to match your specific case. The script restores display units and ETABS result-selection settings, and never opens, saves or unlocks the source EDB.
+
+`ETABS_Signed_Source_Results.csv` is generated automatically for the chosen point set; use it and its SHA256 in the subsequent torsion review. For Service, use your *actual* SLS source EDB and `--state SLS`, not ULS results.
 
 ### Run locally, Python 3.12 / Spyder-compatible
 
