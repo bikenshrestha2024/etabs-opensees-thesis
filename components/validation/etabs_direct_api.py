@@ -239,8 +239,16 @@ def connect_and_extract(folder, mapping):
     The existing project connector attaches to the active ETABS session.
     """
     from OpenSees_Project_Inputs_V123 import connect_etabs
+    from components.inputs.project_workbooks import source_limit_state
+    current,reason=source_limit_state(folder)
+    if current:
+        for item in validate_mapping(mapping):
+            if item['limit_state']!=current:
+                raise ValueError('Selected export is '+current+
+                                 ' but ETABS comparison requests '+item['limit_state']+
+                                 '. '+reason)
     app=connect_etabs()
-    return extract_from_sap(app.SapModel,mapping)
+    return extract_from_sap(app.SapModel,{**mapping,'export_dir':str(folder)})
 
 
 def fingerprint(path):
