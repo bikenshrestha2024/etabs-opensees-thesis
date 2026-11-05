@@ -185,15 +185,27 @@ def extract_from_sap(sap, mapping):
                 # Modal mass is recorded for audit only; aggregate is not an
                 # equivalent shape pairing or matching OpenSees mass model.
                 mm=_arrays(sap.Results.ModalParticipatingMassRatios(),17,"ModalParticipatingMassRatios")
+                matched=[]
                 for i in range(mm[0]):
                     if str(mm[1][i])!=source:continue
-                    add(m,int(mm[3][i]),"mass_UX","percent","ETABS_modal_mass",
-                        _finite(mm[5][i],"UX")*100,source)
-                    add(m,int(mm[3][i]),"mass_UY","percent","ETABS_modal_mass",
-                        _finite(mm[6][i],"UY")*100,source)
+                    matched.append(i)
+                    # Individual effective modal mass ratio; use the same
+                    # mode/axis/basis as the OpenSees modal collector.
+                    add(m,int(mm[3][i]),"individual_mass","percent","modal_mass",
+                        _finite(mm[5][i],"UX")*100,source,axis_override="X")
+                    add(m,int(mm[3][i]),"individual_mass","percent","modal_mass",
+                        _finite(mm[6][i],"UY")*100,source,axis_override="Y")
+                if matched:
+                    last=max(matched,key=lambda i:float(mm[3][i]))
+                    # CSI SumUX / SumUY fields are 8 and 9. The OpenSees
+                    # modal audit reports cumulative mass in percent at ALL.
+                    add(m,"ALL","cumulative_mass","percent","modal_mass",
+                        _finite(mm[8][last],"SumUX")*100,source,axis_override="X")
+                    add(m,"ALL","cumulative_mass","percent","modal_mass",
+                        _finite(mm[9][last],"SumUY")*100,source,axis_override="Y")
                 continue
             force_basis=("CQC_force_scaled" if m.get("force_basis_verified") else "ETABS_force_unverified")
-            disp_basis=("CQC_design_unscaled_by_7_5" if m.get("displacement_basis_verified") else "ETABS_displacement_unverified")
+            disp_basis=("CQC_design_unscaled_by_7_5" if m.get("displacement_basis_verified") and m.get("drift_location_verified") else "ETABS_displacement_unverified")
             r=_arrays(sap.Results.BaseReact(),13,"BaseReact")
             if not r[0]:raise RuntimeError("ETABS returned no BaseReact rows for "+source)
             for i in range(r[0]):
@@ -222,7 +234,13 @@ def extract_from_sap(sap, mapping):
                 vals=[abs(_finite(dis[6 if m["axis"]=="X" else 7][i],"U")) for i in range(dis[0]) if str(dis[3][i])==source]
                 if not vals:
                     raise RuntimeError("No JointDispl output for "+source+" / ETABS object "+p)
-                add(m,str(point["story_number"]),"displacement","m",disp_basis,max(vals),source)
+                point_basis=("CQC_design_unscaled_by_7_5"
+                             if m.get("displacement_basis_verified") and
+                                point.get("same_location_verified") is True and
+                                m.get("point_response_basis_verified") is True
+                             else "ETABS_point_location_unverified")
+                add(m,str(point["story_number"]),"displacement","m",point_basis,max(vals),source,
+                    {"point_object":p})
     finally:
         # Restore original case/combo selections and display units even on errors.
         try:_restore_setup(sap,snapshot)

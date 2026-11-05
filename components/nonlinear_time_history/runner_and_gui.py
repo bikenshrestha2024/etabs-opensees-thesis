@@ -353,6 +353,40 @@ def _run_analysis(config):
                 _configure_nonlinear_transient(ops, linear_solver=linear_solver)
                 # Record every accepted adaptive substep, including intermediate peaks.
                 gravity_offsets={s["node"]:list(ops.nodeDisp(s["node"])) for s in stories}
+                # Read-only response recording: this does not change the
+                # nonlinear integrator, section, wall, damping, or mass model.
+                # Only the accepted internal steps are sampled. Support
+                # reactions are gravity-baseline-subtracted (same basis as
+                # the established linear THA recorder).
+                from components.shared.response_recorders import (
+                    append_base_shear, support_resultants,
+                    write_base_shear_roof_curve, write_recorder_index, write_rows)
+                from components.nonlinear_time_history.device_recording import (
+                    active_device_catalog, baseline_axial_projection,
+                    device_sample, summarize_device_demands)
+                source_model_data_path=model.parent/"OpenSees_Complete_Model_Data_V118.json"
+                support_nodes=[]
+                devices=[]
+                device_baselines={}
+                device_history=[]
+                missing_recorder_evidence=[]
+                if source_model_data_path.is_file():
+                    source_model_data=json.loads(source_model_data_path.read_text(encoding="utf-8-sig"))
+                    support_nodes=[int(n) for n,flags in source_model_data.get("supports",{}).items()
+                                   if any(bool(q) for q in flags[:3])]
+                    if not support_nodes or not set(support_nodes).issubset(node_tags):
+                        missing_recorder_evidence.append("Source support mapping absent or inconsistent with active OpenSees nodes")
+                        support_nodes=[]
+                    devices=active_device_catalog(model.parent,source_model_data.get("frames",[]))
+                    for device in devices:
+                        if device["tag"] not in ops.getEleTags():
+                            raise ValueError("Activated FVD/BRB tag missing from model: "+str(device["tag"]))
+                        device_baselines[device["tag"]]=baseline_axial_projection(
+                            ops,device,source_model_data["nodes"])
+                else:
+                    missing_recorder_evidence.append("OpenSees_Complete_Model_Data_V118.json unavailable: base shear/device channels not recorded")
+                base_reaction_reference=(support_resultants(ops,support_nodes)
+                                         if support_nodes else None)
                 csv_path=out / f"NBC105_NLTHA_{case}_history.csv"
                 stream=HistoryStream(csv_path)
                 history_metadata(csv_path,config['model_script'],stories,config['limit_state'],status='running')
@@ -363,6 +397,9 @@ def _run_analysis(config):
                     row = {"time_s": float(ops.getTime())}
                     for story in stories:
                         disp = ops.nodeDisp(story["node"])
+                        accel = ops.nodeAccel(story["node"])
+                        row[f"{story['story_name']}_UX_relative_accel_m_s2"] = float(accel[0]) * model_length_to_m
+                        row[f"{story['story_name']}_UY_relative_accel_m_s2"] = float(accel[1]) * model_length_to_m
                         row[f"{story['story_name']}_UX_m"] = (float(disp[0])-gravity_offsets[story["node"]][0]) * model_length_to_m
                         row[f"{story['story_name']}_UY_m"] = (float(disp[1])-gravity_offsets[story["node"]][1]) * model_length_to_m
                         row[f"{story['story_name']}_RZ_rad"] = float(disp[5])-gravity_offsets[story["node"]][5] if len(disp)>5 else 0.
@@ -371,6 +408,14 @@ def _run_analysis(config):
                             current = row[f"{story['story_name']}_{col}_m"]
                             below = row[f"{stories[i-1]['story_name']}_{col}_m"] if i else 0.0
                             row[f"{story['story_name']}_drift_{axis}"] = (current - below) / story["height"]
+                    if support_nodes:
+                        append_base_shear(row,ops,support_nodes,base_reaction_reference)
+                    if devices:
+                        # Recorder errors are explicit; never label incomplete
+                        # force/stroke histories as completed device demands.
+                        sampled=[device_sample(ops,device,source_model_data["nodes"],
+                                 device_baselines[device["tag"]]) for device in devices]
+                        device_history.extend(sampled)
                     row["accepted_internal_substeps"] = 1
                     # A successful Newton return code cannot by itself certify
                     # finite accepted-state response. Detect corrupt rows before
@@ -396,6 +441,31 @@ def _run_analysis(config):
                 csv_path = out / f"NBC105_NLTHA_{case}_history.csv"
                 stream.close()
                 history_metadata(csv_path,config['model_script'],stories,config['limit_state'])
+                from components.shared.response_recorders import write_recorder_index
+                recorded_files=[(csv_path.name,[
+                    "accepted-step master displacement and relative acceleration",
+                    "accepted-step master drift"])]
+                if support_nodes and lines:
+                    roofcurve=out/f"NBC105_NLTHA_{case}_Base_Shear_Roof.csv"
+                    write_base_shear_roof_curve(roofcurve,lines,stories[-1]["story_name"])
+                    recorded_files.append((roofcurve.name,[
+                        "signed incremental base shear X/Y", "synchronous roof UX/UY"]))
+                if devices and device_history:
+                    device_path=out/f"NBC105_NLTHA_{case}_Device_Force_Stroke.csv"
+                    demands_path=out/f"NBC105_NLTHA_{case}_Device_Demands.csv"
+                    write_rows(device_path,device_history)
+                    write_rows(demands_path,summarize_device_demands(device_history))
+                    recorded_files.extend([
+                        (device_path.name,["actual solver FVD/BRB force/velocity/stroke"]),
+                        (demands_path.name,["unqualified peak device demands and signed work"])])
+                write_recorder_index(out, "nonlinear_time_history_"+case,
+                    recorded_files,
+                    notes=["Accelerations from UniformExcitation are relative to ground.",
+                           "Recover absolute acceleration only with matched signed ground input.",
+                           "Base reactions exclude initial gravity load.",
+                           "FVD/BRB energy sign is unverified; not a dissipation qualification.",
+                           *missing_recorder_evidence],
+                    filename="NBC105_NLTHA_"+case+"_Recorder_Index.json")
                 from OpenSees_Response_Checks_V132 import export_history_checks
                 edge_peaks=export_history_checks(lines,stories,out,case,config['limit_state'],config['model_script'])
                 drift_limit = 0.025 if config["limit_state"] == "ULS" else 0.006
@@ -420,6 +490,11 @@ def _run_analysis(config):
                     "drift_screen_Y": "PASS" if max(abs(r[f"{s['story_name']}_drift_Y"]) for r in lines for s in stories) <= drift_limit else "REVIEW",
                     "damping_model":damping_model,"damping_check_scope":"Initial eigenmodes; committed-stiffness Rayleigh ratios can change during yielding",
                     "linear_solver": linear_solver,
+                    "base_shear_recording": "SIGNED_GRAVITY_SUBTRACTED" if support_nodes else "NOT_RECORDED",
+                    "floor_acceleration_recording": "RELATIVE_UX_UY_AT_ACCEPTED_STEPS",
+                    "active_device_count": len(devices),
+                    "device_demand_recording": "RECORDED_UNQUALIFIED" if devices else "NO_ACTIVE_MAPPED_DEVICE",
+                    "recorder_missing_evidence": missing_recorder_evidence,
                     "rayleigh_alphaM_s-1": alpha_m, "rayleigh_betaKcommitted_s": beta_kc,
                     "rayleigh_calibration_periods_s": periods, "checked_modal_damping": modal_damping,
                     "history_csv": str(csv_path), "model_readiness_manifest": readiness["path"]}
@@ -428,6 +503,20 @@ def _run_analysis(config):
                     peak['floor_edge_peak_story_drift_'+axis]=value
                     peak['peak_story_drift_'+axis]=max(peak['peak_story_drift_'+axis],value)
                     peak['drift_screen_'+axis]='PASS' if peak['peak_story_drift_'+axis]<=drift_limit else 'REVIEW'
+                # Stable M0-M6 comparison interface. These values use the
+                # same accepted-step history as the underlying NLTHA report;
+                # there is no independent peak-time splicing for one channel.
+                peak["max_story_drift_X"]=peak["peak_story_drift_X"]
+                peak["max_story_drift_Y"]=peak["peak_story_drift_Y"]
+                peak["peak_roof_torsion_rad"]=max(
+                    abs(row[f"{stories[-1]['story_name']}_RZ_rad"]) for row in lines)
+                if support_nodes:
+                    peak["peak_base_shear_X_kN"]=max(abs(row["base_shear_X_kN"]) for row in lines)
+                    peak["peak_base_shear_Y_kN"]=max(abs(row["base_shear_Y_kN"]) for row in lines)
+                else:
+                    # Never manufacture zero base shear from an unknown support.
+                    peak["peak_base_shear_X_kN"]=None
+                    peak["peak_base_shear_Y_kN"]=None
                 profiler.add('case_exports_and_drift',phase_clock)
                 peak['performance']=profiler.finish()
                 records.append(peak)

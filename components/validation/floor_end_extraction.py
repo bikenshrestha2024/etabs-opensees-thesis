@@ -118,6 +118,15 @@ def map_floor_ends(geometry_rows,result_rows,*,limit_state,source,
                        "y_m":_finite(original["y_m"],"y_m"),
                        "z_m":_finite(original["z_m"],"z_m"),
                        "is_perimeter":_bool(original["is_perimeter"],"is_perimeter")}
+    # All nodes sharing a story label must occupy one geometric floor level.
+    # A mislabeled mezzanine/roof node must not become an "opposite end".
+    by_story={}
+    for node in geometry.values():
+        by_story.setdefault(node['storey'],[]).append(node['z_m'])
+    for story,elevations in by_story.items():
+        if max(elevations)-min(elevations)>1e-4:
+            raise ValueError("Floor elevation mismatch for story "+story+
+                             ": verify geometry units, story labels and floor mesh")
     groups={}
     for original in result_rows:
         st=str(original["storey"]).strip()
@@ -142,6 +151,16 @@ def map_floor_ends(geometry_rows,result_rows,*,limit_state,source,
         record["steps"].add(step)
         if node in record["nodes"]:raise ValueError("Duplicate response for node/case/story/axis")
         record["nodes"][node]=(ux,uy)
+    # One centered linear load case must correspond to the same analysis
+    # step at EVERY floor. Previous per-floor-only checks could silently
+    # assemble a nonphysical cross-storey response profile.
+    case_steps={}
+    for (st,axis,case),record in groups.items():
+        case_steps.setdefault((axis,case),set()).update(record['steps'])
+    for (axis,case),steps in case_steps.items():
+        if len(steps)!=1:
+            raise ValueError("More than one response step across floors for "+axis+
+                             " / "+case+": "+repr(sorted(steps)))
     per_floor={}
     for (st,axis,case),record in sorted(groups.items()):
         if len(record["steps"])!=1:

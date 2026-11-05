@@ -11,12 +11,12 @@ import math
 from pathlib import Path
 
 DEFAULT_PERCENT_LIMITS = {
-    "period":2.0,"cumulative_mass":1.0,"base_shear":5.0,
+    "period":2.0,"cumulative_mass":1.0,"individual_mass":1.0,"base_shear":5.0,
     "story_shear":5.0,"displacement":5.0,"drift_ratio":5.0,
 }
 DEFAULT_ABS_ZERO = {"period":1e-5,"base_shear":0.01,
                     "story_shear":0.01,"displacement":1e-5,
-                    "drift_ratio":1e-6,"cumulative_mass":0.01}
+                    "drift_ratio":1e-6,"cumulative_mass":0.01,"individual_mass":0.01}
 
 
 def evaluate(open_rows, ref_rows, fields, policy=None):
@@ -28,7 +28,10 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
     eccentricity and same response location are independently reviewed.
     """
     policy=policy or {}
-    checked=bool(policy.get("assumptions_verified",False))
+    approval=policy.get("assumptions_verified",False)
+    if not isinstance(approval,bool):
+        raise ValueError("assumptions_verified must be a real JSON boolean, not a truthy string")
+    checked=(approval is True)
     limits=dict(DEFAULT_PERCENT_LIMITS)
     limits.update(policy.get("percent_limits",{}))
     zero=dict(DEFAULT_ABS_ZERO)
@@ -44,6 +47,7 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
         if not math.isfinite(v):raise ValueError("Nonfinite reference "+repr(key))
         idx[key]=v
     appeared=set()
+    referenced=set()
     result=[]
     for source in open_rows:
         r=dict(source)
@@ -56,6 +60,10 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
         # A unit or result-basis mismatch cannot be turned into an implicit
         # conversion. Keep it visible; don't claim those values are equal.
         near=[k for k in idx if k[:6]==key[:6] and k!=key]
+        # A reference with the same physical quantity but different units or
+        # response basis was PRESENT, not missing. Do not count it again as
+        # MISSING_OPENSEES in the final unmatched-reference pass.
+        referenced.update(near)
         if not exact:
             status="NOT_COMPARABLE" if near else "MISSING_ETABS"
             note="Unit/basis or case mismatch: "+", ".join(str(k[6:]) for k in near) if near else "No exact ETABS method/state/case/axis/story/metric/unit/basis key"
@@ -79,7 +87,7 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
                  status=status,note=note,matching_key=match_key)
         result.append(r)
     for k,v in idx.items():
-        if k not in appeared:
+        if k not in appeared and k not in referenced:
             result.append({**dict(zip(fields,k)),"value":None,"etabs_value":v,
                 "difference":None,"percent_difference":None,
                 "status":"MISSING_OPENSEES","note":"ETABS quantity has no normalized OpenSees result",

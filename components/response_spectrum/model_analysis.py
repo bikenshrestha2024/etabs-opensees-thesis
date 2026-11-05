@@ -27,7 +27,10 @@ def run_model_spectrum(folder,config,output_dir):
     from NBC105_Analysis_Settings_V109 import calculate_esm
     from OpenSees_Earthquake_Analysis_NBC105_V111 import read_story_csv
     from OpenSees_Modal_Analysis_NBC105_V111 import run_nbc105_modal_audit
-    folder=Path(folder).resolve();out=Path(output_dir);out.mkdir(parents=True,exist_ok=True)
+    folder=Path(folder).resolve();out=Path(output_dir)
+    from components.inputs.project_workbooks import require_source_state
+    require_source_state(folder,config['limit_state'])
+    out.mkdir(parents=True,exist_ok=True)
     data=json.loads((folder/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding='utf-8-sig'))
     manifest=json.loads((folder/'OpenSees_Export_Manifest_V118.json').read_text(encoding='utf-8-sig'))
     stories=read_story_csv(folder/manifest['esm_story_weight_csv']);groups=sorted(data['diaphragms'],key=lambda g:g['master_xyz'][2]);state=config['limit_state']
@@ -143,7 +146,7 @@ def run_model_spectrum(folder,config,output_dir):
             ])
             deformation=dict(nodes=display_nodes,limit_state=state,response_case=case_axis,dof_names=['Ux','Uy','Uz','Rx','Ry','Rz'],dof_availability=[True]*6,eccentricity_sign=ecc_sign,elements=[e['nodes'] for e in data['frames']+data['shells']],displacements={str(n):(u[j]*amp).tolist() for j,n in enumerate(display_ns)},note=state+' '+axis+' MRSM component-wise positive CQC envelope; not a simultaneous physical shape. Force base-shear scale is not applied.')
             (out/('Deformation_MRSM_'+state+'_'+case_axis+'_V132.json')).write_text(json.dumps(deformation),encoding='utf-8')
-            result=dict(gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'),limit_state=state,axis=axis,accidental_eccentricity_sign=ecc_sign,unscaled_modal_base_shear_kN=raw_V,reference_ESM_base_shear_kN=reference['base_shear_kN'],force_scale=scale,scaled_modal_base_shear_kN=raw_V*scale,displacement_scale_from_7_5=1.,drift_amplification=amp,combination='CQC, equal modal damping',mass_participation_percent=modal['cumulative_U'+axis+'_percent'],stories=story_result,modal_base_shears_kN=modal_V,modal_rows=rows,units='kN m s; dimensionless Cd converted to m/s2 using 9.80665',scope='Elastic model with inherent torsion plus signed 5 percent per-floor eccentric inertia torque; lumped floor influence vector on unchanged eigenmodes. Orthogonal member design combinations require review; member design not performed.',status='ANALYSIS COMPLETE / DESIGN COMBINATIONS REQUIRE REVIEW')
+            result=dict(model_sha256=model_signature,implementation_sha256=source_signature,modal_numeric_sha256=numeric_signature,gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'),limit_state=state,axis=axis,accidental_eccentricity_sign=ecc_sign,unscaled_modal_base_shear_kN=raw_V,reference_ESM_base_shear_kN=reference['base_shear_kN'],force_scale=scale,scaled_modal_base_shear_kN=raw_V*scale,displacement_scale_from_7_5=1.,drift_amplification=amp,combination='CQC, equal modal damping',mass_participation_percent=modal['cumulative_U'+axis+'_percent'],stories=story_result,modal_base_shears_kN=modal_V,modal_rows=rows,units='kN m s; dimensionless Cd converted to m/s2 using 9.80665',scope='Elastic model with inherent torsion plus signed 5 percent per-floor eccentric inertia torque; lumped floor influence vector on unchanged eigenmodes. Orthogonal member design combinations require review; member design not performed.',status='ANALYSIS COMPLETE / DESIGN COMBINATIONS REQUIRE REVIEW')
             relevant=[r['error_percent'] for r in force_checks if abs(r['modal_inertia_base_shear_kN'])>max(1.,max(abs(v) for v in modal_V)*1e-4)]
             result['stiffness_review']='Gross in-plane elastic wall stiffness: review NBC Table 3-1; no compliance certification.'
             result['modal_force_equilibrium_max_relevant_percent']=max(relevant or [0.])
@@ -185,6 +188,40 @@ def run_model_spectrum(folder,config,output_dir):
     export_reports(out)
     return results
 
+def mrsm_period_defaults(folder, values):
+    """Return NBC §5.1.3 adopted periods only with current-model Rayleigh+Aw.
+
+    The legacy workbook C14/C15 references are NOT the sole proof of a
+    calculated Rayleigh period or the adopted T=min(Tr,1.25*T_emp).
+    This is for the thesis concrete shear-wall structural system. The
+    associated source/period audit must still be independently reviewed.
+    """
+    from components.modal.analysis import nbc105_period_estimate
+    folder=Path(folder)
+    required=("awx","awy","rayleigh_tx","rayleigh_ty")
+    missing=[key for key in required if values.get(key) in (None,"")]
+    if missing:
+        return {"T1_X":"","T1_Y":""}, ("Validated period defaults unavailable; "
+                "missing source-model fields: "+", ".join(missing)+
+                ". Select the correct ULS/SLS Rayleigh cache and wall Aw.")
+    model=folder/"OpenSees_Complete_Model_Data_V118.json"
+    if not model.is_file():
+        return {"T1_X":"","T1_Y":""},"Missing assembled current-model geometry for H."
+    data=json.loads(model.read_text(encoding="utf-8-sig"))
+    groups=data.get("diaphragms",[])
+    if not groups:
+        return {"T1_X":"","T1_Y":""},"No mapped floor elevations for seismic height."
+    height=max(float(g["master_xyz"][2]) for g in groups)-float(data["base_z_m"])
+    periods=nbc105_period_estimate(
+        height_m=height,system_type="concrete shear-wall building",
+        wall_aw_x_m2=values["awx"],wall_aw_y_m2=values["awy"],
+        rayleigh_x_s=values["rayleigh_tx"],rayleigh_y_s=values["rayleigh_ty"])
+    return {"T1_X":periods["adopted_design_period_X_s"],
+            "T1_Y":periods["adopted_design_period_Y_s"]}, (
+            "NBC §5.1.3 adopted period=min(reviewed current-state Rayleigh, "
+            "1.25×directional empirical wall period). Verify Aw and model hash.")
+
+
 def launch(parent,folder):
     import tkinter as tk
     from tkinter import ttk,messagebox
@@ -192,22 +229,36 @@ def launch(parent,folder):
     from OpenSees_Project_Inputs_V123 import import_project_inputs
     from OpenSees_Research_UI_V123 import scrollable_form
     win=tk.Toplevel(parent);win.title('Model MRSM — SLS / ULS, reports and deformation');win.geometry('1100x820');form=scrollable_form(win)
-    root=Path(__file__).parent;values=import_project_inputs(root,folder)['values'];fields={}
-    defaults=dict(limit_state='Both',soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=values.get('workbook_adopted_tx',''),T1_Y=values.get('workbook_adopted_ty',''),nmodes=40,damping=.05)
+    from components.inputs.project_workbooks import source_limit_state,require_source_state
+    model_state,model_state_evidence=source_limit_state(folder)
+    initial_state=model_state or 'ULS'
+    root=Path(__file__).parents[2]
+    values=import_project_inputs(root,folder,initial_state)['values'];fields={}
+    period_defaults,period_note=mrsm_period_defaults(folder,values)
+    defaults=dict(limit_state=initial_state,soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=period_defaults['T1_X'],T1_Y=period_defaults['T1_Y'],nmodes=40,damping=.05)
     ttk.Label(form,text='Model response spectrum: mode shapes + site spectrum → CQC actions, force scaling, drift and nodal envelopes',wraplength=1000,font=('Segoe UI',12,'bold')).pack(anchor='w')
     grid=ttk.Frame(form);grid.pack(fill='x')
     for i,(name,value) in enumerate(defaults.items()):
         fields[name]=tk.StringVar(value=str(value));r=i//2;c=(i%2)*2;ttk.Label(grid,text=name,width=20).grid(row=r,column=c,sticky='w',pady=4)
-        options=['Both','SLS','ULS'] if name=='limit_state' else ['A','B','C','D'] if name=='soil' else None
+        options=['ULS','SLS'] if name=='limit_state' else ['A','B','C','D'] if name=='soil' else None
         widget=ttk.Combobox(grid,textvariable=fields[name],values=options,state='readonly',width=25) if options else ttk.Entry(grid,textvariable=fields[name],width=25);widget.grid(row=r,column=c+1,sticky='ew',padx=6)
     grid.columnconfigure(1,weight=1);grid.columnconfigure(3,weight=1)
     def refresh(*unused):
         state=fields['limit_state'].get()
-        if state=='Both':return
+        try:
+            require_source_state(folder,state)
+        except ValueError as exc:
+            fields['limit_state'].set(initial_state)
+            messagebox.showwarning('Source state mismatch',str(exc),parent=win)
+            return
         v=import_project_inputs(root,folder,state)['values']
-        for name,key in [('soil','soil'),('Z','Z'),('I','I'),('rmu','rmu'),('omegau','omegau'),('omegas','omegas'),('T1_X','workbook_adopted_tx'),('T1_Y','workbook_adopted_ty')]:
+        period_values,_=mrsm_period_defaults(folder,v)
+        for name,key in [('soil','soil'),('Z','Z'),('I','I'),('rmu','rmu'),('omegau','omegau'),('omegas','omegas')]:
             if key in v:fields[name].set(str(v[key]))
+        for axis in ('X','Y'):
+            fields['T1_'+axis].set(str(period_values['T1_'+axis]) if period_values['T1_'+axis] else '')
     fields['limit_state'].trace_add('write',refresh)
+    ttk.Label(form,text=period_note,wraplength=1000).pack(anchor='w',pady=3)
     ttk.Label(form,text='Each state runs X and Y, with E0 / Eplus / Eminus cases (6 cases/state). E0 is centered; Eplus/Eminus are signed 5% perpendicular-breadth eccentric inertia cases. Soil selection requires site evidence. Acceleration conversion is internal for the kN-m-s model. Workbook / PNG / PDF are exported automatically.',wraplength=1000).pack(anchor='w',pady=6)
     actions=ttk.Frame(form);actions.pack(fill='x');output=Path(folder)/'OpenSees_Analysis_Results'
     log_value=tk.StringVar()
@@ -220,9 +271,11 @@ def launch(parent,folder):
         except (tk.TclError,RuntimeError):pass
     def run():
         try:
-            cfg={k:v.get() for k,v in fields.items()};cfg['nmodes']=int(cfg['nmodes'])
+            cfg={k:v.get() for k,v in fields.items()}
+            require_source_state(folder,cfg['limit_state'])
+            cfg['nmodes']=int(cfg['nmodes'])
             for k in ['Z','I','rmu','omegau','omegas','T1_X','T1_Y','damping']:cfg[k]=float(cfg[k])
-            states=['ULS','SLS'] if cfg['limit_state']=='Both' else [cfg['limit_state']];button.configure(state='disabled')
+            states=[cfg['limit_state']];button.configure(state='disabled')
             ledger=CaseLedger(output/"MRSM_Batch_Status_V151.json",[state+" "+axis+"_"+ecc for state in states for axis in ("X","Y") for ecc in ("E0","Eplus","Eminus")]);board["ledger"]=ledger;board["cancelled"]=False
             def worker():
                 try:
