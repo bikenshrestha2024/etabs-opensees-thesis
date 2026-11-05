@@ -74,6 +74,19 @@ class ETABSFloorApiTests(unittest.TestCase):
             self.assertEqual(sap.Results.Setup.cases,{"XCM":False,"OTHER":True})
             self.assertEqual(sap.Results.Setup.combos,{"COMBO":True})
             self.assertEqual(out[0]["response_basis"],"signed_centered_linear_increment")
+    def test_rejects_source_limit_state_mismatch(self):
+        with tempfile.TemporaryDirectory() as folder:
+            ultimate=Path(folder)/"ULTIMATE MODEL.EDB"
+            ultimate.write_bytes(b"fake")
+            with self.assertRaisesRegex(ValueError,"Cross-state source"):
+                extract_centered_from_sap(Sap(ultimate),self.geometry(),
+                    **{**self.kw(ultimate),"limit_state":"SLS"})
+            service=Path(folder)/"SERVICE MODEL.EDB"
+            service.write_bytes(b"fake")
+            with self.assertRaisesRegex(ValueError,"Cross-state source"):
+                extract_centered_from_sap(Sap(service),self.geometry(),
+                    **self.kw(service))
+
     def test_rejects_wrong_edb(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/"ULTIMATE.EDB";path.write_bytes(b"fake")
