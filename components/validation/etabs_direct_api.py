@@ -134,6 +134,23 @@ def extract_from_sap(sap, mapping):
     markers, blocking misleading equality. No COM call is made in tests.
     """
     cases=validate_mapping(mapping)
+    from components.inputs.project_workbooks import source_limit_state
+    # The ETABS EDB selected here must correspond to the actual OpenSees
+    # export. A source-labelled Ultimate model must not be compared with
+    # Service responses (or vice versa), even when numeric units and case
+    # names happen to match.
+    model_state,_=source_limit_state(mapping.get("export_dir",""))
+    if not model_state:
+        name=Path(str(mapping.get("source_edb",""))).stem.casefold()
+        import re
+        ultimate=bool(re.search(r'(?<![a-z])(ultimate|uls)(?![a-z])',name))
+        service=bool(re.search(r'(?<![a-z])(service|sls)(?![a-z])',name))
+        if ultimate != service:model_state='ULS' if ultimate else 'SLS'
+    if model_state:
+        for case in cases:
+            if case["limit_state"]!=model_state:
+                raise ValueError("Cross-limit-state comparison blocked: source EDB is "+
+                                 model_state+" but case is "+case["limit_state"])
     selected=Path(str(mapping.get("source_edb",""))).expanduser()
     actual=Path(str(sap.GetModelFilename())).resolve()
     if not selected.is_file():
@@ -222,8 +239,16 @@ def connect_and_extract(folder, mapping):
     The existing project connector attaches to the active ETABS session.
     """
     from OpenSees_Project_Inputs_V123 import connect_etabs
+    from components.inputs.project_workbooks import source_limit_state
+    current,reason=source_limit_state(folder)
+    if current:
+        for item in validate_mapping(mapping):
+            if item['limit_state']!=current:
+                raise ValueError('Selected export is '+current+
+                                 ' but ETABS comparison requests '+item['limit_state']+
+                                 '. '+reason)
     app=connect_etabs()
-    return extract_from_sap(app.SapModel,mapping)
+    return extract_from_sap(app.SapModel,{**mapping,'export_dir':str(folder)})
 
 
 def fingerprint(path):
