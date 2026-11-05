@@ -584,9 +584,15 @@ class ESMGui:
             self._show_empirical()
             self._direction_changed()
             if missing:
-                self.status.set('ESM workbook import incomplete: missing '+', '.join(missing)
-                    +'. Click Excel sources… to select the current model calculator/scaling workbooks; '
-                    'review the provenance Excel and wall geometry. Nothing is assumed zero.')
+                source_notes=[str(note) for note in data['notes']
+                              if ('SCALING SUMMARY' in str(note) or
+                                  'source EDB differs' in str(note) or
+                                  'No NBC Calculator' in str(note))]
+                self.status.set('ESM source import incomplete: missing '+', '.join(missing)
+                    +'. '+(' | '.join(source_notes[:3]) if source_notes else
+                          'No model-matched source fields were found.')
+                    +' | Use Excel sources… to select/reconcile the exact source workbook. '
+                    'Matching filename alone is not proof that a Copy EDB is identical.')
             else:
                 self.status.set('ESM workbook inputs loaded. Rayleigh periods require a matching '
                     'preliminary run; ETABS eigenperiods are reference-only. Review provenance.')
@@ -661,26 +667,61 @@ class ESMGui:
             self._load_project_inputs()
 
     def _run_rayleigh(self):
+        """Run distinct ULS/SLS reference analyses when Both is selected.
+
+        Previous behavior generated ULS only, while the Both ESM export
+        (correctly) requires state-specific ULS *and* SLS Rayleigh evidence.
+        Each subprocess uses its own stiffness state and result directory;
+        no result is synthesized from the other state. Failed runs retain
+        their logs and do not become imported periods.
+        """
         try:
             awx=float(self.awx.get());awy=float(self.awy.get())
-            if min(awx,awy)<=0:raise ValueError('Import and review positive directional wall indices first.')
+            if not all(math.isfinite(v) and v>0 for v in (awx,awy)):
+                raise ValueError('Import and review finite positive X/Y wall Aw first.')
+            # Works through both the root compatibility launcher and direct
+            # components.equivalent_static imports (e.g. tests / Spyder).
             script=HERE/'OpenSees_Rayleigh_Preliminary_V123.py'
-            rayleigh_state='ULS' if self.state.get()=='Both' else self.state.get()
-            command=[self.python_exe.get(),str(script),str(self.export_dir),str(awx),str(awy),'.01',rayleigh_state]
+            if not script.is_file():
+                script=HERE.parents[1]/'OpenSees_Rayleigh_Preliminary_V123.py'
+            if not script.is_file():raise FileNotFoundError(script)
+            states=['ULS','SLS'] if self.state.get()=='Both' else [self.state.get()]
+            if any(state not in ('ULS','SLS') for state in states):
+                raise ValueError('Select ULS, SLS or Both.')
             out=Path(self.outdir.get());out.mkdir(parents=True,exist_ok=True)
-            self.status.set('Running empirical-shape reference loads and Rayleigh calculations for X and Y…')
+            self.status.set('Running separate '+', '.join(states)+' X/Y Rayleigh reference analyses…')
             def worker():
-                try:
-                    proc=subprocess.run(command,capture_output=True,text=True,errors='replace', env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'}, encoding='utf-8')
-                    (out/'NBC105_Rayleigh_Preliminary_V123.log').write_text(proc.stdout+'\n'+proc.stderr,encoding='utf-8')
-                    self.root.after(0,lambda text=proc.stdout+'\n'+proc.stderr:self.status.set(text))
-                    if proc.returncode:raise RuntimeError(proc.stderr[-1800:])
-                    self.root.after(0,self._load_project_inputs)
-                    self.root.after(0,lambda:self.status.set('Rayleigh X/Y complete. Imported calculated periods; Excel, PNG, PDF and JSON saved.'))
-                except Exception as exc:
-                    text=str(exc);self.root.after(0,lambda:self.status.set('Rayleigh run failed: '+text))
+                import os
+                completed=[]
+                for state in states:
+                    command=[self.python_exe.get(),str(script),str(self.export_dir),
+                             str(awx),str(awy),'.01',state]
+                    try:
+                        proc=subprocess.run(command,capture_output=True,text=True,
+                            errors='replace',encoding='utf-8',
+                            env={**dict(os.environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
+                        log=out/('NBC105_Rayleigh_Preliminary_V123_'+state+'.log')
+                        log.write_text(proc.stdout+'\n'+proc.stderr,encoding='utf-8')
+                        if proc.returncode:
+                            raise RuntimeError(state+' Rayleigh failed (exit '+str(proc.returncode)+
+                                               '), see '+str(log)+': '+proc.stderr[-1200:])
+                        completed.append(state)
+                        self.root.after(0,lambda state=state:self.status.set(
+                            state+' Rayleigh X/Y complete; '+str(len(completed))+
+                            '/'+str(len(states))+' states finished.'))
+                    except Exception as exc:
+                        reason=str(exc)
+                        self.root.after(0,lambda reason=reason:self.status.set(
+                            'Rayleigh run stopped: '+reason+
+                            ' | No periods fabricated for uncompleted states.'))
+                        return
+                self.root.after(0,self._load_project_inputs)
+                self.root.after(0,lambda:self.status.set(
+                    'State-specific '+', '.join(states)+
+                    ' X/Y Rayleigh analyses completed; inspect the per-state JSON, Excel and plots.'))
             threading.Thread(target=worker,daemon=True).start()
-        except Exception as exc:messagebox.showerror('Rayleigh setup',str(exc))
+        except Exception as exc:
+            messagebox.showerror('Rayleigh setup',str(exc))
 
     def _apply_system_factors(self,_event=None):
         factors=NBC105_ESM_SYSTEM_FACTORS.get(self.system.get())

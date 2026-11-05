@@ -129,6 +129,65 @@ def _wall_aw_from_patches(height_m, first_base_m, first_top_m, patches):
         raise ValueError("No first-storey wall height intervals were available.")
     return reference_result
 
+def _same_edb_file_content(source_edb, workbook_edb):
+    """Allow path-renamed .EDB copies only with matching on-disk SHA256.
+
+    A matching name after dropping '- Copy' is not evidence of equivalent
+    model stiffness, masses or geometry. Never trust that heuristic.
+    """
+    import hashlib
+    left=Path(str(source_edb));right=Path(str(workbook_edb))
+    if not (left.is_file() and right.is_file()):return False
+    try:
+        if left.stat().st_size!=right.stat().st_size:return False
+        def digest(path):
+            h=hashlib.sha256()
+            with path.open('rb') as handle:
+                for block in iter(lambda:handle.read(1024*1024),b''):h.update(block)
+            return h.digest()
+        return digest(left)==digest(right)
+    except (OSError,PermissionError):
+        return False
+
+
+def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
+    """Review candidates without treating unmatched workbooks as valid data."""
+    from openpyxl import load_workbook
+    export_dir=Path(export_dir);root=Path(root)
+    selected=export_dir/'NBC105_Workbook_Source.json'
+    roots=[export_dir/'Project_Input_Workbooks',export_dir,
+           root/'Project_Input_Workbooks',Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
+    candidates=[]
+    if selected.is_file():
+        try:
+            references=json.loads(selected.read_text(encoding='utf-8-sig'))
+            candidates.extend(Path(p) for p in references.get('workbooks',[]))
+        except (OSError,ValueError) as exc:
+            return ['Saved workbook selection is invalid: '+str(exc)]
+    for directory in roots:
+        if directory.is_dir():
+            candidates.extend(directory.glob('*.xlsx'))
+    expected=_source_edb_path(export_dir)
+    notes=[]
+    for path in dict.fromkeys(candidates):
+        if not path.is_file():continue
+        try:
+            wb=load_workbook(path,read_only=True,data_only=True)
+            if 'SCALING SUMMARY' not in wb:
+                wb.close();continue
+            source=str(wb['SCALING SUMMARY']['B4'].value or '').strip()
+            wb.close()
+            if source and expected and _portable_source_stem(source).casefold()!=_portable_source_stem(expected).casefold():
+                identical=_same_edb_file_content(expected,source)
+                notes.append(f'{path.name}: B4 source EDB differs from selected model: {source!r}; '+
+                             ('files are byte-identical (SHA256 verified)' if identical else
+                              'NO verified equality: do not import this workbook as current-model Aw/T.'))
+        except (OSError,ValueError,KeyError) as exc:
+            notes.append(f'{path.name}: cannot read scaling sheet: {exc}')
+    if not candidates:notes.append('No candidate Excel workbooks found. Select the actual NBC calculator and scaling workbook.')
+    return notes
+
+
 def source_workbooks(root, export_dir,limit_state='ULS'):
     """Discover explicit or model-matched current Excel calculation inputs.
 
@@ -171,7 +230,7 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
             sheets=set(wb.sheetnames)
             source=''
             if 'SCALING SUMMARY' in sheets:
-                source=str(wb['SCALING SUMMARY']['B4'].value or '').casefold()
+                source=str(wb['SCALING SUMMARY']['B4'].value or '').strip()
             wb.close()
             return sheets,source
         except (OSError,ValueError,KeyError):
@@ -194,7 +253,11 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
         # An explicit stored EDB path for a different building is a hard
         # mismatch even when the scaling workbook has a plausible filename.
         if expected_edb and source and _portable_source_stem(source).casefold()!=expected_edb:
-            return -1
+            # Only a binary-identical EDB copy can inherit workbook geometry
+            # provenance despite a changed filename. Never drop a 'Copy'
+            # suffix and assume source-model equivalence.
+            if not _same_edb_file_content(_source_edb_path(export_dir),source):
+                return -1
         name=(path.stem+' '+source).casefold()
         has_sls=any(token in name for token in ('service','sls'))
         has_uls=any(token in name for token in ('ultimate','uls'))
@@ -259,7 +322,13 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
     def put(key,value,path,sheet,cell):
         if value is None or str(value).startswith('='):return
         values[key]=value;audit.append(dict(field=key,value=value,source=str(path),sheet=sheet,cell=cell))
-    for path in source_workbooks(root,export_dir,limit_state):
+    source_books=source_workbooks(root,export_dir,limit_state)
+    if source_books[1] is None:
+        notes.append('No source-verified SCALING SUMMARY workbook selected. Aw and workbook adopted periods are pending; no unverified value is substituted.')
+        notes.extend(scaling_workbook_diagnostics(root,export_dir,limit_state))
+    if source_books[0] is None:
+        notes.append('No NBC Calculator workbook selected: soil, Z, I and system factors require reviewed inputs.')
+    for path in source_books:
         if path is None:continue
         wb=load_workbook(path,data_only=True,read_only=True)
         if 'NBC Calculator' in wb:
