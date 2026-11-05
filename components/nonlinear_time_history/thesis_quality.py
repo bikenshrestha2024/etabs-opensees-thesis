@@ -98,40 +98,84 @@ def write_quality_report(output_folder, summaries):
 
 
 def generate_isolation_configs(config, output_dir):
-    """Prepare ZERO/X/Y/XY independent runs, never execute or change base config."""
-    destination = Path(output_dir).resolve()
-    base = dict(config)
+    """Generate isolated ZERO/X/Y/XY short probes, never execute.
+
+    Source ULS/SLS is preserved; probes must use the same input bytes,
+    orientation, timestep, zero-damping flag, and material/solver settings.
+    Never manufacture proof of physical model equality.
+    """
+    destination=Path(output_dir).resolve()
+    base=dict(config)
     if not base.get("model_folder"):
         raise ValueError("model_folder missing from original nonlinear run config")
-    source = Path(base["model_folder"]).resolve()
-    if destination == source:
+    state=str(base.get("limit_state","")).upper()
+    if state not in ("ULS","SLS"):
+        raise ValueError("Source limit_state must explicitly be ULS or SLS")
+    if base.get("analysis_intent")=="THESIS_NLTHA":
+        raise ValueError("First-step probes must be RESEARCH_DIAGNOSTIC, not production thesis acceptance")
+    if base.get("orientations",["XY"]) not in (["XY"],["XY","YX"]):
+        raise ValueError("Diagnostic baseline requires explicit XY source orientation")
+    source=Path(base["model_folder"]).resolve()
+    if not source.is_dir():
+        raise FileNotFoundError("Source model_folder does not exist: "+str(source))
+    if source==destination:
         raise ValueError("Diagnostic outputs must not overwrite the model source")
-    if destination.is_relative_to(source) and destination.parent == source:
-        # A subfolder is allowed, but never write into a source input file.
+    if destination.is_relative_to(source) and destination.name not in (
+        "NLTHA_Probes","OpenSees_Analysis_Results"):
+        # Ordinary nested output is permitted only outside input file names;
+        # production source files are never modified by this generator.
         pass
-    destination.mkdir(parents=True, exist_ok=True)
-    probes = []
-    for label in ("ZERO", "X", "Y", "XY"):
-        trial = dict(base)
-        trial["diagnostic_excitation"] = label
-        trial["limit_state"] = "ULS"
-        trial["orientations"] = ["XY"]
-        trial["duration_s"] = 0.005
-        trial["diagnostic_zero_damping"] = True
-        trial["diagnostic_mass_damping"] = False
-        trial["output_dir"] = str(destination / label)
-        name = destination / f"Probe_{label}.json"
-        if name.exists():
-            raise FileExistsError(f"Will not overwrite existing diagnostic input: {name}")
-        probes.append((name, trial))
-    for name, trial in probes:
-        name.write_text(json.dumps(trial, indent=2), encoding="utf-8")
-    return [str(name) for name, _ in probes]
+    dt=float(base.get("dt_s",0))
+    if not math.isfinite(dt) or dt<=0:
+        raise ValueError("Original configuration must specify finite positive dt_s")
+    period=float(base.get("diagnostic_probe_duration_s",dt))
+    if not math.isfinite(period) or period<=0 or period<dt-1e-12:
+        raise ValueError("diagnostic_probe_duration_s must be >= dt_s")
+    if not math.isclose(period/dt,round(period/dt),rel_tol=0,abs_tol=1e-8):
+        raise ValueError("Probe duration must contain an integer number of solver steps")
+    inputs={}
+    model_file=source/"OpenSees_Complete_Model_Data_V118.json"
+    if not model_file.is_file():
+        raise FileNotFoundError("Current assembled model data missing: "+str(model_file))
+    inputs["model_sha256"]=hashlib.sha256(model_file.read_bytes()).hexdigest()
+    for axis,path in (("A",base.get("x_path")),("B",base.get("y_path"))):
+        if not path or not Path(path).is_file():
+            raise FileNotFoundError("Actual Kobe/source pair "+axis+" missing: "+str(path))
+        inputs["record_"+axis+"_sha256"]=hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    paths=[destination/f"Probe_{name}.json" for name in ("ZERO","X","Y","XY")]
+    manifest_path=destination/"00_Probe_Evidence_Manifest.json"
+    collisions=[p for p in [*paths,manifest_path] if p.exists()]
+    if collisions:
+        raise FileExistsError("Refusing to overwrite existing diagnostic evidence: "+str(collisions[0]))
+    destination.mkdir(parents=True,exist_ok=True)
+    probes=[]
+    for label,path in zip(("ZERO","X","Y","XY"),paths):
+        trial=dict(base)
+        trial.update(
+            diagnostic_excitation=label,limit_state=state,
+            orientations=["XY"],duration_s=period,
+            diagnostic_zero_damping=True,diagnostic_mass_damping=False,
+            analysis_intent="RESEARCH_DIAGNOSTIC",
+            output_dir=str(destination/label))
+        # NEVER mutate source config or select different earthquake files.
+        path.write_text(json.dumps(trial,indent=2),encoding="utf-8")
+        probes.append(str(path))
+    manifest=dict(
+        status="CONFIGS_ONLY_NO_SOLVER_RUN",
+        limit_state=state,dt_s=dt,probe_duration_s=period,
+        gravity_and_materials_unchanged=True,zero_damping_is_diagnostic=True,
+        input_fingerprints=inputs,probe_configs=probes,
+        relative_result_type="FIRST_STEP_DIAGNOSTIC_NOT_CODE_ACCEPTANCE",
+        note="Native ZERO/X/Y/XY reruns and current wall element-map evidence required.")
+    manifest_path.write_text(json.dumps(manifest,indent=2),encoding="utf-8")
+    return probes
 
 
 def review_isolation_runs(folder):
     """Read saved evidence only. Missing output is UNKNOWN, not PASS."""
     root = Path(folder)
+    manifest_path=root/"00_Probe_Evidence_Manifest.json"
+    manifest=json.loads(manifest_path.read_text(encoding="utf-8-sig")) if manifest_path.exists() else None
     rows = []
     for label in ("ZERO", "X", "Y", "XY"):
         directory = root / label
@@ -152,7 +196,12 @@ def review_isolation_runs(folder):
                 "COMPLETED_TRUNCATED_TRIAL", "COMPLETED_EXPLORATORY_RECORD"
             )
             try:
-                valid = valid and float(data["physical_time_s"]) >= 0.005-1e-8
+                expected=float(manifest["probe_duration_s"]) if manifest else 0.005
+                valid = valid and float(data["physical_time_s"]) >= expected-1e-8
+                if manifest:
+                    valid=valid and data.get("limit_state")==manifest["limit_state"]
+                    valid=valid and data.get("diagnostic_excitation")==label
+                    valid=valid and data.get("model_sha256")==manifest["input_fingerprints"]["model_sha256"]
             except (ValueError, TypeError, KeyError):
                 valid = False
             rows.append({"probe": label, "status": "PROBE_PASSED" if valid else "INCOMPLETE",
