@@ -83,6 +83,7 @@ on:
       - 'components/validation/etabs_equivalence_report.py'
       - 'components/validation/etabs_comparison.py'
       - 'tests/verify_etabs_direct_equivalence.py'
+      - 'tests/verify_audit_repairs_20261105.py'
       - 'docs/validation/etabs_direct/**'
       - 'components/equivalent_static/calculation_and_gui.py'
       - 'components/inputs/project_workbooks.py'
@@ -118,6 +119,7 @@ on:
       - 'components/validation/etabs_equivalence_report.py'
       - 'components/validation/etabs_comparison.py'
       - 'tests/verify_etabs_direct_equivalence.py'
+      - 'tests/verify_audit_repairs_20261105.py'
       - 'docs/validation/etabs_direct/**'
       - 'components/equivalent_static/**'
       - 'components/inputs/project_workbooks.py'
@@ -171,6 +173,7 @@ jobs:
           python tests/verify_floor_end_extraction.py
           python tests/verify_etabs_floor_end_api.py
           python tests/verify_etabs_direct_equivalence.py
+          python tests/verify_audit_repairs_20261105.py
           python tests/verify_esm_output_safety.py
           python tests/verify_native_wall_probe_preparation.py
           python tests/verify_component_experiment_evidence.py
