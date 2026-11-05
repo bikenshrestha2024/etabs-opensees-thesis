@@ -27,8 +27,11 @@ class FloorEndTests(unittest.TestCase):
               record("D",.002),record("O",.1)]
         pairs,governing=map_floor_ends(self.geometry(),rows,
             limit_state="ULS",source="ETABS")
-        self.assertEqual(len(pairs),1)
-        self.assertEqual({pairs[0]["node_a"],pairs[0]["node_b"]},{"A","B"})
+        self.assertEqual(len(pairs),2)
+        pair_set={frozenset((p["node_a"],p["node_b"])) for p in pairs}
+        self.assertEqual(pair_set,{frozenset(("A","B")),frozenset(("C","D"))})
+        # The recessed wing must be evaluated too; its 10 m local span
+        # cannot be lost by searching only global Y=0 and Y=20 extremes.
         self.assertAlmostEqual(governing[0]["ratio"],3.0)
         self.assertEqual(governing[0]["status"],"EXTREME TORSION")
 
