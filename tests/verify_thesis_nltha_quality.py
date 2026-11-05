@@ -41,13 +41,22 @@ class ThesisNLTHAQualityTests(unittest.TestCase):
 
     def test_probes_are_separate_and_keep_original_config(self):
         with tempfile.TemporaryDirectory() as d:
-            original = {"model_folder": str(Path(d)/"export"),
-                        "x_path": "x.txt", "y_path": "y.txt",
+            model=Path(d)/"export"
+            model.mkdir()
+            (model/"OpenSees_Complete_Model_Data_V118.json").write_text('{"nodes":{}}')
+            a_path=Path(d)/"x.txt";b_path=Path(d)/"y.txt"
+            a_path.write_text("0.0\\n0.1");b_path.write_text("0.0\\n-0.1")
+            original = {"model_folder": str(model),
+                        "x_path": str(a_path), "y_path": str(b_path),
+                        "limit_state":"ULS", "dt_s":0.005,
+                        "analysis_intent":"RESEARCH_DIAGNOSTIC",
                         "nonlinear_walls": True}
             before = original.copy()
             paths = generate_isolation_configs(original, Path(d)/"probes")
             self.assertEqual(original, before)
             self.assertEqual(len(paths), 4)
+            manifest=json.loads((Path(d)/"probes"/"00_Probe_Evidence_Manifest.json").read_text())
+            self.assertEqual(len(manifest["input_fingerprints"]["model_sha256"]),64)
             for file in paths:
                 data = json.loads(Path(file).read_text())
                 self.assertEqual(data["limit_state"], "ULS")
