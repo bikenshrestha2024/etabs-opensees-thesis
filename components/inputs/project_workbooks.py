@@ -190,8 +190,15 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
             return -1
         if state=='ULS' and has_sls and not has_uls:
             return -1
-        if expected_floor and not re.search(
-                rf'(?i)(?:^|[-_\s]){re.escape(expected_floor)}(?=[-_\s.]|$)',name):
+        # Match the EDB's floor identifier using the EDB path itself.
+        # The source cell often uses Windows backslashes, which are not
+        # generic regex word separators on Linux GitHub Actions.
+        source_floor=_model_floor(export_dir,source) if source else ''
+        filename_floor=_model_floor(export_dir,path.stem)
+        actual_floor=source_floor or filename_floor
+        if expected_floor and actual_floor and actual_floor != expected_floor:
+            return -1
+        if expected_floor and not actual_floor:
             return -1
         exact=int(bool(expected_edb) and expected_edb in source)
         config_tokens=[token for token in ('belt','truss','outrigger','cap') if token in Path(expected_edb).stem.casefold()]
