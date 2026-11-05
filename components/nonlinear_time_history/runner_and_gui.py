@@ -503,6 +503,20 @@ def _run_analysis(config):
                     peak['floor_edge_peak_story_drift_'+axis]=value
                     peak['peak_story_drift_'+axis]=max(peak['peak_story_drift_'+axis],value)
                     peak['drift_screen_'+axis]='PASS' if peak['peak_story_drift_'+axis]<=drift_limit else 'REVIEW'
+                # Stable M0-M6 comparison interface. These values use the
+                # same accepted-step history as the underlying NLTHA report;
+                # there is no independent peak-time splicing for one channel.
+                peak["max_story_drift_X"]=peak["peak_story_drift_X"]
+                peak["max_story_drift_Y"]=peak["peak_story_drift_Y"]
+                peak["peak_roof_torsion_rad"]=max(
+                    abs(row[f"{stories[-1]['story_name']}_RZ_rad"]) for row in lines)
+                if support_nodes:
+                    peak["peak_base_shear_X_kN"]=max(abs(row["base_shear_X_kN"]) for row in lines)
+                    peak["peak_base_shear_Y_kN"]=max(abs(row["base_shear_Y_kN"]) for row in lines)
+                else:
+                    # Never manufacture zero base shear from an unknown support.
+                    peak["peak_base_shear_X_kN"]=None
+                    peak["peak_base_shear_Y_kN"]=None
                 profiler.add('case_exports_and_drift',phase_clock)
                 peak['performance']=profiler.finish()
                 records.append(peak)
