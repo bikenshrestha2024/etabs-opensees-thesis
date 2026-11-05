@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--etabs-api",action="store_true",help="Attach to already-open ETABS EDB and read signed static results")
     parser.add_argument("--edb",type=Path)
     parser.add_argument("--case",dest="etabs_case")
+    parser.add_argument("--axis",choices=["X","Y"])
     parser.add_argument("--step-type")
     parser.add_argument("--step-number",type=float)
     parser.add_argument("--reviewed-centered-cm",action="store_true")
@@ -34,17 +35,15 @@ def main():
     if opts.etabs_api:
         if opts.source!="ETABS":
             parser.error("--etabs-api is only for ETABS")
-        if not all((opts.edb,opts.etabs_case,opts.step_type,
+        if not all((opts.edb,opts.etabs_case,opts.axis,opts.step_type,
                     opts.step_number is not None,opts.reviewed_centered_cm)):
-            parser.error("ETABS API needs --edb, --case, --step-type, --step-number and --reviewed-centered-cm")
+            parser.error("ETABS API needs --edb, --case, --axis, --step-type, --step-number and --reviewed-centered-cm")
         import csv
         from components.validation.floor_end_extraction import read_csv,GEOMETRY_COLUMNS
         from components.validation.etabs_floor_end_api import connect_and_extract
         geometry=read_csv(opts.geometry,GEOMETRY_COLUMNS)
         rows=connect_and_extract(geometry,source_edb=opts.edb,
-            limit_state=opts.state,case=opts.etabs_case,axis=opts.etabs_case[0].upper()
-            if opts.etabs_case.upper().startswith(("X","Y")) else
-            parser.error("ETABS case must be explicitly named with starting X or Y"),
+            limit_state=opts.state,case=opts.etabs_case,axis=opts.axis,
             step_type=opts.step_type,step_number=opts.step_number,
             reviewed_centered_cm=opts.reviewed_centered_cm)
         opts.output.mkdir(parents=True,exist_ok=True)
