@@ -90,7 +90,7 @@ class ETABSFloorApiTests(unittest.TestCase):
     def test_rejects_wrong_edb(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/"ULTIMATE.EDB";path.write_bytes(b"fake")
-            other=Path(folder)/"SERVICE.EDB";other.write_bytes(b"different")
+            other=Path(folder)/"OTHER.EDB";other.write_bytes(b"different")
             with self.assertRaisesRegex(ValueError,"Active ETABS EDB differs"):
                 extract_centered_from_sap(Sap(path),self.geometry(),**self.kw(other))
     def test_does_not_assume_centered_and_rejects_envelopes(self):
