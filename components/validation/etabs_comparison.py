@@ -89,7 +89,7 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None):
 def launch(parent,folder):
  import tkinter as tk
  from tkinter import ttk,filedialog,messagebox
- win=tk.Toplevel(parent);win.title('ETABS comparison - modal / ESM / MRSM');win.geometry('1200x750');path=tk.StringVar();status=tk.StringVar();bar=ttk.Frame(win);bar.pack(fill='x');ttk.Entry(bar,textvariable=path,width=75).pack(side='left')
+ win=tk.Toplevel(parent);win.title('ETABS comparison - modal / ESM / MRSM');win.geometry('1200x750');path=tk.StringVar();status=tk.StringVar();latest={'rows':None,'out':None,'etabs_rows':None,'policy':None};bar=ttk.Frame(win);bar.pack(fill='x');ttk.Entry(bar,textvariable=path,width=75).pack(side='left')
  def browse():
   p=filedialog.askopenfilename(parent=win,title='Normalized ETABS CSV',filetypes=[('CSV','*.csv')])
   if p:path.set(p)
@@ -125,6 +125,7 @@ def launch(parent,folder):
      (out/'ETABS_API_Provenance.json').write_text(json.dumps(provenance,indent=2),encoding='utf-8')
     finally:comtypes.CoUninitialize()
     def done():
+     latest.update(rows=compared,out=out,etabs_rows=extracted,policy=mapping)
      tree.delete(*tree.get_children())
      for row in compared:tree.insert('','end',values=[row.get(c,'') for c in cols])
      counts={k:sum(row.get('status')==k for row in compared) for k in ('PASS','FAIL','NOT_COMPARABLE','MISSING_ETABS','MISSING_OPENSEES')}
@@ -140,14 +141,18 @@ def launch(parent,folder):
  for c in cols:tree.heading(c,text=c);tree.column(c,width=150,stretch=False)
  def refresh():
   try:
-   rows,out=save(folder,path.get() or None);tree.delete(*tree.get_children())
+   rows,out=(save(folder,path.get()) if path.get() else
+             (save(folder,etabs_rows=latest['etabs_rows'],policy=latest['policy']) if latest['etabs_rows'] is not None else save(folder)))
+   tree.delete(*tree.get_children())
    for r in rows:tree.insert('','end',values=[r.get(c,'') for c in cols])
    status.set(str(len(rows))+' saved quantities. Template and report: '+str(out))
   except Exception as e:messagebox.showerror('Comparison inputs',str(e),parent=win)
  def plot():
   selected=tree.selection()
   if not selected:messagebox.showinfo('Select quantity','Select a comparison row first.',parent=win);return
-  key=tree.item(selected[0],'values');rows,_=save(folder,path.get() or None)
+  key=tree.item(selected[0],'values')
+  rows=(save(folder,path.get())[0] if path.get() else
+        latest['rows'] if latest['rows'] is not None else save(folder)[0])
   subset=[r for r in rows if all(str(r.get(k,''))==key[cols.index(k)] for k in ('method','limit_state','case','axis','metric','unit','basis'))]
   from matplotlib.figure import Figure
   from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg,NavigationToolbar2Tk
