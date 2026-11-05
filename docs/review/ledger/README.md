@@ -2,7 +2,7 @@
 
 **Baseline reviewed:** [66c5c971ea297dc9d7fb0499b871a6204297913d](https://github.com/bikenshrestha2024/opensees-nbc105-research/commit/66c5c971ea297dc9d7fb0499b871a6204297913d) at 2026-11-04 12:59 UTC. The ledger is a **snapshot**, not a certification of current head or native solver correctness.
 
-**PR overlap check:** [draft PR #5](https://github.com/bikenshrestha2024/opensees-nbc105-research/pull/5) remains **open and unmerged**. It changes `full_record_gate.py`, `tests/verify_full_record_gate.py`, the README and `03_THESIS_REVIEW_2026_11_04.md`. This branch deliberately does **not** duplicate its time-step numeric string and case-identity changes.
+**Updated PR overlap check (2026-11-04):** [PR #5](https://github.com/bikenshrestha2024/opensees-nbc105-research/pull/5) **merged** on 2026-11-04 at 16:38:12 UTC. Its full-record time-step and case-identity changes must not be duplicated. For the later default-branch SHA and inspection status, see [the current-head checkpoint](CURRENT_HEAD_CHECKPOINT_20261104.md).
 
 ## Coverage and evidence tiers
 
