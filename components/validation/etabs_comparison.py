@@ -4,32 +4,90 @@ import csv,json,math,time
 FIELDS=['method','limit_state','case','axis','location','metric','unit','basis']
 GUIDE='Export ETABS tables for the SAME model, mass source, effective stiffness, diaphragm, restraints, gravity/P-Delta, modes, damping, spectrum units, eccentricity and combinations. Normalize rows to this template. Modes must be paired by shape/participation, not only mode number. MRSM CQC envelopes are not signed simultaneous actions. No reinforcement-demand engine is claimed.'
 
-def collect(folder):
- folder=Path(folder);root=folder/'OpenSees_Analysis_Results';rows=[]
- from components.inputs.project_workbooks import analysis_output_folder
- def add(method,state,case,axis,loc,metric,unit,basis,value,file):
-  if value is not None and math.isfinite(float(value)):rows.append(dict(method=method,limit_state=state,case=case,axis=axis,location=str(loc),metric=metric,unit=unit,basis=basis,value=float(value),source_file=str(file)))
- for state in ('ULS','SLS'):
-  p=analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
-  if not p.is_file():p=root/('Modal_'+state)/'NBC105_Modal_V111.json'
-  if p.exists():
-   d=json.loads(p.read_text(encoding='utf-8-sig'))
-   for r in d.get('rows',[]):add('MODAL',state,'MODAL','',r['mode'],'period','s','eigen',r['period_s'],p)
-   for axis in ('X','Y'):add('MODAL',state,'MODAL',axis,'ALL','cumulative_mass','percent','modal_mass',d.get('cumulative_U'+axis+'_percent'),p)
- for p in root.rglob('MRSM_Results_V132.json'):
-  for case,d in json.loads(p.read_text(encoding='utf-8-sig')).items():
-   state=d['limit_state'];axis=d['axis'];add('MRSM',state,case,axis,'BASE','base_shear','kN','CQC_force_scaled',d.get('scaled_modal_base_shear_kN'),p)
-   for r in d['stories']:
-    add('MRSM',state,case,axis,r['story_number'],'story_shear','kN','CQC_force_scaled',r['scaled_story_shear_kN'],p)
-    add('MRSM',state,case,axis,r['story_number'],'displacement','m','CQC_design_unscaled_by_7_5',r.get('design_displacement_m'),p)
-    add('MRSM',state,case,axis,r['story_number'],'drift_ratio','ratio','CQC_design_unscaled_by_7_5',r['design_drift_ratio'],p)
- for p in root.rglob('NBC105_ESM_OpenSees_Response_*.json'):
-  document=json.loads(p.read_text(encoding='utf-8-sig'))
-  rr=document if isinstance(document,list) else document.get('rows',document.get('stories',[]))
-  for r in rr:
-   for key,metric,unit in [('U_design_m','displacement','m'),('design_drift_ratio','drift_ratio','ratio'),('story_shear_kN','story_shear','kN')]:
-    add('ESM',r.get('limit_state','UNKNOWN'),r.get('response_case',p.stem),r.get('direction',''),r.get('height_m',''),metric,unit,'static_design',r.get(key),p)
- return rows
+def collect(folder, issues=None):
+    """Collect ONLY current-model, source-state-matched result evidence.
+
+    Historical model outputs without a model hash remain on disk but are not
+    silently imported. A result with a different hash is excluded. Separate
+    model and limit-state identity is more important than a filename match.
+    """
+    import hashlib
+    from components.inputs.project_workbooks import (
+        analysis_output_folder, source_limit_state)
+    folder=Path(folder)
+    root=folder/'OpenSees_Analysis_Results'
+    rows=[]
+    issues=[] if issues is None else issues
+    model=folder/'OpenSees_Complete_Model_Data_V118.json'
+    if not model.is_file():
+        raise FileNotFoundError('Cannot compare saved results without current assembled model: '+str(model))
+    expected=hashlib.sha256(model.read_bytes()).hexdigest()
+    selected_state,state_note=source_limit_state(folder)
+    if selected_state is None:
+        raise ValueError('Cannot prove one-model/one-state ETABS comparison: '+state_note)
+    def add(method,state,case,axis,loc,metric,unit,basis,value,file):
+        if value is not None and math.isfinite(float(value)):
+            rows.append(dict(method=method,limit_state=state,case=case,axis=axis,
+                location=str(loc),metric=metric,unit=unit,basis=basis,
+                value=float(value),source_file=str(file)))
+    def accepted(document,path,state):
+        if state!=selected_state:
+            issues.append(str(path)+': rejected opposite-state '+str(state))
+            return False
+        actual=document.get('model_sha256') if isinstance(document,dict) else None
+        if actual!=expected:
+            issues.append(str(path)+': missing or mismatched assembled model SHA256; not imported')
+            return False
+        return True
+    state=selected_state
+    p=analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
+    if not p.is_file():
+        p=root/('Modal_'+state)/'NBC105_Modal_V111.json'
+    if p.is_file():
+        d=json.loads(p.read_text(encoding='utf-8-sig'))
+        if accepted(d,p,d.get('limit_state',state)):
+            for r in d.get('rows',[]):
+                add('MODAL',state,'MODAL','',r['mode'],'period','s','eigen',r['period_s'],p)
+                for axis in ('X','Y'):
+                    add('MODAL',state,'MODAL',axis,r['mode'],'individual_mass',
+                        'percent','modal_mass',r.get('U'+axis+'_participation_percent'),p)
+            for axis in ('X','Y'):
+                add('MODAL',state,'MODAL',axis,'ALL','cumulative_mass','percent','modal_mass',
+                    d.get('cumulative_U'+axis+'_percent'),p)
+    for p in sorted(root.rglob('MRSM_Results_V132.json')):
+        document=json.loads(p.read_text(encoding='utf-8-sig'))
+        if not isinstance(document,dict):
+            issues.append(str(p)+': unexpected MRSM structure')
+            continue
+        for case,d in document.items():
+            if not accepted(d,p,d.get('limit_state')):
+                continue
+            axis=d['axis']
+            add('MRSM',state,case,axis,'BASE','base_shear','kN',
+                'CQC_force_scaled',d.get('scaled_modal_base_shear_kN'),p)
+            for r in d['stories']:
+                add('MRSM',state,case,axis,r['story_number'],'story_shear',
+                    'kN','CQC_force_scaled',r.get('scaled_story_shear_kN'),p)
+                # This is a master-node or extrapolated diaphragm response,
+                # not a reviewed exact ETABS point/displacement location.
+                add('MRSM',state,case,axis,r['story_number'],'displacement',
+                    'm','CQC_design_unscaled_by_7_5',r.get('design_displacement_m'),p)
+                add('MRSM',state,case,axis,r['story_number'],'drift_ratio',
+                    'ratio','CQC_design_unscaled_by_7_5',r.get('design_drift_ratio'),p)
+    for p in sorted(root.rglob('NBC105_ESM_OpenSees_Response_*.json')):
+        document=json.loads(p.read_text(encoding='utf-8-sig'))
+        if not isinstance(document,dict) or not accepted(document,p,document.get('limit_state')):
+            issues.append(str(p)+': legacy ESM response without model/state provenance excluded; re-export with fingerprint before direct comparison')
+            continue
+        rr=document.get('rows',document.get('stories',[]))
+        for r in rr:
+            for key,metric,unit in [
+                ('U_design_m','displacement','m'),
+                ('design_drift_ratio','drift_ratio','ratio'),
+                ('story_shear_kN','story_shear','kN')]:
+                add('ESM',state,r.get('response_case',p.stem),r.get('direction',''),
+                    r.get('height_m',''),metric,unit,'static_design',r.get(key),p)
+    return rows
 
 def compare(rows, etabs, policy=None):
     """Compare exact normalized response bases with explicit evidence gates."""
@@ -48,7 +106,9 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None):
     start=time.perf_counter();folder=Path(folder)
     out=folder/'OpenSees_Analysis_Results/ETABS_Comparison_V148'
     out.mkdir(parents=True,exist_ok=True)
-    rows=collect(folder)
+    source_issues=[]
+    rows=collect(folder,source_issues)
+    (out/'Comparison_Source_Exclusions.json').write_text(json.dumps(source_issues,indent=2),encoding='utf-8')
     def write(p,rr,fields):
         with p.open('w',newline='',encoding='utf-8-sig') as h:
             w=csv.DictWriter(h,fieldnames=fields,extrasaction='ignore')
