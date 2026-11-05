@@ -16,7 +16,7 @@ from components.validation.etabs_direct_api import extract_from_sap
 class SourceStateTests(unittest.TestCase):
     def _export(self,folder,filename):
         (folder/"OpenSees_Element_Connectivity.json").write_text(
-            json.dumps({"source_edb":r"D:\Models\"+filename}),encoding="utf-8")
+            json.dumps({"source_edb":"D:/Models/"+filename}),encoding="utf-8")
 
     def test_ultimate_is_the_only_selected_state(self):
         with tempfile.TemporaryDirectory() as directory:
