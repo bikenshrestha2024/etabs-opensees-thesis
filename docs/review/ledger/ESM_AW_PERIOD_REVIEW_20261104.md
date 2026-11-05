@@ -28,3 +28,15 @@ The official DUDBC NBC 105:2025 **§5.1.1–5.1.3** document was opened and the 
 - High-rise ULS equivalent-static eligibility: **NOT EVALUATED**; ESM is diagnostic where §3.2.1 conditions do not permit it.
 
 Do not merge a failing CI or label this change as independently validated against an ETABS model.
+
+## 2026-11-05 independent failure-log follow-up and external basis
+
+**Actual GitHub Actions failure discovered:** branch commit `439d8bcf` had a failed new synthetic test `test_windows_edb_identity_selects_correct_scaling_workbook`: `source_workbooks` returned `None` instead of the correct workbook because the source floor name was recognized only by a regex against a combined string, and the Windows EDB path used a backslash before the floor number. This was an **actual failing regression**, not a hypothetical defect.
+
+**Correction:** `components/inputs/project_workbooks.py:source_workbooks.score` now obtains floor identity from the parsed EDB source stem using `_model_floor`, with a filename fallback only when source metadata cannot supply the floor. Exact source identity still rejects known wrong EDBs. The CI run at commit `01a4997dfcc64092396412b5ee5baefe2add1414` completed successfully: [GitHub Actions run](https://github.com/bikenshrestha2024/opensees-nbc105-research/actions/runs/41943908613). This **does not** validate actual ETABS wall area or base shear.
+
+**Cross-project reading scope:** earlier project `02_MODELLING_BASIS.md` (assumed material hierarchy, nominal Concrete02/ConcreteCM and Fe500/SteelMPF, FVD unit conversion and outrigger connection limitations); wall fork `SFI-MVLEM-3D/README.md` (original 3D four-node FSAM formulation, not the enhanced E-SFI); active main `docs/review/01_WALL_GEOMETRY_MATERIALS_FIRST_STEP.md` and `docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md` (known P0 gates). No whole-source line review of those other repositories was performed.
+
+**Verified external sources checked:** official NBC 105:2025 §§5.1,5.2,6.1–6.5,7.3,7.5,9.3, DUDBC catalog; OpenSees E-SFI wall element input/recorders; CTBUH *Outrigger Design for High-Rise Buildings* (2nd ed., 2017); PEER 2017/06 performance guidelines; Malik and Kolay (2023), DOI 10.1002/tal.2003. See [complete engineering parameter manual](../20261105_PROFESSIONAL_STRUCTURAL_ENGINEERING_PROVENANCE_MANUAL.md) and [machine-readable parameter register](../20261105_PARAMETER_PROVENANCE_REGISTER.csv).
+
+**Open checks:** root-to-tip effective-wall area and height acceptance; project rebar and confinement; full native Zero/X/Y/XY diagnosis; eight-pair original SeismoMatch scaling provenance; actual ULS/SLS model-specific Rayleigh/ETABS comparison and 224 intended M0–M6 histories. Review remains **PARTIAL**. 
