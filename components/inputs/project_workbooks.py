@@ -230,7 +230,7 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
             sheets=set(wb.sheetnames)
             source=''
             if 'SCALING SUMMARY' in sheets:
-                source=str(wb['SCALING SUMMARY']['B4'].value or '').casefold()
+                source=str(wb['SCALING SUMMARY']['B4'].value or '').strip()
             wb.close()
             return sheets,source
         except (OSError,ValueError,KeyError):
