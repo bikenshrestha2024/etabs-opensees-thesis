@@ -237,7 +237,6 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     state=str(limit_state).strip().upper()
     if state=='BOTH':state='ULS'
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
-    require_source_state(export_dir,state)
     search=[export_dir/'Project_Input_Workbooks',export_dir,root/'Project_Input_Workbooks',Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
     selected=export_dir/'NBC105_Workbook_Source.json'
     if selected.is_file():
