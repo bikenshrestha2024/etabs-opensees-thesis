@@ -40,7 +40,7 @@ class FixedAuditFindings(unittest.TestCase):
                geom("2A","2",7.,0.,0.),geom("2B","2",7.,0.,20.)]
         rows=[response("1A","1"),response("1B","1"),
               response("2A","2","LATER"),response("2B","2","LATER")]
-        with self.assertRaisesRegex(ValueError,"across floors"):
+        with self.assertRaisesRegex(ValueError,"response step across floors"):
             map_floor_ends(nodes,rows,limit_state="ULS",source="OPENSEES")
 
     def test_reject_inconsistent_floor_elevation(self):
