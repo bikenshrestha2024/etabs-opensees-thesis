@@ -28,7 +28,10 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
     eccentricity and same response location are independently reviewed.
     """
     policy=policy or {}
-    checked=bool(policy.get("assumptions_verified",False))
+    approval=policy.get("assumptions_verified",False)
+    if not isinstance(approval,bool):
+        raise ValueError("assumptions_verified must be a real JSON boolean, not a truthy string")
+    checked=(approval is True)
     limits=dict(DEFAULT_PERCENT_LIMITS)
     limits.update(policy.get("percent_limits",{}))
     zero=dict(DEFAULT_ABS_ZERO)
