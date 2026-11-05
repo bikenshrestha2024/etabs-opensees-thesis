@@ -188,6 +188,40 @@ def run_model_spectrum(folder,config,output_dir):
     export_reports(out)
     return results
 
+def mrsm_period_defaults(folder, values):
+    """Return NBC §5.1.3 adopted periods only with current-model Rayleigh+Aw.
+
+    The legacy workbook C14/C15 references are NOT the sole proof of a
+    calculated Rayleigh period or the adopted T=min(Tr,1.25*T_emp).
+    This is for the thesis concrete shear-wall structural system. The
+    associated source/period audit must still be independently reviewed.
+    """
+    from components.modal.analysis import nbc105_period_estimate
+    folder=Path(folder)
+    required=("awx","awy","rayleigh_tx","rayleigh_ty")
+    missing=[key for key in required if values.get(key) in (None,"")]
+    if missing:
+        return {"T1_X":"","T1_Y":""}, ("Validated period defaults unavailable; "
+                "missing source-model fields: "+", ".join(missing)+
+                ". Select the correct ULS/SLS Rayleigh cache and wall Aw.")
+    model=folder/"OpenSees_Complete_Model_Data_V118.json"
+    if not model.is_file():
+        return {"T1_X":"","T1_Y":""},"Missing assembled current-model geometry for H."
+    data=json.loads(model.read_text(encoding="utf-8-sig"))
+    groups=data.get("diaphragms",[])
+    if not groups:
+        return {"T1_X":"","T1_Y":""},"No mapped floor elevations for seismic height."
+    height=max(float(g["master_xyz"][2]) for g in groups)-float(data["base_z_m"])
+    periods=nbc105_period_estimate(
+        height_m=height,system_type="concrete shear-wall building",
+        wall_aw_x_m2=values["awx"],wall_aw_y_m2=values["awy"],
+        rayleigh_x_s=values["rayleigh_tx"],rayleigh_y_s=values["rayleigh_ty"])
+    return {"T1_X":periods["adopted_design_period_X_s"],
+            "T1_Y":periods["adopted_design_period_Y_s"]}, (
+            "NBC §5.1.3 adopted period=min(reviewed current-state Rayleigh, "
+            "1.25×directional empirical wall period). Verify Aw and model hash.")
+
+
 def launch(parent,folder):
     import tkinter as tk
     from tkinter import ttk,messagebox
@@ -200,7 +234,8 @@ def launch(parent,folder):
     initial_state=model_state or 'ULS'
     root=Path(__file__).parents[2]
     values=import_project_inputs(root,folder,initial_state)['values'];fields={}
-    defaults=dict(limit_state=initial_state,soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=values.get('workbook_adopted_tx',''),T1_Y=values.get('workbook_adopted_ty',''),nmodes=40,damping=.05)
+    period_defaults,period_note=mrsm_period_defaults(folder,values)
+    defaults=dict(limit_state=initial_state,soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=period_defaults['T1_X'],T1_Y=period_defaults['T1_Y'],nmodes=40,damping=.05)
     ttk.Label(form,text='Model response spectrum: mode shapes + site spectrum → CQC actions, force scaling, drift and nodal envelopes',wraplength=1000,font=('Segoe UI',12,'bold')).pack(anchor='w')
     grid=ttk.Frame(form);grid.pack(fill='x')
     for i,(name,value) in enumerate(defaults.items()):
@@ -217,9 +252,13 @@ def launch(parent,folder):
             messagebox.showwarning('Source state mismatch',str(exc),parent=win)
             return
         v=import_project_inputs(root,folder,state)['values']
-        for name,key in [('soil','soil'),('Z','Z'),('I','I'),('rmu','rmu'),('omegau','omegau'),('omegas','omegas'),('T1_X','workbook_adopted_tx'),('T1_Y','workbook_adopted_ty')]:
+        period_values,_=mrsm_period_defaults(folder,v)
+        for name,key in [('soil','soil'),('Z','Z'),('I','I'),('rmu','rmu'),('omegau','omegau'),('omegas','omegas')]:
             if key in v:fields[name].set(str(v[key]))
+        for axis in ('X','Y'):
+            fields['T1_'+axis].set(str(period_values['T1_'+axis]) if period_values['T1_'+axis] else '')
     fields['limit_state'].trace_add('write',refresh)
+    ttk.Label(form,text=period_note,wraplength=1000).pack(anchor='w',pady=3)
     ttk.Label(form,text='Each state runs X and Y, with E0 / Eplus / Eminus cases (6 cases/state). E0 is centered; Eplus/Eminus are signed 5% perpendicular-breadth eccentric inertia cases. Soil selection requires site evidence. Acceleration conversion is internal for the kN-m-s model. Workbook / PNG / PDF are exported automatically.',wraplength=1000).pack(anchor='w',pady=6)
     actions=ttk.Frame(form);actions.pack(fill='x');output=Path(folder)/'OpenSees_Analysis_Results'
     log_value=tk.StringVar()
