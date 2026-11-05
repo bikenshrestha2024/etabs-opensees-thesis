@@ -159,7 +159,7 @@ def map_floor_ends(geometry_rows,result_rows,*,limit_state,source,
         case_steps.setdefault((axis,case),set()).update(record['steps'])
     for (axis,case),steps in case_steps.items():
         if len(steps)!=1:
-            raise ValueError("Mixed analysis steps across floors for "+axis+
+            raise ValueError("More than one response step across floors for "+axis+
                              " / "+case+": "+repr(sorted(steps)))
     per_floor={}
     for (st,axis,case),record in sorted(groups.items()):
