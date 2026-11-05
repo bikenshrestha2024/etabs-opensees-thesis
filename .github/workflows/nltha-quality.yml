@@ -93,6 +93,11 @@ on:
       - 'tests/verify_esm_aw_period_provenance.py'
       - 'tests/verify_esm_blank_copy_rayleigh.py'
       - 'tests/verify_esm_source_state_isolation.py'
+      - 'components/validation/torsion_check.py'
+      - 'torsion_check.py'
+      - 'tests/verify_nbc105_torsion_check.py'
+      - 'validation_checklist.md'
+      - 'docs/source/components/validation/torsion_check.py.md'
       - 'tests/verify_esm_output_safety.py'
       - 'tools/run_native_wall_probes.py'
       - 'tests/verify_native_wall_probe_preparation.py'
@@ -155,6 +160,7 @@ jobs:
           python tests/verify_esm_aw_period_provenance.py
           python tests/verify_esm_blank_copy_rayleigh.py
           python tests/verify_esm_source_state_isolation.py
+          python tests/verify_nbc105_torsion_check.py
           python tests/verify_etabs_direct_equivalence.py
           python tests/verify_esm_output_safety.py
           python tests/verify_native_wall_probe_preparation.py
