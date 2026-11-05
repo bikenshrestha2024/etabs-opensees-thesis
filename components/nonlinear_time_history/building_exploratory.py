@@ -523,9 +523,16 @@ def _run(config):
             ops.pattern('UniformExcitation',tag,direction,'-accel',tag)
         _configure_nonlinear_transient(ops)
         configure_transient_system(ops,transient_system)
+        suspect_tags=config.get('diagnostic_suspect_tags',[])
+        if not isinstance(suspect_tags,list) or len(suspect_tags)>16:
+            raise ValueError('diagnostic_suspect_tags must be a list of <=16 element tags')
+        suspect_tags=[int(x) for x in suspect_tags]
+        if any(x<=0 for x in suspect_tags):
+            raise ValueError('diagnostic_suspect_tags must be positive')
         diag={
             'evidence_output_path':str(case/'First_Step_Failure_Evidence.json'),
             'element_map_path':str(model/'OpenSees_Complete_Element_Map_V118.json'),
+            'suspect_tags':suspect_tags if suspect_tags else None,
             'efficient_recovery':True,
             'max_subdivision_depth':max_subdivision_depth,
         };rows=[];last=time.perf_counter();case_start=last
@@ -627,6 +634,12 @@ def _run(config):
             # code does NOT imply every recorder response is finite.
             verify_numeric_accepted_row(row, row_index=len(rows))
             rows.append(row)
+            if suspect_tags and config.get('analysis_intent','RESEARCH_DIAGNOSTIC')!='THESIS_NLTHA':
+                from components.nonlinear_time_history.failure_evidence import snapshot_selected_state
+                snapshot_selected_state(ops,
+                    case/'Last_Accepted_Wall_State.json',
+                    suspect_tags=suspect_tags,
+                    stage="LAST_ACCEPTED_COMMITTED")
         history=case/'Building_Nonlinear_history.csv'
         _set_run_stage('transient_analysis',orientation=orientation,case_output_dir=str(case),
                        requested_duration_s=end,record_duration_s=record_end,
