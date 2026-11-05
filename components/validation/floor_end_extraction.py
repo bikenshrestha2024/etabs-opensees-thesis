@@ -58,28 +58,37 @@ def sha256(path):
 
 
 def _candidate_pairs(nodes,axis,end_tol_m,alignment_tol_m):
-    """Only perimeter nodes on opposite perpendicular-coordinate extremes.
+    """Find opposite perimeter ends for each matching longitudinal section.
 
-    For X loading, compare Y-min to Y-max ends with similar longitudinal X.
-    For Y loading, compare X-min to X-max ends with similar longitudinal Y.
-    A re-entrant plan may lack a matching cross-plan end at some bays: these
-    are NOT fabricated; a missing candidate means NOT EVALUATED.
-    All eligible pairs are screened rather than assuming a single corner.
+    A re-entrant plan can have a full-width wing and a shortened wing:
+    using only the GLOBAL min/max transverse coordinates would omit a
+    physical opposite-end pair in the shortened region. Instead, for
+    each local longitudinal station, identify the two transverse ends
+    of the verified perimeter and retain each unique matched pair.
+    This does not interpolate along a slab edge or infer exterior nodes
+    from an arbitrary cloud of coordinates.
     """
     perpendicular="y_m" if axis=="X" else "x_m"
     longitudinal="x_m" if axis=="X" else "y_m"
-    perimeters=[n for n in nodes if n["is_perimeter"]]
-    if len(perimeters)<2:return []
-    minimum=min(n[perpendicular] for n in perimeters)
-    maximum=max(n[perpendicular] for n in perimeters)
-    if maximum-minimum<=end_tol_m:
-        return []
-    near_min=[n for n in perimeters if n[perpendicular]-minimum<=end_tol_m]
-    near_max=[n for n in perimeters if maximum-n[perpendicular]<=end_tol_m]
-    return [(a,b) for a in near_min for b in near_max
-            if a["node_id"]!=b["node_id"] and
-            abs(a[longitudinal]-b[longitudinal])<=alignment_tol_m]
-
+    perimeter=[n for n in nodes if n["is_perimeter"]]
+    if len(perimeter)<2:return []
+    candidates={}
+    for node in perimeter:
+        station=node[longitudinal]
+        aligned=[p for p in perimeter
+                 if abs(p[longitudinal]-station)<=alignment_tol_m]
+        if len(aligned)<2:continue
+        low=min(p[perpendicular] for p in aligned)
+        high=max(p[perpendicular] for p in aligned)
+        if high-low<=end_tol_m:continue
+        side_a=[p for p in aligned if p[perpendicular]-low<=end_tol_m]
+        side_b=[p for p in aligned if high-p[perpendicular]<=end_tol_m]
+        for a in side_a:
+            for b in side_b:
+                if a["node_id"]==b["node_id"]:continue
+                key=tuple(sorted((a["node_id"],b["node_id"])))
+                candidates[key]=(a,b)
+    return [candidates[k] for k in sorted(candidates)]
 
 def map_floor_ends(geometry_rows,result_rows,*,limit_state,source,
                    end_tol_m=0.05,alignment_tol_m=0.10):
