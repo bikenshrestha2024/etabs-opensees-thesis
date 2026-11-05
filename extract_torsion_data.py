@@ -56,6 +56,18 @@ def main():
     pairs,governing,manifest=write_outputs(opts.output,opts.geometry,responses,
         source=opts.source,limit_state=opts.state,
         end_tol_m=opts.end_tol_m,alignment_tol_m=opts.alignment_tol_m)
+    if opts.etabs_api:
+        import json
+        from components.validation.floor_end_extraction import sha256
+        provenance=opts.output/"Floor_End_Provenance.json"
+        audit=json.loads(provenance.read_text(encoding="utf-8"))
+        audit.update(etabs_source_edb=str(opts.edb.resolve()),
+            etabs_edb_sha256=sha256(opts.edb),
+            etabs_source_case=opts.etabs_case,
+            etabs_step_type=opts.step_type,
+            etabs_step_number=opts.step_number,
+            etabs_reviewed_centered_cm_assertion=True)
+        provenance.write_text(json.dumps(audit,indent=2),encoding="utf-8")
     print("Source:",opts.source,"Limit state:",opts.state)
     print("Opposite-end pairs:",len(pairs),"Floor/case checks:",len(governing))
     for row in governing:
