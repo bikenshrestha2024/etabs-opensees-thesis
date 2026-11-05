@@ -96,6 +96,10 @@ on:
       - 'components/validation/torsion_check.py'
       - 'torsion_check.py'
       - 'tests/verify_nbc105_torsion_check.py'
+      - 'components/validation/floor_end_extraction.py'
+      - 'extract_torsion_data.py'
+      - 'tests/verify_floor_end_extraction.py'
+      - 'docs/validation/floor_end_extraction/**'
       - 'validation_checklist.md'
       - 'docs/source/components/validation/torsion_check.py.md'
       - 'tests/verify_esm_output_safety.py'
@@ -161,6 +165,7 @@ jobs:
           python tests/verify_esm_blank_copy_rayleigh.py
           python tests/verify_esm_source_state_isolation.py
           python tests/verify_nbc105_torsion_check.py
+          python tests/verify_floor_end_extraction.py
           python tests/verify_etabs_direct_equivalence.py
           python tests/verify_esm_output_safety.py
           python tests/verify_native_wall_probe_preparation.py
