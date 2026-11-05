@@ -59,6 +59,10 @@ on:
       - 'components/nonlinear_time_history/runner_and_gui.py'
       - '21_NLTHA_TRIAGE.py'
       - 'tests/verify_thesis_nltha_quality.py'
+      - 'tests/verify_v169_wall_triage_evidence.py'
+      - 'components/nonlinear_time_history/thesis_quality.py'
+      - 'components/nonlinear_time_history/failure_evidence.py'
+      - 'docs/review/20261105_WALL_FIRST_STEP_DIAGNOSTIC_IMPLEMENTATION.md'
       - '.github/workflows/nltha-quality.yml'
       - 'components/sections/devices.py'
       - 'tests/verify_device_parameter_finiteness.py'
@@ -134,6 +138,10 @@ on:
       - 'components/nonlinear_time_history/building_exploratory.py'
       - '21_NLTHA_TRIAGE.py'
       - 'tests/verify_thesis_nltha_quality.py'
+      - 'tests/verify_v169_wall_triage_evidence.py'
+      - 'components/nonlinear_time_history/thesis_quality.py'
+      - 'components/nonlinear_time_history/failure_evidence.py'
+      - 'docs/review/20261105_WALL_FIRST_STEP_DIAGNOSTIC_IMPLEMENTATION.md'
       - '.github/workflows/nltha-quality.yml'
   workflow_dispatch:
 
@@ -159,6 +167,7 @@ jobs:
         run: |
           export PYTHONPATH="$PWD"
           python tests/verify_thesis_nltha_quality.py
+          python tests/verify_v169_wall_triage_evidence.py
           python tests/verify_device_parameter_finiteness.py
           python tests/verify_documentation_coverage.py
           python tests/verify_active_repository_audit.py
