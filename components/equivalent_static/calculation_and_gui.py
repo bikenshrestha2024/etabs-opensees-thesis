@@ -61,6 +61,43 @@ def resolve_esm_state_periods(*, height_m, aw_by_axis, factor, states,
             results[state][axis]=min(empirical,ray)
     return results
 
+
+def validated_pdelta_sidecar_path(model_script):
+    """Return the legacy P-Delta sidecar only for an existing explicit model.
+
+    A blank/invalid GUI model path previously resolved to Path('').parent == '.'
+    and wrote OpenSees_Initial_PDelta_Input_V124.json into the current process
+    working directory. This can overwrite an unrelated source file. Returning
+    None preserves standalone ESM calculation without creating that sidecar.
+    """
+    value=str(model_script or "").strip()
+    if not value:
+        return None
+    model=Path(value)
+    if not model.is_file() or model.suffix.lower()!=".py":
+        return None
+    return model.parent/"OpenSees_Initial_PDelta_Input_V124.json"
+
+
+def state_rayleigh_provenance(state, selected_axis, gui_by_axis, sls_by_axis=None):
+    """Give each exported case its matching state-specific X/Y Rayleigh metadata.
+
+    Does not generate a period or substitute ETABS modal data. For SLS in a
+    joint export, use only independently imported source-matched SLS values.
+    """
+    selected=str(state).strip().upper()
+    if selected not in ("ULS","SLS"):
+        raise ValueError("Unknown ESM limit state")
+    source=sls_by_axis if selected=="SLS" and sls_by_axis is not None else gui_by_axis
+    if not isinstance(source,dict):
+        raise ValueError("No period metadata dictionary")
+    return {"Rayleigh_T1_X_s":source.get("X") or None,
+            "Rayleigh_T1_Y_s":source.get("Y") or None,
+            "Rayleigh_evidence_state":selected,
+            "Rayleigh_evidence_axis":selected_axis}
+
+
+
 def recommended_story_weight_input(export_dir):
     """Choose a complete story ledger only when tags match the current model.
 
@@ -837,7 +874,14 @@ class ESMGui:
                 adopted=self._adopted_axis_period(axis,height)
                 reference=calculate_esm(rows,period_s=adopted,soil_type=self.soil.get(),zoning_factor_z=float(self.Z.get()),importance_factor_i=float(self.I.get()),limit_state='ULS',r_mu=float(self.rmu.get()),omega_u=float(self.omegau.get()),vs30_m_s=self.vs30.get(),n_spt_blow_30cm=self.n_spt.get(),diagnostic_reference=True)
                 references[axis]=dict(period_s=adopted,stories=reference['stories'],basis='NBC ULS coefficient and floor distribution used only as a diagnostic EL reference; high-rise design requires the applicable dynamic method.',code_eligible=reference['code_eligible'],site_subsoil_status=reference['site_subsoil_status'])
-            safe_write(Path(self.model_script.get()).parent/'OpenSees_Initial_PDelta_Input_V124.json',json.dumps(references,indent=2))
+            # Only create the historical P-Delta sidecar next to an explicitly
+            # selected, existing .py model. Standalone ESM calculations are
+            # permitted without a model script, but never write into cwd.
+            pdelta_path=validated_pdelta_sidecar_path(self.model_script.get())
+            if pdelta_path is not None:
+                safe_write(pdelta_path,json.dumps(references,indent=2))
+            else:
+                self.status.set('P-Delta sidecar skipped: select a verified existing Python model script. ESM force tables remain available.')
             H=max(float(r["height_m"]) for r in rows)
             selected=self.state.get(); states=["ULS","SLS"] if selected=="Both" else [selected]
             irr={"Regular":False,"Irregular":True,"Unknown — confirm":None}[self.irregular.get()]
@@ -857,7 +901,11 @@ class ESMGui:
                     if not result["site_subsoil_verified"]:summaries.append("SITE CLASSIFICATION NOT VERIFIED: "+result["site_subsoil_status"])
                     result["period_source"]=("Separate matched "+state+" Rayleigh/empirical minimum" if state_periods else self.period_sources.get(self.direction.get(),"Directional Rayleigh/empirical calculation"))
                     result["input_provenance"]=getattr(self,"project_input_audit",{})
-                    result["period_selection"]={"direction":self.direction.get(),"empirical_Aw_X_m2":self.awx.get() or None,"empirical_Aw_Y_m2":self.awy.get() or None,"empirical_multiplier":self.period_factor.get(),"Rayleigh_T1_X_s":self.rayleigh_tx.get() or None,"Rayleigh_T1_Y_s":self.rayleigh_ty.get() or None,"ETABS_or_Excel_reference_T1_X_s":self.etabs_tx.get() or None,"ETABS_or_Excel_reference_T1_Y_s":self.etabs_ty.get() or None,"ETABS_modal_metadata":self.etabs_modal_metadata,"selected_period_s":result["period_s"],"selection_rule":"NBC §5.1: adopt the lesser of 1.25 times the empirical period and the directional Rayleigh period. ETABS eigenperiod is a comparison only."}
+                    period_evidence=state_rayleigh_provenance(
+                        state,self.direction.get(),
+                        {"X":self.rayleigh_tx.get(),"Y":self.rayleigh_ty.get()},
+                        {"X":sls_values.get("rayleigh_tx"),"Y":sls_values.get("rayleigh_ty")} if state_periods and state=="SLS" else None)
+                    result["period_selection"]={"direction":self.direction.get(),"empirical_Aw_X_m2":self.awx.get() or None,"empirical_Aw_Y_m2":self.awy.get() or None,"empirical_multiplier":self.period_factor.get(),**period_evidence,"ETABS_or_Excel_reference_T1_X_s":self.etabs_tx.get() or None,"ETABS_or_Excel_reference_T1_Y_s":self.etabs_ty.get() or None,"ETABS_modal_metadata":self.etabs_modal_metadata,"selected_period_s":result["period_s"],"selection_rule":"NBC §5.1: adopt the lesser of 1.25 times the empirical period and the directional Rayleigh period. ETABS eigenperiod is a comparison only."}
                     for polarity in polarities:
                         for ecc_sign in ecc_signs:
                             breadth=(bdim,ecc_sign)
