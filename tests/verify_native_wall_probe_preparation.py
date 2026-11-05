@@ -12,8 +12,15 @@ class ProbePreparation(unittest.TestCase):
             root=Path(folder)
             model=root/"model";model.mkdir()
             (model/"OpenSees_Complete_Model_Data_V118.json").write_text('{"nodes":{}}')
+            motion_a=root/"Kobe_A.txt";motion_b=root/"Kobe_B.txt"
+            motion_a.write_text("0.0\\n0.01")
+            motion_b.write_text("0.0\\n-0.01")
             source=root/"source.json"
             source.write_text(json.dumps({"model_folder":str(model),
+                                          "x_path":str(motion_a),
+                                          "y_path":str(motion_b),
+                                          "limit_state":"ULS",
+                                          "dt_s":0.005,
                                           "analysis_intent":"RESEARCH_DIAGNOSTIC"}))
             dest=root/"probes"
             path=prepare(source,dest)
