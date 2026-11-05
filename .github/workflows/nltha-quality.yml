@@ -85,6 +85,7 @@ on:
       - 'tests/verify_esm_input_loader.py'
       - 'tests/verify_esm_partial_input.py'
       - 'tests/verify_esm_source_selection.py'
+      - 'tests/verify_esm_aw_period_provenance.py'
       - 'tools/run_native_wall_probes.py'
       - 'tests/verify_native_wall_probe_preparation.py'
       - 'tools/audit_component_experiments.py'
@@ -93,6 +94,10 @@ on:
       - 'tests/verify_soil_c_case_completion.py'
   pull_request:
     paths:
+      - 'components/equivalent_static/**'
+      - 'components/inputs/project_workbooks.py'
+      - 'tests/verify_esm_aw_period_provenance.py'
+      - 'docs/programs/12_EQUIVALENT_STATIC.md'
       - 'docs/review/ledger/**'
       - 'tools/validate_review_ledger.py'
       - 'tests/verify_review_ledger.py'
@@ -120,7 +125,7 @@ jobs:
           python -m pip install openpyxl==3.1.5
       - name: Syntax-check key NLTHA files
         run: |
-          python -m compileall -q components/equivalent_static/calculation_and_gui.py components/inputs/project_workbooks.py components/model/assembly.py components/nonlinear_time_history 36_SOIL_C_NLTHA_RUN_MATRIX.py 35_SOIL_C_NLTHA_PREFLIGHT.py 33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py components/response_spectrum/nbc_pair_spectrum_audit.py 32_NBC105_PAIR_SPECTRUM_AUDIT.py components/model/reinforcement_mapping.py components/sections/devices.py components/validation/expanded_workbench_tabs.py components/validation/visual_workbench.py components/model/readiness_dashboard.py components/model/readiness_dashboard_gui.py components/ui/application.py
+          python -m compileall -q tests/verify_esm_aw_period_provenance.py components/equivalent_static/calculation_and_gui.py components/inputs/project_workbooks.py components/model/assembly.py components/nonlinear_time_history 36_SOIL_C_NLTHA_RUN_MATRIX.py 35_SOIL_C_NLTHA_PREFLIGHT.py 33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py components/response_spectrum/nbc_pair_spectrum_audit.py 32_NBC105_PAIR_SPECTRUM_AUDIT.py components/model/reinforcement_mapping.py components/sections/devices.py components/validation/expanded_workbench_tabs.py components/validation/visual_workbench.py components/model/readiness_dashboard.py components/model/readiness_dashboard_gui.py components/ui/application.py
       - name: Run non-native NLTHA and device quality checks
         run: |
           export PYTHONPATH="$PWD"
@@ -134,6 +139,7 @@ jobs:
           python tests/verify_esm_input_loader.py
           python tests/verify_esm_partial_input.py
           python tests/verify_esm_source_selection.py
+          python tests/verify_esm_aw_period_provenance.py
           python tests/verify_native_wall_probe_preparation.py
           python tests/verify_component_experiment_evidence.py
           python tests/verify_soil_c_case_completion.py

@@ -27,6 +27,40 @@ except Exception as exc:
     raise RuntimeError("Keep NBC105_Analysis_Settings_V109.py beside this GUI.") from exc
 
 
+
+def resolve_esm_state_periods(*, height_m, aw_by_axis, factor, states,
+                              rayleigh_by_state):
+    """Calculate NBC 105 §5.1 adopted periods from case-specific Rayleigh evidence.
+
+    A ULS Rayleigh period cannot be silently reused for a separately modeled
+    SLS stiffness state. Workbook-adopted references are not Rayleigh results.
+    Values in seconds and wall indices in square metres.
+    """
+    h=float(height_m)
+    fac=float(factor)
+    if not all(math.isfinite(x) and x>0 for x in (h,fac)):
+        raise ValueError("ESM height and empirical factor must be finite positive.")
+    results={}
+    for state in states:
+        state=str(state).upper()
+        if state not in ("ULS","SLS"):
+            raise ValueError("Unsupported ESM limit state: "+state)
+        record=rayleigh_by_state.get(state,{})
+        results[state]={}
+        for axis in ("X","Y"):
+            area=float(aw_by_axis[axis])
+            if not math.isfinite(area) or area<=0:
+                raise ValueError(f"{state} {axis}: wall Aw must be finite and positive.")
+            raw=record.get(axis)
+            if raw is None or str(raw).strip()=="":
+                raise ValueError(f"{state} {axis}: matching limit-state Rayleigh period is required; do not reuse the other state's period.")
+            ray=float(raw)
+            if not math.isfinite(ray) or ray<=0:
+                raise ValueError(f"{state} {axis}: Rayleigh period must be finite positive.")
+            empirical=fac*.075*h**.75/math.sqrt(area)
+            results[state][axis]=min(empirical,ray)
+    return results
+
 def recommended_story_weight_input(export_dir):
     """Choose a complete story ledger only when tags match the current model.
 
@@ -345,7 +379,7 @@ class ESMGui:
         self.I=tk.StringVar(value=""); self.vs30=tk.StringVar(value=""); self.n_spt=tk.StringVar(value=""); self.system=tk.StringVar(value="Select / determine from Table 5-2")
         self.rmu=tk.StringVar(value=""); self.omegau=tk.StringVar(value=""); self.omegas=tk.StringVar(value="")
         self.irregular=tk.StringVar(value="Unknown — confirm")
-        self.use_workbook_periods=tk.BooleanVar(value=True); self.period_sources={}; self.awx=tk.StringVar(); self.awy=tk.StringVar(); self.period_factor=tk.StringVar(value="1.25")
+        self.use_workbook_periods=tk.BooleanVar(value=False); self.period_sources={}; self.awx=tk.StringVar(); self.awy=tk.StringVar(); self.period_factor=tk.StringVar(value="1.25")
         self.rayleigh_tx=tk.StringVar(); self.rayleigh_ty=tk.StringVar()
         self.etabs_tx=tk.StringVar(); self.etabs_ty=tk.StringVar()
         self.computed_x=tk.StringVar();self.computed_y=tk.StringVar()
@@ -637,19 +671,38 @@ class ESMGui:
             if rows: self.period_note.set(f"Loaded {len(rows)} ETABS stories; roof elevation H={max(float(r['height_m']) for r in rows):.3f} m; diaphragm tags imported. {blanks} DL/LL input cells are blank and require verified ETABS totals.")
         except Exception as exc: self.period_note.set(f"ETABS export metadata could not be read: {exc}")
     def _adopted_axis_period(self,axis,height):
-        aw=float((self.awx if axis=='X' else self.awy).get());empirical=float(self.period_factor.get())*.075*height**.75/math.sqrt(aw)
+        if axis not in ("X","Y"):
+            raise ValueError("Axis must be X or Y.")
+        aw=float((self.awx if axis=='X' else self.awy).get())
+        factor=float(self.period_factor.get())
+        H=float(height)
+        if not all(math.isfinite(v) and v>0 for v in (aw,factor,H)):
+            raise ValueError(axis+": Aw, height and factor must be finite positive.")
+        empirical=factor*.075*H**.75/math.sqrt(aw)
         ray=(self.rayleigh_tx if axis=='X' else self.rayleigh_ty).get().strip()
         if ray:
+            ray_value=float(ray)
+            if not math.isfinite(ray_value) or ray_value<=0:
+                raise ValueError(axis+": Rayleigh period must be finite positive.")
             self.period_sources[axis]='Calculated directional Rayleigh and amplified empirical minimum'
-            return min(empirical,float(ray))
-        reference=(self.excel_tx if axis=='X' else self.excel_ty).get().strip()
-        if self.use_workbook_periods.get() and reference:
-            numeric=getattr(self,'project_input_audit',{}).get('values',{}).get('workbook_adopted_t'+axis.lower())
-            value=float(numeric if numeric is not None else reference.split()[0])
-            if value<=0 or value>empirical+1e-5:raise ValueError(axis+' imported adopted reference exceeds the current amplified empirical bound; recalculate Rayleigh and resolve the workbook/model difference.')
-            self.period_sources[axis]='Imported workbook adopted-period reference; no new Rayleigh calculation claimed'
+            return min(empirical,ray_value)
+        if self.use_workbook_periods.get():
+            v=getattr(self,'project_input_audit',{}).get('values',{})
+            raw=v.get('workbook_adopted_t'+axis.lower())
+            imported_aw=v.get('aw'+axis.lower())
+            if raw is None or imported_aw is None:
+                raise ValueError(axis+": an attributed workbook adopted-period and wall Aw reference is required.")
+            if not math.isclose(float(imported_aw),aw,rel_tol=1e-7,abs_tol=1e-9):
+                raise ValueError(axis+": selected Aw differs from the workbook Aw used for its adopted period; recalculate Rayleigh.")
+            geometry_aw=v.get('geometry_aw_'+axis.lower())
+            if geometry_aw is not None and not math.isclose(float(geometry_aw),aw,rel_tol=1e-6,abs_tol=1e-9):
+                raise ValueError(axis+": workbook Aw conflicts with the exported-wall geometry estimate; reconcile physical wall grouping/openings before relying on its period.")
+            value=float(raw)
+            if not math.isfinite(value) or value<=0 or value>empirical+1e-5:
+                raise ValueError(axis+": workbook adopted period is invalid or exceeds the amplified empirical bound.")
+            self.period_sources[axis]='EXPLICIT workbook adopted-period reference only; no matching Rayleigh calculation'
             return value
-        raise ValueError(axis+' requires a calculated Rayleigh period or a documented imported adopted-period reference.')
+        raise ValueError(axis+' requires a matching calculated Rayleigh period; workbook reference use is disabled by default.')
 
     def _update_periods(self):
         if self.direction.get()=='Both X/Y':
@@ -766,6 +819,20 @@ class ESMGui:
             # This does not make high-rise ULS ESM a permitted design method.
             references={}
             height=max(float(r['height_m']) for r in rows)
+            # Distinct ULS/SLS stiffness states require their own Rayleigh evidence.
+            # Do not silently propagate ULS T1 to an SLS ESM force profile.
+            selected_states=['ULS','SLS'] if self.state.get()=='Both' else [self.state.get()]
+            state_periods={}
+            if len(selected_states)==2:
+                from components.inputs.project_workbooks import import_project_inputs
+                sls_values=import_project_inputs(HERE,self.export_dir,'SLS')['values']
+                state_periods=resolve_esm_state_periods(
+                    height_m=height,aw_by_axis={'X':float(self.awx.get()),'Y':float(self.awy.get())},
+                    factor=float(self.period_factor.get()),states=selected_states,
+                    rayleigh_by_state={
+                        'ULS':{'X':self.rayleigh_tx.get(),'Y':self.rayleigh_ty.get()},
+                        'SLS':{'X':sls_values.get('rayleigh_tx'),'Y':sls_values.get('rayleigh_ty')},
+                    })
             for axis,awvar,rayvar in [('X',self.awx,self.rayleigh_tx),('Y',self.awy,self.rayleigh_ty)]:
                 adopted=self._adopted_axis_period(axis,height)
                 reference=calculate_esm(rows,period_s=adopted,soil_type=self.soil.get(),zoning_factor_z=float(self.Z.get()),importance_factor_i=float(self.I.get()),limit_state='ULS',r_mu=float(self.rmu.get()),omega_u=float(self.omegau.get()),vs30_m_s=self.vs30.get(),n_spt_blow_30cm=self.n_spt.get(),diagnostic_reference=True)
@@ -785,12 +852,12 @@ class ESMGui:
             made=[]; summaries=[]; failures=[]; self.last_runners=[]
             for state in states:
                 try:
-                    result=calculate_esm(rows,period_s=self._adopted_axis_period(self.direction.get(),H),soil_type=self.soil.get(),zoning_factor_z=float(self.Z.get()),importance_factor_i=float(self.I.get()),limit_state=state,r_mu=float(self.rmu.get() or 1.0),omega_u=float(self.omegau.get() or 1.0),omega_s=float(self.omegas.get() or 1.0),irregular=irr,location_name=self.location.get(),zoning_source=self.z_source.get(),vs30_m_s=self.vs30.get(),n_spt_blow_30cm=self.n_spt.get(),diagnostic_reference=True)
+                    result=calculate_esm(rows,period_s=(state_periods[state][self.direction.get()] if state_periods else self._adopted_axis_period(self.direction.get(),H)),soil_type=self.soil.get(),zoning_factor_z=float(self.Z.get()),importance_factor_i=float(self.I.get()),limit_state=state,r_mu=float(self.rmu.get() or 1.0),omega_u=float(self.omegau.get() or 1.0),omega_s=float(self.omegas.get() or 1.0),irregular=irr,location_name=self.location.get(),zoning_source=self.z_source.get(),vs30_m_s=self.vs30.get(),n_spt_blow_30cm=self.n_spt.get(),diagnostic_reference=True)
                     if not result["code_eligible"]:summaries.append("ULS COMPARISON ONLY: "+result["esm_eligibility"])
                     if not result["site_subsoil_verified"]:summaries.append("SITE CLASSIFICATION NOT VERIFIED: "+result["site_subsoil_status"])
-                    result["period_source"]=self.period_sources.get(self.direction.get(),"Directional Rayleigh/empirical calculation")
+                    result["period_source"]=("Separate matched "+state+" Rayleigh/empirical minimum" if state_periods else self.period_sources.get(self.direction.get(),"Directional Rayleigh/empirical calculation"))
                     result["input_provenance"]=getattr(self,"project_input_audit",{})
-                    result["period_selection"]={"direction":self.direction.get(),"empirical_Aw_X_m2":self.awx.get() or None,"empirical_Aw_Y_m2":self.awy.get() or None,"empirical_multiplier":self.period_factor.get(),"Rayleigh_T1_X_s":self.rayleigh_tx.get() or None,"Rayleigh_T1_Y_s":self.rayleigh_ty.get() or None,"ETABS_or_Excel_reference_T1_X_s":self.etabs_tx.get() or None,"ETABS_or_Excel_reference_T1_Y_s":self.etabs_ty.get() or None,"ETABS_modal_metadata":self.etabs_modal_metadata,"selected_period_s":self.T.get(),"selection_rule":"NBC §5.1: adopt the lesser of 1.25 times the empirical period and the directional Rayleigh period. ETABS eigenperiod is a comparison only."}
+                    result["period_selection"]={"direction":self.direction.get(),"empirical_Aw_X_m2":self.awx.get() or None,"empirical_Aw_Y_m2":self.awy.get() or None,"empirical_multiplier":self.period_factor.get(),"Rayleigh_T1_X_s":self.rayleigh_tx.get() or None,"Rayleigh_T1_Y_s":self.rayleigh_ty.get() or None,"ETABS_or_Excel_reference_T1_X_s":self.etabs_tx.get() or None,"ETABS_or_Excel_reference_T1_Y_s":self.etabs_ty.get() or None,"ETABS_modal_metadata":self.etabs_modal_metadata,"selected_period_s":result["period_s"],"selection_rule":"NBC §5.1: adopt the lesser of 1.25 times the empirical period and the directional Rayleigh period. ETABS eigenperiod is a comparison only."}
                     for polarity in polarities:
                         for ecc_sign in ecc_signs:
                             breadth=(bdim,ecc_sign)

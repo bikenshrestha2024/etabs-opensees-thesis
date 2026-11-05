@@ -85,7 +85,63 @@ def _wall_aw_from_lines(height_m, lines):
                                  wall_area_m2=area,Aw_contribution_m2=contribution))
     return aw,segments
 
+
+def _wall_aw_from_patches(height_m, first_base_m, first_top_m, patches):
+    """Conservatively audit first-storey projected Aw through its full height.
+
+    A partial-height opening may produce different effective wall segments at
+    distinct z slices. Combining their 2D projections would count wall
+    material that is missing at some elevations. In that case the automatic
+    estimate is unsafe; require an independently reviewed effective-wall Aw.
+    Each patch has (axis, plane, thickness, start, end, zmin, zmax).
+    """
+    base=float(first_base_m); top=float(first_top_m)
+    if not math.isfinite(base) or not math.isfinite(top) or top<=base:
+        raise ValueError("First storey has invalid base/top elevations.")
+    if not patches:
+        raise ValueError("No first-storey wall patches were found.")
+    cuts=sorted({base,top,*(float(p[5]) for p in patches),
+                *(float(p[6]) for p in patches)})
+    reference_signature=None
+    reference_result=None
+    for za,zb in zip(cuts,cuts[1:]):
+        if zb-za<=1e-8:
+            continue
+        mid=(za+zb)/2.
+        lines={}
+        for axis,plane,thickness,start,end,zmin,zmax in patches:
+            if zmin<=mid+1e-8 and zmax>=mid-1e-8:
+                lines.setdefault((axis,plane,thickness),[]).append((start,end))
+        area,segments=_wall_aw_from_lines(height_m,lines)
+        signature=tuple(sorted((row["axis"],round(row["plane_m"],6),
+                         round(row["thickness_m"],6),round(row["start_m"],6),
+                         round(row["end_m"],6)) for row in segments))
+        if reference_signature is None:
+            reference_signature=signature
+            reference_result=(area,segments)
+        elif signature!=reference_signature:
+            raise ValueError(
+                "First-storey wall footprint changes with elevation (possible "
+                "partial-height opening or discontinuity); automatic Aw cannot "
+                "merge these wall patches. Review effective first-storey wall "
+                "areas and openings against ETABS under NBC §5.1.2.")
+    if reference_result is None:
+        raise ValueError("No first-storey wall height intervals were available.")
+    return reference_result
+
 def source_workbooks(root, export_dir,limit_state='ULS'):
+    """Discover explicit or model-matched current Excel calculation inputs.
+
+    Inputs: project root and ETABS export directory (Path-like), ULS/SLS state.
+    Returns: [NBC Calculator workbook Path|None, scaling workbook Path|None].
+    The SCALING SUMMARY B4 EDB identity and source floor/state are more
+    authoritative than a similar workbook filename. A stored Windows path
+    MUST be normalized on Linux CI as well as Windows Spyder. No workbook
+    calculations are evaluated: openpyxl reads cached formula values.
+    Selecting a workbook is NOT physical validation of wall Aw or periods;
+    use the per-cell audit from import_project_inputs and real ETABS checks.
+    Read source files only; never modify their values or formula caches.
+    """
     root=Path(root);export_dir=Path(export_dir)
     state=str(limit_state).strip().upper()
     if state=='BOTH':state='ULS'
@@ -104,7 +160,7 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     candidates=list(dict.fromkeys(explicit+candidates))
     if explicit:
         candidates=explicit
-    expected_edb=Path(_source_edb_path(export_dir)).stem.casefold()
+    expected_edb=_portable_source_stem(_source_edb_path(export_dir)).casefold()
     expected_floor=_model_floor(export_dir,expected_edb)
     state_tokens=('service','sls') if state=='SLS' else ('ultimate','uls')
 
@@ -135,6 +191,10 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     scaling=[record for record in records if 'SCALING SUMMARY' in record[1]]
     def score(record):
         path,_,source=record
+        # An explicit stored EDB path for a different building is a hard
+        # mismatch even when the scaling workbook has a plausible filename.
+        if expected_edb and source and _portable_source_stem(source).casefold()!=expected_edb:
+            return -1
         name=(path.stem+' '+source).casefold()
         has_sls=any(token in name for token in ('service','sls'))
         has_uls=any(token in name for token in ('ultimate','uls'))
@@ -142,8 +202,15 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
             return -1
         if state=='ULS' and has_sls and not has_uls:
             return -1
-        if expected_floor and not re.search(
-                rf'(?i)(?:^|[-_\s]){re.escape(expected_floor)}(?=[-_\s.]|$)',name):
+        # Match the EDB's floor identifier using the EDB path itself.
+        # The source cell often uses Windows backslashes, which are not
+        # generic regex word separators on Linux GitHub Actions.
+        source_floor=_model_floor(export_dir,source) if source else ''
+        filename_floor=_model_floor(export_dir,path.stem)
+        actual_floor=source_floor or filename_floor
+        if expected_floor and actual_floor and actual_floor != expected_floor:
+            return -1
+        if expected_floor and not actual_floor:
             return -1
         exact=int(bool(expected_edb) and expected_edb in source)
         config_tokens=[token for token in ('belt','truss','outrigger','cap') if token in Path(expected_edb).stem.casefold()]
@@ -161,12 +228,30 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
             scaling_book=next((path for path in explicit if path in matches),None)
     if scaling_book is None:
         default_name=SERVICE_SCALING if state=='SLS' else SCALING
-        scaling_book=next((directory/default_name for directory in search
-                           if (directory/default_name).is_file()),None)
+        # Do not bypass the source/floor/limit-state identity check through a
+        # hard-coded filename fallback. This previously selected wrong-model
+        # ESM Aw and adopted-period reference cells without warning.
+        fallback_candidates=[record for record in scaling if record[0].name==default_name]
+        valid_fallbacks=[record for record in fallback_candidates if score(record)>=0]
+        if len(valid_fallbacks)==1:
+            scaling_book=valid_fallbacks[0][0]
     return [calculator,scaling_book]
 
 
 def import_project_inputs(root, export_dir,limit_state='ULS'):
+    """Read source-attributed ESM inputs and optionally audit wall geometry.
+
+    Inputs: ETABS export JSONs + selected or auto-discovered spreadsheets.
+    Output: {values, audit, notes}, where audit retains source/sheet/cell and
+    geometry terms are separately labeled rather than silently overriding
+    workbook Aw. The first story is determined using diaphragm elevations,
+    with z-varying wall footprints rejected for automatic Aw computation.
+    This screen does not decide physical wall grouping, construction-stage
+    seismic base or the actual effective area at openings (NBC §5.1.2).
+    Rayleigh cache values are accepted only when model/weight/state/Aw hashes
+    and metadata match; ETABS eigenperiods remain references, not Rayleigh T.
+    Side effects: none on the source ETABS files or Excel workbooks.
+    """
     from openpyxl import load_workbook
     state=str(limit_state).strip().upper()
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
@@ -220,7 +305,8 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                 base=min(p[2] for p in xyz);roof=max(p[2] for p in xyz);H=roof-base
                 levels=sorted({g['master_xyz'][2] for g in topo['rigid_diaphragm_groups'] if g['master_xyz'][2]>base+1e-6})
                 if not math.isfinite(H) or H<=0:raise ValueError('Source model has no positive base-to-roof height.')
-                first=levels[0];lines={}
+                if not levels:raise ValueError('No source first-storey diaphragm elevation.')
+                first=levels[0];lines={};patches=[]
                 for e in topo['elements']:
                     if e['category']!='SHEAR WALL':continue
                     q=[coords[n] for n in e['node_tags']]
@@ -239,8 +325,11 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                         thickness=shell_thickness.get(str(e['etabs_object']))
                         if thickness is None or not math.isfinite(thickness) or thickness<=0:
                             raise ValueError(f"Wall {e['etabs_object']} has no positive thickness in the source audit or assembled shell model.")
-                    lines.setdefault((axis,round(q[0][across],6),thickness),[]).append((min(p[along] for p in q),max(p[along] for p in q)))
-                aw,segments=_wall_aw_from_lines(H,lines)
+                    plane=round(q[0][across],6)
+                    start=min(p[along] for p in q);end=max(p[along] for p in q)
+                    lines.setdefault((axis,plane,thickness),[]).append((start,end))
+                    patches.append((axis,plane,thickness,start,end,zmin,zmax))
+                aw,segments=_wall_aw_from_patches(H,base,first,patches)
                 if not all(v>0 for v in aw.values()):raise ValueError('Both directions need recognized first-story walls.')
                 for axis in ('X','Y'):
                     key='aw'+axis.lower()
