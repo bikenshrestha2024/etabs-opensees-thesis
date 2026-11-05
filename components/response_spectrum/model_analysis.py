@@ -27,7 +27,10 @@ def run_model_spectrum(folder,config,output_dir):
     from NBC105_Analysis_Settings_V109 import calculate_esm
     from OpenSees_Earthquake_Analysis_NBC105_V111 import read_story_csv
     from OpenSees_Modal_Analysis_NBC105_V111 import run_nbc105_modal_audit
-    folder=Path(folder).resolve();out=Path(output_dir);out.mkdir(parents=True,exist_ok=True)
+    folder=Path(folder).resolve();out=Path(output_dir)
+    from components.inputs.project_workbooks import require_source_state
+    require_source_state(folder,config['limit_state'])
+    out.mkdir(parents=True,exist_ok=True)
     data=json.loads((folder/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding='utf-8-sig'))
     manifest=json.loads((folder/'OpenSees_Export_Manifest_V118.json').read_text(encoding='utf-8-sig'))
     stories=read_story_csv(folder/manifest['esm_story_weight_csv']);groups=sorted(data['diaphragms'],key=lambda g:g['master_xyz'][2]);state=config['limit_state']
@@ -192,18 +195,27 @@ def launch(parent,folder):
     from OpenSees_Project_Inputs_V123 import import_project_inputs
     from OpenSees_Research_UI_V123 import scrollable_form
     win=tk.Toplevel(parent);win.title('Model MRSM — SLS / ULS, reports and deformation');win.geometry('1100x820');form=scrollable_form(win)
-    root=Path(__file__).parent;values=import_project_inputs(root,folder)['values'];fields={}
-    defaults=dict(limit_state='Both',soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=values.get('workbook_adopted_tx',''),T1_Y=values.get('workbook_adopted_ty',''),nmodes=40,damping=.05)
+    from components.inputs.project_workbooks import source_limit_state,require_source_state
+    model_state,model_state_evidence=source_limit_state(folder)
+    initial_state=model_state or 'ULS'
+    root=Path(__file__).parents[2]
+    values=import_project_inputs(root,folder,initial_state)['values'];fields={}
+    defaults=dict(limit_state=initial_state,soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=values.get('workbook_adopted_tx',''),T1_Y=values.get('workbook_adopted_ty',''),nmodes=40,damping=.05)
     ttk.Label(form,text='Model response spectrum: mode shapes + site spectrum → CQC actions, force scaling, drift and nodal envelopes',wraplength=1000,font=('Segoe UI',12,'bold')).pack(anchor='w')
     grid=ttk.Frame(form);grid.pack(fill='x')
     for i,(name,value) in enumerate(defaults.items()):
         fields[name]=tk.StringVar(value=str(value));r=i//2;c=(i%2)*2;ttk.Label(grid,text=name,width=20).grid(row=r,column=c,sticky='w',pady=4)
-        options=['Both','SLS','ULS'] if name=='limit_state' else ['A','B','C','D'] if name=='soil' else None
+        options=['ULS','SLS'] if name=='limit_state' else ['A','B','C','D'] if name=='soil' else None
         widget=ttk.Combobox(grid,textvariable=fields[name],values=options,state='readonly',width=25) if options else ttk.Entry(grid,textvariable=fields[name],width=25);widget.grid(row=r,column=c+1,sticky='ew',padx=6)
     grid.columnconfigure(1,weight=1);grid.columnconfigure(3,weight=1)
     def refresh(*unused):
         state=fields['limit_state'].get()
-        if state=='Both':return
+        try:
+            require_source_state(folder,state)
+        except ValueError as exc:
+            fields['limit_state'].set(initial_state)
+            messagebox.showwarning('Source state mismatch',str(exc),parent=win)
+            return
         v=import_project_inputs(root,folder,state)['values']
         for name,key in [('soil','soil'),('Z','Z'),('I','I'),('rmu','rmu'),('omegau','omegau'),('omegas','omegas'),('T1_X','workbook_adopted_tx'),('T1_Y','workbook_adopted_ty')]:
             if key in v:fields[name].set(str(v[key]))
@@ -220,9 +232,11 @@ def launch(parent,folder):
         except (tk.TclError,RuntimeError):pass
     def run():
         try:
-            cfg={k:v.get() for k,v in fields.items()};cfg['nmodes']=int(cfg['nmodes'])
+            cfg={k:v.get() for k,v in fields.items()}
+            require_source_state(folder,cfg['limit_state'])
+            cfg['nmodes']=int(cfg['nmodes'])
             for k in ['Z','I','rmu','omegau','omegas','T1_X','T1_Y','damping']:cfg[k]=float(cfg[k])
-            states=['ULS','SLS'] if cfg['limit_state']=='Both' else [cfg['limit_state']];button.configure(state='disabled')
+            states=[cfg['limit_state']];button.configure(state='disabled')
             ledger=CaseLedger(output/"MRSM_Batch_Status_V151.json",[state+" "+axis+"_"+ecc for state in states for axis in ("X","Y") for ecc in ("E0","Eplus","Eminus")]);board["ledger"]=ledger;board["cancelled"]=False
             def worker():
                 try:
