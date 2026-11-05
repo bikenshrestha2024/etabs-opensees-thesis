@@ -37,6 +37,13 @@ def extract_centered_from_sap(sap,geometry,*,source_edb,limit_state,case,
     if not case or not step_type or step_type.lower() in ("max","min","envelope","mode"):
         raise ValueError("Select a single centered static case/step, not a CQC/max envelope")
     model=Path(source_edb).resolve()
+    from components.inputs.project_workbooks import _portable_source_stem
+    import re
+    source_name=_portable_source_stem(model).casefold()
+    if re.search(r'(?<![a-z])(ultimate|uls)(?![a-z])',source_name) and state!='ULS':
+        raise ValueError('Cross-state source: Ultimate EDB cannot be extracted as SLS')
+    if re.search(r'(?<![a-z])(service|sls)(?![a-z])',source_name) and state!='SLS':
+        raise ValueError('Cross-state source: Service EDB cannot be extracted as ULS')
     if not model.is_file() or model.suffix.lower()!=".edb":
         raise FileNotFoundError("The original .EDB must exist locally")
     active=Path(str(sap.GetModelFilename())).resolve()
