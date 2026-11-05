@@ -143,13 +143,13 @@ def extract_from_sap(sap, mapping):
     original_units=sap.GetPresentUnits()
     snapshot=_snapshot_setup(sap)
     rows=[]
-    def add(m,location,metric,unit,basis,value,source_case,extra=None):
+    def add(m,location,metric,unit,basis,value,source_case,extra=None,axis_override=None):
         if value is None:return
         rows.append({**{k:str(m.get(k,"")) for k in ("method","limit_state","case","axis")},
             "location":str(location),"metric":metric,"unit":unit,"basis":basis,
             "value":_finite(value,metric),"source_file":str(actual),
             "etabs_source_case":str(source_case),"etabs_step_type":str((extra or {}).get("step_type","")),
-            "etabs_step_number":(extra or {}).get("step_number","")})
+            "etabs_step_number":(extra or {}).get("step_number",""),\n            **({"axis":axis_override} if axis_override is not None else {})})
     try:
         _ok(sap.SetPresentUnits(UNITS_KN_M_C),"SetPresentUnits(kN-m-C)")
         for m in cases:
@@ -163,7 +163,7 @@ def extract_from_sap(sap, mapping):
                     if str(r[1][i])!=source:continue
                     mode=int(r[3][i])
                     add(m,mode,"period","s","eigen" if m.get("modal_mode_pairing_verified") else "ETABS_mode_unpaired",
-                        r[4][i],source,{"step_type":r[2][i],"step_number":r[3][i]})
+                        r[4][i],source,{"step_type":r[2][i],"step_number":r[3][i]},axis_override="")
                 # Modal mass is recorded for audit only; aggregate is not an
                 # equivalent shape pairing or matching OpenSees mass model.
                 mm=_arrays(sap.Results.ModalParticipatingMassRatios(),17,"ModalParticipatingMassRatios")
@@ -200,8 +200,8 @@ def extract_from_sap(sap, mapping):
                 add(m,story,"drift_ratio","ratio",disp_basis,v,source)
             for point in m.get("points",[]):
                 p=str(point["etabs_point"])
-                dis=_arrays(sap.Results.JointDispl(p,0),14,"JointDispl")
-                vals=[abs(_finite(dis[7 if m["axis"]=="X" else 8][i],"U")) for i in range(dis[0]) if str(dis[3][i])==source]
+                dis=_arrays(sap.Results.JointDispl(p,0),12,"JointDispl")
+                vals=[abs(_finite(dis[6 if m["axis"]=="X" else 7][i],"U")) for i in range(dis[0]) if str(dis[3][i])==source]
                 if not vals:
                     raise RuntimeError("No JointDispl output for "+source+" / ETABS object "+p)
                 add(m,str(point["story_number"]),"displacement","m",disp_basis,max(vals),source)
