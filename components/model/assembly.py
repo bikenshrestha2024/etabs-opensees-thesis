@@ -602,7 +602,7 @@ def apply_gravity_profile(data,cfg,profile,pattern_types=None):
     from OpenSees_Storey_Gravity_V131 import classify
     if profile in ('AS_CONFIGURED','SEISMIC_SOURCE'):
         return dict(profile=profile,factors=dict(cfg['gravity_factors']),scope='Configured gravity preload, separate from mass_factors. NBC 8.1.1.2 / 9.3.1.2 refer TH gravity to 5.2; this is not the 1.2D+1.5L gravity strength combination. Review occupancy, roof and selected analysis purpose.')
-    allowed={'GRAVITY_1.2D_1.5L':(1.2,1.5),'UPLIFT_0.9D':(.9,0.)}
+    allowed={'GRAVITY_1.0D_1.0L':(1.0,1.0),'GRAVITY_1.2D_1.5L':(1.2,1.5),'UPLIFT_0.9D':(.9,0.)}
     if profile not in allowed:raise ValueError('Unknown gravity profile '+profile)
     if not data.get('unfactored_patterns'):raise ValueError('Case-specific PDelta needs unfactored source patterns')
     dead,live=allowed[profile];factors={};gravity={};ledger={}
@@ -613,7 +613,10 @@ def apply_gravity_profile(data,cfg,profile,pattern_types=None):
         gravity[pattern]={node:[float(v)*factor for v in values] for node,values in nodes.items()}
         ledger[pattern]=-sum(values[2] for values in gravity[pattern].values())
     data['gravity']=gravity;data['gravity_by_pattern_kN']=ledger;data['total_downward_load_kN']=sum(ledger.values())
-    return dict(profile=profile,factors=factors,scope='Fresh combination preload with PDelta transformations; seismic mass retained from source mass factors')
+    scope='Fresh combination preload with PDelta transformations; seismic mass retained from source mass factors'
+    if profile=='GRAVITY_1.0D_1.0L':
+        scope='Unfactored 100% dead plus 100% live gravity comparison, including assigned roof live; seismic mass factors unchanged. Match ETABS case and model.'
+    return dict(profile=profile,factors=factors,scope=scope)
 
 
 def export_gravity_beam_actions(ops,data,folder,limit_state,mode):

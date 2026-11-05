@@ -43,7 +43,7 @@ def export(folder):
             for item in items:ws.append([json.dumps(item.get(k)) if isinstance(item.get(k),(dict,list)) else item.get(k) for k in keys])
             ws.auto_filter.ref=ws.dimensions;ws.freeze_panes='A2'
     note=wb.create_sheet('Read first');note.append(['Missing combination results are not PASS. Profiles select gravity preloads for future fresh model runs, with original seismic mass retained.'])
-    note.append(['AS_CONFIGURED = source configured preload; GRAVITY_1.2D_1.5L; UPLIFT_0.9D. Snow/liquid/earth/wind/vertical earthquake applicability still requires project action data.'])
+    note.append(['AS_CONFIGURED = source configured preload; GRAVITY_1.0D_1.0L = 100% dead + 100% live comparison; GRAVITY_1.2D_1.5L; UPLIFT_0.9D. Snow/liquid/earth/wind/vertical earthquake applicability still requires project action data.'])
     note.append(['Linear time history is a linear transient model about a selected preloaded state. It is not a full nonlinear PDelta time-history solution. Positive CQC component envelopes are not concurrent deformed shapes.'])
     wb.save(out/'All_Case_Review_V142.xlsx');(out/'All_Case_Review_V142.json').write_text(json.dumps(result,indent=2),encoding='utf-8');return result,out
 
@@ -54,8 +54,8 @@ def launch(parent,folder):
     from matplotlib.figure import Figure
     from OpenSees_Research_UI_V123 import embed_figures
     win=tk.Toplevel(parent);win.title('V142 saved drift / deflection and combination coverage');win.geometry('1200x800');controls=ttk.Frame(win);controls.pack(fill='x')
-    profile=tk.StringVar(value=os.environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'));ttk.Label(controls,text='Gravity preload for subsequent analysis runs:').pack(side='left');ttk.Combobox(controls,textvariable=profile,values=['AS_CONFIGURED','GRAVITY_1.2D_1.5L','UPLIFT_0.9D'],state='readonly',width=28).pack(side='left')
-    def apply():os.environ['OPENSEES_GRAVITY_PROFILE']=profile.get();messagebox.showinfo('Preload selected','Subsequent fresh analysis processes inherit this preload. Existing results are not recalculated. Mass factors remain unchanged.',parent=win)
+    profile=tk.StringVar(value=os.environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'));ttk.Label(controls,text='Gravity preload for subsequent analysis runs:').pack(side='left');ttk.Combobox(controls,textvariable=profile,values=['AS_CONFIGURED','GRAVITY_1.0D_1.0L','GRAVITY_1.2D_1.5L','UPLIFT_0.9D'],state='readonly',width=28).pack(side='left')
+    def apply():os.environ['OPENSEES_GRAVITY_PROFILE']=profile.get();messagebox.showinfo('Preload selected','Subsequent fresh analysis processes inherit this preload, including modal and time-history runs. Existing results and assembly-time storey/formula ledgers are not recalculated. The standalone gravity expected-load input must match the selected profile. Mass factors remain unchanged. Restore AS_CONFIGURED after the comparison.',parent=win)
     ttk.Button(controls,text='Apply to subsequent runs',command=apply).pack(side='left')
     text=tk.StringVar();ttk.Label(win,textvariable=text,wraplength=1150).pack(fill='x');body=ttk.Frame(win);body.pack(fill='both',expand=True)
     def refresh():
