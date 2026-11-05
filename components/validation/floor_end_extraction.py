@@ -212,4 +212,62 @@ def write_outputs(folder,geometry_file,displacement_file,*,limit_state,source,
         source_basis="NBC 105:2025 §§5.4.2.1–5.4.2.2 centered CM signed directional floor-end displacement",
         note="CSV nodes/perimeter labels and centered cases must be independently verified; no EDB or OpenSees native extraction claimed")
     (out/"Floor_End_Provenance.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
+    # Keep the original source CSV and model read-only. Spreadsheet formulas
+    # do not invent absent responses, and screening limits are labelled as
+    # code thresholds rather than cross-platform matching tolerances.
+    from openpyxl import Workbook
+    from openpyxl.chart import LineChart,Reference
+    from openpyxl.styles import Font,PatternFill
+    book=Workbook();summary=book.active;summary.title="Status and provenance"
+    for name,value in (("Source program",source),("Limit state",limit_state),
+        ("NBC reference","NBC 105:2025 §§5.4.2.1–5.4.2.2"),
+        ("Horizontal response","Same-step directional signed Ux or Uy; centered load"),
+        ("Geometry SHA256",manifest["geometry_sha256"]),
+        ("Response SHA256",manifest["displacements_sha256"]),
+        ("Physical source validated","REQUIRES INDEPENDENT ETABS/OPENSEES REVIEW"),
+        ("Number of candidate pairs",len(pairs)),
+        ("Number of floor-case checks",len(governing))):
+        summary.append([name,value])
+    summary.column_dimensions["A"].width=35
+    summary.column_dimensions["B"].width=88
+    def table(name,rows):
+        sheet=book.create_sheet(name)
+        headers=list(dict.fromkeys(k for r in rows for k in r))
+        if headers:
+            sheet.append(headers)
+            for item in rows:sheet.append([item.get(k) for k in headers])
+            sheet.freeze_panes="A2"
+            sheet.auto_filter.ref=sheet.dimensions
+            for cell in sheet[1]:
+                cell.font=Font(bold=True,color="FFFFFF")
+                cell.fill=PatternFill("solid",fgColor="16324C")
+            for column in sheet.columns:
+                letter=column[0].column_letter
+                sheet.column_dimensions[letter].width=min(55,max(15,len(str(column[0].value))+4))
+        else:
+            sheet.append(["NOT EVALUATED — no reviewed floor-end pairs"])
+        return sheet
+    table("All eligible pairs",pairs)
+    table("Governing per floor",governing)
+    plot=book.create_sheet("Torsion ratio profiles")
+    plot.append(["Floor / Axis / Case","Computed ratio","Torsion limit 1.5",
+                 "Extreme limit 2.5","Evidence status"])
+    for row in governing:
+        ratio=row.get("ratio")
+        plot.append([str(row["storey"])+" / "+row["axis"]+" / "+row["case"],
+            ratio if isinstance(ratio,(int,float)) and math.isfinite(ratio) else None,
+            1.5,2.5,row["status"]])
+    if governing:
+        chart=LineChart()
+        chart.title="NBC 105 floor-end torsion ratios — reviewed centered cases"
+        chart.y_axis.title="Max/min directional displacement"
+        chart.x_axis.title="Storey, axis and case"
+        data_ref=Reference(plot,min_col=2,max_col=4,min_row=1,max_row=1+len(governing))
+        chart.add_data(data_ref,titles_from_data=True)
+        chart.set_categories(Reference(plot,min_col=1,min_row=2,max_row=1+len(governing)))
+        chart.width=23;chart.height=12
+        plot.add_chart(chart,"G2")
+    plot.column_dimensions["A"].width=32
+    plot.column_dimensions["E"].width=25
+    book.save(out/"Floor_End_Torsion_Review.xlsx")
     return pairs,governing,manifest
