@@ -405,12 +405,18 @@ class ESMGui:
         self.export_dir=None  # initialized after locating the selected export
         export_dir=Path(sys.argv[1]) if len(sys.argv)>1 and Path(sys.argv[1]).is_dir() else Path(r"D:\Thesis Opensees\Etabs Nodes Export")
         self.export_dir=export_dir
+        from components.inputs.project_workbooks import source_limit_state
+        detected_state,detected_note=source_limit_state(export_dir)
+        # Default to the source model, not a mixed ULS/SLS export. If the
+        # source is unidentified ULS is only a visible UI default and the
+        # project import gate still requires an explicitly reviewed model.
+        initial_state=detected_state or 'ULS'
         story_csv,story_source_note=recommended_story_weight_input(export_dir)
         self.path=tk.StringVar(value=str(story_csv) if story_csv and story_csv.is_file() else "")
         self.story_source_note=story_source_note
-        self.outdir=tk.StringVar(value=str(analysis_output_folder(export_dir,'Both')))
+        self.outdir=tk.StringVar(value=str(analysis_output_folder(export_dir,initial_state)))
         self._output_is_automatic=True
-        self.state=tk.StringVar(value="Both"); self.soil=tk.StringVar(value="C")
+        self.state=tk.StringVar(value=initial_state); self.soil=tk.StringVar(value="C")
         self.T=tk.StringVar(value=""); self.Z=tk.StringVar(value="")
         self.location=tk.StringVar(value=""); self.z_source=tk.StringVar(value="Annex C municipality table")
         self.I=tk.StringVar(value=""); self.vs30=tk.StringVar(value=""); self.n_spt=tk.StringVar(value=""); self.system=tk.StringVar(value="Select / determine from Table 5-2")
@@ -434,6 +440,8 @@ class ESMGui:
         from OpenSees_Complete_Export_V118 import autoselect_inputs
         autoselect_inputs(self, export_dir, 'modal_model_script')
         self._load_project_inputs()
+        if not detected_state:
+            self.status.set('SOURCE STATE REQUIRES REVIEW: '+detected_note+' | ULS shown as a UI default only; verify the actual .EDB before calculation.')
         self.state.trace_add('write',lambda *_:self._state_changed())
         self.direction.trace_add('write',lambda *_: self._direction_changed())
         self.root.after(250,lambda:self._read_etabs_periods(show_error=False))
@@ -485,7 +493,7 @@ class ESMGui:
         ttk.Label(refs,text="NBC 105:2025: §3.2.1 ESM eligibility | §4.1.2/Table 4-1 soil spectrum | §4.1.4 and Annex C/Table C-1 zoning Z | Table 4-4 importance I | §4.2 SLS spectrum | §5.1 period | Table 5-1 seismic weight | Table 5-2 system factors | §§6.1–6.4 coefficient, base shear, vertical distribution and eccentric application | §5.5.1 ULS/SLS deflections | §5.5.3 drift limits | §5.6 accidental eccentricity | §6.5 ESM deflection scale kd. Official PDF: https://ebps.kathmandu.gov.np/UploadFiles/NBC_105_2025_Sesmic_Design.pdf | DUDBC code index: https://www.dudbc.gov.np/pages/24231978/. Enter the exact municipality and verified Annex C/Table C-1 Z, or document map interpolation; the GUI does not guess Z. ETABS mapping: ETABS_to_OpenSees_Node_Mapping.csv and OpenSees_Element_Connectivity.json.",wraplength=1000).pack(anchor="w")
         calc=ttk.LabelFrame(top,text="3. Code/project parameters — verify against the approved design basis",padding=8); calc.pack(fill="x",pady=5)
         calc.columnconfigure(1,weight=1); calc.columnconfigure(3,weight=1)
-        ttk.Label(calc,text="Limit state cases").grid(row=0,column=0,sticky="w",padx=5,pady=4); ttk.Combobox(calc,textvariable=self.state,values=["Both","ULS","SLS"],state="readonly",width=16).grid(row=0,column=1,sticky="w",padx=5)
+        ttk.Label(calc,text="Limit state cases").grid(row=0,column=0,sticky="w",padx=5,pady=4); ttk.Combobox(calc,textvariable=self.state,values=["ULS","SLS"],state="readonly",width=16).grid(row=0,column=1,sticky="w",padx=5)
         ttk.Label(calc,text="Soil type (Table 4-1)").grid(row=0,column=2,sticky="w",padx=5,pady=4); ttk.Combobox(calc,textvariable=self.soil,values=["A","B","C","D"],state="readonly",width=16).grid(row=0,column=3,sticky="w",padx=5)
         self._field(calc,"Adopted T1 (s), lesser value per §5.1",self.T,1,0); self._field(calc,"Zoning factor Z, §4.1.4",self.Z,1,2)
         self._field(calc,"Location / municipality",self.location,2,0)
@@ -544,12 +552,21 @@ class ESMGui:
         except Exception as exc:messagebox.showerror('Result plots',str(exc))
 
     def _state_changed(self):
+        from components.inputs.project_workbooks import source_limit_state
+        actual,note=source_limit_state(self.export_dir)
+        selected=self.state.get()
+        if actual and selected!=actual:
+            self.status.set('CROSS-STATE COMPARISON BLOCKED: '+note)
+            self.state.set(actual)
+            return
         if self._output_is_automatic:
             self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get())))
         self._load_project_inputs()
 
     def _load_project_inputs(self):
         try:
+            from components.inputs.project_workbooks import require_source_state
+            require_source_state(self.export_dir,self.state.get())
             self.rayleigh_tx.set('');self.rayleigh_ty.set('')
             from OpenSees_Project_Inputs_V123 import populate
             data=populate(self,HERE,self.export_dir)
@@ -886,6 +903,8 @@ class ESMGui:
             return
         started=time.perf_counter()
         try:
+            from components.inputs.project_workbooks import require_source_state
+            require_source_state(self.export_dir,self.state.get())
             if not self.path.get(): raise ValueError("Choose the verified story-weight CSV first; this dialog does not read an EDB directly.")
             self._update_periods()
             if not self.T.get().strip() or not self.Z.get().strip(): raise ValueError("Enter the adopted T1 and seismic zoning factor Z from project/geotechnical/code data.")
