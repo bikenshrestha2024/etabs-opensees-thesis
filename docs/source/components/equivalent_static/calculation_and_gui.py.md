@@ -37,3 +37,12 @@ The ESM initialization previously referenced an undefined `rayleigh_state`; now 
 - §6.5 Table 6-1 permits deflection factor 0.85 for 6+ storeys; it does **not** authorize scaling of MRSM drift/displacement by the §7.5 member-force factor.
 
 All automatic calculations must report source model hash, source wall opening interpretation, seismic base and load-path reconciliation. Do not claim native ETABS reproduction until outputs are independently compared. See [parameter manual](../../../review/20261105_PROFESSIONAL_STRUCTURAL_ENGINEERING_PROVENANCE_MANUAL.md).
+
+
+### 2026-11-05 bounded review — sidecar path and per-state metadata
+
+Source review of `_calculate` identified an unverified/blank `model_script` path previously resolving to current working directory when writing `OpenSees_Initial_PDelta_Input_V124.json`. The new `validated_pdelta_sidecar_path` returns a target **only** for an explicitly selected existing `.py` script, preserving the legacy filename and sidecar location for valid working cases. ESM standalone computations remain usable, but they do not emit a P-Delta model sidecar absent a real model path.
+
+A separate mismatch existed when a combined SLS case used its SLS period `result.period_s` but the output `period_selection.Rayleigh_T1_X_s/Y_s` described the ULS GUI periods. `state_rayleigh_provenance` now attaches the matching SLS imported evidence to SLS outputs and labels the evidence state. These are program integrity corrections, not proof that source modal/period properties are physically correct.
+
+Regressions: `tests/verify_esm_output_safety.py` (seven synthetic tests). No native ETABS comparison is asserted.
