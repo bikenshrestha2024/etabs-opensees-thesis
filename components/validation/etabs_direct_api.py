@@ -149,7 +149,8 @@ def extract_from_sap(sap, mapping):
             "location":str(location),"metric":metric,"unit":unit,"basis":basis,
             "value":_finite(value,metric),"source_file":str(actual),
             "etabs_source_case":str(source_case),"etabs_step_type":str((extra or {}).get("step_type","")),
-            "etabs_step_number":(extra or {}).get("step_number",""),\n            **({"axis":axis_override} if axis_override is not None else {})})
+            "etabs_step_number":(extra or {}).get("step_number",""),
+            **({"axis":axis_override} if axis_override is not None else {})})
     try:
         _ok(sap.SetPresentUnits(UNITS_KN_M_C),"SetPresentUnits(kN-m-C)")
         for m in cases:
