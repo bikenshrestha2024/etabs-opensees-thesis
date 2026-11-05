@@ -92,6 +92,7 @@ on:
       - 'tests/verify_esm_source_selection.py'
       - 'tests/verify_esm_aw_period_provenance.py'
       - 'tests/verify_esm_blank_copy_rayleigh.py'
+      - 'tests/verify_esm_source_state_isolation.py'
       - 'tests/verify_esm_output_safety.py'
       - 'tools/run_native_wall_probes.py'
       - 'tests/verify_native_wall_probe_preparation.py'
@@ -153,6 +154,7 @@ jobs:
           python tests/verify_esm_source_selection.py
           python tests/verify_esm_aw_period_provenance.py
           python tests/verify_esm_blank_copy_rayleigh.py
+          python tests/verify_esm_source_state_isolation.py
           python tests/verify_etabs_direct_equivalence.py
           python tests/verify_esm_output_safety.py
           python tests/verify_native_wall_probe_preparation.py
