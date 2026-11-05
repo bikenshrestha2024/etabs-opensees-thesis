@@ -17,9 +17,69 @@ def _numbers(raw):
         return [float(raw)]
 
 
+def snapshot_selected_state(ops, output_path, *, suspect_tags,
+                            stage="LAST_ACCEPTED_COMMITTED", max_values=24):
+    """Minimal element/node evidence for a committed (not failed) state.
+
+    Only actual live solver tags are queried. Unsupported eleResponse
+    channels are identified explicitly. This never updates the solver
+    state, alters the material, or assumes that a nonfinite response is
+    the initiating cause. Use immediately after gravity and each accepted
+    diagnostic step; the last committed snapshot survives a failed attempt.
+    """
+    tags=sorted({int(tag) for tag in suspect_tags})
+    if len(tags)>16 or any(t<=0 for t in tags):
+        raise ValueError("suspect_tags must have 1..16 positive solver tags")
+    existing=set(map(int,ops.getEleTags()))
+    report={"status":stage,"time_s":float(ops.getTime()),
+            "tag_count":len(tags),"elements":[],"missing_tags":[],
+            "warning":"Committed response evidence is not material qualification."}
+    for tag in tags:
+        if tag not in existing:
+            report["missing_tags"].append(tag)
+            continue
+        item={"tag":tag,"nodes":[],"responses":{}}
+        try:
+            elements_nodes=[int(x) for x in ops.eleNodes(tag)]
+        except Exception as exc:
+            item["node_query_error"]=str(exc)
+            elements_nodes=[]
+        for node in elements_nodes:
+            entry={"tag":node}
+            for name in ("nodeCoord","nodeDisp","nodeVel","nodeAccel"):
+                try:
+                    values=_numbers(getattr(ops,name)(node))
+                    entry[name]={"status":"FINITE" if all(math.isfinite(v) for v in values) else "NONFINITE",
+                                 "values":[str(v) for v in values[:max_values]]}
+                except Exception as exc:
+                    entry[name]={"status":"UNSUPPORTED_OR_ERROR","error":str(exc)}
+            item["nodes"].append(entry)
+        for name,args in (
+            ("localForce",("localForce",)),
+            ("basicDeformation",("basicDeformation",)),
+            ("globalForce",("globalForce",)),
+            ("ShearDef",("ShearDef",)),
+            ("Curvature",("Curvature",)),
+            ("RCPanel1_panel_stress",("RCPanel",1,"panel_stress")),
+            ("RCPanel1_panel_strain",("RCPanel",1,"panel_strain"))):
+            try:
+                value=_numbers(ops.eleResponse(tag,*args))
+                item["responses"][name]={
+                    "status":("UNSUPPORTED_EMPTY" if not value else
+                              "FINITE" if all(math.isfinite(v) for v in value) else "NONFINITE"),
+                    "values":[str(v) for v in value[:max_values]]}
+            except Exception as exc:
+                item["responses"][name]={"status":"UNSUPPORTED_OR_ERROR","error":str(exc)}
+        report["elements"].append(item)
+    output=Path(output_path)
+    output.parent.mkdir(parents=True,exist_ok=True)
+    output.write_text(json.dumps(report,indent=2,allow_nan=False),encoding="utf-8")
+    return report
+
+
 def snapshot_failed_step(
     ops, output_path, *, algorithm, dt, return_code,
-    element_map_path=None, maximum_findings=150,
+    element_map_path=None, maximum_findings=150, suspect_tags=None,
 ):
     """Write observed non-finite responses without treating missing responses as zero."""
     out = Path(output_path)
@@ -53,7 +113,11 @@ def snapshot_failed_step(
         "query_errors": [],
     }
 
-    for tag in ops.getNodeTags():
+    focus=set(map(int,suspect_tags)) if suspect_tags is not None else None
+    if focus is not None and (len(focus)>16 or any(t<=0 for t in focus)):
+        raise ValueError("suspect_tags must contain 1..16 positive element tags")
+    report["focused_element_tags"]=sorted(focus) if focus is not None else None
+    for tag in ([] if focus is not None else ops.getNodeTags()):
         report["nodes_scanned"] += 1
         try:
             values = _numbers(ops.nodeDisp(tag))
@@ -65,7 +129,7 @@ def snapshot_failed_step(
             if len(report["query_errors"]) < maximum_findings:
                 report["query_errors"].append({"node": int(tag), "error": str(exc)})
 
-    for tag in ops.getEleTags():
+    for tag in (sorted(focus) if focus is not None else ops.getEleTags()):
         report["elements_scanned"] += 1
         source = inverse.get(int(tag))
         queries = [
