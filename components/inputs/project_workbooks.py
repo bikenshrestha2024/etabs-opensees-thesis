@@ -130,6 +130,18 @@ def _wall_aw_from_patches(height_m, first_base_m, first_top_m, patches):
     return reference_result
 
 def source_workbooks(root, export_dir,limit_state='ULS'):
+    """Discover explicit or model-matched current Excel calculation inputs.
+
+    Inputs: project root and ETABS export directory (Path-like), ULS/SLS state.
+    Returns: [NBC Calculator workbook Path|None, scaling workbook Path|None].
+    The SCALING SUMMARY B4 EDB identity and source floor/state are more
+    authoritative than a similar workbook filename. A stored Windows path
+    MUST be normalized on Linux CI as well as Windows Spyder. No workbook
+    calculations are evaluated: openpyxl reads cached formula values.
+    Selecting a workbook is NOT physical validation of wall Aw or periods;
+    use the per-cell audit from import_project_inputs and real ETABS checks.
+    Read source files only; never modify their values or formula caches.
+    """
     root=Path(root);export_dir=Path(export_dir)
     state=str(limit_state).strip().upper()
     if state=='BOTH':state='ULS'
@@ -227,6 +239,19 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
 
 
 def import_project_inputs(root, export_dir,limit_state='ULS'):
+    """Read source-attributed ESM inputs and optionally audit wall geometry.
+
+    Inputs: ETABS export JSONs + selected or auto-discovered spreadsheets.
+    Output: {values, audit, notes}, where audit retains source/sheet/cell and
+    geometry terms are separately labeled rather than silently overriding
+    workbook Aw. The first story is determined using diaphragm elevations,
+    with z-varying wall footprints rejected for automatic Aw computation.
+    This screen does not decide physical wall grouping, construction-stage
+    seismic base or the actual effective area at openings (NBC §5.1.2).
+    Rayleigh cache values are accepted only when model/weight/state/Aw hashes
+    and metadata match; ETABS eigenperiods remain references, not Rayleigh T.
+    Side effects: none on the source ETABS files or Excel workbooks.
+    """
     from openpyxl import load_workbook
     state=str(limit_state).strip().upper()
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
