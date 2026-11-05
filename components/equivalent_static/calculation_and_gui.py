@@ -679,7 +679,11 @@ class ESMGui:
             awx=float(self.awx.get());awy=float(self.awy.get())
             if not all(math.isfinite(v) and v>0 for v in (awx,awy)):
                 raise ValueError('Import and review finite positive X/Y wall Aw first.')
+            # Works through both the root compatibility launcher and direct
+            # components.equivalent_static imports (e.g. tests / Spyder).
             script=HERE/'OpenSees_Rayleigh_Preliminary_V123.py'
+            if not script.is_file():
+                script=HERE.parents[1]/'OpenSees_Rayleigh_Preliminary_V123.py'
             if not script.is_file():raise FileNotFoundError(script)
             states=['ULS','SLS'] if self.state.get()=='Both' else [self.state.get()]
             if any(state not in ('ULS','SLS') for state in states):
