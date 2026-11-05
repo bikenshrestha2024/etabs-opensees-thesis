@@ -151,7 +151,7 @@ jobs:
       - name: Install isolated CI workbook test dependency
         run: |
           # This is the GitHub Actions runner, not the user's conda-forge Windows environment.
-          python -m pip install openpyxl==3.1.5
+          python -m pip install openpyxl==3.1.5 numpy==2.1.3
       - name: Syntax-check key NLTHA files
         run: |
           python -m compileall -q components/validation/etabs_direct_api.py components/validation/etabs_equivalence_report.py components/validation/etabs_comparison.py components/response_spectrum/model_analysis.py components/validation/irregularity_review.py components/validation/floor_end_extraction.py tests/verify_etabs_direct_equivalence.py tests/verify_esm_output_safety.py tests/verify_esm_aw_period_provenance.py components/equivalent_static/calculation_and_gui.py components/inputs/project_workbooks.py components/model/assembly.py components/nonlinear_time_history 36_SOIL_C_NLTHA_RUN_MATRIX.py 35_SOIL_C_NLTHA_PREFLIGHT.py 33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py components/response_spectrum/nbc_pair_spectrum_audit.py 32_NBC105_PAIR_SPECTRUM_AUDIT.py components/model/reinforcement_mapping.py components/sections/devices.py components/validation/expanded_workbench_tabs.py components/validation/visual_workbench.py components/model/readiness_dashboard.py components/model/readiness_dashboard_gui.py components/ui/application.py
