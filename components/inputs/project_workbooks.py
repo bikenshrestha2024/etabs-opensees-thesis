@@ -44,6 +44,38 @@ def _model_floor(export_dir,source_edb=''):
     return ''
 
 
+def source_limit_state(export_dir):
+    """Infer a single model's ULS/SLS identity from its ETABS source filename.
+
+    Returns (state, evidence), with state 'ULS', 'SLS', or None. It does
+    not infer stiffness from a successful gravity analysis. Ambiguous and
+    unlabelled EDBs require explicit user review rather than silently using
+    a case from the wrong stiffness model.
+    """
+    path=_source_edb_path(export_dir)
+    if not path:
+        return None,'No source_edb in the ETABS export manifests'
+    stem=_portable_source_stem(path).casefold()
+    uls=bool(re.search(r'(?<![a-z])(ultimate|uls)(?![a-z])',stem))
+    sls=bool(re.search(r'(?<![a-z])(service|sls)(?![a-z])',stem))
+    if uls and sls:
+        return None,'Ambiguous EDB state contains both ULS/Ultimate and SLS/Service: '+path
+    if uls:return 'ULS','Source EDB is labelled Ultimate/ULS: '+path
+    if sls:return 'SLS','Source EDB is labelled Service/SLS: '+path
+    return None,'Source EDB does not identify Ultimate or Service: '+path
+
+
+def require_source_state(export_dir,selected_state):
+    """Prevent accidental cross-stiffness apples-to-oranges analysis."""
+    source,note=source_limit_state(export_dir)
+    selected=str(selected_state).strip().upper()
+    if selected not in ('ULS','SLS'):
+        raise ValueError('Select one limit state (ULS or SLS) for a source-matched comparison.')
+    if source and selected!=source:
+        raise ValueError(f'Selected {selected} conflicts with the source model {source}. '+note)
+    return note
+
+
 def analysis_output_folder(export_dir,limit_state='ULS'):
     """Return a separate, source-identifiable result folder inside the shared results root."""
     folder=Path(export_dir)
@@ -205,6 +237,7 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     state=str(limit_state).strip().upper()
     if state=='BOTH':state='ULS'
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
+    require_source_state(export_dir,state)
     search=[export_dir/'Project_Input_Workbooks',export_dir,root/'Project_Input_Workbooks',Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
     selected=export_dir/'NBC105_Workbook_Source.json'
     if selected.is_file():
@@ -318,6 +351,7 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
     from openpyxl import load_workbook
     state=str(limit_state).strip().upper()
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
+    require_source_state(export_dir,state)
     values={};audit=[];notes=[]
     def put(key,value,path,sheet,cell):
         if value is None or str(value).startswith('='):return
