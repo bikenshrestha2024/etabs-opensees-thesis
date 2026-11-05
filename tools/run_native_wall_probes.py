@@ -104,6 +104,19 @@ def execute(manifest_path, *, allow_native=False, timeout_s=None):
         if entry["sha256"] and sha256(entry["path"]) != entry["sha256"]:
             raise ValueError("Model source file changed after probe preparation")
     root = manifest_path.parent
+    probe_register=root/"00_Probe_Evidence_Manifest.json"
+    if not probe_register.is_file():
+        raise FileNotFoundError("Missing original probe input SHA256 register")
+    current=json.loads(probe_register.read_text(encoding="utf-8-sig"))
+    actual_config=json.loads(Path(manifest["source_config_path"]).read_text(encoding="utf-8-sig"))
+    paths={"model_sha256":Path(actual_config["model_folder"])/SOURCE_FILES[0],
+           "record_A_sha256":Path(actual_config["x_path"]),
+           "record_B_sha256":Path(actual_config["y_path"])}
+    for name,path in paths.items():
+        if not path.is_file() or sha256(path)!=current["input_fingerprints"][name]:
+            raise ValueError("Prepared "+name+" source changed or disappeared before native execution")
+    if current.get("status")!="CONFIGS_ONLY_NO_SOLVER_RUN":
+        raise ValueError("Probe input register was not generated in preparation-only mode")
     for probe in PROBES:
         config = root / ("Probe_" + probe + ".json")
         if not config.is_file():
