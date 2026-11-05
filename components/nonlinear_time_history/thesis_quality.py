@@ -156,7 +156,8 @@ def generate_isolation_configs(config, output_dir):
             orientations=["XY"],duration_s=period,
             diagnostic_zero_damping=True,diagnostic_mass_damping=False,
             analysis_intent="RESEARCH_DIAGNOSTIC",
-            output_dir=str(destination/label))
+            output_dir=str(destination/label),
+            diagnostic_suspect_tags=[110280,112778])
         # NEVER mutate source config or select different earthquake files.
         path.write_text(json.dumps(trial,indent=2),encoding="utf-8")
         probes.append(str(path))
