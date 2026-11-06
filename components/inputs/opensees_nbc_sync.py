@@ -127,12 +127,133 @@ def _source_snapshot(export_dir,state):
         'aw_evidence':evidence,
         'wall_aw_profile':profile,
         'continuous_pier_diagnostic':diagnostic,
+        'opening_reduction_audit':(
+            opening_reduction_audit(profile,height)
+            if diagnostic is not None else None),
         'rayleigh_s':{axis:_positive(v.get('rayleigh_t'+axis.lower()))
                       for axis in ('X','Y')},
         'notes':data['notes'],
         'source_audit':data['audit']
     }
     return result
+
+
+def _profile_intervals(profile, z, *, tolerance=1e-6):
+    """Physical wall cross section at z, independent of element mesh splits."""
+    matches=[r for r in profile.get('rows',[])
+             if float(r['z_bottom_m'])-tolerance <= z <= float(r['z_top_m'])+tolerance]
+    if len(matches)!=1:
+        raise ValueError(f'Wall cross-section at z={z:g} belongs to {len(matches)} slices')
+    grouped={}
+    for seg in matches[0].get('segments',[]):
+        key=(seg['axis'],round(float(seg['plane_m']),6),
+             round(float(seg['thickness_m']),6))
+        grouped.setdefault(key,[]).append(
+            (float(seg['start_m']),float(seg['end_m'])))
+    normalized={}
+    for key,spans in grouped.items():
+        merged=[]
+        for a,b in sorted(spans):
+            if merged and a <= merged[-1][1]+tolerance:
+                merged[-1]=(merged[-1][0],max(merged[-1][1],b))
+            else:merged.append((a,b))
+        normalized[key]=merged
+    return normalized
+
+
+def compare_wall_profiles(opensees_profile, etabs_profile, *, tolerance_m=0.001):
+    """Exact source-slice geometry comparison, not independent NBC acceptance.
+
+    For every combined floor-slice boundary compare the unioned physical
+    projected intervals on each (direction, wall plane, thickness). A mismatch
+    in any X/Y pier or opening is a failure. The tolerance is a numerical
+    geometry screening setting (1 mm default), NOT an NBC acceptance tolerance.
+    """
+    if not math.isfinite(tolerance_m) or tolerance_m<=0:
+        raise ValueError('Geometry comparison tolerance must be positive')
+    a=opensees_profile.get('rows',[]);b=etabs_profile.get('rows',[])
+    if not a or not b:
+        return dict(status='NO_COMMON_SOURCE_GEOMETRY',max_difference_m=None,
+                    mismatches=[{'reason':'Missing elevation slices'}],checked_slices=0)
+    z1=(float(a[0]['z_bottom_m']),float(a[-1]['z_top_m']))
+    z2=(float(b[0]['z_bottom_m']),float(b[-1]['z_top_m']))
+    if any(abs(x-y)>tolerance_m for x,y in zip(z1,z2)):
+        return dict(status='MISMATCHED_STORY_ELEVATIONS',checked_slices=0,
+                    max_difference_m=max(abs(x-y) for x,y in zip(z1,z2)),
+                    mismatches=[{'open_sees':z1,'etabs':z2}])
+    cuts=sorted(set(
+        [z1[0],z1[1]]+
+        [float(r['z_bottom_m']) for r in a+b]+
+        [float(r['z_top_m']) for r in a+b]))
+    issues=[];maxdiff=0.;checked=0
+    for lower,upper in zip(cuts,cuts[1:]):
+        if upper-lower<=1e-8:continue
+        z=(lower+upper)/2
+        left=_profile_intervals(opensees_profile,z)
+        right=_profile_intervals(etabs_profile,z)
+        checked+=1
+        for key in sorted(set(left)|set(right)):
+            spans_a=left.get(key,[]);spans_b=right.get(key,[])
+            if len(spans_a)!=len(spans_b):
+                issues.append({'z_mid_m':z,'axis':key[0],'plane_m':key[1],
+                               'thickness_m':key[2],'open_sees':spans_a,
+                               'etabs':spans_b,'reason':'Pier/opening interval count differs'})
+                continue
+            for la,lb in zip(spans_a,spans_b):
+                diff=max(abs(la[0]-lb[0]),abs(la[1]-lb[1]))
+                maxdiff=max(maxdiff,diff)
+                if diff>tolerance_m:
+                    issues.append({'z_mid_m':z,'axis':key[0],'plane_m':key[1],
+                                   'thickness_m':key[2],'open_sees':la,
+                                   'etabs':lb,'reason':'Pier boundary discrepancy'})
+    return dict(status=('GEOMETRY_MATCHED_REVIEW_REQUIRED' if not issues else
+                        'GEOMETRY_MISMATCH'),checked_slices=checked,
+                tolerance_m=tolerance_m,max_difference_m=maxdiff,
+                mismatches=issues[:200],total_mismatches=len(issues),
+                disclaimer='Geometry matching does not establish code-effective '
+                           'wall-pier grouping, coupling, materials or actual '
+                           'ETABS analysis equivalence.')
+
+
+def opening_reduction_audit(profile, height_m):
+    """Compute gross plan projection and continuous pier contribution separately.
+
+    Gross: union of *all* material projected at any first-storey elevation.
+    Net: intersection of physical material available at *every* elevation.
+    The difference is a geometry reduction in cross-section contribution;
+    it is NOT the vertical opening area nor a blanket NBC deduction rule.
+    """
+    from components.inputs.project_workbooks import (
+        _wall_aw_from_lines,_continuous_wall_pier_diagnostic)
+    grouped={}
+    for row in profile.get('rows',[]):
+        for seg in row['segments']:
+            key=(seg['axis'],float(seg['plane_m']),float(seg['thickness_m']))
+            grouped.setdefault(key,[]).append(
+                (float(seg['start_m']),float(seg['end_m'])))
+    if not grouped:
+        return {'status':'NO_GEOMETRY','axes':{}}
+    gross,segments=_wall_aw_from_lines(height_m,grouped)
+    continuous=_continuous_wall_pier_diagnostic(height_m,profile)
+    net=continuous['aw_candidate_m2']
+    axes={}
+    for axis in ('X','Y'):
+        g=float(gross[axis]);n=net.get(axis)
+        # No full-height walls in a direction means net=0 for audit; it
+        # remains a null candidate for a prospective NBC input.
+        nvalue=float(n) if n is not None else 0.
+        axes[axis]={'gross_projected_Aw_m2':g,
+                    'continuous_pier_Aw_m2':n,
+                    'excluded_noncontinuous_Aw_m2':max(0.,g-nvalue),
+                    'excluded_fraction_of_gross':((g-nvalue)/g if g>0 else None),
+                    'gross_segments':[v for v in segments if v['axis']==axis],
+                    'continuous_segments':[v for v in continuous['continuous_segments']
+                                           if v['axis']==axis]}
+    return {'status':'OPENING_DEDUCTION_GEOMETRY_AUDIT',
+            'axes':axes,'continuous_pier_status':continuous['status'],
+            'disclaimer':'Gross-minus-through-height difference is only an '
+                         'opening/discontinuity *geometric* exclusion; it is '
+                         'not gross opening area and not an NBC-certified Aw.'}
 
 
 def _etabs_numeric_triplet(response,expected=3):
@@ -263,6 +384,19 @@ def export_sync_report(report, output_dir, template=None):
         ws.append([p['z_bottom_m'],p['z_top_m'],p['aw_x_m2'],p['aw_y_m2'],
                    p['x_segment_count'],p['y_segment_count']])
     ws.append([])
+    ws.append(['OPENING REDUCTION: gross projected versus continuous-through-height'])
+    for axis,items in (report.get('opening_reduction_audit') or {}).get('axes',{}).items():
+        ws.append([axis,'Gross Aw (m²)',items['gross_projected_Aw_m2'],
+                   'Continuous Aw (m²)',items['continuous_pier_Aw_m2'],
+                   'Excluded (m²)',items['excluded_noncontinuous_Aw_m2']])
+    ws.append([])
+    ws.append(['ETABS ↔ OpenSees wall-pier geometry crosscheck'])
+    cross=report.get('geometry_crosscheck') or {}
+    ws.append(['Status',cross.get('status'),'Slices checked',cross.get('checked_slices'),
+               'Tolerance (m)',cross.get('tolerance_m')])
+    for mismatch in cross.get('mismatches',[])[:100]:
+        ws.append(['Mismatch',str(mismatch)])
+    ws.append([])
     ws.append(['CONTINUOUS THROUGH-HEIGHT PIER DIAGNOSTIC — NOT CODE ACCEPTED'])
     for seg in (report.get('continuous_pier_diagnostic') or {}).get('continuous_segments',[]):
         ws.append(['FULL HEIGHT',seg['axis'],seg['plane_m'],seg['start_m'],
@@ -299,9 +433,24 @@ def synchronize(export_dir,state='ULS',template=None,output_dir=None,etabs_fallb
     report=_source_snapshot(export_dir,state)
     if etabs_fallback:
         try:
-            report['etabs_fallback']=read_etabs_wall_profile(export_dir)
+            fallback=read_etabs_wall_profile(export_dir)
+            report['etabs_fallback']=fallback
+            if report.get('wall_aw_profile') is not None:
+                audit=compare_wall_profiles(report['wall_aw_profile'],fallback['profile'])
+                if fallback.get('errors') or fallback.get('skipped_nonorthogonal'):
+                    audit['status']='INCOMPLETE_ETABS_EXTRACTION'
+                    audit['reason']='ETABS skipped/failed area objects: '
+                    audit['reason']+=str(fallback.get('errors',[])[:5])
+                report['geometry_crosscheck']=audit
+                # Source confidence is upgraded only for full matching
+                # projected geometry, not for arbitrary comparable Aw numbers.
+                for axis in ('X','Y'):
+                    report['aw_evidence'][axis]['geometry_crosscheck']=audit['status']
+                    report['aw_evidence'][axis]['code_accepted']=False
         except Exception as exc:
             report['etabs_fallback']={'status':'NOT_AVAILABLE','reason':str(exc)}
+            report['geometry_crosscheck']={
+                'status':'NOT_AVAILABLE','reason':str(exc)}
     if output_dir is None:
         output_dir=analysis_output_folder(export_dir,state)/'NBC105_Input_Sync'
     paths=export_sync_report(report,output_dir,template=template)

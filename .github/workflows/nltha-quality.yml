@@ -106,6 +106,8 @@ on:
       - 'tests/verify_esm_blank_copy_rayleigh.py'
       - 'tests/verify_esm_rayleigh_blank_preflight_20261106.py'
       - 'tests/verify_opensees_first_nbc_sync.py'
+      - 'tests/verify_esm_opening_etabs_crosscheck.py'
+      - 'docs/review/20261106_ESM_OPENING_DEDUCTION_CROSSCHECK.md'
       - 'tests/verify_esm_continuous_pier_diagnostic.py'
       - 'tests/verify_esm_bad_zip_isolation_20261106.py'
       - 'docs/review/20261106_ESM_BADZIP_WORKBOOK_ISOLATION.md'
@@ -202,6 +204,7 @@ jobs:
           python tests/verify_esm_blank_copy_rayleigh.py
           python tests/verify_esm_rayleigh_blank_preflight_20261106.py
           python tests/verify_opensees_first_nbc_sync.py
+          python tests/verify_esm_opening_etabs_crosscheck.py
           python tests/verify_esm_continuous_pier_diagnostic.py
           python tests/verify_esm_bad_zip_isolation_20261106.py
           python tests/verify_esm_blank_aw_source_20261106.py
