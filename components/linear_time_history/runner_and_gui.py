@@ -59,6 +59,20 @@ from OpenSees_Input_Records_V130 import (
 
 # SECTION 18.2 — Build one fresh model, freeze gravity, and configure damping
 @timed_outputs('Linear time history','config')
+def select_diagnostic_duration(full_duration_s, trial_duration_s=None):
+    """Return (actual seconds, truncated) without mislabelling full records."""
+    full=float(full_duration_s)
+    if not math.isfinite(full) or full<=0:
+        raise ValueError("Full record duration must be finite and positive")
+    if trial_duration_s in (None,""):
+        return full,False
+    requested=float(trial_duration_s)
+    if not math.isfinite(requested) or requested<=0:
+        raise ValueError("trial_duration_s must be finite and positive")
+    actual=min(full,requested)
+    return actual,actual<full-1e-9
+
+
 def _run_analysis(config):
     config.setdefault('gravity_profile',os.environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
     if not config.get("execute_linear_time_history", False):
@@ -186,6 +200,13 @@ def _run_analysis(config):
                 # upper bounds; the Tn term is not divided by 100.
                 dt = min(dt_record, t1 / 100.0, tn, 0.01)
                 duration = (len(motion["x"]) - 1) * motion["dt_x"] if orientation == "X_ONLY" else max((len(motion["x"]) - 1) * motion["dt_x"], (len(motion["y"]) - 1) * motion["dt_y"])
+                full_record_duration=duration
+                duration,is_truncated=select_diagnostic_duration(
+                    full_record_duration,config.get("trial_duration_s"))
+                if is_truncated:
+                    print(f"[LINEAR TRIAL] {case}: analyzed={duration:g}s; "
+                          f"full_record={full_record_duration:g}s; "
+                          "TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE",flush=True)
                 nsteps = int(math.ceil(duration / dt))
                 # SECTION 18.4 — NBC-limited integration step and linear Newmark stack.
                 ops.wipeAnalysis(); ops.constraints("Transformation"); ops.numberer("RCM")
@@ -260,7 +281,12 @@ def _run_analysis(config):
                 drift_limit = 0.025 if config["limit_state"] == "ULS" else 0.006
                 peak = {"case": case, "pair_id": motion["pair_id"], "field_type": motion.get("field_type", "Custom"), "orientation": orientation,
                     "scale_factor": motion["scale"], "acceleration_units": motion["units"], "record_dt_min_s": dt_record,
-                    "analysis_dt_s": dt, "duration_s": duration, "steps": nsteps,
+                    "analysis_dt_s": dt, "duration_s": duration,
+                    "full_record_duration_s": full_record_duration,
+                    "is_truncated_trial": is_truncated,
+                    "acceptance_label": ("COMPLETED_TRUNCATED_TRIAL" if is_truncated
+                                         else "FULL_RECORD_COMPLETION_REQUIRES_REVIEW"),
+                    "steps": nsteps,
                     "peak_roof_UX_m": max(abs(r[f"{stories[-1]['story_name']}_UX_m"]) for r in lines),
                     "peak_roof_UY_m": max(abs(r[f"{stories[-1]['story_name']}_UY_m"]) for r in lines),
                     "minimum_roof_UX_m": min(r[f"{stories[-1]['story_name']}_UX_m"] for r in lines),
@@ -343,6 +369,10 @@ def _run_analysis(config):
         "model_length_unit": model_length_unit, "model_acceleration_unit": model_acceleration_unit,
         "clauses": ["3.2.3", "8.1.1", "8.1.2", "8.1.3", "9.3.2", "9.3.3"],
         "model_script": config["model_script"], "limit_state_context": config["limit_state"], "torsion_sensitive": config["torsion_sensitive"],
+        "trial_duration_s": config.get("trial_duration_s"),
+        "acceptance_classification": ("DIAGNOSTIC_NOT_CODE_ACCEPTANCE" if
+                any(r["is_truncated_trial"] for r in records) else
+                "FULL_RECORD_REQUIRES_SEPARATE_ACCEPTANCE"),
         "record_pairs": len(motions) if config.get("motion_mode") != "X_ONLY_SCREENING" else 0,
         "individual_record_count": len(motions), "motion_case_count": len(records),
         "pair_aggregation_guidance": "For each orthogonal pair, the two required swapped-orientation analyses are enveloped by taking the larger peak demand for each response quantity. NBC §8.1.3 then selects maximum for fewer than 7 pairs or arithmetic mean for more than 7 pairs. The supplied combined suite has 8 pairs; near-field (6) and far-field (2) subgroup statistics are reported separately for comparison. Exactly 7 is left flagged because the clause wording does not specify it.",
@@ -441,6 +471,7 @@ class LinearTimeHistoryGUI:
         self.damping = tk.StringVar(value="5.0"); self.p1 = tk.StringVar(); self.p2 = tk.StringVar()
         self.t1x = tk.StringVar(); self.t1y = tk.StringVar(); self.tnx = tk.StringVar(); self.tny = tk.StringVar()
         self.nmodes = tk.StringVar(value="20"); self.ls = tk.StringVar(value="ULS")
+        self.trial_duration=tk.StringVar(value="")
         self._output_is_automatic=True
         self.torsion = tk.BooleanVar(value=True); self.running = False
         self.motion_mode = tk.StringVar(value=LTH_DEFAULT_MODE)
@@ -523,6 +554,8 @@ class LinearTimeHistoryGUI:
             if var is self.ls: ttk.Combobox(grid, textvariable=var, values=("ULS", "SLS"), state="readonly", width=11).grid(row=i // 3, column=(i % 3) * 2 + 1, sticky="ew", padx=(0, 12))
             else: ttk.Entry(grid, textvariable=var, width=12).grid(row=i // 3, column=(i % 3) * 2 + 1, sticky="ew", padx=(0, 12))
         for c in range(6): grid.columnconfigure(c, weight=1 if c % 2 else 0)
+        self._entry(params,"Optional short trial duration (s)",self.trial_duration)
+        ttk.Label(params,text="Blank runs the full record. A shorter positive duration is only a numerical diagnostic and is NEVER NBC record acceptance.",wraplength=1050,foreground="#9a3412").pack(anchor="w",pady=3)
         ttk.Label(params,text="The ULS/SLS context is passed to the selected builder (which may apply implemented state-specific stiffness modifiers) and labels outputs; it does not load a second ETABS model or derive service-load combinations. With only a ULS export, an SLS-labelled run is not independently validated. Verify service loads, effective stiffness, periods and motion/scaling basis before treating it as an SLS result.",wraplength=1060,foreground="#9a3412").pack(anchor="w",fill="x",pady=(4,2))
         ttk.Checkbutton(params, text="Torsionally sensitive 3D structure (requires at least 3 orthogonal motion pairs)", variable=self.torsion).pack(anchor="w", pady=(5, 0))
         ttk.Label(params, text="T1 is from NBC §5.1 (lesser adopted period); Tn is the highest mode needed for 90% mass participation in each axis. Obtain/verify these in the Modal Analysis GUI. The chosen Rayleigh calibration periods and checked modal damping must keep all inspected modes ≤5%.", wraplength=1060, foreground="#8a3412").pack(anchor="w", pady=(5, 0))
@@ -584,7 +617,8 @@ class LinearTimeHistoryGUI:
                 "motion_mode": "X_ONLY_SCREENING" if x_only else "PAIRED_3D", "peer_x_paths": self.x_record_paths,
                 "x_scale_factor": float(self.x_scale.get()), "pair_scale_factor": float(self.pair_scale.get()),
                 "use_preloaded_peer_pairs": use_preloaded_pairs, "peer_pairs": LTH_DEFAULT_PEER_PAIRS,
-                "execute_linear_time_history": True, "record_matching_metadata": LTH_MATCHING_METADATA}
+                "execute_linear_time_history": True, "record_matching_metadata": LTH_MATCHING_METADATA,
+                "trial_duration_s": (float(self.trial_duration.get()) if self.trial_duration.get().strip() else None)}
             if not x_only:values.update(self.pair_selector.config())
             required = ["model_script", "python", "story_nodes_csv", "output_dir"]
             if not x_only and not use_preloaded_pairs: required.append("motion_manifest")
