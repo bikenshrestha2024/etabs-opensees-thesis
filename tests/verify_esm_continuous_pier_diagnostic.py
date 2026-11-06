@@ -28,7 +28,7 @@ class TestContinuousPierGeometry(unittest.TestCase):
         self.assertAlmostEqual(x,expected['X'])
         self.assertAlmostEqual(y,expected['Y'])
         self.assertLess(x,profile['rows'][0]['aw_x_m2'])
-        self.assertTrue(any('NOT' in v for v in result['warnings']))
+        self.assertTrue(any('not a code-approved' in v.lower() for v in result['warnings']))
 
     def test_mesh_splits_same_wall_merge_back_without_double_counting(self):
         patches=[
