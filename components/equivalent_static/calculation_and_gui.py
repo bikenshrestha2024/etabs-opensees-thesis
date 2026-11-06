@@ -729,10 +729,30 @@ class ESMGui:
             lines=['OpenSees-first audit complete. No ETABS EDB was modified.',
                    *statuses,'Excel audit copy: '+str(paths[1]),
                    'JSON provenance: '+str(paths[0])]
+            deductions=(report.get('opening_reduction_audit') or {}).get('axes',{})
+            for axis in ('X','Y'):
+                reduction=deductions.get(axis)
+                if reduction:
+                    lines.append(
+                        f"{axis} opening-reduced geometry: "
+                        f"gross projected Aw={reduction['gross_projected_Aw_m2']:.8g} m²; "
+                        f"continuous pier Aw={reduction['continuous_pier_Aw_m2']} m²; "
+                        f"excluded projected contribution="
+                        f"{reduction['excluded_noncontinuous_Aw_m2']:.8g} m². "
+                        "NOT the vertical opening area or approved NBC Aw.")
             if etabs:
                 fallback=report.get('etabs_fallback',{})
                 lines.append('ETABS read-only fallback: '+str(fallback.get('status')))
                 if fallback.get('reason'):lines.append(fallback['reason'])
+                matched=report.get('geometry_crosscheck',{})
+                lines.append('ETABS↔OpenSees pier/opening geometry: '
+                             +str(matched.get('status','NO_COMPARISON')))
+                if matched.get('total_mismatches'):
+                    lines.append(f"{matched['total_mismatches']} discrepancies "
+                                 f"at {matched.get('checked_slices',0)} elevation slices.")
+                elif matched.get('status')=='GEOMETRY_MATCHED_REVIEW_REQUIRED':
+                    lines.append('Geometry matches numerically; engineer must still '
+                                 'confirm first-storey effective piers and NBC §5.1.2.')
             self.status.set(' | '.join(lines))
             messagebox.showinfo('NBC 105 source synchronization',
                 '\\n'.join(lines)+'\\n\\nDo not treat a candidate Aw as '
