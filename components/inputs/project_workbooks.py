@@ -283,6 +283,7 @@ def _same_edb_file_content(source_edb, workbook_edb):
 def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
     """Review candidates without treating unmatched workbooks as valid data."""
     from openpyxl import load_workbook
+    from zipfile import BadZipFile
     export_dir=Path(export_dir);root=Path(root)
     selected=export_dir/'NBC105_Workbook_Source.json'
     roots=[export_dir/'Project_Input_Workbooks',export_dir,
@@ -323,8 +324,10 @@ def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
                 notes.append(f'{path.name}: B4 source EDB differs from selected model: {source!r}; '+
                              ('files are byte-identical (SHA256 verified)' if identical else
                               'NO verified equality: do not import this workbook as current-model Aw/T.'))
-        except (OSError,ValueError,KeyError) as exc:
-            notes.append(f'{path.name}: cannot read scaling sheet: {exc}')
+        except (OSError,ValueError,KeyError,BadZipFile) as exc:
+            notes.append(f'{path}: INVALID_XLSX_SKIPPED: {type(exc).__name__}: {exc}; '
+                         'file must be an actual readable XLSX (OOXML ZIP archive). '
+                         'Re-export as .xlsx from Excel or unselect it; original is unchanged.')
     if not candidates:notes.append('No candidate Excel workbooks found. Select the actual NBC calculator and scaling workbook.')
     if not any('SCALING SUMMARY!B14' in note for note in notes):
         notes.append('No SCALING SUMMARY sheet found in searched/selected workbooks. Check export directory and Excel sources.')
@@ -384,8 +387,16 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
                 source=str(wb['SCALING SUMMARY']['B4'].value or '').strip()
             wb.close()
             return sheets,source
-        except (OSError,ValueError,KeyError):
+        except (OSError,ValueError,KeyError) as exc:
             return set(),''
+        except Exception as exc:
+            # openpyxl raises zipfile.BadZipFile (not an OSError or ValueError)
+            # for corrupted/misnamed .xlsx. Do not hide unrelated programmer
+            # errors or abort geometry extraction: only catch this known type.
+            from zipfile import BadZipFile
+            if isinstance(exc,BadZipFile):
+                return set(),''
+            raise
 
     records=[]
     for path in candidates:
@@ -469,6 +480,7 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
     Side effects: none on the source ETABS files or Excel workbooks.
     """
     from openpyxl import load_workbook
+    from zipfile import BadZipFile
     state=str(limit_state).strip().upper()
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
     require_source_state(export_dir,state)
@@ -502,7 +514,13 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
         notes.append('No NBC Calculator workbook selected: soil, Z, I and system factors require reviewed inputs.')
     for path in source_books:
         if path is None:continue
-        wb=load_workbook(path,data_only=True,read_only=True)
+        try:
+            wb=load_workbook(path,data_only=True,read_only=True)
+        except (BadZipFile,OSError,ValueError) as exc:
+            notes.append(f'{path}: INVALID_XLSX_SKIPPED: {type(exc).__name__}: '
+                         f'{exc}. The file was not opened or modified. '
+                         'Verify a genuine Excel .xlsx archive, then reselect.')
+            continue
         if 'NBC Calculator' in wb:
             ws=wb['NBC Calculator']
             for key,cell in {'soil':'B9','Z':'B10','I':'B11','period_factor':'B15','system_excel':'E10'}.items():put(key,ws[cell].value,path,ws.title,cell)
