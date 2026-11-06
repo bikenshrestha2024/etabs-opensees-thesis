@@ -280,6 +280,86 @@ def _same_edb_file_content(source_edb, workbook_edb):
         return False
 
 
+def _scaling_summary(ws):
+    """Read the legacy or shifted ETABS NBC scaling summary by labelled rows.
+
+    Return (source_edb, fields), with each field mapping to (value, cell).
+    This only extracts candidate values; source_workbooks() must still
+    prove current-model EDB identity before importing any result.
+
+    Layouts seen in ETABS scripts place the Source EDB field around B4/B5
+    and X/Y Aw and adopted periods at B14/C14 or B16/C16. Detect each
+    source row by its labels instead of importing header strings as values.
+    """
+    def clean(v):
+        return " ".join(str(v or "").strip().casefold().split())
+    def positive(v):
+        if isinstance(v,bool):return False
+        try:
+            n=float(v)
+            return math.isfinite(n) and n>0
+        except (TypeError,ValueError,OverflowError):
+            return False
+    def path_value(v):
+        v=str(v or "").strip()
+        return v if v.lower().endswith(".edb") else ""
+    # Fast and bounded even on large workbooks.
+    source=""
+    for row in ws.iter_rows(min_row=1,max_row=12,min_col=1,max_col=10):
+        for i,cell in enumerate(row):
+            label=clean(cell.value)
+            if "source edb" in label or "etabs model" in label:
+                for neighbor in row[i+1:i+4]:
+                    found=path_value(neighbor.value)
+                    if found:
+                        source=found
+                        break
+            if source:break
+        if source:break
+    if not source:
+        for coord in ("B4","B5"):
+            source=path_value(ws[coord].value)
+            if source:break
+    fields={}
+    # Locate actual X and Y result rows. The value of the leftmost axis
+    # label must be exactly X/Y or an explicit Aw-X/Aw-Y label. "X" inside
+    # explanatory headers such as "Target Base Shear X" is not accepted.
+    axis_rows={}
+    for row in ws.iter_rows(min_row=10,max_row=48,min_col=1,max_col=9):
+        for i,cell in enumerate(row[:3]):
+            v=clean(cell.value).replace("_","-")
+            axis=("X" if v in ("x","x-direction","direction x","aw-x","aw x")
+                  else "Y" if v in ("y","y-direction","direction y","aw-y","aw y")
+                  else None)
+            if axis is None:continue
+            area=next((c for c in row[i+1:] if positive(c.value)),None)
+            if area is None:continue
+            # Aw and T occupy adjacent numeric cells in the supplied
+            # integrated scaling sheet. Require two valid adjacent inputs.
+            j=next((k for k,c in enumerate(row) if c.coordinate==area.coordinate),-1)
+            period=next((c for c in row[j+1:] if positive(c.value)),None)
+            if period is None:continue
+            if axis not in axis_rows:
+                axis_rows[axis]=(area,period)
+    for axis in ("X","Y"):
+        if axis in axis_rows:
+            area,period=axis_rows[axis]
+            suffix=axis.lower()
+            fields["aw"+suffix]=(area.value,area.coordinate)
+            fields["workbook_adopted_t"+suffix]=(period.value,period.coordinate)
+    # In legacy files the X/Y rows are unlabelled, but the fixed cells
+    # genuinely contain numbers. Never accept header strings as values.
+    for axis,row in (("X",14),("Y",15)):
+        awkey="aw"+axis.lower()
+        tkey="workbook_adopted_t"+axis.lower()
+        area=ws[f"B{row}"];period=ws[f"C{row}"]
+        if awkey not in fields and positive(area.value):
+            fields[awkey]=(area.value,area.coordinate)
+            if positive(period.value):
+                fields[tkey]=(period.value,period.coordinate)
+    return source,fields
+
+
 def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
     """Review candidates without treating unmatched workbooks as valid data."""
     from openpyxl import load_workbook
@@ -309,8 +389,9 @@ def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
             if 'SCALING SUMMARY' not in wb:
                 wb.close();continue
             ws=wb['SCALING SUMMARY']
-            source=str(ws['B4'].value or '').strip()
-            awx=ws['B14'].value;awy=ws['B15'].value
+            source,fields=_scaling_summary(ws)
+            awx=fields.get('awx',(None,None))[0]
+            awy=fields.get('awy',(None,None))[0]
             wb.close()
             def fmt(value):
                 try:
@@ -318,7 +399,8 @@ def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
                     return f'{num:.8g}' if math.isfinite(num) and num>0 else 'INVALID '+repr(value)
                 except (TypeError,ValueError,OverflowError):
                     return 'INVALID '+repr(value)
-            notes.append(f'{path}: SCALING SUMMARY!B14 Aw-X={fmt(awx)}, B15 Aw-Y={fmt(awy)}, B4={source!r}') 
+            notes.append(f'{path}: SCALING SUMMARY!B14 Aw-X={fmt(awx)}, B15 Aw-Y={fmt(awy)} '
+                         f'(fixed or labeled rows), source EDB={source!r}')
             if source and expected and _portable_source_stem(source).casefold()!=_portable_source_stem(expected).casefold():
                 identical=_same_edb_file_content(expected,source)
                 notes.append(f'{path.name}: B4 source EDB differs from selected model: {source!r}; '+
@@ -384,7 +466,7 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
             sheets=set(wb.sheetnames)
             source=''
             if 'SCALING SUMMARY' in sheets:
-                source=str(wb['SCALING SUMMARY']['B4'].value or '').strip()
+                source=_scaling_summary(wb['SCALING SUMMARY'])[0]
             wb.close()
             return sheets,source
         except (OSError,ValueError,KeyError) as exc:
@@ -532,9 +614,25 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
             # B16/B17 are ambiguously labelled ETABS/Rayleigh in the workbook.
             # Import neither as Rayleigh without its force/displacement evidence.
             if ws['B16'].value or ws['B17'].value:notes.append('Workbook B16/B17 need a method/source classification; not assigned as Rayleigh periods.')
-        if 'SCALING SUMMARY' in wb:
+        # A workbook selected as a calculator can also contain a scaling
+        # tab for an unrelated EDB. Only the independently identity-checked
+        # scaling source is allowed to provide Aw or adopted T references.
+        if 'SCALING SUMMARY' in wb and path == source_books[1]:
             ws=wb['SCALING SUMMARY']
-            for key,cell in {'awx':'B14','awy':'B15','workbook_adopted_tx':'C14','workbook_adopted_ty':'C15','reference_base_shear_X':'E7','reference_base_shear_Y':'E8','source_edb':'B4'}.items():put(key,ws[cell].value,path,ws.title,cell)
+            source,fields=_scaling_summary(ws)
+            for key,(value,cell) in fields.items():
+                put(key,value,path,ws.title,cell)
+            # Retain actionable diagnostics for invalid legacy B14/B15
+            # rather than silently omitting nonnumeric Excel error/header
+            # strings. A genuinely shifted labelled row supersedes them.
+            for key,coord in (('awx','B14'),('awy','B15'),
+                              ('workbook_adopted_tx','C14'),
+                              ('workbook_adopted_ty','C15')):
+                if key not in fields:
+                    put(key,ws[coord].value,path,ws.title,coord)
+            if source:put('source_edb',source,path,ws.title,'labelled source EDB')
+            for key,cell in {'reference_base_shear_X':'E7','reference_base_shear_Y':'E8'}.items():
+                put(key,ws[cell].value,path,ws.title,cell)
         wb.close()
     folder=Path(export_dir)
     topology=folder/'OpenSees_Element_Connectivity.json'

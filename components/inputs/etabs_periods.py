@@ -46,9 +46,11 @@ def attach_or_open(folder,open_if_needed=False):
 
 def workbook_references(root,folder):
     from OpenSees_Project_Inputs_V123 import source_workbooks
+    from components.inputs.project_workbooks import _scaling_summary
     from openpyxl import load_workbook
     result={}
-    for path in source_workbooks(root,folder):
+    source_books=source_workbooks(root,folder)
+    for path in dict.fromkeys(source_books):
         if path is None:continue
         wb=load_workbook(path,data_only=True,read_only=True)
         if 'NBC Calculator' in wb:
@@ -57,9 +59,14 @@ def workbook_references(root,folder):
                 value=ws[cell].value
                 if isinstance(value,(int,float)) and math.isfinite(value) and value>0:
                     result['optional_'+axis]=dict(value=value,kind='Workbook ETABS/Rayleigh reference (ambiguous label)',source=str(path),sheet=ws.title,cell=cell)
-        if 'SCALING SUMMARY' in wb:
-            for axis,cell in [('X','C14'),('Y','C15')]:
-                value=wb['SCALING SUMMARY'][cell].value
+        # Never import a scaling tab from a calculator selected for a
+        # different EDB, even when its label and values look plausible.
+        if 'SCALING SUMMARY' in wb and path==source_books[1]:
+            _,fields=_scaling_summary(wb['SCALING SUMMARY'])
+            for axis in ('X','Y'):
+                item=fields.get('workbook_adopted_t'+axis.lower())
+                if not item:continue
+                value,cell=item
                 if isinstance(value,(int,float)) and math.isfinite(value) and value>0:
                     result['adopted_'+axis]=dict(value=value,kind='Workbook NBC adopted reference, not eigenperiod',source=str(path),sheet='SCALING SUMMARY',cell=cell)
         # A clearly named modal export has a mode/period/UX/UY table.
@@ -92,7 +99,8 @@ def populate(gui,root,folder):
     for axis in ('X','Y'):
         r=refs.get('adopted_'+axis)
         if r:getattr(gui,'excel_t'+axis.lower()).set(f"{r['value']:.9g} s — {r['sheet']}!{r['cell']}")
-        r=refs.get('modal_'+axis) or refs.get('optional_'+axis) or refs.get('adopted_'+axis)
+        # Adopted NBC reference period is NOT an ETABS measured eigenperiod.
+        r=refs.get('modal_'+axis) or refs.get('optional_'+axis)
         if r:getattr(gui,'etabs_t'+axis.lower()).set(f"{r['value']:.9g}")
     cache=Path(folder)/'ETABS_Modal_Periods_V125.json'
     if cache.is_file():
