@@ -154,6 +154,68 @@ def _wall_aw_profile(height_m, first_base_m, first_top_m, patches):
     return dict(uniform_footprint=all_same,rows=rows)
 
 
+def _continuous_wall_pier_diagnostic(height_m, profile):
+    """Intersect actual wall-section intervals at every first-storey z slice.
+
+    A positive result is only a *lower-bound-like geometric diagnostic* for
+    continuous projected wall material, not a certified NBC effective Aw.
+    It deliberately omits openings, transfer regions and non-axis-aligned
+    contributions. Do NOT interpret it as a structural/compliance lower bound.
+    Wall segments are matched by source axis, plane and thickness; each
+    candidate must exist over the FULL storey height.
+    """
+    rows=list(profile.get('rows',[]))
+    if not rows:
+        return {'status':'NO_GEOMETRY','aw_candidate_m2':{'X':None,'Y':None},
+                'continuous_segments':[],'warnings':['No first-storey wall slices']}
+    def row_segments(row):
+        grouped={}
+        for seg in row.get('segments',[]):
+            key=(seg['axis'],float(seg['plane_m']),float(seg['thickness_m']))
+            grouped.setdefault(key,[]).append((float(seg['start_m']),float(seg['end_m'])))
+        return grouped
+    per_slice=[row_segments(row) for row in rows]
+    shared_keys=set(per_slice[0])
+    for group in per_slice[1:]:
+        shared_keys.intersection_update(group)
+    common={}
+    for key in sorted(shared_keys):
+        intervals=list(per_slice[0][key])
+        for group in per_slice[1:]:
+            overlap=[]
+            for start,end in intervals:
+                for a,b in group[key]:
+                    low=max(start,a);high=min(end,b)
+                    if high-low>1e-8:overlap.append((low,high))
+            # Normalize overlap so element discretization cannot double count.
+            merged=[]
+            for low,high in sorted(overlap):
+                if merged and low<=merged[-1][1]+1e-8:
+                    merged[-1]=(merged[-1][0],max(merged[-1][1],high))
+                else:
+                    merged.append((low,high))
+            intervals=merged
+            if not intervals:break
+        if intervals:common[key]=intervals
+    from_any=any(group for group in per_slice)
+    if not common:
+        return dict(status='NO_FULL_HEIGHT_CONTINUOUS_WALL_SEGMENTS',
+            aw_candidate_m2={'X':None,'Y':None},continuous_segments=[],
+            warnings=['No identical projected wall length extends through every '
+                      'first-storey slice. Do not manufacture Aw.'])
+    values,segments=_wall_aw_from_lines(height_m,common)
+    candidate={axis:(values[axis] if values[axis]>0 else None) for axis in ('X','Y')}
+    warnings=['Derived solely from the intersection of wall material at every '
+              'first-storey elevation; ignores partial-height spandrels, '
+              'perforated wall group action and other physical mechanisms.',
+              'GEOMETRIC DIAGNOSTIC ONLY. Not a code-approved NBC 105 Aw or '
+              'a physical lower bound on actual seismic demand.']
+    if from_any and any(candidate[axis] is None for axis in ('X','Y')):
+        warnings.append('At least one direction lacks full-height aligned segments.')
+    return dict(status='PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC',
+        aw_candidate_m2=candidate,continuous_segments=segments,warnings=warnings)
+
+
 def _wall_aw_from_patches(height_m, first_base_m, first_top_m, patches):
     """Conservatively audit first-storey projected Aw through its full height.
 
