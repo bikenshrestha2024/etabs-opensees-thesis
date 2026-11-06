@@ -1041,7 +1041,7 @@ class ESMGui:
                 raise ValueError(axis+": Rayleigh period must be finite positive.")
             self.period_sources[axis]='Calculated directional Rayleigh and amplified empirical minimum'
             return min(empirical,ray_value)
-        if self.use_workbook_periods.get() and self.excel_direct_reference:
+        if self.use_workbook_periods.get() and getattr(self,'excel_direct_reference',None):
             r=self.excel_direct_reference
             if r['limit_state']!=self.state.get().strip().upper():
                 raise ValueError(axis+': Excel reference belongs to another limit state.')
