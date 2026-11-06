@@ -103,6 +103,8 @@ on:
       - 'tests/verify_esm_partial_input.py'
       - 'tests/verify_esm_source_selection.py'
       - 'tests/verify_esm_aw_period_provenance.py'
+      - 'tests/verify_esm_explicit_excel_method.py'
+      - 'docs/review/20261106_THESIS_EXCEL_METHOD_DECISION_REGISTER.md'
       - 'tests/verify_esm_blank_copy_rayleigh.py'
       - 'tests/verify_esm_rayleigh_blank_preflight_20261106.py'
       - 'tests/verify_opensees_first_nbc_sync.py'
@@ -152,6 +154,8 @@ on:
       - 'components/inputs/etabs_periods.py'
       - 'docs/review/20261106_ESM_SHIFTED_SCALING_ROWS_Codex.md'
       - 'tests/verify_esm_aw_period_provenance.py'
+      - 'tests/verify_esm_explicit_excel_method.py'
+      - 'docs/review/20261106_THESIS_EXCEL_METHOD_DECISION_REGISTER.md'
       - 'docs/programs/12_EQUIVALENT_STATIC.md'
       - 'docs/review/ledger/**'
       - 'tools/validate_review_ledger.py'
@@ -201,6 +205,7 @@ jobs:
           python tests/verify_esm_partial_input.py
           python tests/verify_esm_source_selection.py
           python tests/verify_esm_aw_period_provenance.py
+          python tests/verify_esm_explicit_excel_method.py
           python tests/verify_esm_blank_copy_rayleigh.py
           python tests/verify_esm_rayleigh_blank_preflight_20261106.py
           python tests/verify_opensees_first_nbc_sync.py
