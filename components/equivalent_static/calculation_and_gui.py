@@ -444,7 +444,11 @@ class ESMGui:
             self.status.set('SOURCE STATE REQUIRES REVIEW: '+detected_note+' | ULS shown as a UI default only; verify the actual .EDB before calculation.')
         self.state.trace_add('write',lambda *_:self._state_changed())
         self.direction.trace_add('write',lambda *_: self._direction_changed())
-        self.root.after(250,lambda:self._read_etabs_periods(show_error=False))
+        # ETABS is an optional comparison source; on-start ROT attachment can
+        # fail with WinError -2147221021 even when workbook/geometry inputs are
+        # valid. Do not automatically obscure input diagnostics with a COM error.
+        self.awx.trace_add('write',lambda *_:self._show_empirical())
+        self.awy.trace_add('write',lambda *_:self._show_empirical())
 
     def _field(self,parent,label,var,row,col=0,width=18):
         ttk.Label(parent,text=label).grid(row=row,column=col,sticky="w",padx=5,pady=4)
@@ -458,6 +462,7 @@ class ESMGui:
         ttk.Button(footer,text='Open output folder',command=self._open_export_folder).pack(side='left',padx=3)
         ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
         ttk.Button(footer,text='Excel sources…',command=self._choose_workbooks).pack(side='left',padx=3)
+        ttk.Button(footer,text='Why are Aw/period fields blank?',command=self._show_source_diagnostics).pack(side='left',padx=3)
         ttk.Button(footer,text='Preliminary Rayleigh run (X/Y)',command=self._run_rayleigh).pack(side='left',padx=3)
         for button in footer.winfo_children():button.pack_forget()
         for index,button in enumerate(footer.winfo_children()):
@@ -570,6 +575,7 @@ class ESMGui:
             self.rayleigh_tx.set('');self.rayleigh_ty.set('')
             from OpenSees_Project_Inputs_V123 import populate
             data=populate(self,HERE,self.export_dir)
+            self.project_input_audit=data
             from OpenSees_ETABS_Periods_V125 import populate as period_references
             refs=period_references(self,HERE,self.export_dir)
             self.etabs_modal_metadata={'source':'Excel references unless live ETABS replaces them','references':refs}
@@ -604,12 +610,15 @@ class ESMGui:
                 source_notes=[str(note) for note in data['notes']
                               if ('SCALING SUMMARY' in str(note) or
                                   'source EDB differs' in str(note) or
-                                  'No NBC Calculator' in str(note))]
+                                  'No NBC Calculator' in str(note) or
+                                  'Aw reconstruction unavailable' in str(note) or
+                                  'wall Aw reconstruction unavailable' in str(note) or
+                                  'Invalid aw' in str(note))]
                 self.status.set('ESM source import incomplete: missing '+', '.join(missing)
                     +'. '+(' | '.join(source_notes[:3]) if source_notes else
                           'No model-matched source fields were found.')
-                    +' | Use Excel sources… to select/reconcile the exact source workbook. '
-                    'Matching filename alone is not proof that a Copy EDB is identical.')
+                    +' | Click Why are Aw/period fields blank? for the source and geometry errors. '
+                    'You may manually enter independently verified Aw; no guessed values are used.')
             else:
                 self.status.set('ESM workbook inputs loaded. Rayleigh periods require a matching '
                     'preliminary run; ETABS eigenperiods are reference-only. Review provenance.')
@@ -676,6 +685,29 @@ class ESMGui:
         ray=(self.rayleigh_tx if self.direction.get()=='X' else self.rayleigh_ty).get()
         if ray:self._update_periods()
         else:self.T.set('')
+
+    def _show_source_diagnostics(self):
+        from components.inputs.project_workbooks import scaling_workbook_diagnostics
+        source=getattr(self,'project_input_audit',{}) or {}
+        notes=[str(v) for v in source.get('notes',[])]
+        notes+=scaling_workbook_diagnostics(HERE,self.export_dir,self.state.get())
+        notes=list(dict.fromkeys(notes))
+        from components.inputs.project_workbooks import _source_edb_path
+        intro=('Current export: '+str(self.export_dir)+'\\n'
+               +'Source EDB: '+(_source_edb_path(self.export_dir) or 'NOT RECORDED')
+               +'\\nLimit state: '+self.state.get()
+               +'\\n\\nA workbook with a different B4 EDB is rejected unless '
+               +'both EDB files exist and have identical SHA256. Workbook text '
+               +'and unevaluated formulas are never wall areas. '
+               +'If the exported wall geometry cannot independently reconstruct Aw, '
+               +'enter a separately calculated and documented Aw-X/Aw-Y manually. '
+               +'ETABS COM connection is optional for importing Excel.\\n\\n')
+        report=intro+'\\n'.join(notes or ['No additional source diagnostics recorded.'])
+        output=Path(self.outdir.get())
+        output.mkdir(parents=True,exist_ok=True)
+        (output/'ESM_Source_Diagnostics.txt').write_text(report,encoding='utf-8')
+        messagebox.showinfo('ESM input source audit (saved to output folder)',
+                            report[:9000],parent=self.root)
 
     def _choose_workbooks(self):
         names=filedialog.askopenfilenames(title='Select calculator and/or scaling workbooks',filetypes=[('Excel workbooks','*.xlsx')])
