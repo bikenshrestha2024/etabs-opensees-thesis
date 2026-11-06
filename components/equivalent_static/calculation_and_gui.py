@@ -429,6 +429,7 @@ class ESMGui:
         self.excel_tx=tk.StringVar();self.excel_ty=tk.StringVar()
         self.period_note=tk.StringVar(value="Load ETABS story export; enter directional Aw and optional ETABS modal periods.")
         self.etabs_modal_metadata=None
+        self.excel_direct_reference=None
         self.direction=tk.StringVar(value="Both X/Y"); self.polarity=tk.StringVar(value="Both ±")
         self.centered_case=tk.BooleanVar(value=True); self.include_torsion=tk.BooleanVar(value=True); self.bdim=tk.StringVar(value="")
         self.eccsign=tk.StringVar(value="Both ±")
@@ -462,6 +463,7 @@ class ESMGui:
         ttk.Button(footer,text='Open output folder',command=self._open_export_folder).pack(side='left',padx=3)
         ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
         ttk.Button(footer,text='Excel sources…',command=self._choose_workbooks).pack(side='left',padx=3)
+        ttk.Button(footer,text='Use original Excel Aw/T (research)',command=self._use_explicit_excel_calculation).pack(side='left',padx=3)
         ttk.Button(footer,text='Why are Aw/period fields blank?',command=self._show_source_diagnostics).pack(side='left',padx=3)
         ttk.Button(footer,text='Sync from OpenSees model',command=self._sync_opensees_inputs).pack(side='left',padx=3)
         ttk.Button(footer,text='Check live ETABS geometry (read-only)',command=lambda:self._sync_opensees_inputs(etabs=True)).pack(side='left',padx=3)
@@ -571,6 +573,7 @@ class ESMGui:
         self._load_project_inputs()
 
     def _load_project_inputs(self):
+        self.excel_direct_reference=None
         try:
             from components.inputs.project_workbooks import require_source_state
             require_source_state(self.export_dir,self.state.get())
@@ -688,6 +691,64 @@ class ESMGui:
         if ray:self._update_periods()
         else:self.T.set('')
 
+    def _use_explicit_excel_calculation(self):
+        """User-selected historic Excel method, with source-identity warning."""
+        from tkinter import filedialog
+        from components.inputs.project_workbooks import read_explicit_excel_calculation
+        path=filedialog.askopenfilename(parent=self.root,
+            title='Select original ETABS NBC 105 calculated SCALING SUMMARY',
+            filetypes=[('Excel workbook','*.xlsx')])
+        if not path:return
+        try:
+            reference=read_explicit_excel_calculation(path,self.export_dir,self.state.get())
+            mismatch=reference['source_identity']=='DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY'
+            notice=('Workbook: '+reference['source_workbook']+
+                '\\nOriginal source EDB: '+reference['workbook_source_edb']+
+                '\\nCurrent source EDB: '+str(reference['current_export_source_edb'])+
+                '\\nIdentity: '+reference['source_identity']+
+                '\\n\\nAw-X = '+str(reference['values']['awx'])+' m² ('+
+                reference['cells']['awx']+')'+
+                '\\nAw-Y = '+str(reference['values']['awy'])+' m² ('+
+                reference['cells']['awy']+')'+
+                '\\n\\nThe module will use these exact Excel values as '
+                'a RESEARCH reference, not derive new ones from the wall mesh. '
+                'Workbook adopted periods remain separate from '
+                'ETABS eigenperiods and OpenSees Rayleigh periods. '
+                'Original EDB, workbook and OpenSees model stay unchanged.')
+            if mismatch:
+                notice+='\\n\\nWARNING: The Excel source EDB has NOT been '
+                'verified identical to the current Copy EDB. Results using '
+                'these inputs are research comparisons only.'
+            if not messagebox.askyesno('Use original Excel calculation?',
+                notice+'\\n\\nApply these Excel values to the ESM form?',
+                parent=self.root):return
+            self.excel_direct_reference=reference
+            self.awx.set(f"{reference['values']['awx']:.12g}")
+            self.awy.set(f"{reference['values']['awy']:.12g}")
+            self.excel_tx.set(str(reference['values'].get('workbook_adopted_tx','')))
+            self.excel_ty.set(str(reference['values'].get('workbook_adopted_ty','')))
+            self.use_workbook_periods.set(
+                all('workbook_adopted_t'+axis in reference['values']
+                    for axis in ('x','y')))
+            self._aw_sync_evidence={
+                axis:{'status':'EXCEL_METHOD_DIRECT_'+reference['source_identity'],
+                      'code_accepted':False,
+                      'source_workbook':reference['source_workbook'],
+                      'cell':reference['cells']['aw'+axis.lower()]}
+                for axis in ('X','Y')}
+            self.period_note.set('Original Excel Aw imported directly. '
+                'Workbook adopted T references are NOT OpenSees Rayleigh '
+                'or ETABS measured eigenperiods.')
+            self._show_empirical()
+            self.status.set('DIRECT EXCEL CALCULATION: Aw-X='+
+                str(reference['values']['awx'])+', Aw-Y='+
+                str(reference['values']['awy'])+' m² | '+
+                reference['source_identity']+' | '+reference['source_workbook']+
+                ' | RESEARCH/REFERENCE ONLY; review EDB identity and openings.')
+        except Exception as exc:
+            self.status.set('Direct Excel calculation import failed: '+str(exc))
+            messagebox.showerror('Excel calculation source rejected',str(exc),parent=self.root)
+
     def _sync_opensees_inputs(self,etabs=False):
         """Source-labelled wall and period audit; never a silent EDB edit."""
         try:
@@ -723,6 +784,7 @@ class ESMGui:
                 period=report['rayleigh_s'][axis]
                 if period is not None:
                     var.set(f'{period:.10g}')
+            self.excel_direct_reference=None
             self._aw_sync_evidence=report['aw_evidence']
             self._aw_sync_model_hash=report['assembled_model_sha256']
             self._show_empirical()
@@ -979,6 +1041,26 @@ class ESMGui:
                 raise ValueError(axis+": Rayleigh period must be finite positive.")
             self.period_sources[axis]='Calculated directional Rayleigh and amplified empirical minimum'
             return min(empirical,ray_value)
+        if self.use_workbook_periods.get() and self.excel_direct_reference:
+            r=self.excel_direct_reference
+            if r['limit_state']!=self.state.get().strip().upper():
+                raise ValueError(axis+': Excel reference belongs to another limit state.')
+            original_aw=r['values'].get('aw'+axis.lower())
+            original_period=r['values'].get('workbook_adopted_t'+axis.lower())
+            if original_aw is None or original_period is None:
+                raise ValueError(axis+': Excel calculation lacks an attributed Aw/adopted T pair.')
+            if not math.isclose(float(original_aw),aw,rel_tol=1e-7,abs_tol=1e-9):
+                raise ValueError(axis+': current Aw differs from selected Excel calculation. '
+                                 'Re-select workbook or run Rayleigh.')
+            value=float(original_period)
+            if not math.isfinite(value) or value<=0 or value>empirical+1e-5:
+                raise ValueError(axis+': Excel adopted period exceeds the '
+                                 'NBC amplified empirical bound for current H/Aw. '
+                                 'Run source-matched Rayleigh.')
+            self.period_sources[axis]=(
+                'DIRECT EXCEL NBC ADOPTED PERIOD REFERENCE (NOT ETABS EIGEN; '
+                'NOT OPENSEES RAYLEIGH); '+r['source_identity'])
+            return value
         if self.use_workbook_periods.get():
             v=getattr(self,'project_input_audit',{}).get('values',{})
             raw=v.get('workbook_adopted_t'+axis.lower())
@@ -1175,6 +1257,15 @@ class ESMGui:
                         axis: getattr(self,'_aw_sync_evidence',{}).get(axis,{}).get(
                             'status','USER_OR_IMPORTED_UNVERIFIED') for axis in ('X','Y')}
                     result["wall_aw_code_accepted"]=False
+                    if self.excel_direct_reference:
+                        result['excel_method_direct_reference']=self.excel_direct_reference
+                        result['diagnostic_only']=True
+                        result['research_only_reason']=(
+                            'Explicit original Excel calculation: workbook values '
+                            'used directly; physical wall area and current EDB '
+                            'equivalence not yet verified.')
+                        summaries.append('EXCEL METHOD DIRECT RESEARCH REFERENCE — '
+                                         'not native model or code acceptance.')
                     if any(status=='PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC'
                            for status in result["wall_aw_source_classification"].values()):
                         result["diagnostic_only"]=True
