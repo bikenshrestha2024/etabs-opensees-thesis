@@ -399,7 +399,8 @@ def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
                     return f'{num:.8g}' if math.isfinite(num) and num>0 else 'INVALID '+repr(value)
                 except (TypeError,ValueError,OverflowError):
                     return 'INVALID '+repr(value)
-            notes.append(f'{path}: SCALING SUMMARY!B14 (or labeled row) Aw-X={fmt(awx)}, Aw-Y={fmt(awy)}, source EDB={source!r}')
+            notes.append(f'{path}: SCALING SUMMARY!B14 Aw-X={fmt(awx)}, B15 Aw-Y={fmt(awy)} '
+                         f'(fixed or labeled rows), source EDB={source!r}')
             if source and expected and _portable_source_stem(source).casefold()!=_portable_source_stem(expected).casefold():
                 identical=_same_edb_file_content(expected,source)
                 notes.append(f'{path.name}: B4 source EDB differs from selected model: {source!r}; '+
@@ -621,6 +622,14 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
             source,fields=_scaling_summary(ws)
             for key,(value,cell) in fields.items():
                 put(key,value,path,ws.title,cell)
+            # Retain actionable diagnostics for invalid legacy B14/B15
+            # rather than silently omitting nonnumeric Excel error/header
+            # strings. A genuinely shifted labelled row supersedes them.
+            for key,coord in (('awx','B14'),('awy','B15'),
+                              ('workbook_adopted_tx','C14'),
+                              ('workbook_adopted_ty','C15')):
+                if key not in fields:
+                    put(key,ws[coord].value,path,ws.title,coord)
             if source:put('source_edb',source,path,ws.title,'labelled source EDB')
             for key,cell in {'reference_base_shear_X':'E7','reference_base_shear_Y':'E8'}.items():
                 put(key,ws[cell].value,path,ws.title,cell)
