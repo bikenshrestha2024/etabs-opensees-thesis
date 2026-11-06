@@ -105,7 +105,7 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(original['NBC Calculator']['B14'].value,'ORIGINAL_FORMULA')
             self.assertEqual(copy['NBC Calculator']['B14'].value,'ORIGINAL_FORMULA')
             self.assertIn('OpenSees Source Sync',copy.sheetnames)
-            self.assertIsNone(copy['OpenSees Source Sync']['B12'].value if False else None)
+            self.assertEqual(copy['OpenSees Source Sync']['B9'].value,2.1)
             self.assertTrue(json_file.is_file())
             with self.assertRaises(FileExistsError):
                 sync.export_sync_report(report,root/'audit',template)
