@@ -607,7 +607,8 @@ class LinearTimeHistoryGUI:
                 "motion_mode": "X_ONLY_SCREENING" if x_only else "PAIRED_3D", "peer_x_paths": self.x_record_paths,
                 "x_scale_factor": float(self.x_scale.get()), "pair_scale_factor": float(self.pair_scale.get()),
                 "use_preloaded_peer_pairs": use_preloaded_pairs, "peer_pairs": LTH_DEFAULT_PEER_PAIRS,
-                "execute_linear_time_history": True, "record_matching_metadata": LTH_MATCHING_METADATA}
+                "execute_linear_time_history": True, "record_matching_metadata": LTH_MATCHING_METADATA,
+                "trial_duration_s": (float(self.trial_duration.get()) if self.trial_duration.get().strip() else None)}
             if not x_only:values.update(self.pair_selector.config())
             required = ["model_script", "python", "story_nodes_csv", "output_dir"]
             if not x_only and not use_preloaded_pairs: required.append("motion_manifest")
