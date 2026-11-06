@@ -68,6 +68,10 @@ class ESMBlankRegression(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp)
             gui.outdir=Var(str(folder));gui.export_dir=folder
+            (folder/'OpenSees_Complete_Model_Data_V118.json').write_text('{}')
+            (folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').write_text(
+                'story_number,story_name,height_m,dead_load_kN,storage_live_load_kN,other_live_load_kN\\n'
+                '1,Story1,3,100,0,0\\n')
             gui.python_exe=Var('python')
             gui.status=Var('')
             gui.root=types.SimpleNamespace(after=lambda _ms,func:func())
