@@ -118,6 +118,42 @@ def _wall_aw_from_lines(height_m, lines):
     return aw,segments
 
 
+def _wall_aw_profile(height_m, first_base_m, first_top_m, patches):
+    """Non-approving effective wall-area profile across first-storey slices.
+
+    Do not adopt the highest, lowest or average value when openings change
+    the geometry. Each cross-section is diagnostic until wall piers are
+    independently grouped and reviewed under the applicable NBC clause.
+    """
+    base=float(first_base_m);top=float(first_top_m)
+    if not (math.isfinite(base) and math.isfinite(top) and top>base):
+        raise ValueError("First-storey lower and upper elevations invalid")
+    if not patches:raise ValueError("No source first-storey wall patches")
+    cuts=sorted({base,top,*(float(p[5]) for p in patches),
+                 *(float(p[6]) for p in patches)})
+    rows=[];reference_signature=None;all_same=True
+    for za,zb in zip(cuts,cuts[1:]):
+        if zb-za<=1e-8:continue
+        z=(za+zb)/2
+        lines={}
+        for axis,plane,thickness,start,end,zmin,zmax in patches:
+            if zmin<=z+1e-8 and zmax>=z-1e-8:
+                lines.setdefault((axis,plane,thickness),[]).append((start,end))
+        aw,segments=_wall_aw_from_lines(height_m,lines)
+        signature=tuple(sorted((part['axis'],round(part['plane_m'],6),
+                  round(part['thickness_m'],6),round(part['start_m'],6),
+                  round(part['end_m'],6)) for part in segments))
+        if reference_signature is None:reference_signature=signature
+        elif signature!=reference_signature:all_same=False
+        rows.append(dict(z_bottom_m=za,z_top_m=zb,z_mid_m=z,
+                         aw_x_m2=aw['X'],aw_y_m2=aw['Y'],
+                         x_segment_count=sum(p['axis']=='X' for p in segments),
+                         y_segment_count=sum(p['axis']=='Y' for p in segments),
+                         segments=segments))
+    if not rows:raise ValueError("No first-storey wall cross-section intervals")
+    return dict(uniform_footprint=all_same,rows=rows)
+
+
 def _wall_aw_from_patches(height_m, first_base_m, first_top_m, patches):
     """Conservatively audit first-storey projected Aw through its full height.
 
@@ -472,6 +508,18 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                     start=min(p[along] for p in q);end=max(p[along] for p in q)
                     lines.setdefault((axis,plane,thickness),[]).append((start,end))
                     patches.append((axis,plane,thickness,start,end,zmin,zmax))
+                # Retain actual per-elevation sections even if openings
+                # prevent adoption of a single effective Aw for ESM.
+                profile=_wall_aw_profile(H,base,first,patches)
+                values['wall_aw_profile']=profile
+                if not profile['uniform_footprint']:
+                    notes.append('First-storey wall slices vary with elevation: '+
+                        '; '.join(
+                          f"z={r['z_bottom_m']:.3f}..{r['z_top_m']:.3f}m: "
+                          f"Aw-X={r['aw_x_m2']:.7g}, Aw-Y={r['aw_y_m2']:.7g} m²"
+                          for r in profile['rows'][:12])+
+                        '. These are NOT adopted NBC effective Aw values. '
+                        'Review openings, wall-pier grouping and actual ULS EDB.')
                 aw,segments=_wall_aw_from_patches(H,base,first,patches)
                 if not all(v>0 for v in aw.values()):raise ValueError('Both directions need recognized first-story walls.')
                 for axis in ('X','Y'):
