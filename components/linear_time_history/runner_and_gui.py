@@ -59,6 +59,20 @@ from OpenSees_Input_Records_V130 import (
 
 # SECTION 18.2 — Build one fresh model, freeze gravity, and configure damping
 @timed_outputs('Linear time history','config')
+def select_diagnostic_duration(full_duration_s, trial_duration_s=None):
+    """Return (actual seconds, truncated) without mislabelling full records."""
+    full=float(full_duration_s)
+    if not math.isfinite(full) or full<=0:
+        raise ValueError("Full record duration must be finite and positive")
+    if trial_duration_s in (None,""):
+        return full,False
+    requested=float(trial_duration_s)
+    if not math.isfinite(requested) or requested<=0:
+        raise ValueError("trial_duration_s must be finite and positive")
+    actual=min(full,requested)
+    return actual,actual<full-1e-9
+
+
 def _run_analysis(config):
     config.setdefault('gravity_profile',os.environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
     if not config.get("execute_linear_time_history", False):
@@ -187,16 +201,12 @@ def _run_analysis(config):
                 dt = min(dt_record, t1 / 100.0, tn, 0.01)
                 duration = (len(motion["x"]) - 1) * motion["dt_x"] if orientation == "X_ONLY" else max((len(motion["x"]) - 1) * motion["dt_x"], (len(motion["y"]) - 1) * motion["dt_y"])
                 full_record_duration=duration
-                trial_duration=config.get("trial_duration_s")
-                if trial_duration not in (None,""):
-                    requested=float(trial_duration)
-                    if not math.isfinite(requested) or requested<=0:
-                        raise ValueError("trial_duration_s must be finite and positive")
-                    duration=min(duration,requested)
-                    print(f"[LINEAR TRIAL] {case}: requested={requested:g}s; "
-                          f"analyzed={duration:g}s; full_record={full_record_duration:g}s",
-                          flush=True)
-                is_truncated=duration<full_record_duration-1e-9
+                duration,is_truncated=select_diagnostic_duration(
+                    full_record_duration,config.get("trial_duration_s"))
+                if is_truncated:
+                    print(f"[LINEAR TRIAL] {case}: analyzed={duration:g}s; "
+                          f"full_record={full_record_duration:g}s; "
+                          "TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE",flush=True)
                 nsteps = int(math.ceil(duration / dt))
                 # SECTION 18.4 — NBC-limited integration step and linear Newmark stack.
                 ops.wipeAnalysis(); ops.constraints("Transformation"); ops.numberer("RCM")
