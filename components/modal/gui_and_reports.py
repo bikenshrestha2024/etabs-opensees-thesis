@@ -216,6 +216,9 @@ class ModalAuditGUI:
         tk.Label(form, text="Select a complete OpenSees model builder with the intended geometry, constraints, seismic mass and gravity state. This audit runs it in a separate process and does not retain its domain for later analyses.", wraplength=870, foreground="#9a4b24", anchor="w", justify="left").pack(anchor="w", pady=(8, 4))
         tk.Checkbutton(form, text="I reviewed the model script, mass source, constraints and gravity preload for this modal run.", variable=self.confirm, wraplength=840, anchor="w", justify="left").pack(anchor="w", pady=5)
         self.run_button=ttk.Button(outer, text="Run selected SLS / ULS modal audit", command=self._run);self.run_button.pack(anchor="w", pady=10)
+        self.stop_button=ttk.Button(outer,text="Stop modal solver and skip pending states",
+                                    command=self._stop_modal,state="disabled")
+        self.stop_button.pack(anchor="w",pady=3)
         from OpenSees_Research_UI_V123 import copyable_log
         from components.shared.case_status import panel
         self.case_board=panel(outer)
@@ -269,6 +272,17 @@ class ModalAuditGUI:
         p = filedialog.askdirectory(parent=self.root)
         if p:self._output_is_automatic=False;self.output.set(p)
 
+    def _stop_modal(self):
+        """User-requested subprocess cancellation; no modal acceptance."""
+        self.case_board["cancelled"]=True
+        process=self.case_board.get("process")
+        if process is not None and process.poll() is None:
+            try:process.terminate()
+            except OSError as exc:
+                self.status.set("Modal cancellation request failed: "+str(exc))
+        self.status.set("Modal cancel requested; no partial files constitute a PASS.")
+        self.stop_button.configure(state="disabled")
+
     def _run(self):
         try:
             model = Path(self.model.get()).expanduser().resolve()
@@ -299,6 +313,7 @@ class ModalAuditGUI:
         base_output=output
         solver=self.solver.get()
         self.run_button.configure(state='disabled')
+        self.stop_button.configure(state='normal')
         def worker():
             messages=[]
             try:
@@ -360,6 +375,7 @@ class ModalAuditGUI:
                 self.case_board["process"]=None
                 ledger.finish_pending("Batch interrupted or cancelled; inspect log")
                 self.root.after(0,lambda:self.run_button.configure(state='normal'))
+                self.root.after(0,lambda:self.stop_button.configure(state='disabled'))
         threading.Thread(target=worker, daemon=True).start()
 
     def run(self):
