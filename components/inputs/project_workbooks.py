@@ -799,10 +799,16 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                         except (TypeError,ValueError):
                             notes.append(f'Workbook {key.upper()} is not numeric; review the source cell before period calculations.')
                     else:
-                        values[key]=aw[axis]
-                        audit.append(dict(field=key,value=aw[axis],source=str(topology),
-                                          sheet='first-story wall geometry',
-                                          cell='automatic fallback to geometry_aw_'+axis.lower()))
+                        # User's Excel NBC Calculator is the authoritative
+                        # calculation path for effective Aw (including openings).
+                        # Geometry-based shell slices are only diagnostics:
+                        # never silently substitute them for a workbook result.
+                        notes.append(
+                            f'No source-verified Excel {key.upper()} was imported. '
+                            f'Geometry candidate {aw[axis]:g} m² is diagnostic only; '
+                            'select the matching calculation workbook or enter '
+                            'an independently reviewed Aw before ESM periods.'
+                        )
                 values['wall_geometry_segments']=segments
                 notes.append('The automatic geometry estimate merges shell mesh subdivisions and treats separated wall segments independently; it is an audit/fallback, not an interpretation of how to group perforated walls for NBC Aw. A reviewed workbook Aw is preserved for period calculations. Confirm wall/opening grouping, directional Lwi, and whether seismic height H excludes qualifying basements under NBC 105:2025 §5.1.2.')
             except Exception as exc:
