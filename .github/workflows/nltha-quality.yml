@@ -98,6 +98,8 @@ on:
       - 'tests/verify_esm_source_selection.py'
       - 'tests/verify_esm_aw_period_provenance.py'
       - 'tests/verify_esm_blank_copy_rayleigh.py'
+      - 'tests/verify_esm_blank_aw_source_20261106.py'
+      - 'docs/review/20261106_ESM_BLANK_AW_SOURCE_FIX.md'
       - 'tests/verify_esm_source_state_isolation.py'
       - 'components/validation/torsion_check.py'
       - 'torsion_check.py'
@@ -179,6 +181,7 @@ jobs:
           python tests/verify_esm_source_selection.py
           python tests/verify_esm_aw_period_provenance.py
           python tests/verify_esm_blank_copy_rayleigh.py
+          python tests/verify_esm_blank_aw_source_20261106.py
           python tests/verify_esm_source_state_isolation.py
           python tests/verify_nbc105_torsion_check.py
           python tests/verify_floor_end_extraction.py
