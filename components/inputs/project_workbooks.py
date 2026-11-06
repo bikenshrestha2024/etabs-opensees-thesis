@@ -353,9 +353,10 @@ def _scaling_summary(ws):
         awkey="aw"+axis.lower()
         tkey="workbook_adopted_t"+axis.lower()
         area=ws[f"B{row}"];period=ws[f"C{row}"]
-        if awkey not in fields and positive(area.value) and positive(period.value):
+        if awkey not in fields and positive(area.value):
             fields[awkey]=(area.value,area.coordinate)
-            fields[tkey]=(period.value,period.coordinate)
+            if positive(period.value):
+                fields[tkey]=(period.value,period.coordinate)
     return source,fields
 
 
