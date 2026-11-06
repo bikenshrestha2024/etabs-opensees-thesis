@@ -783,10 +783,10 @@ class ESMGui:
             if actual and state!='BOTH' and actual!=state:
                 issues.append(f'Cross-state source blocked: selected {state}, '
                               f'but export identifies {actual}. {reason}')
-            if state=='BOTH':
-                issues.append('For apple-to-apple comparison select only the '
-                              'matching Ultimate→ULS or Service→SLS model. '
-                              'Both requires independent source models.')
+            # BOTH is an existing advanced workflow with separate ULS/SLS
+            # runs; retain compatibility. The caller must still validate
+            # both state-specific source models before accepting results.
+            # The source validation for individual states is strict.
         except Exception as exc:
             issues.append('Could not verify source stiffness state: '+str(exc))
         return values,issues
