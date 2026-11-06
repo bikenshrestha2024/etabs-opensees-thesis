@@ -237,7 +237,14 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     state=str(limit_state).strip().upper()
     if state=='BOTH':state='ULS'
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
-    search=[export_dir/'Project_Input_Workbooks',export_dir,root/'Project_Input_Workbooks',Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
+    # ETABS source exports and the legacy scaling workbooks are frequently
+    # stored in adjacent folders rather than inside the same export folder.
+    # Search a bounded directory set, and validate sheet + B4 model identity
+    # before choosing anything. Never recursively search an entire drive.
+    search=[export_dir/'Project_Input_Workbooks',export_dir,
+            export_dir.parent/'Project_Input_Workbooks',export_dir.parent,
+            root/'Project_Input_Workbooks',root,
+            Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
     selected=export_dir/'NBC105_Workbook_Source.json'
     if selected.is_file():
         names=json.loads(selected.read_text(encoding='utf-8-sig'))
@@ -251,8 +258,9 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     candidates=list(dict.fromkeys(explicit+candidates))
     if explicit:
         candidates=explicit
-    expected_edb=_portable_source_stem(_source_edb_path(export_dir)).casefold()
-    expected_floor=_model_floor(export_dir,expected_edb)
+    expected_source=_source_edb_path(export_dir)
+    expected_edb=_portable_source_stem(expected_source).casefold()
+    expected_floor=_model_floor(export_dir,expected_source)
     state_tokens=('service','sls') if state=='SLS' else ('ultimate','uls')
 
     def workbook_info(path):
@@ -307,8 +315,8 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
             return -1
         if expected_floor and not actual_floor:
             return -1
-        exact=int(bool(expected_edb) and expected_edb in source)
-        config_tokens=[token for token in ('belt','truss','outrigger','cap') if token in Path(expected_edb).stem.casefold()]
+        exact=int(bool(expected_edb) and _portable_source_stem(source).casefold()==expected_edb)
+        config_tokens=[token for token in ('belt','truss','outrigger','cap') if token in expected_edb]
         config_matches=sum(token in name for token in config_tokens)
         return exact*100+config_matches*10+int(any(token in path.name.casefold() for token in state_tokens))
 
@@ -352,12 +360,30 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
     require_source_state(export_dir,state)
     values={};audit=[];notes=[]
+    # Prevent cached Excel labels and formula-error strings (e.g. 'Aw (m²)')
+    # from appearing as valid wall indices or periods in the ESM GUI.
+    positive_fields={
+        'awx','awy','rayleigh_tx','rayleigh_ty','workbook_adopted_tx',
+        'workbook_adopted_ty','Z','I','period_factor','rmu','omegau','omegas',
+        'reference_base_shear_X','reference_base_shear_Y',
+    }
     def put(key,value,path,sheet,cell):
-        if value is None or str(value).startswith('='):return
-        values[key]=value;audit.append(dict(field=key,value=value,source=str(path),sheet=sheet,cell=cell))
+        if value is None or (isinstance(value,str) and value.startswith('=')):return
+        if key in positive_fields:
+            try:
+                numeric=float(value)
+            except (ValueError,TypeError,OverflowError):
+                notes.append(f'Invalid {key} in {Path(path).name} {sheet}!{cell}: {value!r}; requires a finite positive number, not a label/formula error.')
+                return
+            if not math.isfinite(numeric) or numeric<=0:
+                notes.append(f'Invalid {key} in {Path(path).name} {sheet}!{cell}: {value!r}; must be finite and positive.')
+                return
+            value=numeric
+        values[key]=value
+        audit.append(dict(field=key,value=value,source=str(path),sheet=sheet,cell=cell))
     source_books=source_workbooks(root,export_dir,limit_state)
     if source_books[1] is None:
-        notes.append('No source-verified SCALING SUMMARY workbook selected. Aw and workbook adopted periods are pending; no unverified value is substituted.')
+        notes.append('No source-verified SCALING SUMMARY workbook selected. Inspect candidate B4, B14, B15 values and the current wall geometry audit. Manual reviewed Aw inputs remain available.')
         notes.extend(scaling_workbook_diagnostics(root,export_dir,limit_state))
     if source_books[0] is None:
         notes.append('No NBC Calculator workbook selected: soil, Z, I and system factors require reviewed inputs.')
