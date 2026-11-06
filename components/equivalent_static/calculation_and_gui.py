@@ -463,6 +463,8 @@ class ESMGui:
         ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
         ttk.Button(footer,text='Excel sources…',command=self._choose_workbooks).pack(side='left',padx=3)
         ttk.Button(footer,text='Why are Aw/period fields blank?',command=self._show_source_diagnostics).pack(side='left',padx=3)
+        ttk.Button(footer,text='Sync from OpenSees model',command=self._sync_opensees_inputs).pack(side='left',padx=3)
+        ttk.Button(footer,text='Check live ETABS geometry (read-only)',command=lambda:self._sync_opensees_inputs(etabs=True)).pack(side='left',padx=3)
         ttk.Button(footer,text='Preliminary Rayleigh run (X/Y)',command=self._run_rayleigh).pack(side='left',padx=3)
         for button in footer.winfo_children():button.pack_forget()
         for index,button in enumerate(footer.winfo_children()):
@@ -685,6 +687,53 @@ class ESMGui:
         ray=(self.rayleigh_tx if self.direction.get()=='X' else self.rayleigh_ty).get()
         if ray:self._update_periods()
         else:self.T.set('')
+
+    def _sync_opensees_inputs(self,etabs=False):
+        """Source-labelled wall and period audit; never a silent EDB edit."""
+        try:
+            from datetime import datetime
+            from components.inputs.opensees_nbc_sync import synchronize
+            selected=str(self.state.get()).strip().upper()
+            if selected not in ('ULS','SLS'):
+                messagebox.showwarning('Select source state',
+                    'Choose one matching source Ultimate→ULS or Service→SLS model.',
+                    parent=self.root)
+                return
+            audit_dir=Path(self.outdir.get())/'NBC105_Input_Sync'/(
+                datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
+            report,paths=synchronize(self.export_dir,selected,
+                output_dir=audit_dir,etabs_fallback=etabs)
+            statuses=[]
+            for axis,var in (('X',self.awx),('Y',self.awy)):
+                value=report['aw_candidate_m2'][axis]
+                evidence=report['aw_evidence'][axis]['status']
+                if value is not None and evidence=='OPEN_SEES_GEOMETRY_CANDIDATE_REVIEW_REQUIRED':
+                    # Editable research input, NOT an NBC-approved result;
+                    # real pier/opening grouping still requires verification.
+                    var.set(f'{value:.10g}')
+                    statuses.append(f'{axis}: {value:.8g} m² (geometry candidate; REVIEW REQUIRED)')
+                else:
+                    statuses.append(f'{axis}: not automatically filled ({evidence})')
+            for axis,var in (('X',self.rayleigh_tx),('Y',self.rayleigh_ty)):
+                period=report['rayleigh_s'][axis]
+                if period is not None:
+                    var.set(f'{period:.10g}')
+            self._show_empirical()
+            lines=['OpenSees-first audit complete. No ETABS EDB was modified.',
+                   *statuses,'Excel audit copy: '+str(paths[1]),
+                   'JSON provenance: '+str(paths[0])]
+            if etabs:
+                fallback=report.get('etabs_fallback',{})
+                lines.append('ETABS read-only fallback: '+str(fallback.get('status')))
+                if fallback.get('reason'):lines.append(fallback['reason'])
+            self.status.set(' | '.join(lines))
+            messagebox.showinfo('NBC 105 source synchronization',
+                '\\n'.join(lines)+'\\n\\nDo not treat a candidate Aw as '
+                'NBC acceptance until wall piers/openings are reviewed.',
+                parent=self.root)
+        except Exception as exc:
+            self.status.set('Input synchronization failed: '+str(exc))
+            messagebox.showerror('NBC 105 input sync',str(exc),parent=self.root)
 
     def _show_source_diagnostics(self):
         from components.inputs.project_workbooks import scaling_workbook_diagnostics
