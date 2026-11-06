@@ -52,7 +52,7 @@ def _source_snapshot(export_dir,state):
     evidence={}
     for axis in ('X','Y'):
         key='aw'+axis.lower()
-        geometric=_positive(v.get('geometry_'+key))
+        geometric=_positive(v.get('geometry_aw_'+axis.lower()))
         workbook=_positive(v.get('workbook_'+key))
         imported=_positive(v.get(key))
         if geometric is not None and (not profile or profile.get('uniform_footprint')):
