@@ -50,9 +50,17 @@ def _source_snapshot(export_dir,state):
     profile=v.get('wall_aw_profile')
     diagnostic=None
     if profile and not profile.get('uniform_footprint',False):
-        source_model=json.loads(model.read_text(encoding='utf-8-sig'))
-        z0=float(source_model['base_z_m'])
-        height=max(float(g['master_xyz'][2]) for g in source_model['diaphragms'])-z0
+        # Use the very same base-to-roof height used to create the
+        # first-storey wall profile, rather than re-inferring a different
+        # datum from the assembled JSON.
+        height=_positive(v.get('wall_aw_height_m'))
+        if height is None:
+            source_model=json.loads(model.read_text(encoding='utf-8-sig'))
+            level_roof=max(float(g['master_xyz'][2])
+                           for g in source_model['diaphragms'])
+            z0=float(source_model.get('base_z_m',
+                                     profile['rows'][0]['z_bottom_m']))
+            height=level_roof-z0
         if not math.isfinite(height) or height<=0:
             raise ValueError('Invalid seismic height in source OpenSees model')
         diagnostic=_continuous_wall_pier_diagnostic(height,profile)
