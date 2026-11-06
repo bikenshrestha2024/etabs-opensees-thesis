@@ -30,7 +30,10 @@ def geometry(uniform):
                   Aw_contribution_m2=2.1)]}
     if not uniform:
         a=None
-        row2=dict(row,z_bottom_m=1.5,aw_x_m2=1.4,z_top_m=3.)
+        row2=dict(row,z_bottom_m=1.5,aw_x_m2=1.4,z_top_m=3.,
+                  segments=[dict(axis='X',plane_m=0.,start_m=0.,end_m=2.,
+                                 thickness_m=.3,wall_length_m=2.,
+                                 Aw_contribution_m2=1.4)])
         row=dict(row,z_top_m=1.5)
         return {'uniform_footprint':False,'rows':[row,row2]},a
     return {'uniform_footprint':True,'rows':[row]},a
@@ -81,14 +84,17 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(report['rayleigh_s']['X'],3.1)
             self.assertEqual(len(report['assembled_model_sha256']),64)
 
-    def test_nonuniform_opening_never_auto_fills_even_with_workbook(self):
+    def test_nonuniform_opening_fills_only_traceable_provisional_pier_candidate(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);data=self.with_snapshot(root,False)
             with patch.object(sync,'require_source_state'),patch.object(sync,'import_project_inputs',return_value=data),patch.object(sync,'_source_edb_path',return_value='D:/Models/ULTIMATE MODEL.EDB'):
                 report=sync._source_snapshot(root,'ULS')
-            self.assertIsNone(report['aw_candidate_m2']['X'])
+            self.assertIsNotNone(report['aw_candidate_m2']['X'])
             self.assertEqual(report['aw_evidence']['X']['status'],
-                             'NONUNIFORM_WALL_OPENING_REVIEW_REQUIRED')
+                             'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC')
+            self.assertFalse(report['aw_evidence']['X']['code_accepted'])
+            self.assertLess(report['aw_candidate_m2']['X'],2.1)
+            self.assertEqual(len(report['continuous_pier_diagnostic']['continuous_segments']),1)
 
     def test_excel_template_preserved_new_sheet_and_new_path(self):
         with tempfile.TemporaryDirectory() as tmp:

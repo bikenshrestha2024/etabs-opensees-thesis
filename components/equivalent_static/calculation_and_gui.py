@@ -707,17 +707,24 @@ class ESMGui:
             for axis,var in (('X',self.awx),('Y',self.awy)):
                 value=report['aw_candidate_m2'][axis]
                 evidence=report['aw_evidence'][axis]['status']
-                if value is not None and evidence=='OPEN_SEES_GEOMETRY_CANDIDATE_REVIEW_REQUIRED':
-                    # Editable research input, NOT an NBC-approved result;
-                    # real pier/opening grouping still requires verification.
+                if value is not None and evidence in (
+                    'OPEN_SEES_GEOMETRY_CANDIDATE_REVIEW_REQUIRED',
+                    'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC'):
+                    # Prefill the source-derived *diagnostic* to enable a
+                    # preliminary comparison, never silent NBC acceptance.
                     var.set(f'{value:.10g}')
-                    statuses.append(f'{axis}: {value:.8g} m² (geometry candidate; REVIEW REQUIRED)')
+                    statuses.append(f'{axis}: {value:.8g} m² '
+                        + ('(CONTINUOUS-PIER GEOMETRIC DIAGNOSTIC ONLY; not NBC accepted)'
+                           if evidence=='PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC'
+                           else '(geometry candidate; REVIEW REQUIRED)'))
                 else:
                     statuses.append(f'{axis}: not automatically filled ({evidence})')
             for axis,var in (('X',self.rayleigh_tx),('Y',self.rayleigh_ty)):
                 period=report['rayleigh_s'][axis]
                 if period is not None:
                     var.set(f'{period:.10g}')
+            self._aw_sync_evidence=report['aw_evidence']
+            self._aw_sync_model_hash=report['assembled_model_sha256']
             self._show_empirical()
             lines=['OpenSees-first audit complete. No ETABS EDB was modified.',
                    *statuses,'Excel audit copy: '+str(paths[1]),
@@ -1079,6 +1086,18 @@ class ESMGui:
             if not self.path.get(): raise ValueError("Choose the verified story-weight CSV first; this dialog does not read an EDB directly.")
             self._update_periods()
             if not self.T.get().strip() or not self.Z.get().strip(): raise ValueError("Enter the adopted T1 and seismic zoning factor Z from project/geotechnical/code data.")
+            # Never relabel a research comparison using a provisional
+            # continuous-pier geometry candidate as qualified NBC design.
+            candidate_evidence=getattr(self,'_aw_sync_evidence',{})
+            preliminary_axes=[axis for axis in ('X','Y')
+                if candidate_evidence.get(axis,{}).get('status')==
+                    'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC']
+            if preliminary_axes:
+                self.status.set(
+                    'GEOMETRIC DIAGNOSTIC ONLY: provisional continuous-pier '
+                    'Aw used in '+', '.join(preliminary_axes)+
+                    '. Review physical NBC §5.1.2 wall piers/openings before '
+                    'design acceptance. ESM is comparison only.')
             self._adopted_axis_period(self.direction.get(),max(float(r["height_m"]) for r in read_story_csv(self.path.get())))
             if not self.location.get().strip(): raise ValueError("Enter the project municipality/location used to establish Z.")
             if self.system.get()=="Select / determine from Table 5-2": raise ValueError("Choose the verified structural system in NBC Table 5-2 so the Rμ and Ω factors are populated.")
@@ -1132,6 +1151,16 @@ class ESMGui:
                     if not result["site_subsoil_verified"]:summaries.append("SITE CLASSIFICATION NOT VERIFIED: "+result["site_subsoil_status"])
                     result["period_source"]=("Separate matched "+state+" Rayleigh/empirical minimum" if state_periods else self.period_sources.get(self.direction.get(),"Directional Rayleigh/empirical calculation"))
                     result["input_provenance"]=getattr(self,"project_input_audit",{})
+                    result["wall_aw_source_classification"]={
+                        axis: getattr(self,'_aw_sync_evidence',{}).get(axis,{}).get(
+                            'status','USER_OR_IMPORTED_UNVERIFIED') for axis in ('X','Y')}
+                    result["wall_aw_code_accepted"]=False
+                    if any(status=='PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC'
+                           for status in result["wall_aw_source_classification"].values()):
+                        result["diagnostic_only"]=True
+                        summaries.append("OPENING PIER DIAGNOSTIC ONLY — "
+                            "source continuous-through-height geometric Aw "
+                            "is NOT NBC engineering acceptance.")
                     period_evidence=state_rayleigh_provenance(
                         state,self.direction.get(),
                         {"X":self.rayleigh_tx.get(),"Y":self.rayleigh_ty.get()},

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from components.inputs.project_workbooks import (
     import_project_inputs, require_source_state, _source_edb_path,
-    _wall_aw_profile, analysis_output_folder,
+    _wall_aw_profile, _continuous_wall_pier_diagnostic, analysis_output_folder,
 )
 
 def _hash(path):
@@ -48,6 +48,22 @@ def _source_snapshot(export_dir,state):
     data=import_project_inputs(Path(__file__).resolve().parents[2],folder,state)
     v=data['values']
     profile=v.get('wall_aw_profile')
+    diagnostic=None
+    if profile and not profile.get('uniform_footprint',False):
+        # Use the very same base-to-roof height used to create the
+        # first-storey wall profile, rather than re-inferring a different
+        # datum from the assembled JSON.
+        height=_positive(v.get('wall_aw_height_m'))
+        if height is None:
+            source_model=json.loads(model.read_text(encoding='utf-8-sig'))
+            level_roof=max(float(g['master_xyz'][2])
+                           for g in source_model['diaphragms'])
+            z0=float(source_model.get('base_z_m',
+                                     profile['rows'][0]['z_bottom_m']))
+            height=level_roof-z0
+        if not math.isfinite(height) or height<=0:
+            raise ValueError('Invalid seismic height in source OpenSees model')
+        diagnostic=_continuous_wall_pier_diagnostic(height,profile)
     approved={}
     evidence={}
     for axis in ('X','Y'):
@@ -65,12 +81,20 @@ def _source_snapshot(export_dir,state):
                 evidence[axis]={'status':'OPEN_SEES_GEOMETRY_CANDIDATE_REVIEW_REQUIRED',
                     'open_sees_candidate_m2':geometric}
         elif profile and not profile.get('uniform_footprint',False):
-            # Different first-storey horizontal sections CANNOT be merged into
-            # one validated NBC wall area. Show ALL slice candidates to reviewer.
-            approved[axis]=None
+            # Only the continuous through-height projected material is shown
+            # as a provisional diagnostic. A partial-height opening is NOT
+            # interchangeable with a single NBC §5.1.2 effective wall pier.
+            candidate=diagnostic['aw_candidate_m2'][axis] if diagnostic else None
+            approved[axis]=candidate
             evidence[axis]={
-                'status':'NONUNIFORM_WALL_OPENING_REVIEW_REQUIRED',
-                'section_candidates_m2':[r['aw_'+axis.lower()+'_m2'] for r in profile['rows']],
+                'status':('PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC'
+                          if candidate is not None else
+                          'NO_CONTINUOUS_PIER_IN_THIS_AXIS'),
+                'code_accepted':False,
+                'full_height_only':True,
+                'continuous_pier_candidate_m2':candidate,
+                'section_candidates_m2':[r['aw_'+axis.lower()+'_m2']
+                                         for r in profile['rows']],
                 'matching_workbook_candidate_m2':imported}
         elif imported is not None:
             approved[axis]=None
@@ -102,6 +126,7 @@ def _source_snapshot(export_dir,state):
         'aw_candidate_m2':approved,
         'aw_evidence':evidence,
         'wall_aw_profile':profile,
+        'continuous_pier_diagnostic':diagnostic,
         'rayleigh_s':{axis:_positive(v.get('rayleigh_t'+axis.lower()))
                       for axis in ('X','Y')},
         'notes':data['notes'],
@@ -229,7 +254,7 @@ def export_sync_report(report, output_dir, template=None):
         ('Candidate Aw (m²)',report['aw_candidate_m2']['X'],report['aw_candidate_m2']['Y']),
         ('Evidence status',report['aw_evidence']['X']['status'],report['aw_evidence']['Y']['status']),
         ('Rayleigh period (s)',report['rayleigh_s']['X'],report['rayleigh_s']['Y']),
-        ('REVIEW REQUIRED','Do not use a nonuniform wall opening slice as adopted NBC Aw.')
+        ('REVIEW REQUIRED','Provisional through-height piers are NOT an NBC approved Aw.')
     ]
     for row in rows:ws.append(list(row))
     ws.append([])
@@ -237,6 +262,12 @@ def export_sync_report(report, output_dir, template=None):
     for p in (report.get('wall_aw_profile') or {}).get('rows',[]):
         ws.append([p['z_bottom_m'],p['z_top_m'],p['aw_x_m2'],p['aw_y_m2'],
                    p['x_segment_count'],p['y_segment_count']])
+    ws.append([])
+    ws.append(['CONTINUOUS THROUGH-HEIGHT PIER DIAGNOSTIC — NOT CODE ACCEPTED'])
+    for seg in (report.get('continuous_pier_diagnostic') or {}).get('continuous_segments',[]):
+        ws.append(['FULL HEIGHT',seg['axis'],seg['plane_m'],seg['start_m'],
+                   seg['end_m'],seg['thickness_m'],seg['wall_length_m'],
+                   seg['Aw_contribution_m2']])
     ws.append([])
     ws.append(['Axis','Plane (m)','Start (m)','End (m)','Thickness (m)','Length (m)','Aw contribution (m²)','z-bottom','z-top'])
     for p in (report.get('wall_aw_profile') or {}).get('rows',[]):
