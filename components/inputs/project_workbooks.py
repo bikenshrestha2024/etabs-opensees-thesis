@@ -256,8 +256,8 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
         if directory.is_dir():
             candidates.extend(path for path in directory.glob('*.xlsx') if path.is_file())
     candidates=list(dict.fromkeys(explicit+candidates))
-    if explicit:
-        candidates=explicit
+    # Explicit choices take priority; do not hide the other workbook type
+    # when the user selects only a scaling file or only a calculator.
     expected_source=_source_edb_path(export_dir)
     expected_edb=_portable_source_stem(expected_source).casefold()
     expected_floor=_model_floor(export_dir,expected_source)
@@ -318,7 +318,9 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
         exact=int(bool(expected_edb) and _portable_source_stem(source).casefold()==expected_edb)
         config_tokens=[token for token in ('belt','truss','outrigger','cap') if token in expected_edb]
         config_matches=sum(token in name for token in config_tokens)
-        return exact*100+config_matches*10+int(any(token in path.name.casefold() for token in state_tokens))
+        return (exact*100+config_matches*10+
+                int(any(token in path.name.casefold() for token in state_tokens))+
+                (50 if path in explicit else 0))
 
     ranked=sorted(((score(record),record) for record in scaling),key=lambda item:item[0],reverse=True)
     scaling_book=None
