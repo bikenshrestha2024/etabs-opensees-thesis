@@ -360,6 +360,84 @@ def _scaling_summary(ws):
     return source,fields
 
 
+def read_explicit_excel_calculation(workbook_path, export_dir, limit_state):
+    """Opt-in direct EXCEL-method values; preserve source EDB discrepancy.
+
+    Unlike source_workbooks(), the requested Excel calculation is *not*
+    silently rejected for EDB hashes differing from the current Copy EDB.
+    Different/missing source identity stays a visible research-comparison
+    restriction, not verified NBC code input. This function NEVER alters
+    a workbook, EDB, OpenSees model or existing source selection.
+    """
+    from openpyxl import load_workbook
+    from zipfile import BadZipFile
+    path=Path(workbook_path).expanduser().resolve()
+    if not path.is_file() or path.suffix.lower()!='.xlsx':
+        raise ValueError('Select an existing genuine .xlsx NBC calculation workbook.')
+    state=str(limit_state).strip().upper()
+    if state not in ('ULS','SLS'):
+        raise ValueError('Select one model state: Ultimate/ULS or Service/SLS.')
+    require_source_state(export_dir,state)
+    try:
+        wb=load_workbook(path,read_only=True,data_only=True)
+    except (BadZipFile,OSError,ValueError) as exc:
+        raise ValueError(f'Cannot read Excel workbook {path}: {type(exc).__name__}: {exc}') from exc
+    try:
+        if 'SCALING SUMMARY' not in wb:
+            raise ValueError(f'Workbook has no SCALING SUMMARY sheet: {path}')
+        source,fields=_scaling_summary(wb['SCALING SUMMARY'])
+    finally:
+        wb.close()
+    if not source:
+        raise ValueError('SCALING SUMMARY is missing its original Source EDB; '
+                         'direct Excel reference needs source attribution.')
+    name=(path.stem+' '+source).casefold()
+    if state=='ULS' and ('service' in name or 'sls' in name) and not (
+       'ultimate' in name or 'uls' in name):
+        raise ValueError('Refusing a Service/SLS workbook in Ultimate/ULS reference mode.')
+    if state=='SLS' and ('ultimate' in name or 'uls' in name) and not (
+       'service' in name or 'sls' in name):
+        raise ValueError('Refusing an Ultimate/ULS workbook in Service/SLS reference mode.')
+    values={};cells={}
+    for axis in ('X','Y'):
+        key='aw'+axis.lower()
+        if key not in fields:
+            raise ValueError(f'Excel workbook has no numeric Aw-{axis} for source {source!r}. '
+                             'Check the labelled X/Y SCALING SUMMARY rows.')
+        raw,cell=fields[key]
+        try:area=float(raw)
+        except (TypeError,ValueError,OverflowError):area=float('nan')
+        if not math.isfinite(area) or area<=0:
+            raise ValueError(f'Excel Aw-{axis} in {cell} must be finite and positive.')
+        values[key]=area;cells[key]=cell
+        tkey='workbook_adopted_t'+axis.lower()
+        if tkey in fields:
+            raw,cell=fields[tkey]
+            try:period=float(raw)
+            except (TypeError,ValueError,OverflowError):period=float('nan')
+            if math.isfinite(period) and period>0:
+                values[tkey]=period;cells[tkey]=cell
+    current=_source_edb_path(export_dir)
+    exact=bool(current and
+               _portable_source_stem(current).casefold()==_portable_source_stem(source).casefold()
+               and str(current).replace('\\','/').casefold()==
+                   str(source).replace('\\','/').casefold())
+    identical=bool(not exact and _same_edb_file_content(current,source))
+    status=('SAME_EDB_PATH_REFERENCE' if exact else
+            'BYTE_IDENTICAL_EDB_REFERENCE' if identical else
+            'DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY')
+    return dict(values=values,cells=cells,source_workbook=str(path),
+                source_sheet='SCALING SUMMARY',workbook_source_edb=source,
+                current_export_source_edb=current,source_identity=status,
+                limit_state=state,
+                code_accepted=False,
+                notice=('The Excel values are read directly without recalculating wall '
+                        'piers. A different source EDB is a research comparison only; '
+                        'wall openings, effective area and code acceptance remain '
+                        'unverified until reconciled.'),
+                workbook_sha256=__import__('hashlib').sha256(path.read_bytes()).hexdigest())
+
+
 def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
     """Review candidates without treating unmatched workbooks as valid data."""
     from openpyxl import load_workbook
