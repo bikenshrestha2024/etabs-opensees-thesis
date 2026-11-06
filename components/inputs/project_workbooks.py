@@ -188,7 +188,9 @@ def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
     export_dir=Path(export_dir);root=Path(root)
     selected=export_dir/'NBC105_Workbook_Source.json'
     roots=[export_dir/'Project_Input_Workbooks',export_dir,
-           root/'Project_Input_Workbooks',Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
+           export_dir.parent/'Project_Input_Workbooks',export_dir.parent,
+           root/'Project_Input_Workbooks',root,
+           Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
     candidates=[]
     if selected.is_file():
         try:
@@ -207,8 +209,17 @@ def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
             wb=load_workbook(path,read_only=True,data_only=True)
             if 'SCALING SUMMARY' not in wb:
                 wb.close();continue
-            source=str(wb['SCALING SUMMARY']['B4'].value or '').strip()
+            ws=wb['SCALING SUMMARY']
+            source=str(ws['B4'].value or '').strip()
+            awx=ws['B14'].value;awy=ws['B15'].value
             wb.close()
+            def fmt(value):
+                try:
+                    num=float(value)
+                    return f'{num:.8g}' if math.isfinite(num) and num>0 else 'INVALID '+repr(value)
+                except (TypeError,ValueError,OverflowError):
+                    return 'INVALID '+repr(value)
+            notes.append(f'{path}: SCALING SUMMARY!B14 Aw-X={fmt(awx)}, B15 Aw-Y={fmt(awy)}, B4={source!r}') 
             if source and expected and _portable_source_stem(source).casefold()!=_portable_source_stem(expected).casefold():
                 identical=_same_edb_file_content(expected,source)
                 notes.append(f'{path.name}: B4 source EDB differs from selected model: {source!r}; '+
@@ -217,6 +228,8 @@ def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
         except (OSError,ValueError,KeyError) as exc:
             notes.append(f'{path.name}: cannot read scaling sheet: {exc}')
     if not candidates:notes.append('No candidate Excel workbooks found. Select the actual NBC calculator and scaling workbook.')
+    if not any('SCALING SUMMARY!B14' in note for note in notes):
+        notes.append('No SCALING SUMMARY sheet found in searched/selected workbooks. Check export directory and Excel sources.')
     return notes
 
 
