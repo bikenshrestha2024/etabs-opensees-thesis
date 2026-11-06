@@ -574,6 +574,9 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                 # prevent adoption of a single effective Aw for ESM.
                 profile=_wall_aw_profile(H,base,first,patches)
                 values['wall_aw_profile']=profile
+                values['wall_aw_height_m']=H
+                values['wall_aw_first_base_m']=base
+                values['wall_aw_first_top_m']=first
                 if not profile['uniform_footprint']:
                     notes.append('First-storey wall slices vary with elevation: '+
                         '; '.join(
