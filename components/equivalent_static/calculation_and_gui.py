@@ -741,6 +741,56 @@ class ESMGui:
             (self.export_dir/'NBC105_Workbook_Source.json').write_text(json.dumps({'workbooks':list(names)},indent=2),encoding='utf-8')
             self._load_project_inputs()
 
+    @staticmethod
+    def _rayleigh_input_preflight(awx_text, awy_text, limit_state, export_dir):
+        """Explicit source/field diagnostics before a costly OpenSees model build.
+
+        This checks numeric and file readiness only. It CANNOT certify wall
+        openings, NBC §5.1.2 effective pier grouping, or physical ETABS
+        equivalence, which remain separately reviewed evidence gates.
+        """
+        issues=[]
+        values={}
+        for axis,raw in (('X',awx_text),('Y',awy_text)):
+            raw=str(raw).strip()
+            if not raw:
+                issues.append(f'Aw-{axis} is blank. Inspect first-storey wall slices in '
+                              '"Why are Aw/period fields blank?", review pier grouping '
+                              'and openings, then enter your source-verified Aw (m²).')
+                continue
+            try:
+                area=float(raw)
+            except (TypeError,ValueError,OverflowError):
+                issues.append(f'Aw-{axis} must be a finite positive number in m², '
+                              f'not {raw!r}. Excel labels are not wall areas.')
+                continue
+            if not math.isfinite(area) or area<=0:
+                issues.append(f'Aw-{axis} must be finite and greater than zero: {raw!r}.')
+                continue
+            values[axis]=area
+        state=str(limit_state).strip().upper()
+        if state not in ('ULS','SLS','BOTH'):
+            issues.append('Select ULS or SLS from the source-matched stiffness model.')
+        folder=Path(export_dir)
+        for filename in ('OpenSees_Complete_Model_Data_V118.json',
+                         'NBC105_ESM_Story_Weights_Assembled_V118.csv'):
+            if not (folder/filename).is_file():
+                issues.append(f'Missing current-export input: {folder/filename}. '
+                              'Rebuild/export the current model and reconciled story weights.')
+        try:
+            from components.inputs.project_workbooks import source_limit_state
+            actual,reason=source_limit_state(folder)
+            if actual and state!='BOTH' and actual!=state:
+                issues.append(f'Cross-state source blocked: selected {state}, '
+                              f'but export identifies {actual}. {reason}')
+            if state=='BOTH':
+                issues.append('For apple-to-apple comparison select only the '
+                              'matching Ultimate→ULS or Service→SLS model. '
+                              'Both requires independent source models.')
+        except Exception as exc:
+            issues.append('Could not verify source stiffness state: '+str(exc))
+        return values,issues
+
     def _run_rayleigh(self):
         """Run distinct ULS/SLS reference analyses when Both is selected.
 
@@ -751,9 +801,22 @@ class ESMGui:
         their logs and do not become imported periods.
         """
         try:
-            awx=float(self.awx.get());awy=float(self.awy.get())
-            if not all(math.isfinite(v) and v>0 for v in (awx,awy)):
-                raise ValueError('Import and review finite positive X/Y wall Aw first.')
+            areas,issues=self._rayleigh_input_preflight(
+                self.awx.get(),self.awy.get(),self.state.get(),self.export_dir)
+            if issues:
+                explanation=('Preliminary Rayleigh cannot start because source '
+                    'inputs are incomplete or mismatched. Gravity PASS does not '
+                    'provide the missing effective wall areas.\\n\\n'
+                    + '\\n'.join(f'{i+1}. {reason}' for i,reason in enumerate(issues))
+                    + '\\n\\nUse "Why are Aw/period fields blank?" to inspect '
+                      'first-storey wall slices. If wall openings change the '
+                      'footprint, calculate a reviewed effective Aw from the '
+                      'source wall piers. Do not copy values from another EDB.')
+                self.status.set('Rayleigh PRECHECK BLOCKED: '+ '; '.join(issues))
+                messagebox.showwarning('Rayleigh input evidence required',
+                                       explanation,parent=self.root)
+                return
+            awx=areas['X'];awy=areas['Y']
             # Works through both the root compatibility launcher and direct
             # components.equivalent_static imports (e.g. tests / Spyder).
             script=HERE/'OpenSees_Rayleigh_Preliminary_V123.py'
@@ -796,7 +859,8 @@ class ESMGui:
                     ' X/Y Rayleigh analyses completed; inspect the per-state JSON, Excel and plots.'))
             threading.Thread(target=worker,daemon=True).start()
         except Exception as exc:
-            messagebox.showerror('Rayleigh setup',str(exc))
+            self.status.set('Rayleigh setup error: '+str(exc))
+            messagebox.showerror('Rayleigh setup',str(exc),parent=self.root)
 
     def _apply_system_factors(self,_event=None):
         factors=NBC105_ESM_SYSTEM_FACTORS.get(self.system.get())
