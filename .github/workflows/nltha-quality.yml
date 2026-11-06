@@ -222,6 +222,7 @@ jobs:
           python tests/verify_audit_repairs_20261105.py
           python tests/verify_mrsm_period_source.py
           python tests/verify_esm_output_safety.py
+          python tests/verify_esm_dual_module.py
           python tests/verify_native_wall_probe_preparation.py
           python tests/verify_component_experiment_evidence.py
           python tests/verify_soil_c_case_completion.py
