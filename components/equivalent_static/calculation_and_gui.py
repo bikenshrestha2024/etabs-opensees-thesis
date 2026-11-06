@@ -702,12 +702,38 @@ class ESMGui:
                +'If the exported wall geometry cannot independently reconstruct Aw, '
                +'enter a separately calculated and documented Aw-X/Aw-Y manually. '
                +'ETABS COM connection is optional for importing Excel.\\n\\n')
+        profile=source.get('values',{}).get('wall_aw_profile')
+        if profile:
+            rows=profile['rows']
+            intro+=('First-storey wall footprint: '+
+                ('uniform across height' if profile['uniform_footprint'] else
+                 'NONUNIFORM (do not adopt one Aw automatically)')+
+                 '\\n')
+            intro+='Wall slices:\\n'
+            for r in rows:
+                intro+=(f"  z={r['z_bottom_m']:.4f}..{r['z_top_m']:.4f} m, "
+                        f"Aw-X={r['aw_x_m2']:.8g} m², Aw-Y={r['aw_y_m2']:.8g} m²; "
+                        f"segments X={r['x_segment_count']}, Y={r['y_segment_count']}\\n")
         report=intro+'\\n'.join(notes or ['No additional source diagnostics recorded.'])
         output=Path(self.outdir.get())
         output.mkdir(parents=True,exist_ok=True)
         (output/'ESM_Source_Diagnostics.txt').write_text(report,encoding='utf-8')
-        messagebox.showinfo('ESM input source audit (saved to output folder)',
-                            report[:9000],parent=self.root)
+        # An information messagebox rendered hundreds of workbook candidates
+        # as an unreadable single paragraph. Use a scrollable, selectable
+        # report with source files and wall slices on separate lines.
+        from tkinter.scrolledtext import ScrolledText
+        window=tk.Toplevel(self.root)
+        window.title('ESM source audit — read-only diagnostics')
+        window.geometry('1080x720')
+        ttk.Label(window,text=('Current source and first-storey wall '
+            'audit (not NBC engineering acceptance)'),padding=8).pack(anchor='w')
+        viewer=ScrolledText(window,wrap='word',font=('Consolas',10))
+        viewer.pack(fill='both',expand=True,padx=8,pady=5)
+        viewer.insert('1.0',report)
+        viewer.configure(state='disabled')
+        ttk.Label(window,text='Saved report: '+str(output/'ESM_Source_Diagnostics.txt'),
+                  wraplength=1000,padding=8).pack(anchor='w')
+        ttk.Button(window,text='Close',command=window.destroy).pack(pady=6)
 
     def _choose_workbooks(self):
         names=filedialog.askopenfilenames(title='Select calculator and/or scaling workbooks',filetypes=[('Excel workbooks','*.xlsx')])
