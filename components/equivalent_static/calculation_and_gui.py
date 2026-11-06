@@ -403,6 +403,7 @@ class ESMGui:
     def __init__(self,root):
         self.root=root; root.title("NBC 105:2025 — Earthquake Analysis — Equivalent Static Method")
         self.export_dir=None  # initialized after locating the selected export
+        self.esm_module=tk.StringVar(value="OpenSees Direct Equivalent Static")
         export_dir=Path(sys.argv[1]) if len(sys.argv)>1 and Path(sys.argv[1]).is_dir() else Path(r"D:\Thesis Opensees\Etabs Nodes Export")
         self.export_dir=export_dir
         from components.inputs.project_workbooks import source_limit_state
@@ -451,6 +452,36 @@ class ESMGui:
         self.awx.trace_add('write',lambda *_:self._show_empirical())
         self.awy.trace_add('write',lambda *_:self._show_empirical())
 
+    def _run_etabs_linked(self):
+        """Use the uploaded original Excel/ETABS engine, without touching RS scaling."""
+        from components.equivalent_static.etabs_linked_excel import run_etabs_excel
+        source=filedialog.askopenfilename(parent=self.root,title="Select ETABS EDB (read-only)",
+                                            filetypes=[("ETABS model","*.edb")])
+        if not source: return
+        workbook=filedialog.askopenfilename(parent=self.root,title="Select original NBC105 Excel calculator",
+                                              filetypes=[("Excel calculator","*.xlsx")])
+        if not workbook: return
+        engine=filedialog.askopenfilename(parent=self.root,title="Select original ETABS NBC105 integrated Python engine",
+                                           filetypes=[("Python engine","*.py")])
+        if not engine: return
+        out=filedialog.askdirectory(parent=self.root,title="Output directory for NEW populated Excel and audit",
+                                     initialdir=self.outdir.get() if Path(self.outdir.get()).is_dir() else str(Path.home()))
+        if not out: return
+        self.status.set("ETABS linked ESM: reading model and populating a new Excel copy (no RS scaling).")
+        def task():
+            try:
+                target,audit,coeff=run_etabs_excel(source,workbook,engine,out,
+                    log=lambda msg:self.root.after(0,lambda m=str(msg):self.status.set(m)))
+                def success():
+                    self.status.set("ETABS linked Excel ready: "+str(target)+" | provenance "+str(audit))
+                    messagebox.showinfo("ETABS Linked ESM",f"Populated original Excel method:\\n{target}\\n\\nAudit:\\n{audit}\\n\\nOpenSees Direct remains available in the dropdown.",parent=self.root)
+                self.root.after(0,success)
+            except Exception as exc:
+                error=str(exc)
+                self.root.after(0,lambda:messagebox.showerror("ETABS Linked ESM failed",error,parent=self.root))
+                self.root.after(0,lambda:self.status.set("ETABS linked ESM FAILED: "+error))
+        threading.Thread(target=task,daemon=True).start()
+
     def _field(self,parent,label,var,row,col=0,width=18):
         ttk.Label(parent,text=label).grid(row=row,column=col,sticky="w",padx=5,pady=4)
         ttk.Entry(parent,textvariable=var,width=width).grid(row=row,column=col+1,sticky="ew",padx=5,pady=4)
@@ -459,6 +490,7 @@ class ESMGui:
         # Persistent actions remain visible; only the long input form scrolls.
         footer=ttk.Frame(self.root,padding=8);footer.pack(side='bottom',fill='x')
         ttk.Button(footer,text='1. Calculate + export',command=self._calculate).pack(side='left',padx=3)
+        ttk.Button(footer,text='ETABS Linked: populate original Excel',command=self._run_etabs_linked).pack(side='left',padx=3)
         self.run_button=ttk.Button(footer,text='2. Run exported cases',command=self._run_generated,state='disabled');self.run_button.pack(side='left',padx=3)
         ttk.Button(footer,text='Open output folder',command=self._open_export_folder).pack(side='left',padx=3)
         ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
@@ -475,6 +507,13 @@ class ESMGui:
         from OpenSees_Research_UI_V123 import scrollable_form
         top=scrollable_form(self.root)
         ttk.Label(top,text="NBC 105:2025 EQUIVALENT STATIC ANALYSIS",font=("Segoe UI",16,"bold")).pack(anchor="w")
+        module_row=ttk.Frame(top);module_row.pack(fill="x",pady=5)
+        ttk.Label(module_row,text="ESM analysis module:").pack(side="left",padx=(0,8))
+        ttk.Combobox(module_row,textvariable=self.esm_module,
+                     values=["OpenSees Direct Equivalent Static","ETABS Linked Equivalent Static"],
+                     state="readonly",width=39).pack(side="left")
+        ttk.Label(module_row,text="ETABS linked uses original workbook + ETABS OAPI; OpenSees direct uses existing ESM force export.",
+                  wraplength=520).pack(side="left",padx=8)
         ttk.Label(top,text="This earthquake-analysis module calculates NBC forces and can run a complete OpenSeesPy model builder followed by the lateral analysis. ETABS EDB extraction remains in the main converter.",wraplength=1000).pack(anchor="w",pady=(2,10))
         ttk.Label(top,text="ETABS linkage: story elevations and diaphragm tags are read from the selected export. The selected assembled ledger contains imported gravity components. Compare its story totals with ETABS before design use.",foreground="#174a7e",wraplength=1000).pack(anchor="w",pady=(0,6))
         filebox=ttk.LabelFrame(top,text="1. Verified story seismic-weight CSV (ETABS export or prepared input)",padding=8); filebox.pack(fill="x",pady=5)
@@ -1163,6 +1202,8 @@ class ESMGui:
         try: os.startfile(self.path.get())
         except Exception as e: messagebox.showerror("Could not open CSV",str(e))
     def _calculate(self):
+        if self.esm_module.get()=="ETABS Linked Equivalent Static":
+            return self._run_etabs_linked()
         if self.direction.get()=='Both X/Y':
             if not all((self.rayleigh_tx if axis=='X' else self.rayleigh_ty).get().strip() or (self.use_workbook_periods.get() and (self.excel_tx if axis=='X' else self.excel_ty).get().strip()) for axis in ('X','Y')):
                 self.last_runners=[];self.run_button.configure(state='disabled')
