@@ -92,12 +92,18 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             raise ValueError("ETABS JSON must be an object")
     # Build in staging area; existing bundle is never overwritten by failed exports.
     output_dir.mkdir(parents=True,exist_ok=True)
-    dest=output_dir/"Gravity_ETABS_OpenSees_Evidence"
-    if dest.exists():
-        raise FileExistsError("Comparison evidence directory already exists; choose a fresh output location: "+str(dest))
+    # Keep previous evidence immutable; choose one unused revision for BOTH
+    # extracted folder and upload ZIP. Do not overwrite or reuse old data.
+    base_name="Gravity_ETABS_OpenSees_Evidence"
+    name=base_name
+    rev=1
+    while (output_dir/name).exists() or (output_dir/(name+".zip")).exists():
+        rev+=1
+        name=base_name+f"_V{rev:02d}"
+    dest=output_dir/name
     files=[];missing=[];oversize=[]
     with tempfile.TemporaryDirectory(prefix="gravity_bundle_",dir=output_dir) as tmp:
-        stage=Path(tmp)/"Gravity_ETABS_OpenSees_Evidence"
+        stage=Path(tmp)/name
         stage.mkdir()
         def add(src,arc,required=False):
             src=Path(src)
@@ -177,13 +183,12 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             "Include native ETABS gravity JSON with the same load case.\n"
             "Inspect EVIDENCE_MANIFEST.json for MISSING and SKIPPED files.\n"
             "No missing physical responses are inferred.\n",encoding="utf8")
-        zip_path=output_dir/"Gravity_ETABS_OpenSees_Evidence.zip"
-        if zip_path.exists():
-            raise FileExistsError("ZIP already exists; choose a fresh output directory: "+str(zip_path))
+        zip_path=output_dir/(name+".zip")
         with zipfile.ZipFile(zip_path,"w",compression=zipfile.ZIP_DEFLATED) as z:
             for file in stage.rglob("*"):
                 if file.is_file(): z.write(file,file.relative_to(stage.parent).as_posix())
         stage.rename(dest)
+    audit["output_zip"]=str(zip_path)
     return audit,zip_path
 
 def main(argv=None):
