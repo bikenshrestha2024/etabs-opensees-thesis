@@ -39,7 +39,15 @@ def _runner_source(model_script, result_path, support_nodes, applied_kN, nsteps)
         "    from OpenSees_Analysis_Stack_V110 import run_gravity_stage",
         "    node_tags = [int(n) for n in ops.getNodeTags()]",
         "    element_tags = [int(e) for e in ops.getEleTags()]",
-        "    report = run_gravity_stage(ops, SUPPORT_NODES, APPLIED_VERTICAL_LOAD_KN, model_nodes=node_tags, nsteps=NSTEPS, freeze=True, system='UmfPack', response_output_dir=RESULT_PATH.parent / 'Gravity_Response')",
+        "    # New V118 entries already run the gravity stage during construction.",
+        "    # NEVER apply the same gravity source twice.",
+        "    model_report = model_globals.get('MODEL_REPORT', {})",
+        "    if isinstance(model_report, dict) and model_report.get('preload_completed'):",
+        "        report_file = MODEL_SCRIPT.parent / 'OpenSees_Complete_Gravity_Check_V118.json'",
+        "        if not report_file.is_file(): raise FileNotFoundError('Preloaded gravity report missing: ' + str(report_file))",
+        "        report = json.loads(report_file.read_text(encoding='utf-8-sig'))",
+        "    else:",
+        "        report = run_gravity_stage(ops, SUPPORT_NODES, APPLIED_VERTICAL_LOAD_KN, model_nodes=node_tags, nsteps=NSTEPS, freeze=True, system='UmfPack', response_output_dir=RESULT_PATH.parent / 'Gravity_Response')",
         "    ops.reactions()",
         "    nodes = []",
         "    for n in node_tags:",
@@ -78,6 +86,9 @@ class GravityAnalysisGUI:
         self.support_var = tk.StringVar()
         self.load_var = tk.StringVar()
         self.steps_var = tk.StringVar(value="10")
+        # Full independent gravity: all assigned dead, live AND roof live at 1.0.
+        # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
+        self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self._build()
@@ -153,6 +164,36 @@ class GravityAnalysisGUI:
             self.model_var.set(p)
             self._read_code_inputs(show_error=False)
 
+    def _selected_gravity_evidence(self, model):
+        """Read fresh unfactored source loads; never reuse the 0.30 preload total.
+
+        [REF components/model/assembly.py apply_gravity_profile]
+        Independent 1D+1L+roof-live comparison leaves seismic mass unchanged.
+        """
+        from OpenSees_Complete_Export_V118 import apply_gravity_profile
+        from copy import deepcopy
+        source=model.parent
+        data_path=source/'OpenSees_Complete_Model_Data_V118.json'
+        config_path=source/'OpenSees_Complete_Model_Config_V118.json'
+        meta_path=source/'OpenSees_Source_Model_Metadata_V118.json'
+        if not data_path.is_file() or not config_path.is_file():
+            raise ValueError('Fresh model data/config needed to compute full 1.0D+1.0L gravity. Rebuild from current ETABS export.')
+        data=json.loads(data_path.read_text(encoding='utf-8-sig'))
+        cfg=json.loads(config_path.read_text(encoding='utf-8-sig'))
+        meta=json.loads(meta_path.read_text(encoding='utf-8-sig')) if meta_path.is_file() else {}
+        selected=self.gravity_profile_var.get()
+        if selected=='GRAVITY_1.0D_1.0L':
+            if not data.get('unfactored_patterns'):
+                raise ValueError('No unfactored pattern ledger. Rebuild ETABS export; cannot use 0.30 source preload as full gravity.')
+            context=apply_gravity_profile(data,cfg,selected,meta.get('pattern_types',{}))
+            total=float(data['total_downward_load_kN'])
+        elif selected=='AS_CONFIGURED':
+            context=apply_gravity_profile(data,cfg,selected,meta.get('pattern_types',{}))
+            total=float(data['total_downward_load_kN'])
+        else:
+            raise ValueError('Unknown gravity profile '+str(selected))
+        return total,context,cfg
+
     def _read_code_inputs(self, show_error=True):
         """Read literal support/load metadata embedded by the model exporter."""
         try:
@@ -171,7 +212,7 @@ class GravityAnalysisGUI:
             if not isinstance(data, dict):
                 raise ValueError("This script has no GRAVITY_GUI_INPUTS metadata. Select a generated model that contains that dictionary, or enter support/load inputs manually only after reviewing the model script.")
             supports = [int(x) for x in data.get("support_node_tags", [])]
-            total = data.get("total_downward_load_kN")
+            total, context, cfg = self._selected_gravity_evidence(model)
             if not supports:
                 raise ValueError("No fixed support node tags were found in the generated code.")
             self.support_var.set(", ".join(map(str, supports)))
@@ -180,7 +221,7 @@ class GravityAnalysisGUI:
             note = data.get("load_total_units_note", "")
             coverage = data.get("coverage_note", "")
             if hasattr(self,"storey_tree"):self._show_storey_loads()
-            self.status_var.set("Read supports and gravity total from the selected model metadata. Review the export coverage report before running.")
+            self.status_var.set("Gravity profile "+context['profile']+"; applied="+str(total)+" kN. Seismic mass independent.")
             if show_error:
                 messagebox.showinfo("Values read from generated code", f"Supports: {supports}\nVertical line-load total: {total} kN\n\n{note}\n{coverage}\n\nThis auto-total only sums loads present in the generated model script.", parent=self.win)
             return data
@@ -202,6 +243,13 @@ class GravityAnalysisGUI:
         tk.Label(form, text="V118 automatically selects OpenSees_Complete_Gravity_Model.py from the current export manifest. This entry builds the connected frame, slab/wall mesh, loads and mass. For older exports, use Rebuild assembled model from saved ETABS export in the main window first. Review OpenSees_Complete_Export_Report_V118.json for missing or unsupported inputs.", wraplength=1080, foreground="#9a3412", anchor="w", justify="left").pack(anchor="w", pady=(0, 6))
         self._path_row(form, "Python executable (with OpenSeesPy)", self.python_var, lambda: self._browse_file(self.python_var, "Select Python with OpenSeesPy", [("Python executable", "python.exe"), ("All files", "*.*")]))
         self._path_row(form, "All outputs folder", self.output_var, self._browse_dir)
+        profile_row=ttk.Frame(form);profile_row.pack(fill="x",pady=4)
+        ttk.Label(profile_row,text="Gravity run purpose:").pack(side="left",padx=(0,6))
+        ttk.Combobox(profile_row,textvariable=self.gravity_profile_var,state="readonly",width=37,
+                     values=("GRAVITY_1.0D_1.0L","AS_CONFIGURED")).pack(side="left")
+        ttk.Label(profile_row,text="1.0D + 1.0L includes assigned roof live; configured is seismic preload.",
+                  wraplength=520).pack(side="left",padx=8)
+        self.gravity_profile_var.trace_add("write",lambda *_: self._read_code_inputs(show_error=False) if self.model_var.get() else None)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
         self._path_row(form, "ETABS gravity results JSON (optional)", self.etabs_gravity_json_var,
@@ -286,7 +334,13 @@ class GravityAnalysisGUI:
         except ValueError as exc: raise ValueError("Enter comma-separated integer support tags, a numeric load in kN, and an integer step count.") from exc
         if not supports or total <= 0 or steps < 1: raise ValueError("Support tags, positive applied load and at least one load step are required.")
         if len(set(supports)) != len(supports): raise ValueError("Support node tags contain duplicates; each support must appear once.")
-        return model, out, py, supports, total, steps
+        # Recalculate before every run; reject stale manually entered totals.
+        expected, context, _ = self._selected_gravity_evidence(model)
+        if abs(total-expected)>max(0.01,abs(expected)*1e-7):
+            raise ValueError("Displayed total differs from source-derived "+context['profile']+
+                             " load: expected "+str(expected)+" kN, entered "+str(total)+
+                             " kN. Refresh the selected model and its gravity inputs.")
+        return model, out, py, supports, expected, steps
 
     def run(self):
         try: model, out, py, supports, total, steps = self._inputs()
@@ -297,18 +351,18 @@ class GravityAnalysisGUI:
         self.run_button.configure(state="disabled")
         self.status_var.set("Running model and nonlinear gravity steps…")
         self.log.delete("1.0", "end")
-        self.log.insert("end", f"Model: {model}\nOutput folder: {out}\nSupports: {supports}\nApplied load: {total:g} kN\nSteps: {steps}\n")
+        self.log.insert("end", f"Model: {model}\\nOutput folder: {out}\\nSupports: {supports}\\nApplied load: {total:g} kN\\nSteps: {steps}\\nProfile: {self.gravity_profile_var.get()}\\n")
         self.win.update_idletasks()
         result_path = out / "Gravity_Result_V110.json"
         runner_path = out / "Gravity_Run_V110.py"
         log_path = out / "Gravity_Run_V110.log"
         runner_path.write_text(_runner_source(model, result_path, supports, total, steps), encoding="utf-8")
-        thread = threading.Thread(target=self._worker, args=(py, runner_path, result_path, log_path, out), daemon=True)
+        thread = threading.Thread(target=self._worker, args=(py, runner_path, result_path, log_path, out, self.gravity_profile_var.get()), daemon=True)
         thread.start()
 
-    def _worker(self, py, runner, result_path, log_path, out):
+    def _worker(self, py, runner, result_path, log_path, out, profile):
         try:
-            proc = subprocess.run([str(py), str(runner)], cwd=str(out), capture_output=True, text=True, errors="replace", env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'}, encoding='utf-8')
+            proc = subprocess.run([str(py), str(runner)], cwd=str(out), capture_output=True, text=True, errors="replace", env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1','OPENSEES_GRAVITY_PROFILE':profile}, encoding='utf-8')
             combined = proc.stdout + ("\n--- STDERR ---\n" + proc.stderr if proc.stderr else "")
             log_path.write_text(combined, encoding="utf-8")
             if not result_path.exists():
