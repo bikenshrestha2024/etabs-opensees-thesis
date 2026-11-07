@@ -128,12 +128,12 @@ class GravityDirectAPITests(unittest.TestCase):
             sap.Results=Result()
             events=[]
             initial={'units':6,'cases':[],'combos':[('1. DL + LL',False)]}
-            with patch.object(g,'_snapshot',return_value=initial), \\
-                 patch.object(g,'_restore',return_value=None), \\
+            with (patch.object(g,'_snapshot',return_value=initial), 
+                 patch.object(g,'_restore',return_value=None), 
                  patch.object(g,'_combo',return_value=[
-                     {'name':'Dead','factor':1.0},{'name':'Live','factor':1.0}]), \\
-                 patch.object(g,'_get_case_status',return_value={'Dead':1,'Live':1}), \\
-                 patch.object(g,'_base',side_effect=RuntimeError('No saved BaseReact rows')):
+                     {'name':'Dead','factor':1.0},{'name':'Live','factor':1.0}]), 
+                 patch.object(g,'_get_case_status',return_value={'Dead':1,'Live':1}), 
+                 patch.object(g,'_base',side_effect=RuntimeError('No saved BaseReact rows'))):
                 with self.assertRaisesRegex(RuntimeError,'no usable BaseReact'):
                     g.extract_from_sap(sap,source_edb=edb,
                         log=lambda stage,message,**kwargs:events.append(stage))
