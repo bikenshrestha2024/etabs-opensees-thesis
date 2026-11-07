@@ -4,6 +4,19 @@ For this project's requested comparison, select `GRAVITY_1.0D_1.0L` in the case-
 
 The profile controls the gravity **preload**, not the independently assembled seismic mass. NBC 105:2025 section 5.2, Table 5-1 identifies 0.60 for storage live load, 0.30 for other live load and zero roof live load in seismic weight; applicability and occupancy must be verified. See the [official NBC 105:2025](https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf). These mass fractions do not replace the user-selected full-live gravity comparison. The 1.0D+1.0L comparison is a project-selected diagnostic, not a claim about every required design load combination.
 
+## Explicit separation: independent gravity versus earthquake analyses (2026-11-07)
+
+The **standalone Gravity GUI** defaults to `GRAVITY_1.0D_1.0L` and applies **1.0 Dead + 1.0 Live + 1.0 assigned Roof Live**. Roof live is included only when the source ETABS model actually contains that load. The GUI now derives the total from `unfactored_patterns` in the exact model export, not from old generated `GRAVITY_GUI_INPUTS` metadata that might reflect 0.30 live. A mismatch with an entered load total is rejected before the run.
+
+Earthquake workflows (ESM, modal/eigen, MRSM and response-history) **do not use this full-gravity comparison profile**. The default model `mass_factors` retain 1.0 for dead, 0.30 for ordinary live and 0 for roof live, subject to reviewed NBC 105:2025 occupancy/load classifications. Storage live fractions may differ, and independent full-gravity checks must not overwrite those mass factors. The configured gravity preload used with P-Delta/seismic calculations is a separate analysis state, which must also be reviewed for the intended load combination; it is not automatically the full 1.0D+1.0L case.
+
+| Run purpose | Dead gravity | Ordinary floor live gravity | Assigned roof live gravity | Ordinary floor live seismic mass | Roof live seismic mass |
+|---|---:|---:|---:|---:|---:|
+| Independent ETABS/OpenSees gravity comparison | 1.00 | 1.00 | 1.00 | Separate/not changed | Separate/not changed |
+| Default earthquake model `AS_CONFIGURED` | 1.00 | 0.30 | 0.00 | 0.30 | 0.00 |
+
+**Important:** The gravity GUI passes `OPENSEES_GRAVITY_PROFILE` only to its own subprocess. It does not set or persist a process-wide environment override in the parent application. A freshly generated model that preloads gravity is **not preloaded a second time** by the standalone GUI. Inspect `Gravity_Result_V110.json` for `gravity_profile` and the recorded solver report, and compare with a matching ETABS static gravity case. The software does not assert automatic ETABS force/displacement equivalence.
+
 ## Procedure and limits
 
 1. Export the same ETABS model and verify the load-pattern inventory, slab and wall connectivity, local axes, restraints and self-weight multiplier. Compare the same individual patterns and include roof live in both models only when assigned.
