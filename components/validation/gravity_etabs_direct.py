@@ -11,6 +11,8 @@ import hashlib
 import json
 import math
 import traceback
+import shutil
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -127,7 +129,11 @@ def extract_from_sap(sap,case='1. DL + LL',source_edb=None,allow_alternate_edb=F
     selected=Path(str(sap.GetModelFilename())).resolve()
     log('ETABS_MODEL','Read ETABS active model',path=str(selected))
     source_path=Path(source_edb).resolve() if source_edb else None
-    differs=bool(source_path and selected!=source_path)
+    path_differs=bool(source_path and selected!=source_path)
+    identical_bytes=False
+    if path_differs and source_path.is_file():
+        identical_bytes=_file_hash(selected)==_file_hash(source_path)
+    differs=path_differs and not identical_bytes
     if differs and not allow_alternate_edb:
         raise ValueError(
             'Active ETABS EDB differs from OpenSees export source: '+str(selected)+
@@ -235,7 +241,10 @@ def extract_from_sap(sap,case='1. DL + LL',source_edb=None,allow_alternate_edb=F
             source_model_edb=str(source_path) if source_path else None,
             source_model_edb_sha256=_file_hash(source_path) if source_path and source_path.is_file() else None,
             active_etabs_edb_sha256=_file_hash(selected),
-            model_identity_status=('ALTERNATE_EDB_UNVERIFIED' if differs else 'SAME_EDB_PATH'),
+            model_identity_status=('ALTERNATE_EDB_UNVERIFIED' if differs else
+                                   'IDENTICAL_EDB_BYTES_WORKING_COPY' if identical_bytes else
+                                   'SAME_EDB_PATH'),
+            is_isolated_working_copy=bool(identical_bytes),
             matched_edb_identity=not differs,
             case_definition=components,case_step=dict(type=step[0],number=step[1]),
             units=dict(force='kN',length='m',moment='kN-m'),
@@ -385,11 +394,13 @@ def _release_owned_instance(instance):
             raise RuntimeError('Owned ETABS ApplicationExit(False) returned '+str(code))
 
 
-def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_dir=None,allow_alternate_edb=False,launch_new_etabs=False,etabs_edb_path=None,etabs_exe_path=None,log_callback=None):
-    """Read attached ETABS EDB and compare with existing gravity JSON.
+def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_dir=None,allow_alternate_edb=False,launch_new_etabs=False,etabs_edb_path=None,etabs_exe_path=None,log_callback=None,run_if_missing=False):
+    """Compare the original ETABS source EDB to the OpenSees gravity result.
 
-    [REF components/validation/etabs_direct_api.py connect_and_extract] Existing
-    read-only ETABS connector; no model opening, saving or analysis.
+    [REF components/validation/etabs_direct_api.py connect_and_extract] Audit
+    selected results. When run_if_missing is enabled, analyze only an isolated
+    EDB copy; never run or save the original source model.
+    [REF CSI ETABS OAPI cAnalyze.RunAnalysis] Runs enabled analysis cases.
     """
     from OpenSees_Project_Inputs_V123 import connect_etabs
     from components.inputs.project_workbooks import _source_edb_path
@@ -415,8 +426,9 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
     report('START','Begin ETABS/OpenSees direct gravity comparison',
            case=case,launch_new_etabs=bool(launch_new_etabs),
            allow_alternate_edb=bool(allow_alternate_edb),
+           run_if_missing=bool(run_if_missing),
            gravity_json=str(gravity),source_export_folder=str(folder))
-    app=None;owned=False
+    app=None;owned=False;working_copy=None;original_hash=None
     try:
         source=_source_edb_path(folder)
         if not source:raise ValueError('Export lacks source EDB identity; re-export rather than guessing')
@@ -431,17 +443,64 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
                 raise FileNotFoundError('Selected gravity EDB missing: '+str(selected))
             if selected!=Path(source).resolve() and not allow_alternate_edb:
                 raise ValueError('Different gravity-copy EDB requires explicit diagnostic approval')
-            report('ETABS_LAUNCH','Launching private ETABS instance',edb=str(selected),
+            original_hash=_file_hash(selected)
+            if run_if_missing:
+                # ETABS RunAnalysis can write model/result sidecars; all such
+                # writes are confined to this private working directory.
+                work_root=out/'ETABS_Gravity_Working_Copies'
+                work_root.mkdir(parents=True,exist_ok=True)
+                work_dir=work_root/('run_'+uuid.uuid4().hex[:12])
+                work_dir.mkdir()
+                working_copy=work_dir/selected.name
+                shutil.copy2(selected,working_copy)
+                if _file_hash(working_copy)!=original_hash:
+                    raise IOError('Isolated EDB copy hash verification failed')
+                report('ETABS_WORKING_COPY','Copied selected EDB before analysis',
+                       original_edb=str(selected),copy=str(working_copy),
+                       sha256=original_hash,
+                       note='Only this copy may receive ETABS analysis output files')
+            opened_edb=working_copy or selected
+            report('ETABS_LAUNCH','Launching private ETABS instance',
+                   edb=str(opened_edb),
                    executable=str(etabs_exe_path or 'registered ETABS COM'))
-            app=_new_etabs_instance(selected,exe_path=etabs_exe_path)
+            app=_new_etabs_instance(opened_edb,exe_path=etabs_exe_path)
             owned=True
-            report('ETABS_OPEN','Private ETABS instance opened expected EDB',edb=str(selected))
+            report('ETABS_OPEN','Private ETABS instance opened expected EDB',edb=str(opened_edb))
         else:
             report('ETABS_ATTACH','Connecting to already-open ETABS session')
             app=connect_etabs()
             report('ETABS_ATTACH','Connected; this ETABS instance will not be closed')
-        data=extract_from_sap(app.SapModel,case,source_edb=source,
-                              allow_alternate_edb=allow_alternate_edb,log=report)
+        if run_if_missing and not owned:
+            raise ValueError('Automatic analysis requires a privately launched ETABS instance')
+        try:
+            data=extract_from_sap(app.SapModel,case,source_edb=source,
+                                  allow_alternate_edb=allow_alternate_edb,log=report)
+        except RuntimeError as missing:
+            # Restrict retries to genuine missing-results errors; unrelated
+            # CSI API errors must not trigger an expensive analysis run.
+            if not run_if_missing or 'no usable BaseReact results' not in str(missing):
+                raise
+            if not owned or working_copy is None:
+                raise RuntimeError('Refusing to analyze any EDB outside a private verified copy') from missing
+            report('ETABS_ANALYZE','Missing gravity results: running ETABS enabled cases on private EDB copy',
+                   source_status=str(missing),
+                   warning='RunAnalysis may run every enabled case (including long time histories).')
+            ret=app.SapModel.Analyze.RunAnalysis()
+            if ret not in (0,None):
+                raise RuntimeError('ETABS Analyze.RunAnalysis returned '+str(ret)+
+                                   ' on isolated EDB: '+str(working_copy))
+            report('ETABS_ANALYZE','CSI RunAnalysis returned success on working copy',
+                   working_copy=str(working_copy))
+            data=extract_from_sap(app.SapModel,case,source_edb=source,
+                                  allow_alternate_edb=allow_alternate_edb,log=report)
+        if original_hash and _file_hash(selected)!=original_hash:
+            raise RuntimeError('Original EDB hash changed unexpectedly during comparison; STOP and audit')
+        if working_copy is not None:
+            data['analysis_working_copy']=str(working_copy)
+            data['original_source_edb_sha256_before']=original_hash
+            data['original_source_edb_sha256_after']=_file_hash(selected)
+            report('ETABS_PROVENANCE','Verified original EDB unchanged; comparison used isolated copy',
+                   original_sha256=original_hash,copy=str(working_copy))
         result=json.loads(gravity.read_text(encoding='utf-8-sig'))
         report('OPENSEES_RESULT','Loaded OpenSees gravity results',
                profile=result.get('gravity_profile'),ok=result.get('ok'))
