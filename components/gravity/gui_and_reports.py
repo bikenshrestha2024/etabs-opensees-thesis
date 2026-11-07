@@ -71,7 +71,9 @@ class GravityAnalysisGUI:
         self.win.geometry("1120x780")
         self.win.minsize(920, 650)
         self.model_var = tk.StringVar()
-        self.output_var = tk.StringVar(value=str(Path.cwd()))
+        self.output_var = tk.StringVar(value=str(Path.cwd() / "OpenSees_Analysis_Results" / "Gravity_Results"))
+        self.comparison_output_var = tk.StringVar(value="")
+        self.etabs_gravity_json_var = tk.StringVar(value="")
         self.python_var = tk.StringVar(value=sys.executable)
         self.support_var = tk.StringVar()
         self.load_var = tk.StringVar()
@@ -118,6 +120,32 @@ class GravityAnalysisGUI:
     def _browse_dir(self):
         p = filedialog.askdirectory(parent=self.win, title="Choose one folder for all gravity outputs")
         if p: self.output_var.set(p)
+
+    def _export_comparison_bundle(self):
+        """Prepare a single ZIP for independent ETABS/OpenSees gravity review."""
+        try:
+            from components.gravity.comparison_bundle import export_bundle
+            model = Path(self.model_var.get()).expanduser().resolve()
+            if not model.is_file():
+                raise ValueError("Select an existing generated gravity model script")
+            source = model.parent
+            gravity_dir = Path(self.output_var.get()).expanduser().resolve()
+            chosen = self.comparison_output_var.get().strip()
+            comparison_dir = (Path(chosen).expanduser().resolve() if chosen else
+                gravity_dir / "Gravity_ETABS_OpenSees_Comparison")
+            etabs_path = self.etabs_gravity_json_var.get().strip() or None
+            report, archive = export_bundle(source, gravity_dir, comparison_dir,
+                                             etabs_json=etabs_path)
+            self.status_var.set("Upload-ready gravity evidence: " + str(archive))
+            messagebox.showinfo("Gravity comparison evidence", 
+                f"ZIP for upload:\\n{archive}\\n\\nMissing items: {len(report['missing'])}"
+                "\\nReview EVIDENCE_MANIFEST.json before comparison.",parent=self.win)
+        except Exception as exc:
+            messagebox.showerror("Gravity evidence bundle",str(exc),parent=self.win)
+
+    def _browse_file_or_dir_for_comparison(self):
+        selected=filedialog.askdirectory(parent=self.win,title="Choose a NEW gravity evidence output folder")
+        if selected:self.comparison_output_var.set(str(Path(selected)/"ETABS_OpenSees_Gravity_Comparison"))
 
     def _browse_model(self):
         p = filedialog.askopenfilename(parent=self.win, title="Select generated OpenSeesPy model script", filetypes=[("Python scripts", "*.py"), ("All files", "*.*")])
@@ -174,6 +202,11 @@ class GravityAnalysisGUI:
         tk.Label(form, text="V118 automatically selects OpenSees_Complete_Gravity_Model.py from the current export manifest. This entry builds the connected frame, slab/wall mesh, loads and mass. For older exports, use Rebuild assembled model from saved ETABS export in the main window first. Review OpenSees_Complete_Export_Report_V118.json for missing or unsupported inputs.", wraplength=1080, foreground="#9a3412", anchor="w", justify="left").pack(anchor="w", pady=(0, 6))
         self._path_row(form, "Python executable (with OpenSeesPy)", self.python_var, lambda: self._browse_file(self.python_var, "Select Python with OpenSeesPy", [("Python executable", "python.exe"), ("All files", "*.*")]))
         self._path_row(form, "All outputs folder", self.output_var, self._browse_dir)
+        self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
+                       lambda: self._browse_file_or_dir_for_comparison())
+        self._path_row(form, "ETABS gravity results JSON (optional)", self.etabs_gravity_json_var,
+                       lambda: self._browse_file(self.etabs_gravity_json_var,
+                          "Select matching ETABS gravity results JSON", [("JSON", "*.json")]))
         ttk.Button(form, text="Read support tags and gravity load total from selected model code", command=self._read_code_inputs).pack(anchor="w", pady=(4, 2))
         inputs = ttk.Frame(form); inputs.pack(fill="x", pady=(5, 2))
         ttk.Label(inputs, text="OpenSees support node tags (auto-read)").grid(row=0, column=0, sticky="w", padx=4)
@@ -190,6 +223,7 @@ class GravityAnalysisGUI:
         self.run_button = ttk.Button(bar, text="Run gravity, check, freeze + export", command=self.run)
         self.run_button.pack(side="left")
         ttk.Button(bar,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
+        ttk.Button(bar,text="Bundle gravity evidence ZIP",command=self._export_comparison_bundle).pack(side="left",padx=5)
         def load_path():
             try:
                 path=__import__('OpenSees_Load_Path_V141').export(Path(self.model_var.get()).parent)
