@@ -140,6 +140,66 @@ class GravityDirectAPITests(unittest.TestCase):
             self.assertIn('ETABS_CASE_STATUS',events)
             self.assertIn('ETABS_RESULTS',events)
 
+    def test_auto_analysis_requires_source_copy_and_preserves_source_hash(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from hashlib import sha256
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            source=root/'Original.EDB'
+            source.write_bytes(b'original source model')
+            before=sha256(source.read_bytes()).hexdigest()
+            gravity=root/'Gravity_Result_V110.json'
+            gravity.write_text(json.dumps({'ok':True,
+                'gravity_profile':'GRAVITY_1.0D_1.0L',
+                'report':{'applied_vertical_load_kN':100.,
+                          'support_vertical_reaction_kN':100.}}))
+            calls=[]
+            class Analyze:
+                def RunAnalysis(self):
+                    calls.append('run')
+                    return 0
+            class Sap:
+                Analyze=Analyze()
+            class App:
+                SapModel=Sap()
+            def fake_open(edb_path,exe_path=None):
+                calls.append(('open',Path(edb_path)))
+                return App()
+            def fake_extract(sap,case,source_edb,allow_alternate_edb,log):
+                calls.append(('extract',Path(source_edb)))
+                if calls.count('run')==0:
+                    raise RuntimeError('ETABS gravity combination has no usable BaseReact results')
+                return {'summary':{'base_reaction_FZ_kN':101.},
+                        'case':case,'model_identity_status':'SAME_EDB_PATH',
+                        'joint_reactions':[],'base_reactions':[],
+                        'support_displacements':[],
+                        'source_case_base_reactions':[]}
+            with patch('components.inputs.project_workbooks._source_edb_path',
+                       return_value=str(source)), \\
+                 patch.object(g,'_new_etabs_instance',side_effect=fake_open), \\
+                 patch.object(g,'_release_owned_instance',side_effect=lambda app:calls.append('closed')), \\
+                 patch.object(g,'extract_from_sap',side_effect=fake_extract), \\
+                 patch.object(g,'export_direct',return_value=root/'out'):
+                comp,_=g.connect_and_compare(root,gravity,output_dir=root/'out',
+                            launch_new_etabs=True,run_if_missing=True)
+            self.assertEqual(before,sha256(source.read_bytes()).hexdigest())
+            self.assertEqual(calls.count('run'),1)
+            self.assertEqual(calls[-1],'closed')
+            self.assertNotEqual(calls[0][1],source)
+            self.assertEqual(comp['model_identity_status'],'WORKING_COPY_ANALYZED_FROM_SOURCE_EDB')
+            self.assertFalse(comp['matched_edb_identity'])
+            self.assertTrue((root/'out'/'ETABS_Gravity_Extraction.log').is_file())
+
+    def test_gravity_gui_run_missing_is_consent_gated(self):
+        from pathlib import Path
+        src=(Path(__file__).resolve().parents[1]/
+            'components/gravity/gui_and_reports.py').read_text('utf-8')
+        self.assertIn('run_if_missing=bool(self.run_missing_etabs_results.get())',src)
+        self.assertIn('messagebox.askyesno(',src)
+
     def test_exact_base_row_no_envelope(self):
         rows=[dict(LoadCase='X',StepType='',StepNum=0,FZ=40)]
         self.assertEqual(g._exact_one(rows,'X')['FZ'],40)
