@@ -28,6 +28,14 @@ class TestESMModules(unittest.TestCase):
         self.assertNotIn("SetCase",source)
         self.assertNotIn("SetScaleFactor",source)
         self.assertNotIn("sap.Analyze.RunAnalysis()",source)
+    def test_coefficients_not_mislabeled(self):
+        source=LINK.read_text(encoding="utf-8")
+        self.assertIn('"C_elastic":float(r["C"])',source)
+        self.assertIn('"Cd_selected":float(',source)
+        self.assertNotIn('"C":float(r["Cd_uls"]',source)
+        for cell in ("wall_length_mm","wall_thickness_mm","opening_width_mm","opening_count"):
+            self.assertIn('"'+cell+'"',source)
+
     def test_adapter_requires_original_calculator(self):
         source=LINK.read_text(encoding="utf-8")
         self.assertIn("_engine(engine_path)",source)
