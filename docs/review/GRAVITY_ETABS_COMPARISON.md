@@ -84,6 +84,30 @@ column-wall load distribution or matched displacement/member stiffness.
 No separate gravity API application is needed. See
 [gravity_etabs_direct.py](../source/components/validation/gravity_etabs_direct.py.md).
 
+## Diagnostic comparison using a separate `Gravity.EDB` and repeated evidence exports
+
+If ETABS has a deliberately saved gravity-only **copy** open (for example
+`Gravity.EDB`) instead of the exact source EDB referenced by the OpenSees export,
+the GUI normally refuses to compare their results. To examine this diagnostic
+scenario, check **Use a separately saved ETABS gravity-copy EDB** and confirm the
+warning. This enables the live OAPI extraction from the **currently open**
+ETABS model, without opening, modifying, saving or running it.
+
+The output records the original export EDB path and SHA256 (if accessible),
+the active ETABS EDB path and SHA256, and
+`model_identity_status=ALTERNATE_EDB_UNVERIFIED`. The comparison can display
+a difference in gravity base reactions, but **must not certify structural
+equivalence or identical loading/geometry**. A separate review must compare
+source model geometry, weight, load patterns, boundary restraints, frame and
+wall sections, and stiffness before treating the difference as a model
+conversion error. The checkbox defaults OFF each time the GUI is launched.
+
+The gravity evidence button now creates versioned directories and archives
+(`Gravity_ETABS_OpenSees_Evidence.zip`, then
+`Gravity_ETABS_OpenSees_Evidence_V02.zip`, etc.) in the selected comparison
+folder. Previous ZIPs/directories remain unchanged. Upload the latest
+archive containing the direct comparison; earlier packages remain auditable.
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
