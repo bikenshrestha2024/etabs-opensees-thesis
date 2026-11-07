@@ -109,6 +109,45 @@ def _get_case_status(sap):
     if int(n)!=len(names) or int(n)!=len(states):raise ValueError('Analysis status lengths differ')
     return {str(name):int(state) for name,state in zip(names,states)}
 
+def _gravity_run_flags(sap):
+    """Inspect ETABS load-case run flags without changing the source model.
+
+    [REF CSI ETABS OAPI cAnalyze.GetRunCaseFlag] Returns enabled run flags.
+    """
+    n,names,flags=_out(sap.Analyze.GetRunCaseFlag(),3,'Analyze.GetRunCaseFlag')
+    if int(n)!=len(names) or int(n)!=len(flags):
+        raise ValueError('ETABS analysis run-flag arrays differ in length')
+    return {str(name):bool(flag) for name,flag in zip(names,flags)}
+
+
+def _enable_gravity_cases_on_copy(sap,log):
+    """Enable only existing Dead and Live cases on the isolated working EDB.
+
+    [REF CSI ETABS OAPI cAnalyze.SetRunCaseFlag] Mutate working copy only.
+    A gravity comparison must not trigger all enabled seismic histories.
+    """
+    before=_gravity_run_flags(sap)
+    for needed in ('Dead','Live'):
+        if needed not in before:
+            raise ValueError('ETABS working copy lacks required load case '+needed)
+    log('ETABS_RUN_FLAGS','Read run flags on isolated EDB copy',
+        enabled_count=sum(before.values()),
+        dead_enabled=before['Dead'],live_enabled=before['Live'])
+    _out((sap.Analyze.SetRunCaseFlag('',False,True),),0,'Disable all working-copy cases')
+    for needed in ('Dead','Live'):
+        _out((sap.Analyze.SetRunCaseFlag(needed,True,False),),0,
+             'Enable working-copy '+needed)
+    after=_gravity_run_flags(sap)
+    if not after.get('Dead') or not after.get('Live'):
+        raise RuntimeError('ETABS did not enable both Dead and Live for analysis')
+    enabled=[k for k,v in after.items() if v]
+    if set(enabled)!={'Dead','Live'}:
+        raise RuntimeError('Unexpected extra enabled cases on gravity working copy: '+str(enabled))
+    log('ETABS_RUN_FLAGS','Enabled only Dead and Live for gravity analysis',
+        enabled=enabled,former_enabled_count=sum(before.values()))
+    return before,after
+
+
 def _point_rows(sap,method,point,fields):
     return _rows(getattr(sap.Results,method)(point,0),fields,method+' '+point)
 
@@ -500,15 +539,26 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
                 raise
             if not owned or working_copy is None:
                 raise RuntimeError('Refusing to analyze any EDB outside a private verified copy') from missing
-            report('ETABS_ANALYZE','Missing gravity results: running ETABS enabled cases on private EDB copy',
-                   source_status=str(missing),
-                   warning='RunAnalysis may run every enabled case (including long time histories).')
+            report('ETABS_ANALYZE','Missing gravity results; inspecting working-copy run flags',
+                   source_status=str(missing))
+            _enable_gravity_cases_on_copy(app.SapModel,report)
             ret=app.SapModel.Analyze.RunAnalysis()
             if ret not in (0,None):
                 raise RuntimeError('ETABS Analyze.RunAnalysis returned '+str(ret)+
                                    ' on isolated EDB: '+str(working_copy))
-            report('ETABS_ANALYZE','CSI RunAnalysis returned success on working copy',
-                   working_copy=str(working_copy))
+            try:
+                post_status=_get_case_status(app.SapModel)
+            except Exception as status_error:
+                raise RuntimeError('Analysis returned success but case status cannot be verified: '+
+                                   str(status_error)) from status_error
+            report('ETABS_ANALYZE','Analysis call completed; checking solved-case status',
+                   working_copy=str(working_copy),
+                   dead_status=post_status.get('Dead'),
+                   live_status=post_status.get('Live'))
+            if post_status.get('Dead')!=4 or post_status.get('Live')!=4:
+                raise RuntimeError('ETABS RunAnalysis returned 0, but Dead/Live are NOT FINISHED: '+
+                                   str({k:post_status.get(k) for k in ('Dead','Live')})+
+                                   '. Inspect the working copy ETABS analysis .LOG for warnings and failures.')
             # Running analysis may update the private EDB's saved state;
             # it is still the exact byte-verified source copy at creation.
             # Compare to the working EDB itself at this stage, while retaining
