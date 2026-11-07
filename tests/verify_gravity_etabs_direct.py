@@ -30,6 +30,30 @@ class GravityDirectAPITests(unittest.TestCase):
         o['gravity_profile']='AS_CONFIGURED'
         with self.assertRaisesRegex(ValueError,'full 1.0D'):
             g.compare_existing(e,o)
+    def test_alternate_edb_requires_explicit_permission(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        with TemporaryDirectory() as d:
+            source=Path(d)/'Original.EDB';source.write_bytes(b'original')
+            alt=Path(d)/'Gravity.EDB';alt.write_bytes(b'copy')
+            class Sap:
+                def GetModelFilename(self):return str(alt)
+            with self.assertRaisesRegex(ValueError,'diagnostic alternate-EDB mode'):
+                g.extract_from_sap(Sap(),source_edb=source)
+            # Guard is bypassed ONLY in explicit diagnostic mode; extractor
+            # must continue to inspect real case/units rather than fabricate data.
+            with patch.object(g,'_snapshot',side_effect=RuntimeError('session inspected')):
+                with self.assertRaisesRegex(RuntimeError,'session inspected'):
+                    g.extract_from_sap(Sap(),source_edb=source,allow_alternate_edb=True)
+
+    def test_gui_protects_alternate_mode(self):
+        from pathlib import Path
+        src=(Path(__file__).resolve().parents[1]/
+             'components/gravity/gui_and_reports.py').read_text('utf-8')
+        self.assertIn('self.allow_alternate_edb',src)
+        self.assertIn('messagebox.askyesno',src)
+
     def test_exact_base_row_no_envelope(self):
         rows=[dict(LoadCase='X',StepType='',StepNum=0,FZ=40)]
         self.assertEqual(g._exact_one(rows,'X')['FZ'],40)
