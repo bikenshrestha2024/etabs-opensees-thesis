@@ -292,6 +292,13 @@ def _run_analysis(config):
                 if min(periods) <= 0: raise ValueError("Both Rayleigh calibration periods must be positive.")
                 zeta = float(config["damping_ratio_percent"]) / 100.0
                 if not 0 < zeta <= NBC105_MAX_LINEAR_DAMPING_RATIO: raise ValueError("NBC 105:2025 §8.1.1 limits linear viscous damping to 5%.")
+                # [REF PEER TBI 2017; LATBSDC 2020] inherent damping default 2.5%.
+                # [REF NBC105-2025 §8.1.1 (repo citation)] ratios above 2.5% (up
+                # to the 5% cap) need the explicit inherent_damping_five_percent flag.
+                from components.nonlinear_time_history.damping_regions import (
+                    DEFAULT_INHERENT_DAMPING_RATIO, apply_structural_rayleigh)
+                if zeta > DEFAULT_INHERENT_DAMPING_RATIO + 1e-12 and config.get("inherent_damping_five_percent") is not True:
+                    raise ValueError("Damping above 2.5% requires inherent_damping_five_percent=true (explicit opt-in; NBC 105 §8.1.1 cap 5%).")
                 alpha_m, beta_kc = rayleigh_coefficients(periods[0], periods[1], zeta)
                 ncheck = int(config["modes_to_check"])
                 # NBC linear viscous damping model; calibrate at the two
@@ -309,11 +316,24 @@ def _run_analysis(config):
                 exceeded = [r for r in modal_damping if r["damping_ratio_percent"] > 5.0 + 1e-8]
                 if exceeded:
                     raise RuntimeError("Rayleigh damping exceeds NBC's 5% limit in the checked modes: " + ", ".join(f"mode {r['mode']}={r['damping_ratio_percent']:.3f}%" for r in exceeded) + ". Change calibration periods and review the full modal range.")
+                rayleigh_scope=str(config.get("rayleigh_scope","STRUCTURAL_REGION")).upper()
+                if rayleigh_scope not in ("STRUCTURAL_REGION","GLOBAL_LEGACY"):
+                    raise ValueError("rayleigh_scope must be STRUCTURAL_REGION or GLOBAL_LEGACY")
                 if damping_model=='Modal (initial eigenbasis)':
                     ops.rayleigh(0.,0.,0.,0.)
                     ops.modalDamping(*([zeta]*len(frequencies)))
                     alpha_m=beta_kc=0.
-                else:ops.rayleigh(alpha_m, 0.0, 0.0, beta_kc)
+                    rayleigh_assignment=dict(method='modal_damping_initial_eigenbasis')
+                elif rayleigh_scope=="GLOBAL_LEGACY":
+                    ops.rayleigh(alpha_m, 0.0, 0.0, beta_kc)
+                    rayleigh_assignment=dict(method='global_rayleigh_legacy')
+                else:
+                    # [REF Charney 2008; Zareian & Medina 2010] structural
+                    # elements + orphan mass nodes only; FVD/BRB/truss/link
+                    # elements (ops.eleType) excluded from Rayleigh damping.
+                    rayleigh_assignment=apply_structural_rayleigh(
+                        ops,alpha_m,beta_kc,
+                        extra_excluded_tags=config.get("rayleigh_excluded_element_tags",[]))
                 print('[DAMPING] '+damping_model+' | checked initial modes='+str(len(frequencies))+' | target='+str(100*zeta)+'%; Rayleigh committed ratios may evolve during yielding',flush=True)
                 # The record scale factor is already verified to satisfy NBC's
                 # 0.33–3 bound; g-valued records are converted to m/s².
@@ -498,6 +518,7 @@ def _run_analysis(config):
                     "recorder_missing_evidence": missing_recorder_evidence,
                     "rayleigh_alphaM_s-1": alpha_m, "rayleigh_betaKcommitted_s": beta_kc,
                     "rayleigh_calibration_periods_s": periods, "checked_modal_damping": modal_damping,
+                    "rayleigh_scope": rayleigh_scope, "rayleigh_assignment": rayleigh_assignment,
                     "history_csv": str(csv_path), "model_readiness_manifest": readiness["path"]}
                 for axis,value in edge_peaks.items():
                     peak['master_peak_story_drift_'+axis]=peak['peak_story_drift_'+axis]
@@ -688,7 +709,9 @@ class NonlinearTimeHistoryGUI:
         self.manifest = tk.StringVar(); self.stories = tk.StringVar(); self.output = tk.StringVar(); self.readiness = tk.StringVar()
         self.damping_model=tk.StringVar(value="Rayleigh committed")
         self.linear_solver=tk.StringVar(value="UmfPack")
-        self.damping = tk.StringVar(value="5.0"); self.p1 = tk.StringVar(); self.p2 = tk.StringVar()
+        # [REF PEER TBI 2017; LATBSDC 2020] default 2.5%; 5% needs explicit opt-in.
+        self.damping = tk.StringVar(value="2.5"); self.p1 = tk.StringVar(); self.p2 = tk.StringVar()
+        self.damping_five_percent = tk.BooleanVar(value=False)
         self.t1x = tk.StringVar(); self.t1y = tk.StringVar(); self.tnx = tk.StringVar(); self.tny = tk.StringVar()
         self.nmodes = tk.StringVar(value="20"); self.ls = tk.StringVar(value="ULS")
         self.trial_duration = tk.StringVar(value="0")
@@ -764,7 +787,8 @@ class NonlinearTimeHistoryGUI:
         damping_row=ttk.Frame(params);damping_row.pack(fill='x')
         ttk.Label(damping_row,text='Nonlinear viscous damping model').pack(side='left')
         ttk.Combobox(damping_row,textvariable=self.damping_model,values=['Rayleigh committed','Modal (initial eigenbasis)'],state='readonly',width=30).pack(side='left')
-        ttk.Label(params,text='Damping is a project assumption: 5% is a limit, not a measured value. Modal damping uses converged Newton iterations; explicit FVD damping remains separate. See Chopra & McKenna (2016), doi:10.1002/eqe.2622.',wraplength=1060).pack(anchor='w')
+        ttk.Checkbutton(params,text='Allow inherent damping above 2.5% (up to the NBC 105 §8.1.1 cap of 5%) — explicit opt-in',variable=self.damping_five_percent).pack(anchor='w')
+        ttk.Label(params,text='Damping is a project assumption: default 2.5% (tall-building practice), 5% is a cap, not a measured value. Rayleigh damping is applied only to structural elements; FVD/BRB/truss/link elements are excluded. Modal damping uses converged Newton iterations; explicit FVD damping remains separate. See Chopra & McKenna (2016), doi:10.1002/eqe.2622.',wraplength=1060).pack(anchor='w')
         solver_row=ttk.Frame(params);solver_row.pack(fill="x",pady=3)
         ttk.Label(solver_row,text="Sparse linear equation solver").pack(side="left")
         ttk.Combobox(solver_row,textvariable=self.linear_solver,values=LINEAR_SYSTEMS,state="readonly",width=20).pack(side="left",padx=6)
@@ -844,6 +868,7 @@ class NonlinearTimeHistoryGUI:
                 "execute_nonlinear_time_history": True, "record_matching_metadata": LTH_MATCHING_METADATA}
             if not x_only:values.update(self.pair_selector.config())
             values["damping_model"]=self.damping_model.get()
+            values["inherent_damping_five_percent"]=bool(self.damping_five_percent.get())
             required = ["model_script", "python", "story_nodes_csv", "output_dir", "model_readiness_json"]
             if not x_only and not use_preloaded_pairs: required.append("motion_manifest")
             for k in required:
@@ -851,6 +876,7 @@ class NonlinearTimeHistoryGUI:
             if not x_only and (values["T1_y_s"] is None or values["Tn_y_s"] is None):
                 raise ValueError("The full paired 3D procedure needs T1 and Tn for both X and Y directions.")
             if values["damping_ratio_percent"] > 5.0: raise ValueError("NBC 105:2025 §8.1.1: viscous damping cannot exceed 5%; avoid double-counting explicit FVD damping.")
+            if values["damping_ratio_percent"] > 2.5 and not values["inherent_damping_five_percent"]: raise ValueError("Damping above 2.5% requires the explicit opt-in checkbox (NBC 105 §8.1.1 cap 5%).")
             if values["modes_to_check"] < 1: raise ValueError("Check at least one eigenmode.")
             # Validate CSV and motion metadata before starting a long analysis.
             motions,_stories = _read_inputs(values)

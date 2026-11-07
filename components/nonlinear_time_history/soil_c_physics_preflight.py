@@ -109,10 +109,14 @@ def audit_soil_c_analysis_config(config):
 def assess_modal_damping_and_time_step(config, eigenperiods_s, record_dt_s):
     """Explicit mode IDs and period-based dt screen; no fake Tn90 inference.
 
+    [REF R10 NBC105-2025 §9.3.2.4 (dt bound)] [REF PEER TBI 2017; LATBSDC 2020 (inherent damping ratio)]
+
     Selection is from natural modes of a preloaded full 3D model.
     Uses 1-based modal indices as defined by the actual OpenSees eigen solve;
     does not claim a mode has 90% cumulative mass participation.
     """
+    from components.nonlinear_time_history.damping_regions import (
+        resolve_inherent_damping_ratio)
     periods = [_positive(p, "eigenperiod") for p in eigenperiods_s]
     selected = config.get("damping_reference_modes")
     if not (isinstance(selected, list) and len(selected)==2
@@ -126,7 +130,10 @@ def assess_modal_damping_and_time_step(config, eigenperiods_s, record_dt_s):
     report=dict(
         damping_reference_modes_1_based=selected,
         damping_reference_periods_s=[periods[a-1],periods[b-1]],
-        damping_zeta_assumed=0.05,
+        # [REF PEER TBI 2017; LATBSDC 2020; NBC105-2025 §8.1.1 (repo citation)]
+        # Report the ratio actually configured (default 0.025; 0.05 only via
+        # inherent_damping_five_percent). Previously a fixed 0.05 was written.
+        damping_zeta_assumed=resolve_inherent_damping_ratio(config),
         modal_participation_90_percent_independently_verified=False,
         status="REVIEW_MODE_PARTICIPATION_AND_DAMPING_FORMULATION",
     )

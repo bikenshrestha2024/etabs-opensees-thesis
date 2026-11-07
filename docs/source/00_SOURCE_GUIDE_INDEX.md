@@ -126,3 +126,8 @@ All **90 active Python modules** have individual source guides (with source blob
 | [soil_c_run_matrix.py](../../components/nonlinear_time_history/soil_c_run_matrix.py) | [Guide](components/nonlinear_time_history/soil_c_run_matrix.py.md) | Soil C M0–M6 ULS/SLS eight-pair configuration matrix; 112 configs, 224 case slots | P0 |
 
 | [ground_acceleration.py](../../components/nonlinear_time_history/ground_acceleration.py) | [Guide](components/nonlinear_time_history/ground_acceleration.py.md) | UniformExcitation support relative versus absolute floor-acceleration recording | P0 |
+| [components/nonlinear_time_history/damping_regions.py](../../components/nonlinear_time_history/damping_regions.py) | [Guide](components/nonlinear_time_history/damping_regions.py.md) | 05 Damping (2026-11-07) | P1 |
+| [components/nonlinear_time_history/energy_balance.py](../../components/nonlinear_time_history/energy_balance.py) | [Guide](components/nonlinear_time_history/energy_balance.py.md) | 06 Recorders (2026-11-07) | P1 |
+| [components/model/section_tags.py](../../components/model/section_tags.py) | [Guide](components/model/section_tags.py.md) | 01 Import/geometry (2026-11-07) | P1 |
+| [tools/plot_results.py](../../tools/plot_results.py) | [Guide](tools/plot_results.py.md) | 09 Interpretation (2026-11-07) | P1 |
+| [tools/export_dashboard.py](../../tools/export_dashboard.py) | [Guide](tools/export_dashboard.py.md) | 09 Interpretation (2026-11-07) | P1 |

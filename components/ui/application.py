@@ -1035,7 +1035,10 @@ def main():
         if unmapped: messagebox.showerror('Section mappings missing','Commit ETABS-to-OpenSeesPy mappings in the main program first:\n\n'+'\n'.join(unmapped[:20])); return
         if not Path(__file__).resolve().with_name('Define_Section_V109.py').exists():
             messagebox.showerror('Define_Section_V109.py missing','Keep Define_Section_V109.py beside this program.'); return
-        section_tags={'SHS_350x350x16_STEEL_FIBER':701,'RC_BEAM_600x800_FIBER':611,'RC_COLUMN_1100x1100_FIBER':621,'RC_COLUMN_1250x1250_FIBER':631}
+        # [REF components/sections/definitions.py SECTION_TAGS] exported script
+        # calls Define_Section_V109.define_all_fiber_sections, so use its tags.
+        from components.model.section_tags import default_section_tags
+        section_tags=default_section_tags()
         targets=sorted({mapping[str(secmap[str(e.get('etabs_object'))].get('assigned_section') or '')] for e in eligible if str(e.get('etabs_object')) not in device_assignments})
         unsupported=sorted(set(targets)-set(section_tags))
         if unsupported: messagebox.showerror('Unsupported target','Define_Section_V109.py lacks executable fiber sections for: '+', '.join(unsupported)); return
