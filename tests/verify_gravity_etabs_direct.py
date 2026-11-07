@@ -177,12 +177,12 @@ class GravityDirectAPITests(unittest.TestCase):
                         'joint_reactions':[],'base_reactions':[],
                         'support_displacements':[],
                         'source_case_base_reactions':[]}
-            with patch('components.inputs.project_workbooks._source_edb_path',
-                       return_value=str(source)), \\
-                 patch.object(g,'_new_etabs_instance',side_effect=fake_open), \\
-                 patch.object(g,'_release_owned_instance',side_effect=lambda app:calls.append('closed')), \\
-                 patch.object(g,'extract_from_sap',side_effect=fake_extract), \\
-                 patch.object(g,'export_direct',return_value=root/'out'):
+            with (patch('components.inputs.project_workbooks._source_edb_path',
+                       return_value=str(source)),
+                 patch.object(g,'_new_etabs_instance',side_effect=fake_open),
+                 patch.object(g,'_release_owned_instance',side_effect=lambda app:calls.append('closed')),
+                 patch.object(g,'extract_from_sap',side_effect=fake_extract),
+                 patch.object(g,'export_direct',return_value=root/'out')):
                 comp,_=g.connect_and_compare(root,gravity,output_dir=root/'out',
                             launch_new_etabs=True,run_if_missing=True)
             self.assertEqual(before,sha256(source.read_bytes()).hexdigest())
