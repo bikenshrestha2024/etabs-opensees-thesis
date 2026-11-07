@@ -491,8 +491,19 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
                                    ' on isolated EDB: '+str(working_copy))
             report('ETABS_ANALYZE','CSI RunAnalysis returned success on working copy',
                    working_copy=str(working_copy))
-            data=extract_from_sap(app.SapModel,case,source_edb=source,
+            # Running analysis may update the private EDB's saved state;
+            # it is still the exact byte-verified source copy at creation.
+            # Compare to the working EDB itself at this stage, while retaining
+            # original source provenance separately for auditing.
+            data=extract_from_sap(app.SapModel,case,
+                                  source_edb=working_copy,
                                   allow_alternate_edb=allow_alternate_edb,log=report)
+            data['source_model_edb']=str(Path(source).resolve())
+            data['source_model_edb_sha256']=_file_hash(source)
+            data['model_identity_status']=(
+                'ALTERNATE_EDB_UNVERIFIED' if selected!=Path(source).resolve()
+                else 'WORKING_COPY_ANALYZED_FROM_SOURCE_EDB')
+            data['matched_edb_identity']=False
         if original_hash and _file_hash(selected)!=original_hash:
             raise RuntimeError('Original EDB hash changed unexpectedly during comparison; STOP and audit')
         if working_copy is not None:
