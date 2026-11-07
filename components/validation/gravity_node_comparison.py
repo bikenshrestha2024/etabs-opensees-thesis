@@ -183,3 +183,60 @@ def write_node_comparison(folder,report):
     except ImportError:
         pass
     return json_path
+
+
+def export_opensees_applied_nodal_loads(model_data_json,output_dir):
+    """Export actual converted OpenSees equivalent nodal source loads by pattern.
+
+    [REF components/model/assembly.py apply_gravity_profile]
+    This is an applied-load ledger, not an ETABS-reaction comparison. Shell
+    pressure and frame line loads may already have been converted to nodes.
+    """
+    source=Path(model_data_json)
+    if not source.is_file():
+        raise FileNotFoundError("OpenSees model-data JSON missing: "+str(source))
+    data=json.loads(source.read_text(encoding="utf-8-sig"))
+    patterns=data.get("unfactored_patterns")
+    nodes=data.get("nodes")
+    if not isinstance(patterns,dict) or not isinstance(nodes,dict):
+        raise ValueError("Model data lacks nodal coordinates/unfactored source patterns")
+    output_dir=Path(output_dir)
+    output_dir.mkdir(parents=True,exist_ok=True)
+    dest=output_dir/"OpenSees_Applied_Nodal_Gravity_By_Pattern.csv"
+    fields=["pattern","node_tag","x_m","y_m","z_m","fx_kN","fy_kN","fz_kN",
+            "mx_kNm","my_kNm","mz_kNm","gravity_factor"]
+    counts=defaultdict(int);totals=defaultdict(float)
+    with dest.open("w",newline="",encoding="utf-8-sig") as stream:
+        writer=csv.DictWriter(stream,fieldnames=fields)
+        writer.writeheader()
+        for pattern,records in patterns.items():
+            if not isinstance(records,dict):
+                raise ValueError("Pattern "+str(pattern)+" must contain node-force records")
+            for tag,forces in records.items():
+                loc=nodes.get(str(tag))
+                if loc is None:
+                    raise ValueError("Pattern "+str(pattern)+" missing node "+str(tag))
+                if len(forces)!=6:
+                    raise ValueError("Expected 6 force components at "+str(tag))
+                row=dict(pattern=pattern,node_tag=tag,
+                         x_m=float(loc[0]),y_m=float(loc[1]),z_m=float(loc[2]),
+                         fx_kN=float(forces[0]),fy_kN=float(forces[1]),
+                         fz_kN=float(forces[2]),mx_kNm=float(forces[3]),
+                         my_kNm=float(forces[4]),mz_kNm=float(forces[5]),
+                         gravity_factor=1.0)
+                writer.writerow(row)
+                counts[pattern]+=1
+                totals[pattern]+=row["fz_kN"]
+    summary=dict(status="SOURCE_APPLIED_NODAL_LOADS_NOT_ETABS_VERIFIED",
+                 profile="GRAVITY_1.0D_1.0L",source=str(source),
+                 negative_FZ_is_downward=True,
+                 records_by_pattern=dict(counts),
+                 vertical_applied_kN_by_pattern=dict(totals),
+                 limitations=[
+                   "Nodal forces are equivalent loads after conversion from frame/shell assignments",
+                   "Not directly comparable to ETABS JointReact and not proof of local member load transfer",
+                   "ETABS actual distributed load patterns and shell mesh connectivity must be compared independently"
+                 ])
+    (output_dir/"OpenSees_Applied_Nodal_Gravity_Summary.json").write_text(
+        json.dumps(summary,indent=2,allow_nan=False),encoding="utf8")
+    return summary
