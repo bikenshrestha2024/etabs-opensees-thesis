@@ -133,3 +133,4 @@ All **90 active Python modules** have individual source guides (with source blob
 | [tools/export_dashboard.py](../../tools/export_dashboard.py) | [Guide](tools/export_dashboard.py.md) | 09 Interpretation (2026-11-07) | P1 |
 | [components/inputs/aw_sources.py](../../components/inputs/aw_sources.py) | [Guide](components/inputs/aw_sources.py.md) | 01 Import/geometry → 04 Modal / ESM period (2026-11-07) | P1 |
 | [components/ui/output_folder.py](../../components/ui/output_folder.py) | [Guide](components/ui/output_folder.py.md) | All analysis windows (2026-11-07) | P1 |
+| [components/ui/exploratory_options.py](../../components/ui/exploratory_options.py) | [Guide](components/ui/exploratory_options.py.md) | 06 Isolated nonlinear probes (2026-11-07) | P1 |

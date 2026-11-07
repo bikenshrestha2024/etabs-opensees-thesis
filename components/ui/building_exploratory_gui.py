@@ -47,6 +47,10 @@ def launch(parent,model_folder,output_folder=None):
                 if v is out:output_is_automatic=False
         ttk.Button(form,text='Browse',command=choose).grid(row=i,column=2)
     catalogue={r['pair_id']:r for r in LTH_DEFAULT_PEER_PAIRS};bar=ttk.Frame(win);bar.pack(fill='x',padx=8)
+    # [REF OpenSees_Input_Records_V130 LTH_DEFAULT_PEER_PAIRS] IDs can be folder
+    # paths on some installations; never assume the literal Kobe ID exists.
+    if pair.get() not in catalogue and catalogue:
+        pair.set(next((k for k in catalogue if 'KOBE' in k.upper()),next(iter(catalogue))))
     ttk.Label(bar,text='Earthquake').pack(side='left');box=ttk.Combobox(bar,textvariable=pair,values=list(catalogue),state='readonly',width=33);box.pack(side='left')
     def select(*_):
         r=catalogue[pair.get()];x.set(r['x_path']);y.set(r['y_path'])
@@ -94,6 +98,35 @@ def launch(parent,model_folder,output_folder=None):
     ttk.Entry(materialbar,textvariable=brace_fy,width=8).pack(side='left')
     ttk.Label(materialbar,text='Steel01 b').pack(side='left',padx=(6,2))
     ttk.Entry(materialbar,textvariable=brace_b,width=6).pack(side='left')
+    # [REF V168_FIRST_STEP_DIAGNOSTICS.md; components/ui/exploratory_options.py]
+    # Probe, damping and case-identity settings previously only in RunConfig.json.
+    from components.ui.exploratory_options import DAMPING_MODES,EXCITATIONS,VARIANTS,build_options,describe,event_name
+    probe=ttk.LabelFrame(win,text='Diagnostics, damping and case identity');probe.pack(fill='x',padx=8,pady=(4,0))
+    excitation=tk.StringVar(value='XY');damping_mode=tk.StringVar(value=list(DAMPING_MODES)[0])
+    damping_ratio=tk.StringVar(value='0.025');allow_high=tk.BooleanVar(value=False);reference_modes=tk.StringVar(value='')
+    energy=tk.BooleanVar(value=False);energy_tol=tk.StringVar(value='0.05');variant=tk.StringVar(value='UNASSIGNED')
+    row1=ttk.Frame(probe);row1.pack(fill='x')
+    ttk.Label(row1,text='Excitation').pack(side='left')
+    ttk.Combobox(row1,textvariable=excitation,values=EXCITATIONS,state='readonly',width=6).pack(side='left',padx=(2,10))
+    ttk.Label(row1,text='Damping').pack(side='left')
+    ttk.Combobox(row1,textvariable=damping_mode,values=list(DAMPING_MODES),state='readonly',width=30).pack(side='left',padx=(2,10))
+    ttk.Label(row1,text='Inherent ratio (fraction)').pack(side='left')
+    ttk.Entry(row1,textvariable=damping_ratio,width=7).pack(side='left',padx=(2,4))
+    ttk.Checkbutton(row1,text='Allow above 2.5% (NBC §8.1.1 cap 5%)',variable=allow_high).pack(side='left',padx=(0,10))
+    ttk.Label(row1,text='Damping reference modes (blank = first/last)').pack(side='left')
+    ttk.Entry(row1,textvariable=reference_modes,width=8).pack(side='left',padx=2)
+    row2=ttk.Frame(probe);row2.pack(fill='x',pady=(2,0))
+    ttk.Checkbutton(row2,text='Record energy balance',variable=energy).pack(side='left')
+    ttk.Label(row2,text='tolerance').pack(side='left',padx=(6,2))
+    ttk.Entry(row2,textvariable=energy_tol,width=6).pack(side='left',padx=(0,10))
+    ttk.Label(row2,text='Variant').pack(side='left')
+    ttk.Combobox(row2,textvariable=variant,values=VARIANTS,state='readonly',width=12).pack(side='left',padx=(2,10))
+    pair_note=tk.StringVar()
+    ttk.Label(row2,textvariable=pair_note,foreground='#174a7e').pack(side='left')
+    pair.trace_add('write',lambda *_:pair_note.set('pair_id = '+event_name(pair.get())));pair_note.set('pair_id = '+event_name(pair.get()))
+    ttk.Label(probe,text='Repeat the documented first-step failure with Excitation X + ZERO damping and a 0.1 s trial. '
+              'Probes other than XY with Rayleigh damping are diagnostics, never thesis cases. Energy balance adds Python work per accepted step.',
+              foreground='#8a3412',wraplength=1100).pack(anchor='w')
     sensitivity=ttk.Frame(win);sensitivity.pack(fill='x',padx=8,pady=(2,0))
     sensitivity_parameter=tk.StringVar(value='brace.fy_mpa')
     sensitivity_values=tk.StringVar(value='310.5, 345, 379.5')
@@ -199,6 +232,11 @@ def launch(parent,model_folder,output_folder=None):
             dest=Path(out.get())/('EXPLORATORY_FRAME_NL_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S'));dest.mkdir(parents=True,exist_ok=False)
             extra_tags=[int(value.strip()) for value in tracked_members.get().split(',') if value.strip()]
             config=dict(model_folder=str(source),output_dir=str(dest),x_path=x.get(),y_path=y.get(),dt_s=float(dt.get()),duration_s=float(duration.get()) or None,scale=float(scale.get()),orientations=['XY','YX'] if orientation.get()=='XY + YX' else [orientation.get()],limit_state=ls.get(),tracked_frame_tag=int(tracked.get()),tracked_element_tags=extra_tags,nonlinear_walls=full.get(),material_basis=basis.get(),steelmpf_transition=steel_transition.get(),gravity_system=gravity_system.get(),transient_system=transient_system.get(),material_overrides={'brace.fy_mpa':float(brace_fy.get()),'brace.b':float(brace_b.get())})
+            options=build_options(excitation=excitation.get(),damping_mode=damping_mode.get(),
+                ratio=damping_ratio.get(),allow_above_2_5=allow_high.get(),reference_modes=reference_modes.get(),
+                energy_balance=energy.get(),energy_tolerance=energy_tol.get(),variant=variant.get(),
+                pair_label=pair.get())
+            config.update(options)
             run_states=('ULS','SLS') if ls.get()=='Both' else (ls.get(),)
             if run_sensitivity:
                 values=[float(value.strip()) for value in sensitivity_values.get().split(',') if value.strip()]
@@ -227,7 +265,7 @@ def launch(parent,model_folder,output_folder=None):
                 candidate=None,
                 case=None,
             )
-            configpath=dest/'Requested_Config.json';configpath.write_text(json.dumps(config,indent=2),encoding='utf-8');state.update(running=True,last=dest);button.configure(state='disabled');status.set('Running exploratory model in separate process. Outputs: '+str(dest))
+            configpath=dest/'Requested_Config.json';configpath.write_text(json.dumps(config,indent=2),encoding='utf-8');state.update(running=True,last=dest);button.configure(state='disabled');status.set('Running exploratory model in separate process ['+describe(options)+']. Outputs: '+str(dest))
             if run_sensitivity:
                 sensitivity_button.configure(state='disabled')
                 combinations=len(values)*len(config['orientations'])*(2 if ls.get()=='Both' else 1)
