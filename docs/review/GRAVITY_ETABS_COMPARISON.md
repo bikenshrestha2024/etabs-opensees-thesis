@@ -163,6 +163,41 @@ For the uploaded `Gravity_ETABS_OpenSees_Evidence_V03.zip`, OpenSees records
 `etabs/etabs_gravity.json`. The model comparison remains pending a successful
 ETABS extraction.
 
+## Run missing ETABS gravity results on a verified source-model copy
+
+The user-confirmed **If gravity results are missing, run ETABS on a private COPY**
+setting defaults on in the gravity GUI. The selected EDB defaults to the
+**original source EDB captured during the ETABS→OpenSees export**, not
+`Gravity.EDB` or an unrelated model currently open in ETABS. If that source
+file is inaccessible, execution fails closed. Any different EDB still requires
+the alternate-model diagnostic consent.
+
+To avoid changing the original EDB, the program creates
+`<gravity output>/Gravity_ETABS_OpenSees_Direct/ETABS_Gravity_Working_Copies/run_<id>/<original filename>.EDB`
+and verifies its SHA256 matches the selected original before opening.
+ETABS is launched as an owned instance, the selected existing `1. DL + LL`
+combination is read, and *only if its actual BaseReact result is missing*,
+the program calls `SapModel.Analyze.RunAnalysis()` on that working copy.
+This may run **all enabled cases**, including expensive histories: it
+preserves ETABS case settings rather than silently disabling other cases.
+It then attempts the same extraction again, exports direct reactions, and
+closes only its owned instance without saving the original. Analysis
+sidecars and the analyzed working EDB remain isolated for review.
+
+The analysis of an isolated copy is labelled
+`WORKING_COPY_ANALYZED_FROM_SOURCE_EDB`, with original EDB hashes
+recorded before/after; this alone does not certify section/geometry/
+load-distribution equivalence. If real results are still missing or
+RunAnalysis returns nonzero, the log records the exact API error without
+fabricating gravity reactions. User must review the original model's analysis
+status and any unsupported cases.
+
+For the screenshot supplied 2026-11-07, a *separately analyzed* ETABS model
+shows `1. DL + LL` Base Reaction FZ = **311367.3139 kN**, versus OpenSees
+320047.788933 kN. That image demonstrates the gravity force discrepancy,
+but those files are not yet established as identical source models.
+ETABS direct OAPI extraction must preserve explicit model provenance.
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
