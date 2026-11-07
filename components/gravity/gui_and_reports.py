@@ -84,6 +84,7 @@ class GravityAnalysisGUI:
         self.comparison_output_var = tk.StringVar(value="")
         self.etabs_gravity_json_var = tk.StringVar(value="")
         self.etabs_case_var = tk.StringVar(value="1. DL + LL")
+        self.allow_alternate_edb = tk.BooleanVar(value=False)
         self.python_var = tk.StringVar(value=sys.executable)
         self.support_var = tk.StringVar()
         self.load_var = tk.StringVar()
@@ -153,8 +154,18 @@ class GravityAnalysisGUI:
             self.status_var.set("Reading active ETABS; model remains unchanged…")
             self.win.update_idletasks()
             comparison_out=gravity.parent/"Gravity_ETABS_OpenSees_Direct"
+            alternate=bool(self.allow_alternate_edb.get())
+            if alternate and not messagebox.askyesno(
+                "Diagnostic comparison only",
+                "You selected a different ETABS EDB from the original OpenSees export.\\n\\n"
+                "This comparison can report gravity-reaction DIFFERENCES but cannot "
+                "verify that the two models have identical geometry, loads, materials or supports.\\n\\n"
+                "Continue with unverified alternate-model provenance?",
+                parent=self.win):
+                return
             comp,out=connect_and_compare(model.parent,gravity,
-                              case=self.etabs_case_var.get().strip(),output_dir=comparison_out)
+                              case=self.etabs_case_var.get().strip(),output_dir=comparison_out,
+                              allow_alternate_edb=alternate)
             self.etabs_gravity_json_var.set(str(out/"etabs_gravity.json"))
             self.status_var.set("Direct gravity comparison saved: "+str(out))
             note=(f"ETABS FZ = {comp['etabs_base_FZ_kN']:.3f} kN\\n"
@@ -162,7 +173,8 @@ class GravityAnalysisGUI:
                   f"Difference = {comp['difference_kN']:.3f} kN "
                   f"({comp['percent_difference']:.4f}%)\\n\\n"
                   "This is a global reaction check, not engineering acceptance.\\n"
-                  "Review partial support data and component loads.")
+                  "Review partial support data and component loads.\\n"
+                  "Model identity: "+str(comp.get('model_identity_status','UNVERIFIED')))
             messagebox.showinfo("Direct ETABS/OpenSees gravity comparison",note,parent=self.win)
         except Exception as exc:
             self.status_var.set("Direct ETABS gravity extraction blocked: "+str(exc))
@@ -292,6 +304,9 @@ class GravityAnalysisGUI:
         ttk.Label(case_row,text="ETABS exact gravity combination").pack(side="left",padx=(0,6))
         ttk.Entry(case_row,textvariable=self.etabs_case_var,width=32).pack(side="left")
         ttk.Label(case_row,text="Existing LINEAR ADD: Dead(1) + Live(1)",wraplength=420).pack(side="left",padx=8)
+        ttk.Checkbutton(form,
+          text="Use a separately saved ETABS gravity-copy EDB (diagnostic only; model equivalence UNVERIFIED)",
+          variable=self.allow_alternate_edb).pack(anchor="w",pady=(2,4))
         self._path_row(form, "ETABS gravity results JSON (optional)", self.etabs_gravity_json_var,
                        lambda: self._browse_file(self.etabs_gravity_json_var,
                           "Select matching ETABS gravity results JSON", [("JSON", "*.json")]))
