@@ -20,7 +20,11 @@ def launch(parent,model_folder,output_folder=None):
     from tkinter import ttk,filedialog,messagebox
     from OpenSees_Input_Records_V130 import LTH_DEFAULT_PEER_PAIRS
     from components.inputs.project_workbooks import analysis_output_folder
-    win=tk.Toplevel(parent);win.title('Building nonlinear research history - frames / FSAM walls');win.geometry('1150x800')
+    # [REF components/ui/plot_utilities.py scrollable_form] the window was
+    # taller than a laptop screen; scroll instead of clipping the controls.
+    top=tk.Toplevel(parent);top.title('Building nonlinear research history - frames / FSAM walls')
+    from components.ui.plot_utilities import scrollable_form
+    win=scrollable_form(top,padding=4)
     ttk.Label(win,text='CURRENT BUILDING | SELECT LITERATURE MATERIAL BASIS AND WALL FORMULATION',font=('Segoe UI',12,'bold')).pack(anchor='w',padx=8,pady=6)
     ttk.Label(win,text='Uses the selected building geometry, loads and mass in an isolated copy. Full-wall route assigns nonlinear E-SFI-MVLEM-3D and unconfined FSAM web regions, with per-property ratios from the available wall layout. Published constitutive references and M30/Fe500 sensitivity are distinct. Frame bar schedules remain template assumptions. No automatic calibration or design approval.',wraplength=1100).pack(anchor='w',padx=8)
     form=ttk.Frame(win,padding=8);form.pack(fill='x');form.columnconfigure(1,weight=1)
@@ -91,7 +95,8 @@ def launch(parent,model_folder,output_folder=None):
     brace_fy=tk.StringVar(value='345');brace_b=tk.StringVar(value='.01')
     materialbar=ttk.LabelFrame(win,text='Material basis and sensitivity');materialbar.pack(fill='x',padx=8,pady=(4,0))
     ttk.Checkbutton(materialbar,text='Nonlinear FSAM walls (unconfined core web)',variable=full).pack(side='left')
-    ttk.Combobox(materialbar,textvariable=basis,values=['PUBLISHED_REFERENCE','M30_FE500_SENSITIVITY'],state='readonly',width=28).pack(side='left')
+    from components.nonlinear_time_history.material_source_sets import BASES as MATERIAL_BASES
+    ttk.Combobox(materialbar,textvariable=basis,values=list(MATERIAL_BASES),state='readonly',width=28).pack(side='left')
     ttk.Label(materialbar,text='SteelMPF transition').pack(side='left',padx=(8,2))
     ttk.Combobox(materialbar,textvariable=steel_transition,values=['OPENSEES_DOCUMENTED','PEER_APPENDIX_EXACT'],state='readonly',width=23).pack(side='left')
     ttk.Label(materialbar,text='Brace Fy (MPa)').pack(side='left',padx=(8,2))
@@ -131,6 +136,7 @@ def launch(parent,model_folder,output_folder=None):
     sensitivity_parameter=tk.StringVar(value='brace.fy_mpa')
     sensitivity_values=tk.StringVar(value='310.5, 345, 379.5')
     sensitivity_units=tk.StringVar(value='Candidate values (MPa)')
+    candidate_reason=tk.StringVar(value='')
     candidates_by_parameter={'brace.fy_mpa':'310.5, 345, 379.5'}
     last_sensitivity_parameter={'value':sensitivity_parameter.get()}
     parameter_units={
@@ -161,6 +167,7 @@ def launch(parent,model_folder,output_folder=None):
     ttk.Combobox(sensitivity,textvariable=sensitivity_parameter,values=list(MATERIAL_OVERRIDE_BOUNDS),state='readonly',width=23).pack(side='left')
     ttk.Label(sensitivity,textvariable=sensitivity_units).pack(side='left',padx=(8,2))
     ttk.Entry(sensitivity,textvariable=sensitivity_values,width=36).pack(side='left')
+    ttk.Label(sensitivity,textvariable=candidate_reason,foreground='#174a7e',wraplength=520).pack(side='left',padx=6)
     parameter_note=tk.StringVar()
     parameter_explanation=ttk.Label(win,textvariable=parameter_note,wraplength=1100,foreground='#174a7e',justify='left')
     parameter_explanation.pack(anchor='w',padx=8,pady=3)
@@ -186,7 +193,14 @@ def launch(parent,model_folder,output_folder=None):
         selected=sensitivity_parameter.get()
         if previous!=selected:
             candidates_by_parameter[previous]=sensitivity_values.get()
-            sensitivity_values.set(candidates_by_parameter.get(selected,''))
+            # [REF material_source_sets.default_candidates] fill every parameter
+            # (was blank except brace.fy_mpa) from the selected basis baseline.
+            text=candidates_by_parameter.get(selected,'')
+            if not text.strip():
+                from components.nonlinear_time_history.material_source_sets import default_candidates
+                text,why=default_candidates(selected,basis.get(),steel_transition.get())
+                candidate_reason.set(why)
+            sensitivity_values.set(text)
             last_sensitivity_parameter['value']=selected
         sensitivity_units.set(
             'Candidate values ('+parameter_units.get(selected,'parameter units')+')')
@@ -215,6 +229,23 @@ def launch(parent,model_folder,output_folder=None):
         except Exception as exc:
             messagebox.showerror('Cannot prepare material draft',str(exc),parent=win)
     ttk.Button(materialbar,text='Prepare wall material + FSAM draft',command=make_material_draft).pack(side='left')
+    def show_source_table():
+        # [REF material_source_sets.source_table] one row per parameter with status.
+        from components.nonlinear_time_history.material_source_sets import source_table
+        rows=source_table(basis.get());view=tk.Toplevel(top);view.title('Material source table — '+basis.get())
+        cols=('family','parameter','value','unit','status','locator')
+        tree=ttk.Treeview(view,columns=cols,show='headings',height=24)
+        for c in cols:tree.heading(c,text=c);tree.column(c,width=320 if c=='locator' else 150)
+        for row in rows:tree.insert('', 'end',values=[row.get(c,'') for c in cols])
+        tree.pack(fill='both',expand=True)
+        def save():
+            path=filedialog.asksaveasfilename(parent=view,defaultextension='.csv',initialfile='Material_Source_Table_'+basis.get()+'.csv')
+            if path:
+                import csv as _csv
+                with open(path,'w',newline='',encoding='utf-8-sig') as fh:
+                    w=_csv.DictWriter(fh,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
+        ttk.Button(view,text='Save as CSV (opens in Excel)',command=save).pack(anchor='w')
+    ttk.Button(materialbar,text='Material source table',command=show_source_table).pack(side='left',padx=4)
     status=tk.StringVar(value='Short trial recommended to inspect numerical behavior. No readiness approval is auto-created.');ttk.Label(win,textvariable=status,wraplength=1100).pack(anchor='w',padx=8,pady=5)
     from tkinter.scrolledtext import ScrolledText
     from components.shared.case_status import panel

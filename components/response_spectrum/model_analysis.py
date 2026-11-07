@@ -188,7 +188,7 @@ def run_model_spectrum(folder,config,output_dir):
     export_reports(out)
     return results
 
-def mrsm_period_defaults(folder, values):
+def mrsm_period_defaults(folder, values, state='ULS'):
     """Return NBC §5.1.3 adopted periods only with current-model Rayleigh+Aw.
 
     The legacy workbook C14/C15 references are NOT the sole proof of a
@@ -198,12 +198,28 @@ def mrsm_period_defaults(folder, values):
     """
     from components.modal.analysis import nbc105_period_estimate
     folder=Path(folder)
+    values=dict(values)
+    aw_note=''
+    if values.get("awx") in (None,"") or values.get("awy") in (None,""):
+        # [REF NBC105-2025 §5.1.2; components/inputs/aw_sources.py] same-EDB
+        # ETABS-linked Excel method first, then the OpenSees geometry
+        # diagnostic; the label is shown with the adopted periods.
+        try:
+            from components.inputs.aw_sources import resolve_aw
+            res=resolve_aw(folder,state)
+            for axis in ("X","Y"):
+                if values.get("aw"+axis.lower()) in (None,"") and res.get(axis) is not None:
+                    values["aw"+axis.lower()]=res[axis]
+            aw_note=" Aw source: "+"; ".join(f"{a}={res['labels'].get(a,'n/a')}" for a in ("X","Y"))+"."
+        except Exception as exc:
+            aw_note=" Aw source lookup failed: "+str(exc)+"."
     required=("awx","awy","rayleigh_tx","rayleigh_ty")
     missing=[key for key in required if values.get(key) in (None,"")]
     if missing:
         return {"T1_X":"","T1_Y":""}, ("Validated period defaults unavailable; "
                 "missing source-model fields: "+", ".join(missing)+
-                ". Select the correct ULS/SLS Rayleigh cache and wall Aw.")
+                ". Run the preliminary Rayleigh analysis (ESM window) for this state, "
+                "or type reviewed T1_X / T1_Y."+aw_note)
     model=folder/"OpenSees_Complete_Model_Data_V118.json"
     if not model.is_file():
         return {"T1_X":"","T1_Y":""},"Missing assembled current-model geometry for H."
@@ -219,7 +235,7 @@ def mrsm_period_defaults(folder, values):
     return {"T1_X":periods["adopted_design_period_X_s"],
             "T1_Y":periods["adopted_design_period_Y_s"]}, (
             "NBC §5.1.3 adopted period=min(reviewed current-state Rayleigh, "
-            "1.25×directional empirical wall period). Verify Aw and model hash.")
+            "1.25×directional empirical wall period). Verify Aw and model hash."+aw_note)
 
 
 def launch(parent,folder):
@@ -234,7 +250,7 @@ def launch(parent,folder):
     initial_state=model_state or 'ULS'
     root=Path(__file__).parents[2]
     values=import_project_inputs(root,folder,initial_state)['values'];fields={}
-    period_defaults,period_note=mrsm_period_defaults(folder,values)
+    period_defaults,period_note=mrsm_period_defaults(folder,values,initial_state)
     defaults=dict(limit_state=initial_state,soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=period_defaults['T1_X'],T1_Y=period_defaults['T1_Y'],nmodes=40,damping=.05)
     ttk.Label(form,text='Model response spectrum: mode shapes + site spectrum → CQC actions, force scaling, drift and nodal envelopes',wraplength=1000,font=('Segoe UI',12,'bold')).pack(anchor='w')
     grid=ttk.Frame(form);grid.pack(fill='x')
@@ -252,7 +268,7 @@ def launch(parent,folder):
             messagebox.showwarning('Source state mismatch',str(exc),parent=win)
             return
         v=import_project_inputs(root,folder,state)['values']
-        period_values,_=mrsm_period_defaults(folder,v)
+        period_values,_=mrsm_period_defaults(folder,v,state)
         for name,key in [('soil','soil'),('Z','Z'),('I','I'),('rmu','rmu'),('omegau','omegau'),('omegas','omegas')]:
             if key in v:fields[name].set(str(v[key]))
         for axis in ('X','Y'):
@@ -273,6 +289,14 @@ def launch(parent,folder):
         try:
             cfg={k:v.get() for k,v in fields.items()}
             require_source_state(folder,cfg['limit_state'])
+            # [REF NBC105-2025 §5.1.3, §7.5] name blank inputs instead of
+            # failing with "could not convert string to float: ''".
+            blank=[k for k in ('Z','I','rmu','omegau','omegas','T1_X','T1_Y','damping','nmodes')
+                   if not str(cfg.get(k,'')).strip()]
+            if blank:
+                raise ValueError('Fill these inputs first: '+', '.join(blank)+
+                    '. T1_X/T1_Y are the NBC §5.1.3 adopted periods = min(Rayleigh, 1.25×empirical); '
+                    'run the preliminary Rayleigh analysis in the ESM window or enter reviewed values.')
             cfg['nmodes']=int(cfg['nmodes'])
             for k in ['Z','I','rmu','omegau','omegas','T1_X','T1_Y','damping']:cfg[k]=float(cfg[k])
             states=[cfg['limit_state']];button.configure(state='disabled')
