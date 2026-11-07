@@ -17,6 +17,7 @@ import sys
 import threading
 import traceback
 from pathlib import Path
+from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
@@ -138,6 +139,18 @@ class GravityAnalysisGUI:
         p = filedialog.askdirectory(parent=self.win, title="Choose one folder for all gravity outputs")
         if p: self.output_var.set(p)
 
+    def _gravity_action_log(self,stage,message):
+        """Add bounded timestamped action messages to the existing Run log.
+
+        [REF docs/review/GRAVITY_ETABS_COMPARISON.md] Audit API operations
+        without changing analysis values or solver state.
+        """
+        stamp=datetime.now().astimezone().isoformat(timespec="seconds")
+        line=f"[{stamp}] [{stage}] {message}"
+        self.log.insert("end",line+"\\n")
+        self.log.see("end")
+        self.win.update_idletasks()
+
     def _direct_etabs_gravity_compare(self):
         """Extract matching ETABS full gravity and compare without switching programs.
 
@@ -152,6 +165,8 @@ class GravityAnalysisGUI:
                 raise FileNotFoundError("Run OpenSees full-gravity analysis first: "+str(gravity))
             if self.gravity_profile_var.get()!="GRAVITY_1.0D_1.0L":
                 raise ValueError("Direct gravity comparison requires GRAVITY_1.0D_1.0L")
+            self.nb.select(self.log_tab)
+            self._gravity_action_log("ETABS_START","Requesting direct ETABS/OpenSees gravity comparison")
             # COM runs on the main Tk thread. Owned ETABS instances are closed
             # in the direct API finally block, leaving user's ETABS untouched.
             self.status_var.set("Opening dedicated ETABS EDB and reading gravity results…")
@@ -171,7 +186,9 @@ class GravityAnalysisGUI:
                               allow_alternate_edb=alternate,
                               launch_new_etabs=bool(self.launch_etabs_for_gravity.get()),
                               etabs_edb_path=self.etabs_edb_path.get().strip() or None,
-                              etabs_exe_path=self.etabs_exe_path.get().strip() or None)
+                              etabs_exe_path=self.etabs_exe_path.get().strip() or None,
+                              log_callback=lambda line:self._gravity_action_log("ETABS_API",line))
+            self._gravity_action_log("ETABS_SUCCESS","Comparison JSON, CSV and Excel exported: "+str(out))
             self.etabs_gravity_json_var.set(str(out/"etabs_gravity.json"))
             self.status_var.set("Direct gravity comparison saved: "+str(out))
             note=(f"ETABS FZ = {comp['etabs_base_FZ_kN']:.3f} kN\\n"
@@ -183,6 +200,8 @@ class GravityAnalysisGUI:
                   "Model identity: "+str(comp.get('model_identity_status','UNVERIFIED')))
             messagebox.showinfo("Direct ETABS/OpenSees gravity comparison",note,parent=self.win)
         except Exception as exc:
+            self._gravity_action_log("ETABS_ERROR",str(exc))
+            self.nb.select(self.log_tab)
             self.status_var.set("Direct ETABS gravity extraction blocked: "+str(exc))
             messagebox.showerror("Direct ETABS gravity comparison",str(exc),parent=self.win)
 
@@ -422,7 +441,11 @@ class GravityAnalysisGUI:
         self.run_button.configure(state="disabled")
         self.status_var.set("Running model and nonlinear gravity steps…")
         self.log.delete("1.0", "end")
-        self.log.insert("end", f"Model: {model}\\nOutput folder: {out}\\nSupports: {supports}\\nApplied load: {total:g} kN\\nSteps: {steps}\\nProfile: {self.gravity_profile_var.get()}\\n")
+        self._gravity_action_log("GRAVITY_START","Selected model: "+str(model))
+        self._gravity_action_log("GRAVITY_SETTINGS",f"Profile={self.gravity_profile_var.get()} | "
+            f"Downward load={total:.6f} kN | supports={len(supports)} | steps={steps}")
+        self._gravity_action_log("GRAVITY_OUTPUT","Result and run logs: "+str(out))
+        self.log.insert("end",f"Support tags: {supports}\\n")
         self.win.update_idletasks()
         result_path = out / "Gravity_Result_V110.json"
         runner_path = out / "Gravity_Run_V110.py"
@@ -441,6 +464,7 @@ class GravityAnalysisGUI:
             else:
                 payload = json.loads(result_path.read_text(encoding="utf-8"))
             if proc.returncode != 0: payload["ok"] = False
+            payload["_process_returncode"]=proc.returncode
             self.win.after(0, lambda: self._finished(payload, combined, out))
         except Exception as exc:
             detail = traceback.format_exc()
@@ -450,6 +474,7 @@ class GravityAnalysisGUI:
 
     def _finished(self, payload, log_text, out):
         self.run_button.configure(state="normal")
+        self._gravity_action_log("GRAVITY_SOLVER","Full OpenSees console log follows")
         self.log.insert("end", "\n" + log_text + "\n")
         self.log.see("end")
         if not payload.get("ok"):
@@ -465,6 +490,14 @@ class GravityAnalysisGUI:
             self.nb.select(self.log_tab)
             return
         rep = payload["report"]
+        self._gravity_action_log("GRAVITY_EQUILIBRIUM",str({
+           "applied_vertical_kN":rep.get("applied_vertical_load_kN"),
+           "support_reaction_kN":rep.get("support_vertical_reaction_kN"),
+           "equilibrium_error_percent":rep.get("equilibrium_error_percent"),
+           "max_downward_uz_m":rep.get("max_downward_uz_m"),
+           "frozen":rep.get("frozen"),
+           "elapsed_seconds":rep.get("elapsed_seconds")}))
+        self._gravity_action_log("GRAVITY_EXPORT","Generated gravity result report and workbook/plots in "+str(out))
         self.status_var.set(f"Gravity PASS | equilibrium error {rep['equilibrium_error_percent']:.4g}% | {rep['elapsed_seconds']:.2f} s | outputs saved in {out}")
         self.nb.select(self.plot_tab)
         messagebox.showinfo("Gravity analysis complete", "Gravity converged; reaction check passed; gravity frozen at time zero.\n\nExcel workbook, separate 300 dpi PNG/PDF figures and critical-action PDF saved.\nUse the result tabs or Open output folder to inspect them.\n\n" + str(out), parent=self.win)
