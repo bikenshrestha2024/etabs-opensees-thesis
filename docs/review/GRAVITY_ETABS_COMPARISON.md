@@ -137,6 +137,32 @@ gravity EDB and record that difference.
 `1. DL + LL` must already have usable analyzed Dead and Live results; otherwise
 the operation stops instead of silently running or saving an analysis.
 
+## Detailed action logging (V03 evidence follow-up)
+
+All direct ETABS extraction steps are recorded in the existing Gravity GUI
+**Run log** tab and in
+`<gravity output>/Gravity_ETABS_OpenSees_Direct/ETABS_Gravity_Extraction.log`
+and `ETABS_Gravity_Extraction_Events.jsonl`. Events record selected source
+EDB, launched/attached ETABS mode, original EDB identity, the selected
+Dead(1)+Live(1) combination, advisory ETABS analysis case status codes,
+saved global base reaction, independent Dead/Live base reactions,
+restrained joint inventory counts, missing joint-force/displacement data,
+comparison results, export artifacts, failures and owned-instance shutdown.
+Traceback is preserved when an API operation fails. The evidence ZIP includes
+both log files if they exist.
+
+The **case-status code is advisory**. A case with status other than 4 is not
+immediately rejected if actual, finite stored reaction results are available;
+on the other hand, a status code alone is not proof of usable results. Missing
+`BaseReact` values still block comparison, with the exact case and API
+status included in the diagnostic. No ETABS analysis is automatically run and
+no source EDB is modified or saved.
+
+For the uploaded `Gravity_ETABS_OpenSees_Evidence_V03.zip`, OpenSees records
+320047.788933 kN applied and support reacted, and the archive still lacks
+`etabs/etabs_gravity.json`. The model comparison remains pending a successful
+ETABS extraction.
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
