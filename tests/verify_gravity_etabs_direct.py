@@ -162,9 +162,11 @@ class GravityDirectAPITests(unittest.TestCase):
                     calls.append('run')
                     return 0
             class Sap:
-                Analyze=Analyze()
+                pass
+            Sap.Analyze=Analyze()
             class App:
-                SapModel=Sap()
+                pass
+            App.SapModel=Sap()
             def fake_open(edb_path,exe_path=None):
                 calls.append(('open',Path(edb_path)))
                 return App()
