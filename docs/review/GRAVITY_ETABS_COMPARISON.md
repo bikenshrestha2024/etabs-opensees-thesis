@@ -108,6 +108,35 @@ The gravity evidence button now creates versioned directories and archives
 folder. Previous ZIPs/directories remain unchanged. Upload the latest
 archive containing the direct comparison; earlier packages remain auditable.
 
+## Dedicated ETABS instance for gravity comparison (2026-11-07)
+
+The **Extract ETABS + compare gravity** action now defaults to
+**Open ETABS in a new dedicated instance; close after comparison WITHOUT saving**.
+This resolves the COM `GetActiveObject` attachment error without taking over an
+existing ETABS window. The GUI allows an explicit **EDB to open**; leaving it
+blank selects the exact EDB recorded in the OpenSees export provenance.
+An optional ETABS.exe path can be provided for a specific installed version;
+otherwise the registered ETABS API executable is used.
+
+The module calls CSI `CreateObjectProgID` (or `CreateObject` when a path is
+provided), `ApplicationStart`, `SapModel.File.OpenFile`, extracts the
+already-analyzed exact gravity combination, and calls
+`ApplicationExit(False)` in a `finally` block. If the EDB cannot be opened
+or the analysis results are unavailable, it reports a failure and still closes
+only the instance it created. The source EDB is **never saved**; an unrelated
+already-open ETABS instance is **never closed**.
+
+A deliberately different gravity-copy EDB may still be selected using the
+explicit diagnostic consent checkbox. That result remains
+`ALTERNATE_EDB_UNVERIFIED`. If the EDB is currently open in another ETABS
+process, exclusive file locks or licensing may prevent a second instance
+from opening it; close the other copy or use a separate already-analyzed
+gravity EDB and record that difference.
+
+**Important:** Opening an EDB does not compute new load cases. The case
+`1. DL + LL` must already have usable analyzed Dead and Live results; otherwise
+the operation stops instead of silently running or saving an analysis.
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
