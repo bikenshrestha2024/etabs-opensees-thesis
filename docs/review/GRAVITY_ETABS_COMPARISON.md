@@ -242,6 +242,31 @@ OpenSees 320047.788933 kN. No reliable worst-node ranking exists until the
 live ETABS API extraction succeeds. These new reports are designed to
 produce that evidence, not to infer per-node discrepancies from global totals.
 
+## ETABS API BaseReact returned 1 despite RunAnalysis returning 0
+
+In the 2026-11-07 screenshot/log, `GetCaseStatus` reported Dead=1,
+Live=1 **before and after** `RunAnalysis()`. Per CSI API, 1 means **Not run**,
+whereas 4 means **Finished**. A zero `RunAnalysis()` return does NOT prove
+that the intended Dead/Live cases were enabled and completed. The UI table
+showing results from a different analyzed EDB/session does not establish
+results availability in the newly opened isolated copy.
+
+The updated gravity-only ETABS workflow queries
+`SapModel.Analyze.GetRunCaseFlag()`, logs prior flags, disables all case
+run flags **on the isolated working copy only**, enables `Dead` and
+`Live`, calls `RunAnalysis()`, then requires status 4 for both before
+requesting `Results.BaseReact()` again. Disabled seismic analyses are not
+run unnecessarily. This intentionally changes *only* the copied model's
+analysis run settings and never modifies or saves the original source EDB.
+It fails with explicit status and working-copy log location if cases do not
+finish. In ETABS models where the gravity cases depend on a preceding
+analysis case, the dependency must be reviewed before use.
+
+API references:
+[GetCaseStatus](https://docs.csiamerica.com/help-files/etabs-api-2016/html/a24b2f43-be87-e0ff-587b-068339d9a350.htm),
+[GetRunCaseFlag](https://docs.csiamerica.com/help-files/etabs-api-2016/html/dc111164-bf67-43f5-df8c-323a5349af48.htm),
+[SetRunCaseFlag](https://docs.csiamerica.com/help-files/etabs-api-2016/html/c4f02de1-a693-0edd-1df1-62a81d9c7eb3.htm).
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
