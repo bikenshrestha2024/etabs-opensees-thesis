@@ -114,7 +114,7 @@ def _point_position(sap,point):
     if len(restraint)!=6:raise ValueError('Incomplete restraint for '+point)
     return [float(x),float(y),float(z)],[bool(x) for x in restraint]
 
-def extract_from_sap(sap,case='1. DL + LL',source_edb=None):
+def extract_from_sap(sap,case='1. DL + LL',source_edb=None,allow_alternate_edb=False):
     """Get exactly one full-gravity concurrent result, without changing ETABS model.
 
     [REF components/validation/etabs_direct_api.py extract_from_sap] Restores
@@ -122,8 +122,18 @@ def extract_from_sap(sap,case='1. DL + LL',source_edb=None):
     [REF docs/review/GRAVITY_ETABS_COMPARISON.md] Require exact model and case.
     """
     selected=Path(str(sap.GetModelFilename())).resolve()
-    if source_edb and selected!=Path(source_edb).resolve():
-        raise ValueError('Active ETABS EDB differs from OpenSees export source: '+str(selected))
+    source_path=Path(source_edb).resolve() if source_edb else None
+    differs=bool(source_path and selected!=source_path)
+    if differs and not allow_alternate_edb:
+        raise ValueError(
+            'Active ETABS EDB differs from OpenSees export source: '+str(selected)+
+            ' | Export source: '+str(source_path)+
+            '. If this is an intentional gravity-only COPY of the same model, '
+            'enable diagnostic alternate-EDB mode in the GUI. The result will '
+            'remain UNVERIFIED for model equivalence until source geometry '
+            'and loading are independently reconciled.')
+    if not selected.is_file():
+        raise FileNotFoundError('Active ETABS EDB unavailable: '+str(selected))
     state=_snapshot(sap)
     if case not in [x for x,_ in state['combos']]:
         raise ValueError('Required gravity combination not found: '+str(case))
@@ -182,6 +192,11 @@ def extract_from_sap(sap,case='1. DL + LL',source_edb=None):
         components_total=sum(c['weighted_FZ_kN'] for c in component_rows)
         delta=components_total-base_vertical
         return dict(schema='ETABS_GRAVITY_DIRECT_V1',source_edb=str(selected),case=case,
+            source_model_edb=str(source_path) if source_path else None,
+            source_model_edb_sha256=_file_hash(source_path) if source_path and source_path.is_file() else None,
+            active_etabs_edb_sha256=_file_hash(selected),
+            model_identity_status=('ALTERNATE_EDB_UNVERIFIED' if differs else 'SAME_EDB_PATH'),
+            matched_edb_identity=not differs,
             case_definition=components,case_step=dict(type=step[0],number=step[1]),
             units=dict(force='kN',length='m',moment='kN-m'),
             base_reactions=[base],source_case_base_reactions=component_rows,
@@ -195,12 +210,22 @@ def extract_from_sap(sap,case='1. DL + LL',source_edb=None):
                 joint_reactions_axes='POINT_LOCAL',
                 data_complete=len(reaction_rows)==len(supports) and not errors,
                 physical_roof_live_assignments_verified=False),
-            warnings=errors+[
+            warnings=errors+([dict(stage='model_identity',
+                note='Alternate EDB was explicitly permitted for diagnostic comparison only. '
+                     'Its geometry, section properties, load assignments and supports '
+                     'are not proven identical to the OpenSees source model.')] if differs else [])+[
                 dict(stage='units',note='Individual JointReact values use point local axes; BaseReact FZ is global.'),
                 dict(stage='load_inventory',note='Combo definition does not prove roof-live physical assignments.'),
                 dict(stage='support_scope',note='Ground springs/links and internal mesh reaction nodes may need additional evidence.')])
     finally:
         _restore(sap,state)
+
+def _file_hash(path):
+    h=hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for block in iter(lambda:stream.read(1024*1024),b''):
+            h.update(block)
+    return h.hexdigest()
 
 def compare_existing(etabs,open_sees_result):
     """Compare actual ETABS base FZ to matching completed OpenSees full gravity.
@@ -225,6 +250,7 @@ def compare_existing(etabs,open_sees_result):
         opensees_applied_kN=applied,difference_kN=delta,
         percent_difference=percent,
         matched_edb_identity=etabs.get('matched_edb_identity',False),
+        model_identity_status=etabs.get('model_identity_status','UNVERIFIED'),
         limitations=['Only global reaction totals compared; self-weight, slab forces and displacement equivalence remain to be checked.'])
 
 def export_direct(folder,etabs,comp):
@@ -268,7 +294,7 @@ def export_direct(folder,etabs,comp):
         pass
     return out
 
-def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_dir=None):
+def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_dir=None,allow_alternate_edb=False):
     """Read attached ETABS EDB and compare with existing gravity JSON.
 
     [REF components/validation/etabs_direct_api.py connect_and_extract] Existing
@@ -284,8 +310,8 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
     gravity=Path(gravity_result_path)
     if not gravity.is_file():raise FileNotFoundError('OpenSees gravity JSON missing: '+str(gravity))
     app=connect_etabs()
-    data=extract_from_sap(app.SapModel,case,source_edb=source)
-    data['matched_edb_identity']=True
+    data=extract_from_sap(app.SapModel,case,source_edb=source,
+                          allow_alternate_edb=allow_alternate_edb)
     result=json.loads(gravity.read_text(encoding='utf-8-sig'))
     comp=compare_existing(data,result)
     out=export_direct(output_dir or gravity.parent/'Gravity_ETABS_OpenSees_Direct',data,comp)
