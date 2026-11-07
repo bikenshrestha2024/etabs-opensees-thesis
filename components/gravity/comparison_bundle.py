@@ -127,7 +127,9 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         # Direct ETABS extraction is saved beside the OpenSees gravity output.
         # Include current comparison evidence in the same archive when present.
         direct=gravity_dir/"Gravity_ETABS_OpenSees_Direct"
-        for name in ("Direct_Gravity_Comparison.json",
+        for name in ("ETABS_Gravity_Extraction.log",
+                     "ETABS_Gravity_Extraction_Events.jsonl",
+                     "Direct_Gravity_Comparison.json",
                      "ETABS_Base_Reactions.csv",
                      "ETABS_Fixed_Support_Reactions.csv",
                      "ETABS_Support_Displacements.csv",
