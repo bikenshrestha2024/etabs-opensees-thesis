@@ -530,6 +530,20 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             data['original_source_edb_sha256_after']=_file_hash(selected)
             report('ETABS_PROVENANCE','Verified original EDB unchanged; comparison used isolated copy',
                    original_sha256=original_hash,copy=str(working_copy))
+        # Capture the separate OpenSees converted APPLIED nodal force ledger.
+        # These values must NOT be equated with support reactions.
+        try:
+            from components.validation.gravity_node_comparison import export_opensees_applied_nodal_loads
+            load_summary=export_opensees_applied_nodal_loads(
+                folder/'OpenSees_Complete_Model_Data_V118.json',out)
+            report('OPENSEES_NODAL_LOADS','Exported source-pattern equivalent nodal gravity forces',
+                   patterns=load_summary['records_by_pattern'],
+                   FZ_kN=load_summary['vertical_applied_kN_by_pattern'],
+                   note='Do not treat applied nodal force as support reaction')
+        except (FileNotFoundError,ValueError,KeyError,TypeError) as exc:
+            report('OPENSEES_NODAL_LOADS_BLOCKED',
+                   'Nodal source-force ledger missing or incompatible; support audit continues',
+                   error=str(exc))
         result=json.loads(gravity.read_text(encoding='utf-8-sig'))
         report('OPENSEES_RESULT','Loaded OpenSees gravity results',
                profile=result.get('gravity_profile'),ok=result.get('ok'))
