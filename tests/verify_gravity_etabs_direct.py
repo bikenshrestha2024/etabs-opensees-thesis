@@ -105,6 +105,41 @@ class GravityDirectAPITests(unittest.TestCase):
         self.assertIn('self.launch_etabs_for_gravity = tk.BooleanVar(value=True)',gui)
         self.assertIn('launch_new_etabs=bool(self.launch_etabs_for_gravity.get())',gui)
 
+    def test_nonfinished_api_status_does_not_preempt_actual_base_reaction(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        with TemporaryDirectory() as d:
+            edb=Path(d)/'Gravity.EDB';edb.write_bytes(b'model')
+            class Sap:
+                def GetModelFilename(self):return str(edb)
+                def SetPresentUnits(self,unit):return 0
+            class Setup:
+                def DeselectAllCasesAndCombosForOutput(self):return 0
+                def SetComboSelectedForOutput(self,case):return 0
+            sap=Sap()
+            class Results:
+                Setup=Setup() if False else None
+            # Mock only the external CSI API; retain real decision logic.
+            class Result:
+                Setup=type('SetupMock',(),{
+                    'DeselectAllCasesAndCombosForOutput':lambda self:0,
+                    'SetComboSelectedForOutput':lambda self,x:0})()
+            sap.Results=Result()
+            events=[]
+            initial={'units':6,'cases':[],'combos':[('1. DL + LL',False)]}
+            with patch.object(g,'_snapshot',return_value=initial), \\
+                 patch.object(g,'_restore',return_value=None), \\
+                 patch.object(g,'_combo',return_value=[
+                     {'name':'Dead','factor':1.0},{'name':'Live','factor':1.0}]), \\
+                 patch.object(g,'_get_case_status',return_value={'Dead':1,'Live':1}), \\
+                 patch.object(g,'_base',side_effect=RuntimeError('No saved BaseReact rows')):
+                with self.assertRaisesRegex(RuntimeError,'no usable BaseReact'):
+                    g.extract_from_sap(sap,source_edb=edb,
+                        log=lambda stage,message,**kwargs:events.append(stage))
+            self.assertIn('ETABS_CASE_STATUS',events)
+            self.assertIn('ETABS_RESULTS',events)
+
     def test_exact_base_row_no_envelope(self):
         rows=[dict(LoadCase='X',StepType='',StepNum=0,FZ=40)]
         self.assertEqual(g._exact_one(rows,'X')['FZ'],40)
