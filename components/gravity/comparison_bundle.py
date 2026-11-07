@@ -145,6 +145,17 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         if etabs_json is None and (direct/"etabs_gravity.json").is_file():
             etabs_json=direct/"etabs_gravity.json"
 
+        # Always export the OpenSees applied nodal load ledger even when
+        # the live ETABS API comparison is unavailable. This uses the exact
+        # source patterns, not inferred loads from support reactions.
+        try:
+            from components.validation.gravity_node_comparison import export_opensees_applied_nodal_loads
+            summary=export_opensees_applied_nodal_loads(
+                export_dir/"OpenSees_Complete_Model_Data_V118.json",
+                stage/"opensees")
+        except (FileNotFoundError,ValueError,KeyError,TypeError) as exc:
+            missing.append({"file":"opensees/OpenSees_Applied_Nodal_Gravity_By_Pattern.csv",
+                            "required":False,"reason":str(exc)})
         if etabs_json:
             add(etabs_json,"etabs/etabs_gravity.json",required=True)
         else:
