@@ -216,8 +216,26 @@ def extract_from_sap(sap,case='1. DL + LL',source_edb=None,allow_alternate_edb=F
                 if len(matching)!=1:
                     raise ValueError('Expected exactly one concurrent support reaction row, got '+str(len(matching)))
                 r=matching[0]
+                # JointReact is reported in point LOCAL axes. The vertical
+                # global reaction equals F3 only for an unrotated point.
+                # Any nonzero/advanced/unknown axes must remain unverified;
+                # do not silently compare local F3 with global OpenSees RZ.
+                try:
+                    angles=_out(sap.PointObj.GetLocalAxes(name),4,
+                                'PointObj.GetLocalAxes '+name)
+                    ax=[_finite(v,'axis angle') for v in angles[:3]]
+                    advanced=bool(angles[3])
+                    aligned=all(abs(v)<1e-9 for v in ax) and not advanced
+                    basis='GLOBAL_Z_VERIFIED_DEFAULT_AXES' if aligned else 'POINT_LOCAL_ROTATED'
+                except Exception as exc:
+                    aligned=False;ax=None;advanced=None
+                    basis='POINT_LOCAL_AXES_UNAVAILABLE'
+                    errors.append(dict(stage='point_local_axes',point=name,error=str(exc)))
                 reaction_rows.append(dict(point=name,x_m=xyz[0],y_m=xyz[1],z_m=xyz[2],
                     **{key:_finite(r[key],key) for key in ('F1','F2','F3','M1','M2','M3')},
+                    rz_global_kN=_finite(r['F3'],'F3') if aligned else None,
+                    global_z_basis=basis,local_axis_angles_deg=ax,
+                    local_axes_advanced=advanced,
                     axes='POINT_LOCAL',element=str(r['Elm'])))
             except Exception as exc:
                 errors.append(dict(stage='JointReact',point=name,error=str(exc)))
@@ -516,6 +534,28 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
         report('OPENSEES_RESULT','Loaded OpenSees gravity results',
                profile=result.get('gravity_profile'),ok=result.get('ok'))
         comp=compare_existing(data,result)
+        from components.validation.gravity_node_comparison import compare_support_nodes,write_node_comparison
+        try:
+            node_audit=compare_support_nodes(data,result,tolerance_m=0.01)
+            write_node_comparison(out,node_audit)
+            comp['node_comparison']={
+                k:v for k,v in node_audit.items()
+                if k not in ('rows','top_discrepancies','diagnostic_hypotheses')}
+            report('NODE_COMPARISON','Compared coordinate-matched support reactions',
+                   valid_matches=node_audit['valid_one_to_one_global_z_count'],
+                   axes_unverified=node_audit['axis_unverified_count'],
+                   ambiguous=node_audit['ambiguous_count'],
+                   unmatched_etabs=node_audit['etabs_unmatched_count'],
+                   unmatched_opensees=node_audit['opensees_unmatched_count'],
+                   matched_sum_difference_kN=node_audit['matched_sum_difference_kN'],
+                   largest_differences=node_audit['top_discrepancies'][:8],
+                   note='ETABS local F3 is used only when point axes are verified default')
+        except (ValueError,KeyError,TypeError) as exc:
+            comp['node_comparison']=dict(status='BLOCKED_MISSING_OR_INCOMPATIBLE_EVIDENCE',
+                                          reason=str(exc))
+            report('NODE_COMPARISON_BLOCKED',
+                   'Could not verify support-node comparison; global totals remain separate',
+                   error=str(exc))
         report('DIRECT_COMPARISON','Compared ETABS global FZ and OpenSees support RZ',
                etabs_FZ_kN=comp['etabs_base_FZ_kN'],
                opensees_RZ_kN=comp['opensees_support_FZ_kN'],
