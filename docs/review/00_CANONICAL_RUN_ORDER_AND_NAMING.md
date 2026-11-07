@@ -19,6 +19,15 @@ until tests establish that their imports and outputs can be migrated safely.
 | 08 Model comparison | `27_COMPARE_OUTRIGGERS.py`, `36_SOIL_C_NLTHA_RUN_MATRIX.py` | 112 configs × 2 orientations = 224 **intended** analyses (ULS/SLS, M0–M6), comparisons only from completed cases |
 | 09 Interpretation | `18_NONLINEAR_PERFORMANCE.py` | physical acceptance tables, drift/torsion/member limits, FVD/BRB forces and energy, actual thesis plots |
 
+## Cross-stage evidence dashboard (read-only)
+
+After obtaining **actual files and native evidence**, run
+`37_THESIS_EVIDENCE_DASHBOARD.py` to generate an Excel-compatible CSV,
+JSON and optional Matplotlib audit figure. Its file SHA256 checks and ordered
+user-declared stages are **identity screens only**, not physical validation or
+NBC 105 code approval. Continue using the stage-specific native gates below.
+See [dashboard guide](../programs/37_THESIS_EVIDENCE_DASHBOARD.md).
+
 ## Root numbering policy
 
 - `01–20` canonical code paths are listed in [the original 01–20 mapping](../../00_READ_FIRST_RUN_ORDER.md).
