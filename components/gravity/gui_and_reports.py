@@ -83,6 +83,7 @@ class GravityAnalysisGUI:
         self.output_var = tk.StringVar(value=str(Path.cwd() / "OpenSees_Analysis_Results" / "Gravity_Results"))
         self.comparison_output_var = tk.StringVar(value="")
         self.etabs_gravity_json_var = tk.StringVar(value="")
+        self.etabs_case_var = tk.StringVar(value="1. DL + LL")
         self.python_var = tk.StringVar(value=sys.executable)
         self.support_var = tk.StringVar()
         self.load_var = tk.StringVar()
@@ -132,6 +133,40 @@ class GravityAnalysisGUI:
     def _browse_dir(self):
         p = filedialog.askdirectory(parent=self.win, title="Choose one folder for all gravity outputs")
         if p: self.output_var.set(p)
+
+    def _direct_etabs_gravity_compare(self):
+        """Extract matching ETABS full gravity and compare without switching programs.
+
+        [REF components/validation/gravity_etabs_direct.py connect_and_compare]
+        """
+        try:
+            from components.validation.gravity_etabs_direct import connect_and_compare
+            model=Path(self.model_var.get()).expanduser().resolve()
+            if not model.is_file():raise ValueError("Select a generated OpenSees gravity model first")
+            gravity=Path(self.output_var.get()).expanduser().resolve()/"Gravity_Result_V110.json"
+            if not gravity.is_file():
+                raise FileNotFoundError("Run OpenSees full-gravity analysis first: "+str(gravity))
+            if self.gravity_profile_var.get()!="GRAVITY_1.0D_1.0L":
+                raise ValueError("Direct gravity comparison requires GRAVITY_1.0D_1.0L")
+            # Run OAPI on the GUI main thread: do not move a COM interface
+            # across Tk worker threads. Local ETABS session is left analyzed.
+            self.status_var.set("Reading active ETABS; model remains unchanged…")
+            self.win.update_idletasks()
+            comparison_out=gravity.parent/"Gravity_ETABS_OpenSees_Direct"
+            comp,out=connect_and_compare(model.parent,gravity,
+                              case=self.etabs_case_var.get().strip(),output_dir=comparison_out)
+            self.etabs_gravity_json_var.set(str(out/"etabs_gravity.json"))
+            self.status_var.set("Direct gravity comparison saved: "+str(out))
+            note=(f"ETABS FZ = {comp['etabs_base_FZ_kN']:.3f} kN\\n"
+                  f"OpenSees RZ = {comp['opensees_support_FZ_kN']:.3f} kN\\n"
+                  f"Difference = {comp['difference_kN']:.3f} kN "
+                  f"({comp['percent_difference']:.4f}%)\\n\\n"
+                  "This is a global reaction check, not engineering acceptance.\\n"
+                  "Review partial support data and component loads.")
+            messagebox.showinfo("Direct ETABS/OpenSees gravity comparison",note,parent=self.win)
+        except Exception as exc:
+            self.status_var.set("Direct ETABS gravity extraction blocked: "+str(exc))
+            messagebox.showerror("Direct ETABS gravity comparison",str(exc),parent=self.win)
 
     def _export_comparison_bundle(self):
         """Prepare a single ZIP for independent ETABS/OpenSees gravity review."""
@@ -253,6 +288,10 @@ class GravityAnalysisGUI:
         self.gravity_profile_var.trace_add("write",lambda *_: self._read_code_inputs(show_error=False) if self.model_var.get() else None)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
+        case_row=ttk.Frame(form);case_row.pack(fill="x",pady=2)
+        ttk.Label(case_row,text="ETABS exact gravity combination").pack(side="left",padx=(0,6))
+        ttk.Entry(case_row,textvariable=self.etabs_case_var,width=32).pack(side="left")
+        ttk.Label(case_row,text="Existing LINEAR ADD: Dead(1) + Live(1)",wraplength=420).pack(side="left",padx=8)
         self._path_row(form, "ETABS gravity results JSON (optional)", self.etabs_gravity_json_var,
                        lambda: self._browse_file(self.etabs_gravity_json_var,
                           "Select matching ETABS gravity results JSON", [("JSON", "*.json")]))
@@ -272,6 +311,7 @@ class GravityAnalysisGUI:
         self.run_button = ttk.Button(bar, text="Run gravity, check, freeze + export", command=self.run)
         self.run_button.pack(side="left")
         ttk.Button(bar,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
+        ttk.Button(bar,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
         ttk.Button(bar,text="Bundle gravity evidence ZIP",command=self._export_comparison_bundle).pack(side="left",padx=5)
         def load_path():
             try:
