@@ -99,10 +99,20 @@ def run_etabs_excel(edb,workbook,engine_path,output_dir,log=print):
         summary={}
         for axis,r,condition in (("X",x,condition_x),("Y",y,condition_y)):
             summary[axis]={"Aw_m2":float(r["Aw"]),"T1_s":float(r["adopted_T"]),
-                           "k":float(r["k"]),"C":float(r["Cd_uls"] if condition=="Ultimate" else r["Cd_service"]),
+                           "k":float(r["k"]),
+                           "C_elastic":float(r["C"]),
+                           "Cd_ultimate":float(r["Cd_uls"]),
+                           "Cd_service":float(r["Cd_service"]),
+                           "Cd_selected":float(r["Cd_uls"] if condition=="Ultimate" else r["Cd_service"]),
                            "condition":condition,
                            "original_excel_row_contributions":[
                                {"sheet":"NBC Calculator","row":a.get("excel_row"),
+                                "source_cells":{"wall_length_mm":"F"+str(a.get("excel_row")),
+                                                "wall_thickness_mm":"G"+str(a.get("excel_row")),
+                                                "opening_width_mm":"H"+str(a.get("excel_row")),
+                                                "opening_count":"J"+str(a.get("excel_row"))},
+                                "effective_wall_length_m":a.get("effective_m"),
+                                "gross_wall_length_m":a.get("wall_m"),
                                 "Aw_contribution_m2":a.get("contribution")} for a in r.get("records",[])]}
             log(f"{axis}: Excel Aw={r['Aw']} m2, adopted T={r['adopted_T']} s")
         audit={"status":"RESEARCH COMPARISON ONLY; NOT NBC DESIGN ACCEPTANCE",
