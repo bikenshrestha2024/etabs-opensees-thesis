@@ -15,7 +15,8 @@ def prepare(source, destination, basis='PUBLISHED_REFERENCE',
              'OpenSees_Load_Conversion_Audit.json', 'OpenSees_Source_Model_Metadata_V118.json']
     for name in names:
         if not (source / name).is_file(): raise FileNotFoundError(source / name)
-    if basis not in ('PUBLISHED_REFERENCE', 'M30_FE500_SENSITIVITY'): raise ValueError('Unknown material basis')
+    from components.nonlinear_time_history.material_source_sets import BASES
+    if basis not in BASES: raise ValueError('Unknown material basis')
     read = lambda p: json.loads(p.read_text(encoding='utf-8-sig'))
     data, cfg = read(source / names[0]), read(source / names[1])
     properties = {}
@@ -26,7 +27,7 @@ def prepare(source, destination, basis='PUBLISHED_REFERENCE',
             raise ValueError('Invalid or inconsistent wall thickness for ' + key)
         properties[key] = thickness
     if not properties: raise ValueError('No shear-wall properties found in this export')
-    catalog = 'PEER_Web_ESFI_Patch.json' if basis == 'PUBLISHED_REFERENCE' else 'M30_Fe500_SFI_MVLEM_3D.json'
+    catalog = 'M30_Fe500_SFI_MVLEM_3D.json' if basis == 'M30_FE500_SENSITIVITY' else 'PEER_Web_ESFI_Patch.json'
     reference = read(ROOT / 'Material_Catalog' / catalog)
     tags = {name: 962000+i for i,name in enumerate(sorted(properties))}
     # Historical layout only: two curtains of 20 mm bars at 200 mm spacing.

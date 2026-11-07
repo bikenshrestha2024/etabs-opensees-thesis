@@ -170,8 +170,12 @@ def _steelmpf_transition(profile):
         return dict(R0=20.,cR1=.925,cR2=.0015,
                     basis='OpenSees SteelMPF author-documented transition default; PEER appendix cR1 entry retained as an explicit alternate')
     if profile=='PEER_APPENDIX_EXACT':
-        return dict(R0=20.,cR1=18.5,cR2=.0015,
-                    basis='PEER 2015/12 Appendix B.3 web card, exact printed transition values')
+        # [REF PEER 2015/12 App. B.3; Menegotto & Pinto 1973; OpenSees SteelMPF]
+        # Printed a1=18.5 is the absolute form R=R0-a1*xi/(a2+xi); OpenSees uses
+        # R=R0*(1-cR1*xi/(cR2+xi)) so cR1=a1/R0=0.925. cR1=18.5 gave NaN on the
+        # first reversal (verified natively, 2026-11-07).
+        return dict(R0=20.,cR1=18.5/20.,cR2=.0015,
+                    basis='PEER 2015/12 Appendix B.3 printed a1=18.5 converted to OpenSees cR1=a1/R0=0.925; cR2 as printed')
     raise ValueError('Unknown SteelMPF transition profile')
 
 def check_project_material_qualification(config):
@@ -200,11 +204,14 @@ def define_building_materials(ops,data,folder,material_overrides=None):
     import Define_Section_V109 as sections
     material_overrides=validate_material_overrides(material_overrides or {})
     basis=os.environ.get('OPENSEES_RESEARCH_MATERIAL_BASIS','PUBLISHED_REFERENCE')
-    if basis not in ('PUBLISHED_REFERENCE','M30_FE500_SENSITIVITY'):
+    # [REF components/nonlinear_time_history/material_source_sets.py; R01 PEER 2015/12]
+    from components.nonlinear_time_history.material_source_sets import BASES,SINGLE_SOURCE_BASIS,peer_single_source
+    if basis not in BASES:
         raise ValueError('Unknown research material basis')
+    single=peer_single_source() if basis==SINGLE_SOURCE_BASIS else None
     transition_profile=os.environ.get('OPENSEES_STEELMPF_TRANSITION','OPENSEES_DOCUMENTED')
     transition=_steelmpf_transition(transition_profile)
-    wall_file='PEER_Web_ESFI_Patch.json' if basis=='PUBLISHED_REFERENCE' else 'M30_Fe500_SFI_MVLEM_3D.json'
+    wall_file='M30_Fe500_SFI_MVLEM_3D.json' if basis=='M30_FE500_SENSITIVITY' else 'PEER_Web_ESFI_Patch.json'
     wall=json.loads((ROOT/'Material_Catalog'/wall_file).read_text(encoding='utf8'))
     cover=json.loads((ROOT/'Material_Catalog'/'Official_Concrete01.json').read_text(encoding='utf8'))['parameters']
     # Stage 02 — use an approved source register only when explicitly supplied.
@@ -234,6 +241,10 @@ def define_building_materials(ops,data,folder,material_overrides=None):
                      cover_epsU=-.006,core_epsU=-.006,fy_rebar_mpa=500.,
                      E0_mpa=200000.,steel_b=.01,steel_R0=20.,
                      steel_cR1=.925,steel_cR2=.15)
+            if single:
+                # [REF R01 Appendix B.3] frame concrete strength/peak strain and
+                # rebar from the SAME paper card; post-peak terms flagged.
+                q.update(single['frame_section'])
             for key, value in material_overrides.items():
                 if key in FRAME_OVERRIDE_TARGETS:
                     q[FRAME_OVERRIDE_TARGETS[key]] = value
@@ -248,6 +259,8 @@ def define_building_materials(ops,data,folder,material_overrides=None):
         sections.RC_SECTION_CONFIG.clear();sections.RC_SECTION_CONFIG.update(saved)
     from components.validation.parameter_studies import CM,MPF
     c=wall['wall_concrete'];s=dict(wall['wall_steel'])
+    if single:
+        c=dict(single['wall_concrete']);s=dict(single['wall_steel'])
     for key, value in material_overrides.items():
         if key.startswith('wall.'):
             ckey=key.split('.',1)[1]
@@ -259,7 +272,8 @@ def define_building_materials(ops,data,folder,material_overrides=None):
                 c[target]=value
     # Keep the PEER appendix value selectable because its cR1 differs from
     # the SteelMPF author-documented transition default.
-    s.update(R0=transition['R0'],cR1=transition['cR1'],cR2=transition['cR2'])
+    if not single:  # single-source keeps the paper's printed transition values
+        s.update(R0=transition['R0'],cR1=transition['cR1'],cR2=transition['cR2'])
     steel_targets={
         'fyp_mpa':'fyp','fyn_mpa':'fyn','E0_mpa':'E0','bp':'bp','bn':'bn',
         'R0':'R0','cR1':'cR1','cR2':'cR2','a1':'a1','a2':'a2','a3':'a3','a4':'a4',
@@ -305,8 +319,11 @@ def define_building_materials(ops,data,folder,material_overrides=None):
                          basis='User-specified 345 MPa structural-steel baseline; confirm the SHS product standard, grade, thickness, and certificate. Does not represent BRB core qualification.'),
         steelmpf_transition_profile=transition_profile,
         steelmpf_transition_basis=transition['basis'],
-        frame_sections=frame,frame_concrete_source='https://opensees.berkeley.edu/OpenSees/OpenSeesExamples1.1.pdf',
-        frame_steel_basis='Nominal Fe500 plus documented Steel02 defaults; b=0.01 assumed, not an experimental Fe500 fit',
+        frame_sections=frame,
+        frame_concrete_source=(single['source'] if single else 'https://opensees.berkeley.edu/OpenSees/OpenSeesExamples1.1.pdf'),
+        frame_steel_basis=('PEER 2015/12 Appendix B.3 web steel card (same source as walls)' if single else
+                           'Nominal Fe500 plus documented Steel02 defaults; b=0.01 assumed, not an experimental Fe500 fit'),
+        material_source_table=(single['rows'] if single else None),
         frame_reinforcement_basis=('APPROVED_REGISTER_GEOMETRY_ONLY: no independently measured confined concrete law'
                                    if reinforcement_evidence else 'Existing section-layout templates; not verified project bar schedules'),
         frame_reinforcement_evidence=reinforcement_evidence,

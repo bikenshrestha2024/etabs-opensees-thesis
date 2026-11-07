@@ -134,3 +134,4 @@ All **90 active Python modules** have individual source guides (with source blob
 | [components/inputs/aw_sources.py](../../components/inputs/aw_sources.py) | [Guide](components/inputs/aw_sources.py.md) | 01 Import/geometry → 04 Modal / ESM period (2026-11-07) | P1 |
 | [components/ui/output_folder.py](../../components/ui/output_folder.py) | [Guide](components/ui/output_folder.py.md) | All analysis windows (2026-11-07) | P1 |
 | [components/ui/exploratory_options.py](../../components/ui/exploratory_options.py) | [Guide](components/ui/exploratory_options.py.md) | 06 Isolated nonlinear probes (2026-11-07) | P1 |
+| [components/nonlinear_time_history/material_source_sets.py](../../components/nonlinear_time_history/material_source_sets.py) | [Guide](components/nonlinear_time_history/material_source_sets.py.md) | 02 Materials single-source sets (2026-11-07) | P1 |

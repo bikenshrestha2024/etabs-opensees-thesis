@@ -157,6 +157,8 @@ on:
       - 'components/ui/exploratory_options.py'
       - 'components/ui/building_exploratory_gui.py'
       - 'tests/verify_exploratory_options.py'
+      - 'components/nonlinear_time_history/material_source_sets.py'
+      - 'tests/verify_material_source_sets.py'
   pull_request:
     paths:
       - 'components/nonlinear_time_history/damping_regions.py'
@@ -176,6 +178,8 @@ on:
       - 'components/ui/exploratory_options.py'
       - 'components/ui/building_exploratory_gui.py'
       - 'tests/verify_exploratory_options.py'
+      - 'components/nonlinear_time_history/material_source_sets.py'
+      - 'tests/verify_material_source_sets.py'
       - 'components/validation/etabs_direct_api.py'
       - 'components/validation/etabs_equivalence_report.py'
       - 'components/validation/etabs_comparison.py'
@@ -239,6 +243,7 @@ jobs:
           python tests/verify_damping_regions.py
           python tests/verify_aw_sources_and_thickness.py
           python tests/verify_exploratory_options.py
+          python tests/verify_material_source_sets.py
           python tests/verify_modal_cancel_status.py
           python tests/verify_v170_modern_reconciliation.py
           python tests/verify_nbc105_periods.py
