@@ -294,7 +294,58 @@ def export_direct(folder,etabs,comp):
         pass
     return out
 
-def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_dir=None,allow_alternate_edb=False):
+def _new_etabs_instance(edb_path, *, exe_path=None):
+    """Launch a PRIVATE ETABS COM instance and open the selected EDB.
+
+    [REF CSI ETABS OAPI cHelper.CreateObjectProgID; cOAPI.ApplicationStart]
+    [REF CSI ETABS OAPI cSapModel.File.OpenFile] No attached ETABS instance
+    is taken over or closed. Caller owns and must finally close this instance.
+    """
+    import comtypes.client
+    helper=comtypes.client.CreateObject('ETABSv1.Helper')
+    try:
+        from comtypes.gen import ETABSv1
+        helper=helper.QueryInterface(ETABSv1.cHelper)
+    except (ImportError,AttributeError):
+        # The interface may be usable through late-bound COM on some machines.
+        pass
+    if exe_path:
+        exe=Path(exe_path).expanduser().resolve()
+        if not exe.is_file():raise FileNotFoundError('ETABS executable not found: '+str(exe))
+        instance=helper.CreateObject(str(exe))
+    else:
+        instance=helper.CreateObjectProgID('CSI.ETABS.API.ETABSObject')
+    try:
+        result=instance.ApplicationStart()
+        if result not in (0,None):
+            raise RuntimeError('ETABS ApplicationStart returned '+str(result))
+        opened=instance.SapModel.File.OpenFile(str(edb_path))
+        if opened not in (0,None):
+            raise RuntimeError('ETABS File.OpenFile returned '+str(opened)+
+                               '; check EDB version, file access and license')
+        actual=Path(str(instance.SapModel.GetModelFilename())).resolve()
+        if actual!=Path(edb_path).resolve():
+            raise RuntimeError('ETABS opened a different file: '+str(actual))
+    except BaseException:
+        # Instance belongs solely to this request; never touch pre-existing ETABS.
+        try:instance.ApplicationExit(False)
+        except Exception:pass
+        raise
+    return instance
+
+
+def _release_owned_instance(instance):
+    """Close ONLY ETABS started for the direct gravity comparison; do not save.
+
+    [REF CSI ETABS OAPI cOAPI.ApplicationExit(False)] False = no EDB save.
+    """
+    if instance is not None:
+        code=instance.ApplicationExit(False)
+        if code not in (0,None):
+            raise RuntimeError('Owned ETABS ApplicationExit(False) returned '+str(code))
+
+
+def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_dir=None,allow_alternate_edb=False,launch_new_etabs=False,etabs_edb_path=None,etabs_exe_path=None):
     """Read attached ETABS EDB and compare with existing gravity JSON.
 
     [REF components/validation/etabs_direct_api.py connect_and_extract] Existing
@@ -309,10 +360,24 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
     if not Path(source).is_file():raise FileNotFoundError('ETABS source EDB path is inaccessible: '+source)
     gravity=Path(gravity_result_path)
     if not gravity.is_file():raise FileNotFoundError('OpenSees gravity JSON missing: '+str(gravity))
-    app=connect_etabs()
-    data=extract_from_sap(app.SapModel,case,source_edb=source,
-                          allow_alternate_edb=allow_alternate_edb)
-    result=json.loads(gravity.read_text(encoding='utf-8-sig'))
-    comp=compare_existing(data,result)
-    out=export_direct(output_dir or gravity.parent/'Gravity_ETABS_OpenSees_Direct',data,comp)
-    return comp,out
+    # The isolated process mode is preferred: no ROT/GetActiveObject attach
+    # and no possibility of closing the user's existing ETABS window.
+    if launch_new_etabs:
+        selected=Path(etabs_edb_path).expanduser().resolve() if etabs_edb_path else Path(source).resolve()
+        if not selected.is_file():
+            raise FileNotFoundError('Selected gravity EDB missing: '+str(selected))
+        if selected!=Path(source).resolve() and not allow_alternate_edb:
+            raise ValueError('Selected ETABS gravity EDB differs from export source; explicitly approve diagnostic alternate-model mode')
+        app=_new_etabs_instance(selected,exe_path=etabs_exe_path)
+    else:
+        app=connect_etabs()
+    try:
+        data=extract_from_sap(app.SapModel,case,source_edb=source,
+                              allow_alternate_edb=allow_alternate_edb)
+        result=json.loads(gravity.read_text(encoding='utf-8-sig'))
+        comp=compare_existing(data,result)
+        out=export_direct(output_dir or gravity.parent/'Gravity_ETABS_OpenSees_Direct',data,comp)
+        return comp,out
+    finally:
+        if launch_new_etabs:
+            _release_owned_instance(app)
