@@ -87,6 +87,7 @@ class GravityAnalysisGUI:
         self.etabs_case_var = tk.StringVar(value="1. DL + LL")
         self.allow_alternate_edb = tk.BooleanVar(value=False)
         self.launch_etabs_for_gravity = tk.BooleanVar(value=True)
+        self.run_missing_etabs_results = tk.BooleanVar(value=True)
         self.etabs_edb_path = tk.StringVar(value="")
         self.etabs_exe_path = tk.StringVar(value="")
         self.python_var = tk.StringVar(value=sys.executable)
@@ -173,6 +174,21 @@ class GravityAnalysisGUI:
             self.win.update_idletasks()
             comparison_out=gravity.parent/"Gravity_ETABS_OpenSees_Direct"
             alternate=bool(self.allow_alternate_edb.get())
+            if self.run_missing_etabs_results.get():
+                if not self.launch_etabs_for_gravity.get():
+                    raise ValueError("Automatic analysis is permitted only for a private ETABS instance")
+                if not messagebox.askyesno(
+                    "Automatic ETABS analysis on a copy",
+                    "If the selected ETABS EDB lacks gravity results, the program will "
+                    "make a SHA256-verified working COPY of that EDB, then run ETABS "
+                    "analysis on the copy.\\n\\n"
+                    "ETABS may run ALL currently enabled cases, including time histories. "
+                    "The original source EDB will not be saved or analyzed. "
+                    "The working EDB and its analysis files remain in the output folder.\\n\\n"
+                    "Proceed?",parent=self.win):
+                    self._gravity_action_log("ETABS_CANCELLED",
+                        "User declined automatic analysis on isolated EDB copy")
+                    return
             if alternate and not messagebox.askyesno(
                 "Diagnostic comparison only",
                 "You selected a different ETABS EDB from the original OpenSees export.\\n\\n"
@@ -187,6 +203,7 @@ class GravityAnalysisGUI:
                               launch_new_etabs=bool(self.launch_etabs_for_gravity.get()),
                               etabs_edb_path=self.etabs_edb_path.get().strip() or None,
                               etabs_exe_path=self.etabs_exe_path.get().strip() or None,
+                              run_if_missing=bool(self.run_missing_etabs_results.get()),
                               log_callback=lambda line:self._gravity_action_log("ETABS_API",line))
             self._gravity_action_log("ETABS_SUCCESS","Comparison JSON, CSV and Excel exported: "+str(out))
             self.etabs_gravity_json_var.set(str(out/"etabs_gravity.json"))
@@ -332,6 +349,9 @@ class GravityAnalysisGUI:
         ttk.Checkbutton(form,
           text="Open ETABS in a new dedicated instance; close after comparison WITHOUT saving (recommended)",
           variable=self.launch_etabs_for_gravity).pack(anchor="w",pady=(2,4))
+        ttk.Checkbutton(form,
+          text="If gravity results are missing, run ETABS on a verified private COPY of the original EDB (may run all enabled cases)",
+          variable=self.run_missing_etabs_results).pack(anchor="w",pady=(2,4))
         self._path_row(form, "EDB to open (blank = exact source EDB)", self.etabs_edb_path,
                        lambda:self._browse_file(self.etabs_edb_path,
                            "Choose analyzed ETABS gravity model", [("ETABS model","*.edb")]))
