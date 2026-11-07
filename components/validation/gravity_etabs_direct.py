@@ -541,6 +541,7 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             comp['node_comparison']={
                 k:v for k,v in node_audit.items()
                 if k not in ('rows','top_discrepancies','diagnostic_hypotheses')}
+            comp['top_node_discrepancies']=node_audit['top_discrepancies'][:10]
             report('NODE_COMPARISON','Compared coordinate-matched support reactions',
                    valid_matches=node_audit['valid_one_to_one_global_z_count'],
                    axes_unverified=node_audit['axis_unverified_count'],
