@@ -21,6 +21,40 @@ class GravityComparisonProfileTests(unittest.TestCase):
         self.assertEqual(data['nodal_mass'], mass)
         self.assertEqual(cfg, factors)
 
+    def test_seismic_profile_remains_separate_from_full_roof_live_gravity(self):
+        from components.model.assembly import apply_gravity_profile
+        data={'unfactored_patterns':{
+            'Dead':{'1':[0,0,-100,0,0,0]},
+            'Live':{'1':[0,0,-30,0,0,0]},
+            'Roof Live':{'1':[0,0,-20,0,0,0]}},
+            'nodal_mass':{'1':10.0},
+            'total_downward_load_kN':109.0}
+        cfg={'gravity_factors':{'Dead':1.0,'Live':0.3,'Roof Live':0.0},
+             'mass_factors':{'Dead':1.0,'Live':0.3,'Roof Live':0.0}}
+        snapshot=copy.deepcopy(data)
+        seismic=apply_gravity_profile(data,cfg,'AS_CONFIGURED')
+        self.assertEqual(seismic['factors']['Live'],0.3)
+        self.assertEqual(seismic['factors']['Roof Live'],0.0)
+        self.assertEqual(data,snapshot)
+        full=apply_gravity_profile(data,cfg,'GRAVITY_1.0D_1.0L')
+        self.assertEqual(data['total_downward_load_kN'],150.0)
+        self.assertEqual(full['factors']['Live'],1.0)
+        self.assertEqual(full['factors']['Roof Live'],1.0)
+        self.assertEqual(data['nodal_mass'],snapshot['nodal_mass'])
+        self.assertEqual(cfg['mass_factors']['Roof Live'],0.0)
+
+    def test_gravity_gui_explicit_profile_and_no_second_preload(self):
+        import ast
+        from pathlib import Path
+        root=Path(__file__).resolve().parents[1]
+        source=(root/'components/gravity/gui_and_reports.py').read_text(encoding='utf-8')
+        ast.parse(source)
+        self.assertIn('tk.StringVar(value="GRAVITY_1.0D_1.0L")',source)
+        self.assertIn("'OPENSEES_GRAVITY_PROFILE':profile",source)
+        self.assertIn("model_report.get('preload_completed')",source)
+        self.assertIn("self._selected_gravity_evidence(model)",source)
+        self.assertIn("'gravity_profile':GRAVITY_PROFILE",source)
+
     def test_unknown_pattern_fails_closed(self):
         data = {'unfactored_patterns': {'mystery': {'1': [0, 0, -1]}}}
         with self.assertRaisesRegex(ValueError, 'unclassified'):
