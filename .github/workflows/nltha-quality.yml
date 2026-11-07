@@ -140,8 +140,42 @@ on:
       - 'tests/verify_component_experiment_evidence.py'
       - 'tools/audit_soil_c_case_completion.py'
       - 'tests/verify_soil_c_case_completion.py'
+      - 'components/nonlinear_time_history/damping_regions.py'
+      - 'components/nonlinear_time_history/energy_balance.py'
+      - 'components/model/section_tags.py'
+      - 'tools/plot_results.py'
+      - 'tools/export_dashboard.py'
+      - 'tests/verify_damping_regions.py'
+      - 'tests/verify_section_tags.py'
+      - 'tests/verify_ref_tags.py'
+      - 'tests/data/ref_tag_baseline.json'
+      - 'tests/verify_plot_and_dashboard.py'
+      - 'components/inputs/aw_sources.py'
+      - 'components/ui/output_folder.py'
+      - 'components/equivalent_static/etabs_linked_excel.py'
+      - 'tests/verify_aw_sources_and_thickness.py'
+      - 'components/ui/exploratory_options.py'
+      - 'components/ui/building_exploratory_gui.py'
+      - 'tests/verify_exploratory_options.py'
   pull_request:
     paths:
+      - 'components/nonlinear_time_history/damping_regions.py'
+      - 'components/nonlinear_time_history/energy_balance.py'
+      - 'components/model/section_tags.py'
+      - 'tools/plot_results.py'
+      - 'tools/export_dashboard.py'
+      - 'tests/verify_damping_regions.py'
+      - 'tests/verify_section_tags.py'
+      - 'tests/verify_ref_tags.py'
+      - 'tests/data/ref_tag_baseline.json'
+      - 'tests/verify_plot_and_dashboard.py'
+      - 'components/inputs/aw_sources.py'
+      - 'components/ui/output_folder.py'
+      - 'components/equivalent_static/etabs_linked_excel.py'
+      - 'tests/verify_aw_sources_and_thickness.py'
+      - 'components/ui/exploratory_options.py'
+      - 'components/ui/building_exploratory_gui.py'
+      - 'tests/verify_exploratory_options.py'
       - 'components/validation/etabs_direct_api.py'
       - 'components/validation/etabs_equivalence_report.py'
       - 'components/validation/etabs_comparison.py'
@@ -185,7 +219,7 @@ jobs:
       - name: Install isolated CI workbook test dependency
         run: |
           # This is the GitHub Actions runner, not the user's conda-forge Windows environment.
-          python -m pip install openpyxl==3.1.5 numpy==2.1.3
+          python -m pip install openpyxl==3.1.5 numpy==2.1.3 matplotlib==3.9.2
       - name: Syntax-check key NLTHA files
         run: |
           python -m compileall -q components/modal/gui_and_reports.py components/linear_time_history/runner_and_gui.py components/validation/etabs_direct_api.py components/validation/etabs_equivalence_report.py components/validation/etabs_comparison.py components/response_spectrum/model_analysis.py components/validation/irregularity_review.py components/validation/floor_end_extraction.py tests/verify_etabs_direct_equivalence.py tests/verify_esm_output_safety.py tests/verify_esm_aw_period_provenance.py components/equivalent_static/calculation_and_gui.py components/inputs/project_workbooks.py components/model/assembly.py components/nonlinear_time_history 36_SOIL_C_NLTHA_RUN_MATRIX.py 35_SOIL_C_NLTHA_PREFLIGHT.py 33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py components/response_spectrum/nbc_pair_spectrum_audit.py 32_NBC105_PAIR_SPECTRUM_AUDIT.py components/model/reinforcement_mapping.py components/sections/devices.py components/validation/expanded_workbench_tabs.py components/validation/visual_workbench.py components/model/readiness_dashboard.py components/model/readiness_dashboard_gui.py components/ui/application.py
@@ -198,6 +232,13 @@ jobs:
           python tests/verify_documentation_coverage.py
           python tests/verify_active_repository_audit.py
           python tests/verify_review_ledger.py
+          python tests/verify_section_tags.py
+          python tests/verify_ref_tags.py
+          MPLBACKEND=Agg python tests/verify_plot_and_dashboard.py
+          # Native checks are SKIPPED (not passed) when OpenSeesPy is absent.
+          python tests/verify_damping_regions.py
+          python tests/verify_aw_sources_and_thickness.py
+          python tests/verify_exploratory_options.py
           python tests/verify_modal_cancel_status.py
           python tests/verify_v170_modern_reconciliation.py
           python tests/verify_nbc105_periods.py

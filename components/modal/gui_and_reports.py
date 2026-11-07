@@ -162,12 +162,16 @@ class ModalAuditGUI:
         self.aw_y = tk.StringVar()
         self.tr_x = tk.StringVar()
         self.tr_y = tk.StringVar()
+        # [REF NBC105-2025 §5.1.2] every auto-filled Aw shows its source.
+        self.aw_source = tk.StringVar(value='Wall Aw source: not loaded yet')
+        self.aw_resolution = None
         self.mode_x = tk.StringVar()
         self.mode_y = tk.StringVar()
         self.confirm = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Select an OpenSees model script to run the modal audit.")
         self._build()
         self.root.after_idle(lambda:__import__('OpenSees_Complete_Export_V118').autoselect_inputs(self,Path(self.model.get()).parent if self.model.get() else r'D:/Thesis Opensees/Etabs Nodes Export','modal_model_script'))
+        self.root.after_idle(lambda:self._fill_aw_from_sources(only_blank=True))
         self.model.trace_add('write',lambda *args:self._sync_project_system())
         from OpenSees_Research_UI_V123 import scrollable_form
 
@@ -176,7 +180,8 @@ class ModalAuditGUI:
         from OpenSees_Research_UI_V123 import scrollable_form
         outer = scrollable_form(self.root,padding=14)
         tools=ttk.Frame(outer);tools.pack(fill='x',pady=4)
-        ttk.Button(tools,text='Open output folder',command=lambda:os.startfile(self.output.get())).pack(side='left',padx=4)
+        from components.ui.output_folder import add_open_output_button
+        add_open_output_button(tools,self.output,window=self.root)
         ttk.Button(tools,text='View modal figure',command=self._view_plot).pack(side='left',padx=4)
         ttk.Label(outer, text="NBC 105:2025 MODAL ANALYSIS AUDIT", font=("Segoe UI", 16, "bold")).pack(anchor="w")
         tk.Label(outer, text="Eigen periods + frequency + directional modal mass participation + NBC checks (§7.3–7.5)", wraplength=850, anchor="w", justify="left").pack(anchor="w", pady=(4, 12))
@@ -203,6 +208,7 @@ class ModalAuditGUI:
         ttk.Entry(prow2, textvariable=self.aw_x, width=10).pack(side="left", padx=(6, 14))
         ttk.Label(prow2, text="Wall Aw Y (m²)").pack(side="left")
         ttk.Entry(prow2, textvariable=self.aw_y, width=10).pack(side="left", padx=(6, 14))
+        ttk.Button(prow2, text="Fill Aw from sources", command=lambda:self._fill_aw_from_sources(only_blank=False)).pack(side="left", padx=(0, 10))
         tk.Label(prow2, text="RC dual systems with shear walls: use the reviewed wall-period expression here; system factors remain separate. For wall systems, enter directional NBC §5.1.2 Aw from first-storey effective wall segments; review openings.", wraplength=360, anchor="w", justify="left").pack(side="left")
         prow3 = ttk.Frame(period); prow3.pack(fill="x", pady=2)
         ttk.Label(prow3, text="Rayleigh T X (s)").pack(side="left")
@@ -212,10 +218,14 @@ class ModalAuditGUI:
         ttk.Label(prow3, text="Optional modal mode IDs reviewed as fundamental X / Y").pack(side="left")
         ttk.Entry(prow3, textvariable=self.mode_x, width=5).pack(side="left", padx=4)
         ttk.Entry(prow3, textvariable=self.mode_y, width=5).pack(side="left", padx=4)
+        tk.Label(period, textvariable=self.aw_source, wraplength=850, foreground="#1f4e79", anchor="w", justify="left").pack(anchor="w", pady=(2, 0))
         tk.Label(period, text="NBC §5.1.3: amplified empirical period = 1.25 × empirical; adopted design period = the lesser of this and Rayleigh period. ETABS eigenperiod is a comparison diagnostic; it does not replace NBC's adopted period.", wraplength=850, foreground="#9a4b24", anchor="w", justify="left").pack(anchor="w", pady=(4, 0))
         tk.Label(form, text="Select a complete OpenSees model builder with the intended geometry, constraints, seismic mass and gravity state. This audit runs it in a separate process and does not retain its domain for later analyses.", wraplength=870, foreground="#9a4b24", anchor="w", justify="left").pack(anchor="w", pady=(8, 4))
         tk.Checkbutton(form, text="I reviewed the model script, mass source, constraints and gravity preload for this modal run.", variable=self.confirm, wraplength=840, anchor="w", justify="left").pack(anchor="w", pady=5)
-        self.run_button=ttk.Button(outer, text="Run selected SLS / ULS modal audit", command=self._run);self.run_button.pack(anchor="w", pady=10)
+        run_row=ttk.Frame(outer);run_row.pack(anchor="w", pady=10)
+        self.run_button=ttk.Button(run_row, text="Run selected SLS / ULS modal audit", command=self._run);self.run_button.pack(side="left")
+        add_open_output_button(run_row,lambda:self._last_result_folder or self.output.get(),window=self.root,padx=8)
+        self._last_result_folder=None
         self.stop_button=ttk.Button(outer,text="Stop modal solver and skip pending states",
                                     command=self._stop_modal,state="disabled")
         self.stop_button.pack(anchor="w",pady=3)
@@ -232,6 +242,40 @@ class ModalAuditGUI:
             "This audit computes eigen/modal-mass results and flags required follow-up. It does not calculate response-spectrum member forces, missing-mass correction, modal combination, or base-shear scaling."
         )
         tk.Label(box, text=notes, justify="left", wraplength=850, anchor="nw").pack(anchor="nw")
+
+    def _fill_aw_from_sources(self, only_blank=True):
+        """Fill blank Aw from the ETABS-linked Excel method or OpenSees geometry.
+
+        [REF NBC105-2025 §5.1.2; components/inputs/aw_sources.py resolve_aw]
+        Runs in a worker thread; values that the workbook import already set
+        are kept unless the user presses the button (only_blank=False).
+        """
+        model=self.model.get().strip()
+        if not model:
+            self.aw_source.set('Wall Aw source: select the OpenSees model script first.');return
+        if only_blank and self.aw_x.get().strip() and self.aw_y.get().strip():
+            self.aw_source.set('Wall Aw source: source-verified project workbook (loaded at start-up).');return
+        export=Path(model).parent;state=self.limit_state.get()
+        self.aw_source.set('Wall Aw source: searching ETABS-linked Excel method and OpenSees geometry…')
+        def work():
+            try:
+                from components.inputs.aw_sources import resolve_aw
+                res=resolve_aw(export,state)
+            except Exception as exc:
+                self.root.after(0,lambda e=str(exc):self.aw_source.set('Wall Aw source: lookup failed: '+e));return
+            def apply():
+                self.aw_resolution={k:v for k,v in res.items() if k!='reference'}
+                parts=[]
+                for axis,var in (('X',self.aw_x),('Y',self.aw_y)):
+                    value=res.get(axis)
+                    if value is not None and (not only_blank or not var.get().strip()):
+                        var.set(f'{value:.10g}')
+                    parts.append(f"{axis}: {res['labels'].get(axis,'not filled')}")
+                notes=[n for n in res.get('notes',[]) if n]
+                self.aw_source.set('Wall Aw source — '+' | '.join(parts)
+                    +((' | ' + notes[0]) if notes and res.get('method')!='ORIGINAL_EXCEL_METHOD_ETABS_LINKED' else ''))
+            self.root.after(0,apply)
+        __import__('threading').Thread(target=work,daemon=True).start()
 
     def _sync_project_system(self):
         try:
@@ -322,6 +366,14 @@ class ModalAuditGUI:
                     ledger.set(state,"RUNNING","Stage 1/3: model and gravity preload")
                     state_output=analysis_output_folder(model.parent,state) if self._output_is_automatic else base_output
                     output=state_output/('Modal_'+state);output.mkdir(parents=True,exist_ok=True)
+                    self._last_result_folder=str(output)
+                    # [REF NBC105-2025 §5.1.2] keep the Aw provenance beside the result.
+                    (output/'Wall_Aw_Source.json').write_text(json.dumps(dict(
+                        wall_aw_x_m2=(period_inputs or {}).get('wall_aw_x_m2'),
+                        wall_aw_y_m2=(period_inputs or {}).get('wall_aw_y_m2'),
+                        label=self.aw_source.get(),
+                        resolution=self.aw_resolution,
+                        code_accepted=False),indent=2,default=str),encoding='utf-8')
                     self.root.after(0,lambda state=state,output=output:self.status.set(f'Running {state} stiffness case: stage 1/3: rebuild + gravity preload; stage 2/3: solve {n} modes with {solver}; stage 3/3: mass participation, period comparison and export. Results: {output}'))
                     source=_runner_source(model,output,n,solver,period_inputs,mode_x,mode_y,state)
                     runner=output/'_run_nbc105_modal_v111.py'
@@ -367,7 +419,10 @@ class ModalAuditGUI:
                     messages.append(msg)
                 summary='\n'.join(messages)
                 self.root.after(0,lambda summary=summary:self.status.set(summary))
-                self.root.after(0,lambda summary=summary:messagebox.showinfo('Modal audit batch finished',summary,parent=self.root))
+                from components.ui.output_folder import offer_open_folder
+                folder=self._last_result_folder or str(base_output)
+                self.root.after(0,lambda summary=summary,folder=folder:offer_open_folder(
+                    folder,summary,parent=self.root,title='Modal audit batch finished'))
             except Exception as exc:
                 error_text=str(exc)
                 self.root.after(0,lambda error_text=error_text:self.status.set('Error: '+error_text))

@@ -481,7 +481,7 @@ def _run(config):
                 config,periods,records[0][1])
             (case/'Soil_C_Selected_Modal_Damping_and_Time_Step.json').write_text(
                 json.dumps(selected_audit,indent=2,allow_nan=False),encoding='utf-8')
-            # Same physical modes for both orientations; define two 5% targets
+            # Same physical modes for both orientations; define two zeta targets
             # instead of arbitrarily damping the first and 20th modes.
             mode_a,mode_b=selected_audit['damping_reference_modes_1_based']
             damping_periods=(periods[mode_a-1],periods[mode_b-1])
@@ -494,12 +494,42 @@ def _run(config):
                     damping_reference_periods_s=damping_periods,
                     note='Exploratory only: first/20th damping can distort nonlinear higher modes'),
                     indent=2,allow_nan=False),encoding='utf-8')
-        alpha,beta=rayleigh_coefficients(*damping_periods,.05)
-        if config.get('diagnostic_mass_damping'):alpha,beta=2*.05*min(math.sqrt(v) for v in eigenvalues),0.
+        # [REF PEER TBI 2017; LATBSDC 2020] inherent ratio default 0.025.
+        # [REF NBC105-2025 §8.1.1 (repo citation)] 0.05 only with the explicit
+        # inherent_damping_five_percent flag. Pre-2026-11-07 runs used a fixed
+        # 0.05: set inherent_damping_five_percent=true to reproduce them.
+        from components.nonlinear_time_history.damping_regions import (
+            apply_structural_rayleigh, modal_damping_ratios,
+            resolve_inherent_damping_ratio)
+        zeta=resolve_inherent_damping_ratio(config)
+        alpha,beta=rayleigh_coefficients(*damping_periods,zeta)
+        # Diagnostic overrides are preserved; mass-only damping uses the same
+        # configured zeta at the first mode (was a fixed 0.05).
+        if config.get('diagnostic_mass_damping'):alpha,beta=2*zeta*min(math.sqrt(v) for v in eigenvalues),0.
         if config.get('diagnostic_zero_damping'):alpha,beta=0.,0.
-        print('[TRANSIENT PROBE]', 'excitation='+excitation, 'zero_damping='+str(bool(config.get('diagnostic_zero_damping'))), 'system='+transient_system, flush=True)
-        (case/'Initial_Modal_Damping.json').write_text(json.dumps(dict(eigenvalues=eigenvalues,periods_s=periods,alphaM=alpha,betaKcomm=beta,dt_screen_s=bound),indent=2))
-        ops.rayleigh(alpha,0.,0.,beta)
+        print('[TRANSIENT PROBE]', 'excitation='+excitation, 'zero_damping='+str(bool(config.get('diagnostic_zero_damping'))), 'system='+transient_system, 'inherent_zeta='+format(zeta,'g'), flush=True)
+        # [REF Charney 2008; Zareian & Medina 2010] Rayleigh only on frame,
+        # core-wall and slab elements; FVD/BRB/brace trusses excluded. The
+        # GLOBAL_LEGACY scope reproduces the previous ops.rayleigh call and is
+        # kept for regression comparison only.
+        rayleigh_scope=str(config.get('rayleigh_scope','STRUCTURAL_REGION')).upper()
+        if rayleigh_scope not in ('STRUCTURAL_REGION','GLOBAL_LEGACY'):
+            raise ValueError('rayleigh_scope must be STRUCTURAL_REGION or GLOBAL_LEGACY')
+        if thesis_intent and rayleigh_scope!='STRUCTURAL_REGION':
+            raise ValueError('THESIS_NLTHA requires rayleigh_scope=STRUCTURAL_REGION')
+        if rayleigh_scope=='GLOBAL_LEGACY':
+            ops.rayleigh(alpha,0.,0.,beta)
+            damping_audit=dict(method='global_rayleigh_legacy',alphaM_per_s=alpha,betaKcomm_s=beta)
+        elif alpha==0. and beta==0.:
+            damping_audit=dict(method='none_diagnostic_zero_damping')
+        else:
+            damping_audit=apply_structural_rayleigh(
+                ops,alpha,beta,extra_excluded_tags=config.get('rayleigh_excluded_element_tags',[]))
+        (case/'Rayleigh_Damping_Assignment.json').write_text(json.dumps(damping_audit,indent=2,allow_nan=False),encoding='utf-8')
+        (case/'Initial_Modal_Damping.json').write_text(json.dumps(dict(
+            eigenvalues=eigenvalues,periods_s=periods,alphaM=alpha,betaKcomm=beta,dt_screen_s=bound,
+            inherent_damping_ratio=zeta,rayleigh_scope=rayleigh_scope,
+            initial_modal_damping_ratios=modal_damping_ratios(alpha,beta,eigenvalues)),indent=2))
         _set_run_stage('transient_setup',orientation=orientation,case_output_dir=str(case))
         from components.nonlinear_time_history.nbc105_horizontal_input import (
             write_manifest,unit_and_scale)
@@ -575,6 +605,25 @@ def _run(config):
                         for d in active_devices}
         device_rows=[]
         tracked_element_rows=[]
+        # [REF Uang & Bertero 1990; Christopoulos & Filiatrault 2006] optional
+        # relative energy balance (input, kinetic, Rayleigh, strain/hysteretic,
+        # device, constant-gravity work). Opt-in because it loops over every
+        # element at every accepted substep in Python.
+        energy_recorder=None
+        if config.get('energy_balance',False):
+            from components.nonlinear_time_history.damping_regions import classify_elements
+            from components.nonlinear_time_history.energy_balance import EnergyBalanceRecorder
+            energy_groups=classify_elements(
+                ops,extra_excluded_tags=config.get('rayleigh_excluded_element_tags',[]))
+            def _ground(index):
+                return lambda t:applied_ground_acceleration(
+                    records,time_s=t,orientation=orientation,excitation=excitation,
+                    additional_spectral_scale=scale)[index]
+            energy_recorder=EnergyBalanceRecorder(
+                ops,structural_tags=energy_groups['structural'],
+                device_tags=energy_groups['excluded'],
+                ground_accel={1:_ground(0),2:_ground(1)},
+                alpha_m=alpha,beta_k=beta)
         from components.nonlinear_time_history.full_record_gate import (
             verify_numeric_accepted_row)
         def capture():
@@ -629,6 +678,9 @@ def _run(config):
                 ))
             for device in active_devices:
                 device_rows.append(device_sample(ops,device,data['nodes'],device_initial[device['tag']]))
+            if energy_recorder is not None:
+                if energy_recorder.rows:energy_recorder.step(row['time_s'])
+                else:energy_recorder.start(row['time_s'])
             # Check every accepted step immediately, not only after an entire
             # record has consumed hours of CPU time. A zero solver return
             # code does NOT imply every recorder response is finite.
@@ -714,6 +766,12 @@ def _run(config):
         tracked_element_path=write_rows(
             case/'Tracked_Element_Force_Displacement.csv',
             tracked_element_rows)
+        energy_summary=None
+        if energy_recorder is not None:
+            energy_summary=energy_recorder.write(
+                case,tolerance=float(config.get('energy_balance_tolerance',0.05)))
+            print('[ENERGY BALANCE]',orientation,energy_summary['status'],
+                  'max_relative_error='+format(energy_summary.get('max_relative_error',float('nan')),'.4g'),flush=True)
         if device_rows:
             write_rows(case/'Device_Accepted_Step_History.csv',device_rows)
             demands=summarize_device_demands(device_rows)
@@ -742,6 +800,10 @@ def _run(config):
         recorder_files.append((tracked_element_path.name,[
             'selected frame/brace/device tag axial force and gravity-relative projected axial extension',
             'local force vector retained as JSON in native OpenSees local-end ordering']))
+        if energy_summary is not None:
+            recorder_files.append(('Energy_Balance.csv',[
+                'relative input, kinetic, Rayleigh, strain/hysteretic, device and gravity work (kJ)',
+                'balance error and relative error per accepted step']))
         if device_rows:
             recorder_files.append(('Device_Accepted_Step_History.csv',
                 ['active FVD/BRB basicForce or axialForce, relative displacement/velocity']))
@@ -794,7 +856,8 @@ def _run(config):
             diagnostic_excitation=excitation,
             diagnostic_zero_damping=bool(config.get('diagnostic_zero_damping')),
             diagnostic_mass_damping=bool(config.get('diagnostic_mass_damping')),
-            rayleigh_alphaM=alpha,rayleigh_betaKcomm=beta,
+            rayleigh_alphaM=alpha,rayleigh_betaKcomm=beta,inherent_damping_ratio=zeta,rayleigh_scope=rayleigh_scope,
+            energy_balance_status=energy_summary['status'] if energy_summary else 'NOT_RECORDED',
             material_overrides=material_overrides,
             status='COMPLETED_TRUNCATED_TRIAL' if end<record_end else 'COMPLETED_EXPLORATORY_RECORD',
             physical_time_s=end,full_record_duration_s=record_end,

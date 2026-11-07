@@ -563,7 +563,11 @@ class LinearTimeHistoryGUI:
         ttk.Button(root, text="NBC site spectrum + optional X/Y scale diagnostic (A–D)", command=self._open_spectrum_tool).pack(anchor="w", pady=(0, 6))
         ttk.Button(root,text='Refresh known project / modal parameters',command=self._refresh_known).pack(anchor='w',pady=(0,6))
         ttk.Checkbutton(root, text="RUN_LINEAR_TIME_HISTORY = True  —  enable execution (default False)", variable=self.execute).pack(anchor="w", pady=(0, 4))
-        ttk.Button(root, text="Run NBC Linear Time-History Cases", command=self._run).pack(anchor="w", pady=(0, 8))
+        run_row = ttk.Frame(root); run_row.pack(anchor="w", pady=(0, 8))
+        ttk.Button(run_row, text="Run NBC Linear Time-History Cases", command=self._run).pack(side="left")
+        # [REF components/ui/output_folder.py] shared output-folder action.
+        from components.ui.output_folder import add_open_output_button
+        add_open_output_button(run_row, self.output, window=self.win, padx=8)
         from components.shared.case_status import panel
         self.case_board=panel(root)
         from OpenSees_Results_UI_V127 import history_viewer

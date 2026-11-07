@@ -13,3 +13,7 @@ A correct Excel output is not a completed model-equivalence or NBC 105 design-ac
 
 ## Engineering limitation
 Original source engine and workbook are selected locally; they have not been tested in GitHub-hosted CI against the user's Windows ETABS model.
+
+## Direct wall thickness check (2026-11-07)
+
+`direct_wall_thickness_inventory(sap)` reads every wall-oriented area object's property and its **numeric** `PropArea.GetWall` thickness. Section names such as "Outrigger Wall 250" are never parsed. `check_excel_wall_thickness` compares each Excel `NBC Calculator!G<row>` thickness the original engine wrote against those values (0.5 mm tolerance). The result is stored in the provenance JSON as `direct_thickness_check`. A MISMATCH sets the audit status to `THICKNESS_MISMATCH_DO_NOT_USE`, and the ESM and modal windows then refuse to use that Aw.

@@ -44,6 +44,9 @@ def launch(parent):
         except queue.Empty:pass
         if win.winfo_exists():win.after(150,poll)
     button=ttk.Button(bar,text='Run elastic + nonlinear comparison',command=run);button.pack(side='left',padx=8)
+    # [REF components/ui/output_folder.py] shared output-folder action.
+    from components.ui.output_folder import add_open_output_button
+    add_open_output_button(bar,out,window=win)
     ttk.Button(bar,text='View saved graphs / animation',command=lambda:show_results(win,out.get())).pack(side='left')
     def cards():
         from OpenSees_Literature_Materials_V137 import export_cards

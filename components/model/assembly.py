@@ -638,7 +638,11 @@ def export_gravity_beam_actions(ops,data,folder,limit_state,mode):
 @timed_outputs('Model construction and optional gravity preload','folder')
 def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='ULS',
                         research_profile=None, gravity_system='UmfPack'):
-    """Build all supported structural families, loads, mass and diaphragms."""
+    """Build all supported structural families, loads, mass and diaphragms.
+
+    [REF R10 NBC105-2025 §9.3.1 (3D model, gravity, P-Delta)] [REF R02 Kolozvari et al. 2023 (E-SFI-MVLEM-3D)]
+    [REF components/model/section_tags.py (fibre section tags validated against ETABS section names)]
+    """
     research=research_profile in ('LITERATURE_EXPLORATORY_V138','LITERATURE_FRAME_NL_ELASTIC_WALL_V138','LITERATURE_BUILDING_NL_V161')
     research_elastic_walls=research_profile=='LITERATURE_FRAME_NL_ELASTIC_WALL_V138'
     if research_profile is not None and not research:raise ValueError('Unknown exploratory profile')
@@ -699,7 +703,18 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             material_file=Path(cfg['nonlinear_materials_file'])
             if not material_file.is_absolute(): material_file=folder/material_file
             result=runpy.run_path(str(material_file)); result['define_materials'](ops)
-    section_tags={'SHS_350x350x16_STEEL_FIBER':701,'RC_BEAM_600x800_FIBER':611,'RC_COLUMN_1100x1100_FIBER':621,'RC_COLUMN_1250x1250_FIBER':631}
+    # [REF components/model/section_tags.py; OpenSees section tag namespace]
+    # Tags come from components/sections/definitions.py SECTION_TAGS (the module
+    # that creates the fibre sections), optionally extended by
+    # cfg['nonlinear_section_tags'] on the reviewed route. With no override this
+    # equals the former literal {SHS 701, beam 611, col1100 621, col1250 631}.
+    from components.model.section_tags import (
+        resolve_nonlinear_section_tags, validate_frame_mapping)
+    section_tags=resolve_nonlinear_section_tags(cfg,research=research)
+    if mode=='nonlinear':
+        # [REF NBC105-2025 §9.3.1] fail before element creation and list every
+        # ETABS frame section lacking a mapped nonlinear section.
+        validate_frame_mapping(data,cfg,section_tags,overrides=overrides,research=research)
     tag=100000; used_sections={}; element_map={}; element_labels={}
     for e in data['frames']:
         tag+=1; p=e['properties']

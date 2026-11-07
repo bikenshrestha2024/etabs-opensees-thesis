@@ -941,7 +941,7 @@ def main():
         Path(out).write_text(json.dumps(payload,indent=2,default=str),encoding="utf-8")
         with open(str(Path(out).with_suffix(".csv")),"w",newline="",encoding="utf-8-sig") as f:
             w=csv.DictWriter(f,fieldnames=FIELDS); w.writeheader(); w.writerows(rows)
-        messagebox.showinfo("Saved",f"Reviewed JSON and CSV saved.\\n{out}")
+        messagebox.showinfo("Saved",f"Reviewed JSON and CSV saved.\n{out}")
     def row_problems(r):
         problems=[]
         sec=str(r.get("assigned_section") or "").strip()
@@ -964,8 +964,8 @@ def main():
             messagebox.showerror("Approval blocked","This frame has no valid section assignment. Resolve it in ETABS first."); return
         problems=[p for p in row_problems({**r,"review_status":"APPROVED"}) if p!="review_status not APPROVED"]
         if problems:
-            messagebox.showerror("Approval blocked","Complete and verify these fields before approval:\\n\\n"+", ".join(problems)); return
-        if not messagebox.askyesno("Confirm section approval",f"Approve the reviewed properties for ALL frame objects assigned to '{sec}'?\\n\\nConfirm only after comparing section dimensions, material properties, A/Iy/Iz/J and units with ETABS."):
+            messagebox.showerror("Approval blocked","Complete and verify these fields before approval:\n\n"+", ".join(problems)); return
+        if not messagebox.askyesno("Confirm section approval",f"Approve the reviewed properties for ALL frame objects assigned to '{sec}'?\n\nConfirm only after comparing section dimensions, material properties, A/Iy/Iz/J and units with ETABS."):
             return
         copy_fields=["section_type","material_name","material_type_code","width_m","depth_m","tube_flange_thickness_m","tube_web_thickness_m","E_kN_m2","G_kN_m2","A_m2","Iy_m4","Iz_m4","J_m4"]
         count=0
@@ -1035,7 +1035,10 @@ def main():
         if unmapped: messagebox.showerror('Section mappings missing','Commit ETABS-to-OpenSeesPy mappings in the main program first:\n\n'+'\n'.join(unmapped[:20])); return
         if not Path(__file__).resolve().with_name('Define_Section_V109.py').exists():
             messagebox.showerror('Define_Section_V109.py missing','Keep Define_Section_V109.py beside this program.'); return
-        section_tags={'SHS_350x350x16_STEEL_FIBER':701,'RC_BEAM_600x800_FIBER':611,'RC_COLUMN_1100x1100_FIBER':621,'RC_COLUMN_1250x1250_FIBER':631}
+        # [REF components/sections/definitions.py SECTION_TAGS] exported script
+        # calls Define_Section_V109.define_all_fiber_sections, so use its tags.
+        from components.model.section_tags import default_section_tags
+        section_tags=default_section_tags()
         targets=sorted({mapping[str(secmap[str(e.get('etabs_object'))].get('assigned_section') or '')] for e in eligible if str(e.get('etabs_object')) not in device_assignments})
         unsupported=sorted(set(targets)-set(section_tags))
         if unsupported: messagebox.showerror('Unsupported target','Define_Section_V109.py lacks executable fiber sections for: '+', '.join(unsupported)); return
