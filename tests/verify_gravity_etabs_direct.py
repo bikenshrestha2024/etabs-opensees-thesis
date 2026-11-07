@@ -67,8 +67,8 @@ class GravityDirectAPITests(unittest.TestCase):
                     events.append(('open',path))
                     return 0
             class Sap:
-                File=File()
                 def GetModelFilename(self):return str(edb)
+            Sap.File=File()
             class Etabs:
                 SapModel=Sap()
                 def ApplicationStart(self):events.append(('start',));return 0
