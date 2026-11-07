@@ -158,7 +158,24 @@ class GravityDirectAPITests(unittest.TestCase):
                           'support_vertical_reaction_kN':100.}}))
             calls=[]
             class Analyze:
+                flags={'Dead':False,'Live':False,'RSX':True}
+                def GetRunCaseFlag(self):
+                    names=list(self.flags)
+                    return (len(names),names,[self.flags[k] for k in names],0)
+                def SetRunCaseFlag(self,name,enabled,all_cases=False):
+                    if all_cases:
+                        for k in self.flags:self.flags[k]=bool(enabled)
+                    else:
+                        self.flags[name]=bool(enabled)
+                    calls.append(('flag',name,bool(enabled),bool(all_cases)))
+                    return 0
+                def GetCaseStatus(self):
+                    names=list(self.flags)
+                    status=4 if 'run' in calls else 1
+                    return (len(names),names,[status if k in ('Dead','Live') else 1
+                                              for k in names],0)
                 def RunAnalysis(self):
+                    self.last_enabled=[k for k,v in self.flags.items() if v]
                     calls.append('run')
                     return 0
             class Sap:
@@ -189,11 +206,33 @@ class GravityDirectAPITests(unittest.TestCase):
                             launch_new_etabs=True,run_if_missing=True)
             self.assertEqual(before,sha256(source.read_bytes()).hexdigest())
             self.assertEqual(calls.count('run'),1)
+            self.assertEqual(App.SapModel.Analyze.last_enabled,['Dead','Live'])
             self.assertEqual(calls[-1],'closed')
             self.assertNotEqual(calls[0][1],source)
             self.assertEqual(comp['model_identity_status'],'WORKING_COPY_ANALYZED_FROM_SOURCE_EDB')
             self.assertFalse(comp['matched_edb_identity'])
             self.assertTrue((root/'out'/'ETABS_Gravity_Extraction.log').is_file())
+
+    def test_run_flags_exclude_all_seismic_cases_on_private_copy(self):
+        from unittest.mock import Mock
+        sap=Mock()
+        flags={'Dead':False,'Live':False,'EQX':True,'TH1':True}
+        def read_flags():
+            names=list(flags)
+            return len(names),names,[flags[k] for k in names],0
+        def set_flag(name,run,all_cases=False):
+            if all_cases:
+                for key in flags:flags[key]=bool(run)
+            else:flags[name]=bool(run)
+            return 0
+        sap.Analyze.GetRunCaseFlag.side_effect=read_flags
+        sap.Analyze.SetRunCaseFlag.side_effect=set_flag
+        events=[]
+        before,after=g._enable_gravity_cases_on_copy(
+            sap,lambda stage,msg,**fields:events.append(stage))
+        self.assertTrue(before['EQX'])
+        self.assertEqual([k for k,v in after.items() if v],['Dead','Live'])
+        self.assertIn('ETABS_RUN_FLAGS',events)
 
     def test_gravity_gui_run_missing_is_consent_gated(self):
         from pathlib import Path
