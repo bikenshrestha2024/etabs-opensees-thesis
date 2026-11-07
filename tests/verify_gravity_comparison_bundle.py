@@ -47,6 +47,22 @@ class GravityBundleTests(unittest.TestCase):
         self.assertTrue((self.root/"out"/second.stem/"EVIDENCE_MANIFEST.json").is_file())
         self.assertEqual(first_hash,hashlib.sha256(first.read_bytes()).hexdigest())
         self.assertEqual(original,hashlib.sha256(path.read_bytes()).hexdigest())
+    def test_bundle_always_exports_opensees_source_nodal_loads(self):
+        model={"nodes":{"1":[0,0,0]},
+               "unfactored_patterns":{"Dead":{"1":[0,0,-50,0,0,0]},
+                                     "Live":{"1":[0,0,-50,0,0,0]}}}
+        (self.export/"OpenSees_Complete_Model_Data_V118.json").write_text(
+            json.dumps(model),encoding="utf8")
+        audit,zip_path=export_bundle(self.export,self.gravity,self.root/"nodal")
+        with zipfile.ZipFile(zip_path) as archive:
+            keys=archive.namelist()
+            self.assertTrue(any(key.endswith(
+                "/opensees/OpenSees_Applied_Nodal_Gravity_By_Pattern.csv")
+                for key in keys))
+            self.assertTrue(any(key.endswith(
+                "/opensees/OpenSees_Applied_Nodal_Gravity_Summary.json")
+                for key in keys))
+
     def test_failure_not_mislabeled_as_good_evidence(self):
         self.sample["ok"]=False
         (self.gravity/"Gravity_Result_V110.json").write_text(json.dumps(self.sample))
