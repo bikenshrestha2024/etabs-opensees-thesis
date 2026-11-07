@@ -63,6 +63,27 @@ Omit `--etabs-json` when unavailable; the evidence ZIP will explicitly report th
 
 **Comparison acceptance remains blocked** until the actual source-model identity, gravity case, ETABS mass/weight, support restraints, stiffness modifiers, units, base reactions, common-node deflections, frame end actions and wall force resultants are reconciled. The generated bundle is only an evidence-capture workflow, not automatic verification or an NBC compliance certificate.
 
+## Direct ETABS API comparison in the existing gravity GUI
+
+The integrated `Extract ETABS + compare gravity` button uses the existing
+`Gravity_Result_V110.json` and the attached, already analyzed ETABS session.
+It first checks that the source EDB in the OpenSees export manifests is
+identical to the active ETABS source; checks that the user-selected LINEAR ADD
+gravity combination consists of exactly Dead(1.0) and Live(1.0); extracts a
+single concurrent global BaseReact FZ; checks source-case additivity; and reads
+individual restrained support reactions and displacements. It records missing
+supports, local joint axes, and cases without valid result rows as evidence
+gaps, never fabricating results.
+
+Results are written under
+`<gravity results>/Gravity_ETABS_OpenSees_Direct/` and automatically selected
+for the existing `Bundle gravity evidence ZIP` workflow. The comparison is
+immediate, but a successful global reaction check does not certify slab-beam-
+column-wall load distribution or matched displacement/member stiffness.
+
+No separate gravity API application is needed. See
+[gravity_etabs_direct.py](../source/components/validation/gravity_etabs_direct.py.md).
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
