@@ -404,10 +404,10 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
         record=dict(timestamp=datetime.now(timezone.utc).isoformat(),
                     stage=stage,message=str(message),**fields)
         with events.open('a',encoding='utf8') as stream:
-            stream.write(json.dumps(record,default=str,allow_nan=False)+'\\n')
+            stream.write(json.dumps(record,default=str,allow_nan=False)+'\n')
         line=f"[{record['timestamp']}] [{stage}] {message}"
         if fields:line+=' | '+json.dumps(fields,default=str,ensure_ascii=False)
-        with logfile.open('a',encoding='utf8') as stream:stream.write(line+'\\n')
+        with logfile.open('a',encoding='utf8') as stream:stream.write(line+'\n')
         if log_callback is not None:log_callback(line)
     # Retain separate .log and JSONL files for traceable API operations.
     logfile.write_text('',encoding='utf8')
