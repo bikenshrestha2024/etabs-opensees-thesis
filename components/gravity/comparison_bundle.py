@@ -34,6 +34,10 @@ FORCE_COLS = ("tag","N_i_kN","Vy_i_kN","Vz_i_kN","T_i_kNm","My_i_kNm","Mz_i_kNm"
               "N_j_kN","Vy_j_kN","Vz_j_kN","T_j_kNm","My_j_kNm","Mz_j_kNm")
 
 def digest(path):
+    """Compute source SHA256 without changing it.
+
+    [REF docs/review/GRAVITY_ETABS_COMPARISON.md] Source identity requirement.
+    """
     h=hashlib.sha256()
     with Path(path).open("rb") as f:
         for part in iter(lambda:f.read(1024*1024),b""):
@@ -52,6 +56,8 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                   max_file_mb=40):
     """Save an uploadable ZIP and an uncompressed evidence folder.
 
+    [REF docs/review/GRAVITY_ETABS_COMPARISON.md] Required same-model case evidence.
+    [REF components/validation/etabs_comparison.py collect] No inferred equality.
     Mandatory field presence is audited; absent ETABS results remain MISSING.
     Model and limit-state comparison must be reviewed independently.
     """
@@ -167,6 +173,10 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
     return audit,zip_path
 
 def main(argv=None):
+    """Run the read-only evidence bundler via CLI.
+
+    [REF docs/source/components/gravity/comparison_bundle.py.md] CLI contract.
+    """
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--export-dir",required=True)
     p.add_argument("--gravity-dir",required=True)
