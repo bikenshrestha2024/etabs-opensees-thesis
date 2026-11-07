@@ -198,6 +198,50 @@ shows `1. DL + LL` Base Reaction FZ = **311367.3139 kN**, versus OpenSees
 but those files are not yet established as identical source models.
 ETABS direct OAPI extraction must preserve explicit model provenance.
 
+## Node-by-node gravity load and reaction discrepancies
+
+The built-in ETABS direct comparison now produces **two distinct source-grounded
+datasets**, because applied nodal gravity load and support reaction are NOT
+physically interchangeable:
+
+1. `OpenSees_Applied_Nodal_Gravity_By_Pattern.csv` and its summary JSON:
+   actual generated OpenSees nodal forces by source load pattern from
+   `OpenSees_Complete_Model_Data_V118.json`. Full gravity uses 1.0 factors,
+   including Roof Live if assigned; the exported file includes applied FZ and
+   nodal XYZ. ETABS frame/area pressure load assignments may distribute forces
+   through elements, so these numbers cannot simply be matched to raw ETABS
+   point load assignments.
+2. `Gravity_Node_Reaction_Comparison.json`,
+   `Gravity_All_Support_Nodes.csv`, `Gravity_Top_Node_Discrepancies.csv`,
+   and `Gravity_Node_Reaction_Comparison.xlsx`: actual ETABS versus OpenSees
+   support reactions matched by *global XYZ location*, never by raw node tags.
+   Uses 0.01 m tolerance, one-to-one matching, and missing/ambiguous record
+   gates. Shows the largest verified differences in kN and percentages.
+   The GUI displays up to five top matched discrepancies.
+
+ETABS JointReact F3 is a **point-local** result. The new extractor records
+PointObj.GetLocalAxes; only verified unrotated default local axes permit F3
+to be treated as global vertical RZ. Nonzero or unavailable angles remain
+unverified and cannot produce a ranked force difference. Also, mismatched
+joint numbers (e.g. ETABS 76 support records versus OpenSees 97) are not
+automatically paired, merged or assigned zero reaction.
+
+**Engineering triage for highest-error matched supports:** first inspect
+location/nearest column or wall, boundary restraint, axial force and
+wall/beam connectivity; next source self-weight, effective member lengths,
+slab mesh and line/area load patterns; then openings, coupling-beam loads,
+diaphragm vertical constraints and frame/shell stiffness. This is a
+diagnostic checklist, **not a claimed root cause** without project evidence.
+To establish which *applied* ETABS node/element load causes an error, obtain
+native ETABS element load assignments and internal shell/frame results,
+including ETABS mesh-to-object mapping. A correct global reaction sum can
+coexist with incorrect force distribution.
+
+The uploaded screenshot total remains ETABS 311367.3139 kN against
+OpenSees 320047.788933 kN. No reliable worst-node ranking exists until the
+live ETABS API extraction succeeds. These new reports are designed to
+produce that evidence, not to infer per-node discrepancies from global totals.
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
