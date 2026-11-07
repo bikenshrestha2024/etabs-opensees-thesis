@@ -54,6 +54,57 @@ class GravityDirectAPITests(unittest.TestCase):
         self.assertIn('self.allow_alternate_edb',src)
         self.assertIn('messagebox.askyesno',src)
 
+    def test_owned_etabs_new_instance_is_closed_on_success_and_failure(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        with TemporaryDirectory() as temp:
+            edb=Path(temp)/'Gravity.EDB'
+            edb.write_bytes(b'test model')
+            events=[]
+            class File:
+                def OpenFile(self,path):
+                    events.append(('open',path))
+                    return 0
+            class Sap:
+                File=File()
+                def GetModelFilename(self):return str(edb)
+            class Etabs:
+                SapModel=Sap()
+                def ApplicationStart(self):events.append(('start',));return 0
+                def ApplicationExit(self,save):events.append(('exit',save));return 0
+            class Helper:
+                def CreateObjectProgID(self,name):
+                    events.append(('create',name));return Etabs()
+            class Client:
+                def CreateObject(self,name):
+                    self.last=name
+                    return Helper()
+            import sys
+            from types import ModuleType
+            fake=ModuleType('comtypes')
+            fake.client=Client()
+            with patch.dict(sys.modules,{'comtypes':fake,'comtypes.client':fake.client}):
+                instance=g._new_etabs_instance(edb)
+                self.assertIsInstance(instance,Etabs)
+                g._release_owned_instance(instance)
+                self.assertEqual(events[-1],('exit',False))
+            events.clear()
+            class BadFile:
+                def OpenFile(self,path):return 12
+            Sap.File=BadFile()
+            with patch.dict(sys.modules,{'comtypes':fake,'comtypes.client':fake.client}):
+                with self.assertRaisesRegex(RuntimeError,'OpenFile'):
+                    g._new_etabs_instance(edb)
+                self.assertEqual(events[-1],('exit',False))
+
+    def test_default_gui_uses_owned_process(self):
+        from pathlib import Path
+        gui=(Path(__file__).resolve().parents[1]/
+             'components/gravity/gui_and_reports.py').read_text('utf-8')
+        self.assertIn('self.launch_etabs_for_gravity = tk.BooleanVar(value=True)',gui)
+        self.assertIn('launch_new_etabs=bool(self.launch_etabs_for_gravity.get())',gui)
+
     def test_exact_base_row_no_envelope(self):
         rows=[dict(LoadCase='X',StepType='',StepNum=0,FZ=40)]
         self.assertEqual(g._exact_one(rows,'X')['FZ'],40)
