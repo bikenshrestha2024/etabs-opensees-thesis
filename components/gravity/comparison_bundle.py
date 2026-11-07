@@ -1,0 +1,185 @@
+"""Package existing gravity evidence for reproducible ETABS vs OpenSees comparison.
+
+READ ONLY on source files. Does not launch ETABS/OpenSees or infer missing values.
+"""
+from __future__ import annotations
+import argparse
+import csv
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import tempfile
+import zipfile
+
+SELECTED = (
+    "OpenSees_Complete_Export_Report_V118.json",
+    "OpenSees_Complete_Model_Config_V118.json",
+    "OpenSees_Complete_Model_Data_V118.json",
+    "OpenSees_Load_Conversion_Audit.json",
+    "LOAD_PATH_AND_DIAPHRAGM_AUDIT_V130.json",
+    "Gravity_Storey_Load_Breakdown_V131.csv",
+    "Gravity_Source_Load_Detail_V131.csv",
+    "Gravity_Profile_ULS.json",
+    "Gravity_Profile_SLS.json",
+    "OpenSees_Complete_Gravity_Check_V118.json",
+    "Gravity_Beam_End_Actions_ULS_V141.csv",
+    "Gravity_Beam_End_Actions_SLS_V141.csv",
+)
+EXTRA = ("Gravity_Result_V110.json", "Gravity_Run_V110.log")
+NODE_COLS = ("tag","x_m","y_m","z_m","ux_m","uy_m","uz_m","rx_rad","ry_rad","rz_rad")
+REACT_COLS = ("node_tag","rx_kN","ry_kN","rz_kN")
+FORCE_COLS = ("tag","N_i_kN","Vy_i_kN","Vz_i_kN","T_i_kNm","My_i_kNm","Mz_i_kNm",
+              "N_j_kN","Vy_j_kN","Vz_j_kN","T_j_kNm","My_j_kNm","Mz_j_kNm")
+
+def digest(path):
+    h=hashlib.sha256()
+    with Path(path).open("rb") as f:
+        for part in iter(lambda:f.read(1024*1024),b""):
+            h.update(part)
+    return h.hexdigest()
+
+def _csv(path, rows, cols):
+    with path.open("w",encoding="utf-8-sig",newline="") as f:
+        w=csv.DictWriter(f,fieldnames=cols,extrasaction="ignore")
+        w.writeheader();w.writerows(rows)
+
+def _safe_relative(path, root):
+    return path.resolve().is_relative_to(root.resolve())
+
+def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
+                  max_file_mb=40):
+    """Save an uploadable ZIP and an uncompressed evidence folder.
+
+    Mandatory field presence is audited; absent ETABS results remain MISSING.
+    Model and limit-state comparison must be reviewed independently.
+    """
+    export_dir=Path(export_dir).expanduser().resolve()
+    gravity_dir=Path(gravity_dir).expanduser().resolve()
+    output_dir=Path(output_dir).expanduser().resolve()
+    if not export_dir.is_dir() or not gravity_dir.is_dir():
+        raise FileNotFoundError("Select existing ETABS-export and OpenSees gravity-result directories")
+    if output_dir in (export_dir,gravity_dir):
+        raise ValueError("Use a dedicated comparison output subfolder, not the source root")
+    if not output_dir.is_relative_to(export_dir) and not output_dir.is_relative_to(gravity_dir):
+        # Other output locations (e.g. D:/Thesis/Gravity_Comparison) are permitted.
+        pass
+    if not isinstance(max_file_mb,(int,float)) or max_file_mb<=0:
+        raise ValueError("max_file_mb must be positive")
+    result=gravity_dir/"Gravity_Result_V110.json"
+    if not result.is_file():
+        raise FileNotFoundError("OpenSees gravity result missing: "+str(result))
+    payload=json.loads(result.read_text(encoding="utf-8-sig"))
+    if not isinstance(payload,dict):
+        raise ValueError("Gravity_Result_V110.json must contain a JSON object")
+    if not payload.get("ok"):
+        raise ValueError("Gravity result does not report a successful solver run; preserve failure log separately")
+    if etabs_json is not None:
+        etabs_json=Path(etabs_json).expanduser().resolve()
+        if not etabs_json.is_file() or etabs_json.suffix.lower()!=".json":
+            raise FileNotFoundError("Selected ETABS result JSON missing")
+        # Prevent importing an unrelated arbitrary source file through guesswork.
+        doc=json.loads(etabs_json.read_text(encoding="utf-8-sig"))
+        if not isinstance(doc,dict):
+            raise ValueError("ETABS JSON must be an object")
+    # Build in staging area; existing bundle is never overwritten by failed exports.
+    output_dir.mkdir(parents=True,exist_ok=True)
+    dest=output_dir/"Gravity_ETABS_OpenSees_Evidence"
+    if dest.exists():
+        raise FileExistsError("Comparison evidence directory already exists; choose a fresh output location: "+str(dest))
+    files=[];missing=[];oversize=[]
+    with tempfile.TemporaryDirectory(prefix="gravity_bundle_",dir=output_dir) as tmp:
+        stage=Path(tmp)/"Gravity_ETABS_OpenSees_Evidence"
+        stage.mkdir()
+        def add(src,arc,required=False):
+            src=Path(src)
+            if not src.is_file():
+                missing.append({"file":arc,"required":required})
+                return False
+            if src.stat().st_size>max_file_mb*1024*1024:
+                oversize.append({"file":arc,"size_bytes":src.stat().st_size,
+                                 "sha256":digest(src),"original_path":str(src)})
+                return False
+            target=stage/arc
+            target.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copy2(src,target)
+            files.append({"file":arc,"source":str(src),"bytes":src.stat().st_size,
+                          "sha256":digest(src)})
+            return True
+        for name in SELECTED:
+            add(export_dir/name,"source/"+name)
+        for name in EXTRA:
+            add(gravity_dir/name,"opensees/"+name,required=name=="Gravity_Result_V110.json")
+        if etabs_json:
+            add(etabs_json,"etabs/etabs_gravity.json",required=True)
+        else:
+            missing.append({"file":"etabs/etabs_gravity.json","required":True,
+                            "reason":"No ETABS gravity JSON selected"})
+        for key,cols in (("nodes",NODE_COLS),("reactions",REACT_COLS),("local_forces",FORCE_COLS)):
+            entries=payload.get(key)
+            if not isinstance(entries,list) or not entries:
+                missing.append({"file":f"opensees/{key}.csv","required":True,
+                                "reason":"Gravity JSON lacks nonempty "+key})
+            else:
+                if any(not isinstance(x,dict) for x in entries):
+                    raise ValueError(key+" requires list of objects")
+                _csv(stage/"opensees"/(key+".csv"),entries,cols)
+        if isinstance(payload.get("reactions"),list) and payload["reactions"]:
+            try:
+                rz=sum(float(x["rz_kN"]) for x in payload["reactions"])
+                applied=float(payload["report"].get("applied_vertical_load_kN",
+                          payload["report"].get("total_downward_load_kN")))
+                error=abs(rz-applied)/abs(applied)*100 if applied else None
+            except (KeyError,TypeError,ValueError,ZeroDivisionError):
+                rz=applied=error=None
+        else:
+            rz=applied=error=None
+        model=export_dir/"OpenSees_Complete_Model_Data_V118.json"
+        model_hash=digest(model) if model.is_file() else None
+        audit={"schema":"gravity-comparison-evidence-v1",
+               "status":"EVIDENCE_EXPORT_ONLY_NOT_ENGINEERING_EQUIVALENCE",
+               "source_export_dir":str(export_dir),"source_gravity_dir":str(gravity_dir),
+               "source_model_sha256":model_hash,"source_etabs_json":str(etabs_json) if etabs_json else None,
+               "source_files":files,"missing":missing,"oversize_skipped":oversize,
+               "node_count":len(payload.get("nodes",[])) if isinstance(payload.get("nodes"),list) else None,
+               "reaction_count":len(payload.get("reactions",[])) if isinstance(payload.get("reactions"),list) else None,
+               "beam_local_force_records":len(payload.get("local_forces",[])) if isinstance(payload.get("local_forces"),list) else None,
+               "openSees_support_rz_kN":rz,"openSees_expected_applied_kN":applied,
+               "openSees_equilibrium_error_pct":error,
+               "compare_verified":False,
+               "limitations":["File presence and source hashes do not prove a matching EDB, load combination, stiffness or coordinate convention.",
+                              "Local beam force responses require compatible tags/local-axis definitions.",
+                              "Shell forces, wall section forces, detailed applied patterns and ETABS per-story reactions are missing unless separately supplied."]}
+        (stage/"EVIDENCE_MANIFEST.json").write_text(json.dumps(audit,indent=2,allow_nan=False),encoding="utf-8")
+        (stage/"README_UPLOAD_FIRST.txt").write_text(
+            "Upload Gravity_ETABS_OpenSees_Evidence.zip for comparison.\n"
+            "Include native ETABS gravity JSON with the same load case.\n"
+            "Inspect EVIDENCE_MANIFEST.json for MISSING and SKIPPED files.\n"
+            "No missing physical responses are inferred.\n",encoding="utf8")
+        zip_path=output_dir/"Gravity_ETABS_OpenSees_Evidence.zip"
+        if zip_path.exists():
+            raise FileExistsError("ZIP already exists; choose a fresh output directory: "+str(zip_path))
+        with zipfile.ZipFile(zip_path,"w",compression=zipfile.ZIP_DEFLATED) as z:
+            for file in stage.rglob("*"):
+                if file.is_file(): z.write(file,file.relative_to(stage.parent).as_posix())
+        stage.rename(dest)
+    return audit,zip_path
+
+def main(argv=None):
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--export-dir",required=True)
+    p.add_argument("--gravity-dir",required=True)
+    p.add_argument("--output-dir",required=True)
+    p.add_argument("--etabs-json")
+    p.add_argument("--max-file-mb",type=float,default=40)
+    a=p.parse_args(argv)
+    report,archive=export_bundle(a.export_dir,a.gravity_dir,a.output_dir,
+                                 etabs_json=a.etabs_json,max_file_mb=a.max_file_mb)
+    print(json.dumps({"zip":str(archive),"missing":len(report["missing"]),
+                      "oversize":len(report["oversize_skipped"]),
+                      "comparison_verified":False},indent=2))
+    return 0
+
+if __name__=="__main__":
+    raise SystemExit(main())
