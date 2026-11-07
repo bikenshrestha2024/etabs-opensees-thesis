@@ -41,6 +41,9 @@ on:
       - 'tests/verify_nbc105_2025_nltha.py'
       - 'components/nonlinear_time_history/thesis_quality.py'
       - 'components/model/assembly.py'
+      - 'components/gravity/comparison_bundle.py'
+      - 'components/gravity/gui_and_reports.py'
+      - 'tests/verify_gravity_comparison_bundle.py'
       - 'components/nonlinear_time_history/research_building_materials.py'
       - 'tests/verify_project_wall_material_gate.py'
       - 'components/nonlinear_time_history/wall_diagnostics.py'
@@ -233,6 +236,7 @@ jobs:
           python tests/verify_thesis_nltha_quality.py
           python tests/verify_v169_wall_triage_evidence.py
           python tests/verify_device_parameter_finiteness.py
+          python tests/verify_gravity_comparison_bundle.py
           python tests/verify_documentation_coverage.py
           python tests/verify_active_repository_audit.py
           python tests/verify_review_ledger.py
