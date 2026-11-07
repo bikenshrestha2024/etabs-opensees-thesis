@@ -10,6 +10,8 @@ import csv
 import hashlib
 import json
 import math
+import traceback
+from datetime import datetime, timezone
 from pathlib import Path
 
 UNITS_KN_M_C=6
@@ -114,14 +116,16 @@ def _point_position(sap,point):
     if len(restraint)!=6:raise ValueError('Incomplete restraint for '+point)
     return [float(x),float(y),float(z)],[bool(x) for x in restraint]
 
-def extract_from_sap(sap,case='1. DL + LL',source_edb=None,allow_alternate_edb=False):
+def extract_from_sap(sap,case='1. DL + LL',source_edb=None,allow_alternate_edb=False,log=None):
     """Get exactly one full-gravity concurrent result, without changing ETABS model.
 
     [REF components/validation/etabs_direct_api.py extract_from_sap] Restores
     original display units and result-selection state on success/failure.
     [REF docs/review/GRAVITY_ETABS_COMPARISON.md] Require exact model and case.
     """
+    log=log or (lambda stage,message,**kw:None)
     selected=Path(str(sap.GetModelFilename())).resolve()
+    log('ETABS_MODEL','Read ETABS active model',path=str(selected))
     source_path=Path(source_edb).resolve() if source_edb else None
     differs=bool(source_path and selected!=source_path)
     if differs and not allow_alternate_edb:
@@ -135,18 +139,39 @@ def extract_from_sap(sap,case='1. DL + LL',source_edb=None,allow_alternate_edb=F
     if not selected.is_file():
         raise FileNotFoundError('Active ETABS EDB unavailable: '+str(selected))
     state=_snapshot(sap)
+    log('ETABS_SELECTION','Captured display units and selected output cases',
+        units=state['units'],cases_count=len(state['cases']),
+        combos_count=len(state['combos']))
     if case not in [x for x,_ in state['combos']]:
         raise ValueError('Required gravity combination not found: '+str(case))
     result=None
     try:
         _out((sap.SetPresentUnits(UNITS_KN_M_C),),0,'SetPresentUnits')
         components=_combo(sap,case)
-        statuses=_get_case_status(sap)
-        for c in components:
-            if statuses.get(c['name'])!=4:
-                raise RuntimeError('Analyze Dead and Live in ETABS first: '+c['name'])
+        log('ETABS_COMBO','Confirmed linear additive gravity combination',
+            combo=case,components=components)
+        # GetCaseStatus is advisory: ETABS can report incomplete or different
+        # status codes after reopening a copy, even when valid saved result
+        # arrays are available. Real BaseReact rows are the authoritative gate.
+        try:
+            statuses=_get_case_status(sap)
+            log('ETABS_CASE_STATUS','Read analysis case status (advisory only)',
+                selected_case_status={c['name']:statuses.get(c['name']) for c in components},
+                status_note='Only actual finite result rows are used to establish availability')
+        except Exception as exc:
+            log('ETABS_CASE_STATUS_WARNING','Could not read analysis status; checking real results',error=str(exc))
+            statuses={}
         _select(sap,case,True)
-        base=_exact_one(_base(sap,case),case,label='BaseReact')
+        log('ETABS_RESULTS','Selecting existing gravity combination output',combo=case)
+        try:
+            base=_exact_one(_base(sap,case),case,label='BaseReact')
+        except Exception as exc:
+            raise RuntimeError('ETABS gravity combination has no usable BaseReact results for '+case+
+                '; verify Dead and Live have been analyzed and the combo exists. '
+                'API status='+str({c['name']:statuses.get(c['name']) for c in components})+
+                '; result error='+str(exc)) from exc
+        log('ETABS_BASE_REACTION','Read global combination base reaction',
+            FZ_kN=base.get('FZ'),step=base.get('StepType'),step_number=base.get('StepNum'))
         if str(base['StepType']).casefold() in ('max','min','envelope'):
             raise ValueError('Envelope reaction is not a simultaneous gravity state')
         base_vertical=_finite(base['FZ'],'BaseReact FZ')
@@ -154,12 +179,20 @@ def extract_from_sap(sap,case='1. DL + LL',source_edb=None,allow_alternate_edb=F
         component_rows=[]
         for c in components:
             _select(sap,c['name'])
-            v=_exact_one(_base(sap,c['name']),c['name'],label='component BaseReact')
+            try:
+                v=_exact_one(_base(sap,c['name']),c['name'],label='component BaseReact')
+            except Exception as exc:
+                raise RuntimeError('Missing saved ETABS BaseReact results for case '+c['name']+
+                    '; API status='+str(statuses.get(c['name']))+
+                    '; actual result='+str(exc)) from exc
+            log('ETABS_COMPONENT_REACTION','Read load case base reaction',
+                case=c['name'],FZ_kN=v.get('FZ'),scale=c['factor'])
             component_rows.append(dict(case=c['name'],factor=c['factor'],
                                        base_FZ_kN=_finite(v['FZ'],'FZ'),
                                        weighted_FZ_kN=c['factor']*_finite(v['FZ'],'FZ')))
         _select(sap,case,True)
         points=_names(sap.PointObj,'PointObj')
+        log('ETABS_POINTS','Inventory ETABS point objects',count=len(points))
         supports=[];reaction_rows=[];displacements=[];errors=[]
         for name in points:
             try:
@@ -189,7 +222,14 @@ def extract_from_sap(sap,case='1. DL + LL',source_edb=None,allow_alternate_edb=F
                     **{key:_finite(d[key],key) for key in ('U1','U2','U3','R1','R2','R3')}))
             except Exception as exc:
                 errors.append(dict(stage='JointDispl',point=name,error=str(exc)))
+        log('ETABS_SUPPORTS','Finished restrained point reaction/displacement extraction',
+            points_scanned=len(points),restrained_points=len(supports),
+            reaction_records=len(reaction_rows),displacement_records=len(displacements),
+            error_count=len(errors),error_samples=errors[:6])
         components_total=sum(c['weighted_FZ_kN'] for c in component_rows)
+        log('ETABS_EQUILIBRIUM','Compare Dead+Live case sums with linear combination',
+            combo_FZ_kN=base_vertical,case_sum_FZ_kN=components_total,
+            delta_kN=components_total-base_vertical)
         delta=components_total-base_vertical
         return dict(schema='ETABS_GRAVITY_DIRECT_V1',source_edb=str(selected),case=case,
             source_model_edb=str(source_path) if source_path else None,
@@ -345,39 +385,92 @@ def _release_owned_instance(instance):
             raise RuntimeError('Owned ETABS ApplicationExit(False) returned '+str(code))
 
 
-def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_dir=None,allow_alternate_edb=False,launch_new_etabs=False,etabs_edb_path=None,etabs_exe_path=None):
+def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_dir=None,allow_alternate_edb=False,launch_new_etabs=False,etabs_edb_path=None,etabs_exe_path=None,log_callback=None):
     """Read attached ETABS EDB and compare with existing gravity JSON.
 
     [REF components/validation/etabs_direct_api.py connect_and_extract] Existing
     read-only ETABS connector; no model opening, saving or analysis.
     """
     from OpenSees_Project_Inputs_V123 import connect_etabs
-    import json
-    folder=Path(export_dir)
     from components.inputs.project_workbooks import _source_edb_path
-    source=_source_edb_path(folder)
-    if not source:raise ValueError('Export lacks source EDB identity; re-export rather than guessing')
-    if not Path(source).is_file():raise FileNotFoundError('ETABS source EDB path is inaccessible: '+source)
+    folder=Path(export_dir)
     gravity=Path(gravity_result_path)
-    if not gravity.is_file():raise FileNotFoundError('OpenSees gravity JSON missing: '+str(gravity))
-    # The isolated process mode is preferred: no ROT/GetActiveObject attach
-    # and no possibility of closing the user's existing ETABS window.
-    if launch_new_etabs:
-        selected=Path(etabs_edb_path).expanduser().resolve() if etabs_edb_path else Path(source).resolve()
-        if not selected.is_file():
-            raise FileNotFoundError('Selected gravity EDB missing: '+str(selected))
-        if selected!=Path(source).resolve() and not allow_alternate_edb:
-            raise ValueError('Selected ETABS gravity EDB differs from export source; explicitly approve diagnostic alternate-model mode')
-        app=_new_etabs_instance(selected,exe_path=etabs_exe_path)
-    else:
-        app=connect_etabs()
+    out=Path(output_dir or gravity.parent/'Gravity_ETABS_OpenSees_Direct')
+    out.mkdir(parents=True,exist_ok=True)
+    logfile=out/'ETABS_Gravity_Extraction.log'
+    events=out/'ETABS_Gravity_Extraction_Events.jsonl'
+    def report(stage,message,**fields):
+        """Persist events even if ETABS raises before the comparison is exported."""
+        record=dict(timestamp=datetime.now(timezone.utc).isoformat(),
+                    stage=stage,message=str(message),**fields)
+        with events.open('a',encoding='utf8') as stream:
+            stream.write(json.dumps(record,default=str,allow_nan=False)+'\\n')
+        line=f"[{record['timestamp']}] [{stage}] {message}"
+        if fields:line+=' | '+json.dumps(fields,default=str,ensure_ascii=False)
+        with logfile.open('a',encoding='utf8') as stream:stream.write(line+'\\n')
+        if log_callback is not None:log_callback(line)
+    # Retain separate .log and JSONL files for traceable API operations.
+    logfile.write_text('',encoding='utf8')
+    events.write_text('',encoding='utf8')
+    report('START','Begin ETABS/OpenSees direct gravity comparison',
+           case=case,launch_new_etabs=bool(launch_new_etabs),
+           allow_alternate_edb=bool(allow_alternate_edb),
+           gravity_json=str(gravity),source_export_folder=str(folder))
+    app=None;owned=False
     try:
-        data=extract_from_sap(app.SapModel,case,source_edb=source,
-                              allow_alternate_edb=allow_alternate_edb)
-        result=json.loads(gravity.read_text(encoding='utf-8-sig'))
-        comp=compare_existing(data,result)
-        out=export_direct(output_dir or gravity.parent/'Gravity_ETABS_OpenSees_Direct',data,comp)
-        return comp,out
-    finally:
+        source=_source_edb_path(folder)
+        if not source:raise ValueError('Export lacks source EDB identity; re-export rather than guessing')
+        report('SOURCE_EDB','Read original EDB from OpenSees export',path=str(source))
+        if not Path(source).is_file():
+            raise FileNotFoundError('ETABS source EDB inaccessible: '+str(source))
+        if not gravity.is_file():
+            raise FileNotFoundError('OpenSees gravity JSON missing: '+str(gravity))
         if launch_new_etabs:
-            _release_owned_instance(app)
+            selected=Path(etabs_edb_path).expanduser().resolve() if etabs_edb_path else Path(source).resolve()
+            if not selected.is_file():
+                raise FileNotFoundError('Selected gravity EDB missing: '+str(selected))
+            if selected!=Path(source).resolve() and not allow_alternate_edb:
+                raise ValueError('Different gravity-copy EDB requires explicit diagnostic approval')
+            report('ETABS_LAUNCH','Launching private ETABS instance',edb=str(selected),
+                   executable=str(etabs_exe_path or 'registered ETABS COM'))
+            app=_new_etabs_instance(selected,exe_path=etabs_exe_path)
+            owned=True
+            report('ETABS_OPEN','Private ETABS instance opened expected EDB',edb=str(selected))
+        else:
+            report('ETABS_ATTACH','Connecting to already-open ETABS session')
+            app=connect_etabs()
+            report('ETABS_ATTACH','Connected; this ETABS instance will not be closed')
+        data=extract_from_sap(app.SapModel,case,source_edb=source,
+                              allow_alternate_edb=allow_alternate_edb,log=report)
+        result=json.loads(gravity.read_text(encoding='utf-8-sig'))
+        report('OPENSEES_RESULT','Loaded OpenSees gravity results',
+               profile=result.get('gravity_profile'),ok=result.get('ok'))
+        comp=compare_existing(data,result)
+        report('DIRECT_COMPARISON','Compared ETABS global FZ and OpenSees support RZ',
+               etabs_FZ_kN=comp['etabs_base_FZ_kN'],
+               opensees_RZ_kN=comp['opensees_support_FZ_kN'],
+               difference_kN=comp['difference_kN'],
+               difference_percent=comp['percent_difference'],
+               identity_status=comp['model_identity_status'])
+        export_direct(out,data,comp)
+        report('EXPORT','Saved gravity comparison evidence',
+               output=str(out),json='etabs_gravity.json',
+               note='Individual point reaction values remain in local axes')
+        return comp,out
+    except Exception as exc:
+        report('FAILED','Direct ETABS gravity comparison failed',
+               error_type=type(exc).__name__,error=str(exc),
+               traceback=traceback.format_exc())
+        raise
+    finally:
+        if owned:
+            try:
+                report('ETABS_CLOSE','Closing only privately launched ETABS instance, no save')
+                _release_owned_instance(app)
+                report('ETABS_CLOSE','Private ETABS instance closed without saving')
+            except Exception as exc:
+                report('ETABS_CLOSE_ERROR','Unable to verify private ETABS close',
+                       error_type=type(exc).__name__,error=str(exc))
+                raise
+        report('END','ETABS direct gravity operation ended',
+               log=str(logfile),events=str(events))
