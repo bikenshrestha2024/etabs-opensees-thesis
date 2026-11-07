@@ -85,6 +85,9 @@ class GravityAnalysisGUI:
         self.etabs_gravity_json_var = tk.StringVar(value="")
         self.etabs_case_var = tk.StringVar(value="1. DL + LL")
         self.allow_alternate_edb = tk.BooleanVar(value=False)
+        self.launch_etabs_for_gravity = tk.BooleanVar(value=True)
+        self.etabs_edb_path = tk.StringVar(value="")
+        self.etabs_exe_path = tk.StringVar(value="")
         self.python_var = tk.StringVar(value=sys.executable)
         self.support_var = tk.StringVar()
         self.load_var = tk.StringVar()
@@ -149,9 +152,9 @@ class GravityAnalysisGUI:
                 raise FileNotFoundError("Run OpenSees full-gravity analysis first: "+str(gravity))
             if self.gravity_profile_var.get()!="GRAVITY_1.0D_1.0L":
                 raise ValueError("Direct gravity comparison requires GRAVITY_1.0D_1.0L")
-            # Run OAPI on the GUI main thread: do not move a COM interface
-            # across Tk worker threads. Local ETABS session is left analyzed.
-            self.status_var.set("Reading active ETABS; model remains unchanged…")
+            # COM runs on the main Tk thread. Owned ETABS instances are closed
+            # in the direct API finally block, leaving user's ETABS untouched.
+            self.status_var.set("Opening dedicated ETABS EDB and reading gravity results…")
             self.win.update_idletasks()
             comparison_out=gravity.parent/"Gravity_ETABS_OpenSees_Direct"
             alternate=bool(self.allow_alternate_edb.get())
@@ -165,7 +168,10 @@ class GravityAnalysisGUI:
                 return
             comp,out=connect_and_compare(model.parent,gravity,
                               case=self.etabs_case_var.get().strip(),output_dir=comparison_out,
-                              allow_alternate_edb=alternate)
+                              allow_alternate_edb=alternate,
+                              launch_new_etabs=bool(self.launch_etabs_for_gravity.get()),
+                              etabs_edb_path=self.etabs_edb_path.get().strip() or None,
+                              etabs_exe_path=self.etabs_exe_path.get().strip() or None)
             self.etabs_gravity_json_var.set(str(out/"etabs_gravity.json"))
             self.status_var.set("Direct gravity comparison saved: "+str(out))
             note=(f"ETABS FZ = {comp['etabs_base_FZ_kN']:.3f} kN\\n"
@@ -304,6 +310,15 @@ class GravityAnalysisGUI:
         ttk.Label(case_row,text="ETABS exact gravity combination").pack(side="left",padx=(0,6))
         ttk.Entry(case_row,textvariable=self.etabs_case_var,width=32).pack(side="left")
         ttk.Label(case_row,text="Existing LINEAR ADD: Dead(1) + Live(1)",wraplength=420).pack(side="left",padx=8)
+        ttk.Checkbutton(form,
+          text="Open ETABS in a new dedicated instance; close after comparison WITHOUT saving (recommended)",
+          variable=self.launch_etabs_for_gravity).pack(anchor="w",pady=(2,4))
+        self._path_row(form, "EDB to open (blank = exact source EDB)", self.etabs_edb_path,
+                       lambda:self._browse_file(self.etabs_edb_path,
+                           "Choose analyzed ETABS gravity model", [("ETABS model","*.edb")]))
+        self._path_row(form, "ETABS.exe (optional; blank = registered ETABS)", self.etabs_exe_path,
+                       lambda:self._browse_file(self.etabs_exe_path,
+                           "Select ETABS.exe", [("ETABS executable","*.exe")]))
         ttk.Checkbutton(form,
           text="Use a separately saved ETABS gravity-copy EDB (diagnostic only; model equivalence UNVERIFIED)",
           variable=self.allow_alternate_edb).pack(anchor="w",pady=(2,4))
