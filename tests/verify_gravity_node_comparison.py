@@ -56,6 +56,24 @@ class GravityNodeAuditTests(unittest.TestCase):
         report=compare_support_nodes(self.etabs,self.os,tolerance_m=.01)
         self.assertEqual(report['valid_one_to_one_global_z_count'],1)
         self.assertGreater(report['opensees_unmatched_count'],0)
+    def test_source_pattern_nodal_load_export_is_separate_from_reactions(self):
+        import json
+        from components.validation.gravity_node_comparison import export_opensees_applied_nodal_loads
+        with tempfile.TemporaryDirectory() as root:
+            folder=Path(root)
+            data=dict(nodes={'1':[0,0,0],'2':[3,0,3]},
+                unfactored_patterns={
+                    'Self Weight':{'1':[0,0,-100,0,0,0]},
+                    'Live':{'2':[0,0,-30,0,0,0]},
+                    'Roof Live':{'2':[0,0,-10,0,0,0]}})
+            source=folder/'model.json'
+            source.write_text(json.dumps(data),encoding='utf8')
+            summary=export_opensees_applied_nodal_loads(source,folder/'out')
+            self.assertEqual(summary['vertical_applied_kN_by_pattern']['Live'],-30)
+            self.assertEqual(summary['vertical_applied_kN_by_pattern']['Roof Live'],-10)
+            self.assertEqual(summary['profile'],'GRAVITY_1.0D_1.0L')
+            self.assertTrue((folder/'out'/'OpenSees_Applied_Nodal_Gravity_By_Pattern.csv').is_file())
+
     def test_disallows_unsupported_matching_tolerance(self):
         with self.assertRaises(ValueError):
             compare_support_nodes(self.etabs,self.os,tolerance_m=2)
