@@ -36,13 +36,17 @@ class GravityBundleTests(unittest.TestCase):
             self.assertTrue(any(s.endswith("/opensees/reactions.csv") for s in names))
             self.assertTrue(any(s.endswith("/opensees/local_forces.csv") for s in names))
             self.assertTrue(any(s.endswith("/EVIDENCE_MANIFEST.json") for s in names))
-    def test_preserves_source_and_refuses_overwrite(self):
+    def test_preserves_source_and_versions_without_overwrite(self):
         path=self.gravity/"Gravity_Result_V110.json"
         original=hashlib.sha256(path.read_bytes()).hexdigest()
-        export_bundle(self.export,self.gravity,self.root/"out")
+        _,first=export_bundle(self.export,self.gravity,self.root/"out")
+        first_hash=hashlib.sha256(first.read_bytes()).hexdigest()
+        _,second=export_bundle(self.export,self.gravity,self.root/"out")
+        self.assertNotEqual(first,second)
+        self.assertTrue(second.name.endswith("_V02.zip"))
+        self.assertTrue((self.root/"out"/second.stem/"EVIDENCE_MANIFEST.json").is_file())
+        self.assertEqual(first_hash,hashlib.sha256(first.read_bytes()).hexdigest())
         self.assertEqual(original,hashlib.sha256(path.read_bytes()).hexdigest())
-        with self.assertRaises(FileExistsError):
-            export_bundle(self.export,self.gravity,self.root/"out")
     def test_failure_not_mislabeled_as_good_evidence(self):
         self.sample["ok"]=False
         (self.gravity/"Gravity_Result_V110.json").write_text(json.dumps(self.sample))
