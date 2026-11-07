@@ -45,6 +45,7 @@ def digest(path):
     return h.hexdigest()
 
 def _csv(path, rows, cols):
+    path.parent.mkdir(parents=True,exist_ok=True)
     with path.open("w",encoding="utf-8-sig",newline="") as f:
         w=csv.DictWriter(f,fieldnames=cols,extrasaction="ignore")
         w.writeheader();w.writerows(rows)
