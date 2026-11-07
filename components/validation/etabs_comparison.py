@@ -165,7 +165,7 @@ def launch(parent,folder):
    template.parent.mkdir(parents=True,exist_ok=True)
    from components.validation.etabs_direct_api import mapping_template
    template.write_text(json.dumps(mapping_template(chosen),indent=2),encoding='utf-8')
-   messagebox.showinfo('ETABS mapping needed','Template created at '+str(template)+'\\nEnter the real ETABS cases, story mapping and matched results basis; then use Direct ETABS API again.',parent=win)
+   messagebox.showinfo('ETABS mapping needed','Template created at '+str(template)+'\nEnter the real ETABS cases, story mapping and matched results basis; then use Direct ETABS API again.',parent=win)
    return
   def worker():
    from components.validation.etabs_direct_api import connect_and_extract

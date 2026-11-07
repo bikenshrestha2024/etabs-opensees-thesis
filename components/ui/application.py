@@ -941,7 +941,7 @@ def main():
         Path(out).write_text(json.dumps(payload,indent=2,default=str),encoding="utf-8")
         with open(str(Path(out).with_suffix(".csv")),"w",newline="",encoding="utf-8-sig") as f:
             w=csv.DictWriter(f,fieldnames=FIELDS); w.writeheader(); w.writerows(rows)
-        messagebox.showinfo("Saved",f"Reviewed JSON and CSV saved.\\n{out}")
+        messagebox.showinfo("Saved",f"Reviewed JSON and CSV saved.\n{out}")
     def row_problems(r):
         problems=[]
         sec=str(r.get("assigned_section") or "").strip()
@@ -964,8 +964,8 @@ def main():
             messagebox.showerror("Approval blocked","This frame has no valid section assignment. Resolve it in ETABS first."); return
         problems=[p for p in row_problems({**r,"review_status":"APPROVED"}) if p!="review_status not APPROVED"]
         if problems:
-            messagebox.showerror("Approval blocked","Complete and verify these fields before approval:\\n\\n"+", ".join(problems)); return
-        if not messagebox.askyesno("Confirm section approval",f"Approve the reviewed properties for ALL frame objects assigned to '{sec}'?\\n\\nConfirm only after comparing section dimensions, material properties, A/Iy/Iz/J and units with ETABS."):
+            messagebox.showerror("Approval blocked","Complete and verify these fields before approval:\n\n"+", ".join(problems)); return
+        if not messagebox.askyesno("Confirm section approval",f"Approve the reviewed properties for ALL frame objects assigned to '{sec}'?\n\nConfirm only after comparing section dimensions, material properties, A/Iy/Iz/J and units with ETABS."):
             return
         copy_fields=["section_type","material_name","material_type_code","width_m","depth_m","tube_flange_thickness_m","tube_web_thickness_m","E_kN_m2","G_kN_m2","A_m2","Iy_m4","Iz_m4","J_m4"]
         count=0

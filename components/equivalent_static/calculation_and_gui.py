@@ -474,7 +474,19 @@ class ESMGui:
                     log=lambda msg:self.root.after(0,lambda m=str(msg):self.status.set(m)))
                 def success():
                     self.status.set("ETABS linked Excel ready: "+str(target)+" | provenance "+str(audit))
-                    messagebox.showinfo("ETABS Linked ESM",f"Populated original Excel method:\\n{target}\\n\\nAudit:\\n{audit}\\n\\nOpenSees Direct remains available in the dropdown.",parent=self.root)
+                    messagebox.showinfo("ETABS Linked ESM",f"Populated original Excel method:\n{target}\n\nAudit:\n{audit}\n\nOpenSees Direct remains available in the dropdown.",parent=self.root)
+                    # [REF NBC105-2025 §5.1.2] the computed Aw/T were previously
+                    # discarded; offer them to the form with their EDB identity.
+                    try:
+                        from components.inputs.aw_sources import linked_reference_from_audit
+                        from components.inputs.project_workbooks import _source_edb_path
+                        reference=linked_reference_from_audit(
+                            json.loads(Path(audit).read_text(encoding='utf-8')),audit,
+                            state=self.state.get(),current_edb=_source_edb_path(self.export_dir))
+                        self._confirm_and_apply_excel_reference(reference)
+                    except Exception as exc:
+                        self.status.set('ETABS-linked Aw/T not applied to the form: '+str(exc))
+                        messagebox.showwarning('ETABS-linked values not applied',str(exc),parent=self.root)
                 self.root.after(0,success)
             except Exception as exc:
                 error=str(exc)
@@ -650,6 +662,19 @@ class ESMGui:
                      if k not in present or not str(present[k]).strip()]
             self._show_empirical()
             self._direction_changed()
+            if {'awx','awy'} & set(missing):
+                # [REF Excel method decision register] same-EDB ETABS-linked
+                # original method result is authoritative over geometry.
+                try:
+                    from components.inputs.aw_sources import latest_linked_reference
+                    linked,why=latest_linked_reference(self.export_dir,self.state.get())
+                except Exception as exc:
+                    linked,why=None,str(exc)
+                if linked:
+                    self._confirm_and_apply_excel_reference(linked,confirm=False)
+                    missing=[k for k in missing if k not in ('awx','awy')]
+                    data['notes'].append('Aw loaded from ETABS-linked original Excel method: '
+                                         +linked['provenance_json'])
             if missing:
                 source_notes=[str(note) for note in data['notes']
                               if ('SCALING SUMMARY' in str(note) or
@@ -740,26 +765,41 @@ class ESMGui:
         if not path:return
         try:
             reference=read_explicit_excel_calculation(path,self.export_dir,self.state.get())
+            self._confirm_and_apply_excel_reference(reference)
+        except Exception as exc:
+            self.status.set('Direct Excel calculation import failed: '+str(exc))
+            messagebox.showerror('Excel calculation source rejected',str(exc),parent=self.root)
+
+    def _confirm_and_apply_excel_reference(self,reference,*,confirm=True):
+        """Show the source identity, then apply Excel-method Aw/T to the form.
+
+        [REF NBC105-2025 §5.1.2; docs/review/20261106_THESIS_EXCEL_METHOD_DECISION_REGISTER.md]
+        Shared by 'Use original Excel Aw/T' and the ETABS-linked run.
+        """
+        if True:
             mismatch=reference['source_identity']=='DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY'
             notice=('Workbook: '+reference['source_workbook']+
-                '\\nOriginal source EDB: '+reference['workbook_source_edb']+
-                '\\nCurrent source EDB: '+str(reference['current_export_source_edb'])+
-                '\\nIdentity: '+reference['source_identity']+
-                '\\n\\nAw-X = '+str(reference['values']['awx'])+' m² ('+
+                '\nOriginal source EDB: '+reference['workbook_source_edb']+
+                '\nCurrent source EDB: '+str(reference['current_export_source_edb'])+
+                '\nIdentity: '+reference['source_identity']+
+                '\n\nAw-X = '+str(reference['values']['awx'])+' m² ('+
                 reference['cells']['awx']+')'+
-                '\\nAw-Y = '+str(reference['values']['awy'])+' m² ('+
+                '\nAw-Y = '+str(reference['values']['awy'])+' m² ('+
                 reference['cells']['awy']+')'+
-                '\\n\\nThe module will use these exact Excel values as '
+                '\n\nThe module will use these exact Excel values as '
                 'a RESEARCH reference, not derive new ones from the wall mesh. '
                 'Workbook adopted periods remain separate from '
                 'ETABS eigenperiods and OpenSees Rayleigh periods. '
                 'Original EDB, workbook and OpenSees model stay unchanged.')
             if mismatch:
-                notice+='\\n\\nWARNING: The Excel source EDB has NOT been '
+                notice+='\n\nWARNING: The Excel source EDB has NOT been '
                 'verified identical to the current Copy EDB. Results using '
                 'these inputs are research comparisons only.'
-            if not messagebox.askyesno('Use original Excel calculation?',
-                notice+'\\n\\nApply these Excel values to the ESM form?',
+            if reference.get('direct_thickness_status'):
+                notice+=('\n\nDirect ETABS wall thickness check (PropArea.GetWall): '
+                         +str(reference['direct_thickness_status']))
+            if confirm and not messagebox.askyesno('Use original Excel calculation?',
+                notice+'\n\nApply these Excel values to the ESM form?',
                 parent=self.root):return
             self.excel_direct_reference=reference
             self.awx.set(f"{reference['values']['awx']:.12g}")
@@ -784,9 +824,6 @@ class ESMGui:
                 str(reference['values']['awy'])+' m² | '+
                 reference['source_identity']+' | '+reference['source_workbook']+
                 ' | RESEARCH/REFERENCE ONLY; review EDB identity and openings.')
-        except Exception as exc:
-            self.status.set('Direct Excel calculation import failed: '+str(exc))
-            messagebox.showerror('Excel calculation source rejected',str(exc),parent=self.root)
 
     def _sync_opensees_inputs(self,etabs=False):
         """Source-labelled wall and period audit; never a silent EDB edit."""
@@ -856,7 +893,7 @@ class ESMGui:
                                  'confirm first-storey effective piers and NBC §5.1.2.')
             self.status.set(' | '.join(lines))
             messagebox.showinfo('NBC 105 source synchronization',
-                '\\n'.join(lines)+'\\n\\nDo not treat a candidate Aw as '
+                '\n'.join(lines)+'\n\nDo not treat a candidate Aw as '
                 'NBC acceptance until wall piers/openings are reviewed.',
                 parent=self.root)
         except Exception as exc:
@@ -870,28 +907,28 @@ class ESMGui:
         notes+=scaling_workbook_diagnostics(HERE,self.export_dir,self.state.get())
         notes=list(dict.fromkeys(notes))
         from components.inputs.project_workbooks import _source_edb_path
-        intro=('Current export: '+str(self.export_dir)+'\\n'
+        intro=('Current export: '+str(self.export_dir)+'\n'
                +'Source EDB: '+(_source_edb_path(self.export_dir) or 'NOT RECORDED')
-               +'\\nLimit state: '+self.state.get()
-               +'\\n\\nA workbook with a different B4 EDB is rejected unless '
+               +'\nLimit state: '+self.state.get()
+               +'\n\nA workbook with a different B4 EDB is rejected unless '
                +'both EDB files exist and have identical SHA256. Workbook text '
                +'and unevaluated formulas are never wall areas. '
                +'If the exported wall geometry cannot independently reconstruct Aw, '
                +'enter a separately calculated and documented Aw-X/Aw-Y manually. '
-               +'ETABS COM connection is optional for importing Excel.\\n\\n')
+               +'ETABS COM connection is optional for importing Excel.\n\n')
         profile=source.get('values',{}).get('wall_aw_profile')
         if profile:
             rows=profile['rows']
             intro+=('First-storey wall footprint: '+
                 ('uniform across height' if profile['uniform_footprint'] else
                  'NONUNIFORM (do not adopt one Aw automatically)')+
-                 '\\n')
-            intro+='Wall slices:\\n'
+                 '\n')
+            intro+='Wall slices:\n'
             for r in rows:
                 intro+=(f"  z={r['z_bottom_m']:.4f}..{r['z_top_m']:.4f} m, "
                         f"Aw-X={r['aw_x_m2']:.8g} m², Aw-Y={r['aw_y_m2']:.8g} m²; "
-                        f"segments X={r['x_segment_count']}, Y={r['y_segment_count']}\\n")
-        report=intro+'\\n'.join(notes or ['No additional source diagnostics recorded.'])
+                        f"segments X={r['x_segment_count']}, Y={r['y_segment_count']}\n")
+        report=intro+'\n'.join(notes or ['No additional source diagnostics recorded.'])
         output=Path(self.outdir.get())
         output.mkdir(parents=True,exist_ok=True)
         (output/'ESM_Source_Diagnostics.txt').write_text(report,encoding='utf-8')
@@ -983,9 +1020,9 @@ class ESMGui:
             if issues:
                 explanation=('Preliminary Rayleigh cannot start because source '
                     'inputs are incomplete or mismatched. Gravity PASS does not '
-                    'provide the missing effective wall areas.\\n\\n'
-                    + '\\n'.join(f'{i+1}. {reason}' for i,reason in enumerate(issues))
-                    + '\\n\\nUse "Why are Aw/period fields blank?" to inspect '
+                    'provide the missing effective wall areas.\n\n'
+                    + '\n'.join(f'{i+1}. {reason}' for i,reason in enumerate(issues))
+                    + '\n\nUse "Why are Aw/period fields blank?" to inspect '
                       'first-storey wall slices. If wall openings change the '
                       'footprint, calculate a reviewed effective Aw from the '
                       'source wall piers. Do not copy values from another EDB.')

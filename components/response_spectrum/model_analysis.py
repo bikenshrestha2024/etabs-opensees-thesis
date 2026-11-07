@@ -314,6 +314,9 @@ def launch(parent,folder):
             threading.Thread(target=worker,daemon=True).start()
         except Exception as e:messagebox.showerror('MRSM inputs',str(e),parent=win)
     button=ttk.Button(actions,text='Run selected state(s)',command=run);button.pack(side='left')
+    # [REF components/ui/output_folder.py] shared output-folder action.
+    from components.ui.output_folder import add_open_output_button
+    add_open_output_button(actions,lambda:str(output),window=win)
     ttk.Button(actions,text='Saved SLS / ULS charts + Excel',command=lambda:__import__('OpenSees_MRSM_Reports_V134').launch(win,output)).pack(side='left',padx=4)
     ttk.Button(actions,text='Deformation / node DOFs',command=lambda:__import__('OpenSees_Response_Checks_V132').launch_response_viewer(win,output)).pack(side='left')
     win._mrsm_fields=fields;win._mrsm_log=log;return win

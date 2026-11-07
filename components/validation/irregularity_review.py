@@ -112,6 +112,9 @@ def launch(parent,folder):
         path=filedialog.askopenfilename(parent=win,title='Reviewed strengths or continuity evidence',filetypes=[('Reviewed CSV / JSON','*.csv *.json')])
         if path:review.set(path)
     ttk.Button(controls,text='Capacity / review file',command=browse).pack(side='left')
+    # [REF components/ui/output_folder.py] shared output-folder action.
+    from components.ui.output_folder import add_open_output_button
+    add_open_output_button(controls,lambda:str(out),window=win)
     ttk.Label(win,textvariable=status,wraplength=1180).pack(anchor='w');frame=ttk.Frame(win);frame.pack(fill='both',expand=True);columns=('clause','check','storey','value','threshold','status','note');tree=ttk.Treeview(frame,columns=columns,show='headings');sy=ttk.Scrollbar(frame,command=tree.yview);sx=ttk.Scrollbar(frame,orient='horizontal',command=tree.xview);tree.configure(yscrollcommand=sy.set,xscrollcommand=sx.set);frame.columnconfigure(0,weight=1);frame.rowconfigure(0,weight=1);tree.grid(row=0,column=0,sticky='nsew');sy.grid(row=0,column=1,sticky='ns');sx.grid(row=1,column=0,sticky='ew')
     for key in columns:tree.heading(key,text=key);tree.column(key,width=110 if key in ('clause','storey','value','threshold','status') else 340,stretch=False)
     detail=tk.Text(win,height=4,wrap='word');detail.pack(fill='x')

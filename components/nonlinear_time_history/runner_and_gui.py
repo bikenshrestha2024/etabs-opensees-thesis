@@ -807,7 +807,11 @@ class NonlinearTimeHistoryGUI:
         ttk.Label(root, text="Readiness is intentionally strict: the nonlinear model must already contain the reviewed ETABS geometry, wall opening mesh and coupling beams, calibrated wall/frame materials, compatible slab/diaphragm representation, reconciled area/frame loads and seismic mass, completed gravity/P-Delta, modal checks, and the selected SHS/FVD/BRB scenario. This tool freezes that completed gravity state with loadConst(time=0) and runs nonlinear Newmark. It cannot make a missing ETABS-to-OpenSees subsystem complete. The manifest is an explicit user checklist, not an automatic certification.", wraplength=1060, foreground="#8a3412").pack(anchor="w", pady=(0, 8))
         ttk.Button(root, text="NBC site spectrum + optional X/Y scale diagnostic (A–D)", command=self._open_spectrum_tool).pack(anchor="w", pady=(0, 6))
         ttk.Checkbutton(root, text="RUN_NONLINEAR_TIME_HISTORY = True  —  enable execution (default False)", variable=self.execute).pack(anchor="w", pady=(0, 4))
-        ttk.Button(root, text="Run NBC Nonlinear Time-History Cases", command=self._run).pack(anchor="w", pady=(0, 8))
+        run_row = ttk.Frame(root); run_row.pack(anchor="w", pady=(0, 8))
+        ttk.Button(run_row, text="Run NBC Nonlinear Time-History Cases", command=self._run).pack(side="left")
+        # [REF components/ui/output_folder.py] shared output-folder action.
+        from components.ui.output_folder import add_open_output_button
+        add_open_output_button(run_row, self.output, window=self.win, padx=8)
         from components.shared.case_status import panel
         self.case_board=panel(root)
         ttk.Button(root,text='Performance objectives / component acceptance',command=lambda:__import__('components.validation.nonlinear_performance',fromlist=['launch']).launch(self.win,self.output.get())).pack(anchor='w',pady=4)

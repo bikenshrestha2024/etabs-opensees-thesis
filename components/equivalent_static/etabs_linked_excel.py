@@ -38,6 +38,109 @@ def _engine(path):
         raise RuntimeError("Selected Python file is not the supplied ETABS engine: "+", ".join(missing))
     return module
 
+def _api_out(result):
+    """Split a comtypes ETABS OAPI return into (outputs, return_code).
+
+    [REF CSI ETABS OAPI: by-reference outputs are returned first, the int
+    return code last; 0 = success]
+    """
+    if isinstance(result, (list, tuple)):
+        values = list(result)
+        return values[:-1], values[-1] if values else -1
+    return [], result
+
+
+def direct_wall_thickness_inventory(sap):
+    """Numeric wall thickness per ETABS area property, read through the API.
+
+    [REF CSI ETABS OAPI cAreaObj.GetNameList / GetDesignOrientation (1 = Wall) /
+    GetProperty; cPropArea.GetWall (Thickness, present length units)]
+    The thickness is the property's numeric Thickness value. Section NAMES
+    (e.g. 'Outrigger Wall 250') are never parsed. Call after SetPresentUnits(6)
+    (kN-m-C), so thickness is in metres.
+    Output: dict(properties={prop: thickness_m}, wall_areas={prop: count},
+    unresolved=[...]).
+    """
+    outputs, code = _api_out(sap.AreaObj.GetNameList())
+    if code != 0 or len(outputs) < 2:
+        raise RuntimeError('ETABS AreaObj.GetNameList failed: ' + str(code))
+    names = list(outputs[1] or [])
+    properties, counts, unresolved = {}, {}, []
+    for name in names:
+        orient, code = _api_out(sap.AreaObj.GetDesignOrientation(name))
+        if code != 0 or not orient or int(orient[0]) != 1:
+            continue
+        prop_out, code = _api_out(sap.AreaObj.GetProperty(name))
+        if code != 0 or not prop_out:
+            unresolved.append(f'{name}: GetProperty code {code}')
+            continue
+        prop = str(prop_out[0])
+        counts[prop] = counts.get(prop, 0) + 1
+        if prop in properties:
+            continue
+        wall, code = _api_out(sap.PropArea.GetWall(prop))
+        thickness = None
+        if code == 0 and len(wall) >= 4:
+            try:
+                thickness = float(wall[3])
+            except (TypeError, ValueError):
+                thickness = None
+        if thickness is None or not math.isfinite(thickness) or thickness <= 0:
+            unresolved.append(f'{prop}: PropArea.GetWall code {code}')
+            continue
+        properties[prop] = thickness
+    return dict(properties=properties, wall_areas=counts, unresolved=unresolved,
+                source='ETABS OAPI PropArea.GetWall Thickness (numeric; names not parsed)')
+
+
+def check_excel_wall_thickness(workbook_path, excel_rows, inventory, *, tolerance_mm=0.5):
+    """Compare every Excel 'NBC Calculator' G-column thickness with ETABS values.
+
+    [REF NBC105-2025 §5.1.2 (Awi uses the actual wall thickness); CSI OAPI PropArea.GetWall]
+    MATCHED when every used row equals some directly read wall thickness
+    within ``tolerance_mm``; MISMATCH otherwise; UNAVAILABLE when ETABS gave
+    no wall thickness or the cell holds an unevaluated formula.
+    """
+    from openpyxl import load_workbook
+    allowed_mm = {p: 1000. * t for p, t in inventory.get('properties', {}).items()}
+    report = dict(status='UNAVAILABLE', tolerance_mm=tolerance_mm, rows=[], mismatches=[],
+                  etabs_wall_thickness_mm=allowed_mm, source=inventory.get('source'),
+                  unresolved=inventory.get('unresolved', []))
+    if not allowed_mm:
+        report['reason'] = 'No wall thickness could be read directly from ETABS.'
+        return report
+    wb = load_workbook(str(workbook_path), data_only=True, read_only=True)
+    try:
+        ws = wb['NBC Calculator'] if 'NBC Calculator' in wb.sheetnames else None
+        if ws is None:
+            report['reason'] = "Workbook has no 'NBC Calculator' sheet."
+            return report
+        unevaluated = False
+        for row in sorted({int(r) for r in excel_rows if r}):
+            value = ws[f'G{row}'].value
+            try:
+                t_mm = float(value)
+            except (TypeError, ValueError):
+                unevaluated = True
+                report['rows'].append(dict(row=row, G=value, status='NOT_NUMERIC'))
+                continue
+            match = [p for p, a in allowed_mm.items() if abs(a - t_mm) <= tolerance_mm]
+            report['rows'].append(dict(row=row, excel_thickness_mm=t_mm, etabs_properties=match))
+            if not match:
+                report['mismatches'].append(
+                    f'NBC Calculator!G{row}={t_mm:g} mm not in ETABS wall thicknesses '
+                    + ', '.join(f'{p}={a:g} mm' for p, a in allowed_mm.items()))
+    finally:
+        wb.close()
+    if report['mismatches']:
+        report['status'] = 'MISMATCH'
+    elif report['rows'] and not unevaluated:
+        report['status'] = 'MATCHED'
+    else:
+        report['reason'] = 'Thickness cells are unevaluated formulas or no rows were used.'
+    return report
+
+
 def run_etabs_excel(edb,workbook,engine_path,output_dir,log=print):
     """Populate original calculator from ETABS, read ORIGINAL calculator method.
 
@@ -71,6 +174,17 @@ def run_etabs_excel(edb,workbook,engine_path,output_dir,log=print):
             raise RuntimeError("ETABS kN-m-C unit assignment failed: "+str(code))
         stories=eng.get_stories(sap)
         xb,yb,grid=eng.read_etabs_walls(sap,stories,log=log)
+        # [REF CSI OAPI PropArea.GetWall] numeric thickness, independent of
+        # the engine's section-name handling.
+        try:
+            thickness_inventory=direct_wall_thickness_inventory(sap)
+            for prop,t in sorted(thickness_inventory['properties'].items()):
+                log(f"Direct ETABS wall thickness: {prop} = {1000*t:.1f} mm "
+                    f"({thickness_inventory['wall_areas'].get(prop,0)} wall areas; PropArea.GetWall)")
+        except Exception as exc:
+            thickness_inventory={'properties':{},'unresolved':[str(exc)],
+                                 'source':'ETABS OAPI PropArea.GetWall (failed)'}
+            log('Direct ETABS wall thickness unavailable: '+str(exc))
         if not stories or not xb or not yb:
             raise RuntimeError("ETABS story/wall extraction incomplete; no invented substitute geometry.")
         shutil.copy2(workbook,target)
@@ -115,7 +229,14 @@ def run_etabs_excel(edb,workbook,engine_path,output_dir,log=print):
                                 "gross_wall_length_m":a.get("wall_m"),
                                 "Aw_contribution_m2":a.get("contribution")} for a in r.get("records",[])]}
             log(f"{axis}: Excel Aw={r['Aw']} m2, adopted T={r['adopted_T']} s")
-        audit={"status":"RESEARCH COMPARISON ONLY; NOT NBC DESIGN ACCEPTANCE",
+        thickness_check=check_excel_wall_thickness(
+            target,[a.get("excel_row") for r in (x,y) for a in r.get("records",[])],
+            thickness_inventory)
+        log("Excel vs direct ETABS wall thickness: "+thickness_check["status"]
+            +("" if not thickness_check["mismatches"] else " | "+"; ".join(thickness_check["mismatches"][:3])))
+        audit={"status":("THICKNESS_MISMATCH_DO_NOT_USE" if thickness_check["status"]=="MISMATCH"
+                         else "RESEARCH COMPARISON ONLY; NOT NBC DESIGN ACCEPTANCE"),
+               "direct_thickness_check":thickness_check,
                "original_method":"Supplied ETABS-integrated Excel calculator",
                "source_edb":str(edb),"source_edb_sha256":_hash(edb),
                "source_excel":str(workbook),"source_excel_sha256":_hash(workbook),
