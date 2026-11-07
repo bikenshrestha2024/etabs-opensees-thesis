@@ -215,6 +215,18 @@ class GravityAnalysisGUI:
                   "This is a global reaction check, not engineering acceptance.\\n"
                   "Review partial support data and component loads.\\n"
                   "Model identity: "+str(comp.get('model_identity_status','UNVERIFIED')))
+            ranked=comp.get('top_node_discrepancies',[])
+            if ranked:
+                note+="\\n\\nLargest verified support discrepancies (ETABS - OpenSees):"
+                for row in ranked[:5]:
+                    note+=f"\\nETABS {row['etabs_point']} / OpenSees {row['opensees_node']}: "
+                    note+=f"{row['delta_etabs_minus_opensees_kN']:+.3f} kN"
+            else:
+                note+="\\n\\nNo one-to-one verified global-Z support pairs yet; review node audit."
+            node_info=comp.get('node_comparison',{})
+            if node_info:
+                note+=f"\\nMatched verified pairs: {node_info.get('valid_one_to_one_global_z_count',0)}"
+                note+=f" | Ambiguous: {node_info.get('ambiguous_count',0)}"
             messagebox.showinfo("Direct ETABS/OpenSees gravity comparison",note,parent=self.win)
         except Exception as exc:
             self._gravity_action_log("ETABS_ERROR",str(exc))
