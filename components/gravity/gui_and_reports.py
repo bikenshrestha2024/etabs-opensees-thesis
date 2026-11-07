@@ -147,7 +147,7 @@ class GravityAnalysisGUI:
         """
         stamp=datetime.now().astimezone().isoformat(timespec="seconds")
         line=f"[{stamp}] [{stage}] {message}"
-        self.log.insert("end",line+"\\n")
+        self.log.insert("end",line+"\n")
         self.log.see("end")
         self.win.update_idletasks()
 
@@ -445,7 +445,7 @@ class GravityAnalysisGUI:
         self._gravity_action_log("GRAVITY_SETTINGS",f"Profile={self.gravity_profile_var.get()} | "
             f"Downward load={total:.6f} kN | supports={len(supports)} | steps={steps}")
         self._gravity_action_log("GRAVITY_OUTPUT","Result and run logs: "+str(out))
-        self.log.insert("end",f"Support tags: {supports}\\n")
+        self.log.insert("end",f"Support tags: {supports}\n")
         self.win.update_idletasks()
         result_path = out / "Gravity_Result_V110.json"
         runner_path = out / "Gravity_Run_V110.py"
