@@ -104,7 +104,7 @@ class GravityAnalysisGUI:
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
         self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
-        self.wall_support_strategy_var=tk.StringVar(value="ETABS Node Position / Continuous")
+        self.wall_support_strategy_var=tk.StringVar(value="ETABS Reaction Validation")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self._build()
