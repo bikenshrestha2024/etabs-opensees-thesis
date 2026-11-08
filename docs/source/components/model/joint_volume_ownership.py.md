@@ -48,6 +48,39 @@ The generated `OpenSees_Complete_Model_Config_V118.json` supports:
   distribution can differ from exact load-centroid placement and therefore
   requires a separate reaction/beam-force test.
 
+## Per-junction overlap breakdown (2026-11-08)
+
+The audit records a per-source RCC volume deduction split into
+`overlap_with_COLUMN_m3`, `overlap_with_SHEAR WALL_m3`,
+`overlap_with_FLOOR_m3`, `overlap_with_BEAM_m3`.
+The aggregate report records
+`overlap_pair_volume_m3` and `overlap_pair_weight_kN` with source
+categories (example `BEAM_OVERLAPS_FLOOR`).
+Each volume is assigned to exactly one earlier owner after subtracting
+previous ownership intersections, avoiding double subtraction in
+three-way beam–column–slab junctions.
+
+These are **geometric sensitivity diagnostics**. The exported source
+ETABS 600×800 beam is assigned a **CP 8 Top Center** insertion point,
+whereas the current cuboid audit assumes the physical beam is centered
+on its frame centerline. The slab plate audit also assumes a centered
+thickness at the shell reference plane. Until ETABS cardinal-point
+locations, slab insertion/offsets, slab holes, wall intersections,
+material densities and section rotations are verified, this can
+overstate or understate *physical* overlap. The previous total
+19,358.527 kN is not a safe weight subtraction.
+
+The frame **clear-length** policy is a distinct source convention. It
+must not be combined with `VERIFIED_SINGLE_OWNER` (enforced). A beam
+offset-length deduction does **not** necessarily remove every slab/beam
+physical overlap along the remaining span, and conversely a physical
+solids-union audit cannot be assumed to reproduce ETABS's self-weight
+`Auto` convention. Compare categories independently rather than
+tuning their totals to the ETABS base reaction.
+
+The actual production model remains unchanged in default
+`AUDIT_ONLY` mode; only the evidence tables are expanded.
+
 ## Exact geometries supported
 
 - Rectangular RCC **columns** along global Z
