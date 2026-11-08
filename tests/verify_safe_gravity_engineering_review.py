@@ -5,7 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from Gravity_Safe_Engineering_Review_V1 import (
-    beam_checks,foundation_regions,review,stage_candidate)
+    beam_checks,foundation_regions,review,stage_candidate,
+    build_isolated_candidate)
 
 
 class SafeGravityReviewTests(unittest.TestCase):
@@ -51,6 +52,39 @@ class SafeGravityReviewTests(unittest.TestCase):
         self.assertEqual(staged["etabs_beam_weight_policy"],"ETABS_BEAM_CLEAR_LENGTH")
         self.assertEqual((self.export/"OpenSees_Complete_Model_Config_V118.json").read_bytes(),
                          old)
+
+    def test_isolated_approved_candidate_never_overwrites_original(self):
+        required=[
+            "OpenSees_Element_Connectivity.json",
+            "OpenSees_Section_Assignment_Audit.json",
+            "OpenSees_Load_Conversion_Audit.json",
+            "OpenSees_Source_Model_Metadata_V118.json"]
+        for name in required:
+            (self.export/name).write_text(json.dumps({"source":name}),encoding="utf8")
+        folder,review_data=review(self.export,etabs_beam_csv=self.weight)
+        candidate=stage_candidate(self.export,folder/"GRAVITY_SAFE_REVIEW.json",
+                    approval_text="I REVIEWED ETABS BEAM SELF WEIGHT AND SOURCE GEOMETRY")
+        original=(self.export/"OpenSees_Complete_Model_Config_V118.json").read_bytes()
+        def builder(target):
+            (target/"OpenSees_Complete_Model_Data_V118.json").write_text(
+                '{"gravity":{"Self Weight":{}}}',encoding="utf8")
+            (target/"OpenSees_Complete_Gravity_Model.py").write_text(
+                "print('requires native validation')\n",encoding="utf8")
+            return {"gravity_model_script":"OpenSees_Complete_Gravity_Model.py"},{
+                "analysis_ready":True,"assembly_errors":[]}
+        rebuilt=build_isolated_candidate(self.export,candidate,build_callback=builder)
+        self.assertTrue((rebuilt/"ISOLATED_CANDIDATE_PROVENANCE.json").is_file())
+        info=json.loads((rebuilt/"ISOLATED_CANDIDATE_PROVENANCE.json").read_text())
+        self.assertEqual(info["state"],"CANDIDATE_ASSEMBLED_NEEDS_NATIVE_GRAVITY_VALIDATION")
+        self.assertFalse(info["native_gravity_solver_executed"])
+        self.assertFalse(info["etabs_equivalence_established"])
+        self.assertEqual(original,
+            (self.export/"OpenSees_Complete_Model_Config_V118.json").read_bytes())
+        self.assertEqual(
+            json.loads((rebuilt/"OpenSees_Complete_Model_Config_V118.json").read_text())[
+                "etabs_beam_weight_policy"],"ETABS_BEAM_CLEAR_LENGTH")
+        with self.assertRaises(FileExistsError):
+            build_isolated_candidate(self.export,candidate,build_callback=builder)
 
     def test_missing_and_invalid_offset_blocks_candidate(self):
         self.audit["rows"][0]["end_j_m"]=None
