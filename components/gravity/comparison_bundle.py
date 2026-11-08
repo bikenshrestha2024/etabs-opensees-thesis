@@ -282,11 +282,11 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         # Record all generated CSVs and original files, including derivatives
         # that were not copied via add(). Every member is inside the upload ZIP.
         package_members=sorted(
-            dict(relative_path=file.relative_to(stage).as_posix(),
-                 extracted_path=str(dest/file.relative_to(stage)),
-                 bytes=file.stat().st_size)
-            for file in stage.rglob("*") if file.is_file()
-        ,key=lambda item:item["relative_path"])
+            [dict(relative_path=file.relative_to(stage).as_posix(),
+                  extracted_path=str(dest/file.relative_to(stage)),
+                  bytes=file.stat().st_size)
+             for file in stage.rglob("*") if file.is_file()],
+            key=lambda item:item["relative_path"])
         audit={"schema":"gravity-comparison-evidence-v2",
                "status":"EVIDENCE_EXPORT_ONLY_NOT_ENGINEERING_EQUIVALENCE",
                "source_export_dir":str(export_dir),"source_gravity_dir":str(gravity_dir),
