@@ -77,6 +77,23 @@ CSI describes offset lengths and rigid-zone factors separately in
 `GetEndLengthOffset` API alone does not establish ETABS's actual `Auto`
 self-weight rule for each source object.
 
+## ETABS frame end length offsets (separate evidence file)
+
+A new `ETABS_Frame_End_Offset_Weight_Audit.csv` is produced on every
+complete model export, using the source `GetEndLengthOffset` call
+captured by `extract_source_metadata`.
+
+The CSV records original ETABS unique object IDs, whole frame lengths,
+reported end I/J offsets, auto/manual mode, rigid-zone factor, reported
+clear length and the **potential**, not automatically accepted,
+end-zone weight `(Li+Lj) × A × gamma`. For the example 600×800 beam with
+0.55 m end offsets at both ends and concrete 25 kN/m³, this diagnostic
+is 13.2 kN. It is a **subset of possible intersection weight**, not
+something to deduct on top of the single-owner volume union.
+The CSV labels automatically determined offsets
+`AUTO_OFFSET_NOT_WEIGHT_RULE`, because the API does not independently
+confirm the frame `Self Weight Option=Auto` computation.
+
 ## Required acceptance checks before turning on correction
 
 1. Verify the original ETABS physical section positions, **including CP 8
