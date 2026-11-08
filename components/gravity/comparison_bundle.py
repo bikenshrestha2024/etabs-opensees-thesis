@@ -39,6 +39,7 @@ EXTRA = ("Gravity_Result_V110.json", "Gravity_Run_V110.log",
 # These exports represent actual gravity responses and review diagnostics.
 # A file not present is reported in the manifest, never manufactured.
 SOURCE_EXTRA = (
+    "Linear_Shell_Stiffness_Audit.json",
     "GRAVITY_SAFE_REVIEW.json",
     "CANDIDATE_PROVENANCE.json",
     "ISOLATED_CANDIDATE_PROVENANCE.json",
