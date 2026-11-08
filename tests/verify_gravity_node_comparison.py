@@ -4,7 +4,8 @@ import unittest
 from pathlib import Path
 
 from components.validation.gravity_node_comparison import (
-    compare_support_nodes,write_node_comparison
+    compare_support_nodes,write_node_comparison,
+    export_fixed_source_support_reactions
 )
 
 
@@ -66,6 +67,55 @@ class GravityNodeAuditTests(unittest.TestCase):
             self.assertIn("ETABS ID mapping",wb.sheetnames)
             self.assertIn("Largest differences",wb.sheetnames)
             self.assertEqual(wb["All OpenSees nodes"].max_row,5)
+
+    def test_exact_source_76_node_workbook_and_critical_ranking(self):
+        from openpyxl import load_workbook
+        os_data=dict(nodes=[dict(tag=1,x_m=0.,y_m=0.,z_m=0.),
+                            dict(tag=2,x_m=6.,y_m=0.,z_m=0.),
+                            dict(tag=3,x_m=12.,y_m=0.,z_m=0.)],
+            reactions=[dict(node_tag=1,rz_kN=110.),
+                       dict(node_tag=2,rz_kN=180.),
+                       dict(node_tag=3,rz_kN=100.)])
+        topo=dict(node_map=[
+            dict(opensees_node_tag=1,etabs_point_name="A",coordinates_m=[0,0,0]),
+            dict(opensees_node_tag=2,etabs_point_name="B",coordinates_m=[6,0,0]),
+            dict(opensees_node_tag=3,etabs_point_name="C",coordinates_m=[12,0,0])])
+        etabs=dict(joint_reactions=[
+            dict(point="A",x_m=0,y_m=0,z_m=0,rz_global_kN=100.,
+                 global_z_basis="GLOBAL_Z_VERIFIED_DEFAULT_AXES"),
+            dict(point="B",x_m=6,y_m=0,z_m=0,rz_global_kN=220.,
+                 global_z_basis="GLOBAL_Z_VERIFIED_DEFAULT_AXES"),
+            dict(point="C",x_m=12,y_m=0,z_m=0,rz_global_kN=100.,
+                 global_z_basis="GLOBAL_Z_VERIFIED_DEFAULT_AXES")])
+        with tempfile.TemporaryDirectory() as root:
+            report=export_fixed_source_support_reactions(root,os_data,topo,etabs,
+                                                         expected_tags=[1,2,3])
+            self.assertEqual(report["matched_count"],3)
+            self.assertEqual([x["opensees_node"] for x in report["rows"]],[1,2,3])
+            self.assertEqual(report["ranked"][0]["opensees_node"],2)
+            self.assertAlmostEqual(report["ranked"][0]["abs_difference_kN"],40.)
+            book=load_workbook(Path(root)/"Gravity_76_Source_Support_Reactions.xlsx")
+            self.assertIn("Nodes 1-76",book.sheetnames)
+            self.assertEqual(book["Nodes 1-76"].max_row,4)
+            self.assertTrue((Path(root)/"Gravity_76_Critical_Reaction_Nodes.csv").exists())
+            no_etabs=export_fixed_source_support_reactions(
+                Path(root)/"no_etabs",os_data,topo,None,expected_tags=[1,2,3])
+            self.assertEqual(no_etabs["matched_count"],0)
+            self.assertEqual(no_etabs["missing_or_unverified"],3)
+            self.assertTrue(all(x["etabs_Rz_kN"] is None for x in no_etabs["rows"]))
+    def test_76_support_audit_cannot_hide_wrong_source_coordinates(self):
+        os_data=dict(nodes=[dict(tag=1,x_m=0,y_m=0,z_m=0)],
+                     reactions=[dict(node_tag=1,rz_kN=100.)])
+        topo=dict(node_map=[dict(opensees_node_tag=1,etabs_point_name="A",
+                                 coordinates_m=[0,0,0])])
+        etabs=dict(joint_reactions=[dict(point="A",x_m=20,y_m=0,z_m=0,
+                                          rz_global_kN=100.)])
+        with tempfile.TemporaryDirectory() as root:
+            report=export_fixed_source_support_reactions(
+                root,os_data,topo,etabs,expected_tags=[1])
+            self.assertEqual(report["matched_count"],0)
+            self.assertEqual(report["rows"][0]["status"],
+                             "ETABS_OPENSEES_COORDINATE_MISMATCH")
 
     def test_point_local_axis_not_mislabeled_as_global_z(self):
         self.etabs['joint_reactions'][0]['rz_global_kN']=None
