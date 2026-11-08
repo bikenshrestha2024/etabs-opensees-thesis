@@ -204,6 +204,15 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         if comparison_root != gravity_dir:
             add(comparison_root/"Gravity_GUI_Actions.log",
                 "gravity_workflow/Gravity_GUI_Actions.log")
+            # Keep a separately executed single gravity run for provenance
+            # rather than replacing it with a newer dual-support run.
+            for name in EXTRA:
+                if name!="Gravity_GUI_Actions.log" and (comparison_root/name).is_file():
+                    add(comparison_root/name,"single_run_root/"+name)
+            for candidate in sorted(comparison_root.iterdir()):
+                if candidate.is_file() and candidate.name.startswith("Gravity_") and (
+                    candidate.suffix.lower() in (".png",".pdf",".svg")):
+                    add(candidate,"single_run_root/figures/"+candidate.name)
         # Existing gravity figures and failure diagnostics are carried over
         # without allowing unbounded recursive ingestion of model exports.
         for candidate in sorted(gravity_dir.iterdir()):
