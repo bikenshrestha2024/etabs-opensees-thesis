@@ -55,3 +55,34 @@ and wall openings at the largest discrepancy coordinates.
 The existing ZIP exporter includes these reports.
 
 Tests: `python tests/verify_gravity_node_comparison.py`.
+
+## All-model node Excel and critical support locations (2026-11-08)
+
+The Direct ETABS gravity comparison now also creates:
+
+- `Gravity_All_Model_Nodes.csv` — every recorded OpenSees
+  gravity node (supports and free nodes), mapped original ETABS
+  point name where available, XYZ, OpenSees 6 DOFs, measured
+  vertical support reaction, and ETABS support-only reaction
+  and displacement where exported.
+- `Gravity_Node_Reaction_Comparison.xlsx` — sheets
+  `Audit`, `All support nodes`, `Largest differences`,
+  `All OpenSees nodes`, `ETABS ID mapping`.
+
+**Do not confuse a mapped non-support node with an ETABS support.**
+Only the original 76 source ETABS restrained-point reactions are
+directly comparable. Missing non-support ETABS displacement and
+reaction entries remain empty, never invented or coerced to zero.
+The source ETABS workbook contains more joint displacement data
+than the current direct API support extraction; a separate importer
+is needed to compare all 1,101 original ETABS joint displacements.
+The 11k+ OpenSees node inventory is useful for locating mesh
+connectivity at critical core-wall, slab and column junctions.
+An identical coordinate match does not establish equivalent
+structural connectivity or restraint transfer.
+
+The conventional V04 **critical support examples** remain points
+264/263, 8/7 and 725/717/720/802; the ranking is recalculated from
+each newly executed direct comparison, not hardcoded.
+
+Regression: `python tests/verify_gravity_node_comparison.py`.
