@@ -105,6 +105,22 @@ def path_log_entries(paths,report):
     for item in report.get("packaged_files",[]):
         entries.append(("EVIDENCE_PACKAGED_PATH",
             item["extracted_path"]))
+    # Always print the three core validation gates next to upload paths.
+    # Numeric status and missing counts come from the packaged scorecard,
+    # never hardcoded from a previous ETABS gravity run.
+    card_file=Path(paths["extracted_evidence_folder"])/"GRAVITY_VALIDATION_SCORECARD.json"
+    if card_file.is_file():
+        import json
+        card=json.loads(card_file.read_text(encoding="utf-8"))
+        for row in card.get("rows",[]):
+            if row.get("key") in ("global","foundation","evidence","beam_weight","joint_volume"):
+                entries.append(("GRAVITY_VALIDATION_"+str(row["key"]).upper(),
+                    row["label"]+" | "+row["status"]+" | "+
+                    json.dumps(row["value"],ensure_ascii=False)))
+        entries.append(("GRAVITY_VALIDATION_CONCLUSION",
+                        str(card.get("conclusion","UNVERIFIED"))))
+    else:
+        entries.append(("GRAVITY_VALIDATION_SCORECARD_MISSING",str(card_file)))
     for item in report["missing"]:
         entries.append(("EVIDENCE_MISSING",str(item)))
     for item in report["oversize_skipped"]:
