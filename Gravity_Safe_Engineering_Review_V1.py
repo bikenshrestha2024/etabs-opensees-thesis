@@ -401,6 +401,22 @@ def build_isolated_candidate(export_dir,candidate_dir,*,build_callback=None):
             copied.append(dict(name=name,sha256=sha256(original),
                                original_path=str(original)))
     shutil.copy2(candidate_config,target/SOURCE)
+    # Preserve independent evidence inside the candidate's ordinary gravity
+    # evidence ZIP, not only alongside the original source export.
+    approved_review=candidate_dir.parent/"GRAVITY_SAFE_REVIEW.json"
+    approved_data=load(approved_review)
+    if not approved_data or not approved_data.get("beam",{}).get("candidate_eligible"):
+        raise ValueError("Independent reviewed gravity evidence unavailable")
+    reviewed_csv=approved_data["beam"].get("source_beam_csv")
+    if not reviewed_csv or reviewed_csv=="USER_ENTERED_NUMBER_NOT_INDEPENDENT_FILE":
+        raise ValueError("Candidate requires independent native ETABS Material List CSV")
+    if not Path(reviewed_csv).is_file() or sha256(reviewed_csv)!=evidence.get(
+            "independent_etabs_beam_csv_sha256"):
+        raise ValueError("Source ETABS Material List CSV changed or missing")
+    shutil.copy2(reviewed_csv,target/"ETABS_Beam_Material_List_Reviewed.csv")
+    shutil.copy2(approved_review,target/"GRAVITY_SAFE_REVIEW.json")
+    shutil.copy2(candidate_dir/"CANDIDATE_PROVENANCE.json",
+                 target/"CANDIDATE_PROVENANCE.json")
     record=dict(state="CANDIDATE_MODEL_SOURCE_COPIED_NOT_SOLVED",
         source_export=str(export),candidate_export=str(target),
         original_source_config_sha256=sha256(export/SOURCE),
