@@ -80,6 +80,18 @@ class GravityScorecardTests(unittest.TestCase):
         self.assertEqual(d["foundation"]["status"],
                          "WITHIN_SCREENING_TOLERANCE_NOT_ACCEPTED")
         self.assertFalse(score["corrected_gravity_model_certified"])
+    def test_stale_direct_etabs_comparison_rejected_even_with_matching_etabs(self):
+        self.diff["opensees_support_FZ_kN"]=311367.313879
+        (self.direct/"Direct_Gravity_Comparison.json").write_text(
+            json.dumps(self.diff))
+        score=create_gravity_scorecard(
+            self.export,self.gravity,self.gravity,[],[])
+        gates={x["key"]:x["status"] for x in score["rows"]}
+        self.assertEqual(gates["global"],
+                         "STALE_COMPARISON_REBUILD_AND_RECOMPARE")
+        self.assertEqual(gates["foundation"],
+                         "STALE_COMPARISON_REBUILD_AND_RECOMPARE")
+
     def test_missing_native_evidence_is_not_accepted(self):
         (self.direct/"Direct_Gravity_Comparison.json").unlink()
         score=create_gravity_scorecard(
