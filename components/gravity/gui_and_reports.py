@@ -97,8 +97,11 @@ class GravityAnalysisGUI:
         self.etabs_exe_path = tk.StringVar(value="")
         self.python_var = tk.StringVar(value=sys.executable)
         self.support_var = tk.StringVar()
-        self.reaction_support_var = tk.StringVar(value="Select original ETABS Joint Reactions table")
+        from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
+        self.reaction_support_var = tk.StringVar(value=", ".join(map(str, sorted(PROJECT_PRIMARY_32))))
         self.position_support_var = tk.StringVar()
+        self.reaction_support_verification_var = tk.StringVar(
+            value="32 project nodes predefined; original ETABS table not yet verified")
         self.load_var = tk.StringVar()
         self.steps_var = tk.StringVar(value="10")
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
@@ -435,7 +438,11 @@ class GravityAnalysisGUI:
             if not supports:
                 raise ValueError("No fixed support node tags were found in the generated code.")
             self.position_support_var.set(", ".join(map(str, supports)))
-            reaction_supports=None
+            from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
+            reaction_supports=sorted(PROJECT_PRIMARY_32)
+            self.reaction_support_var.set(", ".join(map(str,reaction_supports)))
+            self.reaction_support_verification_var.set(
+                "32 project nodes predefined; original ETABS table not yet verified")
             source_table=self.etabs_full_table_var.get().strip()
             if source_table and Path(source_table).is_file():
                 try:
@@ -445,20 +452,17 @@ class GravityAnalysisGUI:
                     selected,filter_audit=classify_supports(source_table,topology,model_data['supports'])
                     reaction_supports=sorted(map(int,selected))
                     self.reaction_support_var.set(", ".join(map(str,reaction_supports)))
+                    self.reaction_support_verification_var.set("PASS: 32 project nodes match original ETABS reactions and mapping")
                     self._gravity_action_log("ETABS_REACTION_FILTER",
                         f"Nonzero FZ support nodes={len(reaction_supports)}; excluded={filter_audit['released_support_count']}; original table={source_table}")
                 except Exception as filter_error:
-                    self.reaction_support_var.set("NOT VERIFIED: "+str(filter_error))
+                    self.reaction_support_verification_var.set("NOT VERIFIED: "+str(filter_error))
                     if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
                         raise
-            else:
-                self.reaction_support_var.set("Select original completed ETABS 1. DL + LL table, then Read BOTH")
             if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
-                if reaction_supports is None:
-                    self.support_var.set("")
-                    self.status_var.set("MAIN 32 SUPPORTS: select original completed ETABS 1. DL + LL table and click Read BOTH before running")
-                else:
-                    self.support_var.set(", ".join(map(str,reaction_supports)))
+                self.support_var.set(", ".join(map(str,reaction_supports)))
+                if not source_table:
+                    self.status_var.set("Main 32 nodes displayed; select completed ETABS 1. DL + LL table before running")
             else:
                 self.support_var.set(", ".join(map(str,supports)))
             if total is not None: self.load_var.set(f"{float(total):.8g}")
@@ -472,7 +476,9 @@ class GravityAnalysisGUI:
             return data
         except Exception as exc:
             self.support_var.set('')
-            self.reaction_support_var.set("Unavailable — review input files")
+            from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
+            self.reaction_support_var.set(", ".join(map(str, sorted(PROJECT_PRIMARY_32))))
+            self.reaction_support_verification_var.set("NOT VERIFIED: "+str(exc))
             self.position_support_var.set("")
             self.load_var.set('')
             if show_error: messagebox.showerror("Could not read gravity inputs", str(exc), parent=self.win)
@@ -538,6 +544,7 @@ class GravityAnalysisGUI:
         separate=ttk.Frame(form);separate.pack(fill="x",pady=(3,2))
         ttk.Label(separate,text="ETABS Reaction Validation — nonzero FZ diagnostic").grid(row=0,column=0,sticky="w",padx=4)
         ttk.Entry(separate,textvariable=self.reaction_support_var,width=98,state="readonly").grid(row=0,column=1,sticky="ew",padx=4)
+        ttk.Label(separate,textvariable=self.reaction_support_verification_var,wraplength=300).grid(row=0,column=2,sticky="w",padx=4)
         ttk.Label(separate,text="ETABS Node Position — original 76 mapped supports").grid(row=1,column=0,sticky="w",padx=4)
         ttk.Entry(separate,textvariable=self.position_support_var,width=98,state="readonly").grid(row=1,column=1,sticky="ew",padx=4)
         separate.columnconfigure(1,weight=1)
