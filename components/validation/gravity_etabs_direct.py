@@ -392,7 +392,13 @@ def export_direct(folder,etabs,comp):
             if rows:
                 columns=list(dict.fromkeys(k for row in rows for k in row))
                 sheet.append(columns)
-                for row in rows:sheet.append([row.get(c) for c in columns])
+                for row in rows:
+                    # ETABS point local-axis metadata includes three-value lists;
+                    # XLSX cells accept scalars only. Preserve structured values
+                    # in machine-readable JSON and serialize for Excel display.
+                    sheet.append([json.dumps(row.get(c),ensure_ascii=False)
+                                  if isinstance(row.get(c),(list,dict,tuple))
+                                  else row.get(c) for c in columns])
                 sheet.freeze_panes='A2';sheet.auto_filter.ref=sheet.dimensions
                 for c in sheet[1]:
                     c.font=Font(bold=True,color='FFFFFF')
