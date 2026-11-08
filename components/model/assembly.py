@@ -409,6 +409,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
               frame_section_mapping=frame_mapping or {},nonlinear_parameters_reviewed=False,
               nonlinear_materials_file='',nonlinear_wall_fsam_tags={},section_overrides={},area_property_overrides={})
         cfg.setdefault('floor_subdivisions',4)
+        cfg.setdefault('joint_volume_weight_policy','AUDIT_ONLY')
+        cfg.setdefault('joint_volume_geometry_verified',False)
         cfg.setdefault('wall_base_restraint_policy','SOURCE_ONLY')
         cfg.setdefault('etabs_wall_auto_mesh_restraints_confirmed',False)
         cfg['slab_bending_factor']=.25
@@ -458,11 +460,61 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
             cuts=sorted(cuts.items()); children=[]
             for (u,a),(v,b) in zip(cuts,cuts[1:]):
                 child=dict(object=obj,nodes=[a,b],length=(v-u)*length,start=u*length,end=v*length,
-                           properties=prop,category=e['category'],basis=_basis(p,q,angle),hinged_brace=hinged,release_i=hinged and u==0.,release_j=hinged and v==1.)
+                           properties=prop,category=e['category'],basis=_basis(p,q,angle),
+                           physical_width_m=float(row['width_m']),
+                           physical_depth_m=float(row['depth_m']),
+                           hinged_brace=hinged,release_i=hinged and u==0.,release_j=hinged and v==1.)
                 frame_elements.append(child); children.append(child)
             segments[obj]=children
         active={n for e in frame_elements+shells for n in e['nodes']}
         nodes={n:p for n,p in nodes.items() if n in active}
+        # Separate physical RCC joint-volume ownership from stiffness end offsets.
+        # Default AUDIT_ONLY never changes loads/mass and never turns an
+        # approximate volume estimate into an accepted building self-weight.
+        from components.model.joint_volume_ownership import (
+            build_joint_volume_ledger, export_joint_volume_ledger)
+        volume_policy=cfg['joint_volume_weight_policy']
+        if volume_policy not in ('AUDIT_ONLY','VERIFIED_SINGLE_OWNER'):
+            raise ValueError('Unknown joint volume policy '+str(volume_policy))
+        volume_ledger=None
+        frame_weight_ratios={}
+        shell_weight_ratios={}
+        try:
+            if volume_policy=='VERIFIED_SINGLE_OWNER':
+                if cfg['joint_volume_geometry_verified'] is not True:
+                    raise ValueError('Joint-volume correction needs explicit verified source geometry')
+                # Non-centroid ETABS insertion-point assignments can move
+                # a beam's actual physical volume off its centerline.
+                # Auto rigid-offset and Self Weight Option are separate.
+                for e in frame_elements:
+                    if e['category'] not in ('BEAM','COLUMN'):continue
+                    raw=meta.get('frames',{}).get(str(e['object']),{}).get('GetInsertionPoint')
+                    if not isinstance(raw,(list,tuple)) or len(raw)!=7 or raw[-1]!=0:
+                        raise ValueError('Verified volume mode needs valid ETABS insertion metadata: '+str(e['object']))
+                    if int(raw[0])!=10:
+                        raise ValueError('Noncentroid ETABS insertion ('+str(raw[0])+
+                            ') for frame '+str(e['object'])+
+                            ': explicit solid placement mapping required before correcting joint volumes')
+            volume_ledger=build_joint_volume_ledger(
+                frame_elements,shells,nodes,
+                geometry_verified=cfg['joint_volume_geometry_verified'],
+                policy=volume_policy)
+            export_joint_volume_ledger(folder,volume_ledger)
+            report['joint_volume_weight_audit']={
+                k:v for k,v in volume_ledger.items() if k!='rows'}
+            if volume_policy=='VERIFIED_SINGLE_OWNER':
+                frame_weight_ratios={r['index']:r['retained_ratio']
+                    for r in volume_ledger['rows'] if r['kind']=='frame'}
+                shell_weight_ratios={r['index']:r['retained_ratio']
+                    for r in volume_ledger['rows'] if r['kind']=='shell'}
+                report['warnings'].append('VERIFIED_SINGLE_OWNER applies conservative rectangular RCC volume ownership to equivalent self-weight; source insertion, ETABS Auto weight, and local force distribution remain engineering review gates.')
+            else:
+                report['warnings'].append('Joint-volume ownership is AUDIT_ONLY. Original gross loads and mass remain authoritative until physical solids and ETABS weight options are verified.')
+        except (ValueError,KeyError,TypeError) as exc:
+            if volume_policy=='VERIFIED_SINGLE_OWNER':
+                raise
+            report['warnings'].append('Joint volume AUDIT_ONLY unavailable: '+str(exc))
+            report['joint_volume_weight_audit']={'status':'BLOCKED', 'error':str(exc)}
         # Nodal vectors remain separate per unfactored source pattern.
         patterns={}; load_provenance=[]; source_context={}
         def add(pattern,node,values):
@@ -530,12 +582,18 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
             if not mult: continue
             pat=r['pattern']
             if pat not in cfg['gravity_factors'] or pat not in cfg['mass_factors']: raise ValueError(f'No load/mass factor for self-weight pattern {pat}')
-            for seg in frame_elements:
-                source_context=dict(source='FRAME:'+str(seg['object']),component='self_weight_'+str(seg['category']).lower())
-                p=seg['properties']; w=-float(mult)*p['A']*p['weight']; line(pat,seg,[0,0,w],[0,0,w])
-            for cell in shells:
-                source_context=dict(source='AREA:'+str(cell['object']),component='self_weight_'+str(cell['category']).lower())
-                p=cell['properties']; surface(pat,cell,-float(mult)*p['thickness']*p['weight']*cell['area'])
+            for idx,seg in enumerate(frame_elements):
+                source_context=dict(source='FRAME:'+str(seg['object']),component='self_weight_'+str(seg['category']).lower(),
+                                    joint_volume_retained_ratio=frame_weight_ratios.get(idx,1.))
+                p=seg['properties']
+                w=-float(mult)*p['A']*p['weight']*frame_weight_ratios.get(idx,1.)
+                line(pat,seg,[0,0,w],[0,0,w])
+            for idx,cell in enumerate(shells):
+                source_context=dict(source='AREA:'+str(cell['object']),component='self_weight_'+str(cell['category']).lower(),
+                                    joint_volume_retained_ratio=shell_weight_ratios.get(idx,1.))
+                p=cell['properties']
+                surface(pat,cell,-float(mult)*p['thickness']*p['weight']*cell['area']*
+                        shell_weight_ratios.get(idx,1.))
         nodal_mass={n:0. for n in nodes}; gravity={}; total=0.; ledger={}
         for pat,values in patterns.items():
             gf=float(cfg['gravity_factors'][pat]); mf=float(cfg['mass_factors'][pat]); ledger[pat]=0.
@@ -589,6 +647,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         payload=dict(config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest(),nodes=nodes,frames=frame_elements,shells=shells,gravity=gravity,unfactored_patterns=patterns,nodal_mass=nodal_mass,supports=supports,
                      diaphragms=groups,total_downward_load_kN=total,gravity_by_pattern_kN=ledger,base_z_m=base_z)
         payload['load_provenance']=load_provenance
+        payload['joint_volume_weight_policy']=volume_policy
+        payload['joint_volume_weight_audit']=report.get('joint_volume_weight_audit')
         payload['wall_base_restraint_policy']=cfg['wall_base_restraint_policy']
         payload['added_wall_mesh_support_tags']=extended_wall_supports
         from OpenSees_Storey_Gravity_V131 import export_storey_gravity
@@ -605,7 +665,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         report['warnings'] += ['Elastic core walls use gross source E/thickness; establish rational cracked-wall stiffness before NBC design use.',
             'Frame EI uses NBC ULS beam 0.35 and column 0.70; source orientation and diaphragm equivalence need ETABS response comparison.',
             'Floor bending uses the configured IS 16700 slab factor; membrane EA is preserved by equivalent E/thickness. Physical thickness controls weight.',
-            'Self-weight is integrated from full section volumes once per source multiplier; ETABS joint-volume overlap conventions require reaction/mass reconciliation.',
+            'Joint-volume policy is recorded separately from geometric stiffness end offsets. AUDIT_ONLY preserves gross weight, VERIFIED_SINGLE_OWNER requires verified centroidal RCC solids and must be reconciled with ETABS.',
             'Only extracted distributed frame/area loads are assembled; point loads, temperature, prestress and link actions require explicit additional transfer if assigned.']
     except Exception as exc:
         import traceback
