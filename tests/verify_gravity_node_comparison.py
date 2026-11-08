@@ -38,6 +38,35 @@ class GravityNodeAuditTests(unittest.TestCase):
             self.assertTrue(out.is_file())
             self.assertTrue((Path(root)/'Gravity_All_Support_Nodes.csv').exists())
             self.assertTrue((Path(root)/'Gravity_Top_Node_Discrepancies.csv').exists())
+    def test_all_node_excel_preserves_source_map_and_does_not_invent_etabs_reactions(self):
+        from openpyxl import load_workbook
+        from components.validation.gravity_node_comparison import all_model_node_rows
+        report=compare_support_nodes(self.etabs,self.os)
+        # Third source point exists but has no exported ETABS support reaction.
+        self.os["nodes"].append(dict(
+            tag=4,x_m=1,y_m=2,z_m=3,ux_m=.001,uy_m=0,uz_m=-.004))
+        topo={"node_map":[
+            {"etabs_point_name":"A","opensees_node_tag":1},
+            {"etabs_point_name":"B","opensees_node_tag":2},
+            {"etabs_point_name":"D","opensees_node_tag":4}]}
+        inventory=all_model_node_rows(self.os,topo,self.etabs,report)
+        self.assertEqual(len(inventory),4)
+        node4=next(x for x in inventory if x["opensees_node_tag"]=="4")
+        self.assertEqual(node4["etabs_point_id"],"D")
+        self.assertIsNone(node4["etabs_support_Rz_kN"])
+        self.assertIsNone(node4["etabs_U3_m"])
+        self.assertEqual(node4["opensees_Uz_m"],-.004)
+        with tempfile.TemporaryDirectory() as root:
+            write_node_comparison(root,report,etabs=self.etabs,
+                                  opensees=self.os,topology=topo)
+            self.assertTrue((Path(root)/"Gravity_All_Model_Nodes.csv").exists())
+            wb=load_workbook(Path(root)/"Gravity_Node_Reaction_Comparison.xlsx",
+                             read_only=True)
+            self.assertIn("All OpenSees nodes",wb.sheetnames)
+            self.assertIn("ETABS ID mapping",wb.sheetnames)
+            self.assertIn("Largest differences",wb.sheetnames)
+            self.assertEqual(wb["All OpenSees nodes"].max_row,5)
+
     def test_point_local_axis_not_mislabeled_as_global_z(self):
         self.etabs['joint_reactions'][0]['rz_global_kN']=None
         self.etabs['joint_reactions'][0]['global_z_basis']='POINT_LOCAL_ROTATED'
