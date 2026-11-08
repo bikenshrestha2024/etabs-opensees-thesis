@@ -342,6 +342,101 @@ def stage_candidate(export_dir,review_json,*,approval_text):
     return out
 
 
+def build_isolated_candidate(export_dir,candidate_dir,*,build_callback=None):
+    """Create AND assemble an independent candidate export with approved weight.
+
+    No existing original model file is overwritten. Retains original source
+    audits and ID provenance; production config stays gross until user
+    separately chooses to compare/accept the candidate.
+    [REF docs/source/Gravity_Safe_Engineering_Review_V1.py.md]
+    """
+    export=Path(export_dir).expanduser().resolve()
+    candidate_dir=Path(candidate_dir).expanduser().resolve()
+    review_dir=export/"Gravity_Safe_Engineering_Review"
+    if not candidate_dir.is_relative_to(review_dir):
+        raise ValueError("Candidate must be staged under the reviewed source export")
+    evidence=load(candidate_dir/"CANDIDATE_PROVENANCE.json")
+    candidate_config=candidate_dir/SOURCE
+    if not evidence or evidence.get("state")!="REVIEWED_CANDIDATE_NOT_APPLIED":
+        raise ValueError("Candidate provenance missing or not independently reviewed")
+    if not candidate_config.is_file():
+        raise FileNotFoundError("Reviewed candidate config missing")
+    if sha256(export/SOURCE)!=evidence.get("original_config_sha256"):
+        raise ValueError("Original export changed after candidate stage")
+    config=load(candidate_config)
+    if config.get("joint_volume_weight_policy")=="VERIFIED_SINGLE_OWNER":
+        raise ValueError("Candidate would double subtract physical RCC joint weight")
+    if (config.get("etabs_beam_weight_policy")!="ETABS_BEAM_CLEAR_LENGTH"
+        or config.get("etabs_clear_beam_weight_confirmed") is not True):
+        raise ValueError("Candidate does not explicitly select independently reviewed beam clear-weight mode")
+    required=[
+        "OpenSees_Element_Connectivity.json",
+        "OpenSees_Section_Assignment_Audit.json",
+        "OpenSees_Load_Conversion_Audit.json",
+        "OpenSees_Source_Model_Metadata_V118.json"]
+    optional=[
+        "ETABS_Materials.csv",
+        "OpenSees_Area_Model_Config_V116.json",
+        "OpenSees_Complete_Export_Report_V118.json",
+        "ETABS_OpenSees_Beam_Weight_Reconciliation.json",
+        "ETABS_Frame_End_Offset_Weight_Audit.csv",
+        "OpenSees_Joint_Volume_Ownership_Audit.json"]
+    for name in required:
+        if not (export/name).is_file():
+            raise FileNotFoundError("Missing source ETABS export; must re-export EDB: "+name)
+    workroot=review_dir/"ISOLATED_CANDIDATE_MODELS"
+    workroot.mkdir(exist_ok=True)
+    name=candidate_dir.name
+    target=workroot/name
+    if target.exists():
+        raise FileExistsError("Candidate model exists; no overwrite permitted: "+str(target))
+    target.mkdir()
+    copied=[]
+    for name in required+optional:
+        original=export/name
+        if original.is_file():
+            shutil.copy2(original,target/name)
+            if sha256(original)!=sha256(target/name):
+                raise ValueError("Source audit copy hash mismatch "+name)
+            copied.append(dict(name=name,sha256=sha256(original),
+                               original_path=str(original)))
+    shutil.copy2(candidate_config,target/SOURCE)
+    record=dict(state="CANDIDATE_MODEL_SOURCE_COPIED_NOT_SOLVED",
+        source_export=str(export),candidate_export=str(target),
+        original_source_config_sha256=sha256(export/SOURCE),
+        reviewed_candidate_config_sha256=sha256(target/SOURCE),
+        provenance=evidence,source_copies=copied,
+        native_gravity_solver_executed=False,
+        etabs_equivalence_established=False)
+    record_path=target/"ISOLATED_CANDIDATE_PROVENANCE.json"
+    record_path.write_text(json.dumps(record,indent=2),encoding="utf8")
+    try:
+        if build_callback is None:
+            from components.model.assembly import prepare_complete_export
+            runtime_root=Path(__file__).resolve().parent
+            manifest,report=prepare_complete_export(target,runtime_dir=runtime_root)
+        else:
+            manifest,report=build_callback(target)
+        if not (target/"OpenSees_Complete_Model_Data_V118.json").is_file() or not (
+                target/"OpenSees_Complete_Gravity_Model.py").is_file():
+            raise ValueError("Candidate assembly did not produce complete model data and gravity model")
+        if not isinstance(report,dict) or report.get("assembly_errors"):
+            raise ValueError("Candidate assembly contains errors: "+
+                             str((report or {}).get("assembly_errors")))
+        record.update(state="CANDIDATE_ASSEMBLED_NEEDS_NATIVE_GRAVITY_VALIDATION",
+            candidate_model_data_sha256=sha256(target/"OpenSees_Complete_Model_Data_V118.json"),
+            candidate_gravity_model_sha256=sha256(target/"OpenSees_Complete_Gravity_Model.py"),
+            candidate_assembly_report=str(target/"OpenSees_Complete_Export_Report_V118.json"),
+            notes="Run new candidate gravity separately with source-only 76 supports. New ETABS response comparison required; no auto acceptance.")
+    except Exception as exc:
+        record["state"]="CANDIDATE_BUILD_FAILED"
+        record["build_error"]=str(exc)
+        record_path.write_text(json.dumps(record,indent=2),encoding="utf8")
+        raise
+    record_path.write_text(json.dumps(record,indent=2),encoding="utf8")
+    return target
+
+
 def make_region_template(node_comparison_path,output_csv):
     """Generate an UNVERIFIED point map: user must label every source point.
 
@@ -506,10 +601,33 @@ def launch_gui():
                  "Review APPLY_INSTRUCTIONS.txt before rebuilding.")
         except Exception as exc:
             messagebox.showerror("Cannot stage candidate",str(exc),parent=win)
+    def build_reviewed():
+        try:
+            if current[0] is None:
+                raise ValueError("Run the audit first")
+            if not messagebox.askyesno("Build isolated OpenSees candidate",
+                "This creates a SEPARATE source model export with the"
+                " reviewed clear-beam weight setting, then assembles it."
+                "\n\nThe original ETABS export and OpenSees gravity results"
+                " are NOT changed. Structural equivalence remains NOT VALIDATED."
+                "\n\nProceed with the isolated candidate?",parent=win):
+                return
+            staged=stage_candidate(export.get(),current[0],
+                approval_text="I REVIEWED ETABS BEAM SELF WEIGHT AND SOURCE GEOMETRY")
+            show("Building separate candidate export:\n"+str(staged)+"\n")
+            win.update_idletasks()
+            built=build_isolated_candidate(export.get(),staged)
+            show("ISOLATED CANDIDATE ASSEMBLED:\n"+str(built)+
+                 "\n\nRun OpenSees gravity on its OpenSees_Complete_Gravity_Model.py"
+                 " using 76 ETABS source supports first, rerun direct ETABS comparison"
+                 " and inspect node and wall regions. Original model unchanged.")
+        except Exception as exc:
+            messagebox.showerror("Candidate build blocked",str(exc),parent=win)
     bar=ttk.Frame(frame);bar.grid(row=6,column=0,columnspan=3,sticky="w",pady=10)
     ttk.Button(bar,text="1. AUDIT (read only)",command=audit).pack(side="left",padx=5)
     ttk.Button(bar,text="Create unverified region template",command=template).pack(side="left",padx=5)
     ttk.Button(bar,text="2. Stage reviewed candidate",command=stage).pack(side="left",padx=5)
+    ttk.Button(bar,text="3. Build isolated candidate",command=build_reviewed).pack(side="left",padx=5)
     ttk.Label(frame,text="A numerical match is not structural acceptance. "
               "This program never changes source EDB, stiffness, supports or production loads.",
               foreground="#a43a27",wraplength=940).grid(
@@ -527,15 +645,19 @@ def main(argv=None):
     parser.add_argument("--etabs-base-kn",type=float)
     parser.add_argument("--stage-reviewed-candidate",action="store_true")
     parser.add_argument("--approval-text",default="")
+    parser.add_argument("--build-isolated-candidate",action="store_true")
     args=parser.parse_args(argv)
     out,report=review(args.export,etabs_beam_csv=args.etabs_beam_csv,
         etabs_beam_kN=args.etabs_beam_kn,region_csv=args.foundation_map,
         node_comparison=args.node_comparison,etabs_base_kN=args.etabs_base_kn)
     print((out/"GRAVITY_SAFE_REVIEW.txt").read_text(encoding="utf-8"))
-    if args.stage_reviewed_candidate:
+    if args.stage_reviewed_candidate or args.build_isolated_candidate:
         target=stage_candidate(args.export,out/"GRAVITY_SAFE_REVIEW.json",
                                approval_text=args.approval_text)
         print("Candidate staged (source unchanged):",target)
+        if args.build_isolated_candidate:
+            built=build_isolated_candidate(args.export,target)
+            print("Isolated model built; run native gravity before acceptance:",built)
     return 0
 
 
