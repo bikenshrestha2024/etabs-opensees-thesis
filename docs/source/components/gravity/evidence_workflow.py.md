@@ -41,9 +41,14 @@ The original EDB is never altered, and the exporter does not rerun
 ETABS/OpenSees or assert code/engineering acceptance.
 
 The uploader normally caps individual uncompressed source files at
-40 MB to keep ChatGPT uploads manageable; an oversized source is
-logged with its absolute original path and SHA256 rather than silently
-omitted. A large source ETABS full-table workbook may need separate
+40 MB to keep ChatGPT uploads manageable. Oversized **essential** source
+model-data and node-mapping JSON files are first losslessly compressed
+into a nested ZIP, and included if that compressed representation fits.
+Otherwise, oversized files are logged with their absolute original
+path and SHA256 instead of being silently omitted. A small file named
+`LATEST_GRAVITY_UPLOAD.txt` in the gravity root shows the precise
+latest ZIP and evidence-index locations. Every collected/generated
+file's full path is also printed in `Gravity_GUI_Actions.log`. A large source ETABS full-table workbook may need separate
 upload, or use the offline ETABS comparison workbook/CSV (small).
 
 **When running dual wall-base strategies**, the upload manifest records
