@@ -163,8 +163,33 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                 missing.append({"file":arc,"required":required})
                 return False
             if src.stat().st_size>max_file_mb*1024*1024:
+                # A full model-data or ID-mapping JSON can be highly
+                # compressible. Try a *lossless* nested ZIP before dropping
+                # source evidence on the per-file size limit.
+                essential={
+                    "source/OpenSees_Complete_Model_Data_V118.json",
+                    "source/OpenSees_Element_Connectivity.json",
+                    "source/OpenSees_Source_Model_Metadata_V118.json",
+                }
+                if arc in essential:
+                    nested_arc="source/compressed_originals/"+src.name+".zip"
+                    compressed=stage/nested_arc
+                    compressed.parent.mkdir(parents=True,exist_ok=True)
+                    with zipfile.ZipFile(compressed,"w",
+                        compression=zipfile.ZIP_DEFLATED,
+                        compresslevel=6) as container:
+                        container.write(src,arcname=src.name)
+                    if compressed.stat().st_size<=max_file_mb*1024*1024:
+                        files.append({"file":nested_arc,"source":str(src),
+                                      "bytes":compressed.stat().st_size,
+                                      "original_bytes":src.stat().st_size,
+                                      "original_sha256":digest(src),
+                                      "representation":"LOSSLESS_NESTED_ZIP"})
+                        return True
+                    compressed.unlink()
                 oversize.append({"file":arc,"size_bytes":src.stat().st_size,
-                                 "sha256":digest(src),"original_path":str(src)})
+                                 "sha256":digest(src),"original_path":str(src),
+                                 "reason":"Source exceeds maximum size even after optional lossless compression"})
                 return False
             target=stage/arc
             target.parent.mkdir(parents=True,exist_ok=True)
