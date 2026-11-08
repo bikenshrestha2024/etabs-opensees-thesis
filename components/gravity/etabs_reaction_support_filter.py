@@ -13,6 +13,14 @@ from components.validation.gravity_etabs_offline import read_etabs_joint_reactio
 
 PROFILE = "1. DL + LL"
 MODE = "ETABS_NONZERO_REACTION_DIAGNOSTIC"
+# User-confirmed 32 OpenSees support tags for the present November 2026
+# 25-storey project ONLY. Do not silently substitute for other EDB exports.
+PROJECT_PRIMARY_32 = (
+    76,1,2,75,72,4,5,73,71,3,74,6,7,14,63,70,
+    35,42,25,26,51,52,23,24,53,54,8,64,13,69,36,41
+)
+assert len(PROJECT_PRIMARY_32)==len(set(PROJECT_PRIMARY_32))==32
+
 
 
 def classify_supports(etabs_table, connectivity, original_supports, *, tolerance_kN=1e-6):
@@ -72,6 +80,15 @@ def classify_supports(etabs_table, connectivity, original_supports, *, tolerance
                          "review native ETABS restraints and mapping before diagnostic")
     if not selected:
         raise ValueError("All source supports would be removed: refusing gravity run")
+    actual=set(map(int,selected))
+    expected=set(PROJECT_PRIMARY_32)
+    if actual!=expected:
+        raise ValueError(
+            "PRIMARY ETABS REACTION VALIDATION support list disagrees with this "
+            "project's user-confirmed 32 nodes. Missing="+str(sorted(expected-actual))+
+            " unexpected="+str(sorted(actual-expected))+
+            ". Verify original ETABS table, exact model, mapping and threshold; "
+            "do not alter supports to force matching reactions.")
     # Preserve DOF restraints on points whose vertical restraint is not being
     # removed; removed joints are deliberately released for *all* DOFs only
     # in the diagnostic case, and never in the saved model.
@@ -80,6 +97,9 @@ def classify_supports(etabs_table, connectivity, original_supports, *, tolerance
                  original_support_count=len(original_fixed),
                  kept_support_count=len(selected),released_support_count=len(excluded),
                  released_opensees_nodes=excluded,mapping=details,
+                 project_primary_support_tags=list(PROJECT_PRIMARY_32),
+                 user_confirmed_32_exact_match=True,
+                 project_primary_status="SELECTED_AS_MAIN_DIAGNOSTIC_NOT_NATIVE_RESTRAINT_VERIFIED",
                  source_table=str(Path(etabs_table).resolve()),
                  source_sha256=hashlib.sha256(Path(etabs_table).read_bytes()).hexdigest(),
                  warning="DIAGNOSTIC ONLY: ETABS FZ=0 does not demonstrate free UZ or six free DOFs. "
