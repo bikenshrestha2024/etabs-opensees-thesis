@@ -27,7 +27,9 @@ def node_readout(tag,values,coordinates=None,scope='Unscaled physical response')
 
 
 def resolve_node_tag(kind,ident,point_map):
-    """Return string OpenSees tag; never leak integer ETABS mappings into string-key dictionaries."""
+    """Return string OpenSees tag; never leak integer ETABS mappings into string-key dictionaries.
+    [REF docs/source/components/ui/view_controls.py.md]
+    """
     key=str(ident).strip()
     if kind=="ETABS point":
         node=point_map.get(key)
