@@ -56,6 +56,7 @@ def package_gravity_review(model_script, gravity_root, *,
         max_file_mb=max_file_mb)
     folder=Path(report["output_folder"])
     paths={
+        "latest_upload_pointer":str(root/"LATEST_GRAVITY_UPLOAD.txt"),
         "source_export":str(model.parent),
         "gravity_root":str(root),
         "selected_gravity_run":str(gravity),
@@ -70,6 +71,20 @@ def package_gravity_review(model_script, gravity_root, *,
         "oversized_file_count":len(report["oversize_skipped"]),
         "engineering_acceptance":"NOT_ESTABLISHED_BY_PACKAGING"
     }
+    pointer=root/"LATEST_GRAVITY_UPLOAD.txt"
+    lines=["LATEST GRAVITY REVIEW PACKAGE",
+           "This file references outputs on your own computer.",
+           "Packaging is NOT a structural validation or ETABS acceptance.",
+           ""]
+    for key,value in paths.items():
+        if value is not None:
+            lines.append(key+": "+str(value))
+    lines.append("")
+    lines.append("MISSING ITEMS:")
+    for item in report["missing"]:lines.append("  "+str(item))
+    lines.append("OVERSIZE OMITTED:")
+    for item in report["oversize_skipped"]:lines.append("  "+str(item))
+    pointer.write_text("\n".join(lines)+"\n",encoding="utf8")
     return report,paths
 
 
