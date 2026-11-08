@@ -21,3 +21,34 @@ Relevant register IDs: R10. Consult [research reference register](../../../00_RE
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+
+## 2026-11-08 correction: full gravity vs seismic preload formula tabs
+
+The `Slab_Load_Path_Formulas_V141.xlsx` generator formerly populated
+the visible `Surface load formulas` Gravity factor (column G) directly
+from `cfg.gravity_factors` (typically Live 0.3), even when the native
+gravity GUI used the runtime `GRAVITY_1.0D_1.0L` profile (Live 1.0).
+That was an evidence labeling/calculation-view defect, **not** a
+confirmed error in the OpenSees gravity solver.
+
+The exported workbook now contains two separate sheets:
+- `Surface load formulas`: **FULL GRAVITY 1.0D+1.0L**. All included
+  dead and live source patterns, including assigned roof live, use
+  gravity factor 1.0. For an area of 2.25 m² with 4 kN/m² live,
+  applied load is 9.0 kN, not 2.7 kN.
+- `Surface seismic preload`: the model configuration's
+  `gravity_factors`, typically 0.3 for Live.
+Both retain the independent original `mass_factors` column; seismic
+mass is not multiplied by the gravity full-load override. Other
+source-detail formulas continue to use unfactored source loads and
+their own analysis-context settings.
+
+Workbook sheets are diagnostic arithmetic, not replacement for
+independently executed, case-specific solver reactions and
+displacements. A previously saved workbook does **not** update itself
+from GitHub. Refresh using the existing **Export / open current
+load-path formulas** action after updating the application, then
+check the full-gravity factor and configured seismic-preload factor.
+
+Regression: `python tests/verify_slab_full_gravity_factors.py`.
