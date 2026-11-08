@@ -10,7 +10,9 @@ def launch(parent,folder):
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg,NavigationToolbar2Tk
     from mpl_toolkits.mplot3d.art3d import Line3DCollection
-    from OpenSees_View_Controls_V134 import camera_controls,apply_view,node_readout
+    from OpenSees_View_Controls_V134 import (
+        camera_controls,apply_view,node_readout,resolve_node_tag,
+        center_camera_on_node,node_selection_artists,remove_selection_artists)
     win=tk.Toplevel(parent);win.title('SLS / ULS deformation — case and node response');win.geometry('1250x850')
     paths=sorted(Path(folder).rglob('Deformation_*V132.json'));selected=tk.StringVar();top=ttk.Frame(win);top.pack(fill='x')
     box=ttk.Combobox(top,textvariable=selected,values=[str(p) for p in paths],state='readonly',width=110);box.pack(fill='x',expand=True)
@@ -22,13 +24,14 @@ def launch(parent,folder):
     for k in table['columns']:table.heading(k,text=k);table.column(k,width=160,stretch=True)
     table.pack(fill='x')
     fig=Figure(figsize=(10,6),layout='constrained');ax=fig.add_subplot(projection='3d');chart=FigureCanvasTkAgg(fig,master=win)
-    state=dict(base_segments=[],delta_segments=[],data=None,source=None,deformed=None,highlight=None,playing=False,frame=0,phase=1.,job=None,point_map={},payload=None,home=None)
+    state=dict(base_segments=[],delta_segments=[],data=None,source=None,deformed=None,highlight=None,playing=False,frame=0,phase=1.,job=None,point_map={},payload=None,home=None,selection_artists=[])
     cache={}
     def read(path):
         path=str(path)
         if path not in cache:cache[path]=json.loads(Path(path).read_text(encoding='utf-8-sig'))
         return cache[path]
-    def resolved_tag():return state['point_map'].get(ident.get().strip(),'') if kind.get()=='ETABS point' else ident.get().strip()
+    def resolved_tag():
+        return resolve_node_tag(kind.get(),ident.get(),state['point_map'])
     def dof(d,tag):
         values=d.get('displacements',{}).get(str(tag),[]);mask=d.get('dof_availability',[True]*len(values))
         return [values[i] if i<len(values) and i<len(mask) and mask[i] else None for i in range(6)]
@@ -40,10 +43,16 @@ def launch(parent,folder):
             try:state['highlight'].remove()
             except ValueError:pass
             state['highlight']=None
+        remove_selection_artists(state['selection_artists'])
+        state['selection_artists']=[]
         if kind.get() in ('OpenSees node','ETABS point') and tag in d['nodes']:
             values=dof(d,tag);xyz=d['nodes'][tag];point=np.array(xyz)+float(scale.get())*state['phase']*np.array([v or 0. for v in values[:3]]);delta=max(1.,ax.get_zlim()[1]-ax.get_zlim()[0])*.005
             segments=[[point-np.eye(3)[a]*delta,point+np.eye(3)[a]*delta] for a in range(3)]
             state['highlight']=Line3DCollection(segments,colors='#c000a0',linewidths=3);ax.add_collection3d(state['highlight'],autolim=False)
+            span=max(1.,max(hi-lo for lo,hi in
+                (ax.get_xlim(),ax.get_ylim(),ax.get_zlim())))
+            state['selection_artists']=node_selection_artists(
+                ax,point,span_m=span)
             physical=[xyz[a]+(values[a] or 0.) for a in range(3)]
             message.set(node_readout(tag,values,physical,'Unscaled response values. MRSM values are non-concurrent CQC component envelopes; illustration is not a recorded history.'))
             for limit in ('SLS','ULS'):
@@ -60,7 +69,12 @@ def launch(parent,folder):
                 items=payload['frames']+payload['shells']
                 for i,e in enumerate(items):
                     if (kind.get()=='OpenSees element' and ident.get().strip()==str(100001+i)) or (kind.get()=='ETABS FRAME' and i<len(payload['frames']) and str(e['object'])==ident.get().strip()) or (kind.get()=='ETABS AREA' and i>=len(payload['frames']) and str(e['object'])==ident.get().strip()):segments.append([payload['nodes'][str(n)] for n in e['nodes']])
-            state['highlight']=Line3DCollection(segments,colors='#c000a0',linewidths=3);ax.add_collection3d(state['highlight'],autolim=False);message.set('Choose a node for six-DOF values. Older files with only translations show N/A for unrecorded rotations.')
+            state['highlight']=Line3DCollection(segments,colors='#c000a0',linewidths=3);ax.add_collection3d(state['highlight'],autolim=False)
+            if kind.get() in ('OpenSees node','ETABS point'):
+                message.set('Node ID not found: '+ident.get().strip()+
+                    ' | Check the ETABS source-to-OpenSees node mapping.')
+            else:
+                message.set('Element highlight uses source geometry; select a node for six-DOF values.')
         chart.draw_idle()
     def draw(phase=None):
         if state['data'] is None:return
@@ -71,7 +85,7 @@ def launch(parent,folder):
         segments=[base+amount*state['phase']*delta for base,delta in zip(state['base_segments'],state['delta_segments'])]
         state['deformed'].set_segments(segments);show_node();chart.draw_idle()
     def load(*unused):
-        pause();d=read(selected.get());state.update(data=d,phase=1.,point_map={},payload=None);ax.clear()
+        pause();d=read(selected.get());state.update(data=d,phase=1.,point_map={},payload=None,selection_artists=[]);ax.clear()
         for ancestor in Path(selected.get()).parents:
             path=ancestor/'OpenSees_Complete_Model_Data_V118.json'
             if path.is_file():
@@ -105,7 +119,39 @@ def launch(parent,folder):
     def fit():
         for setter,limits in zip((ax.set_xlim,ax.set_ylim,ax.set_zlim),state.get('home') or []):setter(*limits)
         chart.draw_idle()
-    for label,fn in [('Highlight / read node',show_node),('Apply scale',lambda:draw()),('Zoom +',lambda:zoom(.8)),('Zoom -',lambda:zoom(1.25)),('Fit',fit),('Play illustration',play),('Pause / final',lambda:(pause(),draw(1.)))]:ttk.Button(actions,text=label,command=fn).pack(side='left')
+    def zoom_to_node():
+        d=state['data']
+        if d is None:
+            message.set('Load a response case before selecting a node.')
+            return
+        tag=resolved_tag()
+        if kind.get() not in ('OpenSees node','ETABS point') or tag not in d['nodes']:
+            show_node()
+            return
+        values=dof(d,tag)
+        xyz=np.asarray(d['nodes'][tag],dtype=float)
+        disp=np.array([v if v is not None else 0. for v in values[:3]])
+        try:
+            amount=float(scale.get())
+        except (ValueError,tk.TclError):
+            amount=0.
+        if not math.isfinite(amount):
+            amount=0.
+        point=xyz+amount*state['phase']*disp
+        span=center_camera_on_node(ax,point,home=state['home'],
+                                   span_fraction=.08,min_span_m=.8)
+        show_node()
+        message.set('ZOOMED to OpenSees node '+tag+
+            f' | XYZ=({point[0]:.4f}, {point[1]:.4f}, {point[2]:.4f}) m'+
+            f' | view cube {span:.3f} m. Response readout remains unscaled.')
+        chart.draw_idle()
+    for label,fn in [('Highlight / read node',show_node),
+         ('Zoom to Node',zoom_to_node),
+         ('Apply scale',lambda:draw()),('Zoom +',lambda:zoom(.8)),
+         ('Zoom -',lambda:zoom(1.25)),('Fit',fit),
+         ('Play illustration',play),
+         ('Pause / final',lambda:(pause(),draw(1.)))]:
+        ttk.Button(actions,text=label,command=fn).pack(side='left')
     view_choice=camera_controls(win,ax,chart)
     toolbar=ttk.Frame(win);toolbar.pack(side='bottom',fill='x');NavigationToolbar2Tk(chart,toolbar)
     chart.get_tk_widget().pack(fill='both',expand=True)
@@ -116,7 +162,8 @@ def launch(parent,folder):
     win.bind('<Configure>',lambda e:note_label.configure(wraplength=max(450,e.width-24)) if e.widget==win else None,add='+')
     chart.mpl_connect('scroll_event',lambda e:zoom(.8 if e.button=='up' else 1.25) if e.inaxes==ax else None);box.bind('<<ComboboxSelected>>',load)
     win.bind('<Destroy>',lambda e:pause() if e.widget==win else None,add='+')
-    win._response_state=state;win._response_ident=ident;win._response_highlight=show_node
+    win._response_state=state;win._response_ident=ident
+    win._response_highlight=show_node;win._response_zoom_to_node=zoom_to_node
     if paths:selected.set(str(paths[0]));load()
     else:note.set('No saved deformation files in this output tree. Run an analysis first.')
     return win
