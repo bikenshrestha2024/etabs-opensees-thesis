@@ -1,0 +1,64 @@
+"""Conservative volumetric overlap ownership and never-silent activation."""
+import tempfile
+import unittest
+from pathlib import Path
+from components.model.joint_volume_ownership import (
+    _volume, _subtract, build_joint_volume_ledger, export_joint_volume_ledger)
+
+
+class JointWeightTests(unittest.TestCase):
+    def setUp(self):
+        # Column owns intersection; slab owns beam/slab junction; beam gets
+        # the remainder. Stiffness/section are unchanged.
+        self.nodes={
+            1:[0.,0.,0.],2:[0.,0.,6.],
+            3:[0.,0.,3.],4:[6.,0.,3.],
+            5:[0.,-1.,3.],6:[6.,-1.,3.],
+            7:[6.,1.,3.],8:[0.,1.,3.]}
+        self.frames=[
+            dict(object="C1",category="COLUMN",nodes=[1,2],length=6.,
+                 physical_width_m=1.,physical_depth_m=1.,
+                 properties=dict(A=1.,weight=25.)),
+            dict(object="B1",category="BEAM",nodes=[3,4],length=6.,
+                 physical_width_m=.5,physical_depth_m=.6,
+                 properties=dict(A=.3,weight=25.))]
+        self.shells=[
+            dict(object="S1",category="FLOOR",nodes=[5,6,7,8],
+                 area=12.,properties=dict(thickness=.15,weight=25.))]
+    def test_cuboid_subtraction_conserves_volume(self):
+        cube=((0.,2.),(0.,2.),(0.,2.))
+        cut=((1.,3.),(.5,1.5),(.5,1.5))
+        residual=_subtract(cube,cut)
+        self.assertAlmostEqual(sum(map(_volume,residual)),7.)
+    def test_triple_overlap_single_owner(self):
+        audit=build_joint_volume_ledger(self.frames,self.shells,self.nodes)
+        rows={r['object']:r for r in audit['rows']}
+        self.assertAlmostEqual(rows['C1']['net_m3'],6.)
+        self.assertAlmostEqual(rows['S1']['net_m3'],1.725)
+        self.assertAlmostEqual(rows['B1']['net_m3'],1.2375)
+        self.assertAlmostEqual(audit['gross_RCC_weight_kN'],9.6*25)
+        self.assertAlmostEqual(audit['net_RCC_weight_kN'],8.9625*25)
+        self.assertAlmostEqual(audit['potentially_duplicated_RCC_weight_kN'],.6375*25)
+        self.assertEqual(audit['policy'],'AUDIT_ONLY')
+        with tempfile.TemporaryDirectory() as folder:
+            export_joint_volume_ledger(folder,audit)
+            self.assertTrue((Path(folder)/'OpenSees_Joint_Volume_Ownership_Audit.csv').is_file())
+    def test_verified_mode_requires_reviewed_physical_geometry(self):
+        with self.assertRaisesRegex(ValueError,'geometry/insertion-point'):
+            build_joint_volume_ledger(self.frames,self.shells,self.nodes,
+                policy='VERIFIED_SINGLE_OWNER')
+        a=build_joint_volume_ledger(self.frames,self.shells,self.nodes,
+            policy='VERIFIED_SINGLE_OWNER',geometry_verified=True)
+        self.assertLess(a['rows'][-1]['retained_ratio'],1.)
+    def test_unsupported_rotated_geometry_is_not_invented(self):
+        frame=dict(self.frames[1]);frame['nodes']=[1,7]
+        with self.assertRaisesRegex(ValueError,'not axis aligned'):
+            build_joint_volume_ledger([frame],[],self.nodes,
+                policy="VERIFIED_SINGLE_OWNER",geometry_verified=True)
+    def test_invalid_policy_fails_closed(self):
+        with self.assertRaisesRegex(ValueError,'Unknown joint'):
+            build_joint_volume_ledger(self.frames,self.shells,self.nodes,
+                policy="CLEAR_ALL")
+
+if __name__=='__main__':
+    unittest.main()
