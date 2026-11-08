@@ -290,6 +290,7 @@ def review(export_dir,*,etabs_beam_csv=None,etabs_beam_kN=None,
         summary.append("Foundation region count: "+str(len(report["foundation"]["rows"])))
         summary.append("Individual node reaction data remains in GRAVITY_SAFE_REVIEW.json")
     (out/"GRAVITY_SAFE_REVIEW.txt").write_text("\n".join(summary)+"\n",encoding="utf-8")
+    _write_optional_excel(out,report)
     return out,report
 
 
@@ -341,6 +342,181 @@ def stage_candidate(export_dir,review_json,*,approval_text):
     return out
 
 
+def make_region_template(node_comparison_path,output_csv):
+    """Generate an UNVERIFIED point map: user must label every source point.
+
+    [REF components/validation/gravity_node_comparison.py compare_support_nodes]
+    """
+    data=load(node_comparison_path)
+    if not isinstance(data,dict) or not isinstance(data.get("rows"),list):
+        raise ValueError("Full node-comparison JSON with individual rows required")
+    point_rows=data["rows"]
+    output=Path(output_csv)
+    if output.exists():
+        raise FileExistsError("Refuse to overwrite existing engineering mapping "+str(output))
+    output.parent.mkdir(parents=True,exist_ok=True)
+    seen=set()
+    with output.open("w",newline="",encoding="utf-8-sig") as fp:
+        w=csv.writer(fp)
+        w.writerow(["etabs_point","region_id","region_type","verified",
+                    "source_basis","x_m","y_m","z_m","opensees_node",
+                    "etabs_Rz_kN","opensees_Rz_kN","mapping_status"])
+        for row in point_rows:
+            key=str(row.get("etabs_point") or "")
+            if not key or key in seen:continue
+            seen.add(key)
+            w.writerow([key,"UNASSIGNED","OTHER","NO","",row.get("x_m"),
+                row.get("y_m"),row.get("z_m"),row.get("opensees_node"),
+                row.get("etabs_global_rz_kN"),row.get("opensees_rz_kN"),
+                row.get("status")])
+    return output
+
+
+def _write_optional_excel(folder,report):
+    """Readable artifact; preserve machine-readable JSON/CSV if unavailable.
+
+    [REF docs/source/Gravity_Safe_Engineering_Review_V1.py.md]
+    """
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font,PatternFill
+    except ImportError:
+        return None
+    book=Workbook()
+    ws=book.active;ws.title="Review summary"
+    ws.append(["CHECK","VALUE"])
+    beam=report["beam"]
+    for k,v in beam.items():
+        if k=="issues":v=" | ".join(v)
+        ws.append([k,json.dumps(v) if isinstance(v,(dict,list)) else v])
+    ws.append(["STRUCTURAL ACCEPTANCE","NOT VALIDATED"])
+    if "foundation" in report:
+        for name,rows in [
+            ("Foundation regions",report["foundation"]["rows"]),
+            ("Original support points",report["foundation"]["original_individual_rows"])]:
+            sheet=book.create_sheet(name)
+            if not rows:continue
+            fields=list(rows[0])
+            sheet.append(fields)
+            for row in rows:
+                sheet.append([row.get(k) for k in fields])
+    for sheet in book.worksheets:
+        sheet.freeze_panes="A2"
+        sheet.auto_filter.ref=sheet.dimensions
+        for cell in sheet[1]:
+            cell.font=Font(bold=True,color="FFFFFF")
+            cell.fill=PatternFill("solid",fgColor="234264")
+        sheet.column_dimensions["A"].width=32
+        sheet.column_dimensions["B"].width=36
+    result=Path(folder)/"GRAVITY_SAFE_REVIEW.xlsx"
+    book.save(result)
+    return result
+
+
+def launch_gui():
+    """Spyder-compatible file-selection UI; audit is read-only by default.
+
+    [REF docs/source/Gravity_Safe_Engineering_Review_V1.py.md]
+    """
+    try:
+        import tkinter as tk
+        from tkinter import filedialog,messagebox,ttk
+    except ImportError as exc:
+        raise RuntimeError("Tkinter unavailable: run the documented command-line interface") from exc
+    win=tk.Tk()
+    win.title("ETABS / OpenSees — Safe Gravity Engineering Review V1")
+    win.geometry("1010x690")
+    frame=ttk.Frame(win,padding=14);frame.pack(fill="both",expand=True)
+    export=tk.StringVar()
+    beam_csv=tk.StringVar()
+    node_json=tk.StringVar()
+    region_csv=tk.StringVar()
+    base=tk.StringVar()
+    lines=[
+        ("OpenSees source export folder",export,True),
+        ("ETABS Material List Beam CSV",beam_csv,False),
+        ("Full 76-point comparison JSON (optional)",node_json,False),
+        ("Verified region map CSV (optional)",region_csv,False),
+        ("ETABS base FZ in kN (optional)",base,None)]
+    for ix,(label,var,kind) in enumerate(lines):
+        ttk.Label(frame,text=label).grid(row=ix,column=0,sticky="w",pady=6)
+        ttk.Entry(frame,textvariable=var,width=92).grid(
+            row=ix,column=1,sticky="ew",padx=6)
+        if kind is not None:
+            def browse(v=var,directory=kind):
+                found=(filedialog.askdirectory() if directory else
+                       filedialog.askopenfilename(
+                           filetypes=[("CSV / JSON evidence","*.csv *.json"),
+                                      ("All files","*.*")]))
+                if found:v.set(found)
+            ttk.Button(frame,text="Browse...",command=browse).grid(
+                row=ix,column=2,padx=4)
+    frame.columnconfigure(1,weight=1)
+    text=tk.Text(frame,wrap="word",height=21,font=("Consolas",10))
+    text.grid(row=7,column=0,columnspan=3,sticky="nsew",pady=12)
+    frame.rowconfigure(7,weight=1)
+    def show(msg):
+        text.delete("1.0","end")
+        text.insert("end",msg)
+        text.see("1.0")
+    current=[None]
+    def audit():
+        try:
+            if not export.get().strip():raise ValueError("Select source export folder")
+            if not beam_csv.get().strip():raise ValueError("Independent ETABS Material List beam CSV required")
+            path=Path(export.get()).expanduser().resolve()
+            n=node_json.get().strip() or None
+            m=region_csv.get().strip() or None
+            e=finite(base.get(),"ETABS base reaction") if base.get().strip() else None
+            folder,report=review(path,etabs_beam_csv=beam_csv.get(),
+                                 node_comparison=n,region_csv=m,etabs_base_kN=e)
+            xlsx=_write_optional_excel(folder,report)
+            current[0]=folder/"GRAVITY_SAFE_REVIEW.json"
+            show((folder/"GRAVITY_SAFE_REVIEW.txt").read_text(encoding="utf8")+
+                "\nREVIEW DATA: "+str(current[0])+
+                "\nEXCEL: "+str(xlsx or "openpyxl not installed")+
+                "\n\nSource config NOT modified.")
+        except Exception as exc:
+            show("AUDIT BLOCKED: "+repr(exc))
+            messagebox.showerror("Audit blocked",str(exc),parent=win)
+    def template():
+        try:
+            if not node_json.get().strip():raise ValueError("Choose 76-point comparison JSON")
+            out=(Path(export.get()).expanduser().resolve()/
+                 "Gravity_Safe_Engineering_Review"/"FOUNDATION_REGION_TEMPLATE_UNVERIFIED.csv")
+            target=make_region_template(node_json.get(),out)
+            show("Created UNVERIFIED template:\n"+str(target)+
+                 "\nFill all 76 region IDs and source geometry basis; set verified=YES only after reviewing the original ETABS wall/column layout.")
+        except Exception as exc:messagebox.showerror("Template error",str(exc),parent=win)
+    def stage():
+        try:
+            if current[0] is None:
+                raise ValueError("Audit the source model first")
+            if not messagebox.askyesno("Engineering approval required",
+                  "You have checked the ORIGINAL ETABS source material list, "
+                  "all beam end offsets, beam Self Weight Option, section insertion "
+                  "locations and the double-subtraction guard.\n\n"
+                  "Stage a NEW proposed config only (do NOT alter production)?",
+                  parent=win):
+                return
+            target=stage_candidate(export.get(),current[0],
+                approval_text="I REVIEWED ETABS BEAM SELF WEIGHT AND SOURCE GEOMETRY")
+            show("PROPOSED CONFIG CREATED:\n"+str(target)+
+                 "\n\nOriginal model, loads, supports and config unchanged.\n"
+                 "Review APPLY_INSTRUCTIONS.txt before rebuilding.")
+        except Exception as exc:
+            messagebox.showerror("Cannot stage candidate",str(exc),parent=win)
+    bar=ttk.Frame(frame);bar.grid(row=6,column=0,columnspan=3,sticky="w",pady=10)
+    ttk.Button(bar,text="1. AUDIT (read only)",command=audit).pack(side="left",padx=5)
+    ttk.Button(bar,text="Create unverified region template",command=template).pack(side="left",padx=5)
+    ttk.Button(bar,text="2. Stage reviewed candidate",command=stage).pack(side="left",padx=5)
+    ttk.Label(frame,text="A numerical match is not structural acceptance. "
+              "This program never changes source EDB, stiffness, supports or production loads.",
+              foreground="#a43a27",wraplength=940).grid(
+              row=5,column=0,columnspan=3,sticky="w")
+    win.mainloop()
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser(description="Conservative ETABS/OpenSees gravity source reviewer")
     parser.add_argument("--export",required=True,help="ETABS->OpenSees source export folder")
@@ -364,4 +540,8 @@ def main(argv=None):
 
 
 if __name__=="__main__":
-    raise SystemExit(main())
+    import sys
+    if len(sys.argv)==1 or any(a.startswith("--ip=") for a in sys.argv[1:]):
+        launch_gui()
+    else:
+        raise SystemExit(main())
