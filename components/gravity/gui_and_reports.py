@@ -703,6 +703,10 @@ class GravityAnalysisGUI:
         for mode,entry in records.items():
             self._gravity_action_log("DUAL_GRAVITY_RESULT",
                     mode+" | "+("PASS" if entry["payload"] else "FAIL: "+entry["error"]))
+            self._gravity_action_log("DUAL_GRAVITY_SOLVER_LOG",
+                str(Path(entry["out"])/"Gravity_Run_V110.log"))
+            self._gravity_action_log("DUAL_GRAVITY_RESULT_PATH",
+                str(Path(entry["out"])/"Gravity_Result_V110.json"))
         if any(mode not in records or records[mode]["payload"] is None for mode in scenarios):
             self.status_var.set("Dual gravity incomplete; inspect per-case run logs")
             messagebox.showerror("Dual gravity incomplete",
@@ -781,6 +785,9 @@ class GravityAnalysisGUI:
         self.log.insert("end", "\n" + log_text + "\n")
         self.log.see("end")
         if not payload.get("ok"):
+            self._gravity_action_log("GRAVITY_FAILED_SOLVER_LOG",str(out/"Gravity_Run_V110.log"))
+            self._gravity_action_log("GRAVITY_FAILED_RESULT",str(out/"Gravity_Result_V110.json"))
+            self._gravity_action_log("GRAVITY_GUI_LOG",str(out/"Gravity_GUI_Actions.log"))
             self.status_var.set("Gravity run failed — see the log for the failing step.")
             messagebox.showerror("Gravity analysis failed", payload.get("error", "Unknown error"), parent=self.win)
             self.nb.select(self.log_tab)
