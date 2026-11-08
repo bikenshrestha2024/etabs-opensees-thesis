@@ -43,6 +43,8 @@ on:
       - 'components/model/assembly.py'
       - 'components/gravity/comparison_bundle.py'
       - 'components/gravity/validation_scorecard.py'
+      - 'Gravity_Safe_Engineering_Review_V1.py'
+      - 'tests/verify_safe_gravity_engineering_review.py'
       - 'tests/verify_gravity_validation_scorecard.py'
       - 'components/gravity/evidence_workflow.py'
       - 'tests/verify_gravity_evidence_workflow.py'
@@ -258,6 +260,7 @@ jobs:
           python tests/verify_device_parameter_finiteness.py
           python tests/verify_gravity_comparison_bundle.py
           python tests/verify_gravity_validation_scorecard.py
+          python tests/verify_safe_gravity_engineering_review.py
           python tests/verify_gravity_evidence_workflow.py
           python tests/verify_gravity_etabs_direct.py
           python tests/verify_gravity_node_comparison.py
