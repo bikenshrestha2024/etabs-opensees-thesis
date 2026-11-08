@@ -699,7 +699,13 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                       total_seismic_weight_including_fixed_nodes_kN=sum(nodal_mass.values())*9.80665,
                       active_horizontal_seismic_weight_kN=sum(m for n,m in nodal_mass.items() if not all(supports.get(str(n),[0]*6)[:2]))*9.80665,gravity_by_pattern_kN=ledger,
                       elastic_assembled=True)
-        report['warnings'] += ['Elastic core walls use gross source E/thickness; establish rational cracked-wall stiffness before NBC design use.',
+        if cfg.get('linear_shell_stiffness_policy')=='TABULATED_REVIEWED_THIN_SHELL':
+            report['warnings'].append(
+                'ULS tabulated linear ShellMITC4/ElasticMembranePlateSection candidate selected; OpenSees transverse shear scales with plate bending and DOES NOT exactly equal ETABS source v13/v23. Run tests and separately verify object modifiers before ETABS equivalence.')
+        else:
+            report['warnings'].append(
+                'Elastic core walls use gross source E/thickness; establish rational cracked-wall stiffness before NBC design use.')
+        report['warnings'] += [
             'Frame EI uses NBC ULS beam 0.35 and column 0.70; source orientation and diaphragm equivalence need ETABS response comparison.',
             'Floor bending uses the configured IS 16700 slab factor; membrane EA is preserved by equivalent E/thickness. Physical thickness controls weight.',
             'Joint-volume policy is recorded separately from geometric stiffness end offsets. AUDIT_ONLY preserves gross weight, VERIFIED_SINGLE_OWNER requires verified centroidal RCC solids and must be reconciled with ETABS.',
@@ -929,8 +935,11 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
     linear_shell_policy=cfg.get("linear_shell_stiffness_policy","LEGACY_GROSS_SHELL")
     if linear_shell_policy not in ("LEGACY_GROSS_SHELL","TABULATED_REVIEWED_THIN_SHELL"):
         raise ValueError("Unknown linear_shell_stiffness_policy: "+str(linear_shell_policy))
-    if linear_shell_policy=="TABULATED_REVIEWED_THIN_SHELL" and mode!="elastic":
-        raise ValueError("Tabulated elastic shell stiffness is for elastic gravity, modal, ESM and MRSM only; nonlinear wall materials are separate")
+    if linear_shell_policy=="TABULATED_REVIEWED_THIN_SHELL":
+        if mode!="elastic":
+            raise ValueError("Tabulated ULS elastic shell stiffness is for elastic gravity, modal, ESM and MRSM only; nonlinear wall materials are separate")
+        if limit_state!="ULS":
+            raise ValueError("ULS tabulated property modifiers cannot be silently applied to the SLS model. Supply a separately reviewed SLS property mapping.")
     shell_audit={}
     tag=100000; used_sections={}; element_map={}; element_labels={}
     for e in data['frames']:
