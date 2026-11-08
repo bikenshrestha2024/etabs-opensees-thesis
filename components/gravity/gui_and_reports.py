@@ -88,6 +88,7 @@ class GravityAnalysisGUI:
         self.output_var = tk.StringVar(value=str(Path.cwd() / "OpenSees_Analysis_Results" / "Gravity_Results"))
         self.comparison_output_var = tk.StringVar(value="")
         self.etabs_gravity_json_var = tk.StringVar(value="")
+        self.etabs_full_table_var=tk.StringVar(value="")
         self.etabs_case_var = tk.StringVar(value="1. DL + LL")
         self.allow_alternate_edb = tk.BooleanVar(value=False)
         self.launch_etabs_for_gravity = tk.BooleanVar(value=True)
@@ -156,6 +157,80 @@ class GravityAnalysisGUI:
         self.log.insert("end",line+"\n")
         self.log.see("end")
         self.win.update_idletasks()
+
+    def _offline_etabs_table_compare(self):
+        """Read previously completed ETABS spreadsheet; no COM or solver needed.
+
+        [REF components/validation/gravity_etabs_offline.py]
+        """
+        try:
+            source=Path(self.etabs_full_table_var.get()).expanduser().resolve()
+            if not source.is_file():
+                raise FileNotFoundError('Select the analyzed ETABS full table Excel export or Joint Reactions CSV')
+            export_folder=Path(self.model_var.get()).expanduser().resolve().parent
+            mapping=export_folder/'OpenSees_Element_Connectivity.json'
+            if not mapping.is_file():
+                raise FileNotFoundError('Missing source ETABS point mapping: '+str(mapping))
+            main=Path(self.output_var.get()).expanduser().resolve()/'Gravity_Wall_Base_Comparison'
+            runs=sorted((x for x in main.glob('*') if
+                         (x/'ETABS_SOURCE_SUPPORTS'/'Gravity_Result_V110.json').is_file()),
+                        reverse=True)
+            if not runs:raise FileNotFoundError(
+                'Run BOTH wall-base gravity strategies first to generate current source and continuous results')
+            root=runs[0]
+            a=root/'ETABS_SOURCE_SUPPORTS'/'Gravity_Result_V110.json'
+            b=root/'CONTINUOUS_WALL_BASE_FIXED'/'Gravity_Result_V110.json'
+            if not b.is_file():raise FileNotFoundError('Missing continuous wall base result: '+str(b))
+            dst=root/'ETABS_Full_Table_Offline_Comparison'
+            self.nb.select(self.log_tab)
+            self._gravity_action_log('ETABS_OFFLINE_START',
+                'Reading native ETABS joint reaction table without COM: '+str(source))
+            self._gravity_action_log('ETABS_OFFLINE_INPUTS',
+                'OpenSees source+continuous runs: '+str(root))
+            th=threading.Thread(target=self._offline_etabs_worker,
+                args=(source,mapping,a,b,dst),daemon=True)
+            th.start()
+        except Exception as exc:
+            messagebox.showerror('Offline ETABS gravity comparison',str(exc),parent=self.win)
+
+    def _offline_etabs_worker(self,source,mapping,a,b,dst):
+        try:
+            from components.validation.gravity_etabs_offline import (
+                compare_etabs_export,export_offline_comparison)
+            report=compare_etabs_export(source,mapping,a,b,
+                                        case=self.etabs_case_var.get().strip())
+            export_offline_comparison(report,dst)
+            self.win.after(0,lambda:self._offline_etabs_finished(report,dst,None))
+        except Exception as exc:
+            error=traceback.format_exc()
+            self.win.after(0,lambda:self._offline_etabs_finished(None,dst,error))
+
+    def _offline_etabs_finished(self,report,dst,error):
+        if error is not None:
+            self._gravity_action_log('ETABS_OFFLINE_ERROR',error)
+            self.status_var.set('Offline ETABS comparison failed; review Run log')
+            messagebox.showerror('Offline ETABS comparison',error[-1800:],
+                                 parent=self.win)
+            return
+        top=report['rows'][:6]
+        self._gravity_action_log('ETABS_OFFLINE_COMPLETE',
+            'ETABS unique joints='+str(report['etabs_joint_records'])+
+            ', matched OpenSees='+str(report['matched_source_nodes'])+
+            ', total force difference='+str(report['difference_opensees_minus_etabs_kN'])+
+            ' kN; output='+str(dst))
+        for row in top:
+            self._gravity_action_log('ETABS_NODE',
+                'ETABS unique '+str(row['etabs_unique_name'])+
+                ' → OpenSees '+str(row['opensees_node_tag'])+
+                '; difference kN='+str(row['delta_source_minus_etabs_kN'])+
+                '; status='+row['status'])
+        self.status_var.set('Offline ETABS table comparison saved: '+str(dst))
+        messagebox.showinfo('Offline ETABS gravity comparison',
+            f"ETABS joints: {report['etabs_joint_records']}\\n"
+            f"Verified mapped supports: {report['matched_source_nodes']}\\n"
+            f"Total OpenSees − ETABS: {report['difference_opensees_minus_etabs_kN']:+,.3f} kN\\n\\n"
+            "See the full per-point Excel and CSV results in:\\n"+str(dst),
+            parent=self.win)
 
     def _direct_etabs_gravity_compare(self):
         """Extract matching ETABS full gravity and compare without switching programs.
@@ -385,6 +460,12 @@ class GravityAnalysisGUI:
         ttk.Checkbutton(form,
           text="Use a separately saved ETABS gravity-copy EDB (diagnostic only; model equivalence UNVERIFIED)",
           variable=self.allow_alternate_edb).pack(anchor="w",pady=(2,4))
+        self._path_row(form,"Completed ETABS full table XLSX / Joint Reactions CSV",self.etabs_full_table_var,
+            lambda:self._browse_file(self.etabs_full_table_var,
+                "Choose original analyzed ETABS full-table export",
+                [("ETABS Excel or CSV","*.xlsx *.xlsm *.csv"),("All files","*.*")]))
+        ttk.Button(form,text="Compare saved ETABS tables vs BOTH OpenSees gravity cases (no ETABS API)",
+                   command=self._offline_etabs_table_compare).pack(anchor="w",pady=(3,5))
         self._path_row(form, "ETABS gravity results JSON (optional)", self.etabs_gravity_json_var,
                        lambda: self._browse_file(self.etabs_gravity_json_var,
                           "Select matching ETABS gravity results JSON", [("JSON", "*.json")]))
