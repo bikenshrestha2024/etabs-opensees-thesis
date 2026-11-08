@@ -18,6 +18,10 @@ TOL=1e-9
 
 
 def positive(value,what):
+    """Validate physical/section positive inputs.
+
+    [REF docs/source/components/model/linear_shell_stiffness.py.md]
+    """
     try:
         x=float(value)
     except (ValueError,TypeError):
@@ -28,7 +32,10 @@ def positive(value,what):
 
 
 def source_shell_modifiers(values, *, property_name, source_kind):
-    """Require the entire effective ETABS modifier vector, not guesses."""
+    """Require the entire effective ETABS modifier vector, not guesses.
+
+    [REF docs/source/components/model/linear_shell_stiffness.py.md]
+    """
     if not isinstance(values,dict):
         raise ValueError(property_name+": missing audited "+source_kind+" shell modifiers")
     extras=set(values)-set(FIELDS)
@@ -111,7 +118,10 @@ def shell_section_parameters(E,nu,thickness,source_modifiers, *,
 
 
 def section_command(ops,tag,result):
-    """Register explicitly parameterized elastic section; no hidden reductions."""
+    """Register explicitly parameterized elastic section; no hidden reductions.
+
+    [REF docs/source/components/model/linear_shell_stiffness.py.md]
+    """
     ops.section("ElasticMembranePlateSection",int(tag),
                 result["E_membrane_kN_m2"],
                 # E_plate is defined by the optional Ep_modifier.
