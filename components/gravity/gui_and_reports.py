@@ -403,6 +403,8 @@ class GravityAnalysisGUI:
         bar = ttk.Frame(root); bar.pack(fill="x", pady=(0, 7))
         self.run_button = ttk.Button(bar, text="Run gravity, check, freeze + export", command=self.run)
         self.run_button.pack(side="left")
+        ttk.Button(bar,text="Run BOTH wall-base gravity strategies",
+                   command=self.run_both_wall_supports).pack(side="left",padx=5)
         ttk.Button(bar,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
         ttk.Button(bar,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
         ttk.Button(bar,text="Bundle gravity evidence ZIP",command=self._export_comparison_bundle).pack(side="left",padx=5)
@@ -498,6 +500,125 @@ class GravityAnalysisGUI:
         runner_path.write_text(_runner_source(model, result_path, supports, total, steps, self.gravity_profile_var.get()), encoding="utf-8")
         thread = threading.Thread(target=self._worker, args=(py, runner_path, result_path, log_path, out, self.gravity_profile_var.get(), self.wall_support_strategy_var.get()), daemon=True)
         thread.start()
+
+    def run_both_wall_supports(self):
+        """Run both gravity boundary-condition strategies in isolated output folders.
+
+        [REF components/gravity/support_scenarios.py compare_wall_support_gravity]
+        This is a full-gravity support sensitivity test only; seismic mass and
+        the exported model config are not modified.
+        """
+        try:
+            model,out,py,supports,total,steps=self._inputs()
+            if self.gravity_profile_var.get()!="GRAVITY_1.0D_1.0L":
+                raise ValueError("Both wall-base strategy runs require full 1.0D+1.0L gravity")
+            if not self.coverage_confirmed.get():
+                raise ValueError("Confirm gravity load coverage before either run")
+            if not messagebox.askyesno("Run two gravity wall-base strategies",
+                 "Run the same full-gravity load twice with different wall-base "
+                 "restraints?\\n\\n"
+                 "1) Original ETABS point supports only\\n"
+                 "2) Continuous fixed wall-base edge idealization\\n\\n"
+                 "The second case is a foundation boundary-condition sensitivity "
+                 "study, NOT a validated raft/soil model. Existing results are "
+                 "not overwritten.",parent=self.win):
+                return
+            stamp=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            root=out/"Gravity_Wall_Base_Comparison"/stamp
+            if root.exists():raise FileExistsError(str(root))
+            root.mkdir(parents=True)
+            scenarios=("ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED")
+            for mode in scenarios:(root/mode).mkdir()
+            self.run_button.configure(state="disabled")
+            self.status_var.set("Running two independent wall-base gravity cases…")
+            self.nb.select(self.log_tab)
+            self._gravity_action_log("DUAL_GRAVITY_START",
+                "Two gravity strategies; same full gravity="+str(total)+" kN; folder="+str(root))
+            task=threading.Thread(
+                target=self._both_wall_support_worker,
+                args=(model,root,py,supports,total,steps,scenarios),daemon=True)
+            task.start()
+        except Exception as exc:
+            messagebox.showerror("Dual gravity input check",str(exc),parent=self.win)
+
+    def _both_wall_support_worker(self,model,root,py,supports,total,steps,scenarios):
+        """Run independent child processes; preserve per-case logs and results.
+
+        [REF components/gravity/support_scenarios.py export_wall_support_comparison]
+        """
+        records={}
+        for mode in scenarios:
+            out=root/mode
+            runner=out/"Gravity_Run_V110.py"
+            result=out/"Gravity_Result_V110.json"
+            log=out/"Gravity_Run_V110.log"
+            runner.write_text(_runner_source(model,result,supports,total,steps,
+                              "GRAVITY_1.0D_1.0L"),encoding="utf8")
+            env=dict(os.environ)
+            env.update(PYTHONIOENCODING="utf-8",PYTHONUTF8="1",
+                       OPENSEES_GRAVITY_PROFILE="GRAVITY_1.0D_1.0L",
+                       OPENSEES_GRAVITY_GUI_MODE="1",
+                       OPENSEES_GRAVITY_WALL_SUPPORT_STRATEGY=mode)
+            try:
+                proc=subprocess.run([str(py),str(runner)],cwd=str(out),
+                    capture_output=True,text=True,errors="replace",env=env,encoding="utf-8")
+                log.write_text(proc.stdout+
+                    ("\\n--- STDERR ---\\n"+proc.stderr if proc.stderr else ""),encoding="utf8")
+                if proc.returncode:
+                    raise RuntimeError(mode+" returned "+str(proc.returncode)+
+                        ": "+proc.stderr[-1400:])
+                payload=json.loads(result.read_text(encoding="utf8"))
+                if not payload.get("ok"):
+                    raise RuntimeError(mode+" failed: "+str(payload.get("error")))
+                records[mode]=dict(payload=payload,out=str(out),error=None)
+            except Exception as exc:
+                records[mode]=dict(payload=None,out=str(out),error=str(exc))
+                # Retain earlier successful run; do not claim dual completion.
+                break
+        self.win.after(0,lambda:self._finished_both_wall_supports(records,root,scenarios))
+
+    def _finished_both_wall_supports(self,records,root,scenarios):
+        """Generate both reports and a comparison on the GUI thread.
+
+        [REF components/gravity/support_scenarios.py compare_wall_support_gravity]
+        """
+        self.run_button.configure(state="normal")
+        for mode,entry in records.items():
+            self._gravity_action_log("DUAL_GRAVITY_RESULT",
+                    mode+" | "+("PASS" if entry["payload"] else "FAIL: "+entry["error"]))
+        if any(mode not in records or records[mode]["payload"] is None for mode in scenarios):
+            self.status_var.set("Dual gravity incomplete; inspect per-case run logs")
+            messagebox.showerror("Dual gravity incomplete",
+                "One of the two wall-base cases failed. Review the separately saved "
+                "Gravity_Run_V110.log in "+str(root),parent=self.win)
+            return
+        try:
+            from components.gravity.support_scenarios import (
+                compare_wall_support_gravity,export_wall_support_comparison)
+            first=records[scenarios[0]]["payload"]
+            second=records[scenarios[1]]["payload"]
+            comparison=compare_wall_support_gravity(first,second)
+            for mode in scenarios:
+                self._make_outputs(records[mode]["payload"],Path(records[mode]["out"]))
+            export_wall_support_comparison(comparison,root)
+            self._gravity_action_log("DUAL_GRAVITY_DONE",
+                "Both gravity workbooks and comparison saved: "+str(root))
+            self.status_var.set("Two gravity wall-base cases PASS; comparison: "+str(root))
+            messagebox.showinfo("Two gravity conditions completed",
+                "Same full gravity loads; separate support conditions.\\n\\n"
+                "ETABS-source supports: "+
+                str(comparison["summary"][0]["support_count"])+" nodes\\n"
+                "Continuous fixed wall base: "+
+                str(comparison["summary"][1]["support_count"])+" nodes\\n"
+                "Difference in summed base reactions: "+
+                f"{comparison['reaction_total_difference_kN']:.5f} kN\\n\\n"
+                "This is a boundary-condition sensitivity analysis, not an "
+                "independent validation of actual foundation restraint.\\n\\n"+
+                str(root),parent=self.win)
+        except Exception as exc:
+            self._gravity_action_log("DUAL_GRAVITY_REPORT_ERROR",str(exc))
+            self.status_var.set("Runs completed but comparison export failed")
+            messagebox.showerror("Dual gravity export failed",str(exc),parent=self.win)
 
     def _worker(self, py, runner, result_path, log_path, out, profile, support_strategy="ETABS_SOURCE_SUPPORTS"):
         try:
