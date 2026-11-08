@@ -455,8 +455,10 @@ class GravityAnalysisGUI:
                 self.reaction_support_var.set("Select original completed ETABS 1. DL + LL table, then Read BOTH")
             if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
                 if reaction_supports is None:
-                    raise ValueError("ETABS Reaction Validation requires original completed ETABS Joint Reactions table")
-                self.support_var.set(", ".join(map(str,reaction_supports)))
+                    self.support_var.set("")
+                    self.status_var.set("MAIN 32 SUPPORTS: select original completed ETABS 1. DL + LL table and click Read BOTH before running")
+                else:
+                    self.support_var.set(", ".join(map(str,reaction_supports)))
             else:
                 self.support_var.set(", ".join(map(str,supports)))
             if total is not None: self.load_var.set(f"{float(total):.8g}")
@@ -466,7 +468,7 @@ class GravityAnalysisGUI:
             if hasattr(self,"storey_tree"):self._show_storey_loads()
             self.status_var.set("Gravity profile "+context['profile']+"; applied="+str(total)+" kN. Seismic mass independent.")
             if show_error:
-                messagebox.showinfo("Values read from generated code", f"Supports: {supports}\nVertical line-load total: {total} kN\n\n{note}\n{coverage}\n\nThis auto-total only sums loads present in the generated model script.", parent=self.win)
+                messagebox.showinfo("Values read from generated code", f"Active support tags: {self.support_var.get() or 'Missing original ETABS table for primary 32-node filter'}\nOriginal mapped support count: {len(supports)}\nVertical gravity load total: {total} kN\n\n{note}\n{coverage}\n\nThis auto-total only sums loads present in the generated model script.", parent=self.win)
             return data
         except Exception as exc:
             self.support_var.set('')
