@@ -144,7 +144,77 @@ def compare_support_nodes(etabs,opensees,*,tolerance_m=0.01):
         ])
 
 
-def write_node_comparison(folder,report):
+def all_model_node_rows(opensees, topology=None, etabs=None, report=None):
+    """Return every OpenSees node with original ETABS ID and measured response.
+
+    A non-support ETABS reaction is NOT implied by the absence of a support
+    reaction record. The ETABS API extraction currently provides only 76
+    restrained-point displacements; all other ETABS U3 cells stay empty.
+    [REF docs/review/GRAVITY_ETABS_COMPARISON.md]
+    """
+    src={}
+    source_points={}
+    for item in (topology or {}).get("node_map",[]):
+        tag=str(item.get("opensees_node_tag"))
+        name=item.get("etabs_point_name")
+        if name is not None:
+            if tag in src and src[tag]!=str(name):
+                raise ValueError("Conflicting source ETABS point mapping for OpenSees node "+tag)
+            src[tag]=str(name)
+            source_points[str(name)]=tag
+    support={}
+    for item in (opensees or {}).get("reactions",[]):
+        tag=str(item.get("node_tag"))
+        if tag in support:
+            raise ValueError("Duplicate OpenSees support reaction "+tag)
+        support[tag]=item
+    etabs_support={str(r.get("point")):r for r in (etabs or {}).get("joint_reactions",[])}
+    etabs_disp={str(r.get("point")):r for r in (etabs or {}).get("support_displacements",[])}
+    comparison={}
+    for row in (report or {}).get("rows",[]):
+        tag=row.get("opensees_node")
+        if tag is not None:
+            comparison[str(tag)]=row
+    nodes=(opensees or {}).get("nodes",[])
+    if not isinstance(nodes,list):
+        raise ValueError("OpenSees gravity nodes must be list of node records")
+    out=[]
+    for n in nodes:
+        tag=str(n.get("tag"))
+        point=src.get(tag)
+        e=etabs_support.get(point) if point is not None else None
+        d=etabs_disp.get(point) if point is not None else None
+        c=comparison.get(tag) or {}
+        rz=support.get(tag,{}).get("rz_kN")
+        out.append(dict(
+            opensees_node_tag=tag,
+            etabs_point_id=point,
+            x_m=n.get("x_m"),y_m=n.get("y_m"),z_m=n.get("z_m"),
+            is_opensees_support=tag in support,
+            is_etabs_restrained_point=point in etabs_support if point else False,
+            opensees_Ux_m=n.get("ux_m"),opensees_Uy_m=n.get("uy_m"),
+            opensees_Uz_m=n.get("uz_m"),
+            opensees_Rx_rad=n.get("rx_rad"),opensees_Ry_rad=n.get("ry_rad"),
+            opensees_Rz_rad=n.get("rz_rad"),
+            etabs_U1_m=d.get("U1") if d else None,
+            etabs_U2_m=d.get("U2") if d else None,
+            etabs_U3_m=d.get("U3") if d else None,
+            difference_Uz_m=(float(n["uz_m"])-float(d["U3"]))
+              if d and d.get("U3") is not None and n.get("uz_m") is not None else None,
+            etabs_support_Rz_kN=e.get("rz_global_kN") if e else None,
+            opensees_support_Rz_kN=rz,
+            support_Rz_difference_kN=(
+                float(rz)-float(e["rz_global_kN"]))
+              if e and e.get("rz_global_kN") is not None and rz is not None else None,
+            comparison_status=c.get("status",
+               "NO_ETABS_SUPPORT_REACTION" if tag not in support else
+               "UNMATCHED_OR_NO_ETABS_EVIDENCE"),
+            abs_support_difference_kN=c.get("abs_delta_kN"),
+            diagnostic_only=True))
+    return out
+
+
+def write_node_comparison(folder,report,*,etabs=None,opensees=None,topology=None):
     """Save full CSV, ranked CSV and machine-readable JSON from real evidence.
 
     [REF components/gravity/comparison_bundle.py export_bundle]
@@ -157,11 +227,18 @@ def write_node_comparison(folder,report):
             "separation_m","etabs_global_rz_kN","opensees_rz_kN",
             "delta_etabs_minus_opensees_kN","abs_delta_kN",
             "difference_percent","etabs_axis_basis","candidates"]
+    inventory=(all_model_node_rows(opensees,topology,etabs,report)
+               if opensees is not None else [])
     for filename,rows in (("Gravity_All_Support_Nodes.csv",report["rows"]),
                           ("Gravity_Top_Node_Discrepancies.csv",report["top_discrepancies"])):
         with (dest/filename).open("w",newline="",encoding="utf-8-sig") as stream:
             writer=csv.DictWriter(stream,fieldnames=fields,extrasaction="ignore")
             writer.writeheader();writer.writerows(rows)
+    if inventory:
+        with (dest/"Gravity_All_Model_Nodes.csv").open(
+            "w",newline="",encoding="utf-8-sig") as stream:
+            keys=list(inventory[0]);writer=csv.DictWriter(stream,fieldnames=keys)
+            writer.writeheader();writer.writerows(inventory)
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font,PatternFill
@@ -179,6 +256,30 @@ def write_node_comparison(folder,report):
             for cell in sh[1]:
                 cell.font=Font(bold=True,color="FFFFFF")
                 cell.fill=PatternFill("solid",fgColor="24415F")
+        if inventory:
+            sh=workbook.create_sheet("All OpenSees nodes")
+            cols=list(inventory[0]);sh.append(cols)
+            for record in inventory:
+                sh.append([record.get(k) for k in cols])
+            sh.freeze_panes="D2"
+            sh.auto_filter.ref=sh.dimensions
+            for cell in sh[1]:
+                cell.font=Font(bold=True,color="FFFFFF")
+                cell.fill=PatternFill("solid",fgColor="24415F")
+            sh.column_dimensions["A"].width=21
+            sh.column_dimensions["B"].width=20
+            for col in ("C","D","E"):
+                sh.column_dimensions[col].width=15
+            src_rows=[r for r in inventory if r.get("etabs_point_id")]
+            source=workbook.create_sheet("ETABS ID mapping")
+            source_cols=["etabs_point_id","opensees_node_tag","x_m","y_m","z_m",
+                         "is_etabs_restrained_point","is_opensees_support",
+                         "comparison_status"]
+            source.append(source_cols)
+            for row in src_rows:
+                source.append([row.get(k) for k in source_cols])
+            source.freeze_panes="C2"
+            source.auto_filter.ref=source.dimensions
         workbook.save(dest/"Gravity_Node_Reaction_Comparison.xlsx")
     except ImportError:
         pass
