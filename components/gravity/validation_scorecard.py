@@ -96,12 +96,22 @@ def create_gravity_scorecard(export_dir,gravity_dir,comparison_root,missing,over
 
     etabs=_num((direct or {}).get("etabs_base_FZ_kN"))
     opensees=_num((direct or {}).get("opensees_support_FZ_kN"))
+    # A direct comparison may have been generated against an older
+    # single gravity run. Reject it as evidence for a newly rebuilt model.
+    current_reaction=_num((run or {}).get("report",{}).get("support_vertical_reaction_kN"))
+    stale=(opensees is not None and current_reaction is not None and
+           abs(opensees-current_reaction)>max(0.1,abs(current_reaction)*1e-6))
     delta=(opensees-etabs) if etabs is not None and opensees is not None else None
     pct=100.*abs(delta)/abs(etabs) if delta is not None and etabs!=0 else None
     global_details=dict(etabs_kN=etabs,opensees_kN=opensees,
+                        current_run_reaction_kN=current_reaction,
+                        direct_comparison_stale=stale,
                         opensees_minus_etabs_kN=delta,difference_percent_of_etabs=pct,
                         screening_tolerance_percent=global_tolerance_percent)
-    if pct is None:
+    if stale:
+        status="STALE_COMPARISON_REBUILD_AND_RECOMPARE"
+        reason="ETABS direct comparison uses a different OpenSees reaction total from the current selected run"
+    elif pct is None:
         status="MISSING_ETABS_DIRECT_EVIDENCE"
         reason="Real ETABS/OpenSees global reaction comparison required"
     elif pct>global_tolerance_percent:
@@ -132,7 +142,10 @@ def create_gravity_scorecard(export_dir,gravity_dir,comparison_root,missing,over
             large.append(dict(etabs_point=x.get("etabs_point"),
                 opensees_node=x.get("opensees_node"),
                 discrepancy_kN=error,etabs_reaction_kN=ref))
-    if not valid or missing_pairs:
+    if stale:
+        node_status="STALE_COMPARISON_REBUILD_AND_RECOMPARE"
+        node_reason="Individual support reactions are from an older OpenSees result; rerun ETABS comparison for current source-support run"
+    elif not valid or missing_pairs:
         node_status="MISSING_OR_AMBIGUOUS_EVIDENCE"
         node_reason="Incomplete verified source-to-response support mapping"
     elif large:
