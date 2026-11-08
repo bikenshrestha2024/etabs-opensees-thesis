@@ -1,6 +1,6 @@
 """Regression for wall mesh supports: no false base fixity on generated nodes."""
 import unittest
-from components.model.assembly import _resolve_refined_wall_supports
+from components.model.assembly import _resolve_refined_wall_supports, _gravity_wall_support_strategy
 
 
 class WallBaseSupportTests(unittest.TestCase):
@@ -39,6 +39,43 @@ class WallBaseSupportTests(unittest.TestCase):
             original,self.source_nodes,self.nodes,self.topology)
         self.assertEqual(supported["3"],flags)
         self.assertEqual(added,[])
+    def test_runtime_source_only_uses_exact_support_ids(self):
+        data=dict(nodes={str(k):v for k,v in self.nodes.items()},
+                  supports=dict(self.source_supports),
+                  base_z_m=0.,added_wall_mesh_support_tags=[])
+        mapping=dict(node_map=[
+            dict(opensees_node_tag=tag,coordinates_m=loc)
+            for tag,loc in self.source_nodes.items()],
+            elements=self.topology["elements"])
+        selected,added=_gravity_wall_support_strategy(
+            data,mapping,"ETABS_SOURCE_SUPPORTS")
+        self.assertEqual(set(selected),{"1","2"})
+        self.assertEqual(added,[])
+        self.assertEqual(data["supports"],self.source_supports)
+
+    def test_continuous_fixed_base_only_adds_intermediate_wall_base(self):
+        data=dict(nodes={str(k):v for k,v in self.nodes.items()},
+                  supports=dict(self.source_supports),
+                  base_z_m=0.,added_wall_mesh_support_tags=[])
+        mapping=dict(node_map=[
+            dict(opensees_node_tag=tag,coordinates_m=loc)
+            for tag,loc in self.source_nodes.items()],
+            elements=self.topology["elements"])
+        selected,added=_gravity_wall_support_strategy(
+            data,mapping,"CONTINUOUS_WALL_BASE_FIXED")
+        self.assertEqual(added,[101,102])
+        self.assertEqual(set(selected),{"1","2","101","102"})
+        self.assertNotIn("103",selected)
+        self.assertEqual(data["supports"],self.source_supports)
+
+    def test_runtime_refuses_source_only_from_pre_extended_export(self):
+        data=dict(nodes={str(k):v for k,v in self.nodes.items()},
+                  supports=dict(self.source_supports),
+                  base_z_m=0.,added_wall_mesh_support_tags=[101])
+        mapping=dict(node_map=[],elements=[])
+        with self.assertRaisesRegex(ValueError,"SOURCE_ONLY rebuilt export"):
+            _gravity_wall_support_strategy(data,mapping,"ETABS_SOURCE_SUPPORTS")
+
     def test_unknown_policy_fails(self):
         with self.assertRaisesRegex(ValueError,"Unknown wall"):
             _resolve_refined_wall_supports(
