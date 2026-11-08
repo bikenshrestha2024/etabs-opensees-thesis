@@ -24,3 +24,71 @@ def node_readout(tag,values,coordinates=None,scope='Unscaled physical response')
         parts.append(name+'='+('N/A (not recorded)' if v is None else f'{float(v):.7g} '+('m' if i<3 else 'rad')))
     xyz=' | deformed XYZ=('+', '.join(f'{float(v):.7g}' for v in coordinates[:3])+') m' if coordinates is not None else ''
     return 'Node '+str(tag)+' | '+' | '.join(parts)+xyz+'\n'+scope
+
+
+def resolve_node_tag(kind,ident,point_map):
+    """Return string OpenSees tag; never leak integer ETABS mappings into string-key dictionaries."""
+    key=str(ident).strip()
+    if kind=="ETABS point":
+        node=point_map.get(key)
+        return str(node) if node is not None else ""
+    return key
+
+
+def center_camera_on_node(axis,point,*,home=None,span_fraction=0.10,min_span_m=1.0):
+    """Focus all three world axes around node; preserve 3D view orientation.
+
+    A selected base node should remain visible even when 25 storeys
+    extend far above it. The selected-node focus is a camera operation
+    only; it never moves or merges any structural node.
+    [REF docs/source/components/ui/view_controls.py.md]
+    """
+    coords=[float(x) for x in point[:3]]
+    if any(not math.isfinite(x) for x in coords):
+        raise ValueError("Node coordinates are not finite")
+    if not 0<span_fraction<=1:
+        raise ValueError("span_fraction must be in (0,1]")
+    if home is None:
+        home=(axis.get_xlim(),axis.get_ylim(),axis.get_zlim())
+    original=[abs(float(pair[1])-float(pair[0])) for pair in home]
+    # Comparable world-space extent in X,Y,Z avoids losing a selected node
+    # under the entire high-rise model and preserves its apparent depth.
+    span=max(float(min_span_m),max(original)*span_fraction)
+    for coordinate,setter in zip(coords,(axis.set_xlim,axis.set_ylim,axis.set_zlim)):
+        setter(coordinate-span/2,coordinate+span/2)
+    if hasattr(axis,"set_box_aspect"):
+        axis.set_box_aspect((1,1,1))
+    return span
+
+
+def node_selection_artists(axis,point,*,span_m=1.0):
+    """Highly visible marker, crosshair and label on top of wireframe.
+
+    Returns artists so selection can be cleared before a redraw.
+    [REF docs/source/components/ui/view_controls.py.md]
+    """
+    import numpy as np
+    point=np.asarray(point,dtype=float)
+    if point.shape!=(3,) or not np.isfinite(point).all():
+        raise ValueError("Node marker requires a finite xyz triple")
+    span=max(.25,float(span_m))
+    radius=max(.035,span*.045)
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection
+    cross=Line3DCollection(
+        [[point-np.eye(3)[i]*radius,point+np.eye(3)[i]*radius]
+         for i in range(3)],colors="#ff008c",linewidths=5)
+    axis.add_collection3d(cross,autolim=False)
+    dot=axis.scatter([point[0]],[point[1]],[point[2]],
+                     c="#ffde00",edgecolors="#b60072",
+                     s=160,linewidths=2.3,depthshade=False)
+    return [cross,dot]
+
+
+def remove_selection_artists(artists):
+    """Remove previous selected-node marker before drawing the next.
+
+    [REF docs/source/components/ui/view_controls.py.md]
+    """
+    for artist in artists:
+        try:artist.remove()
+        except (ValueError,AttributeError):pass
