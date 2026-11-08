@@ -39,6 +39,10 @@ EXTRA = ("Gravity_Result_V110.json", "Gravity_Run_V110.log",
 # These exports represent actual gravity responses and review diagnostics.
 # A file not present is reported in the manifest, never manufactured.
 SOURCE_EXTRA = (
+    "GRAVITY_SAFE_REVIEW.json",
+    "CANDIDATE_PROVENANCE.json",
+    "ISOLATED_CANDIDATE_PROVENANCE.json",
+    "ETABS_Beam_Material_List_Reviewed.csv",
     "Slab_Load_Path_Formulas_V141.xlsx",
     "OpenSees_Element_Connectivity.json",
     "OpenSees_Source_Model_Metadata_V118.json",
