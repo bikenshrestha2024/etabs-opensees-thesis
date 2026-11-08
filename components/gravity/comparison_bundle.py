@@ -279,6 +279,14 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             rz=applied=error=None
         model=export_dir/"OpenSees_Complete_Model_Data_V118.json"
         model_hash=digest(model) if model.is_file() else None
+        # Record all generated CSVs and original files, including derivatives
+        # that were not copied via add(). Every member is inside the upload ZIP.
+        package_members=sorted(
+            dict(relative_path=file.relative_to(stage).as_posix(),
+                 extracted_path=str(dest/file.relative_to(stage)),
+                 bytes=file.stat().st_size)
+            for file in stage.rglob("*") if file.is_file()
+        ,key=lambda item:item["relative_path"])
         audit={"schema":"gravity-comparison-evidence-v2",
                "status":"EVIDENCE_EXPORT_ONLY_NOT_ENGINEERING_EQUIVALENCE",
                "source_export_dir":str(export_dir),"source_gravity_dir":str(gravity_dir),
@@ -286,6 +294,9 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                "comparison_root":str(comparison_root),
                "source_model_sha256":model_hash,"source_etabs_json":str(etabs_json) if etabs_json else None,
                "source_files":files,"missing":missing,"oversize_skipped":oversize,
+               "packaged_files":package_members,
+               "output_zip":str(output_dir/(bundle_name+".zip")),
+               "output_folder":str(dest),
                "node_count":len(payload.get("nodes",[])) if isinstance(payload.get("nodes"),list) else None,
                "reaction_count":len(payload.get("reactions",[])) if isinstance(payload.get("reactions"),list) else None,
                "beam_local_force_records":len(payload.get("local_forces",[])) if isinstance(payload.get("local_forces"),list) else None,
@@ -298,12 +309,17 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         (stage/"EVIDENCE_MANIFEST.json").write_text(json.dumps(audit,indent=2,allow_nan=False),encoding="utf-8")
         with (stage/"EVIDENCE_FILE_PATHS.txt").open("w",encoding="utf8") as stream:
             stream.write("GRAVITY EVIDENCE INPUTS AND PACKAGE FILES\\n")
+            stream.write("UPLOAD ZIP: "+str(output_dir/(bundle_name+".zip"))+"\\n")
+            stream.write("EXTRACTED REVIEW FOLDER: "+str(dest)+"\\n")
             stream.write("SOURCE EXPORT: "+str(export_dir)+"\\n")
             stream.write("GRAVITY ROOT: "+str(gravity_dir)+"\\n")
             stream.write("DUAL RUN: "+str(dual_run_dir or "NOT SUPPLIED")+"\\n")
             stream.write("COMPARISON ROOT: "+str(comparison_root)+"\\n")
             stream.write("PACKAGED FILES:\\n")
             for item in files:stream.write("  "+item["file"]+" <- "+item["source"]+"\\n")
+            stream.write("GENERATED AND COPIED PACKAGE MEMBERS:\\n")
+            for item in package_members:
+                stream.write("  "+item["extracted_path"]+"\\n")
             stream.write("MISSING FILES:\\n")
             for item in missing:stream.write("  "+str(item)+"\\n")
             stream.write("OVERSIZE OMITTED:\\n")
