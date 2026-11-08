@@ -13,6 +13,10 @@ from pathlib import Path
 SOURCE="ETABS_SOURCE_SUPPORTS"
 CONTINUOUS="CONTINUOUS_WALL_BASE_FIXED"
 PROFILES=(SOURCE,CONTINUOUS)
+DISPLAY_NAMES={
+    SOURCE:"ETABS Reaction Validation",
+    CONTINUOUS:"ETABS Node Position / Continuous",
+}
 
 def compare_wall_support_gravity(source_result, continuous_result):
     """Compare two real completed gravity solver results and matching node tags.
@@ -39,7 +43,7 @@ def compare_wall_support_gravity(source_result, continuous_result):
     summary=[]
     for mode,payload in results.items():
         rep=payload["report"]
-        summary.append(dict(strategy=mode,
+        summary.append(dict(strategy=mode,display_name=DISPLAY_NAMES[mode],
             applied_kN=scalar(rep,"applied_vertical_load_kN"),
             reaction_kN=scalar(rep,"support_vertical_reaction_kN"),
             equilibrium_error_percent=scalar(rep,"equilibrium_error_percent"),
@@ -63,6 +67,7 @@ def compare_wall_support_gravity(source_result, continuous_result):
     return dict(
         schema="gravity-wall-base-strategy-v1",
         status="SENSITIVITY_NOT_ETABS_VALIDATION_OR_FOUNDATION_DESIGN",
+        strategy_display_names=dict(DISPLAY_NAMES),
         same_full_gravity_applied_kN=wa,
         summary=summary,per_node=rows,
         reaction_total_difference_kN=summary[1]["reaction_kN"]-summary[0]["reaction_kN"],
