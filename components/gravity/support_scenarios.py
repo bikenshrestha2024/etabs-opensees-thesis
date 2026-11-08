@@ -14,8 +14,8 @@ SOURCE="ETABS_SOURCE_SUPPORTS"
 CONTINUOUS="CONTINUOUS_WALL_BASE_FIXED"
 PROFILES=(SOURCE,CONTINUOUS)
 DISPLAY_NAMES={
-    SOURCE:"ETABS Reaction Validation",
-    CONTINUOUS:"ETABS Node Position / Continuous",
+    SOURCE:"ETABS Node Position / Continuous (76 original nodes)",
+    CONTINUOUS:"Continuous Wall Base (97-point idealization)",
 }
 
 def compare_wall_support_gravity(source_result, continuous_result):
