@@ -215,7 +215,10 @@ def build_joint_volume_ledger(frames,shells,nodes,*,geometry_verified=False,
 
 
 def export_joint_volume_ledger(folder,ledger):
-    """Write persistent reviewable per-ETABS-object CSV/JSON audit."""
+    """Write persistent reviewable per-ETABS-object CSV/JSON audit.
+
+    [REF docs/source/components/model/joint_volume_ownership.py.md]
+    """
     folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
     (folder/"OpenSees_Joint_Volume_Ownership_Audit.json").write_text(
         json.dumps(ledger,indent=2,allow_nan=False),encoding="utf8")
