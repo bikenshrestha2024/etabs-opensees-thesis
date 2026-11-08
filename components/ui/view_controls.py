@@ -63,7 +63,7 @@ def center_camera_on_node(axis,point,*,home=None,span_fraction=0.10,min_span_m=1
     return span
 
 
-def node_selection_artists(axis,point,*,span_m=1.0):
+def node_selection_artists(axis,point,*,span_m=1.0,label=None):
     """Highly visible marker, crosshair and label on top of wireframe.
 
     Returns artists so selection can be cleared before a redraw.
@@ -83,7 +83,14 @@ def node_selection_artists(axis,point,*,span_m=1.0):
     dot=axis.scatter([point[0]],[point[1]],[point[2]],
                      c="#ffde00",edgecolors="#b60072",
                      s=160,linewidths=2.3,depthshade=False)
-    return [cross,dot]
+    # A fixed screen-space label remains legible even when the selected
+    # physical node is behind a shell surface or dense wall mesh.
+    label_text="NODE "+str(label) if label is not None else "SELECTED NODE"
+    overlay=axis.text2D(.02,.97,label_text,transform=axis.transAxes,
+                       fontsize=12,fontweight="bold",color="#890051",
+                       va="top",bbox=dict(boxstyle="round,pad=.35",
+                       facecolor="#fff1a8",edgecolor="#b60072",linewidth=1.5))
+    return [cross,dot,overlay]
 
 
 def remove_selection_artists(artists):
