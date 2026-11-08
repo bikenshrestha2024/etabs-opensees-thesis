@@ -516,7 +516,7 @@ class GravityAnalysisGUI:
         bar = ttk.Frame(root); bar.pack(fill="x", pady=(0, 7))
         self.run_button = ttk.Button(bar, text="Run gravity, check, freeze + export", command=self.run)
         self.run_button.pack(side="left")
-        ttk.Button(bar,text="Run BOTH wall-base gravity strategies",
+        ttk.Button(bar,text="Run BOTH: ETABS Validation + Node Position / Continuous",
                    command=self.run_both_wall_supports).pack(side="left",padx=5)
         ttk.Button(bar,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
         ttk.Button(bar,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
