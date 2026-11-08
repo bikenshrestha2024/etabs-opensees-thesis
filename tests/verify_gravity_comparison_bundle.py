@@ -36,6 +36,16 @@ class GravityBundleTests(unittest.TestCase):
             self.assertTrue(any(s.endswith("/opensees/reactions.csv") for s in names))
             self.assertTrue(any(s.endswith("/opensees/local_forces.csv") for s in names))
             self.assertTrue(any(s.endswith("/EVIDENCE_MANIFEST.json") for s in names))
+            for result in ("GRAVITY_VALIDATION_SCORECARD.json",
+                           "GRAVITY_VALIDATION_SCORECARD.csv",
+                           "GRAVITY_VALIDATION_SCORECARD.txt"):
+                self.assertTrue(any(n.endswith("/"+result) for n in names),result)
+            score_name=next(n for n in names if n.endswith(
+                "/GRAVITY_VALIDATION_SCORECARD.json"))
+            score=json.loads(z.read(score_name))
+            self.assertEqual(score["conclusion"],"NOT_STRUCTURALLY_VALIDATED")
+            self.assertEqual({x["key"] for x in score["rows"]},
+                {"beam_weight","joint_volume","solver","global","foundation","evidence"})
     def test_preserves_source_and_versions_without_overwrite(self):
         path=self.gravity/"Gravity_Result_V110.json"
         original=hashlib.sha256(path.read_bytes()).hexdigest()
