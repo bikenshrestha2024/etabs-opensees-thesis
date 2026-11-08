@@ -177,6 +177,54 @@ def _resolve_refined_wall_supports(source_supports, source_nodes, nodes, topolog
     return supported,sorted(set(extended))
 
 
+def _gravity_wall_support_strategy(data, topology, strategy):
+    """Choose a gravity-only wall-base restraint strategy without changing exported data.
+
+    [REF docs/review/GRAVITY_ETABS_COMPARISON.md] Compare ETABS source-point
+    restraints against a separate idealized continuous fixed wall-base line.
+    """
+    if strategy not in ('ETABS_SOURCE_SUPPORTS', 'CONTINUOUS_WALL_BASE_FIXED'):
+        raise ValueError('Unknown gravity wall support strategy '+str(strategy))
+    original={str(tag):list(flags) for tag,flags in data['supports'].items()}
+    if strategy=='ETABS_SOURCE_SUPPORTS':
+        if data.get('added_wall_mesh_support_tags'):
+            raise ValueError('ETABS source-only comparison requires a SOURCE_ONLY rebuilt export')
+        return original,[]
+    # This is a fixed-base IDEALIZATION, not an independently validated
+    # raft/soil interaction model. Propagate restraints only on horizontal
+    # source WALL edges at the foundation elevation with two supported ends.
+    source_nodes={int(n['opensees_node_tag']):list(map(float,n['coordinates_m']))
+                  for n in topology.get('node_map',[])}
+    nodes={int(k):list(map(float,v)) for k,v in data['nodes'].items()}
+    base_z=float(data['base_z_m'])
+    original_tags=set(source_nodes)
+    added=set()
+    for e in topology.get('elements',[]):
+        if e.get('dimension')!='area_polygon':continue
+        # Only vertical wall faces, not slabs or arbitrary area mesh regions.
+        pts=[source_nodes.get(int(n)) for n in e.get('node_tags',[])]
+        if not pts or any(p is None for p in pts):continue
+        if max(p[2] for p in pts)-min(p[2] for p in pts)<1e-7:continue
+        ns=e['node_tags']
+        for a,b in zip(ns,ns[1:]+ns[:1]):
+            a=int(a);b=int(b)
+            p,q=source_nodes[a],source_nodes[b]
+            if abs(p[2]-base_z)>1e-7 or abs(q[2]-base_z)>1e-7:continue
+            if original.get(str(a))!=[1]*6 or original.get(str(b))!=[1]*6:
+                continue
+            edge=_sub(q,p);length2=_dot(edge,edge)
+            if length2<=1e-16:raise ValueError('Degenerate wall foundation edge')
+            for n,r in nodes.items():
+                if n in original_tags or str(n) in original:continue
+                if abs(r[2]-base_z)>1e-7:continue
+                t=_dot(_sub(r,p),edge)/length2
+                if 1e-7<t<1-1e-7 and math.dist(
+                    r,[p[i]+t*edge[i] for i in range(3)])<1e-7:
+                    original[str(n)]=[1]*6
+                    added.add(n)
+    return original,sorted(added)
+
+
 def _frame_property(row):
     b=_positive(row.get('width_m'),'frame width'); h=_positive(row.get('depth_m'),'frame depth')
     if str(row.get('section_type','')).startswith('tube'):
@@ -702,6 +750,23 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
     profile=os.environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
     meta=_read(folder/'OpenSees_Source_Model_Metadata_V118.json')
     gravity_context=apply_gravity_profile(data,cfg,profile,meta.get('pattern_types',{}))
+    requested_strategy=os.environ.get('OPENSEES_GRAVITY_WALL_SUPPORT_STRATEGY',
+                                      'ETABS_SOURCE_SUPPORTS')
+    # Only the gravity GUI opts in. Other modal/RSA/NLTHA runs retain the
+    # exported support baseline, even when custom environment is present.
+    if requested_strategy!='ETABS_SOURCE_SUPPORTS' and not os.environ.get('OPENSEES_GRAVITY_GUI_MODE'):
+        raise ValueError('Wall-base support sensitivity mode is allowed only in the gravity GUI')
+    if os.environ.get('OPENSEES_GRAVITY_GUI_MODE'):
+        topology=_read(folder/'OpenSees_Element_Connectivity.json')
+        supports,added_gravity_supports=_gravity_wall_support_strategy(
+            data,topology,requested_strategy)
+        data['supports']=supports
+    else:
+        added_gravity_supports=[]
+    print('[GRAVITY WALL SUPPORT STRATEGY]',
+          json.dumps(dict(strategy=requested_strategy,
+                          added_mesh_fixed_nodes=added_gravity_supports,
+                          support_count=len(data['supports']))),flush=True)
     print('[GRAVITY PROFILE]',json.dumps(gravity_context),flush=True)
     if data.get('config_sha256')!=hashlib.sha256((folder/'OpenSees_Complete_Model_Config_V118.json').read_bytes()).hexdigest():
         raise ValueError('Model config changed after assembly. Use Rebuild from saved export before running analysis.')
@@ -849,7 +914,14 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
         _write(folder/'OpenSees_Complete_Gravity_Check_V118.json',gravity_report)
         export_gravity_beam_actions(ops,data,folder,limit_state,mode)
     _write(folder/'OpenSees_Complete_Element_Map_V118.json',element_map)
-    return dict(mode=mode,preload_completed=preload,nodes=len(ops.getNodeTags()),elements=len(ops.getEleTags()),analysis_ready=False,research_profile=research_profile,scope='EXPLORATORY_ASSUMED_MATERIALS_NOT_DESIGN_ACCEPTANCE' if research else 'REVIEWED_MODEL_INPUT_GATE')
+    return dict(mode=mode,preload_completed=preload,nodes=len(ops.getNodeTags()),
+                elements=len(ops.getEleTags()),analysis_ready=False,
+                gravity_base_support_tags=[int(n) for n,flags in data['supports'].items() if flags[2]],
+                gravity_support_strategy=requested_strategy,
+                gravity_added_support_nodes=added_gravity_supports,
+                research_profile=research_profile,
+                scope='EXPLORATORY_ASSUMED_MATERIALS_NOT_DESIGN_ACCEPTANCE'
+                if research else 'REVIEWED_MODEL_INPUT_GATE')
 
 
 def autoselect_inputs(gui, export_dir, role):
