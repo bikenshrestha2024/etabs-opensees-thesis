@@ -97,12 +97,14 @@ class GravityAnalysisGUI:
         self.etabs_exe_path = tk.StringVar(value="")
         self.python_var = tk.StringVar(value=sys.executable)
         self.support_var = tk.StringVar()
+        self.reaction_support_var = tk.StringVar(value="Select original ETABS Joint Reactions table")
+        self.position_support_var = tk.StringVar()
         self.load_var = tk.StringVar()
         self.steps_var = tk.StringVar(value="10")
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
         self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
-        self.wall_support_strategy_var=tk.StringVar(value="ETABS Reaction Validation")
+        self.wall_support_strategy_var=tk.StringVar(value="ETABS Node Position / Continuous")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self._build()
@@ -429,7 +431,26 @@ class GravityAnalysisGUI:
             total, context, cfg = self._selected_gravity_evidence(model)
             if not supports:
                 raise ValueError("No fixed support node tags were found in the generated code.")
-            self.support_var.set(", ".join(map(str, supports)))
+            self.position_support_var.set(", ".join(map(str, supports)))
+            reaction_supports=None
+            source_table=self.etabs_full_table_var.get().strip()
+            if source_table and Path(source_table).is_file():
+                from components.gravity.etabs_reaction_support_filter import classify_supports
+                model_data=json.loads((model.parent/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding="utf-8-sig"))
+                topology=json.loads((model.parent/'OpenSees_Element_Connectivity.json').read_text(encoding="utf-8-sig"))
+                selected,filter_audit=classify_supports(source_table,topology,model_data['supports'])
+                reaction_supports=sorted(map(int,selected))
+                self.reaction_support_var.set(", ".join(map(str,reaction_supports)))
+                self._gravity_action_log("ETABS_REACTION_FILTER",
+                    f"Nonzero FZ support nodes={len(reaction_supports)}; excluded={filter_audit['released_support_count']}; original table={source_table}")
+            else:
+                self.reaction_support_var.set("Select original completed ETABS 1. DL + LL table, then Read BOTH")
+            if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
+                if reaction_supports is None:
+                    raise ValueError("ETABS Reaction Validation requires original completed ETABS Joint Reactions table")
+                self.support_var.set(", ".join(map(str,reaction_supports)))
+            else:
+                self.support_var.set(", ".join(map(str,supports)))
             if total is not None: self.load_var.set(f"{float(total):.8g}")
             if data.get("load_steps"): self.steps_var.set(str(int(data["load_steps"])))
             note = data.get("load_total_units_note", "")
@@ -441,6 +462,8 @@ class GravityAnalysisGUI:
             return data
         except Exception as exc:
             self.support_var.set('')
+            self.reaction_support_var.set("Unavailable — review input files")
+            self.position_support_var.set("")
             self.load_var.set('')
             if show_error: messagebox.showerror("Could not read gravity inputs", str(exc), parent=self.win)
             else: self.status_var.set(str(exc))
@@ -468,8 +491,8 @@ class GravityAnalysisGUI:
         ttk.Label(wall_row,text="Gravity wall-base supports:").pack(side="left",padx=(0,6))
         ttk.Combobox(wall_row,textvariable=self.wall_support_strategy_var,
             state="readonly",width=38,
-            values=("ETABS Reaction Validation","ETABS Node Position / Continuous")).pack(side="left")
-        ttk.Label(wall_row,text="Validation uses original ETABS restraints; node-position/continuous uses idealized full wall-base fixation.",
+            values=("ETABS Reaction Validation","ETABS Node Position / Continuous","Continuous Wall Base (97)")).pack(side="left")
+        ttk.Label(wall_row,text="Nonzero ETABS reaction = diagnostic only; node position retains 76 original supports; separate 97-node continuous case remains unchanged.",
                   wraplength=485).pack(side="left",padx=8)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
@@ -501,9 +524,15 @@ class GravityAnalysisGUI:
         self._path_row(form, "ETABS gravity results JSON (optional)", self.etabs_gravity_json_var,
                        lambda: self._browse_file(self.etabs_gravity_json_var,
                           "Select matching ETABS gravity results JSON", [("JSON", "*.json")]))
-        ttk.Button(form, text="Read support tags and gravity load total from selected model code", command=self._read_code_inputs).pack(anchor="w", pady=(4, 2))
+        ttk.Button(form, text="Read BOTH support lists and gravity load (original ETABS table required for reaction filter)", command=self._read_code_inputs).pack(anchor="w", pady=(4, 2))
+        separate=ttk.Frame(form);separate.pack(fill="x",pady=(3,2))
+        ttk.Label(separate,text="ETABS Reaction Validation — nonzero FZ diagnostic").grid(row=0,column=0,sticky="w",padx=4)
+        ttk.Entry(separate,textvariable=self.reaction_support_var,width=98,state="readonly").grid(row=0,column=1,sticky="ew",padx=4)
+        ttk.Label(separate,text="ETABS Node Position — original 76 mapped supports").grid(row=1,column=0,sticky="w",padx=4)
+        ttk.Entry(separate,textvariable=self.position_support_var,width=98,state="readonly").grid(row=1,column=1,sticky="ew",padx=4)
+        separate.columnconfigure(1,weight=1)
         inputs = ttk.Frame(form); inputs.pack(fill="x", pady=(5, 2))
-        ttk.Label(inputs, text="OpenSees support node tags (auto-read)").grid(row=0, column=0, sticky="w", padx=4)
+        ttk.Label(inputs, text="ACTIVE run support nodes (auto-selected)").grid(row=0, column=0, sticky="w", padx=4)
         ttk.Entry(inputs, textvariable=self.support_var, width=36).grid(row=0, column=1, sticky="ew", padx=4)
         ttk.Label(inputs, text="Total downward gravity load (kN; verify)").grid(row=0, column=2, sticky="w", padx=4)
         ttk.Entry(inputs, textvariable=self.load_var, width=16).grid(row=0, column=3, sticky="w", padx=4)
@@ -624,8 +653,9 @@ class GravityAnalysisGUI:
         [REF docs/review/GRAVITY_ETABS_COMPARISON.md]
         """
         return {
-            "ETABS Reaction Validation": "ETABS_SOURCE_SUPPORTS",
-            "ETABS Node Position / Continuous": "CONTINUOUS_WALL_BASE_FIXED",
+            "ETABS Reaction Validation": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+            "ETABS Node Position / Continuous": "ETABS_SOURCE_SUPPORTS",
+            "Continuous Wall Base (97)": "CONTINUOUS_WALL_BASE_FIXED",
             "ETABS_SOURCE_SUPPORTS": "ETABS_SOURCE_SUPPORTS",
             "CONTINUOUS_WALL_BASE_FIXED": "CONTINUOUS_WALL_BASE_FIXED",
         }[self.wall_support_strategy_var.get()]
