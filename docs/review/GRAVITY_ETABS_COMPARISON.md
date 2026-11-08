@@ -305,6 +305,59 @@ lift/opening edge coordinates, shell object tags, generated mesh tags,
 actual support flags and reaction aggregation by physically corresponding
 base regions in the final evidence workbook.
 
+## Two gravity wall-base support conditions in the SAME GUI (2026-11-08)
+
+The direct gravity load profile remains `GRAVITY_1.0D_1.0L` for
+**both** support cases: 100% dead, 100% assigned floor live and 100%
+assigned roof live. Only the wall-to-foundation boundary condition
+is changed. This comparison does **not** replace the separately
+configured seismic gravity preload with 30% live, and it does not
+modify modal, ESM, MRSM, NLTHA or mass configurations.
+
+1. `ETABS_SOURCE_SUPPORTS` — reproduce the original ETABS *assigned
+   point restraints* at wall endpoints/opening edges, with no extra
+   fixed intermediate mesh nodes. The genuine ETABS **analysis-mesh
+   restraints/edge constraints** must still be checked to qualify this
+   as exact ETABS model equivalence.
+2. `CONTINUOUS_WALL_BASE_FIXED` — a second OpenSees fixed-foundation
+   idealization; adds six-DOF restraint to generated nodes *only*
+   on horizontal bottom edges of vertical wall source polygons at
+   the model base where both original endpoints are fully fixed.
+   Does not indiscriminately restrain internal or upper-story wall
+   mesh nodes or unsupported base segments. It does **not** represent
+   a raft's flexural stiffness or the soil-structure interaction.
+   Other foundation conditions should be modeled with compatible
+   raft/soil springs or explicit foundation elements, if applicable.
+
+The GUI offers both a single strategy selector and a
+**Run BOTH wall-base gravity strategies** command. The latter launches
+two sequential, independent OpenSees processes and exports two
+`Gravity_Result_V110.json` files, corresponding solver logs and
+formatted Excel reports, plus an Excel/CSV/JSON difference audit
+under
+`<output>/Gravity_Wall_Base_Comparison/<run-id>/`.
+Both applied load totals must agree; the comparison ranks changes
+in reactions at shared node tags and separately identifies newly
+supported wall mesh nodes. Global equilibrium is checked for each
+case independently; neither the 76 ETABS support count nor the
+previous 97 OpenSees support count is an acceptance target without
+matching internal analysis mesh.
+
+The exported source model-data and configuration are not modified
+by these two run-only boundary variations. The reference is
+[CSI ETABS Wall Auto Mesh Options](https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Shell/Wall_Auto_Mesh_Options.htm),
+which explicitly provides an optional automatic edge restraint
+propagation setting, and
+[CSI ETABS Auto Edge Constraints](https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Shell/Auto_Edge_Constraints.htm),
+which can transfer loads between mismatched internal shell meshes
+through interpolation constraints rather than new supports.
+
+**The correct physical model is the one reproducing the real
+connection to the foundation**, not the one with the most reactions,
+the smallest displacement or the closest numerical match to ETABS.
+Compare both, then select final boundary conditions from drawings,
+foundation details and observed ETABS internal mesh behavior.
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
