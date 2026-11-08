@@ -874,6 +874,28 @@ class GravityAnalysisGUI:
             messagebox.showerror("Report generation failed", str(exc), parent=self.win)
             self.nb.select(self.log_tab)
             return
+        if payload.get("wall_support_strategy")=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
+            try:
+                from components.gravity.etabs_reaction_support_filter import export_primary_32_comparison
+                summary=export_primary_32_comparison(
+                    payload,out/"ETABS_Nonzero_Reaction_Support_Audit.json",out)
+                self._gravity_action_log("PRIMARY_32_REACTION_COMPARISON",
+                    f"ETABS={summary['etabs_total_FZ_kN']:.6f} kN; "
+                    f"OpenSees={summary['opensees_total_FZ_kN']:.6f} kN; "
+                    f"delta={summary['global_difference_kN']:.6f} kN; "
+                    f"worst node={summary['worst_node']}; "
+                    f"status={summary['numerical_agreement']} / "
+                    f"{summary['structural_validation']}")
+                for ext in ("xlsx","csv","json"):
+                    self._gravity_action_log("PRIMARY_32_REACTION_OUTPUT",
+                        str(out/("Primary_32_ETABS_OpenSees_Reactions."+ext)))
+            except Exception as comparison_exc:
+                self._gravity_action_log("PRIMARY_32_COMPARISON_FAILED",str(comparison_exc))
+                messagebox.showerror("Gravity solved, comparison not validated",
+                    "Gravity solver passed but node-by-node comparison failed: "+
+                    str(comparison_exc),parent=self.win)
+                self.nb.select(self.log_tab)
+                return
         rep = payload["report"]
         self._gravity_action_log("GRAVITY_EQUILIBRIUM",str({
            "applied_vertical_kN":rep.get("applied_vertical_load_kN"),
