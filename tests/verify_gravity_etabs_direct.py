@@ -180,6 +180,11 @@ class GravityDirectAPITests(unittest.TestCase):
                     return 0
             class Sap:
                 pass
+            class File:
+                def Save(self,path):
+                    calls.append(('save',path))
+                    return 0
+            Sap.File=File()
             Sap.Analyze=Analyze()
             class App:
                 pass
@@ -206,12 +211,39 @@ class GravityDirectAPITests(unittest.TestCase):
                             launch_new_etabs=True,run_if_missing=True)
             self.assertEqual(before,sha256(source.read_bytes()).hexdigest())
             self.assertEqual(calls.count('run'),1)
+            self.assertTrue(any(isinstance(c,tuple) and c[0]=='save' for c in calls))
+            self.assertLess(len(str(calls[0][1])),200)
             self.assertEqual(App.SapModel.Analyze.last_enabled,['Dead','Live'])
             self.assertEqual(calls[-1],'closed')
             self.assertNotEqual(calls[0][1],source)
             self.assertEqual(comp['model_identity_status'],'WORKING_COPY_ANALYZED_FROM_SOURCE_EDB')
             self.assertFalse(comp['matched_edb_identity'])
             self.assertTrue((root/'out'/'ETABS_Gravity_Extraction.log').is_file())
+
+    def test_short_scratch_edb_keeps_original_unchanged(self):
+        import hashlib
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        with TemporaryDirectory() as tmp:
+            source=Path(tmp)/"long_original_name.EDB"
+            source.write_bytes(b'etabs native model fixture')
+            original=hashlib.sha256(source.read_bytes()).hexdigest()
+            with patch.dict('os.environ',{'ETABS_GRAVITY_TEMP_ROOT':str(Path(tmp)/'short')}):
+                messages=[]
+                copy_path=g._short_etabs_working_copy(
+                    source,original,
+                    lambda stage,msg,**kwargs:messages.append((stage,kwargs)))
+                self.assertEqual(copy_path.read_bytes(),source.read_bytes())
+                self.assertLess(len(str(copy_path)),200)
+                self.assertEqual(original,hashlib.sha256(source.read_bytes()).hexdigest())
+                (copy_path.parent/"gravity.LOG").write_text(
+                    'ETABS analysis did not run; synthetic log',encoding='utf8')
+                out=Path(tmp)/'audit'
+                g._collect_etabs_solver_logs(copy_path,out,
+                    lambda stage,msg,**kwargs:messages.append((stage,kwargs)))
+                self.assertTrue((out/'ETABS_Native_Analysis_Logs'/'gravity.LOG').is_file())
+                self.assertIn('ETABS_NATIVE_LOG',[stage for stage,_ in messages])
 
     def test_run_flags_exclude_all_seismic_cases_on_private_copy(self):
         from unittest.mock import Mock
