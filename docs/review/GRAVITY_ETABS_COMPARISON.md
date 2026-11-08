@@ -415,3 +415,58 @@ point reactions and member self-weight.
 | Mass factors | Assembly maintains `mass_factors` separately | Synthetic test checks the existing mass payload is unchanged; project seismic mass not reconciled. |
 | Reports | Assembly-time ledger and standalone gravity GUI source | Profile overrides can make these reports stale; comparison must use matching run evidence. |
 | Load path and ETABS agreement | No matching independent pattern/beam results supplied | Not evaluated; no assertion of physical equivalence. |
+
+
+## Offline 76-point ETABS vs OpenSees source/continuous wall comparison (Nov 2026)
+
+When direct ETABS COM extraction displays \`RunAnalysis returned 0 but
+Dead/Live NOT FINISHED\`, **do not keep rerunning** the 42 ETABS cases
+or edit the original EDB. The user's completed native ETABS Joint
+Reactions worksheet for \`1. DL + LL\` is valid input to the offline
+comparison. The app \`Run_Offline_ETABS_76_Node_Comparison.py\`
+does not invoke ETABS, alter analysis run flags or recalculate
+OpenSees.
+
+Run that single script from Spyder. Select, in order:
+
+1. Original *complete* ETABS table export XLSX containing the
+   \`Joint Reactions\` sheet; use the original full result, not
+   the \`1.5(DL+LL)\` design combination.
+2. \`OpenSees_Element_Connectivity.json\` from the same exact ETABS
+   export: \`node_map\` identifies original ETABS *Unique Name* and
+   OpenSees point tag. It must not use ETABS display labels as keys.
+3. \`Gravity_Wall_Base_Comparison/<run>/ETABS_SOURCE_SUPPORTS/Gravity_Result_V110.json\`.
+4. \`Gravity_Wall_Base_Comparison/<run>/CONTINUOUS_WALL_BASE_FIXED/Gravity_Result_V110.json\`.
+5. A fresh **separate** comparison output folder.
+
+The app writes \`ETABS_Offline_Gravity_Comparison.xlsx\`,
+\`ETABS_Offline_Joint_Reaction_Differences.csv\`,
+and \`ETABS_Offline_Gravity_Comparison.json\`.
+Excel sheets include Summary, All 76 ETABS joints, Critical source
+nodes (ranked absolute reaction error), Additional fixed wall nodes
+(the 21 new restraints explicitly kept separate), and Evidence gates.
+
+Do **not** attribute ETABS-vs-OpenSees source node error to
+source-vs-continuous restraint changes. Keep those three columns
+separately:
+\`ETABS original FZ\`, \`OpenSees 76 support FZ\`,
+and \`OpenSees 97 support FZ\`.
+
+The 2026-11-08 source run had applied gravity 320047.788933 kN;
+both 76 and 97 support runs converged to equal reaction totals. This
+only checks balance. It does not prove correct dead-load definition:
+the independent native ETABS \`1. DL + LL\` base result was
+311367.3139 kN, a source-model load discrepancy of 8680.475 kN
+to investigate through end-offset self weight, brace areas,
+shell/frame physical overlap, loads and model provenance.
+
+Critical results depend on source model properties: also extract
+all ETABS ULS object/section modifiers and verify OpenSees section
+membrane/plate/shear representation. An ETABS point with zero FZ
+does not imply missing support unless actual restraints and its
+native shell connectivity are independently verified.
+
+If the ETABS workbook is very large, Excel's \`Joint Reactions\`
+sheet can be exported **unchanged** as CSV, preserving \`Unique Name\`,
+\`Output Case\`, \`Story\` and global \`FZ\`; select that CSV instead.
+Never strip zero-reaction rows or apply filters before export.
