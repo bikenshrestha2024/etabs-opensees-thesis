@@ -656,7 +656,15 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
         from components.validation.gravity_node_comparison import compare_support_nodes,write_node_comparison
         try:
             node_audit=compare_support_nodes(data,result,tolerance_m=0.01)
-            write_node_comparison(out,node_audit)
+            topo_path=folder/"OpenSees_Element_Connectivity.json"
+            topo=json.loads(topo_path.read_text(encoding="utf-8-sig")) if topo_path.is_file() else None
+            write_node_comparison(out,node_audit,etabs=data,
+                                  opensees=result,topology=topo)
+            report("ALL_NODES_EXCEL","Exported every OpenSees gravity node, ETABS source ID mapping, ranked 76-support comparison",
+                   workbook=str(out/"Gravity_Node_Reaction_Comparison.xlsx"),
+                   all_node_csv=str(out/"Gravity_All_Model_Nodes.csv"),
+                   mapping_count=len((topo or {}).get("node_map",[])),
+                   caution="Unrestrained ETABS support reactions and displacements remain blank if not exported")
             comp['node_comparison']={
                 k:v for k,v in node_audit.items()
                 if k not in ('rows','top_discrepancies','diagnostic_hypotheses')}
