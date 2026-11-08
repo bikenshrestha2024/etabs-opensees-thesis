@@ -3,6 +3,29 @@ import unittest
 from components.validation import gravity_etabs_direct as g
 
 class GravityDirectAPITests(unittest.TestCase):
+    def test_export_direct_serializes_etabs_local_axis_list_in_excel(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from openpyxl import load_workbook
+        with tempfile.TemporaryDirectory() as tmp:
+            etabs={
+                'joint_reactions':[{'point':'1','F3':100.0,
+                    'local_axis_angles_deg':[0.0,0.0,0.0],
+                    'global_z_basis':'GLOBAL_Z_VERIFIED_DEFAULT_AXES'}],
+                'base_reactions':[{'case':'1. DL + LL','FZ':100.0}],
+                'support_displacements':[{'point':'1','Uz':0.0}],
+                'source_case_base_reactions':[{'case':'Dead','FZ':80.0}]}
+            out=g.export_direct(tmp,etabs,{'difference_kN':0.0})
+            book=load_workbook(Path(out)/'ETABS_OpenSees_Direct_Gravity_Comparison.xlsx')
+            sheet=book['ETABS supports']
+            headers=[c.value for c in sheet[1]]
+            self.assertEqual(sheet.cell(2,headers.index('local_axis_angles_deg')+1).value,
+                             '[0.0, 0.0, 0.0]')
+            raw=json.loads((Path(out)/'etabs_gravity.json').read_text('utf8'))
+            self.assertEqual(raw['joint_reactions'][0]['local_axis_angles_deg'],
+                             [0.0,0.0,0.0])
+
     def test_exact_combo_contract(self):
         class Combo:
             def GetTypeCombo(self,name):return (0,0)
