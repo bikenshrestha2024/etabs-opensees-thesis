@@ -1,5 +1,7 @@
 """3D node focus and tag regression tests; no GUI display or OpenSees needed."""
 import ast
+import json
+import tempfile
 import unittest
 from pathlib import Path
 from components.ui.view_controls import resolve_node_tag,center_camera_on_node
@@ -37,6 +39,29 @@ class ViewFocusTests(unittest.TestCase):
             center_camera_on_node(ax,[float("nan"),0,0])
         with self.assertRaisesRegex(ValueError,"span_fraction"):
             center_camera_on_node(ax,[0,0,0],span_fraction=1.4)
+    def test_generated_html_viewer_has_zoom_to_source_node_and_reset(self):
+        from components.model.id_audit import export_id_audit
+        with tempfile.TemporaryDirectory() as root:
+            folder=Path(root)
+            (folder/"OpenSees_Element_Connectivity.json").write_text(
+                json.dumps({"node_map":[
+                    {"etabs_point_name":"264","opensees_node_tag":41,
+                     "coordinates_m":[6,6,0]}],"elements":[]}),encoding="utf8")
+            (folder/"OpenSees_Source_Model_Metadata_V118.json").write_text(
+                json.dumps({"supports":{"41":[1,1,1,1,1,1]}}),encoding="utf8")
+            view=folder/"OpenSees_Structural_Elements_By_Storey.html"
+            view.write_text(
+                '<html><body><div class="plotly-graph-div"></div></body></html>',
+                encoding="utf8")
+            export_id_audit(folder)
+            html=view.read_text(encoding="utf8")
+            self.assertIn('id="viewZoomNode"',html)
+            self.assertIn("scene.xaxis.range",html)
+            self.assertIn("scene.zaxis.range",html)
+            self.assertIn("scene.xaxis.autorange",html)
+            self.assertIn("Exactly one mapped source node required",html)
+            self.assertIn("marker:{size:14",html)
+
     def test_both_viewers_implement_shared_zoom_and_highlight(self):
         base=Path(__file__).resolve().parents[1]
         for file in ("components/ui/plot_utilities.py",
