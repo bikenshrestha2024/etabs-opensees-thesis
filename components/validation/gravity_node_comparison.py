@@ -214,6 +214,168 @@ def all_model_node_rows(opensees, topology=None, etabs=None, report=None):
     return out
 
 
+def export_fixed_source_support_reactions(folder, opensees, topology, etabs=None,
+                                          *, expected_tags=range(1,77),
+                                          coordinate_tolerance_m=0.01):
+    """Write every requested original OpenSees source-support node to Excel.
+
+    [REF docs/review/GRAVITY_ETABS_COMPARISON.md]
+    Never substitute another support scenario, generate missing ETABS reactions,
+    or infer that same ETABS point name implies equal coordinate.
+    The 1..76 range belongs to the user's SOURCE-support baseline, not the
+    97-node continuously fixed wall sensitivity.
+    """
+    output=Path(folder);output.mkdir(parents=True,exist_ok=True)
+    tags=[int(i) for i in expected_tags]
+    if len(tags)!=len(set(tags)) or not tags:
+        raise ValueError("Expected OpenSees support tags must be unique and nonempty")
+    mapping={}
+    for n in topology.get("node_map",[]):
+        key=str(n.get("opensees_node_tag"))
+        if key in mapping:raise ValueError("Duplicate source node mapping "+key)
+        mapping[key]=n
+    nodal={}
+    for n in opensees.get("nodes",[]):
+        key=str(n.get("tag"))
+        if key in nodal:raise ValueError("Duplicate OpenSees node record "+key)
+        nodal[key]=n
+    reactions={}
+    for n in opensees.get("reactions",[]):
+        key=str(n.get("node_tag"))
+        if key in reactions:raise ValueError("Duplicate OpenSees reaction "+key)
+        reactions[key]=n
+    etabs_by_point={}
+    if isinstance(etabs,dict):
+        for e in etabs.get("joint_reactions",[]):
+            point=str(e.get("point"))
+            if point in etabs_by_point:
+                raise ValueError("Duplicate ETABS reaction point "+point)
+            etabs_by_point[point]=e
+    results=[]
+    tol=float(coordinate_tolerance_m)
+    if not math.isfinite(tol) or not 0<tol<=0.5:
+        raise ValueError("Coordinate tolerance must be >0 and <=0.5 m")
+    for tag in tags:
+        k=str(tag)
+        src=mapping.get(k)
+        osnode=nodal.get(k)
+        osreact=reactions.get(k)
+        etpoint=str(src.get("etabs_point_name")) if src and src.get("etabs_point_name") is not None else None
+        etrec=etabs_by_point.get(etpoint) if etpoint is not None else None
+        source_xyz=src.get("coordinates_m") if src else None
+        xyz=tuple(float(osnode[a]) for a in ("x_m","y_m","z_m")) if osnode else None
+        source_dist=(_distance(source_xyz,xyz) if source_xyz is not None and xyz is not None else None)
+        et_dist=(_distance(xyz,_xyz(etrec)) if xyz is not None and etrec is not None else None)
+        o_rz=(float(osreact["rz_kN"]) if osreact and osreact.get("rz_kN") is not None else None)
+        e_rz=(float(etrec["rz_global_kN"]) if etrec and etrec.get("rz_global_kN") is not None else None)
+        status="MATCHED_GLOBAL_Z"
+        if src is None or not etpoint:
+            status="MISSING_ETABS_POINT_MAPPING"
+        elif osnode is None:
+            status="MISSING_OPENSEES_NODE_DATA"
+        elif osreact is None:
+            status="MISSING_OPENSEES_REACTION"
+        elif source_dist is None or source_dist>tol:
+            status="SOURCE_NODE_GEOMETRY_MISMATCH"
+        elif etrec is None:
+            status="MISSING_ETABS_REACTION"
+        elif et_dist is None or et_dist>tol:
+            status="ETABS_OPENSEES_COORDINATE_MISMATCH"
+        elif e_rz is None or not math.isfinite(e_rz):
+            status="ETABS_GLOBAL_Z_NOT_VERIFIED"
+        elif o_rz is None or not math.isfinite(o_rz):
+            status="OPENSEES_REACTION_NOT_FINITE"
+        delta=o_rz-e_rz if status=="MATCHED_GLOBAL_Z" else None
+        details=dict(
+            opensees_node=tag,etabs_point=etpoint,
+            x_m=xyz[0] if xyz else None,y_m=xyz[1] if xyz else None,
+            z_m=xyz[2] if xyz else None,source_node_distance_m=source_dist,
+            etabs_opensees_distance_m=et_dist,
+            etabs_Rz_kN=e_rz,opensees_Rz_kN=o_rz,
+            delta_opensees_minus_etabs_kN=delta,
+            abs_difference_kN=abs(delta) if delta is not None else None,
+            signed_percent_etabs=(100*delta/abs(e_rz) if delta is not None and abs(e_rz)>1e-12 else None),
+            status=status,
+            etabs_global_z_basis=etrec.get("global_z_basis") if etrec else None,
+            etabs_source_point_xyz_m=list(source_xyz) if source_xyz is not None else None)
+        results.append(details)
+    ranked=sorted((x for x in results if x["status"]=="MATCHED_GLOBAL_Z"),
+                  key=lambda x:x["abs_difference_kN"],reverse=True)
+    op_total=sum(float(x["rz_kN"]) for x in reactions.values()
+                 if x.get("rz_kN") is not None)
+    et_total=(sum(float(x["rz_global_kN"]) for x in etabs_by_point.values()
+                  if x.get("rz_global_kN") is not None)
+              if etabs is not None and all(x.get("rz_global_kN") is not None
+                      for x in etabs_by_point.values()) else None)
+    matched=len(ranked)
+    report=dict(schema="gravity-source-76-support-v1",
+        source="OpenSees original ETABS_SOURCE_SUPPORTS gravity run, not continuous-wall sensitivity",
+        expected_opensees_tags=tags,
+        expected_count=len(tags),matched_count=matched,
+        missing_or_unverified=len(tags)-matched,
+        openSees_all_reaction_sum_kN=op_total,
+        etabs_all_extracted_reaction_sum_kN=et_total,
+        comparable_only_if_complete=matched==len(tags),
+        model_equivalence="NOT_STRUCTURALLY_VALIDATED",
+        sort="numerical node tags; critical ranking by absolute point reaction difference",
+        rows=results,ranked=ranked)
+    (output/"Gravity_76_Source_Support_Reactions.json").write_text(
+        json.dumps(report,indent=2,allow_nan=False),encoding="utf-8")
+    keys=["opensees_node","etabs_point","x_m","y_m","z_m",
+          "etabs_Rz_kN","opensees_Rz_kN","delta_opensees_minus_etabs_kN",
+          "abs_difference_kN","signed_percent_etabs","status",
+          "source_node_distance_m","etabs_opensees_distance_m",
+          "etabs_global_z_basis"]
+    def save_csv(name,rows):
+        with (output/name).open("w",newline="",encoding="utf-8-sig") as fh:
+            w=csv.DictWriter(fh,fieldnames=keys,extrasaction="ignore")
+            w.writeheader();w.writerows(rows)
+    save_csv("Gravity_76_Source_Support_Reactions.csv",results)
+    save_csv("Gravity_76_Critical_Reaction_Nodes.csv",ranked)
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font,PatternFill
+        from openpyxl.chart import BarChart,Reference
+        wb=Workbook();ws=wb.active;ws.title="Review summary"
+        for row in [
+            ("Gravity reaction audit","ETABS_SOURCE_SUPPORTS only"),
+            ("Expected OpenSees tags",f"{min(tags)}–{max(tags)} ({len(tags)} requested)"),
+            ("Verified one-to-one comparison",matched),
+            ("Missing / unverified",len(tags)-matched),
+            ("OpenSees reaction sum kN",op_total),
+            ("ETABS extracted reaction sum kN",et_total),
+            ("Structural equivalence","NOT VALIDATED"),
+            ("Condition","Do not assume ETABS non-restrained mesh nodes carry zero or force-point equivalence"),
+        ]: ws.append(row)
+        def sheet(title,records):
+            sh=wb.create_sheet(title)
+            sh.append(keys)
+            for row in records:
+                sh.append([row.get(k) for k in keys])
+            sh.freeze_panes="C2";sh.auto_filter.ref=sh.dimensions
+            for c in sh[1]:
+                c.font=Font(color="FFFFFF",bold=True)
+                c.fill=PatternFill("solid",fgColor="21446A")
+            sh.column_dimensions["A"].width=19
+            sh.column_dimensions["B"].width=20
+            for col in ["F","G","H","I","J"]:sh.column_dimensions[col].width=21
+            sh.column_dimensions["K"].width=38
+            return sh
+        sheet("Nodes 1-76",results)
+        crit=sheet("Critical nodes ranked",ranked)
+        if ranked:
+            chart=BarChart();chart.type="bar";chart.title="Largest absolute reaction differences, kN"
+            chart.y_axis.title="OpenSees node"
+            n=min(20,len(ranked))
+            chart.add_data(Reference(crit,min_col=9,min_row=1,max_row=n+1),titles_from_data=True)
+            chart.set_categories(Reference(crit,min_col=1,min_row=2,max_row=n+1))
+            crit.add_chart(chart,"P2")
+        wb.save(output/"Gravity_76_Source_Support_Reactions.xlsx")
+    except ImportError:
+        report["excel_status"]="OPENPYXL_UNAVAILABLE_CSV_JSON_PRESERVED"
+    return report
+
+
 def write_node_comparison(folder,report,*,etabs=None,opensees=None,topology=None):
     """Save full CSV, ranked CSV and machine-readable JSON from real evidence.
 
