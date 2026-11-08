@@ -55,6 +55,18 @@ class JointWeightTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'not axis aligned'):
             build_joint_volume_ledger([frame],[],self.nodes,
                 policy="VERIFIED_SINGLE_OWNER",geometry_verified=True)
+    def test_etabs_offset_audit_keeps_auto_mode_unverified(self):
+        from components.model.joint_volume_ownership import export_frame_offset_weight_audit
+        children={"B1":[dict(object="B1",category="BEAM",end=6.,
+                     properties=dict(A=.48,weight=25.))]}
+        with tempfile.TemporaryDirectory() as folder:
+            report=export_frame_offset_weight_audit(folder,children,{
+                "B1":{"GetEndLengthOffset":[True,.55,.55,1.,0]}})
+            text=report.read_text(encoding="utf-8-sig")
+            self.assertIn("AUTO_OFFSET_NOT_WEIGHT_RULE",text)
+            self.assertIn("13.2",text)
+            self.assertIn("4.9",text)
+
     def test_invalid_policy_fails_closed(self):
         with self.assertRaisesRegex(ValueError,'Unknown joint'):
             build_joint_volume_ledger(self.frames,self.shells,self.nodes,
