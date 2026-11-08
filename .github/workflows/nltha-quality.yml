@@ -46,6 +46,8 @@ on:
       - 'components/validation/gravity_node_comparison.py'
       - 'tests/verify_gravity_node_comparison.py'
       - 'tests/verify_wall_base_restraints.py'
+      - 'components/gravity/support_scenarios.py'
+      - 'tests/verify_gravity_support_scenarios.py'
       - 'tests/verify_gravity_etabs_direct.py'
       - 'components/gravity/gui_and_reports.py'
       - 'tests/verify_gravity_comparison_bundle.py'
@@ -246,6 +248,7 @@ jobs:
           python tests/verify_gravity_etabs_direct.py
           python tests/verify_gravity_node_comparison.py
           python tests/verify_wall_base_restraints.py
+          python tests/verify_gravity_support_scenarios.py
           python tests/verify_gravity_comparison_profile.py
           python tests/verify_documentation_coverage.py
           python tests/verify_active_repository_audit.py
