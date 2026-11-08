@@ -321,26 +321,36 @@ class GravityAnalysisGUI:
             self.status_var.set("Direct ETABS gravity extraction blocked: "+str(exc))
             messagebox.showerror("Direct ETABS gravity comparison",str(exc),parent=self.win)
 
+    def _publish_gravity_evidence(self, *,single_run=None,dual_run=None):
+        """Create versioned ZIP + exact path log in the gravity output root.
+
+        [REF components/gravity/evidence_workflow.py package_gravity_review]
+        """
+        from components.gravity.evidence_workflow import (
+            package_gravity_review,path_log_entries)
+        report,paths=package_gravity_review(
+            self.model_var.get(),self.output_var.get(),
+            single_run=single_run,dual_run=dual_run,
+            etabs_json=self.etabs_gravity_json_var.get().strip() or None)
+        for stage,message in path_log_entries(paths,report):
+            self._gravity_action_log(stage,message)
+        self.status_var.set("UPLOAD ZIP: "+paths["upload_zip"])
+        return report,paths
+
     def _export_comparison_bundle(self):
-        """Prepare a single ZIP for independent ETABS/OpenSees gravity review."""
+        """Prepare one central evidence ZIP and log its exact upload location."""
         try:
-            from components.gravity.comparison_bundle import export_bundle
-            model = Path(self.model_var.get()).expanduser().resolve()
-            if not model.is_file():
-                raise ValueError("Select an existing generated gravity model script")
-            source = model.parent
-            gravity_dir = Path(self.output_var.get()).expanduser().resolve()
-            chosen = self.comparison_output_var.get().strip()
-            comparison_dir = (Path(chosen).expanduser().resolve() if chosen else
-                gravity_dir / "Gravity_ETABS_OpenSees_Comparison")
-            etabs_path = self.etabs_gravity_json_var.get().strip() or None
-            report, archive = export_bundle(source, gravity_dir, comparison_dir,
-                                             etabs_json=etabs_path)
-            self.status_var.set("Upload-ready gravity evidence: " + str(archive))
-            messagebox.showinfo("Gravity comparison evidence", 
-                f"ZIP for upload:\\n{archive}\\n\\nMissing items: {len(report['missing'])}"
-                "\\nReview EVIDENCE_MANIFEST.json before comparison.",parent=self.win)
+            report,paths=self._publish_gravity_evidence()
+            self.nb.select(self.log_tab)
+            messagebox.showinfo(
+                "Upload gravity evidence to ChatGPT",
+                "ZIP FOR UPLOAD:\n"+paths["upload_zip"]+
+                "\n\nFull index:\n"+paths["exact_file_paths"]+
+                "\n\nMissing: "+str(len(report["missing"]))+
+                " | Oversize: "+str(len(report["oversize_skipped"]))+
+                "\nReview the manifest for excluded evidence.",parent=self.win)
         except Exception as exc:
+            self._gravity_action_log("EVIDENCE_EXPORT_ERROR",str(exc))
             messagebox.showerror("Gravity evidence bundle",str(exc),parent=self.win)
 
     def _browse_file_or_dir_for_comparison(self):
