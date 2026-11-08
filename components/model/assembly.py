@@ -922,6 +922,16 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
         # [REF NBC105-2025 §9.3.1] fail before element creation and list every
         # ETABS frame section lacking a mapped nonlinear section.
         validate_frame_mapping(data,cfg,section_tags,overrides=overrides,research=research)
+    # [REF components/model/linear_shell_stiffness.py]
+    # Explicit engineering opt-in: this approximates ETABS Shell-Thin for
+    # uniformly scaled membrane/bending terms. The OpenSees section couples
+    # transverse shear to plate modulus, so v13=v23=1 with m=0.1 is NOT exact.
+    linear_shell_policy=cfg.get("linear_shell_stiffness_policy","LEGACY_GROSS_SHELL")
+    if linear_shell_policy not in ("LEGACY_GROSS_SHELL","TABULATED_REVIEWED_THIN_SHELL"):
+        raise ValueError("Unknown linear_shell_stiffness_policy: "+str(linear_shell_policy))
+    if linear_shell_policy=="TABULATED_REVIEWED_THIN_SHELL" and mode!="elastic":
+        raise ValueError("Tabulated elastic shell stiffness is for elastic gravity, modal, ESM and MRSM only; nonlinear wall materials are separate")
+    shell_audit={}
     tag=100000; used_sections={}; element_map={}; element_labels={}
     for e in data['frames']:
         tag+=1; p=e['properties']
@@ -968,11 +978,45 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
         else:
             if key not in used_sections:
                 sec=500000+len(used_sections); used_sections[key]=sec
-                factor=float(cfg.get('slab_bending_factor_sls',.35) if limit_state=='SLS' else cfg['slab_bending_factor']) if e['category']=='FLOOR' else (.7 if limit_state=='SLS' else .5) if research_elastic_walls and e['category']=='SHEAR WALL' else 1.
-                root=math.sqrt(_positive(factor,'slab bending factor'))
-                ops.section('ElasticMembranePlateSection',sec,p['E']/root,p['nu'],p['thickness']*root,0.)
+                if linear_shell_policy=="TABULATED_REVIEWED_THIN_SHELL":
+                    from components.model.linear_shell_stiffness import (
+                        shell_section_parameters,section_command)
+                    by_prop=cfg.get("linear_shell_modifiers_by_property",{})
+                    if key not in by_prop:
+                        raise ValueError("Missing reviewed ETABS shell modifier vector for "+
+                                         str(key)+" | "+str(e["category"])+
+                                         ". Do not replace source factors with generic NBC defaults.")
+                    result=shell_section_parameters(
+                        p["E"],p["nu"],p["thickness"],by_prop[key],
+                        property_name=key,
+                        source_kind="MANUAL_ETABS_PROPERTY_SCREENSHOT_NOT_OBJECT_LEVEL",
+                        transverse_shear_policy=cfg.get(
+                            "linear_shell_transverse_shear_policy","REJECT_DIFFERENCE"),
+                        density=0.)
+                    shell_audit[key]=result
+                    section_command(ops,sec,result)
+                    print("[LINEAR_SHELL_STIFFNESS]",json.dumps(result),flush=True)
+                else:
+                    factor=float(cfg.get('slab_bending_factor_sls',.35) if limit_state=='SLS' else cfg['slab_bending_factor']) if e['category']=='FLOOR' else (.7 if limit_state=='SLS' else .5) if research_elastic_walls and e['category']=='SHEAR WALL' else 1.
+                    root=math.sqrt(_positive(factor,'slab bending factor'))
+                    ops.section('ElasticMembranePlateSection',sec,p['E']/root,p['nu'],p['thickness']*root,0.)
             ops.element('ShellMITC4',tag,*e['nodes'],used_sections[key])
         element_map.setdefault('AREA:'+e['object'],[]).append(tag)
+    if linear_shell_policy=="TABULATED_REVIEWED_THIN_SHELL":
+        # Report is bound to the model's original config hash; the shell model
+        # has not been silently "accepted" as ETABS equivalent.
+        shell_audit_file=folder/"Linear_Shell_Stiffness_Audit.json"
+        _write(shell_audit_file,{
+            "model_config_sha256":data.get("config_sha256"),
+            "linear_shell_stiffness_policy":linear_shell_policy,
+            "linear_shell_property_count":len(shell_audit),
+            "properties":shell_audit,
+            "etabs_object_overrides_verified":False,
+            "full_etabs_equivalence":"NOT_VALIDATED",
+            "require_patch_and_modal_comparison":True,
+            "scope":"Elastic ULS ETABS-model comparison only; no nonlinear constitutive application",
+        })
+        print("[LINEAR_SHELL_STIFFNESS_AUDIT]",str(shell_audit_file),flush=True)
     for n,m in data['nodal_mass'].items(): ops.mass(int(n),m,m,m,0.,0.,0.)
     for i,(pattern,values) in enumerate(data['gravity'].items(),700001):
         ops.timeSeries('Linear',i); ops.pattern('Plain',i,i)
