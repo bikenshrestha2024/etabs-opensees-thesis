@@ -281,7 +281,7 @@ def extract_source_metadata(sap, topology, frame_rows, output):
         except Exception as exc: data['errors'].append(f"Point {n['etabs_point_name']} explicit mass: {exc}")
     for row in frame_rows:
         obj=str(row['etabs_object']); r={}
-        for method in ('GetLocalAxes','GetReleases','GetInsertionPoint'):
+        for method in ('GetLocalAxes','GetReleases','GetInsertionPoint','GetEndLengthOffset'):
             try: r[method]=list(getattr(sap.FrameObj,method)(obj))
             except Exception as exc: r[method]=dict(error=str(exc))
         data['frames'][obj]=r
@@ -472,7 +472,12 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         # Default AUDIT_ONLY never changes loads/mass and never turns an
         # approximate volume estimate into an accepted building self-weight.
         from components.model.joint_volume_ownership import (
-            build_joint_volume_ledger, export_joint_volume_ledger)
+            build_joint_volume_ledger, export_joint_volume_ledger,
+            export_frame_offset_weight_audit)
+        # End offsets are a length/stiffness input, never by themselves an
+        # automatic weight reduction. Preserve per-source evidence for audit.
+        export_frame_offset_weight_audit(folder,segments,
+                                         meta.get('frames',{}))
         volume_policy=cfg['joint_volume_weight_policy']
         if volume_policy not in ('AUDIT_ONLY','VERIFIED_SINGLE_OWNER'):
             raise ValueError('Unknown joint volume policy '+str(volume_policy))
