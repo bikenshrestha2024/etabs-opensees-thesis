@@ -16,6 +16,11 @@ import zipfile
 SELECTED = (
     "OpenSees_Complete_Export_Report_V118.json",
     "OpenSees_Complete_Model_Config_V118.json",
+    "ETABS_OpenSees_Beam_Weight_Reconciliation.json",
+    "ETABS_OpenSees_Beam_Weight_Reconciliation.csv",
+    "ETABS_Frame_End_Offset_Weight_Audit.csv",
+    "OpenSees_Joint_Volume_Ownership_Audit.json",
+    "OpenSees_Joint_Volume_Ownership_Audit.csv",
     "OpenSees_Complete_Model_Data_V118.json",
     "OpenSees_Load_Conversion_Audit.json",
     "LOAD_PATH_AND_DIAPHRAGM_AUDIT_V130.json",
