@@ -267,6 +267,44 @@ API references:
 [GetRunCaseFlag](https://docs.csiamerica.com/help-files/etabs-api-2016/html/dc111164-bf67-43f5-df8c-323a5349af48.htm),
 [SetRunCaseFlag](https://docs.csiamerica.com/help-files/etabs-api-2016/html/c4f02de1-a693-0edd-1df1-62a81d9c7eb3.htm).
 
+## Wall/lift base mesh restraints: explicit source support policy (2026-11-08)
+
+The model now defaults to `wall_base_restraint_policy="SOURCE_ONLY"`.
+This preserves the actual imported ETABS point restraint flags at original
+wall-end and opening-edge support nodes, and **does not add** fixed restraints
+at mesh-only intermediate nodes. In the prior implementation, any generated
+point on a fully restrained source area edge was fixed, even without
+confirming the ETABS wall auto-meshing option. That could change the
+number and distribution of lift-core base reactions.
+
+CSI ETABS Wall Auto Mesh Options documents **Add Restraints/Constraints
+on Edge if Corners have Restraints/Constraints**:
+https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Shell/Wall_Auto_Mesh_Options.htm
+
+A separate `wall_base_restraint_policy="EDGE_PROPAGATE_CONFIRMED"` mode is
+available only if `etabs_wall_auto_mesh_restraints_confirmed=true` is
+explicitly set after reviewing the source EDB. This option duplicates the
+old all-fully-fixed source-edge propagation but now records the added
+OpenSees node tags in the export report and model-data JSON.
+It is not a substitute for verifying ETABS internally generated mesh
+restraints, area edge constraints, or foundation springs.
+
+Rebuild the OpenSees model from source audits **and rerun gravity, modal,
+MRSM and other analyses** after changing boundary conditions; previous
+97-node reactions and gravity deflections are not results of the new
+support configuration. Under `SOURCE_ONLY`, the intermediate mesh nodes
+remain part of the ShellMITC4 wall elements but are not fixed by `ops.fix`.
+They may still transfer forces through wall membrane and bending stiffness;
+the resulting reactions appear at the actual restrained source nodes.
+
+For a physically continuous wall-to-raft foundation, fixing only isolated
+corners may not represent the foundation accurately. The correct physical
+restraint is project-dependent; source fidelity and physical foundation
+validation should be audited separately. Include original ETABS points,
+lift/opening edge coordinates, shell object tags, generated mesh tags,
+actual support flags and reaction aggregation by physically corresponding
+base regions in the final evidence workbook.
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
