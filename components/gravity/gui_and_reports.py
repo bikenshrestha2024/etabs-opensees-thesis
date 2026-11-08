@@ -107,7 +107,7 @@ class GravityAnalysisGUI:
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
         self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
-        self.wall_support_strategy_var=tk.StringVar(value="ETABS Reaction Validation")
+        self.wall_support_strategy_var=tk.StringVar(value="ETABS Reaction Validation (32 nodes)")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self._build()
@@ -507,7 +507,7 @@ class GravityAnalysisGUI:
         ttk.Label(wall_row,text="Gravity wall-base supports:").pack(side="left",padx=(0,6))
         ttk.Combobox(wall_row,textvariable=self.wall_support_strategy_var,
             state="readonly",width=38,
-            values=("ETABS Reaction Validation","ETABS Node Position / Continuous","Continuous Wall Base (97)")).pack(side="left")
+            values=("ETABS Reaction Validation (32 nodes)","ETABS Node Position (76 nodes)","Continuous Wall Base (97 nodes)")).pack(side="left")
         ttk.Label(wall_row,text="Nonzero ETABS reaction = diagnostic only; node position retains 76 original supports; separate 97-node continuous case remains unchanged.",
                   wraplength=485).pack(side="left",padx=8)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
@@ -552,7 +552,14 @@ class GravityAnalysisGUI:
         ttk.Label(inputs, text="ACTIVE run support nodes (auto-selected)").grid(row=0, column=0, sticky="w", padx=4)
         ttk.Entry(inputs, textvariable=self.support_var, width=36).grid(row=0, column=1, sticky="ew", padx=4)
         ttk.Label(inputs, text="Total downward gravity load (kN; verify)").grid(row=0, column=2, sticky="w", padx=4)
-        ttk.Entry(inputs, textvariable=self.load_var, width=16).grid(row=0, column=3, sticky="w", padx=4)
+        ttk.Entry(inputs, textvariable=self.load_var, width=16, state="readonly").grid(row=0, column=3, sticky="w", padx=4)
+        ttk.Label(inputs, text="Support case for this gravity load").grid(row=1, column=0, sticky="w", padx=4, pady=(5,0))
+        ttk.Combobox(inputs, textvariable=self.wall_support_strategy_var, state="readonly", width=39,
+            values=("ETABS Reaction Validation (32 nodes)",
+                    "ETABS Node Position (76 nodes)",
+                    "Continuous Wall Base (97 nodes)")).grid(row=1, column=1, sticky="w", padx=4, pady=(5,0))
+        ttk.Label(inputs, text="Load is based on DL/LL profile; support choice redistributes reactions, not applied weight.").grid(
+            row=1,column=2,columnspan=4,sticky="w",padx=4,pady=(5,0))
         ttk.Label(inputs, text="Load steps").grid(row=0, column=4, sticky="w", padx=4)
         ttk.Entry(inputs, textvariable=self.steps_var, width=6).grid(row=0, column=5, sticky="w", padx=4)
         inputs.columnconfigure(1, weight=1)
@@ -692,8 +699,11 @@ class GravityAnalysisGUI:
         [REF docs/review/GRAVITY_ETABS_COMPARISON.md]
         """
         return {
+            "ETABS Reaction Validation (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
             "ETABS Reaction Validation": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+            "ETABS Node Position (76 nodes)": "ETABS_SOURCE_SUPPORTS",
             "ETABS Node Position / Continuous": "ETABS_SOURCE_SUPPORTS",
+            "Continuous Wall Base (97 nodes)": "CONTINUOUS_WALL_BASE_FIXED",
             "Continuous Wall Base (97)": "CONTINUOUS_WALL_BASE_FIXED",
             "ETABS_SOURCE_SUPPORTS": "ETABS_SOURCE_SUPPORTS",
             "CONTINUOUS_WALL_BASE_FIXED": "CONTINUOUS_WALL_BASE_FIXED",
