@@ -20,7 +20,7 @@ class SafeGravityReviewTests(unittest.TestCase):
                 "etabs_beam_weight_policy":"GROSS_SECTION_LENGTH",
                 "etabs_clear_beam_weight_confirmed":False}))
         self.audit=dict(beam_count=2,policy="GROSS_SECTION_LENGTH",
-            gross_beam_weight_kN=72.+36.,rows=[
+            gross_beam_weight_kN=72.+36.,selected_beam_weight_kN=108.,rows=[
                 dict(etabs_object="B1",full_length_m=6.0,frame_area_m2=.48,
                      unit_weight_kN_m3=25.,end_i_m=.55,end_j_m=.55,
                      gross_weight_kN=72.,potential_offset_weight_kN=13.2),
