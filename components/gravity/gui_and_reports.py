@@ -220,6 +220,7 @@ class GravityAnalysisGUI:
                                  parent=self.win)
             return
         top=report['rows'][:6]
+        self._gravity_action_log('ETABS_OFFLINE_OUTPUT',str(dst))
         self._gravity_action_log('ETABS_OFFLINE_COMPLETE',
             'ETABS unique joints='+str(report['etabs_joint_records'])+
             ', matched OpenSees='+str(report['matched_source_nodes'])+
@@ -232,6 +233,11 @@ class GravityAnalysisGUI:
                 '; difference kN='+str(row['delta_source_minus_etabs_kN'])+
                 '; status='+row['status'])
         self.status_var.set('Offline ETABS table comparison saved: '+str(dst))
+        try:
+            self._publish_gravity_evidence(dual_run=dst.parent)
+        except Exception as exc:
+            self._gravity_action_log('EVIDENCE_EXPORT_ERROR',
+                'Offline data saved; evidence ZIP failed: '+str(exc))
         messagebox.showinfo('Offline ETABS gravity comparison',
             f"ETABS joints: {report['etabs_joint_records']}\\n"
             f"Verified mapped supports: {report['matched_source_nodes']}\\n"
@@ -293,8 +299,17 @@ class GravityAnalysisGUI:
                               run_if_missing=bool(self.run_missing_etabs_results.get()),
                               log_callback=lambda line:self._gravity_action_log("ETABS_API",line))
             self._gravity_action_log("ETABS_SUCCESS","Comparison JSON, CSV and Excel exported: "+str(out))
+            self._gravity_action_log("ETABS_OUTPUT_ETABS_JSON",str(out/"etabs_gravity.json"))
+            self._gravity_action_log("ETABS_OUTPUT_COMPARISON",str(out/"Direct_Gravity_Comparison.json"))
+            self._gravity_action_log("ETABS_OUTPUT_EXCEL",str(out/"ETABS_OpenSees_Direct_Gravity_Comparison.xlsx"))
+            self._gravity_action_log("ETABS_OUTPUT_NATIVE_LOGS",str(out/"ETABS_Native_Analysis_Logs"))
             self.etabs_gravity_json_var.set(str(out/"etabs_gravity.json"))
             self.status_var.set("Direct gravity comparison saved: "+str(out))
+            try:
+                self._publish_gravity_evidence()
+            except Exception as pack_exc:
+                self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
+                    "ETABS direct extraction saved; automatic ZIP failed: "+str(pack_exc))
             note=(f"ETABS FZ = {comp['etabs_base_FZ_kN']:.3f} kN\\n"
                   f"OpenSees RZ = {comp['opensees_support_FZ_kN']:.3f} kN\\n"
                   f"Difference = {comp['difference_kN']:.3f} kN "
@@ -590,6 +605,10 @@ class GravityAnalysisGUI:
         self._gravity_action_log("GRAVITY_SETTINGS",f"Profile={self.gravity_profile_var.get()} | "
             f"Downward load={total:.6f} kN | supports={len(supports)} | steps={steps}")
         self._gravity_action_log("GRAVITY_OUTPUT","Result and run logs: "+str(out))
+        self._gravity_action_log("GRAVITY_UPLOAD_DESTINATION",
+            str(out/"Gravity_Evidence_Upload"))
+        self._gravity_action_log("GRAVITY_GUI_LOG",
+            str(out/"Gravity_GUI_Actions.log"))
         self.log.insert("end",f"Support tags: {supports}\n")
         self.win.update_idletasks()
         result_path = out / "Gravity_Result_V110.json"
@@ -699,6 +718,24 @@ class GravityAnalysisGUI:
             for mode in scenarios:
                 self._make_outputs(records[mode]["payload"],Path(records[mode]["out"]))
             export_wall_support_comparison(comparison,root)
+            for mode in scenarios:
+                case=root/mode
+                self._gravity_action_log("DUAL_GRAVITY_RESULT_JSON_"+mode,
+                    str(case/"Gravity_Result_V110.json"))
+                self._gravity_action_log("DUAL_GRAVITY_SOLVER_LOG_"+mode,
+                    str(case/"Gravity_Run_V110.log"))
+                self._gravity_action_log("DUAL_GRAVITY_EXCEL_"+mode,
+                    str(case/"Gravity_Results_V110.xlsx"))
+            self._gravity_action_log("DUAL_GRAVITY_COMPARISON_EXCEL",
+                str(root/"Gravity_Wall_Base_Strategy_Comparison.xlsx"))
+            self._gravity_action_log("DUAL_GRAVITY_COMPARISON_CSV",
+                str(root/"Gravity_Wall_Base_Nodal_Reaction_Differences.csv"))
+            try:
+                self._publish_gravity_evidence(
+                    dual_run=root,single_run=root/"ETABS_SOURCE_SUPPORTS")
+            except Exception as pack_exc:
+                self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
+                    "Both gravity results saved; ZIP packaging failed: "+str(pack_exc))
             self._gravity_action_log("DUAL_GRAVITY_DONE",
                 "Both gravity workbooks and comparison saved: "+str(root))
             self.status_var.set("Two gravity wall-base cases PASS; comparison: "+str(root))
@@ -764,6 +801,17 @@ class GravityAnalysisGUI:
            "frozen":rep.get("frozen"),
            "elapsed_seconds":rep.get("elapsed_seconds")}))
         self._gravity_action_log("GRAVITY_EXPORT","Generated gravity result report and workbook/plots in "+str(out))
+        for filename in ("Gravity_Result_V110.json","Gravity_Run_V110.log","Gravity_Results_V110.xlsx"):
+            self._gravity_action_log("GRAVITY_OUTPUT_FILE",str(out/filename))
+        for path in paths:
+            if Path(path).is_file() and Path(path).name not in (
+                "Gravity_Result_V110.json","Gravity_Run_V110.log","Gravity_Results_V110.xlsx"):
+                self._gravity_action_log("GRAVITY_FIGURE_FILE",str(path))
+        try:
+            self._publish_gravity_evidence(single_run=out)
+        except Exception as pack_exc:
+            self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
+                "Gravity solver passed; upload ZIP failed: "+str(pack_exc))
         self.status_var.set(f"Gravity PASS | equilibrium error {rep['equilibrium_error_percent']:.4g}% | {rep['elapsed_seconds']:.2f} s | outputs saved in {out}")
         self.nb.select(self.plot_tab)
         messagebox.showinfo("Gravity analysis complete", "Gravity converged; reaction check passed; gravity frozen at time zero.\n\nExcel workbook, separate 300 dpi PNG/PDF figures and critical-action PDF saved.\nUse the result tabs or Open output folder to inspect them.\n\n" + str(out), parent=self.win)
