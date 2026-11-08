@@ -358,6 +358,55 @@ the smallest displacement or the closest numerical match to ETABS.
 Compare both, then select final boundary conditions from drawings,
 foundation details and observed ETABS internal mesh behavior.
 
+## ETABS original export comparison and MAX_PATH diagnostic (2026-11-08)
+
+The 2026-11-08 09:53 native ETABS extraction attempted analysis of the
+working copy at a **317-character Windows EDB path** and returned
+`Analyze.RunAnalysis=0`, followed by `Dead=1; Live=1` and missing
+`BaseReact`. All 42 cases were initially enabled; the gravity extraction
+then enabled Dead and Live only. Thus the missing results **cannot be
+attributed solely to disabled run flags**. Windows MAX_PATH=260 in many
+legacy application operations. This path is a plausible (not yet
+confirmed) cause of the inability to create ETABS analysis sidecars.
+Microsoft: https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation
+CSI: https://docs.csiamerica.com/help-files/etabs-api-2016/html/a24b2f43-be87-e0ff-587b-068339d9a350.htm
+
+The ETABS direct API route now copies the original EDB to an isolated,
+short path under `<TEMP>/ETABS_API/run_<id>/gravity.edb`, verifies
+SHA256, explicitly calls `SapModel.File.Save` on the private copy,
+runs only Dead and Live, verifies status 4 and copies available
+lightweight native logs into the analysis evidence folder. The
+`ETABS_GRAVITY_TEMP_ROOT` environment setting optionally selects
+another short writable directory. No original source EDB is modified
+or overwritten. This is a remedy for a suspected path failure, not a
+claim of a successful real ETABS solver run.
+
+**Preferred reference for existing completed ETABS analysis:** the
+already exported `Joint Reactions` XLSX/CSV. In the Gravity GUI select
+**Completed ETABS full table XLSX / Joint Reactions CSV** and use
+**Compare saved ETABS tables vs BOTH OpenSees gravity cases (no ETABS API)**.
+The new `components/validation/gravity_etabs_offline.py` reads only
+exact `Story=Base`, `Output Case=1. DL + LL` rows, maps source
+`Unique Name` to `OpenSees_Element_Connectivity.json` ETABS point IDs,
+and compares each with `ETABS_SOURCE_SUPPORTS` reactions; the
+continuous wall case is included as a separate sensitivity column.
+It saves XLSX, CSV and JSON under the latest dual-run output folder.
+Missing/ambiguous source ID mapping is exposed, never guessed.
+For a very large multi-sheet original workbook (~531 MB), exporting
+`Joint Reactions` alone to a CSV is a faster compatible input.
+
+**Observed actual dual-gravity results:** both cases balance
+320047.788933 kN, with 76 versus 97 restrained nodes; the extra
+21 continuous-only support reactions total **30454.937138 kN**,
+which is exactly offset by reductions at the other source-supported
+points. The maximum downward displacement changes by just
+**0.0055597 mm**. These are OpenSees-vs-OpenSees support
+sensitivity results, not ETABS-vs-OpenSees validation. The
+previously displayed ETABS total remains 311367.3139 kN,
+or 8680.4750 kN lower than OpenSees full gravity.
+Root-cause analysis first requires matching original ETABS
+point reactions and member self-weight.
+
 ## Review ledger
 
 | Area | Evidence reviewed | Status / limitation |
