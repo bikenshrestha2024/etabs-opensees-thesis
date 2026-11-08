@@ -340,6 +340,18 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                "limitations":["File presence and source hashes do not prove a matching EDB, load combination, stiffness or coordinate convention.",
                               "Local beam force responses require compatible tags/local-axis definitions.",
                               "Shell forces, wall section forces, detailed applied patterns and ETABS per-story reactions are missing unless separately supplied."]}
+        # Write an explicit NOT VALIDATED/SCREENING verdict for every upload,
+        # including both gravity discrepancies and all optional omissions.
+        # Read only original local evidence; never infer missing ETABS values.
+        from components.gravity.validation_scorecard import (
+            create_gravity_scorecard,save_gravity_scorecard)
+        scorecard=create_gravity_scorecard(
+            export_dir,gravity_dir,comparison_root,missing,oversize)
+        save_gravity_scorecard(stage,scorecard)
+        audit["validation_scorecard"]=dict(
+            file="GRAVITY_VALIDATION_SCORECARD.json",
+            conclusion=scorecard["conclusion"],
+            unresolved_gates=scorecard["unresolved_gates"])
         (stage/"EVIDENCE_MANIFEST.json").write_text(json.dumps(audit,indent=2,allow_nan=False),encoding="utf-8")
         with (stage/"EVIDENCE_FILE_PATHS.txt").open("w",encoding="utf8") as stream:
             stream.write("GRAVITY EVIDENCE INPUTS AND PACKAGE FILES\\n")
@@ -359,7 +371,8 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             stream.write("OVERSIZE OMITTED:\\n")
             for item in oversize:stream.write("  "+str(item)+"\\n")
         (stage/"README_UPLOAD_FIRST.txt").write_text(
-            "Upload Gravity_ETABS_OpenSees_Evidence.zip for comparison.\n"
+            "Upload this ZIP for comparison.\n"
+            "OPEN GRAVITY_VALIDATION_SCORECARD.txt FIRST for global and support reaction gates.\n"
             "Include native ETABS gravity JSON with the same load case.\n"
             "Inspect EVIDENCE_MANIFEST.json for MISSING and SKIPPED files.\n"
             "No missing physical responses are inferred.\n",encoding="utf8")
