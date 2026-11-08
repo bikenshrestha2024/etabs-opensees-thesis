@@ -64,7 +64,11 @@ def read_etabs_joint_reactions(export,case=CASE):
     for row in _iter_joint_rows(export):
         parts=[_str(x) for x in row]
         if header is None:
-            lookup={key.strip().lower():i for i,key in enumerate(parts)}
+            # ETABS table exports may place display units on a second line
+            # (for example "FZ\nkN"); normalize without accepting fuzzy
+            # column matches that could silently misidentify a response.
+            lookup={key.strip().lower().split("\n",1)[0].strip():i
+                    for i,key in enumerate(parts) if key.strip()}
             required=("story","label","unique name","output case","fz")
             if all(k in lookup for k in required):
                 header=lookup
@@ -141,9 +145,18 @@ def compare_etabs_export(etabs_export,topology_json,source_gravity_json,
     etabs_total=sum(x["etabs_FZ_kN"] for x in rows)
     os_total=_number(source["report"]["support_vertical_reaction_kN"],"OpenSees total Rz")
     applied=_number(source["report"]["applied_vertical_load_kN"],"OpenSees applied gravity")
+    extra=[]
+    if continuous is not None:
+        used_source=set(osr)
+        continuous_nodes={_str(n["tag"]):n for n in continuous.get("nodes",[])}
+        for tag in sorted(set(ctr)-used_source,key=lambda s:int(s) if s.isdigit() else s):
+            n=continuous_nodes.get(tag,{})
+            extra.append(dict(opensees_node_tag=tag,
+                x_m=n.get("x_m"),y_m=n.get("y_m"),z_m=n.get("z_m"),
+                continuous_Rz_kN=ctr[tag],status="CONTINUOUS_ONLY_NOT_ETABS_POINT"))
     return dict(schema="etabs-export-offline-gravity-v1",
         interpretation="Exact ETABS Base Joint Reactions versus OpenSees, matched by source ETABS unique point name",
-        case=case,etabs_export=str(etabs_export),source_gravity_json=str(source_gravity_json),
+        case=case,continuous_only_nodes=extra,etabs_export=str(etabs_export),source_gravity_json=str(source_gravity_json),
         continuous_gravity_json=str(continuous_gravity_json) if continuous else None,
         reference_source="ETABS_FINISHED_FULL_TABLE_EXPORT_NOT_LIVE_COM",
         etabs_joint_records=len(rows),matched_source_nodes=nmatched,
@@ -179,5 +192,42 @@ def export_offline_comparison(report,folder):
     sh=wb.create_sheet("All 76 ETABS joints");sh.append(list(FIELDS))
     for row in report["rows"]:sh.append([row.get(k) for k in FIELDS])
     sh.freeze_panes="A2";sh.auto_filter.ref=sh.dimensions
+    critical=wb.create_sheet("Critical source nodes")
+    critical.append(list(FIELDS))
+    ranked=[x for x in report["rows"] if x.get("delta_source_minus_etabs_kN") is not None]
+    ranked.sort(key=lambda x:abs(x["delta_source_minus_etabs_kN"]),reverse=True)
+    for row in ranked:critical.append([row.get(k) for k in FIELDS])
+    critical.freeze_panes="A2";critical.auto_filter.ref=critical.dimensions
+    # Do not pair additional continuum-wall mesh supports with fictitious
+    # ETABS unique points or treat missing ETABS reaction as zero.
+    extra=report.get("continuous_only_nodes",[])
+    extra_sheet=wb.create_sheet("Additional fixed wall nodes")
+    ef=("opensees_node_tag","x_m","y_m","z_m",
+        "continuous_Rz_kN","status")
+    extra_sheet.append(ef)
+    for row in extra:extra_sheet.append([row.get(k) for k in ef])
+    extra_sheet.freeze_panes="A2"
+    check=wb.create_sheet("Evidence gates")
+    check.append(["Gate","Value","Interpretation"])
+    check.append(["Actual ETABS base output",report.get("sum_etabs_base_joint_FZ_kN"),
+                  "Exact original ETABS combination only"])
+    check.append(["OpenSees base output",report.get("opensees_source_total_reaction_kN"),
+                  "Full-gravity source-support strategy"])
+    check.append(["Global excess",report.get("difference_opensees_minus_etabs_kN"),
+                  "Nonzero means source weights/models remain different"])
+    check.append(["76 unique mapped source supports",report.get("matched_source_nodes"),
+                  "76 required before interpreting pointwise discrepancy"])
+    check.append(["Continuous-only fixed nodes",len(extra),
+                  "Not one-to-one comparable to original ETABS support nodes"])
+    check.append(["Stiffness modifier source verification","NOT VERIFIED BY REACTIONS",
+                  "Requires property/object audit + section patch tests"])
+    check.append(["Beam/slab/column overlapping self weight","NOT VERIFIED BY REACTIONS",
+                  "Requires material volume/end-offset source audit"])
+    check.append(["ETABS equivalence","NOT VALIDATED",
+                  "Reaction totals and distributions still need independent checks"])
+    for ws in wb:
+        if ws.max_row>1:
+            ws.auto_filter.ref=ws.dimensions
+        ws.freeze_panes="A2"
     wb.save(out/"ETABS_Offline_Gravity_Comparison.xlsx")
     return out
