@@ -47,6 +47,8 @@ on:
       - 'tests/verify_gravity_node_comparison.py'
       - 'tests/verify_wall_base_restraints.py'
       - 'components/model/joint_volume_ownership.py'
+      - 'components/model/beam_weight_convention.py'
+      - 'tests/verify_beam_weight_convention.py'
       - 'tests/verify_joint_volume_ownership.py'
       - 'components/gravity/support_scenarios.py'
       - 'tests/verify_gravity_support_scenarios.py'
@@ -253,6 +255,7 @@ jobs:
           python tests/verify_gravity_node_comparison.py
           python tests/verify_wall_base_restraints.py
           python tests/verify_joint_volume_ownership.py
+          python tests/verify_beam_weight_convention.py
           python tests/verify_gravity_support_scenarios.py
           python tests/verify_gravity_etabs_offline.py
           python tests/verify_gravity_comparison_profile.py
