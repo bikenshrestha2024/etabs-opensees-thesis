@@ -411,6 +411,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         cfg.setdefault('floor_subdivisions',4)
         cfg.setdefault('joint_volume_weight_policy','AUDIT_ONLY')
         cfg.setdefault('joint_volume_geometry_verified',False)
+        cfg.setdefault('etabs_beam_weight_policy','GROSS_SECTION_LENGTH')
+        cfg.setdefault('etabs_clear_beam_weight_confirmed',False)
         cfg.setdefault('wall_base_restraint_policy','SOURCE_ONLY')
         cfg.setdefault('etabs_wall_auto_mesh_restraints_confirmed',False)
         cfg['slab_bending_factor']=.25
@@ -478,6 +480,22 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         # automatic weight reduction. Preserve per-source evidence for audit.
         export_frame_offset_weight_audit(folder,segments,
                                          meta.get('frames',{}))
+        from components.model.beam_weight_convention import (
+            build_beam_weight_audit,export_beam_weight_audit)
+        beam_weight_policy=cfg['etabs_beam_weight_policy']
+        if (beam_weight_policy=='ETABS_BEAM_CLEAR_LENGTH' and
+            cfg['joint_volume_weight_policy']=='VERIFIED_SINGLE_OWNER'):
+            raise ValueError('Do not combine beam clear-length weight with single-owner RCC correction: double subtraction')
+        beam_weight_audit,beam_weight_intervals=build_beam_weight_audit(
+            segments,meta.get('frames',{}),
+            policy=beam_weight_policy,
+            etabs_clear_weight_confirmed=cfg['etabs_clear_beam_weight_confirmed'])
+        export_beam_weight_audit(folder,beam_weight_audit)
+        report['etabs_beam_weight_audit']={
+            k:v for k,v in beam_weight_audit.items() if k!='rows'}
+        if beam_weight_policy=='ETABS_BEAM_CLEAR_LENGTH':
+            report['warnings'].append(
+                'Beam weight uses ETABS original beam clear lengths, with source offset evidence and reviewed source beam self-weight; structural stiffness, columns, shells, and braces unchanged.')
         volume_policy=cfg['joint_volume_weight_policy']
         if volume_policy not in ('AUDIT_ONLY','VERIFIED_SINGLE_OWNER'):
             raise ValueError('Unknown joint volume policy '+str(volume_policy))
@@ -589,10 +607,22 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
             if pat not in cfg['gravity_factors'] or pat not in cfg['mass_factors']: raise ValueError(f'No load/mass factor for self-weight pattern {pat}')
             for idx,seg in enumerate(frame_elements):
                 source_context=dict(source='FRAME:'+str(seg['object']),component='self_weight_'+str(seg['category']).lower(),
-                                    joint_volume_retained_ratio=frame_weight_ratios.get(idx,1.))
+                                    joint_volume_retained_ratio=frame_weight_ratios.get(idx,1.),
+                                    beam_self_weight_policy=beam_weight_policy)
                 p=seg['properties']
                 w=-float(mult)*p['A']*p['weight']*frame_weight_ratios.get(idx,1.)
-                line(pat,seg,[0,0,w],[0,0,w])
+                if (beam_weight_policy=='ETABS_BEAM_CLEAR_LENGTH' and
+                    str(seg['category']).upper()=='BEAM'):
+                    start,end=beam_weight_intervals[str(seg['object'])]
+                    # Clip ORIGINAL ETABS clear-weight length to this split
+                    # OpenSees segment; avoid reducing slab and column weights.
+                    start=max(start,seg['start'])
+                    end=min(end,seg['end'])
+                    if end>start+1e-10:
+                        line(pat,seg,[0,0,w],[0,0,w],
+                             start=start-seg['start'],end=end-seg['start'])
+                else:
+                    line(pat,seg,[0,0,w],[0,0,w])
             for idx,cell in enumerate(shells):
                 source_context=dict(source='AREA:'+str(cell['object']),component='self_weight_'+str(cell['category']).lower(),
                                     joint_volume_retained_ratio=shell_weight_ratios.get(idx,1.))
@@ -653,6 +683,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                      diaphragms=groups,total_downward_load_kN=total,gravity_by_pattern_kN=ledger,base_z_m=base_z)
         payload['load_provenance']=load_provenance
         payload['joint_volume_weight_policy']=volume_policy
+        payload['etabs_beam_weight_policy']=beam_weight_policy
+        payload['etabs_beam_weight_audit']=report['etabs_beam_weight_audit']
         payload['joint_volume_weight_audit']=report.get('joint_volume_weight_audit')
         payload['wall_base_restraint_policy']=cfg['wall_base_restraint_policy']
         payload['added_wall_mesh_support_tags']=extended_wall_supports
