@@ -138,6 +138,45 @@ def _area_property(row,materials):
                 nu=float(mat['nu']),weight=_positive(mat['weight'],'area unit weight'))
 
 
+def _resolve_refined_wall_supports(source_supports, source_nodes, nodes, topology,
+                                   policy="SOURCE_ONLY", confirmed_edge_extension=False):
+    """Derive wall mesh restraints from original ETABS supports without inventing BCs.
+
+    SOURCE_ONLY: restraint assigned only to original, surviving ETABS nodes.
+    EDGE_PROPAGATE_CONFIRMED: allow adding restraints at intermediate shell
+    mesh joints if native ETABS wall auto-mesh restraint propagation is
+    explicitly reviewed and confirmed on the source EDB.
+
+    [REF CSI ETABS Wall Auto Mesh Options: Add Restraints/Constraints on Edge
+    if Corners have Restraints/Constraints]
+    """
+    if policy not in ("SOURCE_ONLY", "EDGE_PROPAGATE_CONFIRMED"):
+        raise ValueError("Unknown wall base restraint policy "+str(policy))
+    supported={str(tag):list(flags) for tag,flags in source_supports.items()
+               if int(tag) in nodes}
+    extended=[]
+    if policy=="SOURCE_ONLY":
+        return supported,extended
+    if confirmed_edge_extension is not True:
+        raise ValueError("Wall mesh restraint propagation requires explicit ETABS confirmation")
+    for e in topology["elements"]:
+        if e.get("dimension")!="area_polygon":continue
+        ns=e["node_tags"]
+        for a,b in zip(ns,ns[1:]+ns[:1]):
+            if source_supports.get(str(a))!=[1]*6 or source_supports.get(str(b))!=[1]*6:
+                continue
+            p,q=source_nodes[int(a)],source_nodes[int(b)]
+            v=_sub(q,p);l2=_dot(v,v)
+            if l2<=1e-18:raise ValueError("Zero-length wall source edge")
+            for n,r in nodes.items():
+                if str(n) in supported:continue
+                t=_dot(_sub(r,p),v)/l2
+                if 1e-7<t<1.-1e-7 and math.dist(r,[p[k]+t*v[k] for k in range(3)])<1e-7:
+                    supported[str(n)]=[1]*6
+                    extended.append(int(n))
+    return supported,sorted(set(extended))
+
+
 def _frame_property(row):
     b=_positive(row.get('width_m'),'frame width'); h=_positive(row.get('depth_m'),'frame depth')
     if str(row.get('section_type','')).startswith('tube'):
@@ -322,6 +361,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
               frame_section_mapping=frame_mapping or {},nonlinear_parameters_reviewed=False,
               nonlinear_materials_file='',nonlinear_wall_fsam_tags={},section_overrides={},area_property_overrides={})
         cfg.setdefault('floor_subdivisions',4)
+        cfg.setdefault('wall_base_restraint_policy','SOURCE_ONLY')
+        cfg.setdefault('etabs_wall_auto_mesh_restraints_confirmed',False)
         cfg['slab_bending_factor']=.25
         cfg['slab_bending_factor_sls']=.35
         cfg['slab_stiffness_source']='IS 16700:2023 Table 5: Ig factors 0.25 strength / 0.35 serviceability; gross membrane EA retained; physical self-weight uses original thickness'
@@ -463,18 +504,20 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         if not supports:
             supports={str(n):[1]*6 for n in loads['base_supports']['node_tags'] if int(n) in nodes}
             report['warnings'].append('Support restraints use the existing audit fixed-base assumption; fresh ETABS extraction records actual restraints.')
-        # A fully restrained source boundary remains fully restrained after
-        # refinement; otherwise new base-edge nodes would introduce flexibility.
-        source_supports=dict(supports)
-        for e in topology['elements']:
-            if e['dimension']!='area_polygon': continue
-            ns=e['node_tags']
-            for a,b in zip(ns,ns[1:]+ns[:1]):
-                if source_supports.get(str(a))!=[1]*6 or source_supports.get(str(b))!=[1]*6: continue
-                p,q=source_nodes[int(a)],source_nodes[int(b)]; v=_sub(q,p); l2=_dot(v,v)
-                for n,r in nodes.items():
-                    t=_dot(_sub(r,p),v)/l2
-                    if -1e-7<=t<=1+1e-7 and math.dist(r,[p[k]+t*v[k] for k in range(3)])<1e-7: supports[str(n)]=[1]*6
+        # Preserve explicit ETABS support joints (including wall ends/opening
+        # edges) as the validation baseline; do not turn mesh-only nodes
+        # into new fixed supports without a confirmed ETABS mesh setting.
+        supports,extended_wall_supports=_resolve_refined_wall_supports(
+            supports,source_nodes,nodes,topology,
+            cfg['wall_base_restraint_policy'],
+            cfg['etabs_wall_auto_mesh_restraints_confirmed'])
+        report['wall_base_restraint_policy']=cfg['wall_base_restraint_policy']
+        report['added_wall_mesh_support_tags']=extended_wall_supports
+        report['wall_base_support_count']=len(supports)
+        if extended_wall_supports:
+            report['warnings'].append('Intermediate wall-base mesh support restraints explicitly enabled after confirmed source ETABS mesh setting.')
+        else:
+            report['warnings'].append('SOURCE_ONLY wall supports: no extra fixity at generated wall-base mesh points. Check ETABS wall-auto-mesh restraint propagation before certifying equivalent support conditions.')
         base_z=min(p[2] for p in nodes.values())
         # Mesh nodes on source rigid floors join their floor diaphragm. Original
         # source memberships are retained; extension requires one group/level.
@@ -498,6 +541,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         payload=dict(config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest(),nodes=nodes,frames=frame_elements,shells=shells,gravity=gravity,unfactored_patterns=patterns,nodal_mass=nodal_mass,supports=supports,
                      diaphragms=groups,total_downward_load_kN=total,gravity_by_pattern_kN=ledger,base_z_m=base_z)
         payload['load_provenance']=load_provenance
+        payload['wall_base_restraint_policy']=cfg['wall_base_restraint_policy']
+        payload['added_wall_mesh_support_tags']=extended_wall_supports
         from OpenSees_Storey_Gravity_V131 import export_storey_gravity
         report['storey_gravity']=export_storey_gravity(folder,payload,cfg,meta.get('pattern_types',{}))
         from OpenSees_Model_Audit_V130 import audit
