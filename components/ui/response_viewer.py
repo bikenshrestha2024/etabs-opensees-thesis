@@ -52,7 +52,7 @@ def launch(parent,folder):
             span=max(1.,max(hi-lo for lo,hi in
                 (ax.get_xlim(),ax.get_ylim(),ax.get_zlim())))
             state['selection_artists']=node_selection_artists(
-                ax,point,span_m=span)
+                ax,point,span_m=span,label=tag)
             physical=[xyz[a]+(values[a] or 0.) for a in range(3)]
             message.set(node_readout(tag,values,physical,'Unscaled response values. MRSM values are non-concurrent CQC component envelopes; illustration is not a recorded history.'))
             for limit in ('SLS','ULS'):
