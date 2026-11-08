@@ -108,6 +108,9 @@ class GravityAnalysisGUI:
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self._build()
+        self.wall_support_strategy_var.trace_add(
+            "write", lambda *_: self._read_code_inputs(show_error=False)
+            if self.model_var.get() else None)
         def populate_saved():
             from OpenSees_Complete_Export_V118 import autoselect_inputs
             folder=Path(self.model_var.get()).parent if self.model_var.get() else Path(r'D:/Thesis Opensees/Etabs Nodes Export')
@@ -612,6 +615,24 @@ class GravityAnalysisGUI:
         except ValueError as exc: raise ValueError("Enter comma-separated integer support tags, a numeric load in kN, and an integer step count.") from exc
         if not supports or total <= 0 or steps < 1: raise ValueError("Support tags, positive applied load and at least one load step are required.")
         if len(set(supports)) != len(supports): raise ValueError("Support node tags contain duplicates; each support must appear once.")
+        # Source model and original ETABS table are authoritative; never permit
+        # stale manual support editing to silently change the structural model.
+        import json as _json
+        assembled=_json.loads((model.parent/"OpenSees_Complete_Model_Data_V118.json").read_text(encoding="utf-8-sig"))
+        original=sorted(int(tag) for tag,flags in assembled["supports"].items() if flags[2])
+        policy=self._selected_wall_support_strategy()
+        if policy=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
+            if self.gravity_profile_var.get()!="GRAVITY_1.0D_1.0L":
+                raise ValueError("Nonzero reaction diagnostic must use full 1D+1L")
+            from components.gravity.etabs_reaction_support_filter import classify_supports
+            table=self.etabs_full_table_var.get().strip()
+            selected,_audit=classify_supports(
+                table,model.parent/"OpenSees_Element_Connectivity.json",assembled["supports"])
+            expected_supports=sorted(map(int,selected))
+        else:
+            expected_supports=original
+        if sorted(supports)!=expected_supports:
+            raise ValueError("Displayed supports do not match authoritative selected scenario. Click Read BOTH support lists; no manual unreviewed fixity changes.")
         # Recalculate before every run; reject stale manually entered totals.
         expected, context, _ = self._selected_gravity_evidence(model)
         if abs(total-expected)>max(0.01,abs(expected)*1e-7):
@@ -640,6 +661,10 @@ class GravityAnalysisGUI:
             str(out/"Gravity_GUI_Actions.log"))
         self.log.insert("end",f"Support tags: {supports}\n")
         self.win.update_idletasks()
+        if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
+            out=out/"Gravity_Reaction_Diagnostic"/datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            out.mkdir(parents=True,exist_ok=False)
+            self._gravity_action_log("ETABS_REACTION_DIAGNOSTIC_OUTPUT",str(out))
         result_path = out / "Gravity_Result_V110.json"
         runner_path = out / "Gravity_Run_V110.py"
         log_path = out / "Gravity_Run_V110.log"
@@ -805,7 +830,9 @@ class GravityAnalysisGUI:
         try:
             proc = subprocess.run([str(py), str(runner)], cwd=str(out), capture_output=True, text=True, errors="replace", env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1','OPENSEES_GRAVITY_PROFILE':profile,
                 'OPENSEES_GRAVITY_GUI_MODE':'1',
-                'OPENSEES_GRAVITY_WALL_SUPPORT_STRATEGY':support_strategy}, encoding='utf-8')
+                'OPENSEES_GRAVITY_WALL_SUPPORT_STRATEGY':support_strategy,
+                'OPENSEES_GRAVITY_ETABS_TABLE':str(self.etabs_full_table_var.get().strip()) if support_strategy=='ETABS_NONZERO_REACTION_DIAGNOSTIC' else '',
+                'OPENSEES_GRAVITY_AUDIT_DIR':str(out) if support_strategy=='ETABS_NONZERO_REACTION_DIAGNOSTIC' else ''}, encoding='utf-8')
             combined = proc.stdout + ("\n--- STDERR ---\n" + proc.stderr if proc.stderr else "")
             log_path.write_text(combined, encoding="utf-8")
             if not result_path.exists():
