@@ -200,6 +200,10 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         for name in SELECTED+SOURCE_EXTRA:
             add(export_dir/name,"source/"+name)
         for name in EXTRA:
+            # The central root log is included separately; a dual run has
+            # no reason to have another copy inside each case subfolder.
+            if name=="Gravity_GUI_Actions.log" and comparison_root!=gravity_dir:
+                continue
             add(gravity_dir/name,"opensees/"+name,required=name=="Gravity_Result_V110.json")
         if comparison_root != gravity_dir:
             add(comparison_root/"Gravity_GUI_Actions.log",
@@ -313,6 +317,14 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             rz=applied=error=None
         model=export_dir/"OpenSees_Complete_Model_Data_V118.json"
         model_hash=digest(model) if model.is_file() else None
+        # Write an explicit NOT VALIDATED/SCREENING verdict for every upload,
+        # including both gravity discrepancies and all optional omissions.
+        # Read only original local evidence; never infer missing ETABS values.
+        from components.gravity.validation_scorecard import (
+            create_gravity_scorecard,save_gravity_scorecard)
+        scorecard=create_gravity_scorecard(
+            export_dir,gravity_dir,comparison_root,missing,oversize)
+        save_gravity_scorecard(stage,scorecard)
         # Record all generated CSVs and original files, including derivatives
         # that were not copied via add(). Every member is inside the upload ZIP.
         package_members=sorted(
@@ -340,14 +352,6 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                "limitations":["File presence and source hashes do not prove a matching EDB, load combination, stiffness or coordinate convention.",
                               "Local beam force responses require compatible tags/local-axis definitions.",
                               "Shell forces, wall section forces, detailed applied patterns and ETABS per-story reactions are missing unless separately supplied."]}
-        # Write an explicit NOT VALIDATED/SCREENING verdict for every upload,
-        # including both gravity discrepancies and all optional omissions.
-        # Read only original local evidence; never infer missing ETABS values.
-        from components.gravity.validation_scorecard import (
-            create_gravity_scorecard,save_gravity_scorecard)
-        scorecard=create_gravity_scorecard(
-            export_dir,gravity_dir,comparison_root,missing,oversize)
-        save_gravity_scorecard(stage,scorecard)
         audit["validation_scorecard"]=dict(
             file="GRAVITY_VALIDATION_SCORECARD.json",
             conclusion=scorecard["conclusion"],
