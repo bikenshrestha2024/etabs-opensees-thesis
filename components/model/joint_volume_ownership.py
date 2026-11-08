@@ -159,6 +159,8 @@ def build_joint_volume_ledger(frames,shells,nodes,*,geometry_verified=False,
     accepted=[]
     rows=[]
     bucket=defaultdict(set)
+    overlap_pairs_m3=defaultdict(float)
+    overlap_pairs_weight_kN=defaultdict(float)
     grid_m=3.
     def keys(box):
         ranges=[]
@@ -172,14 +174,25 @@ def build_joint_volume_ledger(frames,shells,nodes,*,geometry_verified=False,
                     yield (i,j,k)
     for solid in candidates:
         boxes=[solid["box"]]
+        # Attribution applies to the remaining, disjoint solid pieces.
+        # Thus a triple overlap is charged exactly ONCE, in the order
+        # COLUMN > SHEAR WALL > FLOOR > BEAM, without repeated deductions.
+        removed_by_owner_m3=defaultdict(float)
         possible=set()
         for key in keys(solid["box"]):possible.update(bucket[key])
         for i in sorted(possible):
             owner=accepted[i]
             if _overlap(owner["box"],solid["box"]) is None:continue
+            before=sum(_volume(box) for box in boxes)
             pieces=[]
             for box in boxes:pieces.extend(_subtract(box,owner["box"]))
             boxes=pieces
+            deducted=before-sum(_volume(box) for box in boxes)
+            if deducted>EPS:
+                removed_by_owner_m3[owner["category"]]+=deducted
+                label=solid["category"]+"_OVERLAPS_"+owner["category"]
+                overlap_pairs_m3[label]+=deducted
+                overlap_pairs_weight_kN[label]+=(deducted*solid["unit_weight_kN_m3"])
             if not boxes:break
         net=sum(_volume(v) for v in boxes)
         gross=solid["gross_m3"]
@@ -188,6 +201,8 @@ def build_joint_volume_ledger(frames,shells,nodes,*,geometry_verified=False,
         row={k:solid[k] for k in ("kind","index","object","category",
                                   "gross_m3","unit_weight_kN_m3")}
         row.update(net_m3=max(0.,net),removed_m3=max(0.,gross-net),
+                   **{"overlap_with_"+category+"_m3":removed_by_owner_m3.get(category,0.)
+                      for category in ORDER},
                    gross_weight_kN=gross*solid["unit_weight_kN_m3"],
                    net_weight_kN=net*solid["unit_weight_kN_m3"],
                    removed_weight_kN=(gross-net)*solid["unit_weight_kN_m3"],
@@ -202,6 +217,11 @@ def build_joint_volume_ledger(frames,shells,nodes,*,geometry_verified=False,
         geometry_verified=bool(geometry_verified),
         priority=list(ORDER),
         exact_axis_aligned_RCC_subtraction=True,
+        physical_geometry_validation_status=(
+            "USER_VERIFIED_RECTANGULAR_SOLIDS" if geometry_verified
+            else "ASSUMED_CENTERED_SOLIDS_NOT_VERIFIED"),
+        overlap_pair_volume_m3=dict(sorted(overlap_pairs_m3.items())),
+        overlap_pair_weight_kN=dict(sorted(overlap_pairs_weight_kN.items())),
         unsupported_items=omitted,
         rows=rows,gross_RCC_weight_kN=gross,net_RCC_weight_kN=net,
         potentially_duplicated_RCC_weight_kN=gross-net,
