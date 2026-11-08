@@ -21,3 +21,24 @@ Relevant register IDs: See module's underlying computational dependencies. Consu
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+## November 2026 — Native 3D Zoom to Node and visible selection
+
+The `components/ui/view_controls.py` shared camera utilities
+`resolve_node_tag`, `center_camera_on_node`,
+`node_selection_artists` and `remove_selection_artists` are used
+in both gravity and SLS/ULS response viewers.
+
+ETABS source point mappings can contain integer OpenSees node tags,
+but the 3D node dictionaries use string keys. The previous lookup
+silently failed for such mapped points. The new lookup normalizes
+tags to strings, highlights a selected node with a prominent magenta
+crosshair/yellow marker and reports unknown IDs.
+
+**Zoom to Node** focuses the 3D camera at the selected node's
+actual plotted XYZ, retaining the current camera orientation
+(isometric, front, top, etc.). **Fit all** restores the full building.
+These controls modify the viewer only, not engineering geometry,
+loads, boundary conditions, materials or structural analysis.
+
+Test: `python tests/verify_3d_zoom_to_node.py`.
