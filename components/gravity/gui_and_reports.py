@@ -691,7 +691,13 @@ class GravityAnalysisGUI:
         wb = Workbook(); ws = wb.active; ws.title = "Summary"
         rows = [
             ["OpenSeesPy gravity analysis report", ""], ["Model script", payload["model_script"]],
-            ["Steps", report["steps"]], ["Applied downward load (kN)", report["applied_vertical_load_kN"]],
+            ["Steps", report["steps"]],
+            ["Gravity load profile", payload.get("gravity_profile")],
+            ["Wall-base support strategy",payload.get("wall_support_strategy")],
+            ["Support count",len(payload.get("reactions",[]))],
+            ["Additional fixed wall-base mesh nodes",len(payload.get("added_wall_support_tags",[]))],
+            ["Added wall-base node tags",", ".join(map(str,payload.get("added_wall_support_tags",[])))],
+            ["Applied downward load (kN)", report["applied_vertical_load_kN"]],
             ["Summed support vertical reactions (kN)", report["support_vertical_reaction_kN"]],
             ["Equilibrium error (%)", report["equilibrium_error_percent"]], ["Tolerance (%)", report["equilibrium_tolerance_percent"]],
             ["Gravity frozen at t=0", report["gravity_frozen"]], ["Elapsed time (s)", report["elapsed_seconds"]],
