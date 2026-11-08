@@ -28,6 +28,11 @@ class SafeGravityReviewTests(unittest.TestCase):
                      unit_weight_kN_m3=25.,end_i_m=0.,end_j_m=0.,
                      gross_weight_kN=36.,potential_offset_weight_kN=0.)])
         self._save_audit()
+        (self.export/"OpenSees_Source_Model_Metadata_V118.json").write_text(
+            json.dumps({"frames":{
+                "B1":{"GetEndLengthOffset":[True,.55,.55,1.0,0]},
+                "B2":{"GetEndLengthOffset":[True,0.,0.,1.0,0]}}}),
+            encoding="utf8")
         self.weight=self.root/"etabs_material_list.csv"
         self.weight.write_text("object_type,weight_kN\nBeam,94.8\n",encoding="utf8")
     def _save_audit(self):
@@ -60,7 +65,8 @@ class SafeGravityReviewTests(unittest.TestCase):
             "OpenSees_Load_Conversion_Audit.json",
             "OpenSees_Source_Model_Metadata_V118.json"]
         for name in required:
-            (self.export/name).write_text(json.dumps({"source":name}),encoding="utf8")
+            if not (self.export/name).exists():
+                (self.export/name).write_text(json.dumps({"source":name}),encoding="utf8")
         folder,review_data=review(self.export,etabs_beam_csv=self.weight)
         candidate=stage_candidate(self.export,folder/"GRAVITY_SAFE_REVIEW.json",
                     approval_text="I REVIEWED ETABS BEAM SELF WEIGHT AND SOURCE GEOMETRY")
@@ -85,6 +91,15 @@ class SafeGravityReviewTests(unittest.TestCase):
                 "etabs_beam_weight_policy"],"ETABS_BEAM_CLEAR_LENGTH")
         with self.assertRaises(FileExistsError):
             build_isolated_candidate(self.export,candidate,build_callback=builder)
+
+    def test_mismatched_etabs_metadata_blocks_candidate(self):
+        path=self.export/"OpenSees_Source_Model_Metadata_V118.json"
+        path.write_text(json.dumps({"frames":{
+            "B1":{"GetEndLengthOffset":[True,.6,.55,1.,0]},
+            "B2":{"GetEndLengthOffset":[True,0.,0.,1.,0]}}}))
+        result=beam_checks(self.export,source_beam_csv=self.weight)
+        self.assertFalse(result["candidate_eligible"])
+        self.assertTrue(any("differ from native" in x for x in result["issues"]))
 
     def test_missing_and_invalid_offset_blocks_candidate(self):
         self.audit["rows"][0]["end_j_m"]=None
