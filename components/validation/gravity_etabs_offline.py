@@ -54,7 +54,10 @@ def _number(value,label):
     return n
 
 def read_etabs_joint_reactions(export,case=CASE):
-    """Read complete, exact DL+LL Base joint reactions (not visible Excel filters)."""
+    """Read complete, exact DL+LL Base joint reactions (not visible Excel filters).
+
+    [REF docs/review/GRAVITY_ETABS_COMPARISON.md] ETABS completed table evidence.
+    """
     header=None
     seen={}
     accepted=0
@@ -87,7 +90,10 @@ def read_etabs_joint_reactions(export,case=CASE):
 
 def compare_etabs_export(etabs_export,topology_json,source_gravity_json,
                          continuous_gravity_json=None,case=CASE):
-    """Match by *verified source mapping*, not identical solver node numbers."""
+    """Match by *verified source mapping*, not identical solver node numbers.
+
+    [REF components/validation/gravity_node_comparison.py] Source ID provenance.
+    """
     etabs=read_etabs_joint_reactions(etabs_export,case)
     topology=json.loads(Path(topology_json).read_text(encoding="utf-8-sig"))
     source=json.loads(Path(source_gravity_json).read_text(encoding="utf-8-sig"))
@@ -155,6 +161,10 @@ def compare_etabs_export(etabs_export,topology_json,source_gravity_json,
         rows=rows)
 
 def export_offline_comparison(report,folder):
+    """Persist the complete original ETABS point comparison.
+
+    [REF docs/review/GRAVITY_ETABS_COMPARISON.md] Full audit evidence.
+    """
     out=Path(folder);out.mkdir(parents=True,exist_ok=True)
     (out/"ETABS_Offline_Gravity_Comparison.json").write_text(
         json.dumps(report,indent=2,allow_nan=False),encoding="utf8")
