@@ -229,3 +229,47 @@ def export_joint_volume_ledger(folder,ledger):
             keys=list(rows[0]);w=csv.DictWriter(f,fieldnames=keys)
             w.writeheader();w.writerows(rows)
     return folder
+
+
+def export_frame_offset_weight_audit(folder,segments,frame_metadata):
+    """Compare potential frame-end excluded weight with the geometric union.
+
+    [REF CSI cFrameObj.GetEndLengthOffset] Return order:
+    AutoOffset, Length1, Length2, RigidZoneFactor, return_code.
+    Automatic offsets are NOT accepted as solved effective weight lengths.
+    """
+    output=Path(folder)/"ETABS_Frame_End_Offset_Weight_Audit.csv"
+    fields=("etabs_object","category","full_length_m","reported_end_i_m",
+            "reported_end_j_m","rigid_zone_factor","auto_offset",
+            "reported_clear_length_m","potential_end_zone_weight_kN",
+            "status","note")
+    rows=[]
+    for obj,children in segments.items():
+        if not children:continue
+        raw=frame_metadata.get(str(obj),{}).get("GetEndLengthOffset")
+        full=float(children[-1]["end"])
+        A=float(children[0]["properties"]["A"])
+        gamma=float(children[0]["properties"]["weight"])
+        row=dict(etabs_object=obj,category=children[0]["category"],
+                 full_length_m=full,reported_end_i_m=None,
+                 reported_end_j_m=None,rigid_zone_factor=None,
+                 auto_offset=None,reported_clear_length_m=None,
+                 potential_end_zone_weight_kN=None,
+                 status="MISSING_ETABS_OFFSET_EVIDENCE",
+                 note="Never infer ETABS Auto self-weight from rigid zone factor")
+        if isinstance(raw,(tuple,list)) and len(raw)==5 and raw[-1]==0:
+            auto,li,lj,rz=raw[:4]
+            li=float(li);lj=float(lj)
+            if li<0 or lj<0 or li+lj>full+1e-7:
+                row["status"]="INVALID_OFFSET_GEOMETRY"
+            else:
+                row.update(auto_offset=bool(auto),reported_end_i_m=li,
+                           reported_end_j_m=lj,rigid_zone_factor=float(rz),
+                           reported_clear_length_m=full-li-lj,
+                           potential_end_zone_weight_kN=(li+lj)*A*gamma,
+                           status="AUTO_OFFSET_NOT_WEIGHT_RULE" if auto else
+                                  "EXPLICIT_OFFSET_NOT_WEIGHT_RULE")
+        rows.append(row)
+    with output.open("w",newline="",encoding="utf-8-sig") as stream:
+        w=csv.DictWriter(stream,fieldnames=fields);w.writeheader();w.writerows(rows)
+    return output
