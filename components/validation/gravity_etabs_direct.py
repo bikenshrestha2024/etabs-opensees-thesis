@@ -13,6 +13,8 @@ import math
 import traceback
 import shutil
 import uuid
+import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -451,6 +453,53 @@ def _release_owned_instance(instance):
             raise RuntimeError('Owned ETABS ApplicationExit(False) returned '+str(code))
 
 
+def _short_etabs_working_copy(selected,expected_sha,log):
+    """Use short, private, writable model path for CSI solver sidecar creation.
+
+    [REF Microsoft Win32 MAX_PATH] CSI analysis workers may not support a
+    300+ character result/model path. The original ETABS file remains read-only.
+    User may override TEMP_ROOT via ETABS_GRAVITY_TEMP_ROOT for short D: paths.
+    """
+    root=Path(os.environ.get("ETABS_GRAVITY_TEMP_ROOT") or tempfile.gettempdir())
+    root=root.expanduser().resolve()/"ETABS_API"
+    path=root/("run_"+uuid.uuid4().hex[:12])/"gravity.edb"
+    if len(str(path))>=200:
+        raise ValueError("ETABS gravity scratch EDB path too long ("+str(len(str(path)))+
+                         "); set ETABS_GRAVITY_TEMP_ROOT to a short writable folder such as D:\\\\ETABS_API")
+    path.parent.mkdir(parents=True,exist_ok=False)
+    shutil.copy2(selected,path)
+    if _file_hash(path)!=expected_sha:
+        raise IOError("Isolated short-path EDB copy hash verification failed")
+    log('ETABS_WORKING_COPY','Created isolated short-path ETABS EDB',
+        original_edb=str(selected),working_copy=str(path),
+        original_path_length=len(str(selected)),copy_path_length=len(str(path)),
+        sha256=expected_sha,warning='Temporary working copy must be retained for native analysis logs')
+    return path
+
+
+def _collect_etabs_solver_logs(working_copy,output_dir,log):
+    """Retain lightweight native ETABS log text for postmortem analysis."""
+    if working_copy is None:return
+    destination=Path(output_dir)/'ETABS_Native_Analysis_Logs'
+    destination.mkdir(parents=True,exist_ok=True)
+    files=[]
+    for pattern in ("*.LOG","*.log","*.txt"):
+        files.extend(Path(working_copy).parent.glob(pattern))
+    for src in sorted(set(files)):
+        try:
+            if src.stat().st_size>50*1024*1024:
+                log('ETABS_LOG_SKIP','Native log exceeds 50 MB; remains in scratch folder',
+                    source=str(src),size=src.stat().st_size)
+                continue
+            dst=destination/src.name
+            shutil.copy2(src,dst)
+            log('ETABS_NATIVE_LOG','Saved native ETABS analysis log',
+                source=str(src),destination=str(dst),bytes=dst.stat().st_size)
+        except OSError as exc:
+            log('ETABS_NATIVE_LOG_ERROR','Unable to copy ETABS analysis log',
+                source=str(src),error=str(exc))
+
+
 def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_dir=None,allow_alternate_edb=False,launch_new_etabs=False,etabs_edb_path=None,etabs_exe_path=None,log_callback=None,run_if_missing=False):
     """Compare the original ETABS source EDB to the OpenSees gravity result.
 
@@ -504,18 +553,10 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             if run_if_missing:
                 # ETABS RunAnalysis can write model/result sidecars; all such
                 # writes are confined to this private working directory.
-                work_root=out/'ETABS_Gravity_Working_Copies'
-                work_root.mkdir(parents=True,exist_ok=True)
-                work_dir=work_root/('run_'+uuid.uuid4().hex[:12])
-                work_dir.mkdir()
-                working_copy=work_dir/selected.name
-                shutil.copy2(selected,working_copy)
-                if _file_hash(working_copy)!=original_hash:
-                    raise IOError('Isolated EDB copy hash verification failed')
-                report('ETABS_WORKING_COPY','Copied selected EDB before analysis',
-                       original_edb=str(selected),copy=str(working_copy),
-                       sha256=original_hash,
-                       note='Only this copy may receive ETABS analysis output files')
+                working_copy=_short_etabs_working_copy(selected,original_hash,report)
+                report('ETABS_WORKING_COPY','Analysis sidecars remain beside scratch EDB; native logs copied to evidence folder',
+                       working_copy=str(working_copy),
+                       path_length=len(str(working_copy)))
             opened_edb=working_copy or selected
             report('ETABS_LAUNCH','Launching private ETABS instance',
                    edb=str(opened_edb),
@@ -542,6 +583,14 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             report('ETABS_ANALYZE','Missing gravity results; inspecting working-copy run flags',
                    source_status=str(missing))
             _enable_gravity_cases_on_copy(app.SapModel,report)
+            # CSI examples save the model before running. Save is confined to
+            # the SHA-verified isolated scratch model, NEVER the original.
+            save_ret=app.SapModel.File.Save(str(working_copy))
+            if save_ret not in (0,None):
+                raise RuntimeError('ETABS File.Save returned '+str(save_ret)+
+                                   ' for private gravity analysis scratch EDB')
+            report('ETABS_SAVE','Saved private short-path working EDB before analysis',
+                   path=str(working_copy),path_length=len(str(working_copy)))
             ret=app.SapModel.Analyze.RunAnalysis()
             if ret not in (0,None):
                 raise RuntimeError('ETABS Analyze.RunAnalysis returned '+str(ret)+
@@ -647,5 +696,8 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
                 report('ETABS_CLOSE_ERROR','Unable to verify private ETABS close',
                        error_type=type(exc).__name__,error=str(exc))
                 raise
+        if working_copy is not None:
+            _collect_etabs_solver_logs(working_copy,out,report)
         report('END','ETABS direct gravity operation ended',
-               log=str(logfile),events=str(events))
+               log=str(logfile),events=str(events),
+               scratch_edb=str(working_copy) if working_copy else None)
