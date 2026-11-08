@@ -92,6 +92,7 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
                 "wall_base_comparison/Gravity_Wall_Base_Strategy_Comparison.xlsx",
                 "offline_etabs/comparison.csv",
                 "gravity_workflow/Gravity_GUI_Actions.log",
+                "single_run_root/Gravity_Result_V110.json",
             ):
                 self.assertTrue(any(x.endswith(tail) for x in names),tail)
 
