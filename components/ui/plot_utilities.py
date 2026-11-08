@@ -112,7 +112,7 @@ def _deformation_controls(parent, chart, fig):
                 span=max(1.,max(abs(hi-lo) for lo,hi in (
                     ax.get_xlim(),ax.get_ylim(),ax.get_zlim())))
                 control['selected_artists']=node_selection_artists(
-                    ax,point,span_m=span)
+                    ax,point,span_m=span,label=tag)
                 from OpenSees_View_Controls_V134 import node_readout
                 physical=control.get('node_dof',{}).get(tag,[])
                 actual=[float(control['node_xyz'][tag][i])+
