@@ -89,12 +89,17 @@ def beam_checks(export,source_beam_weight=None,source_beam_csv=None):
     config=load(export/SOURCE)
     if not isinstance(audit,dict) or not isinstance(config,dict):
         raise FileNotFoundError("Rebuild source export: missing "+BEAM+" or "+SOURCE)
+    meta_path=export/"OpenSees_Source_Model_Metadata_V118.json"
+    meta=load(meta_path)
+    source_frames=(meta or {}).get("frames",{})
     rows=audit.get("rows")
     if not isinstance(rows,list) or not rows:
         raise ValueError("Beam audit has no member-level rows")
     ids=set()
     gross=clear=offset=0.
     issues=[]
+    if not isinstance(source_frames,dict) or not source_frames:
+        issues.append("Native ETABS per-frame GetEndLengthOffset provenance missing")
     for row in rows:
         key=str(row.get("etabs_object","")).strip()
         if not key or key in ids:issues.append("Missing/duplicate beam source ID "+key)
@@ -110,6 +115,17 @@ def beam_checks(export,source_beam_weight=None,source_beam_csv=None):
             issues.append(key+": missing ETABS end offsets")
             continue
         li=finite(li,key+" offset I");lj=finite(lj,key+" offset J")
+        native=(source_frames.get(key) or {}).get("GetEndLengthOffset")
+        if (not isinstance(native,(tuple,list)) or len(native)!=5
+                or native[-1]!=0):
+            issues.append(key+": native ETABS end offset provenance missing")
+        else:
+            ni=finite(native[1],key+" native I")
+            nj=finite(native[2],key+" native J")
+            if abs(ni-li)>1e-7 or abs(nj-lj)>1e-7:
+                issues.append(key+": source beam audit offsets differ from native ETABS metadata")
+            if bool(native[0])!=bool(row.get("etabs_offset_auto",native[0])):
+                issues.append(key+": ETABS automatic/manual offset mode differs")
         if li<0 or lj<0 or li+lj>L+1e-9:
             issues.append(key+": invalid end offsets")
             continue
@@ -125,6 +141,15 @@ def beam_checks(export,source_beam_weight=None,source_beam_csv=None):
     recorded=finite(audit.get("gross_beam_weight_kN"),"recorded gross beam weight")
     if abs(gross-recorded)>max(.01,recorded*1e-7):
         issues.append("Sum of per-member gross weights differs from beam total")
+    active_policy=str(config.get("etabs_beam_weight_policy"))
+    saved_policy=str(audit.get("policy"))
+    if active_policy!=saved_policy:
+        issues.append("Stale config/audit beam-weight policy: source export must be rebuilt")
+    chosen=finite(audit.get("selected_beam_weight_kN"),"selected beam weight")
+    expected_chosen=(gross if active_policy=="GROSS_SECTION_LENGTH" else
+                     clear if active_policy=="ETABS_BEAM_CLEAR_LENGTH" else None)
+    if expected_chosen is None or abs(chosen-expected_chosen)>max(.01,abs(chosen)*1e-7):
+        issues.append("Selected beam weight does not match active policy arithmetic")
     if source_beam_csv is not None:
         expected=read_etabs_beam_csv(source_beam_csv)
         basis=str(Path(source_beam_csv).resolve())
@@ -146,6 +171,7 @@ def beam_checks(export,source_beam_weight=None,source_beam_csv=None):
         issues.append("Physical single-owner joint correction already selected: double subtraction prohibited")
     return dict(schema="safe-beam-weight-review-v1",
         source_config=str(export/SOURCE),source_beam_audit=str(export/BEAM),
+        native_etabs_frame_metadata_sha256=sha256(meta_path) if meta_path.is_file() else None,
         source_beam_csv=basis,source_beam_csv_sha256=source_hash,
         object_count=len(rows),gross_kN=gross,
         potential_offset_kN=offset,
@@ -679,7 +705,7 @@ def main(argv=None):
 
 if __name__=="__main__":
     import sys
-    if len(sys.argv)==1 or any(a.startswith("--ip=") for a in sys.argv[1:]):
+    if "--export" not in sys.argv[1:] and "--help" not in sys.argv[1:]:
         launch_gui()
     else:
         raise SystemExit(main())
