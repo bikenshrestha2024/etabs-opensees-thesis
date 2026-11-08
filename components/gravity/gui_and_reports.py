@@ -156,6 +156,13 @@ class GravityAnalysisGUI:
         line=f"[{stamp}] [{stage}] {message}"
         self.log.insert("end",line+"\n")
         self.log.see("end")
+        try:
+            target=Path(self.output_var.get()).expanduser().resolve()
+            if target.is_dir():
+                with (target/"Gravity_GUI_Actions.log").open("a",encoding="utf-8") as file:
+                    file.write(line+"\n")
+        except OSError:
+            pass  # Logging must not interrupt the solver or output exports.
         self.win.update_idletasks()
 
     def _offline_etabs_table_compare(self):
