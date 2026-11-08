@@ -40,10 +40,24 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
         for pattern,mult in multipliers.items():
             if mult:entries.append((pattern,'self_weight_floor',cell['properties']['thickness']*cell['properties']['weight']*mult,'physical thickness * source unit weight * ETABS self-weight multiplier'))
         for pattern,component,q,origin in entries:
-            surface_row+=1;row=surface_row;own=component=='self_weight_floor';ws.append([cell['object'],component,pattern,index,cell['area'],f'=O{row}*P{row}*Q{row}' if own else q,cfg['gravity_factors'].get(pattern,0),cfg['mass_factors'].get(pattern,0),f'=E{row}*F{row}',f'=I{row}*G{row}',f'=I{row}*H{row}/9.80665',f'=J{row}/4',','.join(map(str,cell['nodes'])),origin,cell['properties']['thickness'] if own else None,cell['properties']['weight'] if own else None,multipliers.get(pattern) if own else None])
+            surface_row+=1;row=surface_row;own=component=='self_weight_floor';ws.append([cell['object'],component,pattern,index,cell['area'],f'=O{row}*P{row}*Q{row}' if own else q,1.0,cfg['mass_factors'].get(pattern,0),f'=E{row}*F{row}',f'=I{row}*G{row}',f'=I{row}*H{row}/9.80665',f'=J{row}/4',','.join(map(str,cell['nodes'])),origin,cell['properties']['thickness'] if own else None,cell['properties']['weight'] if own else None,multipliers.get(pattern) if own else None])
             for node in cell['nodes']:
                 xyz=data['nodes'].get(int(node),data['nodes'].get(str(node))); beams=adjacency.get(int(node),[]);wall=walls.get(int(node),[])
                 links.append([cell['object'],pattern,row,node,*xyz,f"='Surface load formulas'!L{row}",','.join(map(str,beams)),','.join(map(str,wall)),'beam joint' if beams else 'wall joint' if wall else 'slab interior / other joint'])
+    # The primary worksheet is the full-gravity validation load path (1.0D
+    # + 1.0L). Preserve a separate configured seismic-preload view; mass
+    # factors remain an independent column in BOTH sheets.
+    seismic=wb.copy_worksheet(ws)
+    seismic.title='Surface seismic preload'
+    for row in range(2,seismic.max_row+1):
+        pattern=str(seismic.cell(row,3).value)
+        if pattern not in cfg['gravity_factors']:
+            raise ValueError('Slab seismic preload has no gravity factor for pattern '+pattern)
+        seismic.cell(row,7,float(cfg['gravity_factors'][pattern]))
+    # Make the validated 1.0D+1.0L sheet appear first for users opening
+    # the workbook in Excel, rather than showing 0.3 as the gravity case.
+    ws.sheet_view.showGridLines=True
+    seismic.sheet_view.showGridLines=True
     weights=wb.create_sheet('Member weight formulas');weights.append(['Source frame','Solver tag','Category','Area m2','Length m','Unit weight kN per m3','Volume m3','Gross physical weight kN','Note'])
     for tag,e in enumerate(data.get('frames',[]),100001):
         r=tag-100001+2;weights.append([e['object'],tag,e['category'],e['properties']['A'],e['length'],e['properties']['weight'],f'=D{r}*E{r}',f'=G{r}*F{r}','Before self-weight pattern multiplier and gravity factor; overlap conventions require review'])
@@ -70,7 +84,10 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
         'A corner-only panel at column joints cannot resolve beam-span bending. V141 adds floor subdivisions (default 4 per source-panel direction) and splits connected beams at shared mesh nodes.',
         'Refinement is a numerical choice, not an NBC-prescribed mesh. Compare 2/4/8 subdivisions and benchmark beam moments, slab deflection and reactions before design use.',
         'Gravity_Beam_End_Actions_ULS_V141.csv / SLS equivalent are written by complete-model preload. Gravity GUI action tabs also show local shears and bending moments. Beam end actions and shell forces are solver outputs; they cannot be replaced by q*A arithmetic or treated as a unique tributary UDL. Use gravity action reports for actual response.',
-        'Gravity factor is preload; it is not automatically the complete design live-load combination. Mass factor is separately shown. Roof-live preload may be zero while the source roof-live pressure remains visible.',
+        'Surface load formulas: FULL GRAVITY 1.0D+1.0L; all included assigned floor live and roof live at 1.0. It is a separate diagnostic from the configured seismic gravity preload.',
+        'Surface seismic preload: configured analysis gravity fractions, for example Live 0.3, while Mass factor remains an independent column in both worksheets.',
+        'Do NOT interpret a seismic mass factor of 0.3 as the full gravity live load. Mass factors are unchanged by the gravity runtime profile.',
+        'Re-export this workbook after updating the repository; previously saved Slab_Load_Path_Formulas_V141.xlsx will not update automatically.',
         'https://openseespydoc.readthedocs.io/en/latest/src/ShellMITC4.html',
         'https://opensees.berkeley.edu/OpenSees/api/doxygen2/html/RigidDiaphragm_8cpp-source.html',
         'https://opensees.berkeley.edu/OpenSees/api/doxygen2/html/ShellMITC4_8cpp-source.html'] :notes.append([line])
@@ -89,6 +106,9 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
         sheet.freeze_panes='A2';sheet.auto_filter.ref=sheet.dimensions
         for c in sheet[1]:c.font=Font(bold=True,color='FFFFFF');c.fill=PatternFill('solid',fgColor='1E3A5F')
         for col in sheet.columns:sheet.column_dimensions[col[0].column_letter].width=min(55,max(16,len(str(col[0].value))+2))
+    seismic.freeze_panes='A2'
+    seismic.auto_filter.ref=seismic.dimensions
+    seismic.column_dimensions['G'].width=22
     from openpyxl.utils import get_column_letter as letter
     source_title='Source load detail' if 'Source load detail' in wb else 'Source detail' if 'Source detail' in wb else None
     if source_title:
