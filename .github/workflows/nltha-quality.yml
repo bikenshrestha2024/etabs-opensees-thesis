@@ -62,6 +62,10 @@ on:
       - 'tests/verify_gravity_etabs_offline.py'
       - 'tests/verify_gravity_etabs_direct.py'
       - 'components/gravity/gui_and_reports.py'
+      - 'components/ui/plot_utilities.py'
+      - 'components/ui/response_viewer.py'
+      - 'components/ui/view_controls.py'
+      - 'tests/verify_3d_zoom_to_node.py'
       - 'components/gravity/load_path_formulas.py'
       - 'tests/verify_slab_full_gravity_factors.py'
       - 'tests/verify_gravity_comparison_bundle.py'
@@ -264,6 +268,7 @@ jobs:
           python tests/verify_gravity_evidence_workflow.py
           python tests/verify_gravity_etabs_direct.py
           python tests/verify_gravity_node_comparison.py
+          python tests/verify_3d_zoom_to_node.py
           python tests/verify_wall_base_restraints.py
           python tests/verify_joint_volume_ownership.py
           python tests/verify_beam_weight_convention.py
