@@ -470,3 +470,8 @@ If the ETABS workbook is very large, Excel's \`Joint Reactions\`
 sheet can be exported **unchanged** as CSV, preserving \`Unique Name\`,
 \`Output Case\`, \`Story\` and global \`FZ\`; select that CSV instead.
 Never strip zero-reaction rows or apply filters before export.
+
+
+## Human-readable gravity strategy labels (2026-11-08)
+
+The GUI uses **ETABS Reaction Validation** for the original `ETABS_SOURCE_SUPPORTS` identifier and **ETABS Node Position / Continuous** for `CONTINUOUS_WALL_BASE_FIXED`. This is a display-name change only: stable IDs, past result-folder names, saved JSON and existing solver behavior are preserved. The continuous case remains a fixed-wall-base sensitivity model, not an ETABS-validated result. Native ETABS restraints and wall-mesh constraints must still be checked; zero FZ does not prove a free node.
