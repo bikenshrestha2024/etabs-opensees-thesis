@@ -48,6 +48,11 @@ SOURCE_EXTRA = (
     "OpenSees_Element_Connectivity.json",
     "OpenSees_Source_Model_Metadata_V118.json",
     "OpenSees_Complete_Gravity_Model.py",
+    "OpenSees_ID_and_Support_Audit.xlsx",
+    "OpenSees_ID_Lookup.html",
+    "OpenSees_Structural_Elements_By_Storey.html",
+    "OpenSees_Element_Connectivity_3D.html",
+    "OpenSees_Property_Element_Load_Audit_V125.xlsx",
 )
 DIRECT_EXTRA = (
     "ETABS_Native_Analysis_Logs",
@@ -302,6 +307,26 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         else:
             missing.append({"file":"etabs/etabs_gravity.json","required":True,
                             "reason":"No ETABS gravity JSON selected"})
+        # V161: always produce the original 76-support node inventory, even
+        # when the native ETABS API cannot read old analysis results.
+        # Unavailable ETABS reactions remain blank; no false validation PASS.
+        try:
+            from components.validation.gravity_node_comparison import (
+                export_fixed_source_support_reactions)
+            topology_path=export_dir/"OpenSees_Element_Connectivity.json"
+            source_topology=json.loads(topology_path.read_text(encoding="utf-8-sig"))
+            etabs_source=(json.loads(etabs_json.read_text(encoding="utf-8-sig"))
+                          if etabs_json is not None and etabs_json.is_file() else None)
+            audit76=export_fixed_source_support_reactions(
+                stage/"node_audit_76",payload,source_topology,etabs_source)
+            if audit76["missing_or_unverified"]:
+                missing.append({"file":"node_audit_76/ETABS_REACTION_MATCHES",
+                    "required":True,
+                    "reason":str(audit76["missing_or_unverified"])+
+                         " of 76 source support points unverified; see status per row."})
+        except (OSError,ValueError,TypeError,KeyError,ImportError) as exc:
+            missing.append({"file":"node_audit_76/Gravity_76_Source_Support_Reactions.csv",
+                "required":True,"reason":type(exc).__name__+": "+str(exc)})
         for key,cols in (("nodes",NODE_COLS),("reactions",REACT_COLS),("local_forces",FORCE_COLS)):
             entries=payload.get(key)
             if not isinstance(entries,list) or not entries:
