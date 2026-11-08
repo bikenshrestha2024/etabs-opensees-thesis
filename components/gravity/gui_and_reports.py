@@ -44,6 +44,10 @@ def _runner_source(model_script, result_path, support_nodes, applied_kN, nsteps,
         "    # New V118 entries already run the gravity stage during construction.",
         "    # NEVER apply the same gravity source twice.",
         "    model_report = model_globals.get('MODEL_REPORT', {})",
+        "    SUPPORT_NODES = [int(n) for n in model_report.get('gravity_base_support_tags', SUPPORT_NODES)]",
+        "    WALL_SUPPORT_STRATEGY = model_report.get('gravity_support_strategy', 'ETABS_SOURCE_SUPPORTS')",
+        "    ADDED_WALL_SUPPORTS = model_report.get('gravity_added_support_nodes', [])",
+        "    print('[GRAVITY SUPPORT AUDIT]', json.dumps({'strategy':WALL_SUPPORT_STRATEGY, 'supports':len(SUPPORT_NODES), 'additional_mesh_supports':ADDED_WALL_SUPPORTS}),flush=True)",
         "    if isinstance(model_report, dict) and model_report.get('preload_completed'):",
         "        report_file = MODEL_SCRIPT.parent / 'OpenSees_Complete_Gravity_Check_V118.json'",
         "        if not report_file.is_file(): raise FileNotFoundError('Preloaded gravity report missing: ' + str(report_file))",
@@ -67,7 +71,7 @@ def _runner_source(model_script, result_path, support_nodes, applied_kN, nsteps,
         "        except Exception: continue",
         "        if len(values) == 12:",
         "            local_forces.append({'tag':int(e), 'N_i_kN':values[0], 'Vy_i_kN':values[1], 'Vz_i_kN':values[2], 'T_i_kNm':values[3], 'My_i_kNm':values[4], 'Mz_i_kNm':values[5], 'N_j_kN':values[6], 'Vy_j_kN':values[7], 'Vz_j_kN':values[8], 'T_j_kNm':values[9], 'My_j_kNm':values[10], 'Mz_j_kNm':values[11]})",
-        "    RESULT_PATH.write_text(json.dumps({'ok':True,'model_script':str(MODEL_SCRIPT),'report':report,'gravity_profile':GRAVITY_PROFILE,'nodes':nodes,'reactions':reactions,'elements':elements,'local_forces':local_forces}, indent=2), encoding='utf-8')",
+        "    RESULT_PATH.write_text(json.dumps({'ok':True,'model_script':str(MODEL_SCRIPT),'report':report,'gravity_profile':GRAVITY_PROFILE,'wall_support_strategy':WALL_SUPPORT_STRATEGY,'added_wall_support_tags':ADDED_WALL_SUPPORTS,'support_node_tags':SUPPORT_NODES,'nodes':nodes,'reactions':reactions,'elements':elements,'local_forces':local_forces}, indent=2), encoding='utf-8')",
         "except Exception as exc:",
         "    RESULT_PATH.write_text(json.dumps({'ok':False,'error':str(exc),'traceback':traceback.format_exc()}, indent=2), encoding='utf-8')",
         "    traceback.print_exc(); sys.exit(1)",
@@ -97,6 +101,7 @@ class GravityAnalysisGUI:
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
         self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
+        self.wall_support_strategy_var=tk.StringVar(value="ETABS_SOURCE_SUPPORTS")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self._build()
@@ -352,6 +357,13 @@ class GravityAnalysisGUI:
         ttk.Label(profile_row,text="1.0D + 1.0L includes assigned roof live; configured is seismic preload.",
                   wraplength=520).pack(side="left",padx=8)
         self.gravity_profile_var.trace_add("write",lambda *_: self._read_code_inputs(show_error=False) if self.model_var.get() else None)
+        wall_row=ttk.Frame(form);wall_row.pack(fill="x",pady=4)
+        ttk.Label(wall_row,text="Gravity wall-base supports:").pack(side="left",padx=(0,6))
+        ttk.Combobox(wall_row,textvariable=self.wall_support_strategy_var,
+            state="readonly",width=38,
+            values=("ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED")).pack(side="left")
+        ttk.Label(wall_row,text="ETABS original supports vs idealized continuous fixed wall base; same full gravity loads.",
+                  wraplength=485).pack(side="left",padx=8)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
         case_row=ttk.Frame(form);case_row.pack(fill="x",pady=2)
@@ -474,6 +486,7 @@ class GravityAnalysisGUI:
         self.status_var.set("Running model and nonlinear gravity steps…")
         self.log.delete("1.0", "end")
         self._gravity_action_log("GRAVITY_START","Selected model: "+str(model))
+        self._gravity_action_log("GRAVITY_SUPPORTS","Wall base strategy="+self.wall_support_strategy_var.get())
         self._gravity_action_log("GRAVITY_SETTINGS",f"Profile={self.gravity_profile_var.get()} | "
             f"Downward load={total:.6f} kN | supports={len(supports)} | steps={steps}")
         self._gravity_action_log("GRAVITY_OUTPUT","Result and run logs: "+str(out))
@@ -483,12 +496,14 @@ class GravityAnalysisGUI:
         runner_path = out / "Gravity_Run_V110.py"
         log_path = out / "Gravity_Run_V110.log"
         runner_path.write_text(_runner_source(model, result_path, supports, total, steps, self.gravity_profile_var.get()), encoding="utf-8")
-        thread = threading.Thread(target=self._worker, args=(py, runner_path, result_path, log_path, out, self.gravity_profile_var.get()), daemon=True)
+        thread = threading.Thread(target=self._worker, args=(py, runner_path, result_path, log_path, out, self.gravity_profile_var.get(), self.wall_support_strategy_var.get()), daemon=True)
         thread.start()
 
-    def _worker(self, py, runner, result_path, log_path, out, profile):
+    def _worker(self, py, runner, result_path, log_path, out, profile, support_strategy="ETABS_SOURCE_SUPPORTS"):
         try:
-            proc = subprocess.run([str(py), str(runner)], cwd=str(out), capture_output=True, text=True, errors="replace", env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1','OPENSEES_GRAVITY_PROFILE':profile}, encoding='utf-8')
+            proc = subprocess.run([str(py), str(runner)], cwd=str(out), capture_output=True, text=True, errors="replace", env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1','OPENSEES_GRAVITY_PROFILE':profile,
+                'OPENSEES_GRAVITY_GUI_MODE':'1',
+                'OPENSEES_GRAVITY_WALL_SUPPORT_STRATEGY':support_strategy}, encoding='utf-8')
             combined = proc.stdout + ("\n--- STDERR ---\n" + proc.stderr if proc.stderr else "")
             log_path.write_text(combined, encoding="utf-8")
             if not result_path.exists():
