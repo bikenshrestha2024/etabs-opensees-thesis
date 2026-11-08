@@ -73,7 +73,7 @@ class OfflineEtabsGravityTests(unittest.TestCase):
         finally:wb.close()
     def test_etabs_header_with_embedded_newline_units(self):
         wb=Workbook();ws=wb.active;ws.title="Joint Reactions"
-        ws.append(["Story","Label","Unique Name","Output Case","FZ\\nkN"])
+        ws.append(["Story","Label","Unique Name","Output Case","FZ\nkN"])
         ws.append(["Base",1,560,"1. DL + LL",100])
         alt=self.root/"inline_unit_header.xlsx";wb.save(alt)
         report=read_etabs_joint_reactions(alt)
