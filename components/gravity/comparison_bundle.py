@@ -32,7 +32,8 @@ SELECTED = (
     "Gravity_Beam_End_Actions_ULS_V141.csv",
     "Gravity_Beam_End_Actions_SLS_V141.csv",
 )
-EXTRA = ("Gravity_Result_V110.json", "Gravity_Run_V110.log",
+EXTRA = ("ETABS_Nonzero_Reaction_Support_Audit.json",
+         "Gravity_Result_V110.json", "Gravity_Run_V110.log",
          "Gravity_Results_V110.xlsx", "Gravity_GUI_Actions.log",
          "Gravity_Run_V110.py")
 
