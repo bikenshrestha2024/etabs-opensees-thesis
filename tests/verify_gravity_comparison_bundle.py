@@ -75,6 +75,29 @@ class GravityBundleTests(unittest.TestCase):
         self.assertFalse(audit["compare_verified"])
         with zipfile.ZipFile(z) as obj:
             self.assertTrue(any(n.endswith("/etabs/etabs_gravity.json") for n in obj.namelist()))
+    def test_oversize_essential_model_is_preserved_losslessly_if_compressible(self):
+        # Compression is only a transport representation; retain exact bytes
+        # and hash to make model mapping and source mass audit reproducible.
+        raw=b'{"nodes":'+b' '*20000+b'}'
+        model=self.export/"OpenSees_Complete_Model_Data_V118.json"
+        model.write_bytes(raw)
+        report,archive=export_bundle(
+            self.export,self.gravity,self.root/"compressed",max_file_mb=.01)
+        nested=[item for item in report["source_files"]
+                if item.get("representation")=="LOSSLESS_NESTED_ZIP"]
+        self.assertEqual(len(nested),1)
+        self.assertEqual(nested[0]["original_sha256"],
+                         hashlib.sha256(raw).hexdigest())
+        with zipfile.ZipFile(archive) as z:
+            item=next(n for n in z.namelist()
+                if n.endswith("compressed_originals/OpenSees_Complete_Model_Data_V118.json.zip"))
+            import io
+            with zipfile.ZipFile(io.BytesIO(z.read(item))) as z2:
+                self.assertEqual(z2.read("OpenSees_Complete_Model_Data_V118.json"),raw)
+        self.assertFalse(any(
+            x["file"]=="source/OpenSees_Complete_Model_Data_V118.json"
+            for x in report["oversize_skipped"]))
+
     def test_oversize_file_is_flagged(self):
         (self.export/"Gravity_Source_Load_Detail_V131.csv").write_text("0123456789"*150)
         audit,_=export_bundle(self.export,self.gravity,self.root/"small",max_file_mb=.0001)
