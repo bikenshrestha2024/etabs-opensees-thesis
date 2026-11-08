@@ -39,6 +39,21 @@ class JointWeightTests(unittest.TestCase):
         self.assertAlmostEqual(audit['gross_RCC_weight_kN'],9.6*25)
         self.assertAlmostEqual(audit['net_RCC_weight_kN'],8.9625*25)
         self.assertAlmostEqual(audit['potentially_duplicated_RCC_weight_kN'],.6375*25)
+        # Attribution is by the material removed from each later solid:
+        # Column owns both slab/column and beam/column volume;
+        # floor slab owns only the remaining beam/slab volume.
+        pairs=audit['overlap_pair_volume_m3']
+        self.assertAlmostEqual(pairs['FLOOR_OVERLAPS_COLUMN'],.075)
+        self.assertAlmostEqual(pairs['BEAM_OVERLAPS_COLUMN'],.15)
+        self.assertAlmostEqual(pairs['BEAM_OVERLAPS_FLOOR'],.4125)
+        self.assertAlmostEqual(sum(pairs.values()),.6375)
+        self.assertEqual(audit['physical_geometry_validation_status'],
+                         'ASSUMED_CENTERED_SOLIDS_NOT_VERIFIED')
+        beam=rows['B1']
+        self.assertAlmostEqual(beam['overlap_with_COLUMN_m3'],.15)
+        self.assertAlmostEqual(beam['overlap_with_FLOOR_m3'],.4125)
+        self.assertAlmostEqual(sum(audit['overlap_pair_weight_kN'].values()),
+                               audit['potentially_duplicated_RCC_weight_kN'])
         self.assertEqual(audit['policy'],'AUDIT_ONLY')
         with tempfile.TemporaryDirectory() as folder:
             export_joint_volume_ledger(folder,audit)
