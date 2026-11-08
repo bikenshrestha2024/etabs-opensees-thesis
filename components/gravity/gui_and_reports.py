@@ -438,14 +438,19 @@ class GravityAnalysisGUI:
             reaction_supports=None
             source_table=self.etabs_full_table_var.get().strip()
             if source_table and Path(source_table).is_file():
-                from components.gravity.etabs_reaction_support_filter import classify_supports
-                model_data=json.loads((model.parent/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding="utf-8-sig"))
-                topology=json.loads((model.parent/'OpenSees_Element_Connectivity.json').read_text(encoding="utf-8-sig"))
-                selected,filter_audit=classify_supports(source_table,topology,model_data['supports'])
-                reaction_supports=sorted(map(int,selected))
-                self.reaction_support_var.set(", ".join(map(str,reaction_supports)))
-                self._gravity_action_log("ETABS_REACTION_FILTER",
-                    f"Nonzero FZ support nodes={len(reaction_supports)}; excluded={filter_audit['released_support_count']}; original table={source_table}")
+                try:
+                    from components.gravity.etabs_reaction_support_filter import classify_supports
+                    model_data=json.loads((model.parent/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding="utf-8-sig"))
+                    topology=json.loads((model.parent/'OpenSees_Element_Connectivity.json').read_text(encoding="utf-8-sig"))
+                    selected,filter_audit=classify_supports(source_table,topology,model_data['supports'])
+                    reaction_supports=sorted(map(int,selected))
+                    self.reaction_support_var.set(", ".join(map(str,reaction_supports)))
+                    self._gravity_action_log("ETABS_REACTION_FILTER",
+                        f"Nonzero FZ support nodes={len(reaction_supports)}; excluded={filter_audit['released_support_count']}; original table={source_table}")
+                except Exception as filter_error:
+                    self.reaction_support_var.set("NOT VERIFIED: "+str(filter_error))
+                    if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
+                        raise
             else:
                 self.reaction_support_var.set("Select original completed ETABS 1. DL + LL table, then Read BOTH")
             if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
@@ -548,7 +553,7 @@ class GravityAnalysisGUI:
         bar = ttk.Frame(root); bar.pack(fill="x", pady=(0, 7))
         self.run_button = ttk.Button(bar, text="Run gravity, check, freeze + export", command=self.run)
         self.run_button.pack(side="left")
-        ttk.Button(bar,text="Run BOTH: ETABS Validation + Node Position / Continuous",
+        ttk.Button(bar,text="Run existing 76-support + 97-support cases",
                    command=self.run_both_wall_supports).pack(side="left",padx=5)
         ttk.Button(bar,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
         ttk.Button(bar,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
@@ -701,8 +706,9 @@ class GravityAnalysisGUI:
             if not messagebox.askyesno("Run two gravity wall-base strategies",
                  "Run the same full-gravity load twice with different wall-base "
                  "restraints?\\n\\n"
-                 "1) Original ETABS point supports only\\n"
-                 "2) Continuous fixed wall-base edge idealization\\n\\n"
+                 "1) ETABS Node Position (original 76 supports)\\n"
+                 "2) Continuous Wall Base (97 supports)\\n\\n"
+                 "The separate ETABS Reaction Validation diagnostic is RUN individually.\\n\\n"
                  "The second case is a foundation boundary-condition sensitivity "
                  "study, NOT a validated raft/soil model. Existing results are "
                  "not overwritten.",parent=self.win):
