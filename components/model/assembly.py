@@ -859,7 +859,25 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
     # exported support baseline, even when custom environment is present.
     if requested_strategy!='ETABS_SOURCE_SUPPORTS' and not os.environ.get('OPENSEES_GRAVITY_GUI_MODE'):
         raise ValueError('Wall-base support sensitivity mode is allowed only in the gravity GUI')
-    if os.environ.get('OPENSEES_GRAVITY_GUI_MODE'):
+    etabs_reaction_support_audit=None
+    if requested_strategy=='ETABS_NONZERO_REACTION_DIAGNOSTIC':
+        # ETABS FZ=0 is NOT proof of a free native restraint: this is opt-in.
+        if profile!='GRAVITY_1.0D_1.0L':
+            raise ValueError('Reaction diagnostic requires full 1.0D+1.0L gravity')
+        original_table=os.environ.get('OPENSEES_GRAVITY_ETABS_TABLE','').strip()
+        audit_folder=os.environ.get('OPENSEES_GRAVITY_AUDIT_DIR','').strip()
+        if not original_table or not audit_folder:
+            raise ValueError('Reaction diagnostic requires original ETABS table and audit folder')
+        from components.gravity.etabs_reaction_support_filter import classify_supports
+        topology=_read(folder/'OpenSees_Element_Connectivity.json')
+        data['supports'],etabs_reaction_support_audit=classify_supports(
+            original_table,topology,data['supports'])
+        added_gravity_supports=[]
+        target=Path(audit_folder).resolve()
+        target.mkdir(parents=True,exist_ok=True)
+        (target/'ETABS_Nonzero_Reaction_Support_Audit.json').write_text(
+            json.dumps(etabs_reaction_support_audit,indent=2),encoding='utf-8')
+    elif os.environ.get('OPENSEES_GRAVITY_GUI_MODE'):
         topology=_read(folder/'OpenSees_Element_Connectivity.json')
         supports,added_gravity_supports=_gravity_wall_support_strategy(
             data,topology,requested_strategy)
