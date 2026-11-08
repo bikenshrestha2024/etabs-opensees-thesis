@@ -35,6 +35,10 @@ def _truth(v):
 
 
 def load_rows(path, restraint_path=None):
+    """Read mapped reactions and optional native restraint flags.
+
+    [REF docs/source/components/validation/gravity_reactions_3d.py.md]
+    """
     with Path(path).open(newline="", encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
     if not rows:
@@ -79,6 +83,10 @@ def load_rows(path, restraint_path=None):
 
 
 def create_audit(input_csv, output_dir, native_restraints=None):
+    """Generate source/continuous/ETABS reaction comparison and 3D HTML.
+
+    [REF docs/source/components/validation/gravity_reactions_3d.py.md]
+    """
     rows = load_rows(input_csv, native_restraints)
     dest = Path(output_dir)
     dest.mkdir(parents=True, exist_ok=True)
@@ -178,6 +186,10 @@ def create_audit(input_csv, output_dir, native_restraints=None):
 
 
 def main():
+    """Command-line entry point to the offline reaction audit.
+
+    [REF docs/source/components/validation/gravity_reactions_3d.py.md]
+    """
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("reactions_csv")
     p.add_argument("output_dir")
