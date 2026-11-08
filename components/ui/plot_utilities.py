@@ -61,7 +61,9 @@ def _deformation_controls(parent, chart, fig):
     kind=tk.StringVar(value='OpenSees node');value=tk.StringVar();message=tk.StringVar()
     ttk.Combobox(ids,textvariable=kind,values=['OpenSees node','OpenSees element','ETABS object','ETABS point'],state='readonly',width=19).pack(side='left')
     ttk.Entry(ids,textvariable=value,width=12).pack(side='left')
-    from OpenSees_View_Controls_V134 import VIEWS,apply_view
+    from OpenSees_View_Controls_V134 import (
+        VIEWS,apply_view,resolve_node_tag,center_camera_on_node,
+        node_selection_artists,remove_selection_artists)
     view=tk.StringVar(value='Isometric');box=ttk.Combobox(row,textvariable=view,values=list(VIEWS),state='readonly',width=14);box.pack(side='left',padx=6)
     box.bind('<<ComboboxSelected>>',lambda e:(apply_view(control['axis'],view.get()),chart.draw_idle()))
     def zoom(factor):
@@ -71,33 +73,98 @@ def _deformation_controls(parent, chart, fig):
         chart.draw_idle()
     ttk.Button(row,text='Zoom +',style='PlotCompact.TButton',command=lambda:zoom(.8)).pack(side='left')
     ttk.Button(row,text='Zoom -',style='PlotCompact.TButton',command=lambda:zoom(1.25)).pack(side='left')
+    # All views use string source tags. The original mapping may use an
+    # integer OpenSees tag, which previously caused a silent lookup failure.
+    control.setdefault('selected_artists',[])
+    control.setdefault('home_limits',(
+        control['axis'].get_xlim(),control['axis'].get_ylim(),control['axis'].get_zlim()))
+    def selected_node_position():
+        if kind.get() not in ('OpenSees node','ETABS point'):
+            return None,None
+        tag=resolve_node_tag(kind.get(),value.get(),control['point_map'])
+        source=control['node_xyz'].get(tag)
+        if source is None:
+            return tag,None
+        import numpy as np
+        u=control.get('node_dof',{}).get(tag,[])
+        try:factor=float(scale.get())
+        except (ValueError,tk.TclError):
+            factor=control['scale']
+        if not math.isfinite(factor):
+            factor=control['scale']
+        displacement=np.array(
+            [(u[i] if i<len(u) and u[i] is not None else 0.) for i in range(3)],
+            dtype=float)
+        return tag,np.asarray(source,dtype=float)+factor*phase['value']*displacement
+
     def highlight():
-        tag=value.get().strip();points=[]
-        if kind.get()=='ETABS point':tag=str(control['point_map'].get(tag,''))
+        tag=value.get().strip()
+        remove_selection_artists(control['selected_artists'])
+        control['selected_artists']=[]
         if kind.get() in ('OpenSees node','ETABS point'):
-            point=control['node_xyz'].get(tag)
-            if point is not None:points=[point,point]
+            tag,point=selected_node_position()
+            control['highlight'].set_segments([])
+            if point is None:
+                message.set("Node not found: "+str(value.get())+
+                    " | Verify ETABS source mapping and OpenSees node tag.")
+            else:
+                ax=control['axis']
+                span=max(1.,max(abs(hi-lo) for lo,hi in (
+                    ax.get_xlim(),ax.get_ylim(),ax.get_zlim())))
+                control['selected_artists']=node_selection_artists(
+                    ax,point,span_m=span)
+                from OpenSees_View_Controls_V134 import node_readout
+                physical=control.get('node_dof',{}).get(tag,[])
+                actual=[float(control['node_xyz'][tag][i])+
+                    (physical[i] if i<len(physical) and physical[i] is not None else 0.)
+                    for i in range(3)]
+                message.set(node_readout(tag,physical,actual,
+                   "Highlighted node uses source mapping; unscaled DOFs shown. Use Zoom to Node to focus."))
         else:
-            elements=[tag] if kind.get()=='OpenSees element' else [str(n) for key,ns in control['object_map'].items() if key.split(':',1)[-1]==tag for n in ns]
-            segments=[control['element_xyz'][n] for n in elements if n in control['element_xyz']]
+            elements=[tag] if kind.get()=='OpenSees element' else [
+                str(n) for key,ns in control['object_map'].items()
+                if key.split(':',1)[-1]==tag for n in ns]
+            segments=[control['element_xyz'][n] for n in elements
+                      if n in control['element_xyz']]
             control['highlight'].set_segments(segments)
-        if points:
-            import numpy as np
-            physical=control.get('node_dof',{}).get(tag,[])
-            amount=float(scale.get())
-            displacement=np.array([(physical[i] if i<len(physical) and physical[i] is not None else 0.) for i in range(3)])
-            point=np.array(points[0])+amount*phase['value']*displacement;delta=max(control['axis'].get_zlim())*.004
-            control['highlight'].set_segments([[point-np.eye(3)[axis]*delta,point+np.eye(3)[axis]*delta] for axis in range(3)])
-        elif kind.get() in ('OpenSees node','ETABS point'):control['highlight'].set_segments([])
-        from OpenSees_View_Controls_V134 import node_readout
-        if points:
-            physical=control.get('node_dof',{}).get(tag,[])
-            coordinates=[points[0][i]+(physical[i] if i<len(physical) and physical[i] is not None else 0.) for i in range(3)]
-            message.set(node_readout(tag,physical,coordinates,'Gravity final response; readout is unscaled. Marker follows illustrated deformation.'))
-        else:message.set('Element highlight uses source geometry; choose a node for its six DOF.')
+            message.set("Highlighted "+kind.get()+" "+tag+
+                " | Select an OpenSees node or ETABS point to zoom to a single node.")
         chart.draw_idle()
-    ttk.Button(ids,style='PlotCompact.TButton',text='Highlight ID',command=highlight).pack(side='left')
-    ttk.Button(ids,style='PlotCompact.TButton',text='Clear',command=lambda:(control['highlight'].set_segments([]),chart.draw_idle())).pack(side='left')
+
+    def zoom_to_node():
+        tag,point=selected_node_position()
+        if point is None:
+            highlight()
+            return
+        span=center_camera_on_node(
+            control['axis'],point,home=control['home_limits'],
+            span_fraction=.08,min_span_m=.8)
+        highlight()
+        message.set("ZOOMED to node "+tag+
+            f" | XYZ=({point[0]:.4f}, {point[1]:.4f}, {point[2]:.4f}) m"+
+            f" | view cube {span:.3f} m. Zoom - or Fit to restore.")
+        chart.draw_idle()
+
+    def clear_selection():
+        control['highlight'].set_segments([])
+        remove_selection_artists(control['selected_artists'])
+        control['selected_artists']=[]
+        message.set("")
+        chart.draw_idle()
+
+    ttk.Button(ids,style='PlotCompact.TButton',text='Highlight ID',
+               command=highlight).pack(side='left')
+    ttk.Button(ids,style='PlotCompact.TButton',text='Zoom to Node',
+               command=zoom_to_node).pack(side='left')
+    ttk.Button(ids,style='PlotCompact.TButton',text='Clear',
+               command=clear_selection).pack(side='left')
+    ttk.Button(ids,style='PlotCompact.TButton',text='Fit all',
+               command=lambda:(
+                   [setter(*lims) for setter,lims in zip(
+                       (control['axis'].set_xlim,control['axis'].set_ylim,
+                        control['axis'].set_zlim),control['home_limits'])],
+                   chart.draw_idle())).pack(side='left')
+    value.trace_add('write',lambda *_:None)
     ttk.Label(parent,textvariable=message,wraplength=1050,justify='left').pack(anchor='w')
     ttk.Label(row,text='Static interpolation',font=('Segoe UI',9)).pack(side='left',padx=6)
     control['refresh_selection']=highlight
