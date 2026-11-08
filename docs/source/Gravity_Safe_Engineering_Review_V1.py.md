@@ -73,6 +73,52 @@ retain original model evidence, and explicitly install/test the staged
 candidate before comparing reactions. Even a match within screening
 tolerance is **NOT STRUCTURAL ACCEPTANCE**.
 
+## Windows / Spyder graphical program and isolated candidate export
+
+Run \`Gravity_Safe_Engineering_Review_V1.py\` in Spyder with no command
+line arguments; it opens a Tkinter GUI (standard Python). The interface
+has three principal buttons:
+
+1. **AUDIT (read only)**: choose the original generated export folder and
+   independent ETABS Material List CSV. It produces JSON, CSV, TXT
+   and, if \`openpyxl\` is available, an Excel workbook.
+2. **Stage reviewed candidate**: requires an affirmative engineering
+   geometry review. Creates a **new** timestamped config proposal and
+   a hash-verified backup of the original config; changes no model.
+3. **Build isolated candidate**: makes a separate model export within
+   \`Gravity_Safe_Engineering_Review/ISOLATED_CANDIDATE_MODELS/\`,
+   copies and hashes only necessary original ETABS audits and the
+   independently reviewed Material List CSV, then runs the existing
+   \`prepare_complete_export()\` on that **separate candidate directory**.
+
+The isolated candidate has
+\`ISOLATED_CANDIDATE_PROVENANCE.json\`,
+\`GRAVITY_SAFE_REVIEW.json\`,
+\`ETABS_Beam_Material_List_Reviewed.csv\`,
+and newly assembled \`OpenSees_Complete_Model_Data_V118.json\`
+and \`OpenSees_Complete_Gravity_Model.py\`.
+The original EDB, original generated data, original config and all old
+gravity results are unchanged. **An assembled candidate is not yet
+a gravity solver result.** Open the candidate's generated gravity model
+in the existing \`10_GRAVITY.py\` application and run:
+\`ETABS_SOURCE_SUPPORTS\` first, then the independent continuous fixed
+support sensitivity, and the new native ETABS direct comparison.
+Do not compare old direct ETABS outputs with the corrected candidate
+gravity run: the validation scorecard rejects stale totals.
+
+CLI to build an isolated approved candidate:
+
+\`\`\`powershell
+python Gravity_Safe_Engineering_Review_V1.py --export "D:\Thesis Opensees\...\1" --etabs-beam-csv "D:\ETABS_material_list_beams.csv" --build-isolated-candidate --approval-text "I REVIEWED ETABS BEAM SELF WEIGHT AND SOURCE GEOMETRY"
+\`\`\`
+
+The GUI also creates an **UNVERIFIED** 76-point foundation region CSV
+template directly from the original support comparison. You must fill
+every actual wall pier, column or core region and its EDB source
+geometry basis before aggregation is permitted. A region total may
+match while individual wall joint reactions remain wrong, so the
+original point comparison is always retained.
+
 ## Foundation-region comparison — manual, geometry-verified mapping
 
 Use the same original 76 ETABS support points in
