@@ -405,6 +405,19 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             for item in missing:stream.write("  "+str(item)+"\\n")
             stream.write("OVERSIZE OMITTED:\\n")
             for item in oversize:stream.write("  "+str(item)+"\\n")
+        (stage/"REVIEW_76_NODES_FIRST.txt").write_text(
+            "ETABS / OpenSees FOUNDATION REACTION REVIEW — READ FIRST\n"
+            "1. This archive uses the original ETABS_SOURCE_SUPPORTS analysis for tags 1–76.\n"
+            "2. Open node_audit_76/Gravity_76_Source_Support_Reactions.xlsx, Nodes 1-76.\n"
+            "3. Review Critical nodes ranked for the largest ABSOLUTE Rz discrepancies.\n"
+            "4. Follow the ETABS point ID map and coordinates, not identical integer IDs.\n"
+            "5. Unavailable ETABS results remain blank with an explicit status.\n"
+            "6. Compare wall-pier/core region totals independently; never discard node-level errors.\n"
+            "7. Original source OpenSees_ID_and_Support_Audit.xlsx and generated Plotly HTML viewers are copied when present.\n"
+            "8. Zoom to Node appears ONLY after rebuilding the HTML viewer with current main; old HTML will not update.\n"
+            "9. 97-support CONTINUOUS_WALL_BASE_FIXED results are a sensitivity run, NOT nodewise ETABS baseline.\n"
+            "10. This package alone never certifies structural equivalence.\n",
+            encoding="utf-8")
         (stage/"README_UPLOAD_FIRST.txt").write_text(
             "Upload this ZIP for comparison.\n"
             "OPEN GRAVITY_VALIDATION_SCORECARD.txt FIRST for global and support reaction gates.\n"
