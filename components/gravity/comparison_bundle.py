@@ -101,7 +101,7 @@ def _safe_relative(path, root):
     return path.resolve().is_relative_to(root.resolve())
 
 def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
-                  max_file_mb=40, dual_run_dir=None):
+                  max_file_mb=40, dual_run_dir=None, comparison_root=None):
     """Save an uploadable ZIP and an uncompressed evidence folder.
 
     [REF docs/review/GRAVITY_ETABS_COMPARISON.md] Required same-model case evidence.
@@ -112,6 +112,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
     export_dir=Path(export_dir).expanduser().resolve()
     gravity_dir=Path(gravity_dir).expanduser().resolve()
     output_dir=Path(output_dir).expanduser().resolve()
+    comparison_root=Path(comparison_root).expanduser().resolve() if comparison_root else gravity_dir
     if not export_dir.is_dir() or not gravity_dir.is_dir():
         raise FileNotFoundError("Select existing ETABS-export and OpenSees gravity-result directories")
     if output_dir in (export_dir,gravity_dir):
@@ -175,6 +176,9 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             add(export_dir/name,"source/"+name)
         for name in EXTRA:
             add(gravity_dir/name,"opensees/"+name,required=name=="Gravity_Result_V110.json")
+        if comparison_root != gravity_dir:
+            add(comparison_root/"Gravity_GUI_Actions.log",
+                "gravity_workflow/Gravity_GUI_Actions.log")
         # Existing gravity figures and failure diagnostics are carried over
         # without allowing unbounded recursive ingestion of model exports.
         for candidate in sorted(gravity_dir.iterdir()):
@@ -212,7 +216,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
 
         # Direct ETABS extraction is saved beside the OpenSees gravity output.
         # Include current comparison evidence in the same archive when present.
-        direct=gravity_dir/"Gravity_ETABS_OpenSees_Direct"
+        direct=comparison_root/"Gravity_ETABS_OpenSees_Direct"
         for name in ("OpenSees_Applied_Nodal_Gravity_By_Pattern.csv",
                      "OpenSees_Applied_Nodal_Gravity_Summary.json",
                      "Gravity_Node_Reaction_Comparison.json",
@@ -279,6 +283,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                "status":"EVIDENCE_EXPORT_ONLY_NOT_ENGINEERING_EQUIVALENCE",
                "source_export_dir":str(export_dir),"source_gravity_dir":str(gravity_dir),
                "dual_run_dir":str(dual_run_dir) if dual_run_dir else None,
+               "comparison_root":str(comparison_root),
                "source_model_sha256":model_hash,"source_etabs_json":str(etabs_json) if etabs_json else None,
                "source_files":files,"missing":missing,"oversize_skipped":oversize,
                "node_count":len(payload.get("nodes",[])) if isinstance(payload.get("nodes"),list) else None,
@@ -296,6 +301,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             stream.write("SOURCE EXPORT: "+str(export_dir)+"\\n")
             stream.write("GRAVITY ROOT: "+str(gravity_dir)+"\\n")
             stream.write("DUAL RUN: "+str(dual_run_dir or "NOT SUPPLIED")+"\\n")
+            stream.write("COMPARISON ROOT: "+str(comparison_root)+"\\n")
             stream.write("PACKAGED FILES:\\n")
             for item in files:stream.write("  "+item["file"]+" <- "+item["source"]+"\\n")
             stream.write("MISSING FILES:\\n")
