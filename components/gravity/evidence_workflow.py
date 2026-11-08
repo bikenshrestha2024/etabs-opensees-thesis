@@ -82,6 +82,14 @@ def path_log_entries(paths,report):
     for key,value in paths.items():
         if value is not None:
             entries.append(("EVIDENCE_"+key.upper(),str(value)))
+    # Log each collected file's exact on-disk source and its archive path.
+    # The plain-text index inside the ZIP lists generated CSV derivatives too.
+    for item in report["source_files"]:
+        entries.append(("EVIDENCE_FILE",
+            item["file"]+" | source="+item["source"]))
+    for item in report.get("packaged_files",[]):
+        entries.append(("EVIDENCE_PACKAGED_PATH",
+            item["extracted_path"]))
     for item in report["missing"]:
         entries.append(("EVIDENCE_MISSING",str(item)))
     for item in report["oversize_skipped"]:
