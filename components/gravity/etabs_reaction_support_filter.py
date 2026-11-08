@@ -106,3 +106,95 @@ def classify_supports(etabs_table, connectivity, original_supports, *, tolerance
                          "Retain 76- and 97-support runs. Review native source restraints "
                          "and internal wall-edge mesh constraints for acceptance.")
     return selected,audit
+
+def export_primary_32_comparison(gravity_result, audit_json, output_dir):
+    """Compare solved 32-node reaction values with original ETABS source FZ.
+
+    [REF docs/review/GRAVITY_REACTION_FILTER_DIAGNOSTIC.md]
+    """
+    import csv
+    result = gravity_result if isinstance(gravity_result, dict) else json.loads(
+        Path(gravity_result).read_text(encoding="utf-8-sig"))
+    audit = audit_json if isinstance(audit_json, dict) else json.loads(
+        Path(audit_json).read_text(encoding="utf-8-sig"))
+    if result.get("ok") is not True or result.get("wall_support_strategy") != MODE:
+        raise ValueError("A completed, correctly labelled primary diagnostic result is required")
+    if sorted(map(int,result.get("support_node_tags",[]))) != sorted(PROJECT_PRIMARY_32):
+        raise ValueError("Solved support list is not exactly the confirmed 32 tags")
+    reaction_rows = result.get("reactions",[])
+    reactions = {}
+    for row in reaction_rows:
+        tag=int(row["node_tag"])
+        if tag in reactions: raise ValueError("Duplicate solver reaction at "+str(tag))
+        value=float(row["rz_kN"])
+        if not math.isfinite(value):raise ValueError("Nonfinite support reaction at "+str(tag))
+        reactions[tag]=value
+    if set(reactions)!=set(PROJECT_PRIMARY_32):
+        raise ValueError("Solver reaction output does not contain exactly the 32 expected supports")
+    etabs = {int(m["opensees_node"]):m for m in audit["mapping"] if m["selected"]}
+    if set(etabs)!=set(PROJECT_PRIMARY_32):
+        raise ValueError("Source ETABS point mapping does not cover exactly 32 supports")
+    rows=[]
+    for tag in PROJECT_PRIMARY_32:
+        m=etabs[tag]
+        original=float(m["etabs_FZ_kN"])
+        got=reactions[tag]
+        delta=got-original
+        rows.append(dict(opensees_node=tag,etabs_unique_name=m["etabs_unique"],
+                         etabs_FZ_kN=original,opensees_FZ_kN=got,
+                         delta_kN=delta,
+                         percent_delta=(100*delta/original if abs(original)>1e-9 else None),
+                         abs_delta_kN=abs(delta)))
+    rows.sort(key=lambda row:row["abs_delta_kN"],reverse=True)
+    etabs_total=sum(r["etabs_FZ_kN"] for r in rows)
+    open_total=sum(r["opensees_FZ_kN"] for r in rows)
+    solver_total=float(result["report"]["support_vertical_reaction_kN"])
+    if abs(open_total-solver_total)>max(0.01,abs(solver_total)*1e-7):
+        raise ValueError("Saved 32-node reactions do not sum to solver support total")
+    global_diff=open_total-etabs_total
+    # Report diagnostics without converting a numerical match to structural acceptance.
+    summary=dict(
+        mode=MODE,classification="PRIMARY_PROJECT_REACTION_FILTER_DIAGNOSTIC",
+        original_ETABS_case=PROFILE,expected_support_count=32,
+        matched_support_count=len(rows),
+        etabs_total_FZ_kN=etabs_total,opensees_total_FZ_kN=open_total,
+        global_difference_kN=global_diff,
+        global_difference_percent=(100*global_diff/etabs_total if etabs_total else None),
+        worst_abs_node_difference_kN=rows[0]["abs_delta_kN"],
+        worst_node=rows[0]["opensees_node"],
+        original_etabs_table_sha256=audit["source_sha256"],
+        numerical_agreement="SCREENING_ONLY" if abs(global_diff)<=max(1.0,abs(etabs_total)*0.005) else "MISMATCH",
+        structural_validation="NOT_ESTABLISHED",
+        warning="Converged reaction agreement does not verify ETABS internal mesh restraint mapping, "
+                "wall stiffness, beam end-zone weight or equivalent load path.",
+        node_reactions=rows)
+    out=Path(output_dir)
+    out.mkdir(parents=True,exist_ok=True)
+    (out/"Primary_32_ETABS_OpenSees_Reactions.json").write_text(
+        json.dumps(summary,indent=2,allow_nan=False),encoding="utf-8")
+    columns=("opensees_node","etabs_unique_name","etabs_FZ_kN",
+             "opensees_FZ_kN","delta_kN","percent_delta","abs_delta_kN")
+    with (out/"Primary_32_ETABS_OpenSees_Reactions.csv").open(
+        "w",newline="",encoding="utf-8-sig") as stream:
+        w=csv.DictWriter(stream,fieldnames=columns)
+        w.writeheader();w.writerows(rows)
+    from openpyxl import Workbook
+    from openpyxl.styles import Font,PatternFill
+    wb=Workbook();sheet=wb.active;sheet.title="32 support comparison"
+    sheet.append(list(columns))
+    for row in rows:sheet.append([row[k] for k in columns])
+    sheet.freeze_panes="A2";sheet.auto_filter.ref=sheet.dimensions
+    for c in sheet[1]:
+        c.font=Font(color="FFFFFF",bold=True)
+        c.fill=PatternFill("solid",fgColor="183B56")
+    for col,width in {"A":20,"B":22,"C":24,"D":24,"E":20,"F":18,"G":20}.items():
+        sheet.column_dimensions[col].width=width
+    info=wb.create_sheet("Total and limitations")
+    for key,value in summary.items():
+        if key!="node_reactions" and not isinstance(value,(dict,list)):
+            info.append([key,value])
+    info.column_dimensions["A"].width=38
+    info.column_dimensions["B"].width=95
+    wb.save(out/"Primary_32_ETABS_OpenSees_Reactions.xlsx")
+    return summary
+
