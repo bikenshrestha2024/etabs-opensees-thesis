@@ -102,7 +102,7 @@ class GravityAnalysisGUI:
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
         self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
-        self.wall_support_strategy_var=tk.StringVar(value="ETABS_SOURCE_SUPPORTS")
+        self.wall_support_strategy_var=tk.StringVar(value="ETABS Reaction Validation")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self._build()
@@ -468,8 +468,8 @@ class GravityAnalysisGUI:
         ttk.Label(wall_row,text="Gravity wall-base supports:").pack(side="left",padx=(0,6))
         ttk.Combobox(wall_row,textvariable=self.wall_support_strategy_var,
             state="readonly",width=38,
-            values=("ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED")).pack(side="left")
-        ttk.Label(wall_row,text="ETABS original supports vs idealized continuous fixed wall base; same full gravity loads.",
+            values=("ETABS Reaction Validation","ETABS Node Position / Continuous")).pack(side="left")
+        ttk.Label(wall_row,text="Validation uses original ETABS restraints; node-position/continuous uses idealized full wall-base fixation.",
                   wraplength=485).pack(side="left",padx=8)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
@@ -601,7 +601,7 @@ class GravityAnalysisGUI:
         self.status_var.set("Running model and nonlinear gravity steps…")
         self.log.delete("1.0", "end")
         self._gravity_action_log("GRAVITY_START","Selected model: "+str(model))
-        self._gravity_action_log("GRAVITY_SUPPORTS","Wall base strategy="+self.wall_support_strategy_var.get())
+        self._gravity_action_log("GRAVITY_SUPPORTS","Wall base strategy="+self._selected_wall_support_strategy())
         self._gravity_action_log("GRAVITY_SETTINGS",f"Profile={self.gravity_profile_var.get()} | "
             f"Downward load={total:.6f} kN | supports={len(supports)} | steps={steps}")
         self._gravity_action_log("GRAVITY_OUTPUT","Result and run logs: "+str(out))
@@ -615,8 +615,20 @@ class GravityAnalysisGUI:
         runner_path = out / "Gravity_Run_V110.py"
         log_path = out / "Gravity_Run_V110.log"
         runner_path.write_text(_runner_source(model, result_path, supports, total, steps, self.gravity_profile_var.get()), encoding="utf-8")
-        thread = threading.Thread(target=self._worker, args=(py, runner_path, result_path, log_path, out, self.gravity_profile_var.get(), self.wall_support_strategy_var.get()), daemon=True)
+        thread = threading.Thread(target=self._worker, args=(py, runner_path, result_path, log_path, out, self.gravity_profile_var.get(), self._selected_wall_support_strategy()), daemon=True)
         thread.start()
+
+    def _selected_wall_support_strategy(self):
+        """Convert visible gravity strategy label to stable legacy solver ID.
+
+        [REF docs/review/GRAVITY_ETABS_COMPARISON.md]
+        """
+        return {
+            "ETABS Reaction Validation": "ETABS_SOURCE_SUPPORTS",
+            "ETABS Node Position / Continuous": "CONTINUOUS_WALL_BASE_FIXED",
+            "ETABS_SOURCE_SUPPORTS": "ETABS_SOURCE_SUPPORTS",
+            "CONTINUOUS_WALL_BASE_FIXED": "CONTINUOUS_WALL_BASE_FIXED",
+        }[self.wall_support_strategy_var.get()]
 
     def run_both_wall_supports(self):
         """Run both gravity boundary-condition strategies in isolated output folders.
