@@ -66,6 +66,10 @@ class GravityScorecardTests(unittest.TestCase):
             (self.base/"output"/"GRAVITY_VALIDATION_SCORECARD.csv").read_text(
                 encoding="utf-8-sig"))
     def test_numerically_matched_global_cannot_be_engineering_accepted(self):
+        (self.gravity/"Gravity_Result_V110.json").write_text(
+            json.dumps({"ok":True,"report":{
+                "applied_vertical_load_kN":311367.313879,
+                "support_vertical_reaction_kN":311367.313879}}))
         self.diff["opensees_support_FZ_kN"]=311367.313879
         self.diff["top_node_discrepancies"]=[{
             "etabs_point":"1","opensees_node":1,
