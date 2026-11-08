@@ -54,6 +54,31 @@ class OfflineEtabsGravityTests(unittest.TestCase):
         self.assertEqual(audit["rows"][0]["delta_source_minus_etabs_kN"],30.)
         out=export_offline_comparison(audit,self.root/"output")
         self.assertTrue((out/"ETABS_Offline_Gravity_Comparison.xlsx").exists())
+    def test_continuous_only_support_is_not_falsely_mapped_to_etabs(self):
+        data=json.loads(self.b.read_text())
+        data["nodes"].append(dict(tag=8751,x_m=3,y_m=0,z_m=0))
+        data["reactions"].append(dict(node_tag=8751,rz_kN=15.))
+        self.b.write_text(json.dumps(data))
+        report=compare_etabs_export(self.xlsx,self.root/"mapping.json",self.a,self.b)
+        self.assertEqual(len(report["continuous_only_nodes"]),1)
+        self.assertEqual(report["continuous_only_nodes"][0]["opensees_node_tag"],"8751")
+        out=export_offline_comparison(report,self.root/"output_21")
+        from openpyxl import load_workbook
+        wb=load_workbook(out/"ETABS_Offline_Gravity_Comparison.xlsx",read_only=True)
+        try:
+            self.assertIn("Critical source nodes",wb.sheetnames)
+            self.assertIn("Additional fixed wall nodes",wb.sheetnames)
+            self.assertIn("Evidence gates",wb.sheetnames)
+            self.assertEqual(wb["Additional fixed wall nodes"].max_row,2)
+        finally:wb.close()
+    def test_etabs_header_with_embedded_newline_units(self):
+        wb=Workbook();ws=wb.active;ws.title="Joint Reactions"
+        ws.append(["Story","Label","Unique Name","Output Case","FZ\\nkN"])
+        ws.append(["Base",1,560,"1. DL + LL",100])
+        alt=self.root/"inline_unit_header.xlsx";wb.save(alt)
+        report=read_etabs_joint_reactions(alt)
+        self.assertEqual(report["560"]["etabs_FZ_kN"],100.)
+
     def test_csv_fallback_handles_large_etabs_export(self):
         data=read_etabs_joint_reactions(self.csv)
         self.assertEqual(len(data),2)
