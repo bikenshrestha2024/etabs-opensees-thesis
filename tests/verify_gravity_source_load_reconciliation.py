@@ -44,7 +44,10 @@ class SourceLoadAuditTests(unittest.TestCase):
             ("OpenSees_Complete_Model_Config_V118.json",self.cfg),
             ("OpenSees_Source_Model_Metadata_V118.json",self.meta),
             ("OpenSees_Load_Conversion_Audit.json",{}),
-            ("ETABS_OpenSees_Beam_Weight_Reconciliation.json",self.beam)]:
+            ("ETABS_OpenSees_Beam_Weight_Reconciliation.json",self.beam),
+            ("Gravity_Single_Count_Self_Weight_Audit.json",
+             {"status":"SELF_WEIGHT_PATTERN_ACCOUNTING_PASS_NOT_JOINT_SOLID_VALIDATED",
+              "full_DL_LL_physical_self_weight_coefficient":1.0})]:
             (self.root/filename).write_text(json.dumps(value),encoding="utf8")
         self.fake=types.ModuleType("OpenSees_Complete_Export_V118")
         def apply(data,cfg,profile,types):
@@ -79,6 +82,11 @@ class SourceLoadAuditTests(unittest.TestCase):
             json.dumps(self.data),encoding="utf8")
         with self.assertRaisesRegex(ValueError,"does not reconcile"):
             self.run_audit()
+
+    def test_legacy_export_does_not_claim_single_count_validation(self):
+        (self.root/"Gravity_Single_Count_Self_Weight_Audit.json").unlink()
+        info=self.run_audit()
+        self.assertEqual(info["status"],"LEGACY_EXPORT_SINGLE_COUNT_NOT_VERIFIED")
 
     def test_no_source_ledger_fails_closed(self):
         self.data.pop("load_provenance")
