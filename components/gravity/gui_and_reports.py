@@ -875,6 +875,9 @@ class GravityAnalysisGUI:
                 try:
                     check=source_load_audit(Path(case_payload["model_script"]).parent,
                         case_payload["gravity_profile"],case_folder)
+                    if check.get("status")!="SOURCE_LEDGER_RECONCILED_NOT_ETABS_VALIDATED":
+                        raise ValueError("Source audit status="+str(check.get("status"))+
+                            "; fresh ETABS export required")
                     applied=float(case_payload["report"]["applied_vertical_load_kN"])
                     if abs(check["applied_total_kN"]-applied)>max(.01,abs(applied)*1e-8):
                         raise ValueError("Source load total differs from actual gravity solver input")
@@ -998,6 +1001,9 @@ class GravityAnalysisGUI:
                     "etabs_total_FZ_kN"])
             detailed=source_load_audit(Path(payload["model_script"]).parent,
                 payload["gravity_profile"],out,etabs_total_kN=native_total)
+            if detailed.get("status")!="SOURCE_LEDGER_RECONCILED_NOT_ETABS_VALIDATED":
+                raise ValueError("Source audit status="+str(detailed.get("status"))+
+                    "; rebuild from native ETABS export before claiming single-count validation")
             independent=float(detailed["applied_total_kN"])
             applied=float(payload["report"]["applied_vertical_load_kN"])
             if abs(independent-applied)>max(.01,abs(applied)*1e-8):
