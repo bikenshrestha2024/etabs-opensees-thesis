@@ -51,6 +51,8 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
                              required=False)
     slab_physical=_load_json(folder/"Gravity_Slab_Self_Weight_Audit.json",
                              required=False)
+    native_weight=_load_json(folder/"Gravity_Physical_Weight_Modifier_Audit.json",
+                             required=False)
     if not isinstance(data.get("load_provenance"),list) or not data["load_provenance"]:
         raise ValueError("Export has no complete load_provenance; rebuild with current exporter")
     from OpenSees_Complete_Export_V118 import apply_gravity_profile
@@ -173,6 +175,10 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
               "INDEPENDENT_ETABS_MATERIAL_LIST_REQUIRED"),
           native_beam_proof=native_beam_proof,
           single_count_pattern_audit=pattern_count,
+          native_etabs_weight_modifier_verified=bool(
+              native_weight and native_weight.get("source_weight_modifier_verified")),
+          etabs_weight_modifier_audit_status=(
+              native_weight.get("status") if native_weight else "NOT_CAPTURED"),
           physical_slab_gross_self_weight_kN=physical_slab_weight,
           expected_full_gravity_slab_self_weight_kN=expected_applied_slab_weight,
           actual_applied_slab_self_weight_kN=floor_weight_from_assembled,
@@ -187,6 +193,13 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
                "interpretation":"GEOMETRY AUDIT; never add to the beam clear-length deduction"}
               if joint else None),
           active_native_model_identity="NOT_VERIFIED_BY_THIS_OFFLINE_AUDIT")
+    if native_weight is None:
+        info["status"]="NATIVE_ETABS_WEIGHT_MODIFIERS_NOT_VERIFIED"
+    elif native_weight.get("source_weight_conflict"):
+        raise ValueError("Native ETABS source weight modifier not unity: "
+                         "physical gravity source is not equivalent")
+    elif not native_weight.get("source_weight_modifier_verified"):
+        info["status"]="NATIVE_ETABS_WEIGHT_MODIFIERS_NOT_VERIFIED"
     if pattern_count is None:
         info["status"]="LEGACY_EXPORT_SINGLE_COUNT_NOT_VERIFIED"
     elif slab_physical is None:
