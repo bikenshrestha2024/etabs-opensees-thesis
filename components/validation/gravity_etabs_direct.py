@@ -635,6 +635,30 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             data['original_source_edb_sha256_after']=_file_hash(selected)
             report('ETABS_PROVENANCE','Verified original EDB unchanged; comparison used isolated copy',
                    original_sha256=original_hash,copy=str(working_copy))
+        # Extract native element/material quantity tables from the SAME active
+        # ETABS model used for the direct base reaction. Preserve all returned
+        # fields and a manifest; optional API failures must be visible.
+        try:
+            from components.validation.etabs_native_quantity_tables import (
+                export_native_quantity_tables)
+            previous_units=app.SapModel.GetPresentUnits()
+            try:
+                _out((app.SapModel.SetPresentUnits(UNITS_KN_M_C),),
+                     0,"Set ETABS quantity display units")
+                native_tables=export_native_quantity_tables(
+                    app.SapModel,out/"ETABS_Native_Quantity_Tables",log=report)
+            finally:
+                _out((app.SapModel.SetPresentUnits(previous_units),),
+                     0,"Restore native quantity display units")
+            report("ETABS_NATIVE_QUANTITY_EXTRACTION",
+                   "Captured source-model table inventory and available raw quantity tables",
+                   count=native_tables["selected_table_count"],
+                   directory=str(out/"ETABS_Native_Quantity_Tables"),
+                   warning="Native table quantities require per-object alignment before correction")
+        except Exception as quantity_exc:
+            report("ETABS_NATIVE_QUANTITY_BLOCKED",
+                   "Native quantity extraction failed; gravity reaction comparison continues",
+                   error_type=type(quantity_exc).__name__,error=str(quantity_exc))
         # Capture the separate OpenSees converted APPLIED nodal force ledger.
         # These values must NOT be equated with support reactions.
         try:
