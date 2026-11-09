@@ -197,4 +197,71 @@ def reconcile_joint_weight_scenarios(source_folder, output_folder,
         for name, entry in category.items():
             writer.writerow([name, entry["elements"], entry["gross"],
                              entry["overlap"], entry["net"]])
+    # Source-object ledger, not FE cell count. OpenSees mesh splits cannot
+    # produce additional concrete weight or extra original ETABS members.
+    # KEEP category separated: a 'BEAM' and 'COLUMN' can share the same
+    # original ETABS numerical object label.
+    object_rows={}
+    for r in rows:
+        key=(str(r["category"]),str(r.get("object","")),
+             str(r.get("kind","")))
+        if not key[1]:
+            raise ValueError("Source RCC solid lacks original ETABS object ID")
+        entry=object_rows.setdefault(key, {
+            "category":key[0],"etabs_object":key[1],"source_kind":key[2],
+            "mesh_cells_or_segments":0,"gross_volume_m3":0.,
+            "net_volume_m3":0.,"removed_volume_m3":0.,
+            "gross_weight_kN":0.,"net_weight_kN":0.,
+            "overlap_weight_kN":0.})
+        entry["mesh_cells_or_segments"]+=1
+        for source,target in (
+            ("gross_m3","gross_volume_m3"),
+            ("net_m3","net_volume_m3"),
+            ("removed_m3","removed_volume_m3"),
+            ("gross_weight_kN","gross_weight_kN"),
+            ("net_weight_kN","net_weight_kN"),
+            ("removed_weight_kN","overlap_weight_kN")):
+            entry[target]+=_number(r.get(source,0.),
+                                    str(key)+" "+source,True)
+    # Record steel/SHS braces as distinct sources, not fabricated RCC solids.
+    # Their original material quantities must be verified independently.
+    objects=list(object_rows.values())
+    _close(sum(x["gross_weight_kN"] for x in objects),gross,
+           "Original RCC source-object gross conservation")
+    _close(sum(x["overlap_weight_kN"] for x in objects),overlap,
+           "Original RCC source-object overlap conservation")
+    original_beam_ids={str(x["etabs_object"])
+                       for x in objects if x["category"]=="BEAM"}
+    if len(original_beam_ids)!=len(original_beams):
+        raise ValueError(
+            "Original beam object crosswalk differs: volume ledger "
+            "versus ETABS end-offset metadata")
+    weight_by_beam={
+        str(x["etabs_object"]):x for x in objects
+        if x["category"]=="BEAM"}
+    for beam_record in original_beams:
+        obj=str(beam_record["etabs_object"])
+        if obj not in weight_by_beam:
+            raise ValueError("Beam object missing from geometric ledger: "+obj)
+        _close(
+            _number(beam_record["gross_weight_kN"],obj+" offset gross"),
+            weight_by_beam[obj]["gross_weight_kN"],
+            "Original beam gross per-object crosswalk")
+    with (out/"Gravity_Original_ETABS_Object_Quantities.csv").open(
+        "w",newline="",encoding="utf-8-sig") as f:
+        cols=["category","etabs_object","source_kind",
+              "mesh_cells_or_segments","gross_volume_m3","net_volume_m3",
+              "removed_volume_m3","gross_weight_kN","net_weight_kN",
+              "overlap_weight_kN"]
+        writer=csv.DictWriter(f,fieldnames=cols)
+        writer.writeheader()
+        writer.writerows(sorted(objects,
+                                key=lambda row:(row["category"],row["etabs_object"])))
+    report["original_R​​CC_source_objects".replace("\u200b","")]=len(objects)
+    report["original_object_quantity_csv"]=str(
+        out/"Gravity_Original_ETABS_Object_Quantities.csv")
+    report["native_etabs_per_object_matched"]=False
+    report["native_etabs_crosswalk_status"]="AWAITING_NATIVE_MATERIAL_LIST_SCHEMA_AND_SOURCE_IDS"
+    (out/"Gravity_Joint_Weight_Reconciliation.json").write_text(
+        json.dumps(report,indent=2,allow_nan=False),encoding="utf-8")
     return report
