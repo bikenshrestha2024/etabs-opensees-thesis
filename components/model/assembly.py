@@ -564,6 +564,16 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                 geometry_verified=cfg['joint_volume_geometry_verified'],
                 policy=volume_policy)
             export_joint_volume_ledger(folder,volume_ledger)
+            from components.gravity.joint_overlap_review import review_joint_overlap
+            typed_overlap=review_joint_overlap(
+                volume_ledger,folder,
+                beam_offset_candidate_kN=beam_weight_audit.get(
+                    'potential_offset_reduction_kN'))
+            report['typed_joint_overlap_diagnostic']={
+                'status':'AUDIT_ONLY_NOT_APPLIED',
+                'actual_potential_overlap_kN':typed_overlap[
+                    'actual_ledger_global_overlap_kN'],
+                'report':str(folder/'Gravity_Joint_Type_Overlap_Review.xlsx')}
             report['joint_volume_weight_audit']={
                 k:v for k,v in volume_ledger.items() if k!='rows'}
             if volume_policy=='VERIFIED_SINGLE_OWNER':
