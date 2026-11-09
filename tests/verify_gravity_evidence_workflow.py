@@ -96,6 +96,45 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
             ):
                 self.assertTrue(any(x.endswith(tail) for x in names),tail)
 
+    def test_timestamped_32_node_run_is_discovered_and_packaged(self):
+        import os
+        diagnostic=self.gravity/"Gravity_Reaction_Diagnostic"/"20261109_094206_701648"
+        diagnostic.mkdir(parents=True)
+        (diagnostic/"Gravity_Result_V110.json").write_text(
+            json.dumps(self.sample),encoding="utf8")
+        (diagnostic/"Gravity_Run_V110.log").write_text("solver PASS",encoding="utf8")
+        # Ensure newer timestamped run wins over a legacy root result.
+        os.utime(self.gravity/"Gravity_Result_V110.json",(1000,1000))
+        report,paths=package_gravity_review(self.script,self.gravity)
+        self.assertEqual(Path(paths["selected_gravity_run"]),diagnostic)
+        with zipfile.ZipFile(paths["upload_zip"]) as z:
+            self.assertTrue(any(x.endswith("single_run_root/Gravity_Result_V110.json")
+                                for x in z.namelist()))
+
+    def test_missing_root_result_does_not_hide_saved_diagnostic(self):
+        (self.gravity/"Gravity_Result_V110.json").unlink()
+        diagnostic=self.gravity/"Gravity_Reaction_Diagnostic"/"20261109_094206_701648"
+        diagnostic.mkdir(parents=True)
+        (diagnostic/"Gravity_Result_V110.json").write_text(
+            json.dumps(self.sample),encoding="utf8")
+        _,paths=package_gravity_review(self.script,self.gravity)
+        self.assertEqual(Path(paths["selected_gravity_run"]),diagnostic)
+
+    def test_failed_diagnostic_is_not_relabelled_success(self):
+        (self.gravity/"Gravity_Result_V110.json").unlink()
+        diagnostic=self.gravity/"Gravity_Reaction_Diagnostic"/"failed"
+        diagnostic.mkdir(parents=True)
+        (diagnostic/"Gravity_Result_V110.json").write_text(
+            json.dumps({"ok":False}),encoding="utf8")
+        with self.assertRaisesRegex(FileNotFoundError,"No completed gravity"):
+            package_gravity_review(self.script,self.gravity)
+
+    def test_explicit_missing_run_does_not_fallback_to_other_case(self):
+        with self.assertRaisesRegex(FileNotFoundError,"Required OpenSees"):
+            package_gravity_review(self.script,self.gravity,
+                single_run=self.gravity/"different_case")
+
+
     def test_run_versions_are_immutable_and_failed_inputs_not_fabricated(self):
         _,a=package_gravity_review(self.script,self.gravity,
                                    single_run=self.gravity)
