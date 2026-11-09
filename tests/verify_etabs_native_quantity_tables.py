@@ -17,9 +17,11 @@ class FakeDatabase:
                                 fields, count, data):
         if key != "Material List by Object Type":
             raise RuntimeError("Unexpected table requested")
-        return ("", 1, ["Object", "Weight"], 2,
-                ["Object", "Weight"], 2,
-                ["B1", "50.0", "S1", "30.0"], 0)
+        # Exact six-element OUT tuple captured from user's ETABS v23 OAPI:
+        # FieldKeyList, TableVersion, FieldsKeysIncluded,
+        # NumberRecords, TableData, retcode.
+        return ((), 1, ("Object", "Weight"), 2,
+                ("B1", "50.0", "S1", "30.0"), 0)
 
 
 class FakeSap:
@@ -41,10 +43,21 @@ class EtabsNativeQuantityTests(unittest.TestCase):
                              [["Object","Weight"],["B1","50.0"],["S1","30.0"]])
             self.assertTrue((Path(root)/"ETABS_NATIVE_QUANTITY_MANIFEST.json").is_file())
 
+    def test_rejects_nonzero_native_return(self):
+        class Failed(FakeDatabase):
+            def GetTableForDisplayArray(self,*args):
+                return ((),1,("Object","Weight"),1,("B1","50"),1)
+        sap=FakeSap();sap.DatabaseTables=Failed()
+        with tempfile.TemporaryDirectory() as root:
+            result=export_native_quantity_tables(sap,root)
+            self.assertEqual(result["table_exports"][0]["status"],
+                             "UNAVAILABLE_OR_API_ERROR")
+            self.assertIn("retcode=1",result["table_exports"][0]["error"])
+
     def test_malformed_native_data_is_reported_not_fabricated(self):
         class Broken(FakeDatabase):
             def GetTableForDisplayArray(self,*args):
-                return ("",1,[],0,["Object","Weight"],2,["B1","50"],0)
+                return ((),1,("Object","Weight"),2,("B1","50"),0)
         instance=FakeSap()
         instance.DatabaseTables=Broken()
         with tempfile.TemporaryDirectory() as root:
