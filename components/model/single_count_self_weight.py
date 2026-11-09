@@ -14,6 +14,8 @@ def audit_self_weight_patterns(records, gravity_factors, mass_factors, *,
                                beam_weight_policy, joint_volume_policy):
     """Reject accidental double inclusion of the same geometric self-weight.
 
+    [REF docs/source/components/model/single_count_self_weight.py.md]
+
     One physical member's full weight can be allocated to multiple patterns
     only if their combined factors for the analysed profile do not exceed 1.
     For the production configured gravity profile, we check its actual
