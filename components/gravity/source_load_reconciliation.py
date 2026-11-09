@@ -328,11 +328,31 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
             raise ValueError("Native ETABS assignment workbook does not confirm "
                              "clear-length beam weight; no gravity weight correction allowed")
     else:
-        info["etabs_native_assignment_evidence"]={
-            "status":"NOT_CONFIGURED",
-            "required_for_verified_clear_weight":"Set ETABS_GRAVITY_ASSIGNMENT_WORKBOOK to original ETABS assignment XLSX",
-            "automatic_correction_kN":0.0,
-        }
+        # The verified source-export proof persists after the environment
+        # variable is cleared. Do not falsely report it as missing.
+        proof_path=folder/"ETABS_Native_Assignment_Gravity_Quantity_Audit.json"
+        if proof_path.is_file():
+            proof=_load_json(proof_path)
+            if (proof.get("opensees_beam_crosswalk_status") !=
+                    "SOURCE_IDS_OFFSETS_AND_TOTAL_MATCH" or
+                    proof.get("clear_candidate_matches_native_quantity") is not True):
+                raise ValueError("Stored ETABS native assignment evidence is not accepted")
+            info["etabs_native_assignment_evidence"]={
+                "status":"SOURCE_IDS_OFFSETS_AND_TOTAL_MATCH",
+                "source_workbook_name":proof.get("source_workbook_name"),
+                "source_workbook_sha256":proof.get("source_workbook_sha256"),
+                "native_material_weights_kN":proof.get("weights_kN"),
+                "native_beam_objects":proof.get("native_beam_objects"),
+                "file":str(proof_path),
+                "file_sha256":hashlib.sha256(proof_path.read_bytes()).hexdigest(),
+                "automatic_correction_kN":0.0,
+            }
+        else:
+            info["etabs_native_assignment_evidence"]={
+                "status":"NOT_CONFIGURED",
+                "required_for_verified_clear_weight":"Set ETABS_GRAVITY_ASSIGNMENT_WORKBOOK to original ETABS assignment XLSX",
+                "automatic_correction_kN":0.0,
+            }
     out.mkdir(parents=True,exist_ok=True)
     (out/"Gravity_Source_Components_Audit.json").write_text(
         json.dumps(info,indent=2,allow_nan=False),encoding="utf-8")
