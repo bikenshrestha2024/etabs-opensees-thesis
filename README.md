@@ -102,3 +102,12 @@ The [first-step wall orientation, opening geometry and material qualification re
 
 See [the current fix-and-open-issues register](docs/review/02_SOFTWARE_ERROR_REMEDIATION.md). Both active NLTHA response-history paths now reject nonfinite accepted recorder values before writing outputs, and time-step comparisons require matching source hashes and true finer accepted steps. Project-specific E-SFI wall instability and experimental reinforcement/material calibration remain P0 open issues, not CI-passing software bugs.
 
+
+
+## 2026-11 ETABS EQX/EQY P-Delta case verification
+
+The user's native ETABS v23 screenshot shows **EQX+ P Delta Initial** as Nonlinear Static, zero-initial-state, P-Delta, with 1.2 × (Self Weight, Floor Finish, Partition, Wall), 0.5 × Live and +1.5 × EQX. Its **EQX+ P-Delta** dependent Linear Static case uses the preceding nonlinear case's stiffness, **excludes its loads**, and applies EQX × 1.0. Native Y definitions, negative initial branches and response steps require separate extraction.
+
+Start with [the detailed source-bound verification runbook](docs/review/ETABS_EQX_EQY_PDELTA_NATIVE_VALIDATION_RUNBOOK_20261109.md). The new read-only Spyder tool [`tools/ETABS_EQX_EQY_PDELTA_EXPORT.py`](tools/ETABS_EQX_EQY_PDELTA_EXPORT.py) captures saved native case names, all available base-reaction steps and story tables without running analysis or changing the EDB. An upload-ready ZIP contains source hashes and missing-table status. The [four-case input template](examples/EQ_PDelta_4Case_Input_TEMPLATE.json) intentionally leaves unverified results blank. The offline matrix compares signed raw base shear, recovered story shear, roof/master displacements and drift only with compatible source IDs, P-Delta tangent, eccentricity, case definitions and steps.
+
+**Not yet verified:** corrected 32-support gravity reactions, independent full native EQX/EQY results, OpenSees equivalent tangent-state reuse, wall section-cut story shear, matched ULS/SLS stiffness and 5% eccentricity. Existing ESM story shear is an integrated assigned-force *input*, not verified internal section shear. No EQX/EQY results have been fabricated or seismic factors silently changed.
