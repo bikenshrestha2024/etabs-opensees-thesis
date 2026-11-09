@@ -422,6 +422,17 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                 "required":False,
                 "reason":"ETABS native per-object quantity API extraction not performed"
             })
+        eq_native=direct/"ETABS_EQ_PDelta_Native"
+        if eq_native.is_dir():
+            for file in sorted(eq_native.glob("*")):
+                if file.is_file():
+                    add(file,"direct_comparison/ETABS_EQ_PDelta_Native/"+file.name)
+        else:
+            missing.append({
+                "file":"direct_comparison/ETABS_EQ_PDelta_Native/",
+                "required":False,
+                "reason":"Optional saved ETABS EQX/EQY PDelta native extraction not run",
+            })
         if etabs_json is None and (direct/"etabs_gravity.json").is_file():
             etabs_json=direct/"etabs_gravity.json"
 
