@@ -52,3 +52,33 @@ load-path formulas** action after updating the application, then
 check the full-gravity factor and configured seismic-preload factor.
 
 Regression: `python tests/verify_slab_full_gravity_factors.py`.
+
+## 2026-11-09 project clarification: roof live assignment vs roof live factor
+
+The full-gravity comparison profile `GRAVITY_1.0D_1.0L` uses **1.0** for
+every classified, *actually assigned* permanent, floor-live and roof-live
+source load. A Roof Live **pattern definition** does not, on its own, mean
+an applied roof live force exists. If its source assignment ledger is empty
+(or its applied sum is numerically zero after explicitly verified source
+extraction), the corresponding full-gravity load contribution is zero even
+though the requested factor is 1.0. Do **not** generate a synthetic roof
+load, silently discard a nonzero roof load, or infer the absence of load
+assignments solely from an ETABS pattern name.
+
+The configured seismic mass source is separate: for this model
+`mass_factors['Roof Live'] = 0.0`, while floor live is currently configured
+as 0.3 where applicable. A separately defined seismic **preload** likewise
+retains its configured factors; it is not the independently requested
+`1.0D + 1.0L` full gravity reference. Verify the actual ETABS load
+combination components and assigned load patterns before asserting
+equivalence.
+
+In the implementation `components/model/assembly.py::apply_gravity_profile`,
+the full gravity calculation uses independently stored
+`unfactored_patterns`, records
+`gravity_by_pattern_kN['Roof Live'] = 0` for an existing but empty Roof
+Live pattern, and does not mutate `nodal_mass`. This is an **input and
+comparison invariant**, not evidence that the user's entire original ETABS
+EDB contains no roof-live assignments. Test:
+`tests/verify_gravity_comparison_profile.py` (both empty-pattern and
+absent-pattern cases).
