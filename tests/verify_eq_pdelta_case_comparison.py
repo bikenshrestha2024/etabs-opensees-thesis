@@ -68,7 +68,11 @@ class EQTests(unittest.TestCase):
                     etabs_case_definition_verified=True,
                     opensees_case_definition_verified=True,
                     etabs_base_shear_kN=200.,opensees_base_shear_kN=200.,
-                    opensees_tangent_from_matching_initial_state_verified=True)
+                    opensees_tangent_from_matching_initial_state_verified=True,
+                    etabs_original_edb_sha256="a"*64,
+                    opensees_export_source_edb_sha256="a"*64,
+                    etabs_mass_source="MsSrc1",
+                    opensees_mass_source_reference="MsSrc1")
             result=compare_saved_case(
                 etabs_csv=path/"etabs.csv",opensees_csv=path/"open.csv",
                 output_dir=path/"out",axis="X",etabs_case="EQX+ P-Delta",
