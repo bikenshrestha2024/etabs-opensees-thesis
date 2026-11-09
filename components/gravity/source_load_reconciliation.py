@@ -155,6 +155,54 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
             native_beam_proof["status"]="NATIVE_MATERIAL_WEIGHT_NUMERIC_MATCH_CANDIDATE_ONLY"
         else:
             native_beam_proof["status"]="NATIVE_MATERIAL_WEIGHT_NOT_FULLY_VERIFIED"
+    # Reproduce the original geometric overlap review inside EACH gravity-run
+    # evidence directory, rather than requiring the reviewer to locate an
+    # unrelated exporter folder. Never alter applied nodal loads or mass.
+    joint_overlap_review = None
+    joint_overlap_evidence = {
+        "status": "MISSING_SOURCE_LEDGER_NOT_APPLIED",
+        "source_path": str(folder / "OpenSees_Joint_Volume_Ownership_Audit.json"),
+        "source_sha256": None,
+        "files": [],
+        "applied_gravity_correction_kN": 0.0,
+    }
+    if joint is not None:
+        source_joint = folder / "OpenSees_Joint_Volume_Ownership_Audit.json"
+        joint_hash = hashlib.sha256(source_joint.read_bytes()).hexdigest()
+        declared_policy = cfg.get("joint_volume_weight_policy", "AUDIT_ONLY")
+        if joint.get("policy") != declared_policy:
+            raise ValueError(
+                "Joint-overlap source ledger policy differs from current "
+                "gravity model configuration: " + str(joint.get("policy"))
+                + " vs " + str(declared_policy))
+        from components.gravity.joint_overlap_review import review_joint_overlap
+        joint_overlap_review = review_joint_overlap(
+            joint, out,
+            beam_offset_candidate_kN=beam_delta,
+            observed_global_gap_kN=(expected-etabs if etabs is not None else None))
+        joint_overlap_evidence = {
+            "status": "SOURCE_LEDGER_GEOMETRY_AUDITED_NOT_ETABS_VERIFIED",
+            "source_path": str(source_joint),
+            "source_sha256": joint_hash,
+            "policy": joint.get("policy"),
+            "geometry_verified": joint.get("geometry_verified", False),
+            "potential_overlap_kN": joint_overlap_review[
+                "actual_ledger_global_overlap_kN"],
+            "files": [
+                str(out / "Gravity_Joint_Type_Overlap_Review.json"),
+                str(out / "Gravity_Joint_Type_Overlap_Review.csv"),
+                str(out / "Gravity_Joint_Type_Overlap_Review.xlsx"),
+                str(out / "Gravity_Joint_Type_Overlap_Solids.csv"),
+            ],
+            "applied_gravity_correction_kN": 0.0
+            if declared_policy == "AUDIT_ONLY" else None,
+        }
+        # When a reviewed single-owner volume policy was explicitly applied
+        # in the SOURCE EXPORT, do not misrepresent its correction as zero.
+        if declared_policy == "VERIFIED_SINGLE_OWNER":
+            joint_overlap_evidence["status"] = (
+                "SOURCE_MODEL_ALREADY_CORRECTED_REQUIRES_ETABS_VERIFICATION")
+            joint_overlap_evidence["applied_gravity_correction_kN"] = None
     note=(
       "POTENTIAL_ONLY: clear-span deduction not enabled. Confirm original ETABS "
       "Material List per source beam, frame Self Weight Option, end offsets and "
@@ -204,6 +252,7 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
                     joint.get("potentially_duplicated_RCC_weight_kN"),
                "interpretation":"GEOMETRY AUDIT; never add to the beam clear-length deduction"}
               if joint else None),
+          joint_overlap_run_evidence=joint_overlap_evidence,
           active_native_model_identity="NOT_VERIFIED_BY_THIS_OFFLINE_AUDIT")
     if native_weight is None:
         info["status"]="NATIVE_ETABS_WEIGHT_MODIFIERS_NOT_VERIFIED"
@@ -258,6 +307,22 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
         for c in sheet[1]:
             c.font=Font(color="FFFFFF",bold=True)
             c.fill=PatternFill("solid",fgColor="17365D")
+    joint_sheet=wb.create_sheet("Joint overlap source audit")
+    joint_sheet.append(["Evidence", "Value", "Interpretation"])
+    for key,value in joint_overlap_evidence.items():
+        if isinstance(value,(str,int,float,bool)) or value is None:
+            joint_sheet.append([key,value,
+                "Read-only source geometry; no ETABS equivalence implied"])
+    joint_sheet.append(["beam_offset_candidate_kN",beam_delta,
+        "Separate hypothesis, do not add to joint overlap"])
+    joint_sheet.append(["observed_ETABS_gap_kN",
+        (expected-etabs if etabs is not None else None),
+        "Diagnostic only; not an inferred weight correction"])
+    joint_sheet.append(["automatic_overlap_deduction","PROHIBITED",
+        "Only explicitly reviewed source-export policy can change physical loads"])
+    joint_sheet.column_dimensions["A"].width=44
+    joint_sheet.column_dimensions["B"].width=78
+    joint_sheet.column_dimensions["C"].width=70
     wd.column_dimensions["C"].width=28
     wd.column_dimensions["D"].width=35
     ws2.column_dimensions["B"].width=95
