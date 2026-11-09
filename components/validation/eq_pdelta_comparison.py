@@ -62,6 +62,15 @@ def compare_saved_case(*,etabs_csv,opensees_csv,output_dir,axis,
         blockers.append("RESULT_UNITS_MUST_BE_kN_m")
     if details.get("model_equivalence_verified") is not True:
         blockers.append("SOURCE_MODEL_EQUIVALENCE_NOT_VERIFIED")
+    etabs_identity=details.get("etabs_original_edb_sha256")
+    opensees_identity=details.get("opensees_export_source_edb_sha256")
+    if (not isinstance(etabs_identity,str) or
+        not isinstance(opensees_identity,str) or
+        len(etabs_identity)!=64 or len(opensees_identity)!=64 or
+        etabs_identity.lower()!=opensees_identity.lower()):
+        blockers.append("ORIGINAL_ETABS_EDB_PROVENANCE_MISMATCH")
+    if details.get("etabs_mass_source") != details.get("opensees_mass_source_reference"):
+        blockers.append("SEISMIC_MASS_SOURCE_NOT_CROSSWALKED")
     if details.get("force_case_equivalence_verified") is not True:
         blockers.append("LATERAL_FORCE_CASE_EQUIVALENCE_NOT_VERIFIED")
     if details.get("preload_equivalence_verified") is not True:
