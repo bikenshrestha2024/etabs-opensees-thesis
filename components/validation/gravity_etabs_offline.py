@@ -93,7 +93,8 @@ def read_etabs_joint_reactions(export,case=CASE):
     return seen
 
 def compare_etabs_export(etabs_export,topology_json,source_gravity_json,
-                         continuous_gravity_json=None,case=CASE):
+                         continuous_gravity_json=None,case=CASE,
+                         source_strategy="ETABS_SOURCE_SUPPORTS"):
     """Match by *verified source mapping*, not identical solver node numbers.
 
     [REF components/validation/gravity_node_comparison.py] Source ID provenance.
@@ -103,8 +104,10 @@ def compare_etabs_export(etabs_export,topology_json,source_gravity_json,
     source=json.loads(Path(source_gravity_json).read_text(encoding="utf-8-sig"))
     continuous=(json.loads(Path(continuous_gravity_json).read_text(encoding="utf-8-sig"))
                 if continuous_gravity_json is not None else None)
-    if not source.get("ok") or source.get("wall_support_strategy")!="ETABS_SOURCE_SUPPORTS":
-        raise ValueError("OpenSees source-support run is not a verified completed ETABS_SOURCE_SUPPORTS case")
+    if source_strategy not in ("ETABS_SOURCE_SUPPORTS","ETABS_NONZERO_REACTION_DIAGNOSTIC"):
+        raise ValueError("Unsupported source support strategy "+str(source_strategy))
+    if not source.get("ok") or source.get("wall_support_strategy")!=source_strategy:
+        raise ValueError("OpenSees source-support run is not a completed "+source_strategy+" case")
     if source.get("gravity_profile")!="GRAVITY_1.0D_1.0L":
         raise ValueError("Source-support OpenSees gravity profile is not full 1D+1L")
     if continuous is not None:
@@ -156,6 +159,7 @@ def compare_etabs_export(etabs_export,topology_json,source_gravity_json,
                 continuous_Rz_kN=ctr[tag],status="CONTINUOUS_ONLY_NOT_ETABS_POINT"))
     return dict(schema="etabs-export-offline-gravity-v1",
         interpretation="Exact ETABS Base Joint Reactions versus OpenSees, matched by source ETABS unique point name",
+        source_strategy=source_strategy,
         case=case,continuous_only_nodes=extra,etabs_export=str(etabs_export),source_gravity_json=str(source_gravity_json),
         continuous_gravity_json=str(continuous_gravity_json) if continuous else None,
         reference_source="ETABS_FINISHED_FULL_TABLE_EXPORT_NOT_LIVE_COM",
