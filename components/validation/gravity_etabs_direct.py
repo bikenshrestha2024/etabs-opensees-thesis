@@ -659,6 +659,25 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             report("ETABS_NATIVE_QUANTITY_BLOCKED",
                    "Native quantity extraction failed; gravity reaction comparison continues",
                    error_type=type(quantity_exc).__name__,error=str(quantity_exc))
+        # Opt-in: native solved EQX/EQY PDelta verification evidence on the
+        # exact same ETABS model. Never auto-run seismic cases: the gravity
+        # direct workflow otherwise enables/runs only Dead and Live.
+        if os.environ.get("ETABS_EQ_PDELTA_EXPORT", "").strip() == "1":
+            try:
+                from components.validation.etabs_eq_pdelta_native_extract import (
+                    export_eq_pdelta_native_evidence)
+                eq_native=export_eq_pdelta_native_evidence(
+                    app.SapModel,out/"ETABS_EQ_PDelta_Native",
+                    log=report)
+                report("ETABS_EQ_PDELTA_NATIVE",
+                       "Collected available saved ETABS EQX/EQY PDelta cases",
+                       case_names=eq_native["selected_eq_case_names"],
+                       cases=len(eq_native["selected_eq_case_names"]),
+                       note="Does not run missing earthquake cases or modify EDB")
+            except Exception as eq_error:
+                report("ETABS_EQ_PDELTA_NATIVE_BLOCKED",
+                       "Earthquake native audit failed, gravity comparison unaffected",
+                       error=type(eq_error).__name__+": "+str(eq_error))
         # Capture the separate OpenSees converted APPLIED nodal force ledger.
         # These values must NOT be equated with support reactions.
         try:
