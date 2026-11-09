@@ -68,6 +68,16 @@ def compare_saved_case(*,etabs_csv,opensees_csv,output_dir,axis,
         blockers.append("PRELOAD_AND_STIFFNESS_EQUIVALENCE_NOT_VERIFIED")
     if details.get("coordinate_system")!="GLOBAL_XY":
         blockers.append("COORDINATE_AXES_NOT_CONFIRMED")
+    if details.get("etabs_eccentricity_branch") != details.get("opensees_eccentricity_branch"):
+        blockers.append("ECCENTRICITY_BRANCH_MISMATCH")
+    if details.get("opensees_story_shear_basis") != "RECOVERED_SECTION_CUT":
+        blockers.append("OPENSEES_STORY_SHEAR_MUST_BE_RECOVERED_SECTION_CUT")
+    if details.get("etabs_drift_basis") != details.get("opensees_drift_basis"):
+        blockers.append("DRIFT_REFERENCE_POINT_OR_DEFINITION_MISMATCH")
+    if details.get("etabs_response_step") != details.get("opensees_response_step"):
+        blockers.append("RESULT_STEP_MISMATCH")
+    if not details.get("etabs_case_definition_verified") or not details.get("opensees_case_definition_verified"):
+        blockers.append("CASE_DEFINITIONS_NOT_VERIFIED")
     a=_read_rows(etabs_csv)
     b=_read_rows(opensees_csv)
     if set(a)!=set(b):
@@ -93,6 +103,30 @@ def compare_saved_case(*,etabs_csv,opensees_csv,output_dir,axis,
                 signed_percent_difference=diff_pct,
                 screen_within_5_percent=screened,
                 screening_not_code_acceptance=True))
+    # Base shear must use independent signed support-reaction results (not
+    # the sum of assigned floor forces if testing actual solver equivalence).
+    if ("etabs_base_shear_kN" not in details or
+            "opensees_base_shear_kN" not in details):
+        blockers.append("INDEPENDENT_BASE_REACTION_PAIR_MISSING")
+    else:
+        try:
+            ref=float(details["etabs_base_shear_kN"])
+            calc=float(details["opensees_base_shear_kN"])
+            if not math.isfinite(ref) or not math.isfinite(calc):
+                raise ValueError()
+            delta=calc-ref
+            diff_pct=None if abs(ref)<1.0 else 100*delta/abs(ref)
+            results.append(dict(axis=axis,etabs_case=etabs_case,
+                opensees_case=opensees_case,story_name="BASE",
+                elevation_m=0.,metric="base_shear_kN",
+                etabs_value=ref,opensees_value=calc,
+                signed_difference=delta,absolute_difference=abs(delta),
+                signed_percent_difference=diff_pct,
+                screen_within_5_percent=abs(delta)<=1.0 or
+                      (diff_pct is not None and abs(diff_pct)<=REL_SCREEN_PERCENT),
+                screening_not_code_acceptance=True))
+        except (TypeError,ValueError):
+            blockers.append("NONFINITE_BASE_REACTION_PAIR")
     if not common:blockers.append("NO_COMMON_STORIES")
     out=Path(output_dir);out.mkdir(parents=True,exist_ok=True)
     csv_path=out/("EQ_Comparison_"+axis+".csv")
