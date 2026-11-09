@@ -57,10 +57,11 @@ class SourceLoadAuditTests(unittest.TestCase):
         def apply(data,cfg,profile,types):
             self.assertEqual(profile,"GRAVITY_1.0D_1.0L")
             factors={"Self Weight":1.,"Live":1.}
-            ledger={"Self Weight":sum(float(x["downward_kN"])
-                       for x in data["load_provenance"] if x["pattern"]=="Self Weight"),
-                    "Live":sum(float(x["downward_kN"])
-                       for x in data["load_provenance"] if x["pattern"]=="Live")}
+            # Independent assembled un-factored force vectors are the
+            # expected ledger; never derive both sides of a test from
+            # the same load_provenance records.
+            ledger={pat:-sum(float(vec[2]) for vec in nodes.values())
+                    for pat,nodes in data["unfactored_patterns"].items()}
             data["gravity_by_pattern_kN"]=ledger
             data["total_downward_load_kN"]=sum(ledger.values())
             return {"profile":profile,"factors":factors}
@@ -92,6 +93,9 @@ class SourceLoadAuditTests(unittest.TestCase):
 
     def test_legacy_export_does_not_claim_single_count_validation(self):
         (self.root/"Gravity_Single_Count_Self_Weight_Audit.json").unlink()
+        # Legacy runs cannot have a new independent physical slab audit
+        # without the self-weight pattern source evidence.
+        (self.root/"Gravity_Slab_Self_Weight_Audit.json").unlink()
         info=self.run_audit()
         self.assertEqual(info["status"],"LEGACY_EXPORT_SINGLE_COUNT_NOT_VERIFIED")
 
@@ -99,6 +103,7 @@ class SourceLoadAuditTests(unittest.TestCase):
         self.data["load_provenance"].append(
             dict(pattern="Self Weight",component="self_weight_floor",
                  source="AREA:57",node=4,downward_kN=15.))
+        self.data["unfactored_patterns"]["Self Weight"]["4"]=[0,0,-15]
         (self.root/"OpenSees_Complete_Model_Data_V118.json").write_text(
             json.dumps(self.data),encoding="utf8")
         (self.root/"Gravity_Slab_Self_Weight_Audit.json").write_text(
