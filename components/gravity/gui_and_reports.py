@@ -963,6 +963,46 @@ class GravityAnalysisGUI:
             messagebox.showerror("Report generation failed", str(exc), parent=self.win)
             self.nb.select(self.log_tab)
             return
+        # Independently reconcile ALL exported gravity source components.
+        # A matching reaction sum is not proof that ETABS source loads match.
+        source_audit_ok=False
+        try:
+            from components.gravity.source_load_reconciliation import source_load_audit
+            native_total=None
+            etabs_support_audit=out/"ETABS_Nonzero_Reaction_Support_Audit.json"
+            if etabs_support_audit.is_file():
+                native_total=float(json.loads(
+                    etabs_support_audit.read_text(encoding="utf-8-sig"))[
+                    "etabs_total_FZ_kN"])
+            detailed=source_load_audit(Path(payload["model_script"]).parent,
+                payload["gravity_profile"],out,etabs_total_kN=native_total)
+            independent=float(detailed["applied_total_kN"])
+            applied=float(payload["report"]["applied_vertical_load_kN"])
+            if abs(independent-applied)>max(.01,abs(applied)*1e-8):
+                raise ValueError(
+                    f"Source applied load {independent:.6f} kN disagrees with solver "
+                    f"input {applied:.6f} kN. Gravity source validation is BLOCKED.")
+            source_audit_ok=True
+            self._gravity_action_log("GRAVITY_SOURCE_COMPONENTS",
+                f"source total={independent:.6f} kN | "
+                f"beam policy={detailed['beam_weight_policy']} | "
+                f"potential beam end-offset weight={detailed['potential_beam_offset_reduction_kN']:.6f} kN")
+            if native_total is not None:
+                self._gravity_action_log("ETABS_GLOBAL_GRAVITY_GAP",
+                    f"ETABS={native_total:.6f} kN | OpenSees={independent:.6f} kN | "
+                    f"difference={independent-native_total:.6f} kN | "
+                    f"hypothetical after verified beam offset={detailed['post_offset_total_hypothesis_kN']:.6f} kN "
+                    "(hypothesis only; source ETABS beam-weight proof required)")
+            for suffix in ("json","xlsx"):
+                self._gravity_action_log("GRAVITY_SOURCE_AUDIT_FILE",
+                    str(out/("Gravity_Source_Components_Audit."+suffix)))
+            for name in ("Gravity_Source_Components_Detail.csv",
+                         "Gravity_Source_Components_Totals.csv"):
+                self._gravity_action_log("GRAVITY_SOURCE_AUDIT_FILE",str(out/name))
+        except Exception as source_exc:
+            self._gravity_action_log("GRAVITY_SOURCE_AUDIT_BLOCKED",
+                str(source_exc)+" | model reaction equilibrium is NOT source load validation")
+            self.status_var.set("Gravity solved but complete source load audit is BLOCKED")
         # Save only a solved, internally consistent set of support reactions.
         try:
             from components.gravity.reaction_case_registry import register_case
@@ -1023,9 +1063,15 @@ class GravityAnalysisGUI:
         except Exception as pack_exc:
             self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
                 "Gravity solver passed; upload ZIP failed: "+str(pack_exc))
-        self.status_var.set(f"Gravity PASS | equilibrium error {rep['equilibrium_error_percent']:.4g}% | {rep['elapsed_seconds']:.2f} s | outputs saved in {out}")
+        status_name="Gravity PASS (source ledger reconciled)" if source_audit_ok else "Gravity solver PASS; SOURCE AUDIT BLOCKED"
+        self.status_var.set(f"{status_name} | equilibrium error {rep['equilibrium_error_percent']:.4g}% | {rep['elapsed_seconds']:.2f} s | outputs saved in {out}")
         self.nb.select(self.plot_tab)
-        messagebox.showinfo("Gravity analysis complete", "Gravity converged; reaction check passed; gravity frozen at time zero.\n\nExcel workbook, separate 300 dpi PNG/PDF figures and critical-action PDF saved.\nUse the result tabs or Open output folder to inspect them.\n\n" + str(out), parent=self.win)
+        messagebox.showinfo("Gravity analysis complete",
+            "Gravity solver converged; equilibrium check passed; gravity frozen at time zero.\n\n"
+            +("Source gravity ledger reconciled to solver input. ETABS equivalence NOT VALIDATED."
+              if source_audit_ok else
+              "WARNING: full exported source load audit blocked. Review GRAVITY_SOURCE_AUDIT_BLOCKED log.")
+            +"\n\nWorkbooks, plots and source audit saved under:\n"+str(out),parent=self.win)
 
     @timed_outputs('Gravity figure and workbook export','out')
     def _make_outputs(self, payload, out):
