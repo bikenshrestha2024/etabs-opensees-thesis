@@ -92,6 +92,9 @@ def bundle_esm_validation(source_export,esm_output,save_under,progress=None,
                 include(file,label+"/"+file.name)
     announce("COLLECTING | saved ESM X/Y stories, plots, and diagnostics")
     for file in sorted(outputs.rglob("*")):
+        if root in file.parents or any(p.name.startswith("ESM_Validation_Evidence_")
+                                       for p in file.parents):
+            continue
         if not file.is_file() or file.suffix.lower() not in EXT:continue
         if any(term.lower() in file.name.lower() for term in ESM_TERMS):
             relative=file.relative_to(outputs).as_posix()
