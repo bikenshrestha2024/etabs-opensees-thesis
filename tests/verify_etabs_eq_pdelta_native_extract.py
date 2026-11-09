@@ -13,6 +13,12 @@ class ETABSEQNativeTests(unittest.TestCase):
         restore=[]
         with tempfile.TemporaryDirectory() as tmp, ExitStack() as stack:
             stack.enter_context(patch.object(module,"_snapshot",return_value={"units":6}))
+            stack.enter_context(patch.object(module,"_db_display_snapshot",
+                return_value={"cases":["Dead"],"combos":[],"combos_available":True}))
+            stack.enter_context(patch.object(module,"_db_select_case",
+                return_value=None))
+            stack.enter_context(patch.object(module,"_db_restore",
+                return_value=None))
             stack.enter_context(patch.object(module,"_names",return_value=[
                 "Dead","EQX","EQY","EQX+ P Delta Initial",
                 "EQX+ P-Delta","EQY+ P Delta Initial","EQY+ P-Delta"]))
