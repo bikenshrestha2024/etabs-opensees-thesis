@@ -843,11 +843,24 @@ class ESMGui:
                 datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
             report,paths=synchronize(self.export_dir,selected,
                 output_dir=audit_dir,etabs_fallback=etabs)
+            # A provisional reconstructed wall geometry must NEVER overwrite
+            # a model-matched native ETABS-linked ORIGINAL Excel calculation.
+            # Keep it as a separate diagnostic, even when a user clicks Sync.
+            preserved=getattr(self,'excel_direct_reference',None)
+            preserved_status=(preserved or {}).get('source_identity')
+            keep_original=bool(preserved and preserved_status in (
+                'SAME_EDB_PATH_REFERENCE','SAME_EDB_SHA256',
+                'SAME_EDB_SHA256_REFERENCE'))
             statuses=[]
             for axis,var in (('X',self.awx),('Y',self.awy)):
                 value=report['aw_candidate_m2'][axis]
                 evidence=report['aw_evidence'][axis]['status']
-                if value is not None and evidence in (
+                if keep_original:
+                    statuses.append(
+                        f"{axis}: OpenSees geometry candidate={value} m² "
+                        f"({evidence}); original Excel Aw={preserved['values']['aw'+axis.lower()]} m² "
+                        "PRESERVED (candidate NOT applied)")
+                elif value is not None and evidence in (
                     'OPEN_SEES_GEOMETRY_CANDIDATE_REVIEW_REQUIRED',
                     'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC'):
                     # Prefill the source-derived *diagnostic* to enable a
@@ -863,8 +876,10 @@ class ESMGui:
                 period=report['rayleigh_s'][axis]
                 if period is not None:
                     var.set(f'{period:.10g}')
-            self.excel_direct_reference=None
-            self._aw_sync_evidence=report['aw_evidence']
+            if not keep_original:
+                self.excel_direct_reference=None
+                self._aw_sync_evidence=report['aw_evidence']
+            # Preserve workbook adopted T and Excel SHA256 reference as well.
             self._aw_sync_model_hash=report['assembled_model_sha256']
             self._show_empirical()
             lines=['OpenSees-first audit complete. No ETABS EDB was modified.',
