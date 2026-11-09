@@ -1,0 +1,56 @@
+{
+  "schema": "eqx-eqy-pdelta-four-case-input-v1",
+  "notes": "SOURCE TEMPLATE ONLY: source records and OpenSees cases must be filled; missing files/metadata are deliberately blocked.",
+  "cases": [
+    {
+      "axis": "X",
+      "role": "plain",
+      "etabs_case": "EQX",
+      "opensees_case": "UNVERIFIED",
+      "native_case_definition": {},
+      "etabs_story_csv": "",
+      "opensees_story_csv": "",
+      "comparison_metadata": {}
+    },
+    {
+      "axis": "Y",
+      "role": "plain",
+      "etabs_case": "EQY",
+      "opensees_case": "UNVERIFIED",
+      "native_case_definition": {},
+      "etabs_story_csv": "",
+      "opensees_story_csv": "",
+      "comparison_metadata": {}
+    },
+    {
+      "axis": "X",
+      "role": "dependent_positive",
+      "etabs_case": "EQX+ P-Delta",
+      "opensees_case": "UNVERIFIED",
+      "initial_source_case": "EQX+ P Delta Initial",
+      "native_case_definition": {
+        "analysis_type": "Linear Static",
+        "use_nonlinear_case_stiffness": true,
+        "initial_case_loads_included": false,
+        "stiffness_source_case": "EQX+ P Delta Initial",
+        "load_pattern_factors": {
+          "EQX": 1
+        }
+      },
+      "etabs_story_csv": "",
+      "opensees_story_csv": "",
+      "comparison_metadata": {}
+    },
+    {
+      "axis": "Y",
+      "role": "dependent_positive",
+      "etabs_case": "EQY+ P-Delta (VERIFY EXACT NAME)",
+      "opensees_case": "UNVERIFIED",
+      "initial_source_case": "EQY+ P Delta Initial (VERIFY EXACT NAME)",
+      "native_case_definition": {},
+      "etabs_story_csv": "",
+      "opensees_story_csv": "",
+      "comparison_metadata": {}
+    }
+  ]
+}
