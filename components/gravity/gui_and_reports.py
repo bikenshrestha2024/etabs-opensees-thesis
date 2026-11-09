@@ -864,8 +864,26 @@ class GravityAnalysisGUI:
             first=records[scenarios[0]]["payload"]
             second=records[scenarios[1]]["payload"]
             comparison=compare_wall_support_gravity(first,second)
+            from components.gravity.source_load_reconciliation import source_load_audit
+            source_evidence_ok=True
             for mode in scenarios:
-                self._make_outputs(records[mode]["payload"],Path(records[mode]["out"]))
+                case_payload=records[mode]["payload"]
+                case_folder=Path(records[mode]["out"])
+                self._make_outputs(case_payload,case_folder)
+                try:
+                    check=source_load_audit(Path(case_payload["model_script"]).parent,
+                        case_payload["gravity_profile"],case_folder)
+                    applied=float(case_payload["report"]["applied_vertical_load_kN"])
+                    if abs(check["applied_total_kN"]-applied)>max(.01,abs(applied)*1e-8):
+                        raise ValueError("Source load total differs from actual gravity solver input")
+                    self._gravity_action_log("DUAL_GRAVITY_SOURCE_LEDGER",
+                        f"{mode} | {check['applied_total_kN']:.6f} kN | "
+                        f"beam offset candidate {check['potential_beam_offset_reduction_kN']:.6f} kN | "
+                        f"source audit={case_folder/'Gravity_Source_Components_Audit.xlsx'}")
+                except Exception as issue:
+                    source_evidence_ok=False
+                    self._gravity_action_log("DUAL_GRAVITY_SOURCE_AUDIT_BLOCKED",
+                        mode+" | "+str(issue))
             export_wall_support_comparison(comparison,root)
             from components.gravity.reaction_case_registry import register_case
             for mode in scenarios:
@@ -904,7 +922,9 @@ class GravityAnalysisGUI:
                     "Both gravity results saved; ZIP packaging failed: "+str(pack_exc))
             self._gravity_action_log("DUAL_GRAVITY_DONE",
                 "Both gravity workbooks and comparison saved: "+str(root))
-            self.status_var.set("Two gravity wall-base cases PASS; comparison: "+str(root))
+            self.status_var.set(("Two solvers PASS; source ledgers reconciled" if source_evidence_ok
+                else "Two solvers PASS; at least one source ledger BLOCKED")
+                +"; comparison: "+str(root))
             messagebox.showinfo("Two gravity conditions completed",
                 "Same full gravity loads; separate support conditions.\\n\\n"
                 "ETABS-source supports: "+
