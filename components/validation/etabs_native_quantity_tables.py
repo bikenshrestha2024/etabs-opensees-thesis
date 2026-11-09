@@ -12,7 +12,13 @@ from pathlib import Path
 
 KEYWORDS=("material list","material quantities","material quantity",
           "concrete quantities","weight and mass","section properties",
-          "area object","frame object","load pattern","load assignments")
+          "area object","frame object","load pattern","load assignments",
+          "end length offset","end len offset","insertion point",
+          "section property assignment","frame assignment","area assignment",
+          "shell uniform load set","uniform load set","floor object",
+          "wall object","beam object","column object","brace object",
+          "self weight option","self weight multiplier","slab property",
+          "wall property","section property definitions")
 
 
 def _tuple_success(raw, minimum, label):
@@ -102,6 +108,8 @@ def export_native_quantity_tables(sap,output_dir,*,log=None):
         "selected_table_count":len(status),
         "table_exports":status,
         "limitations":[
+            "Verify the exact native End Length Offsets Self Weight Option field per object; Auto is not a proven clear-span or gross weight policy.",
+            "Top-center frame and Top slab insertion locations change physical solid intersections; the current centered-box overlap calculation is not validated for them.",
             "Material List table existence and columns vary by ETABS version.",
             "Frame, shell and slab model-object quantities need per-source ID alignment.",
             "No load was modified, and no ETABS Self Weight Option inferred.",
