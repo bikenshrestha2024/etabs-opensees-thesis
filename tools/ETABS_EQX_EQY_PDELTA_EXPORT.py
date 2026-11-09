@@ -1,0 +1,80 @@
+# -*- coding: utf-8 -*-
+"""ETABS EQX/EQY P-Delta native evidence, Spyder Python 3.12.
+
+ATTACHES to already-open ETABS, never runs analysis, never saves EDB,
+never closes the attached application. Runs separately from gravity.
+Output contains all table selections/headers, source hash, optional
+native raw story response data and exact load-case names.
+"""
+from __future__ import annotations
+import hashlib
+import json
+import sys
+import traceback
+from datetime import datetime
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
+
+def _sha(path):
+    digest=hashlib.sha256()
+    with Path(path).open("rb") as f:
+        for block in iter(lambda:f.read(1024*1024),b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+def main(output_dir=None):
+    from OpenSees_Project_Inputs_V123 import connect_etabs
+    from components.validation.etabs_eq_pdelta_native_extract import (
+        export_eq_pdelta_native_evidence)
+    if output_dir is None:
+        import tkinter as tk
+        from tkinter import filedialog
+        win=tk.Tk();win.withdraw()
+        try:
+            selected=filedialog.askdirectory(
+                title="Choose folder for read-only ETABS EQX/EQY PDelta evidence")
+        finally:
+            win.destroy()
+        if not selected:
+            print("No folder selected. Nothing was changed.")
+            return None
+        output_dir=selected
+    out=Path(output_dir).expanduser().resolve()/(
+        "ETABS_EQ_PDelta_Evidence_"+datetime.now().strftime("%Y%m%d_%H%M%S"))
+    out.mkdir(parents=True,exist_ok=False)
+    events=out/"ETABS_EQ_Extraction.log"
+    def log(kind,*args,**kw):
+        line=kind+" | "+" ".join(map(str,args))
+        if kw:line+=" | "+json.dumps(kw,default=str)
+        with events.open("a",encoding="utf-8") as f:f.write(line+"\n")
+        print(line)
+    try:
+        app=connect_etabs()
+        sap=app.SapModel
+        filename=Path(str(sap.GetModelFilename())).resolve()
+        if not filename.is_file():
+            raise FileNotFoundError("ETABS active EDB does not exist: "+str(filename))
+        identity=dict(active_edb=str(filename),edb_sha256=_sha(filename),
+                      no_analysis_run=True,no_edb_save=True,
+                      no_etabs_process_closed=True,
+                      units_before=sap.GetPresentUnits())
+        (out/"ETABS_Active_Source_Identity.json").write_text(
+            json.dumps(identity,indent=2),encoding="utf-8")
+        log("START","Attached to existing ETABS; read-only",
+            edb_sha256=identity["edb_sha256"])
+        report=export_eq_pdelta_native_evidence(
+            sap,out,log=log)
+        log("FINISHED","Native EQ evidence indexed",
+            selected=report["selected_eq_case_names"],
+            failed_queries=report["failed_case_or_table_queries"])
+        print("UPLOAD THIS FOLDER (or ZIP it):",out)
+        return out
+    except Exception:
+        with (out/"ETABS_EQ_Extraction_Error.log").open("w",encoding="utf-8") as f:
+            f.write(traceback.format_exc())
+        raise
+
+if __name__=="__main__":
+    main()
