@@ -43,7 +43,8 @@ def sha(path):
     return h.hexdigest()
 
 def bundle_esm_validation(source_export,esm_output,save_under,progress=None,
-                          max_file_bytes=150*1024*1024):
+                          max_file_bytes=150*1024*1024,
+                          native_etabs_evidence=None):
     src=Path(source_export).resolve()
     outputs=Path(esm_output).resolve()
     if not src.is_dir():raise FileNotFoundError("Model source export: "+str(src))
@@ -105,6 +106,63 @@ def bundle_esm_validation(source_export,esm_output,save_under,progress=None,
     for file in sorted(src.glob("*ETABS_LINKED_ESM*")):
         if file.is_file() and file.suffix.lower() in EXT:
             include(file,"etabs_linked_excel/"+file.name)
+    # User-selected saved native ETABS case data. No COM query or analysis
+    # is triggered by bundling; keep source files and exact hashes unchanged.
+    if native_etabs_evidence:
+        extra=Path(native_etabs_evidence).resolve()
+        if extra.is_file():
+            include(extra,"native_etabs/"+extra.name)
+        elif extra.is_dir():
+            for file in sorted(extra.rglob("*")):
+                if not file.is_file():continue
+                if len(file.relative_to(extra).parts)>8:continue
+                if file.suffix.lower() not in EXT|{".zip"}:continue
+                include(file,"native_etabs/"+file.relative_to(extra).as_posix())
+        else:
+            manifest["missing_required"].append(
+                "Native ETABS earthquake evidence path unavailable: "+str(extra))
+    else:
+        manifest["missing_optional"].append(
+            "Native ETABS saved EQX/EQY/P-Delta evidence not supplied")
+    # Native ETABS-linked reference: keep the original workbook method
+    # distinct from provisional OpenSees continuous-pier geometry.
+    linked=[]
+    for file in sorted(src.glob("*ETABS_LINKED_ESM.provenance.json")):
+        try:
+            obj=json.loads(file.read_text(encoding="utf-8-sig"))
+            linked.append({
+                "filename":file.name,"sha256":sha(file),
+                "original_source_excel":obj.get("source_excel"),
+                "original_source_excel_sha256":obj.get("source_excel_sha256"),
+                "original_source_edb":obj.get("source_edb"),
+                "original_source_edb_sha256":obj.get("source_edb_sha256"),
+                "reference_status":obj.get("status"),
+                "coefficient_provenance":obj.get("coefficients")})
+        except Exception as exc:
+            manifest["missing_optional"].append(
+                "Cannot read ETABS linked provenance "+file.name+": "+str(exc))
+    sources={str(x.get("original_source_excel_sha256")) for x in linked}
+    coefficient_disagreement=False
+    if len(linked)>1:
+        ref=linked[0].get("coefficient_provenance")
+        coefficient_disagreement=any(
+            x.get("coefficient_provenance")!=ref for x in linked[1:])
+    audit={
+        "status":"ORIGINAL_EXCEL_LINKED_RESEARCH_REFERENCE_ONLY",
+        "linked_source_count":len(linked),
+        "distinct_original_workbook_hashes":sorted(sources),
+        "coefficient_disagreement":coefficient_disagreement,
+        "linked_sources":linked,
+        "accepted_Aw_T1_source":"Native original Excel method ONLY when same EDB verified; no OpenSees geometry replacement",
+        "opensess_continuous_pier_status":"GEOMETRY_DIAGNOSTIC_NOT_CODE_ACCEPTED",
+        "calculation_reference_is_not_measured_etabs_response":True}
+    audit_path=root/"ETABS_Linked_Original_Excel_Aw_T1_Audit.json"
+    audit_path.write_text(json.dumps(audit,indent=2,ensure_ascii=False),
+                          encoding="utf-8")
+    if coefficient_disagreement:
+        manifest["missing_required"].append(
+            "Two ETABS-linked workbook calculation sources disagree in Aw/T1/C/k")
+    manifest["original_excel_source_audit"]=audit_path.name
     config=src/"OpenSees_Complete_Model_Config_V118.json"
     if config.is_file():
         cfg=json.loads(config.read_text(encoding="utf-8-sig"))
@@ -157,6 +215,8 @@ if __name__=="__main__":
     parser.add_argument("--source",required=True)
     parser.add_argument("--esm",required=True)
     parser.add_argument("--out",required=True)
+    parser.add_argument("--native-etabs-evidence",default=None)
     args=parser.parse_args()
     print(json.dumps(bundle_esm_validation(args.source,args.esm,args.out,
-                 progress=lambda x:print(x,flush=True)),indent=2))
+                 progress=lambda x:print(x,flush=True),
+                 native_etabs_evidence=args.native_etabs_evidence),indent=2))
