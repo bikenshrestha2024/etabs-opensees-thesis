@@ -103,6 +103,8 @@ class GravityAnalysisGUI:
         self.reaction_support_verification_var = tk.StringVar(
             value="32 project nodes predefined; original ETABS table not yet verified")
         self.load_var = tk.StringVar()
+        self.solved_reaction_var = tk.StringVar(value="Not analyzed for this case")
+        self.solved_reaction_status_var = tk.StringVar(value="No matching completed 32/76/97-node run")
         self.steps_var = tk.StringVar(value="10")
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
@@ -113,7 +115,9 @@ class GravityAnalysisGUI:
         self._build()
         self.wall_support_strategy_var.trace_add(
             "write", lambda *_: self._read_code_inputs(show_error=False)
-            if self.model_var.get() else None)
+            if self.model_var.get() else self._refresh_case_reaction())
+        self.output_var.trace_add("write", lambda *_: self._refresh_case_reaction())
+        self.model_var.trace_add("write", lambda *_: self._refresh_case_reaction())
         def populate_saved():
             from OpenSees_Complete_Export_V118 import autoselect_inputs
             folder=Path(self.model_var.get()).parent if self.model_var.get() else Path(r'D:/Thesis Opensees/Etabs Nodes Export')
@@ -465,7 +469,8 @@ class GravityAnalysisGUI:
                     self.status_var.set("Main 32 nodes displayed; select completed ETABS 1. DL + LL table before running")
             else:
                 self.support_var.set(", ".join(map(str,supports)))
-            if total is not None: self.load_var.set(f"{float(total):.8g}")
+            if total is not None: self.load_var.set(f"{float(total):.8f}")
+            self._refresh_case_reaction()
             if data.get("load_steps"): self.steps_var.set(str(int(data["load_steps"])))
             note = data.get("load_total_units_note", "")
             coverage = data.get("coverage_note", "")
@@ -481,6 +486,8 @@ class GravityAnalysisGUI:
             self.reaction_support_verification_var.set("NOT VERIFIED: "+str(exc))
             self.position_support_var.set("")
             self.load_var.set('')
+            self.solved_reaction_var.set("Not analyzed for this case")
+            self.solved_reaction_status_var.set("Model input error — no verified reaction")
             if show_error: messagebox.showerror("Could not read gravity inputs", str(exc), parent=self.win)
             else: self.status_var.set(str(exc))
             return None
@@ -551,19 +558,23 @@ class GravityAnalysisGUI:
         inputs = ttk.Frame(form); inputs.pack(fill="x", pady=(5, 2))
         ttk.Label(inputs, text="ACTIVE run support nodes (auto-selected)").grid(row=0, column=0, sticky="w", padx=4)
         ttk.Entry(inputs, textvariable=self.support_var, width=36).grid(row=0, column=1, sticky="ew", padx=4)
-        ttk.Label(inputs, text="Total downward gravity load (kN; verify)").grid(row=0, column=2, sticky="w", padx=4)
+        ttk.Label(inputs, text="Applied downward gravity load (kN)").grid(row=0, column=2, sticky="w", padx=4)
         ttk.Entry(inputs, textvariable=self.load_var, width=16, state="readonly").grid(row=0, column=3, sticky="w", padx=4)
-        ttk.Label(inputs, text="Support case for this gravity load").grid(row=1, column=0, sticky="w", padx=4, pady=(5,0))
+        ttk.Label(inputs, text="Support case (solved reaction)").grid(row=1, column=0, sticky="w", padx=4, pady=(5,0))
         ttk.Combobox(inputs, textvariable=self.wall_support_strategy_var, state="readonly", width=39,
             values=("ETABS Reaction Validation (32 nodes)",
                     "ETABS Node Position (76 nodes)",
                     "Continuous Wall Base (97 nodes)")).grid(row=1, column=1, sticky="w", padx=4, pady=(5,0))
-        ttk.Label(inputs, text="Load is based on DL/LL profile; support choice redistributes reactions, not applied weight.").grid(
-            row=1,column=2,columnspan=4,sticky="w",padx=4,pady=(5,0))
+        ttk.Label(inputs, text="Solved vertical support reaction (kN)").grid(
+            row=1,column=2,sticky="w",padx=4,pady=(5,0))
+        ttk.Entry(inputs,textvariable=self.solved_reaction_var,state="readonly",width=22).grid(
+            row=1,column=3,sticky="w",padx=4,pady=(5,0))
+        ttk.Label(inputs,textvariable=self.solved_reaction_status_var,wraplength=390).grid(
+            row=2,column=1,columnspan=5,sticky="w",padx=4,pady=(4,0))
         ttk.Label(inputs, text="Load steps").grid(row=0, column=4, sticky="w", padx=4)
         ttk.Entry(inputs, textvariable=self.steps_var, width=6).grid(row=0, column=5, sticky="w", padx=4)
         inputs.columnconfigure(1, weight=1)
-        tk.Label(form, text="Enter the total downward gravity load actually applied in the selected model. Use the reviewed gravity preload (dead + sustained live); count self-weight once. Include every support contributing to the vertical reaction sum.", wraplength=1080, anchor="w", justify="left").pack(anchor="w", pady=(4, 2))
+        tk.Label(form, text="Applied gravity is derived from the 1.0D+1.0L or configured load ledger; changing support restraints does NOT change applied gravity. The selected case reaction field shows only the sum of solved OpenSees nodeReaction(n,3) for that exact 32-, 76- or 97-node result. Check equilibrium after convergence; do not use reactions to overwrite applied loads.", wraplength=1080, anchor="w", justify="left").pack(anchor="w", pady=(4, 2))
         tk.Label(root, text="V118 integrates source frame/area loads and geometric self-weight with the source load-pattern multipliers. Equilibrium checks the assembled sources; compare total reactions, self-weight overlap conventions and story masses with ETABS. Review unsupported actions and material assumptions in the export report.", foreground="#9a3412", wraplength=1120, anchor="w", justify="left").pack(anchor="w", pady=4)
         tk.Checkbutton(root, text="I reviewed the model and confirmed the total downward load includes each gravity source once (self-weight, slabs/walls, frame loads and device weights as applicable).", variable=self.coverage_confirmed, wraplength=1080, anchor="w", justify="left").pack(anchor="w", pady=(0, 7))
         bar = ttk.Frame(root); bar.pack(fill="x", pady=(0, 7))
@@ -618,6 +629,44 @@ class GravityAnalysisGUI:
         ttk.Label(row, text=label, width=34).pack(side="left")
         ttk.Entry(row, textvariable=variable).pack(side="left", fill="x", expand=True, padx=5)
         ttk.Button(row, text="Browse…", command=command).pack(side="left")
+
+    def _refresh_case_reaction(self):
+        """Only display a valid, previously solved case-specific support reaction.
+
+        [REF docs/source/components/gravity/reaction_case_registry.py.md]
+        """
+        self.solved_reaction_var.set("Not analyzed for this case")
+        self.solved_reaction_status_var.set("No matching completed run; run the selected case")
+        try:
+            from components.gravity.reaction_case_registry import current_case
+            model=Path(self.model_var.get()).expanduser().resolve()
+            root=Path(self.output_var.get()).expanduser().resolve()
+            if not model.is_file():
+                return
+            scenario=self._selected_wall_support_strategy()
+            profile=self.gravity_profile_var.get()
+            expected=None
+            if scenario=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
+                from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
+                expected=PROJECT_PRIMARY_32
+            elif scenario=="ETABS_SOURCE_SUPPORTS":
+                tags=self.position_support_var.get().strip()
+                if tags:
+                    expected=[int(x.strip()) for x in tags.split(",") if x.strip()]
+            record=current_case(root,model,scenario=scenario,profile=profile,
+                                expected_support_tags=expected)
+            if record is None:
+                self.solved_reaction_status_var.set(
+                    "Not analyzed / model or load profile changed / output unavailable")
+                return
+            self.solved_reaction_var.set(f"{record['summed_reaction_kN']:.6f}")
+            self.solved_reaction_status_var.set(
+                f"{record['support_count']} solved supports | "
+                f"equilibrium difference {record['equilibrium_error_percent']:.6g}% | "
+                f"{'CHECK EQUILIBRIUM' if not record['balance_pass'] else 'numerical equilibrium OK'} | "
+                f"NOT ETABS VALIDATED")
+        except (OSError,KeyError,ValueError,TypeError) as error:
+            self.solved_reaction_status_var.set("Reaction unavailable: "+str(error))
 
     def _inputs(self):
         model = Path(self.model_var.get()).expanduser().resolve()
