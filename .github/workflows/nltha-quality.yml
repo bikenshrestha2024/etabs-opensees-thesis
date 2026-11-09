@@ -91,6 +91,9 @@ on:
       - 'tools/verify_eq_pdelta_4case_matrix.py'
       - 'tests/verify_eq_pdelta_case_comparison.py'
       - 'tests/verify_etabs_eq_pdelta_native_extract.py'
+      - 'components/model/eq_pdelta_initial_tangent.py'
+      - 'tools/OPENSEES_EQ_PDELTA_TANGENT_DIAGNOSTIC.py'
+      - 'tests/verify_eq_pdelta_tangent_preflight.py'
       - 'tests/verify_etabs_native_quantity_tables.py'
       - 'tests/verify_gravity_joint_weight_reconciliation.py'
       - 'tests/verify_gravity_joint_overlap_integration.py'
@@ -316,6 +319,7 @@ jobs:
           python tests/verify_eq_pdelta_evidence.py
           python tests/verify_eq_pdelta_case_comparison.py
           python tests/verify_etabs_eq_pdelta_native_extract.py
+          python tests/verify_eq_pdelta_tangent_preflight.py
           python tests/verify_etabs_native_quantity_tables.py
           python tests/verify_gravity_joint_weight_reconciliation.py
           python tests/verify_gravity_joint_overlap_integration.py
