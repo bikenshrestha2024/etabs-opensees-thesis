@@ -78,6 +78,13 @@ def compare_saved_case(*,etabs_csv,opensees_csv,output_dir,axis,
         blockers.append("RESULT_STEP_MISMATCH")
     if not details.get("etabs_case_definition_verified") or not details.get("opensees_case_definition_verified"):
         blockers.append("CASE_DEFINITIONS_NOT_VERIFIED")
+    if (details.get("pdelta_stiffness_source") not in ("",None,"NONE") and
+            details.get("opensees_tangent_from_matching_initial_state_verified") is not True):
+        blockers.append("OPENSEES_PDELTA_TANGENT_STATE_NOT_VERIFIED")
+    if details.get("response_scope")=="RAW_SIGNED_ANALYSIS" and (
+            details.get("etabs_drift_basis") in ("DESIGN_AMPLIFIED","ENVELOPE")
+            or details.get("opensees_drift_basis") in ("DESIGN_AMPLIFIED","ENVELOPE")):
+        blockers.append("DRIFT_ENVELOPE_OR_AMPLIFICATION_NOT_A_RAW_COMPARISON")
     a=_read_rows(etabs_csv)
     b=_read_rows(opensees_csv)
     if set(a)!=set(b):
