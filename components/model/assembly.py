@@ -589,6 +589,20 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                 raise
             report['warnings'].append('Joint volume AUDIT_ONLY unavailable: '+str(exc))
             report['joint_volume_weight_audit']={'status':'BLOCKED', 'error':str(exc)}
+        # [REF docs/source/components/gravity/slab_self_weight_audit.py.md]
+        # Reconcile every original floor polygon with its meshed ShellMITC4
+        # children, BEFORE applying any load pattern factor. Full physical
+        # slab thickness is independent of elastic bending modification.
+        from components.gravity.slab_self_weight_audit import audit_slab_self_weight
+        slab_weight_audit=audit_slab_self_weight(
+            shells,topology['elements'],source_nodes,
+            joint_volume_ledger=volume_ledger,output_dir=folder)
+        report['slab_weight_audit']={
+            k:v for k,v in slab_weight_audit.items() if k!='records'}
+        report['warnings'].append(
+            'Slab self weight equals original floor area times physical thickness '
+            'times material weight density; beam 800-150 net depth is a '
+            'CONDITIONAL physical overlap, never an automatic correction.')
         # Nodal vectors remain separate per unfactored source pattern.
         patterns={}; load_provenance=[]; source_context={}
         def add(pattern,node,values):
@@ -742,6 +756,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         payload=dict(config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest(),nodes=nodes,frames=frame_elements,shells=shells,gravity=gravity,unfactored_patterns=patterns,nodal_mass=nodal_mass,supports=supports,
                      diaphragms=groups,total_downward_load_kN=total,gravity_by_pattern_kN=ledger,base_z_m=base_z)
         payload['load_provenance']=load_provenance
+        payload['slab_self_weight_audit']={
+            k:v for k,v in slab_weight_audit.items() if k!='records'}
         payload['single_count_self_weight_audit']=self_weight_policy_audit
         payload['joint_volume_weight_policy']=volume_policy
         payload['etabs_beam_weight_policy']=beam_weight_policy
