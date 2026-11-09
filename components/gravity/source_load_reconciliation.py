@@ -109,9 +109,21 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
         allocation=0.
         for entry in pattern_count["etabs_pattern_rows"]:
             pat=str(entry["pattern"])
+            multiplier=float(entry["etabs_self_weight_multiplier"])
+            if not math.isfinite(multiplier) or multiplier<0:
+                raise ValueError("Invalid slab self-weight pattern multiplier for "+pat)
+            # An ETABS pattern with ZERO self-weight adds ZERO slab gravity,
+            # even if the active gravity profile has no factor for it.
+            # EQX/EQY, Roof Live and derived cases must not be assigned
+            # invented factors merely to satisfy this audit.
+            if multiplier==0.0:
+                continue
             if pat not in factors:
-                raise ValueError("Slab self-weight pattern factor missing for "+pat)
-            allocation+=float(entry["etabs_self_weight_multiplier"])*float(factors[pat])
+                raise ValueError("Slab self-weight pattern factor missing for NONZERO "+pat)
+            factor=float(factors[pat])
+            if not math.isfinite(factor) or factor<0:
+                raise ValueError("Invalid slab self-weight gravity factor for "+pat)
+            allocation+=multiplier*factor
         expected_applied_slab_weight=physical_slab_weight*allocation
         if abs(floor_weight_from_assembled-expected_applied_slab_weight)>max(
                 .01,abs(expected_applied_slab_weight)*1e-8):
