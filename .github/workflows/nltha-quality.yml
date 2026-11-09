@@ -84,6 +84,13 @@ on:
       - 'tests/verify_etabs_assignment_gravity_audit.py'
       - 'components/validation/eq_pdelta_evidence.py'
       - 'tests/verify_eq_pdelta_evidence.py'
+      - 'components/validation/eq_pdelta_case_contract.py'
+      - 'components/validation/eq_pdelta_comparison.py'
+      - 'components/validation/etabs_eq_pdelta_native_extract.py'
+      - 'tools/ETABS_EQX_EQY_PDELTA_EXPORT.py'
+      - 'tools/verify_eq_pdelta_4case_matrix.py'
+      - 'tests/verify_eq_pdelta_case_comparison.py'
+      - 'tests/verify_etabs_eq_pdelta_native_extract.py'
       - 'tests/verify_etabs_native_quantity_tables.py'
       - 'tests/verify_gravity_joint_weight_reconciliation.py'
       - 'tests/verify_gravity_joint_overlap_integration.py'
@@ -307,6 +314,8 @@ jobs:
           python tests/verify_gravity_source_load_reconciliation.py
           python tests/verify_etabs_assignment_gravity_audit.py
           python tests/verify_eq_pdelta_evidence.py
+          python tests/verify_eq_pdelta_case_comparison.py
+          python tests/verify_etabs_eq_pdelta_native_extract.py
           python tests/verify_etabs_native_quantity_tables.py
           python tests/verify_gravity_joint_weight_reconciliation.py
           python tests/verify_gravity_joint_overlap_integration.py
