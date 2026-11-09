@@ -402,11 +402,27 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         except (FileNotFoundError,ValueError,KeyError,TypeError) as exc:
             missing.append({"file":"opensees/OpenSees_Applied_Nodal_Gravity_By_Pattern.csv",
                             "required":False,"reason":str(exc)})
+        offline_native_index=(dual_run_dir/"ETABS_Full_Table_Offline_Comparison"/
+                              "OFFLINE_GRAVITY_32_76_97_INDEX.json"
+                              if dual_run_dir is not None else None)
+        has_offline=(offline_native_index is not None and
+                     offline_native_index.is_file())
         if etabs_json:
             add(etabs_json,"etabs/etabs_gravity.json",required=True)
+        elif has_offline:
+            # Offline original full-table ETABS evidence is independent of
+            # COM extraction; no fictional ETABS gravity JSON is created.
+            # Still record the missing *format* as optional because the
+            # native offline workbook and source hashes are packaged.
+            missing.append({"file":"etabs/etabs_gravity.json","required":False,
+                            "reason":"ETABS COM JSON absent; completed original "
+                                     "ETABS full-table offline evidence supplied "
+                                     "under offline_etabs; point mapping and "
+                                     "engineering equivalence require review"})
         else:
             missing.append({"file":"etabs/etabs_gravity.json","required":True,
-                            "reason":"No ETABS gravity JSON selected"})
+                            "reason":"No ETABS gravity JSON or completed offline "
+                                     "full-table comparison selected"})
         # V161: always produce the original 76-support node inventory, even
         # when the native ETABS API cannot read old analysis results.
         # Unavailable ETABS reactions remain blank; no false validation PASS.
