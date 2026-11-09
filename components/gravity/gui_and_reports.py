@@ -243,14 +243,31 @@ class GravityAnalysisGUI:
             payload=json.loads(result.read_text(encoding='utf-8-sig'))
             if not payload.get('ok'):raise ValueError('A successful gravity result is required.')
             from OpenSees_Research_UI_V123 import gravity_figures
-            self.status_var.set('Exporting all action pages (24 members per page); this may take a few minutes…')
+            if self._gravity_busy:
+                messagebox.showwarning("Gravity busy",
+                    "Finish the running solver/exporter before exporting action pages.",
+                    parent=self.win)
+                return
+            self._gravity_busy=True
+            self._set_gravity_operation("RUNNING","Exporting all member action PDF pages")
+            self.status_var.set('Exporting all action pages (24 members per page); see progress indicator…')
             self.win.update_idletasks()
             def worker():
                 try:
                     gravity_figures(payload,out,all_pages=True)
-                    self.win.after(0,lambda:self.status_var.set('All end-action pages exported to Gravity_All_Local_End_Actions_V123.pdf'))
+                    def complete():
+                        self._gravity_busy=False
+                        self._set_gravity_operation("FINISHED",
+                            "All PDF action pages exported | "+str(out))
+                        self.status_var.set("All end-action pages exported to Gravity_All_Local_End_Actions_V123.pdf")
+                    self.win.after(0,complete)
                 except Exception as exc:
-                    text=str(exc);self.win.after(0,lambda:self.status_var.set('Action PDF export failed: '+text))
+                    text=str(exc)
+                    def blocked():
+                        self._gravity_busy=False
+                        self._set_gravity_operation("BLOCKED","Action PDF: "+text)
+                        self.status_var.set("Action PDF export failed: "+text)
+                    self.win.after(0,blocked)
             threading.Thread(target=worker,daemon=True).start()
         except Exception as exc:messagebox.showerror('Action PDF export',str(exc),parent=self.win)
 
@@ -1244,11 +1261,13 @@ class GravityAnalysisGUI:
             self._gravity_action_log("CASE_REACTION_REGISTRATION_FAILED",
                 str(registry_error))
         self._refresh_case_reaction()
+        primary32_summary=None
         if payload.get("wall_support_strategy")=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
             try:
                 from components.gravity.etabs_reaction_support_filter import export_primary_32_comparison
                 summary=export_primary_32_comparison(
                     payload,out/"ETABS_Nonzero_Reaction_Support_Audit.json",out)
+                primary32_summary=summary
                 self._gravity_action_log("PRIMARY_32_REACTION_COMPARISON",
                     f"ETABS={summary['etabs_total_FZ_kN']:.6f} kN; "
                     f"OpenSees={summary['opensees_total_FZ_kN']:.6f} kN; "
@@ -1286,7 +1305,22 @@ class GravityAnalysisGUI:
         except Exception as pack_exc:
             self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
                 "Gravity solver passed; upload ZIP failed: "+str(pack_exc))
-        status_name="Gravity PASS (source ledger reconciled)" if source_audit_ok else "Gravity solver PASS; SOURCE AUDIT BLOCKED"
+        # Solver convergence is distinct from original ETABS engineering equivalence.
+        global_gap=None
+        if primary32_summary:
+            global_gap=abs(float(primary32_summary["global_difference_kN"]))
+        if not source_audit_ok:
+            final_state="BLOCKED"
+            status_name="SOLVER COMPLETED; source ledger audit BLOCKED"
+        elif global_gap is not None and global_gap>max(
+                1.0,abs(float(primary32_summary["etabs_total_FZ_kN"]))*0.005):
+            final_state="MISMATCH"
+            status_name="SOLVER FINISHED; original ETABS 32-support comparison MISMATCH"
+        else:
+            final_state="FINISHED"
+            status_name="SOLVER FINISHED; structural ETABS equivalence NOT CERTIFIED"
+        self._set_gravity_operation(final_state,
+            status_name+" | "+str(out))
         self.status_var.set(f"{status_name} | equilibrium error {rep['equilibrium_error_percent']:.4g}% | {rep['elapsed_seconds']:.2f} s | outputs saved in {out}")
         self.nb.select(self.plot_tab)
         self._gravity_action_log("GRAVITY_CASE_COMPLETED",
