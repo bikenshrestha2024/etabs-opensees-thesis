@@ -99,6 +99,17 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
     if etabs_total_kN is not None:
         etabs=float(etabs_total_kN)
         if not math.isfinite(etabs) or etabs<=0:raise ValueError("Invalid ETABS FZ")
+    native_beam_path=folder/"ETABS_Beam_Material_List_Reviewed.csv"
+    native_beam_proof=None
+    if native_beam_path.is_file():
+        # Existing conservative reviewer checks every beam's source-offset
+        # metadata and aggregate native material-list weight. It never edits.
+        from Gravity_Safe_Engineering_Review_V1 import beam_checks
+        native_beam_proof=beam_checks(folder,source_beam_csv=native_beam_path)
+        if native_beam_proof.get("candidate_eligible") is True:
+            native_beam_proof["status"]="NATIVE_MATERIAL_WEIGHT_NUMERIC_MATCH_CANDIDATE_ONLY"
+        else:
+            native_beam_proof["status"]="NATIVE_MATERIAL_WEIGHT_NOT_FULLY_VERIFIED"
     note=(
       "POTENTIAL_ONLY: clear-span deduction not enabled. Confirm original ETABS "
       "Material List per source beam, frame Self Weight Option, end offsets and "
@@ -124,7 +135,12 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
           unclassified_components=[k for k in by_component if k=="UNCLASSIFIED"],
           status="SOURCE_LEDGER_RECONCILED_NOT_ETABS_VALIDATED",
           engineering_caveat=note,
-          etabs_source_material_weight_comparison="NOT_PROVIDED",
+          etabs_source_material_weight_comparison=(
+              "ETABS_BEAM_MATERIAL_LIST_CANDIDATE_REVIEWED" if native_beam_proof
+              and native_beam_proof.get("candidate_eligible") else
+              "ETABS_BEAM_MATERIAL_LIST_PROOF_BLOCKED" if native_beam_proof else
+              "INDEPENDENT_ETABS_MATERIAL_LIST_REQUIRED"),
+          native_beam_proof=native_beam_proof,
           active_native_model_identity="NOT_VERIFIED_BY_THIS_OFFLINE_AUDIT")
     if info["unclassified_components"]:
         info["status"]="SOURCE_COMPONENT_CLASSIFICATION_INCOMPLETE"
