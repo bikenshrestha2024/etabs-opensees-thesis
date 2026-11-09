@@ -1063,6 +1063,12 @@ class GravityAnalysisGUI:
                 "these are mutually EXCLUSIVE hypotheses; NO automatic correction")
             for item in quantities.get("files", []):
                 self._gravity_action_log("GRAVITY_JOINT_WEIGHT_FILE", item)
+            native=detailed.get("etabs_native_assignment_evidence",{})
+            self._gravity_action_log("ETABS_NATIVE_BEAM_QUANTITY_GATE",
+                f"status={native.get('status','NOT_AVAILABLE')} | "
+                f"native beam count={native.get('native_beam_objects')} | "
+                f"native structural weights={native.get('native_material_weights_kN')} | "
+                f"file={native.get('file')} | original workbook hash={native.get('source_workbook_sha256')}")
             if detailed.get("status")!="SOURCE_LEDGER_RECONCILED_NOT_ETABS_VALIDATED":
                 raise ValueError("Source audit status="+str(detailed.get("status"))+
                     "; rebuild from native ETABS export before claiming single-count validation")
