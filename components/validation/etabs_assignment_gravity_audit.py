@@ -100,6 +100,12 @@ def audit_native_assignment_workbook(workbook_path, output_folder,
             if len(by_id)!=len(rows) or set(by_id)!=set(beams):
                 raise ValueError("OpenSees source-beam IDs fail original native ETABS crosswalk")
             for key in beams:
+                # Validate original beam length as well as both offsets.
+                # An unrelated EDB can reuse IDs but use different geometry.
+                length_native=float(beams[key]["Length"])
+                length_open=float(by_id[key]["full_length_m"])
+                if abs(length_native-length_open)>0.001:
+                    raise ValueError("Original beam length disagrees for "+key)
                 a=offset_by_id[key];b=by_id[key]
                 for native_field,field in (("Offset I","end_i_m"),
                                            ("Offset J","end_j_m")):
