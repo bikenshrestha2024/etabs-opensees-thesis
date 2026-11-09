@@ -128,10 +128,27 @@ class GravityAnalysisGUI:
         p = filedialog.askopenfilename(parent=self.win, title=title, filetypes=filetypes)
         if p: variable.set(p)
 
+    def _selected_result_path(self):
+        """Resolve the selected model/profile/support case through its checked index.
+
+        [REF docs/source/components/gravity/reaction_case_registry.py.md]
+        Never substitute another condition or infer results from a parent directory.
+        """
+        from components.gravity.reaction_case_registry import current_case
+        record=current_case(self.output_var.get(),self.model_var.get(),
+            scenario=self._selected_wall_support_strategy(),
+            profile=self.gravity_profile_var.get())
+        if record is None:
+            raise ValueError("No current completed gravity result for the selected model, "
+                "load profile and support condition. Run that condition first. Index: "+
+                str(Path(self.output_var.get())/"Gravity_Case_Reaction_Index.json"))
+        return Path(record["result_path"])
+
     def _export_all_pages(self):
         try:
-            out=Path(self.output_var.get()).expanduser().resolve()
-            payload=json.loads((out/'Gravity_Result_V110.json').read_text(encoding='utf-8-sig'))
+            result=self._selected_result_path()
+            out=result.parent
+            payload=json.loads(result.read_text(encoding='utf-8-sig'))
             if not payload.get('ok'):raise ValueError('A successful gravity result is required.')
             from OpenSees_Research_UI_V123 import gravity_figures
             self.status_var.set('Exporting all action pages (24 members per page); this may take a few minutes…')
@@ -263,10 +280,10 @@ class GravityAnalysisGUI:
             self._gravity_action_log('EVIDENCE_EXPORT_ERROR',
                 'Offline data saved; evidence ZIP failed: '+str(exc))
         messagebox.showinfo('Offline ETABS gravity comparison',
-            f"ETABS joints: {report['etabs_joint_records']}\\n"
-            f"Verified mapped supports: {report['matched_source_nodes']}\\n"
-            f"Total OpenSees − ETABS: {report['difference_opensees_minus_etabs_kN']:+,.3f} kN\\n\\n"
-            "See the full per-point Excel and CSV results in:\\n"+str(dst),
+            f"ETABS joints: {report['etabs_joint_records']}\n"
+            f"Verified mapped supports: {report['matched_source_nodes']}\n"
+            f"Total OpenSees − ETABS: {report['difference_opensees_minus_etabs_kN']:+,.3f} kN\n\n"
+            "See the full per-point Excel and CSV results in:\n"+str(dst),
             parent=self.win)
 
     def _direct_etabs_gravity_compare(self):
@@ -278,9 +295,7 @@ class GravityAnalysisGUI:
             from components.validation.gravity_etabs_direct import connect_and_compare
             model=Path(self.model_var.get()).expanduser().resolve()
             if not model.is_file():raise ValueError("Select a generated OpenSees gravity model first")
-            gravity=Path(self.output_var.get()).expanduser().resolve()/"Gravity_Result_V110.json"
-            if not gravity.is_file():
-                raise FileNotFoundError("Run OpenSees full-gravity analysis first: "+str(gravity))
+            gravity=self._selected_result_path()
             if self.gravity_profile_var.get()!="GRAVITY_1.0D_1.0L":
                 raise ValueError("Direct gravity comparison requires GRAVITY_1.0D_1.0L")
             self.nb.select(self.log_tab)
@@ -298,19 +313,19 @@ class GravityAnalysisGUI:
                     "Automatic ETABS analysis on a copy",
                     "If the selected ETABS EDB lacks gravity results, the program will "
                     "make a SHA256-verified working COPY of that EDB, then run ETABS "
-                    "analysis on the copy.\\n\\n"
+                    "analysis on the copy.\n\n"
                     "ETABS may run ALL currently enabled cases, including time histories. "
                     "The original source EDB will not be saved or analyzed. "
-                    "The working EDB and its analysis files remain in the output folder.\\n\\n"
+                    "The working EDB and its analysis files remain in the output folder.\n\n"
                     "Proceed?",parent=self.win):
                     self._gravity_action_log("ETABS_CANCELLED",
                         "User declined automatic analysis on isolated EDB copy")
                     return
             if alternate and not messagebox.askyesno(
                 "Diagnostic comparison only",
-                "You selected a different ETABS EDB from the original OpenSees export.\\n\\n"
+                "You selected a different ETABS EDB from the original OpenSees export.\n\n"
                 "This comparison can report gravity-reaction DIFFERENCES but cannot "
-                "verify that the two models have identical geometry, loads, materials or supports.\\n\\n"
+                "verify that the two models have identical geometry, loads, materials or supports.\n\n"
                 "Continue with unverified alternate-model provenance?",
                 parent=self.win):
                 return
@@ -334,24 +349,24 @@ class GravityAnalysisGUI:
             except Exception as pack_exc:
                 self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
                     "ETABS direct extraction saved; automatic ZIP failed: "+str(pack_exc))
-            note=(f"ETABS FZ = {comp['etabs_base_FZ_kN']:.3f} kN\\n"
-                  f"OpenSees RZ = {comp['opensees_support_FZ_kN']:.3f} kN\\n"
+            note=(f"ETABS FZ = {comp['etabs_base_FZ_kN']:.3f} kN\n"
+                  f"OpenSees RZ = {comp['opensees_support_FZ_kN']:.3f} kN\n"
                   f"Difference = {comp['difference_kN']:.3f} kN "
-                  f"({comp['percent_difference']:.4f}%)\\n\\n"
-                  "This is a global reaction check, not engineering acceptance.\\n"
-                  "Review partial support data and component loads.\\n"
+                  f"({comp['percent_difference']:.4f}%)\n\n"
+                  "This is a global reaction check, not engineering acceptance.\n"
+                  "Review partial support data and component loads.\n"
                   "Model identity: "+str(comp.get('model_identity_status','UNVERIFIED')))
             ranked=comp.get('top_node_discrepancies',[])
             if ranked:
-                note+="\\n\\nLargest verified support discrepancies (ETABS - OpenSees):"
+                note+="\n\nLargest verified support discrepancies (ETABS - OpenSees):"
                 for row in ranked[:5]:
-                    note+=f"\\nETABS {row['etabs_point']} / OpenSees {row['opensees_node']}: "
+                    note+=f"\nETABS {row['etabs_point']} / OpenSees {row['opensees_node']}: "
                     note+=f"{row['delta_etabs_minus_opensees_kN']:+.3f} kN"
             else:
-                note+="\\n\\nNo one-to-one verified global-Z support pairs yet; review node audit."
+                note+="\n\nNo one-to-one verified global-Z support pairs yet; review node audit."
             node_info=comp.get('node_comparison',{})
             if node_info:
-                note+=f"\\nMatched verified pairs: {node_info.get('valid_one_to_one_global_z_count',0)}"
+                note+=f"\nMatched verified pairs: {node_info.get('valid_one_to_one_global_z_count',0)}"
                 note+=f" | Ambiguous: {node_info.get('ambiguous_count',0)}"
             messagebox.showinfo("Direct ETABS/OpenSees gravity comparison",note,parent=self.win)
         except Exception as exc:
@@ -379,7 +394,8 @@ class GravityAnalysisGUI:
     def _export_comparison_bundle(self):
         """Prepare one central evidence ZIP and log its exact upload location."""
         try:
-            report,paths=self._publish_gravity_evidence()
+            report,paths=self._publish_gravity_evidence(
+                single_run=self._selected_result_path().parent)
             self.nb.select(self.log_tab)
             messagebox.showinfo(
                 "Upload gravity evidence to ChatGPT",
@@ -594,19 +610,24 @@ class GravityAnalysisGUI:
         bar = ttk.Frame(root); bar.pack(fill="x", pady=(0, 7))
         self.run_button = ttk.Button(bar, text="Run gravity, check, freeze + export", command=self.run)
         self.run_button.pack(side="left")
-        ttk.Button(bar,text="Run existing 76-support + 97-support cases",
-                   command=self.run_both_wall_supports).pack(side="left",padx=5)
-        ttk.Button(bar,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
-        ttk.Button(bar,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
-        ttk.Button(bar,text="Bundle gravity evidence ZIP",command=self._export_comparison_bundle).pack(side="left",padx=5)
+        self.batch_run_button=ttk.Button(bar,text="Run 76 + 97 supports | full gravity",
+                   command=self.run_both_wall_supports)
+        self.batch_run_button.pack(side="left",padx=5)
+        ttk.Label(bar,text="Selected condition: ").pack(side="left",padx=(12,2))
+        ttk.Label(bar,textvariable=self.gravity_profile_var).pack(side="left")
+        ttk.Label(bar,textvariable=self.wall_support_strategy_var).pack(side="left",padx=8)
+        actions=ttk.Frame(root); actions.pack(fill="x",pady=(0,7))
+        ttk.Button(actions,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
+        ttk.Button(actions,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
+        ttk.Button(actions,text="Bundle gravity evidence ZIP",command=self._export_comparison_bundle).pack(side="left",padx=5)
         def load_path():
             try:
                 path=__import__('OpenSees_Load_Path_V141').export(Path(self.model_var.get()).parent)
                 __import__('os').startfile(str(path))
             except Exception as exc:messagebox.showerror('Slab load path',str(exc),parent=self.win)
-        ttk.Button(bar,text='Slab load path + formulas',command=load_path).pack(side='left',padx=4)
-        ttk.Button(bar, text="Open output folder", command=self._open_output_folder).pack(side="left", padx=8)
-        ttk.Label(bar, textvariable=self.status_var).pack(side="left", padx=12)
+        ttk.Button(actions,text='Slab load path + formulas',command=load_path).pack(side='left',padx=4)
+        ttk.Button(actions, text="Open output folder", command=self._open_output_folder).pack(side="left", padx=8)
+        ttk.Label(root, textvariable=self.status_var,wraplength=1100).pack(fill="x",pady=(0,5))
         self.nb = ttk.Notebook(root); self.nb.pack(fill="both", expand=True)
         self.plot_tab = ttk.Frame(self.nb); self.nb.add(self.plot_tab, text="Matplotlib results")
         self.storey_tab = ttk.Frame(self.nb); self.nb.add(self.storey_tab,text="Storey load breakdown")
@@ -736,13 +757,14 @@ class GravityAnalysisGUI:
         if not self.coverage_confirmed.get():
             messagebox.showerror("Gravity load coverage not confirmed", "Review the generated model and verify the total downward load against the project load ledger. The code-derived line-load total may omit slab, wall, self-weight, FVD/BRB or other loads. Confirm coverage before running.", parent=self.win); return
         self.run_button.configure(state="disabled")
-        self.status_var.set("Running model and nonlinear gravity steps…")
+        self.batch_run_button.configure(state="disabled")
+        self.status_var.set("RUNNING | "+self.gravity_profile_var.get()+" | "+self._selected_wall_support_strategy())
         self.log.delete("1.0", "end")
         self._gravity_action_log("GRAVITY_START","Selected model: "+str(model))
         self._gravity_action_log("GRAVITY_SUPPORTS","Wall base strategy="+self._selected_wall_support_strategy())
         self._gravity_action_log("GRAVITY_SETTINGS",f"Profile={self.gravity_profile_var.get()} | "
             f"Downward load={total:.6f} kN | supports={len(supports)} | steps={steps}")
-        self._gravity_action_log("GRAVITY_OUTPUT","Result and run logs: "+str(out))
+        self._gravity_action_log("GRAVITY_OUTPUT","Common output root: "+str(out)+" | case index: "+str(out/"Gravity_Output_Index.txt"))
         self._gravity_action_log("GRAVITY_UPLOAD_DESTINATION",
             str(out/"Gravity_Evidence_Upload"))
         self._gravity_action_log("GRAVITY_GUI_LOG",
@@ -753,6 +775,7 @@ class GravityAnalysisGUI:
             out=out/"Gravity_Reaction_Diagnostic"/datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             out.mkdir(parents=True,exist_ok=False)
             self._gravity_action_log("ETABS_REACTION_DIAGNOSTIC_OUTPUT",str(out))
+        self._gravity_action_log("GRAVITY_CASE_OUTPUT",str(out))
         result_path = out / "Gravity_Result_V110.json"
         runner_path = out / "Gravity_Run_V110.py"
         log_path = out / "Gravity_Run_V110.log"
@@ -791,10 +814,10 @@ class GravityAnalysisGUI:
                 raise ValueError("Confirm gravity load coverage before either run")
             if not messagebox.askyesno("Run two gravity wall-base strategies",
                  "Run the same full-gravity load twice with different wall-base "
-                 "restraints?\\n\\n"
-                 "1) ETABS Node Position (original 76 supports)\\n"
-                 "2) Continuous Wall Base (97 supports)\\n\\n"
-                 "The separate ETABS Reaction Validation diagnostic is RUN individually.\\n\\n"
+                 "restraints?\n\n"
+                 "1) ETABS Node Position (original 76 supports)\n"
+                 "2) Continuous Wall Base (97 supports)\n\n"
+                 "The separate ETABS Reaction Validation diagnostic is RUN individually.\n\n"
                  "The second case is a foundation boundary-condition sensitivity "
                  "study, NOT a validated raft/soil model. Existing results are "
                  "not overwritten.",parent=self.win):
@@ -806,6 +829,7 @@ class GravityAnalysisGUI:
             scenarios=("ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED")
             for mode in scenarios:(root/mode).mkdir()
             self.run_button.configure(state="disabled")
+            self.batch_run_button.configure(state="disabled")
             self.status_var.set("Running two independent wall-base gravity cases…")
             self.nb.select(self.log_tab)
             self._gravity_action_log("DUAL_GRAVITY_START",
@@ -835,11 +859,14 @@ class GravityAnalysisGUI:
                        OPENSEES_GRAVITY_PROFILE="GRAVITY_1.0D_1.0L",
                        OPENSEES_GRAVITY_GUI_MODE="1",
                        OPENSEES_GRAVITY_WALL_SUPPORT_STRATEGY=mode)
+            self.win.after(0,lambda mode=mode:self._gravity_action_log(
+                "GRAVITY_CASE_START",mode+" | GRAVITY_1.0D_1.0L | "+str(root/mode)))
+            self.win.after(0,lambda mode=mode:self.status_var.set("RUNNING | full gravity | "+mode))
             try:
                 proc=subprocess.run([str(py),str(runner)],cwd=str(out),
                     capture_output=True,text=True,errors="replace",env=env,encoding="utf-8")
                 log.write_text(proc.stdout+
-                    ("\\n--- STDERR ---\\n"+proc.stderr if proc.stderr else ""),encoding="utf8")
+                    ("\n--- STDERR ---\n"+proc.stderr if proc.stderr else ""),encoding="utf8")
                 if proc.returncode:
                     raise RuntimeError(mode+" returned "+str(proc.returncode)+
                         ": "+proc.stderr[-1400:])
@@ -859,6 +886,7 @@ class GravityAnalysisGUI:
         [REF components/gravity/support_scenarios.py compare_wall_support_gravity]
         """
         self.run_button.configure(state="normal")
+        self.batch_run_button.configure(state="normal")
         for mode,entry in records.items():
             self._gravity_action_log("DUAL_GRAVITY_RESULT",
                     mode+" | "+("PASS" if entry["payload"] else "FAIL: "+entry["error"]))
@@ -938,20 +966,23 @@ class GravityAnalysisGUI:
                 self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
                     "Both gravity results saved; ZIP packaging failed: "+str(pack_exc))
             self._gravity_action_log("DUAL_GRAVITY_DONE",
-                "Both gravity workbooks and comparison saved: "+str(root))
+                "GRAVITY_1.0D_1.0L | 76 + 97 supports completed | source audit="+
+                ("RECONCILED" if source_evidence_ok else "BLOCKED")+
+                " | ETABS validation not established | comparison="+str(root)+
+                " | common index="+str(root.parents[1]/"Gravity_Output_Index.txt"))
             self.status_var.set(("Two solvers PASS; source ledgers reconciled" if source_evidence_ok
                 else "Two solvers PASS; at least one source ledger BLOCKED")
                 +"; comparison: "+str(root))
             messagebox.showinfo("Two gravity conditions completed",
-                "Same full gravity loads; separate support conditions.\\n\\n"
+                "Same full gravity loads; separate support conditions.\n\n"
                 "ETABS-source supports: "+
-                str(comparison["summary"][0]["support_count"])+" nodes\\n"
+                str(comparison["summary"][0]["support_count"])+" nodes\n"
                 "Continuous fixed wall base: "+
-                str(comparison["summary"][1]["support_count"])+" nodes\\n"
+                str(comparison["summary"][1]["support_count"])+" nodes\n"
                 "Difference in summed base reactions: "+
-                f"{comparison['reaction_total_difference_kN']:.5f} kN\\n\\n"
+                f"{comparison['reaction_total_difference_kN']:.5f} kN\n\n"
                 "This is a boundary-condition sensitivity analysis, not an "
-                "independent validation of actual foundation restraint.\\n\\n"+
+                "independent validation of actual foundation restraint.\n\n"+
                 str(root),parent=self.win)
         except Exception as exc:
             self._gravity_action_log("DUAL_GRAVITY_REPORT_ERROR",str(exc))
@@ -982,6 +1013,7 @@ class GravityAnalysisGUI:
 
     def _finished(self, payload, log_text, out):
         self.run_button.configure(state="normal")
+        self.batch_run_button.configure(state="normal")
         self._gravity_action_log("GRAVITY_SOLVER","Full OpenSees console log follows")
         self.log.insert("end", "\n" + log_text + "\n")
         self.log.see("end")
@@ -1057,7 +1089,7 @@ class GravityAnalysisGUI:
         try:
             from components.gravity.reaction_case_registry import register_case
             scenario=payload["wall_support_strategy"]
-            registry_root=(out.parent.parent if scenario=="ETABS_NONZERO_REACTION_DIAGNOSTIC" else out)
+            registry_root=Path(self.output_var.get()).expanduser().resolve()
             verified=register_case(registry_root,out/"Gravity_Result_V110.json",
                 payload["model_script"],scenario=scenario,
                 profile=payload["gravity_profile"])
@@ -1116,6 +1148,10 @@ class GravityAnalysisGUI:
         status_name="Gravity PASS (source ledger reconciled)" if source_audit_ok else "Gravity solver PASS; SOURCE AUDIT BLOCKED"
         self.status_var.set(f"{status_name} | equilibrium error {rep['equilibrium_error_percent']:.4g}% | {rep['elapsed_seconds']:.2f} s | outputs saved in {out}")
         self.nb.select(self.plot_tab)
+        self._gravity_action_log("GRAVITY_CASE_COMPLETED",
+            f"{payload.get('wall_support_strategy')} | {payload.get('gravity_profile')} | solver converged | "
+            f"source audit={'RECONCILED' if source_audit_ok else 'BLOCKED'} | ETABS validation not established | result={out} | "
+            f"common index={Path(self.output_var.get())/'Gravity_Output_Index.txt'}")
         messagebox.showinfo("Gravity analysis complete",
             "Gravity solver converged; equilibrium check passed; gravity frozen at time zero.\n\n"
             +("Source gravity ledger reconciled to solver input. ETABS equivalence NOT VALIDATED."

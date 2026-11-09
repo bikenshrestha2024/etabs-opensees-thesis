@@ -1,5 +1,10 @@
 # File-by-file review ledger — frozen Git baseline
 
+Latest incremental pass: [2026-11-09 report](../REVIEW_20261109.md) and
+[working-tree ledger](REVIEW_LEDGER_20261109.csv). That separate checkpoint
+records 386 inventoried files, six full-source and four partial software reviews;
+376 remain unreviewed. It does not replace the frozen ledger below.
+
 **Baseline reviewed:** [66c5c971ea297dc9d7fb0499b871a6204297913d](https://github.com/bikenshrestha2024/opensees-nbc105-research/commit/66c5c971ea297dc9d7fb0499b871a6204297913d) at 2026-11-04 12:59 UTC. The ledger is a **snapshot**, not a certification of current head or native solver correctness.
 
 **Updated PR overlap check (2026-11-04):** [PR #5](https://github.com/bikenshrestha2024/opensees-nbc105-research/pull/5) **merged** on 2026-11-04 at 16:38:12 UTC. Its full-record time-step and case-identity changes must not be duplicated. For the later default-branch SHA and inspection status, see [the current-head checkpoint](CURRENT_HEAD_CHECKPOINT_20261104.md).

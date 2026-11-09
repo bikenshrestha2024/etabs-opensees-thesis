@@ -1,8 +1,8 @@
-# OpenSeesPy seismic research — V167
+# ETABS to OpenSeesPy - NBC 105:2025 thesis research
 
-**[00 — Ordered launchers](00_READ_FIRST_RUN_ORDER.md)** · **[Per-program manuals](docs/programs/00_PROGRAM_INDEX.md)** · **[All 20 old/new filenames](docs/00_WORK_ORDER_RENAME_MAP.md)** · **[Baseline handoff](START_HERE_V167.md)**
+**[00 — Ordered launchers](00_READ_FIRST_RUN_ORDER.md)** · **[Per-program manuals](docs/programs/00_PROGRAM_INDEX.md)** · **[Historical rename map](docs/00_WORK_ORDER_RENAME_MAP.md)** · **[Baseline handoff](START_HERE_V167.md)**
 
-The 20 primary executable entry points now use work-order numbers 01–20. The previous filename for each remains a compatibility alias. This ordering prioritizes input reconciliation and material/component validation before whole-building nonlinear analysis. Internal Python modules, earthquake records, research results and historical exports retain their existing names.
+Use the [current launcher index](docs/programs/00_PROGRAM_INDEX.md) for all canonical entry points, including input synchronization, device benchmarks, motion audits and the evidence dashboard. Launcher numbers are stable navigation IDs; the [00-09 engineering dependency map](docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md) defines progression. Legacy aliases remain supported. Experimental sources and historical outputs keep their provenance names.
 
 **Open blocker:** The full-building nonlinear time history still has an unresolved first-step transient failure; no complete validated NLTHA or certified optimum is claimed. The rename itself has not been validated by a native solver run.
 
@@ -13,7 +13,7 @@ The 20 primary executable entry points now use work-order numbers 01–20. The p
 
 ## Research source documentation
 
-- [Guides for all 84 active Python modules](docs/source/00_SOURCE_GUIDE_INDEX.md)
+- [Active component source guides](docs/source/00_SOURCE_GUIDE_INDEX.md)
 - [Scientific reference and citation register](docs/00_RESEARCH_REFERENCES.md)
 - [Thesis NLTHA acceptance gates](docs/00_THESIS_ACCEPTANCE_GATES.md)
 - [Contributor / ChatGPT / Codex instructions](AGENTS.md)
@@ -78,7 +78,7 @@ Use [Stage 35 preflight](35_SOIL_C_NLTHA_PREFLIGHT.py) to audit all 16 source ha
 **Blocked/needs explicit review:** Gorkha export 322.94s versus 120s original; Loma Prieta one-sample A/B end difference; 0.05–6s matching interval versus verified current modal `sqrt(R_mu)*T1`; missing SeismoMatch original scaling factors (0.33..3 and paired lower rule), missing site Vs30, nonlinear RC core/opening/steel/device validation and unresolved X-direction first-step core-wall failure. All raw earthquake waveforms are intentionally kept out of this public repository.
 
 
-**NLTHA JSON evidence schema:** [Stage 37: all Soil C motion, OpenSees recorder, source review and M0–M6 aggregation JSON fields](docs/programs/37_SOIL_C_NLTHA_JSON_SCHEMA.md). This documents actual units, code clauses, reviewer/source-hash evidence and the difference between source preflight, numerical screen and design acceptance.
+**NLTHA JSON evidence schema (reference document, not launcher 37):** [All Soil C motion, OpenSees recorder, source review and M0–M6 aggregation JSON fields](docs/programs/37_SOIL_C_NLTHA_JSON_SCHEMA.md). This documents actual units, code clauses, reviewer/source-hash evidence and the difference between source preflight, numerical screen and design acceptance.
 
 
 ### RTFC AI engineering workflow
@@ -90,7 +90,7 @@ For new Codex, ChatGPT and GitHub coding tasks, use the [numbered RTFC (ROLE–T
 
 Start with the [thesis engineering evidence and workflow review](docs/review/03_THESIS_REVIEW_2026_11_04.md) for the distinction between modal coverage, numerical screening and validated nonlinear response.
 
-For the asymmetric high-rise RCC-core/damped-outrigger thesis, use [the active-source engineering review](docs/review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md) and [canonical 00–09 verification order](docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md) instead of sorting the duplicate numbered legacy launchers. A [static AST source-audit utility](tools/audit_active_repository.py) inventories active code, symbol lines, SHA, syntax status, missing source guides and numbered alias collisions. It **does not** claim native solver convergence or a line-by-line semantic review of all archived files.
+For the asymmetric high-rise RCC-core/damped-outrigger thesis, use [the active-source engineering review](docs/review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md) and [canonical 00–09 verification order](docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md) instead of sorting the duplicate numbered legacy launchers. A [static source compilation and inventory utility](tools/audit_active_repository.py) inventories active code, symbol lines, SHA, syntax status, missing source guides and numbered alias collisions. It **does not** claim native solver convergence or a line-by-line semantic review of all archived files.
 
 
 ### P0 RCC core wall / nonlinear material source review

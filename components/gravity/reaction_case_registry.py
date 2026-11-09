@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from datetime import datetime, timezone
 from pathlib import Path
 
 SCENARIO_SUPPORTS = {
@@ -112,6 +113,7 @@ def register_case(output_root, run_result_path, model_path, *,
     record=checked_reaction_result(payload,model_path,scenario=scenario,
         profile=profile,expected_support_tags=expected_support_tags)
     record["result_path"]=str(result_path)
+    record["indexed_at_utc"]=datetime.now(timezone.utc).isoformat()
     # Keep output index under selected output root; no claims about stale results.
     dest=output_root/INDEX_NAME
     if dest.is_file():
@@ -125,6 +127,20 @@ def register_case(output_root, run_result_path, model_path, *,
     tmp=dest.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(prior,indent=2),encoding="utf-8")
     tmp.replace(dest)
+    lines=["GRAVITY OUTPUT INDEX", "Selected output root: "+str(output_root),
+           "JSON index: "+str(dest),
+           "Each entry identifies a separate load profile and support condition.",
+           "Historical entries may be stale; GUI rechecks model/input fingerprints.",
+           "Solver completion and equilibrium are not ETABS validation.", ""]
+    for key, entry in sorted(prior.items()):
+        lines.extend([key, "  Model: "+str(entry.get("model_path")),
+            "  Supports: "+str(entry.get("support_count")),
+            "  Result: "+str(entry.get("result_path")),
+            "  Indexed UTC: "+str(entry.get("indexed_at_utc","unknown")), ""])
+    text_path=output_root/"Gravity_Output_Index.txt"
+    text_tmp=text_path.with_suffix(".txt.tmp")
+    text_tmp.write_text("\n".join(lines),encoding="utf-8")
+    text_tmp.replace(text_path)
     return record
 
 

@@ -56,6 +56,45 @@ class ReactionCaseRegistryTests(unittest.TestCase):
         self.assertIsNone(current_case(self.output,self.model,
             scenario=mode,profile="AS_CONFIGURED"))
 
+    def test_gui_export_resolves_selected_nested_case_without_parent_result(self):
+        from types import SimpleNamespace
+        from components.gravity.gui_and_reports import GravityAnalysisGUI
+        mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
+        nested=self.output/"Gravity_Reaction_Diagnostic"/"20261109"
+        nested.mkdir(parents=True)
+        result=nested/"Gravity_Result_V110.json"
+        result.write_text(json.dumps(self.payload(mode)),encoding="utf-8")
+        register_case(self.output,result,self.model,scenario=mode,
+                      profile="GRAVITY_1.0D_1.0L")
+        var=lambda value:SimpleNamespace(get=lambda:value)
+        gui=SimpleNamespace(output_var=var(str(self.output)),
+            model_var=var(str(self.model)),gravity_profile_var=var("GRAVITY_1.0D_1.0L"),
+            _selected_wall_support_strategy=lambda:mode)
+        self.assertEqual(GravityAnalysisGUI._selected_result_path(gui),result.resolve())
+        self.assertFalse((self.output/"Gravity_Result_V110.json").exists())
+        gui.gravity_profile_var=var("AS_CONFIGURED")
+        with self.assertRaisesRegex(ValueError,"No current completed"):
+            GravityAnalysisGUI._selected_result_path(gui)
+
+    def test_common_output_index_preserves_all_three_case_locations(self):
+        paths=[]
+        for mode in SCENARIO_SUPPORTS:
+            folder=self.output/"runs"/mode
+            folder.mkdir(parents=True)
+            result=folder/"Gravity_Result_V110.json"
+            result.write_text(json.dumps(self.payload(mode)),encoding="utf-8")
+            register_case(self.output,result,self.model,scenario=mode,
+                          profile="GRAVITY_1.0D_1.0L")
+            paths.append(result)
+        index=json.loads((self.output/"Gravity_Case_Reaction_Index.json").read_text())
+        self.assertEqual(len(index),3)
+        text=(self.output/"Gravity_Output_Index.txt").read_text(encoding="utf-8")
+        for mode, result in zip(SCENARIO_SUPPORTS,paths):
+            self.assertIn(str(result.resolve()),text)
+            self.assertEqual(current_case(self.output,self.model,scenario=mode,
+                profile="GRAVITY_1.0D_1.0L")["result_path"],str(result.resolve()))
+        self.assertIn("not ETABS validation",text)
+
     def test_changed_model_code_invalidates_result(self):
         mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
         f=self.write(self.payload(mode))

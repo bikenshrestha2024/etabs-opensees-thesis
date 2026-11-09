@@ -157,7 +157,7 @@ def create_audit(input_csv, output_dir, native_restraints=None):
             for r in rows
         ]
         figs.append(go.Scatter3d(
-            x=xs, y=ys, z=zs, text=hover, hoverinfo="text", mode="markers+text",
+            x=xs, y=ys, z=zs, hovertext=hover, hoverinfo="text", mode="markers+text",
             text=[r["etabs_unique"] if abs(r[key]) > 0.02*scale else "" for r in rows],
             textposition="top center",
             marker=dict(size=[5+13*math.sqrt(abs(v)/scale) for v in values],

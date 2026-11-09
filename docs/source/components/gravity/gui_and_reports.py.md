@@ -12,6 +12,19 @@ Part of the gravity implementation subsystem. Check the exact classes/functions,
 Document original ETABS export path/SHA, declared kN-m-s model units, stress conversion, local axes, accepted coordinate/section mapping and any third-party scientific input. Do not substitute nominal reinforcement, material grade or a literature benchmark for tested project data.
 
 ## Outputs and failure conditions
+The selected output root contains `Gravity_Case_Reaction_Index.json` and
+`Gravity_Output_Index.txt`. `_selected_result_path` verifies the selected model,
+load profile and support condition before PDF export, direct ETABS comparison or
+manual evidence packaging. Nested diagnostic and batch results are consumed at
+their actual paths. Missing or stale cases produce an explicit message instead of
+substituting another condition.
+
+Run controls occupy the first action row, with the selected profile and support
+strategy visible; report/comparison tools occupy the second row. Both run buttons
+are disabled during a run. `GRAVITY_CASE_START`, `GRAVITY_CASE_COMPLETED` and
+`DUAL_GRAVITY_DONE` distinguish solver completion, source-load reconciliation and
+ETABS validation status. Dialog line breaks use actual newlines.
+
 Capture source commit SHA, model/ground-motion fingerprint, ULS/SLS, record orientation, completed physical duration, solver diagnostics, exception traceback and linked reports. Mark failed or truncated runs and do not include them in thesis rankings.
 
 ## Research and standards
