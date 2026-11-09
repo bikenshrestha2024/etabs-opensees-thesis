@@ -43,6 +43,12 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
     meta=_load_json(folder/REQUIRED[2])
     conversion=_load_json(folder/REQUIRED[3])
     beam=_load_json(folder/REQUIRED[4])
+    # Geometry overlap is a separate potential issue from accidental
+    # self-weight pattern duplication. Audit it without subtracting loads.
+    joint=_load_json(folder/"OpenSees_Joint_Volume_Ownership_Audit.json",
+                     required=False)
+    pattern_count=_load_json(folder/"Gravity_Single_Count_Self_Weight_Audit.json",
+                             required=False)
     if not isinstance(data.get("load_provenance"),list) or not data["load_provenance"]:
         raise ValueError("Export has no complete load_provenance; rebuild with current exporter")
     from OpenSees_Complete_Export_V118 import apply_gravity_profile
@@ -141,6 +147,15 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
               "ETABS_BEAM_MATERIAL_LIST_PROOF_BLOCKED" if native_beam_proof else
               "INDEPENDENT_ETABS_MATERIAL_LIST_REQUIRED"),
           native_beam_proof=native_beam_proof,
+          single_count_pattern_audit=pattern_count,
+          geometric_joint_ownership_audit=(
+              {"policy":joint.get("policy"),
+               "gross_RCC_weight_kN":joint.get("gross_RCC_weight_kN"),
+               "net_RCC_weight_kN":joint.get("net_RCC_weight_kN"),
+               "potentially_duplicated_RCC_weight_kN":
+                    joint.get("potentially_duplicated_RCC_weight_kN"),
+               "interpretation":"GEOMETRY AUDIT; never add to the beam clear-length deduction"}
+              if joint else None),
           active_native_model_identity="NOT_VERIFIED_BY_THIS_OFFLINE_AUDIT")
     if info["unclassified_components"]:
         info["status"]="SOURCE_COMPONENT_CLASSIFICATION_INCOMPLETE"
