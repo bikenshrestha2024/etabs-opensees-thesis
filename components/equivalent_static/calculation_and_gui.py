@@ -472,6 +472,9 @@ class ESMGui:
                 "Another ESM operation is running. Wait for its FINISHED/BLOCKED status.",
                 parent=self.root)
             return
+        native_evidence=filedialog.askdirectory(
+            parent=self.root,
+            title="OPTIONAL: Choose native ETABS EQX/EQY/PDelta evidence folder (Cancel to omit)")
         self._esm_busy=True
         self._set_esm_operation("RUNNING","Collecting local ESM validation evidence")
         def worker():
@@ -480,6 +483,7 @@ class ESMGui:
                     bundle_esm_validation)
                 result=bundle_esm_validation(
                     self.export_dir,self.outdir.get(),self.outdir.get(),
+                    native_etabs_evidence=native_evidence or None,
                     progress=lambda msg:self.root.after(0,
                         lambda m=str(msg):self._set_esm_operation("RUNNING",m)))
                 def success():
