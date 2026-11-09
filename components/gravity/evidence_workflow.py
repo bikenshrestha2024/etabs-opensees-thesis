@@ -29,6 +29,7 @@ def latest_single_run(gravity_root, *, model_script=None):
     """Find a completed result, including timestamped 32-node diagnostic runs.
 
     This is file discovery only, not ETABS or source-load validation.
+    [REF docs/source/components/gravity/evidence_workflow.py.md]
     """
     import json
     root=Path(gravity_root).expanduser().resolve()
