@@ -2946,6 +2946,25 @@ class App:
         """Regenerate model entries after editing the V118 config; no ETABS run."""
         try:
             from OpenSees_Complete_Export_V118 import prepare_complete_export
+            # Synchronize the selected project's copied runtime BEFORE rebuild.
+            # Otherwise the GUI may rebuild a fresh ETABS export using a stale
+            # single_count_self_weight.py that rejects EQX even when native
+            # ETABS confirms EQX has zero self-weight.
+            # [REF docs/source/components/model/single_count_self_weight.py.md]
+            from OpenSees_Release_Health_V142 import repair
+            selected=Path(self.out.get()).resolve()
+            if not (selected/'OpenSees_Complete_Model_Data_V118.json').is_file():
+                raise ValueError('Select the exported model folder with the saved '
+                                 'OpenSees_Complete_Model_Data_V118.json first.')
+            health=repair(Path(__file__).resolve().parent,selected)
+            runtime_audit=selected/'OpenSees_Runtime_V118'/'components'/'model'/'single_count_self_weight.py'
+            if not runtime_audit.is_file() or 'ZERO_SELF_WEIGHT_NO_FACTORS_NEEDED' not in runtime_audit.read_text(encoding='utf-8'):
+                raise RuntimeError('Refreshed runtime is missing the verified zero-'
+                    'self-weight EQX/EQY guard. Update the complete GitHub '
+                    'release and rebuild, not individual standalone files.')
+            self.log('[RUNTIME_REFRESH] Copied current modules and verified EQX/EQY '
+                     'zero-self-weight guard; source export remains unchanged: '
+                     +str(health['runtime_path']))
             manifest,report=prepare_complete_export(self.out.get(),frame_mapping=ETABS_TO_OPENSEES_SECTION)
             self.log('Rebuilt complete-model entries; report: '+str(Path(self.out.get())/manifest['report']))
             if report['assembly_errors']:
