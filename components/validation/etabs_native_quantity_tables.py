@@ -18,7 +18,12 @@ KEYWORDS=("material list","material quantities","material quantity",
           "shell uniform load set","uniform load set","floor object",
           "wall object","beam object","column object","brace object",
           "self weight option","self weight multiplier","slab property",
-          "wall property","section property definitions")
+          "wall property","section property definitions",
+          "load case","case definitions","nonlinear static",
+          "p-delta","pdelta","story shears","story drifts",
+          "story displacements","joint displacements",
+          "diaphragm displacements","base reactions",
+          "story forces","diaphragm center","modal participating mass")
 
 
 def _tuple_success(raw, minimum, label):
@@ -114,6 +119,9 @@ def export_native_quantity_tables(sap,output_dir,*,log=None):
             "Frame, shell and slab model-object quantities need per-source ID alignment.",
             "No load was modified, and no ETABS Self Weight Option inferred.",
             "A zero result or missing table is not evidence of zero self weight.",
+            "Native EQX/EQY nonlinear-case, stiffness dependency and story result tables may be unavailable unless the relevant cases have finished analysis and are selected for output.",
+            "Native response tables may include envelopes, multiple steps, local axes and duplicate story rows; raw records must not be compared until aligned to the same case, step, coordinate and eccentricity.",
+            "Original NBC 105 Aw/T1 values must come from the authoritative original workbook, not reconstructed from these raw results.",
         ],
     }
     (out/"ETABS_NATIVE_QUANTITY_MANIFEST.json").write_text(
