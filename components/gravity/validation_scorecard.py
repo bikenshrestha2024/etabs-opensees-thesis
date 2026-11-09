@@ -40,6 +40,7 @@ def create_gravity_scorecard(export_dir,gravity_dir,comparison_root,missing,over
     comparison_root=Path(comparison_root)
     cfg=_read(export_dir/"OpenSees_Complete_Model_Config_V118.json")
     beam=_read(export_dir/"ETABS_OpenSees_Beam_Weight_Reconciliation.json")
+    native_beam=_read(export_dir/"ETABS_Native_Assignment_Gravity_Quantity_Audit.json")
     union=_read(export_dir/"OpenSees_Joint_Volume_Ownership_Audit.json")
     run=_read(gravity_dir/"Gravity_Result_V110.json")
     direct_path=comparison_root/"Gravity_ETABS_OpenSees_Direct"/"Direct_Gravity_Comparison.json"
@@ -71,8 +72,18 @@ def create_gravity_scorecard(export_dir,gravity_dir,comparison_root,missing,over
             status="GROSS_BEAM_WEIGHT_ACTIVE"
             reason="No beam clear-length reduction applied; compare source self weight and physical overlap independently"
         elif mode=="ETABS_BEAM_CLEAR_LENGTH" and verified is True and beam.get("unresolved_offset_count")==0:
-            status="CLEAR_LENGTH_DIAGNOSTIC_APPLIED"
-            reason="Clear-span source convention selected; physical joint union and reaction equivalence remain unverified"
+            if (native_beam and
+                native_beam.get("opensees_beam_crosswalk_status")
+                    =="SOURCE_IDS_OFFSETS_AND_TOTAL_MATCH" and
+                native_beam.get("clear_candidate_matches_native_quantity") is True):
+                status="NATIVE_ETABS_BEAM_QUANTITY_CONFIRMED"
+                reason=("Original ETABS beam material list, all original beam IDs, "
+                        "lengths and offsets agree with selected clear-length quantity. "
+                        "Local reactions, stiffness and seismic preload remain unverified")
+            else:
+                status="MISSING_NATIVE_BEAM_QUANTITY_PROOF"
+                reason=("Source config selected beam clear-length but matching "
+                        "independent native ETABS assignment workbook evidence was not found")
         else:
             status="UNVERIFIED_BEAM_WEIGHT_CORRECTION"
             reason="Clear-span mode lacks reviewed source option or complete offset data"
@@ -177,7 +188,7 @@ def create_gravity_scorecard(export_dir,gravity_dir,comparison_root,missing,over
     blocker_keys=("global","foundation","joint_volume","beam_weight")
     blockers=[r for r in rows if r["key"] in blocker_keys and
               r["status"] not in ("WITHIN_SCREENING_TOLERANCE_NOT_ACCEPTED",
-                                  "CLEAR_LENGTH_DIAGNOSTIC_APPLIED",
+                                  "NATIVE_ETABS_BEAM_QUANTITY_CONFIRMED",
                                   "GEOMETRY_REVIEW_RECORDED")]
     return dict(schema="gravity-validation-scorecard-v1",
         conclusion="NOT_STRUCTURALLY_VALIDATED",
