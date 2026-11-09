@@ -51,7 +51,11 @@ class SourceLoadAuditTests(unittest.TestCase):
               "etabs_pattern_rows":[
                   {"pattern":"Self Weight","etabs_self_weight_multiplier":1.0}]}),
             ("Gravity_Slab_Self_Weight_Audit.json",
-             {"gross_slab_self_weight_kN":0.0})]:
+             {"gross_slab_self_weight_kN":0.0}),
+            ("Gravity_Physical_Weight_Modifier_Audit.json",
+             {"status":"NATIVE_WEIGHT_MODIFIERS_VERIFIED",
+              "source_weight_modifier_verified":True,
+              "source_weight_conflict":False})]:
             (self.root/filename).write_text(json.dumps(value),encoding="utf8")
         self.fake=types.ModuleType("OpenSees_Complete_Export_V118")
         def apply(data,cfg,profile,types):
@@ -123,6 +127,18 @@ class SourceLoadAuditTests(unittest.TestCase):
         (self.root/"Gravity_Slab_Self_Weight_Audit.json").unlink()
         info=self.run_audit()
         self.assertEqual(info["status"],"LEGACY_EXPORT_SLAB_PHYSICAL_WEIGHT_NOT_VERIFIED")
+
+    def test_legacy_native_weight_modifier_evidence_is_not_validated(self):
+        (self.root/"Gravity_Physical_Weight_Modifier_Audit.json").unlink()
+        info=self.run_audit()
+        self.assertEqual(info["status"],"NATIVE_ETABS_WEIGHT_MODIFIERS_NOT_VERIFIED")
+    def test_source_nonunity_weight_modifier_blocks_equivalence(self):
+        (self.root/"Gravity_Physical_Weight_Modifier_Audit.json").write_text(
+            json.dumps({"status":"SOURCE_NATIVE_WEIGHT_MODIFIER_CONFLICT",
+                        "source_weight_modifier_verified":False,
+                        "source_weight_conflict":True}),encoding="utf8")
+        with self.assertRaisesRegex(ValueError,"not unity"):
+            self.run_audit()
 
     def test_no_source_ledger_fails_closed(self):
         self.data.pop("load_provenance")
