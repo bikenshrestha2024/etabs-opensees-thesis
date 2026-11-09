@@ -25,6 +25,39 @@ def latest_dual_run(gravity_root):
     return matches[0] if matches else None
 
 
+def latest_single_run(gravity_root, *, model_script=None):
+    """Find a completed result, including timestamped 32-node diagnostic runs.
+
+    This is file discovery only, not ETABS or source-load validation.
+    """
+    import json
+    root=Path(gravity_root).expanduser().resolve()
+    diagnostic=root/"Gravity_Reaction_Diagnostic"
+    directories=[root]
+    if diagnostic.is_dir():
+        directories.extend(p for p in diagnostic.iterdir() if p.is_dir())
+    dual=latest_dual_run(root)
+    if dual is not None:
+        directories.append(dual/"ETABS_SOURCE_SUPPORTS")
+    eligible=[]
+    for directory in directories:
+        path=directory/"Gravity_Result_V110.json"
+        if not path.is_file():
+            continue
+        try:
+            payload=json.loads(path.read_text(encoding="utf-8-sig"))
+            if payload.get("ok") is not True:
+                continue
+            source=payload.get("model_script")
+            if model_script is not None and source and (
+                    Path(source).expanduser().resolve()!=Path(model_script).expanduser().resolve()):
+                continue
+            eligible.append((path.stat().st_mtime_ns,str(path),directory))
+        except (OSError,ValueError,TypeError):
+            continue
+    return max(eligible)[2] if eligible else None
+
+
 def package_gravity_review(model_script, gravity_root, *,
                            single_run=None, dual_run=None, etabs_json=None,
                            max_file_mb=40):
@@ -38,7 +71,11 @@ def package_gravity_review(model_script, gravity_root, *,
         raise FileNotFoundError("Generated gravity model script missing: "+str(model))
     dual=Path(dual_run).resolve() if dual_run is not None else latest_dual_run(root)
     gravity=(Path(single_run).resolve() if single_run is not None else
-             dual/"ETABS_SOURCE_SUPPORTS" if dual else root)
+             latest_single_run(root,model_script=model))
+    if gravity is None:
+        raise FileNotFoundError(
+            "No completed gravity result found in output root, timestamped "
+            "Gravity_Reaction_Diagnostic, or dual wall-base runs under "+str(root))
     result=gravity/"Gravity_Result_V110.json"
     if not result.is_file():
         raise FileNotFoundError("Required OpenSees gravity result missing: "+str(result))
