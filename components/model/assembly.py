@@ -225,7 +225,7 @@ def _gravity_wall_support_strategy(data, topology, strategy):
     return original,sorted(added)
 
 
-def _frame_property(row):
+def _frame_property(row,native_sections=None):
     b=_positive(row.get('width_m'),'frame width'); h=_positive(row.get('depth_m'),'frame depth')
     if str(row.get('section_type','')).startswith('tube'):
         tf=_positive(row.get('tube_flange_thickness_m'),'SHS flange thickness')
@@ -235,6 +235,16 @@ def _frame_property(row):
         iy=(b*h**3-(b-2*tw)*(h-2*tf)**3)/12
         iz=(h*b**3-(h-2*tf)*(b-2*tw)**3)/12
         j=4*((b-tw)*(h-tf))**2/(2*(b-tw)/tf+2*(h-tf)/tw)
+        section=str(row['assigned_section'])
+        native=(native_sections or {}).get(section)
+        if native is not None:
+            # Use unmodified geometric section props. ETABS stiffness
+            # modifiers are handled independently; never multiply weight
+            # density or A by bending modifiers.
+            area=_positive(native.get('A'),'ETABS SHS gross section area')
+            iy=_positive(native.get('Iy'),'ETABS SHS I22')
+            iz=_positive(native.get('Iz'),'ETABS SHS I33')
+            j=_positive(native.get('J'),'ETABS SHS torsional constant')
     else:
         if not str(row.get('section_type','')).startswith('rectangle'): raise ValueError('Unsupported frame section family')
         area=b*h; iy=b*h**3/12; iz=h*b**3/12
@@ -279,12 +289,31 @@ def extract_source_metadata(sap, topology, frame_rows, output):
             values=next(list(v) for v in a if isinstance(v,(tuple,list)) and len(v)==6)
             if a[-1]==0 and any(values): data['additional_point_masses'][str(n['opensees_node_tag'])]=values
         except Exception as exc: data['errors'].append(f"Point {n['etabs_point_name']} explicit mass: {exc}")
+    # Capture native section area and inertia in the source ETABS units.
+    # SHS rounded corners must never be inferred from nominal sharp-corner
+    # rectangular dimensions when native GetSectProps is available.
+    data['frame_section_properties']={}
     for row in frame_rows:
         obj=str(row['etabs_object']); r={}
         for method in ('GetLocalAxes','GetReleases','GetInsertionPoint','GetEndLengthOffset'):
             try: r[method]=list(getattr(sap.FrameObj,method)(obj))
             except Exception as exc: r[method]=dict(error=str(exc))
         data['frames'][obj]=r
+        section=str(row.get('assigned_section') or '').strip()
+        if section and section not in data['frame_section_properties']:
+            try:
+                props=list(sap.PropFrame.GetSectProps(section))
+                if len(props)!=13 or props[-1]!=0:
+                    raise ValueError('GetSectProps returned unexpected shape/status '+str(props[-1:]))
+                numeric=[float(x) for x in props[:-1]]
+                if any(not math.isfinite(x) for x in numeric) or numeric[0]<=0:
+                    raise ValueError('Nonfinite/nonpositive section area')
+                data['frame_section_properties'][section]=dict(
+                    A=numeric[0],As2=numeric[1],As3=numeric[2],
+                    J=numeric[3],Iy=numeric[4],Iz=numeric[5],
+                    source='ETABS PropFrame.GetSectProps',api_return=0)
+            except Exception as exc:
+                data['errors'].append('PropFrame.GetSectProps '+section+': '+str(exc))
     try:
         a=list(sap.LinkObj.GetNameList()); data['source_link_count']=int(a[0]) if a[-1]==0 else None
     except Exception as exc: data['errors'].append(f'ETABS link objects: {exc}')
@@ -437,7 +466,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
             obj=str(e['etabs_object']); row=frame_rows[obj]
             if not row.get('assigned_section'):
                 null_frames.append(obj); continue  # ETABS None section carries no stiffness or self-weight.
-            prop=_frame_property(row); i,j=map(int,e['node_tags']); p,q=nodes[i],nodes[j]
+            prop=_frame_property(row,meta.get('frame_section_properties',{})); i,j=map(int,e['node_tags']); p,q=nodes[i],nodes[j]
             length=math.dist(p,q); x=_unit(_sub(q,p)); cuts={0.:i,1.:j}
             frame_meta=meta.get('frames',{}).get(obj,{})
             axes=frame_meta.get('GetLocalAxes',[]); angle=float(axes[0]) if isinstance(axes,list) and axes and axes[-1]==0 else 0.
@@ -486,6 +515,18 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         if (beam_weight_policy=='ETABS_BEAM_CLEAR_LENGTH' and
             cfg['joint_volume_weight_policy']=='VERIFIED_SINGLE_OWNER'):
             raise ValueError('Do not combine beam clear-length weight with single-owner RCC correction: double subtraction')
+        missing_native_shs=sorted({
+            str(row.get('assigned_section'))
+            for row in frame_rows.values()
+            if str(row.get('section_type','')).startswith('tube')
+            and row.get('assigned_section') not in meta.get('frame_section_properties',{})})
+        report['missing_native_shs_section_properties']=missing_native_shs
+        if missing_native_shs:
+            report['warnings'].append(
+                'SHS native ETABS gross area/I/J unavailable for sections '+
+                repr(missing_native_shs)+
+                '. Sharp-corner tube properties are an unvalidated fallback; '
+                're-export from ETABS v23 for full brace mass equivalence.')
         beam_weight_audit,beam_weight_intervals=build_beam_weight_audit(
             segments,meta.get('frames',{}),
             policy=beam_weight_policy,
