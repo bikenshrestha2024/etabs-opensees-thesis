@@ -74,6 +74,20 @@ def run(etabs_xlsx, connectivity_json, case_index_json, output_folder):
            for k in (PRIMARY, SOURCE, CONTINUOUS)]
     if any(not x for x in ids) or ids[0] != ids[1] or ids[0] != ids[2]:
         raise ValueError("Different or missing model-input hashes across 32/76/97 runs")
+    expected_model = paths[1].parent / "OpenSees_Complete_Gravity_Model.py"
+    if not expected_model.is_file():
+        raise FileNotFoundError("Source-export model missing beside mapping: " + str(expected_model))
+    actual_model_sha = _hash(expected_model)
+    for strategy in (PRIMARY, SOURCE, CONTINUOUS):
+        entry = case_index[strategy + "|" + PROFILE]
+        if Path(entry.get("model_path", "")).expanduser().resolve() != expected_model.resolve():
+            raise ValueError("Mapping folder and registered model differ for " + strategy)
+        if entry.get("model_sha256") != actual_model_sha:
+            raise ValueError("Registered model SHA256 differs from current export for " + strategy)
+        for name, expected_hash in entry["input_sha256"].items():
+            candidate = paths[1].parent / name
+            if candidate.is_file() and _hash(candidate) != expected_hash:
+                raise ValueError("Current source file changed since gravity run: " + str(candidate))
     out = Path(output_folder).expanduser().resolve()
     out.mkdir(parents=True, exist_ok=True)
     reports = {}
