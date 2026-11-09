@@ -216,9 +216,21 @@ class GravityAnalysisGUI:
         try:
             from components.validation.gravity_etabs_offline import (
                 compare_etabs_export,export_offline_comparison)
-            report=compare_etabs_export(source,mapping,a,b,
-                                        case=self.etabs_case_var.get().strip())
+            current_case=self.etabs_case_var.get().strip()
+            if current_case!="1. DL + LL":
+                raise ValueError("Current 32/76/97 offline reference requires exact 1. DL + LL")
+            # Keep the original root-level 76/97 workbook for compatibility.
+            report=compare_etabs_export(source,mapping,a,b,case=current_case)
             export_offline_comparison(report,dst)
+            registry=Path(self.output_var.get()).expanduser().resolve()/"Gravity_Case_Reaction_Index.json"
+            if registry.is_file():
+                from Run_Offline_ETABS_Latest_Gravity import run as run_current
+                run_current(source,mapping,registry,dst)
+                self._gravity_action_log("ETABS_OFFLINE_CURRENT",
+                    "Saved PRIMARY_32 and ETABS_NODE_POSITION_76 comparisons with 97-node sensitivity in "+str(dst))
+            else:
+                self._gravity_action_log("ETABS_OFFLINE_REGISTRY_MISSING",
+                    "Legacy 76/97 report saved; 32-node comparison omitted because registry missing: "+str(registry))
             self.win.after(0,lambda:self._offline_etabs_finished(report,dst,None))
         except Exception as exc:
             error=traceback.format_exc()
