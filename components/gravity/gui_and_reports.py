@@ -224,7 +224,7 @@ class GravityAnalysisGUI:
             export_offline_comparison(report,dst)
             registry=Path(self.output_var.get()).expanduser().resolve()/"Gravity_Case_Reaction_Index.json"
             if registry.is_file():
-                from Run_Offline_ETABS_Latest_Gravity import run as run_current
+                from components.validation.gravity_etabs_latest import run as run_current
                 run_current(source,mapping,registry,dst)
                 self._gravity_action_log("ETABS_OFFLINE_CURRENT",
                     "Saved PRIMARY_32 and ETABS_NODE_POSITION_76 comparisons with 97-node sensitivity in "+str(dst))
