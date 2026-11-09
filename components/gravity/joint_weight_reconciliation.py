@@ -257,7 +257,7 @@ def reconcile_joint_weight_scenarios(source_folder, output_folder,
         writer.writeheader()
         writer.writerows(sorted(objects,
                                 key=lambda row:(row["category"],row["etabs_object"])))
-    report["original_R​​CC_source_objects".replace("\u200b","")]=len(objects)
+    report["original_RCC_source_objects"]=len(objects)
     report["original_object_quantity_csv"]=str(
         out/"Gravity_Original_ETABS_Object_Quantities.csv")
     report["native_etabs_per_object_matched"]=False
