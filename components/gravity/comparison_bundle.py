@@ -402,6 +402,19 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                     if candidate.is_file():
                         add(candidate,"direct_comparison/native_analysis_logs/"+
                             candidate.relative_to(native).as_posix())
+        # Preserve every native ETABS table rather than only a hard-coded
+        # 'Material List' filename: ETABS versions use different keys.
+        native_quantities=direct/"ETABS_Native_Quantity_Tables"
+        if native_quantities.is_dir():
+            for file in sorted(native_quantities.glob("*")):
+                if file.is_file():
+                    add(file, "direct_comparison/ETABS_Native_Quantity_Tables/"+file.name)
+        else:
+            missing.append({
+                "file":"direct_comparison/ETABS_Native_Quantity_Tables/",
+                "required":False,
+                "reason":"ETABS native per-object quantity API extraction not performed"
+            })
         if etabs_json is None and (direct/"etabs_gravity.json").is_file():
             etabs_json=direct/"etabs_gravity.json"
 
