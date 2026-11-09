@@ -57,13 +57,23 @@ class EQTests(unittest.TestCase):
                     model_equivalence_verified=True,
                     force_case_equivalence_verified=True,
                     preload_equivalence_verified=True,
-                    coordinate_system="GLOBAL_XY")
+                    coordinate_system="GLOBAL_XY",
+                    etabs_eccentricity_branch="+E5",
+                    opensees_eccentricity_branch="+E5",
+                    opensees_story_shear_basis="RECOVERED_SECTION_CUT",
+                    etabs_drift_basis="MASTER_CENTRE",
+                    opensees_drift_basis="MASTER_CENTRE",
+                    etabs_response_step="FINAL",
+                    opensees_response_step="FINAL",
+                    etabs_case_definition_verified=True,
+                    opensees_case_definition_verified=True,
+                    etabs_base_shear_kN=200.,opensees_base_shear_kN=200.)
             result=compare_saved_case(
                 etabs_csv=path/"etabs.csv",opensees_csv=path/"open.csv",
                 output_dir=path/"out",axis="X",etabs_case="EQX+ P-Delta",
                 opensees_case="X tangent",metadata=md)
             self.assertEqual(result["status"],"COMPATIBLE_NUMERIC_SCREEN_ONLY")
-            self.assertEqual(result["checked_rows"],6)
+            self.assertEqual(result["checked_rows"],7)
             self.assertEqual(result["scanned_failures"],0)
             md["response_scope"]="CODE_AMPLIFIED_DESIGN"
             other=compare_saved_case(
