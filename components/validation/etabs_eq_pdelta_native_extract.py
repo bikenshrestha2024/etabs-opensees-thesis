@@ -23,7 +23,13 @@ OUTPUT_TERMS=(
     "story shear","story drift","story displacement","joint displacement",
     "diaphragm displacement","base reaction","diaphragm center",
     "load case definition","static nonlinear","p-delta","pdelta",
-    "static load case","case - static","story forces")
+    "static load case","case - static","story forces",
+    "modal participating mass","centers of mass","diaphragm mass",
+    "diaphragm drift","diaphragm forces","story stiffness",
+    "pier forces","spandrel forces","element forces - frames",
+    "element forces - walls","joint reactions","frame forces",
+    "section cut forces","section cut","overturning","torsional",
+    "load pattern definitions","load case definitions")
 
 def _sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
@@ -145,7 +151,11 @@ def export_eq_pdelta_native_evidence(sap,out_dir,*,log=None,max_rows=1000000):
                               if value in ("outputcase","loadcase","case")),None)
                     response_table=any(term in key.lower() for term in (
                         "story shear","story forces","story drift",
-                        "displacement","base reaction"))
+                        "displacement","base reaction","pier force",
+                        "spandrel force","element forces","frame force",
+                        "joint reaction","section cut","torsional",
+                        "overturning","diaphragm forces",
+                        "story stiffness"))
                     if response_table and idx is None:
                         raise ValueError("Missing exact output-case column: "+key)
                     if response_table and not table_case_selected:
