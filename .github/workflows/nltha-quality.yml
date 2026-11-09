@@ -66,6 +66,8 @@ on:
       - 'tests/verify_standalone_offline_gravity.py'
       - 'tests/verify_gravity_etabs_direct.py'
       - 'components/gravity/gui_and_reports.py'
+      - 'components/gravity/reaction_case_registry.py'
+      - 'tests/verify_gravity_case_reaction_registry.py'
       - 'components/ui/plot_utilities.py'
       - 'components/ui/response_viewer.py'
       - 'components/ui/view_controls.py'
@@ -278,6 +280,7 @@ jobs:
           python tests/verify_joint_volume_ownership.py
           python tests/verify_beam_weight_convention.py
           python tests/verify_gravity_support_scenarios.py
+          python tests/verify_gravity_case_reaction_registry.py
           python tests/verify_gravity_etabs_offline.py
           python tests/verify_standalone_offline_gravity.py
           python tests/verify_gravity_comparison_profile.py
