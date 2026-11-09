@@ -269,26 +269,39 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
         info["status"]="SELF_WEIGHT_PATTERN_ACCOUNTING_NOT_VERIFIED"
     if info["unclassified_components"]:
         info["status"]="SOURCE_COMPONENT_CLASSIFICATION_INCOMPLETE"
-    # Audit exclusive physical quantity scenarios at the same location as this
-    # gravity run. A matching candidate is NEVER activated automatically.
-    from components.gravity.joint_weight_reconciliation import (
-        reconcile_joint_weight_scenarios)
-    weight_scenarios = reconcile_joint_weight_scenarios(
-        folder, out, expected, etabs, by_component=by_component)
-    info["joint_weight_scenarios"] = {
-        "status": weight_scenarios["status"],
-        "rcc_gross_weight_kN": weight_scenarios["rcc_gross_weight_kN"],
-        "rcc_potential_overlap_kN": weight_scenarios["rcc_potential_overlap_kN"],
-        "beam_end_offset_candidate_kN":
-            weight_scenarios["beam_end_offset_candidate_kN"],
-        "source_hashes_sha256": weight_scenarios["source_hashes_sha256"],
-        "automatic_gravity_correction_kN": 0.0,
-        "files": [
-            str(out/"Gravity_Joint_Weight_Reconciliation.json"),
-            str(out/"Gravity_Joint_Weight_Scenarios.csv"),
-            str(out/"Gravity_Joint_Weight_By_Solid.csv"),
-        ],
-    }
+    # Older source exports lack the complete geometric and per-beam schema.
+    # Do not break their established source-load diagnostics, but never
+    # fabricate an available joint quantity audit for legacy inputs.
+    quantities_ready = (
+        joint is not None and slab_physical is not None
+        and beam.get("schema") == "beam-self-weight-end-offset-v1")
+    if quantities_ready:
+        from components.gravity.joint_weight_reconciliation import (
+            reconcile_joint_weight_scenarios)
+        weight_scenarios = reconcile_joint_weight_scenarios(
+            folder, out, expected, etabs, by_component=by_component)
+        info["joint_weight_scenarios"] = {
+            "status": weight_scenarios["status"],
+            "rcc_gross_weight_kN": weight_scenarios["rcc_gross_weight_kN"],
+            "rcc_potential_overlap_kN":
+                weight_scenarios["rcc_potential_overlap_kN"],
+            "beam_end_offset_candidate_kN":
+                weight_scenarios["beam_end_offset_candidate_kN"],
+            "source_hashes_sha256": weight_scenarios["source_hashes_sha256"],
+            "automatic_gravity_correction_kN": 0.0,
+            "files": [
+                str(out/"Gravity_Joint_Weight_Reconciliation.json"),
+                str(out/"Gravity_Joint_Weight_Scenarios.csv"),
+                str(out/"Gravity_Joint_Weight_By_Solid.csv"),
+            ],
+        }
+    else:
+        weight_scenarios = None
+        info["joint_weight_scenarios"] = {
+            "status": "LEGACY_OR_INCOMPLETE_GEOMETRY_EVIDENCE",
+            "automatic_gravity_correction_kN": 0.0,
+            "files": [],
+        }
     out.mkdir(parents=True,exist_ok=True)
     (out/"Gravity_Source_Components_Audit.json").write_text(
         json.dumps(info,indent=2,allow_nan=False),encoding="utf-8")
@@ -327,23 +340,24 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
         for c in sheet[1]:
             c.font=Font(color="FFFFFF",bold=True)
             c.fill=PatternFill("solid",fgColor="17365D")
-    candidates=wb.create_sheet("Exclusive weight scenarios")
-    candidates.append(["Scenario","Total kN","Candidate deduction kN",
-                       "Difference OpenSees minus ETABS kN",
-                       "Currently applied?","ETABS quantity verified?"])
-    for entry in weight_scenarios["scenarios_EXCLUSIVE_NOT_APPLIED"]:
-        candidates.append([entry["id"],entry["total_kN"],
-                           entry["correction_kN"],
-                           entry["scenario_minus_etabs_kN"],
-                           entry["applied"],
-                           entry["etabs_material_quantity_validated"]])
-    candidates.freeze_panes="A2"
-    candidates.column_dimensions["A"].width=42
-    candidates.column_dimensions["B"].width=24
-    candidates.column_dimensions["C"].width=27
-    candidates.column_dimensions["D"].width=42
-    candidates.column_dimensions["E"].width=21
-    candidates.column_dimensions["F"].width=29
+    if weight_scenarios is not None:
+        candidates=wb.create_sheet("Exclusive weight scenarios")
+        candidates.append(["Scenario","Total kN","Candidate deduction kN",
+                           "Difference OpenSees minus ETABS kN",
+                           "Currently applied?","ETABS quantity verified?"])
+        for entry in weight_scenarios["scenarios_EXCLUSIVE_NOT_APPLIED"]:
+            candidates.append([entry["id"],entry["total_kN"],
+                               entry["correction_kN"],
+                               entry["scenario_minus_etabs_kN"],
+                               entry["applied"],
+                               entry["etabs_material_quantity_validated"]])
+        candidates.freeze_panes="A2"
+        candidates.column_dimensions["A"].width=42
+        candidates.column_dimensions["B"].width=24
+        candidates.column_dimensions["C"].width=27
+        candidates.column_dimensions["D"].width=42
+        candidates.column_dimensions["E"].width=21
+        candidates.column_dimensions["F"].width=29
     joint_sheet=wb.create_sheet("Joint overlap source audit")
     joint_sheet.append(["Evidence", "Value", "Interpretation"])
     for key,value in joint_overlap_evidence.items():
