@@ -9,6 +9,7 @@ import csv
 import hashlib
 import json
 import math
+import os
 from collections import defaultdict
 from pathlib import Path
 
@@ -302,6 +303,35 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
             "status": "LEGACY_OR_INCOMPLETE_GEOMETRY_EVIDENCE",
             "automatic_gravity_correction_kN": 0.0,
             "files": [],
+        }
+    # Native ETABS XLSX confirmation is opt-in, source-bound and read-only.
+    # It never activates beam length or joint-volume weight corrections.
+    original_assignment=os.environ.get("ETABS_GRAVITY_ASSIGNMENT_WORKBOOK", "").strip()
+    if original_assignment:
+        from components.validation.etabs_assignment_gravity_audit import (
+            audit_native_assignment_workbook)
+        native_source=audit_native_assignment_workbook(
+            original_assignment,out,
+            beam_audit_path=folder/"ETABS_OpenSees_Beam_Weight_Reconciliation.json")
+        info["etabs_native_assignment_evidence"]={
+            "status":native_source["opensees_beam_crosswalk_status"],
+            "source_workbook_name":native_source["source_workbook_name"],
+            "source_workbook_sha256":native_source["source_workbook_sha256"],
+            "native_material_weights_kN":native_source["weights_kN"],
+            "native_beam_objects":native_source["native_beam_objects"],
+            "clear_candidate_matches_native_quantity":
+                native_source.get("clear_candidate_matches_native_quantity"),
+            "file":str(out/"ETABS_Native_Assignment_Gravity_Quantity_Audit.json"),
+            "automatic_correction_kN":0.0,
+        }
+        if native_source.get("clear_candidate_matches_native_quantity") is not True:
+            raise ValueError("Native ETABS assignment workbook does not confirm "
+                             "clear-length beam weight; no gravity weight correction allowed")
+    else:
+        info["etabs_native_assignment_evidence"]={
+            "status":"NOT_CONFIGURED",
+            "required_for_verified_clear_weight":"Set ETABS_GRAVITY_ASSIGNMENT_WORKBOOK to original ETABS assignment XLSX",
+            "automatic_correction_kN":0.0,
         }
     out.mkdir(parents=True,exist_ok=True)
     (out/"Gravity_Source_Components_Audit.json").write_text(
