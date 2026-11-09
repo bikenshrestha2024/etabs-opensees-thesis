@@ -1350,6 +1350,7 @@ class ESMGui:
             self.status.set(f'Combined X/Y export: {len(all_runners)} runners. Each direction uses its own adopted period.')
             return
         started=time.perf_counter()
+        self._set_esm_operation("RUNNING","Calculating source-linked NBC ESM forces")
         try:
             from components.inputs.project_workbooks import require_source_state
             require_source_state(self.export_dir,self.state.get())
@@ -1458,10 +1459,14 @@ class ESMGui:
             elapsed=time.perf_counter()-started
             files=", ".join(Path(p).name for p in made)
             note=("\nBlocked cases: " + " | ".join(failures)) if failures else ""
+            self._set_esm_operation("FINISHED",
+                str(len(self.last_runners))+" ESM case scripts generated | "+
+                str(len(failures))+" blocked state cases")
             self.status.set(f"Completed in {elapsed:.2f} s | Location={self.location.get()} | soil={self.soil.get()} | Z={self.Z.get()} ({self.z_source.get()})\n"+"\n".join(summaries)+note+f"\nCreated: {files}")
             self.run_button.configure(state="normal" if Path(self.model_script.get()).is_file() else "disabled")
             messagebox.showinfo("NBC 105 ESM calculation",f"Created {len(self.last_runners)} case runner(s) and documented force profiles.\n" + ("Blocked: "+" | ".join(failures) if failures else "Review inputs before running the exported cases.") + "\n\nUse Plots or Open output folder to inspect the results.")
         except Exception as exc:
+            self._set_esm_operation("BLOCKED",str(exc))
             self.status.set("Blocked: "+str(exc)); messagebox.showerror("ESM calculation blocked",str(exc))
 
     def _run_generated(self):
@@ -1472,6 +1477,8 @@ class ESMGui:
         if not Path(self.python_exe.get()).is_file():
             messagebox.showerror("Python executable required","Select the Python executable with OpenSeesPy installed."); return
         self.run_button.configure(state="disabled")
+        self._set_esm_operation("RUNNING",
+            "OpenSeesPy analysis | 0 of "+str(len(self.last_runners))+" cases")
         self.status.set("Running OpenSeesPy ESM case(s)… per-case logs are being written to the output folder.")
         def worker():
             outcomes=[]
@@ -1482,6 +1489,9 @@ class ESMGui:
                     for line in proc.stdout:
                         chunks.append(line);self.root.after(0,lambda text=line:self.status.set(text.rstrip()))
                     proc.wait();proc.stdout=''.join(chunks);proc.stderr='' 
+                    self.root.after(0,lambda script=script:self._set_esm_operation(
+                        "RUNNING","Finished case "+Path(script).stem+
+                        " | collecting solver status"))
                     log_path=Path(self.outdir.get())/("GUI_Run_"+Path(script).stem+".log")
                     safe_write(log_path,"COMMAND: "+repr([self.python_exe.get(),script])+"\nRETURN CODE: "+str(proc.returncode)+"\n--- STDOUT ---\n"+proc.stdout+"\n--- STDERR ---\n"+proc.stderr)
                     outcomes.append((Path(script).name,proc.returncode,str(log_path)))
