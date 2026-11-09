@@ -25,6 +25,20 @@ def _sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _model_input_fingerprints(model_path):
+    """Fingerprint model code and its exported load/config metadata.
+
+    [REF docs/source/components/gravity/reaction_case_registry.py.md]
+    """
+    model=Path(model_path).resolve()
+    names=(model.name,"OpenSees_Complete_Model_Data_V118.json",
+           "OpenSees_Complete_Model_Config_V118.json",
+           "OpenSees_Source_Model_Metadata_V118.json",
+           "OpenSees_Element_Connectivity.json")
+    return {name:(_sha256(model.parent/name) if (model.parent/name).is_file() else None)
+            for name in names}
+
+
 def checked_reaction_result(payload, model_path, *, scenario, profile,
                             expected_support_tags=None):
     """Verify solver result and 32/76/97 node FZ sum before showing it.
@@ -77,7 +91,9 @@ def checked_reaction_result(payload, model_path, *, scenario, profile,
     equilibrium=100*abs(sum_vertical-applied)/applied
     return dict(
         scenario=scenario,profile=profile,model_path=str(current_model),
-        model_sha256=_sha256(current_model),support_count=len(tags),
+        model_sha256=_sha256(current_model),
+        input_sha256=_model_input_fingerprints(current_model),
+        support_count=len(tags),
         support_tags=sorted(tags),applied_load_kN=applied,
         summed_reaction_kN=sum_vertical,equilibrium_error_percent=equilibrium,
         balance_pass=equilibrium<=0.5, # Numerical screening, not code acceptance
@@ -127,6 +143,8 @@ def current_case(output_root, model_path, *, scenario, profile,
         if not entry:
             return None
         if entry["model_sha256"] != _sha256(model_path):
+            return None
+        if entry.get("input_sha256")!=_model_input_fingerprints(model_path):
             return None
         if Path(entry["model_path"]).resolve()!=Path(model_path).resolve():
             return None
