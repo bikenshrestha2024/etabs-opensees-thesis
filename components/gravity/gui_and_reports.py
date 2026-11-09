@@ -475,9 +475,11 @@ class GravityAnalysisGUI:
             note = data.get("load_total_units_note", "")
             coverage = data.get("coverage_note", "")
             if hasattr(self,"storey_tree"):self._show_storey_loads()
-            self.status_var.set("Gravity profile "+context['profile']+"; applied="+str(total)+" kN. Seismic mass independent.")
+            self.status_var.set("Gravity profile "+context['profile']+
+                "; physical applied load="+str(total)+
+                " kN independent of 32/76/97 support selection. Seismic mass independent.")
             if show_error:
-                messagebox.showinfo("Values read from generated code", f"Active support tags: {self.support_var.get() or 'Missing original ETABS table for primary 32-node filter'}\nOriginal mapped support count: {len(supports)}\nVertical gravity load total: {total} kN\n\n{note}\n{coverage}\n\nThis auto-total only sums loads present in the generated model script.", parent=self.win)
+                messagebox.showinfo("Values read from generated code", f"Active support tags: {self.support_var.get() or 'Missing original ETABS table for primary 32-node filter'}\nOriginal mapped support count: {len(supports)}\nPhysical applied gravity total: {total} kN\n\nThis applied source total does NOT change with the 32/76/97 restrained-node selection; only nodal reactions redistribute.\n\n{note}\n{coverage}\n\nThis auto-total only sums loads present in the generated model script.", parent=self.win)
             return data
         except Exception as exc:
             self.support_var.set('')
