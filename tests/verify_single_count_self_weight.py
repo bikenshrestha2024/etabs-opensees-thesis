@@ -29,6 +29,14 @@ class CountWeightTests(unittest.TestCase):
         data=self.args([{"pattern":"Self Weight","multiplier":.5},
                         {"pattern":"Dead","multiplier":.5}])
         self.assertEqual(data["full_DL_LL_physical_self_weight_coefficient"],1.)
+    def test_legitimate_uls_dead_amplification_not_double_counted(self):
+        data=audit_self_weight_patterns(
+            [{"pattern":"Dead","multiplier":1.}],
+            {"Dead":1.2},{"Dead":1.},
+            beam_weight_policy="GROSS_SECTION_LENGTH",
+            joint_volume_policy="AUDIT_ONLY")
+        self.assertEqual(data["full_DL_LL_physical_self_weight_coefficient"],1.)
+        self.assertAlmostEqual(data["configured_gravity_self_weight_coefficient"],1.2)
     def test_beam_overlap_double_subtraction_is_rejected(self):
         with self.assertRaisesRegex(ValueError,"DOUBLE SUBTRACTION"):
             audit_self_weight_patterns(
