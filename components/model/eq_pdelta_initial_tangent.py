@@ -161,6 +161,9 @@ def run_source_equivalent_initial_and_tangent(
     dof=1 if pre["axis"]=="X" else 2
     ops.reactions()
     initial_reactions={tag:float(ops.nodeReaction(tag,dof)) for tag in tags}
+    initial_reactions_full={
+        tag:[float(ops.nodeReaction(tag,j)) for j in range(1,7)]
+        for tag in tags}
     initial_displacements={row["node"]:float(ops.nodeDisp(row["node"],dof))
                            for row in pre["rows"]}
     initial_state={
@@ -187,6 +190,14 @@ def run_source_equivalent_initial_and_tangent(
     if abs(float(ops.getLoadFactor(971002))-1.)>1e-8:
         raise RuntimeError("Dependent unit EQ not fully applied")
     ops.reactions()
+    support_rows=[]
+    for n in tags:
+        diff=[float(ops.nodeReaction(n,j))-initial_reactions_full[n][j-1]
+              for j in range(1,7)]
+        support_rows.append(dict(
+            node_tag=n,Fx_kN=diff[0],Fy_kN=diff[1],Fz_kN=diff[2],
+            Mx_kNm=diff[3],My_kNm=diff[4],Mz_kNm=diff[5],
+            scope="Signed incremental unit-EQ reactions minus initial PDelta state"))
     reaction=sum(float(ops.nodeReaction(n,dof))-initial_reactions[n]
                  for n in tags)
     force=sum(row["fx"] if dof==1 else row["fy"] for row in pre["rows"])
@@ -231,6 +242,15 @@ def run_source_equivalent_initial_and_tangent(
         "sensitivity_only_32_supports":True,
         "results":profiles,
     }
+    (out/"EQ_PDelta_OpenSees_Support_Reactions.csv").write_text(
+        "",encoding="utf-8") if not support_rows else None
+    if support_rows:
+        with (out/"EQ_PDelta_OpenSees_Support_Reactions.csv").open(
+                "w",encoding="utf-8-sig",newline="") as f:
+            writer=csv.DictWriter(f,fieldnames=list(support_rows[0]))
+            writer.writeheader();writer.writerows(support_rows)
+    report["incremental_support_reactions_file"] = str(
+        out/"EQ_PDelta_OpenSees_Support_Reactions.csv")
     (out/"EQ_PDelta_OpenSees_Tangent_Results.json").write_text(
         json.dumps(report,indent=2,allow_nan=False),encoding="utf-8")
     with (out/"EQ_PDelta_OpenSees_Story_Responses.csv").open(
@@ -238,4 +258,49 @@ def run_source_equivalent_initial_and_tangent(
         keys=list(profiles[0])
         writer=csv.DictWriter(f,fieldnames=keys)
         writer.writeheader();writer.writerows(profiles)
+    try:
+        from openpyxl import Workbook
+        wb=Workbook();ws=wb.active;ws.title="EQ PDelta summary"
+        ws.append(["Field","Value"])
+        for section in ("initial_stage","dependent_linear_increment"):
+            ws.append([section,""])
+            for key,value in report[section].items():
+                ws.append([key,value])
+        for name,entries in (
+                ("Raw story response",profiles),
+                ("Incremental supports",support_rows)):
+            sheet=wb.create_sheet(name)
+            if entries:
+                keys=list(entries[0]);sheet.append(keys)
+                for entry in entries:sheet.append([entry.get(k) for k in keys])
+            sheet.freeze_panes="A2"
+        readme=wb.create_sheet("Scope and blockers")
+        readme.append(["Native ETABS/PDelta equivalence","NOT VALIDATED"])
+        readme.append(["Recovered internal story section cuts","NOT IMPLEMENTED"])
+        readme.append(["Existing M0–M6 NLTHA state","UNCHANGED"])
+        readme.append(["Initial stage tangent reused","Same domain; current tangent Linear algorithm"])
+        wb.save(out/"EQ_PDelta_OpenSees_Tangent_Results.xlsx")
+    except ImportError:
+        pass
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        fig,axs=plt.subplots(1,3,figsize=(15,6),constrained_layout=True)
+        z=[p["elevation_m"] for p in profiles]
+        axs[0].plot([p["applied_story_shear_kN"] for p in profiles],z,"o-")
+        axs[0].set(xlabel="Cumulative applied EQ force (kN)",
+                   ylabel="Height (m)",title="LOAD INPUT, not internal story shear")
+        axs[1].plot([1000*p["displacement_m"] for p in profiles],z,"o-")
+        axs[1].set(xlabel="Raw incremental displacement (mm)",
+                   ylabel="Height (m)",title="Same-domain dependent tangent response")
+        axs[2].plot([100*p["drift_ratio"] for p in profiles],z,"o-")
+        axs[2].set(xlabel="Signed raw interstory drift (%)",
+                   ylabel="Height (m)",title="Diaphragm master drift")
+        for ax in axs:ax.grid(alpha=0.3)
+        fig.suptitle("OpenSees "+pre["axis"]+" PDelta tangent DIAGNOSTIC - ETABS equality unverified")
+        fig.savefig(out/"EQ_PDelta_OpenSees_Tangent_Profiles.png",dpi=150)
+        plt.close(fig)
+    except ImportError:
+        pass
     return report
