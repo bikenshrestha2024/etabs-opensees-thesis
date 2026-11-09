@@ -17,3 +17,8 @@ New ETABS metadata extraction also uses `PropFrame.GetSectProps` to transfer nat
 Gravity source conservation and source-to-ETABS equivalence are independent gates. Avoid introducing reaction-dependent load adjustments or choosing new restraint nodes based only on zero/nonzero ETABS reactions.
 
 Author: ChatGPT GPT-6, November 2026.
+
+
+## 2026-11-09 zero-self-weight seismic-pattern guard
+
+The ETABS load-pattern export includes every pattern, including EQX/EQY, roof live and derived `~` cases whose original self-weight multiplier is exactly 0.0. These records remain visible in `Gravity_Single_Count_Self_Weight_Audit.json` with `factor_status=ZERO_SELF_WEIGHT_NO_FACTORS_NEEDED`, and their gravity and mass contributions are exactly zero without inventing seismic pattern factors. For any nonzero source self-weight multiplier, both gravity and mass coefficients must be explicitly supplied, finite and nonnegative. No earthquake acceleration is converted into a static self-weight gravity load. This rule changes only the audit of zero-allocation pattern metadata; it does not change the full 1.0D+1.0L source loads, live and roof-live assignment, physical self-weight, stiffness or reactions. Regression test: `tests/verify_single_count_self_weight.py`.
