@@ -1499,6 +1499,10 @@ class ESMGui:
                     outcomes.append((Path(script).name,-999,str(exc)))
             def done():
                 self.run_button.configure(state="normal")
+                completed=bool(outcomes) and all(code==0 for _,code,_ in outcomes)
+                self._set_esm_operation("FINISHED" if completed else "BLOCKED",
+                    str(sum(code==0 for _,code,_ in outcomes))+
+                    " of "+str(len(outcomes))+" OpenSees earthquake cases converged")
                 lines=[f"{name}: {'SUCCESS' if code==0 else 'FAILED'} | {log}" for name,code,log in outcomes]
                 self.status.set("OpenSeesPy earthquake cases finished.\n"+"\n".join(lines))
                 if all(code==0 for _,code,_ in outcomes): messagebox.showinfo("ESM analysis complete",self.status.get())
