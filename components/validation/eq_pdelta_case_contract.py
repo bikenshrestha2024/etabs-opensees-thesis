@@ -57,7 +57,10 @@ def check_etabs_case_contract(case, *, axis, role, initial_case=None):
             issues.append("INITIAL_PATTERN_SET_MISMATCH")
         else:
             for name,expected in target.items():
-                if abs(float(factors[name])-expected)>1e-9:
+                try:
+                    if abs(float(factors[name])-expected)>1e-9:
+                        issues.append("WRONG_INITIAL_FACTOR:"+name)
+                except (ValueError,TypeError):
                     issues.append("WRONG_INITIAL_FACTOR:"+name)
     elif role=="dependent_positive":
         if case_type!="LINEAR STATIC":
@@ -68,11 +71,15 @@ def check_etabs_case_contract(case, *, axis, role, initial_case=None):
             issues.append("DEPENDENT_MUST_EXCLUDE_INITIAL_LOADS")
         if initial_case is None or case.get("stiffness_source_case")!=initial_case:
             issues.append("DEPENDENCY_CASE_MISMATCH")
-        if set(factors)!={"EQ"+axis} or abs(float(factors.get("EQ"+axis,0))-1.)>1e-9:
+        try: unit_factor=abs(float(factors.get("EQ"+axis,0))-1.)<=1e-9
+        except (ValueError,TypeError): unit_factor=False
+        if set(factors)!={"EQ"+axis} or not unit_factor:
             issues.append("DEPENDENT_EQ_UNIT_FACTOR_MISMATCH")
     else:
         if case_type!="LINEAR STATIC":issues.append("PLAIN_EQ_NOT_LINEAR_STATIC")
-        if set(factors)!={"EQ"+axis} or abs(float(factors.get("EQ"+axis,0))-1.)>1e-9:
+        try: unit_factor=abs(float(factors.get("EQ"+axis,0))-1.)<=1e-9
+        except (ValueError,TypeError): unit_factor=False
+        if set(factors)!={"EQ"+axis} or not unit_factor:
             issues.append("PLAIN_EQ_UNIT_FACTOR_MISMATCH")
         if case.get("use_nonlinear_case_stiffness") is True:
             issues.append("PLAIN_EQ_USES_NONLINEAR_STIFFNESS")
