@@ -104,7 +104,7 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
             json.dumps(self.sample),encoding="utf8")
         (diagnostic/"Gravity_Run_V110.log").write_text("solver PASS",encoding="utf8")
         # Ensure newer timestamped run wins over a legacy root result.
-        os.utime(self.gravity/"Gravity_Result_V110.json",(1000,1000))
+        os.utime(self.gravity/"Gravity_Result_V110.json",(946684800,946684800))  # 2000-01-01; ZIP-safe
         report,paths=package_gravity_review(self.script,self.gravity)
         self.assertEqual(Path(paths["selected_gravity_run"]),diagnostic)
         with zipfile.ZipFile(paths["upload_zip"]) as z:
