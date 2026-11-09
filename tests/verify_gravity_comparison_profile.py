@@ -46,12 +46,12 @@ class GravityComparisonProfileTests(unittest.TestCase):
     def test_roof_live_defined_but_unassigned_is_zero_in_full_gravity(self):
         # A pattern definition alone creates no applied roof-live force.
         data={'unfactored_patterns':{
-            'Self Weight':{'1':[0,0,-100,0,0,0]},
+            'Dead':{'1':[0,0,-100,0,0,0]},
             'Live':{'1':[0,0,-20,0,0,0]},
             'Roof Live':{}},
             'nodal_mass':{'1':12.5}}
-        cfg={'gravity_factors':{'Self Weight':1,'Live':.3,'Roof Live':0},
-             'mass_factors':{'Self Weight':1,'Live':.3,'Roof Live':0}}
+        cfg={'gravity_factors':{'Dead':1,'Live':.3,'Roof Live':0},
+             'mass_factors':{'Dead':1,'Live':.3,'Roof Live':0}}
         before=copy.deepcopy(data['nodal_mass'])
         result=apply_gravity_profile(data,cfg,'GRAVITY_1.0D_1.0L')
         self.assertEqual(result['factors']['Roof Live'],1.)
