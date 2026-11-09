@@ -4,7 +4,7 @@
 
 A self-weight multiplier is *not another self-weight*. It represents how ETABS assigns a fraction of one physical self-weight to a load pattern; it is retained to avoid dropping or duplicating loads when building Dead/Live, configured seismic preload or other profiles. OpenSees does not automatically apply member body-force weight in the standard frame/shell assembly used here; it must be explicitly loaded once.
 
-The validator raises on duplicate pattern IDs or when sum of source multipliers exceeds unity, or when configured gravity or mass coefficients exceed unity. Multipliers must be nonnegative and finite. Intentional unusual source cases with greater-than-unity self-weight require separate engineering review and code changes, not silent acceptance.
+The validator raises on duplicate pattern IDs or when the sum of source self-weight multipliers exceeds unity. A configured gravity strength-combination factor above unity (for example, 1.2D) is a legitimate factored load and **does not** constitute double-counted geometry. An anomalously high seismic self-weight mass coefficient is separately flagged for review. Multipliers must be nonnegative and finite. Intentional unusual source cases with multiple physical self-weight allocations require separate engineering review, not silent acceptance.
 
 The resulting `Gravity_Single_Count_Self_Weight_Audit.json` contains source pattern allocations, full DL+LL physical self-weight coefficient, configured gravity coefficient, seismic mass coefficient, and explicit `geometric_joint_solid_ownership=NOT_ESTABLISHED_BY_THIS_AUDIT`.
 
