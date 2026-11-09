@@ -17,6 +17,30 @@ class CountWeightTests(unittest.TestCase):
         self.assertEqual(data["full_DL_LL_physical_self_weight_coefficient"],1.)
         self.assertEqual(data["configured_gravity_self_weight_coefficient"],1.)
         self.assertIn("NOT_ESTABLISHED",data["geometric_joint_solid_ownership"])
+    def test_zero_weight_seismic_patterns_need_no_gravity_factors(self):
+        source=[
+            {"pattern":"Self Weight","multiplier":1.0},
+            {"pattern":"Live","multiplier":0.0},
+            {"pattern":"Roof Live","multiplier":0.0},
+            {"pattern":"EQX","multiplier":0.0},
+            {"pattern":"EQY","multiplier":0.0},
+            {"pattern":"~RSX P DeltaECC","multiplier":0.0},
+        ]
+        result=self.args(source)
+        self.assertEqual(result["full_DL_LL_physical_self_weight_coefficient"],1.)
+        self.assertEqual(result["configured_gravity_self_weight_coefficient"],1.)
+        self.assertEqual(result["seismic_mass_self_weight_coefficient"],1.)
+        eq=next(x for x in result["etabs_pattern_rows"] if x["pattern"]=="EQX")
+        self.assertIsNone(eq["configured_gravity_factor"])
+        self.assertEqual(eq["factor_status"],"ZERO_SELF_WEIGHT_NO_FACTORS_NEEDED")
+    def test_nonzero_seismic_pattern_without_factors_still_fails(self):
+        with self.assertRaisesRegex(ValueError,"NONZERO self-weight EQX"):
+            self.args([{"pattern":"Self Weight","multiplier":.75},
+                       {"pattern":"EQX","multiplier":.25}])
+    def test_malformed_zero_weight_pattern_still_fails(self):
+        with self.assertRaisesRegex(ValueError,"Invalid ETABS self-weight"):
+            self.args([{"pattern":"Self Weight","multiplier":1.0},
+                       {"pattern":"EQX","multiplier":"not-a-number"}])
     def test_two_nonzero_patterns_cannot_double_count_volume(self):
         with self.assertRaisesRegex(ValueError,"DOUBLE COUNT"):
             self.args([{"pattern":"Self Weight","multiplier":1.0},
