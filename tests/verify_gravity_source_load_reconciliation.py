@@ -117,6 +117,27 @@ class SourceLoadAuditTests(unittest.TestCase):
         self.assertEqual(info["expected_full_gravity_slab_self_weight_kN"],15.)
         self.assertTrue(info["slab_source_conservation_verified"])
 
+    def test_zero_self_weight_roof_live_eqx_does_not_need_gravity_factor(self):
+        path=self.root/"Gravity_Single_Count_Self_Weight_Audit.json"
+        audit=json.loads(path.read_text(encoding="utf8"))
+        for name in ("Roof Live","EQX","EQY","~RSX P DeltaECC"):
+            audit["etabs_pattern_rows"].append({
+                "pattern":name,"etabs_self_weight_multiplier":0.0})
+        path.write_text(json.dumps(audit),encoding="utf8")
+        result=self.run_audit()
+        self.assertEqual(result["expected_full_gravity_slab_self_weight_kN"],0.)
+        self.assertTrue(result["slab_source_conservation_verified"])
+
+    def test_nonzero_unclassified_slab_weight_still_blocks(self):
+        path=self.root/"Gravity_Single_Count_Self_Weight_Audit.json"
+        audit=json.loads(path.read_text(encoding="utf8"))
+        audit["etabs_pattern_rows"].append({
+            "pattern":"Roof Live","etabs_self_weight_multiplier":0.25})
+        path.write_text(json.dumps(audit),encoding="utf8")
+        with self.assertRaisesRegex(ValueError,"NONZERO Roof Live"):
+            self.run_audit()
+
+
     def test_slab_double_weight_or_omission_is_rejected(self):
         (self.root/"Gravity_Slab_Self_Weight_Audit.json").write_text(
             json.dumps({"gross_slab_self_weight_kN":15.}),encoding="utf8")
