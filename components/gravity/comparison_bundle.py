@@ -33,6 +33,13 @@ SELECTED = (
     "Gravity_Beam_End_Actions_SLS_V141.csv",
 )
 EXTRA = ("ETABS_Nonzero_Reaction_Support_Audit.json",
+         "Primary_32_ETABS_OpenSees_Reactions.xlsx",
+         "Primary_32_ETABS_OpenSees_Reactions.csv",
+         "Primary_32_ETABS_OpenSees_Reactions.json",
+         "Gravity_Source_Components_Audit.xlsx",
+         "Gravity_Source_Components_Audit.json",
+         "Gravity_Source_Components_Detail.csv",
+         "Gravity_Source_Components_Totals.csv",
          "Gravity_Result_V110.json", "Gravity_Run_V110.log",
          "Gravity_Results_V110.xlsx", "Gravity_GUI_Actions.log",
          "Gravity_Run_V110.py")
@@ -71,6 +78,10 @@ DIRECT_EXTRA = (
     "etabs_gravity.json",
 )
 DUAL_FILES = (
+    "Gravity_Source_Components_Audit.xlsx",
+    "Gravity_Source_Components_Audit.json",
+    "Gravity_Source_Components_Detail.csv",
+    "Gravity_Source_Components_Totals.csv",
     "Gravity_Result_V110.json",
     "Gravity_Run_V110.log",
     "Gravity_Run_V110.py",
