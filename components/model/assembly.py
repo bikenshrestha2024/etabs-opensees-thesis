@@ -314,6 +314,18 @@ def extract_source_metadata(sap, topology, frame_rows, output):
                     source='ETABS PropFrame.GetSectProps',api_return=0)
             except Exception as exc:
                 data['errors'].append('PropFrame.GetSectProps '+section+': '+str(exc))
+    # CSI frame: [A,As2,As3,J,I22,I33,MASS,WEIGHT].
+    # CSI shell: [f11,f22,f12,m11,m22,m12,v13,v23,MASS,WEIGHT].
+    # Record native object AND property values, without modifying source EDB.
+    # [REF docs/source/components/model/physical_weight_modifiers.py.md]
+    try:
+        from components.model.physical_weight_modifiers import extract_native_weight_modifiers
+        native_modifiers=extract_native_weight_modifiers(sap,frame_rows)
+        data['etabs_property_modifiers']=native_modifiers
+        if native_modifiers['errors']:
+            data['errors'].extend('GetModifiers: '+e for e in native_modifiers['errors'])
+    except Exception as error:
+        data['errors'].append('Native ETABS property mass/weight modifier extraction: '+str(error))
     try:
         a=list(sap.LinkObj.GetNameList()); data['source_link_count']=int(a[0]) if a[-1]==0 else None
     except Exception as exc: data['errors'].append(f'ETABS link objects: {exc}')
@@ -603,6 +615,27 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
             'Slab self weight equals original floor area times physical thickness '
             'times material weight density; beam 800-150 net depth is a '
             'CONDITIONAL physical overlap, never an automatic correction.')
+        # Stiffness modifiers reduce K, never gamma*physical volume.
+        # Native CSI WEIGHT and MASS modifiers have separate fields, so
+        # verify them explicitly and keep unverified legacy exports flagged.
+        # [REF docs/source/components/model/physical_weight_modifiers.py.md]
+        from components.model.physical_weight_modifiers import review_physical_weight_modifiers
+        physical_modifier_audit=review_physical_weight_modifiers(
+            meta.get('etabs_property_modifiers'),
+            loads.get('etabs_load_pattern_self_weight_multipliers',[]),folder)
+        report['physical_weight_modifier_audit']={
+            k:v for k,v in physical_modifier_audit.items()
+            if k not in ('modifiers','patterns')}
+        if physical_modifier_audit['source_weight_conflict']:
+            raise ValueError("ETABS has a nonunity WEIGHT modifier, so the "
+                "proposed 100%-physical-weight transfer cannot match source "
+                "ETABS unless the native source definition is reviewed. "
+                "See Gravity_Physical_Weight_Modifier_Audit.xlsx")
+        if not physical_modifier_audit['source_weight_modifier_verified']:
+            report['warnings'].append(
+                "Native ETABS mass/weight modifier evidence incomplete: "
+                "physical member volume weight is retained 100%, but "
+                "native ETABS equality is not certified. Re-export from source EDB.")
         # Nodal vectors remain separate per unfactored source pattern.
         patterns={}; load_provenance=[]; source_context={}
         def add(pattern,node,values):
@@ -758,6 +791,9 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         payload['load_provenance']=load_provenance
         payload['slab_self_weight_audit']={
             k:v for k,v in slab_weight_audit.items() if k!='records'}
+        payload['physical_weight_modifier_audit']={
+            k:v for k,v in physical_modifier_audit.items()
+            if k not in ('modifiers','patterns')}
         payload['single_count_self_weight_audit']=self_weight_policy_audit
         payload['joint_volume_weight_policy']=volume_policy
         payload['etabs_beam_weight_policy']=beam_weight_policy
