@@ -668,7 +668,7 @@ class GravityAnalysisGUI:
         except (OSError,KeyError,ValueError,TypeError) as error:
             self.solved_reaction_status_var.set("Reaction unavailable: "+str(error))
 
-    def _inputs(self):
+    def _inputs(self, support_policy=None):
         model = Path(self.model_var.get()).expanduser().resolve()
         report_path = model.parent / 'OpenSees_Complete_Export_Report_V118.json'
         if model.name.startswith('OpenSees_Complete_') and report_path.is_file():
@@ -690,7 +690,7 @@ class GravityAnalysisGUI:
         import json as _json
         assembled=_json.loads((model.parent/"OpenSees_Complete_Model_Data_V118.json").read_text(encoding="utf-8-sig"))
         original=sorted(int(tag) for tag,flags in assembled["supports"].items() if flags[2])
-        policy=self._selected_wall_support_strategy()
+        policy=support_policy or self._selected_wall_support_strategy()
         if policy=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
             if self.gravity_profile_var.get()!="GRAVITY_1.0D_1.0L":
                 raise ValueError("Nonzero reaction diagnostic must use full 1D+1L")
@@ -701,7 +701,11 @@ class GravityAnalysisGUI:
             expected_supports=sorted(map(int,selected))
         else:
             expected_supports=original
-        if sorted(supports)!=expected_supports:
+        if support_policy=="ETABS_SOURCE_SUPPORTS":
+            # The independent dual 76/97 run must not inherit the main
+            # 32-node selection or demand an ETABS table that it does not use.
+            supports=expected_supports
+        elif sorted(supports)!=expected_supports:
             raise ValueError("Displayed supports do not match authoritative selected scenario. Click Read BOTH support lists; no manual unreviewed fixity changes.")
         # Recalculate before every run; reject stale manually entered totals.
         expected, context, _ = self._selected_gravity_evidence(model)
@@ -766,7 +770,7 @@ class GravityAnalysisGUI:
         the exported model config are not modified.
         """
         try:
-            model,out,py,supports,total,steps=self._inputs()
+            model,out,py,supports,total,steps=self._inputs(support_policy="ETABS_SOURCE_SUPPORTS")
             if self.gravity_profile_var.get()!="GRAVITY_1.0D_1.0L":
                 raise ValueError("Both wall-base strategy runs require full 1.0D+1.0L gravity")
             if not self.coverage_confirmed.get():
@@ -863,6 +867,23 @@ class GravityAnalysisGUI:
             for mode in scenarios:
                 self._make_outputs(records[mode]["payload"],Path(records[mode]["out"]))
             export_wall_support_comparison(comparison,root)
+            from components.gravity.reaction_case_registry import register_case
+            for mode in scenarios:
+                info=records[mode]
+                case_path=Path(info["out"])/"Gravity_Result_V110.json"
+                try:
+                    verified=register_case(root.parents[1],case_path,
+                        info["payload"]["model_script"],scenario=mode,
+                        profile="GRAVITY_1.0D_1.0L")
+                    self._gravity_action_log("SOLVED_CASE_REACTION",
+                        f"{mode} | nodes={verified['support_count']} | "
+                        f"Rz={verified['summed_reaction_kN']:.6f} kN | "
+                        f"Applied={verified['applied_load_kN']:.6f} kN | "
+                        f"error={verified['equilibrium_error_percent']:.6g}%")
+                except Exception as register_error:
+                    self._gravity_action_log("CASE_REACTION_REGISTRATION_FAILED",
+                        mode+": "+str(register_error))
+            self._refresh_case_reaction()
             for mode in scenarios:
                 case=root/mode
                 self._gravity_action_log("DUAL_GRAVITY_RESULT_JSON_"+mode,
@@ -942,6 +963,24 @@ class GravityAnalysisGUI:
             messagebox.showerror("Report generation failed", str(exc), parent=self.win)
             self.nb.select(self.log_tab)
             return
+        # Save only a solved, internally consistent set of support reactions.
+        try:
+            from components.gravity.reaction_case_registry import register_case
+            scenario=payload["wall_support_strategy"]
+            registry_root=(out.parent.parent if scenario=="ETABS_NONZERO_REACTION_DIAGNOSTIC" else out)
+            verified=register_case(registry_root,out/"Gravity_Result_V110.json",
+                payload["model_script"],scenario=scenario,
+                profile=payload["gravity_profile"])
+            self._gravity_action_log("SOLVED_CASE_REACTION",
+                f"{scenario} | nodes={verified['support_count']} | "
+                f"Rz={verified['summed_reaction_kN']:.6f} kN | "
+                f"Applied={verified['applied_load_kN']:.6f} kN | "
+                f"error={verified['equilibrium_error_percent']:.6g}% | "
+                f"registry={registry_root}")
+        except Exception as registry_error:
+            self._gravity_action_log("CASE_REACTION_REGISTRATION_FAILED",
+                str(registry_error))
+        self._refresh_case_reaction()
         if payload.get("wall_support_strategy")=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
             try:
                 from components.gravity.etabs_reaction_support_filter import export_primary_32_comparison
