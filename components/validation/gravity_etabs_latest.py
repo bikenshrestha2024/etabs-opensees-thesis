@@ -60,6 +60,10 @@ def _indexed_result(index, strategy, expected_nodes):
 
 
 def run(etabs_xlsx, connectivity_json, case_index_json, output_folder):
+    """Read exact source evidence, reject stale model inputs, export audits.
+
+    [REF components/validation/gravity_etabs_offline.py]
+    """
     paths = [Path(x).expanduser().resolve() for x in
              (etabs_xlsx, connectivity_json, case_index_json)]
     for path in paths:
@@ -142,6 +146,10 @@ def run(etabs_xlsx, connectivity_json, case_index_json, output_folder):
 
 
 def main():
+    """Spyder/CLI entry point for offline native evidence comparison.
+
+    [REF docs/source/components/validation/gravity_etabs_latest.py.md]
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--etabs", help="Completed ETABS full export xlsx / Joint Reactions csv")
     parser.add_argument("--mapping", help="OpenSees_Element_Connectivity.json")
