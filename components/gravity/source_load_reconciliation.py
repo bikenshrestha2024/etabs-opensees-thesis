@@ -49,6 +49,8 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
                      required=False)
     pattern_count=_load_json(folder/"Gravity_Single_Count_Self_Weight_Audit.json",
                              required=False)
+    slab_physical=_load_json(folder/"Gravity_Slab_Self_Weight_Audit.json",
+                             required=False)
     if not isinstance(data.get("load_provenance"),list) or not data["load_provenance"]:
         raise ValueError("Export has no complete load_provenance; rebuild with current exporter")
     from OpenSees_Complete_Export_V118 import apply_gravity_profile
@@ -93,6 +95,29 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
         raise ValueError("Load provenance does not reconcile to assembled gravity: "+
                          f"sum={total:.9f}, assembled={expected:.9f}, "
                          f"delta={delta:.9f}, pattern discrepancies={mismatches[:6]}")
+    # Verify actual assembled floor dead-weight nodal forces independently
+    # against source floor geometry and true ETABS pattern allocations.
+    physical_slab_weight=None
+    expected_applied_slab_weight=None
+    floor_weight_from_assembled=by_component.get("self_weight_floor",0.)
+    if slab_physical is not None:
+        if pattern_count is None:
+            raise ValueError("Slab physical audit exists but self-weight allocation audit is missing")
+        physical_slab_weight=float(slab_physical["gross_slab_self_weight_kN"])
+        allocation=0.
+        for entry in pattern_count["etabs_pattern_rows"]:
+            pat=str(entry["pattern"])
+            if pat not in factors:
+                raise ValueError("Slab self-weight pattern factor missing for "+pat)
+            allocation+=float(entry["etabs_self_weight_multiplier"])*float(factors[pat])
+        expected_applied_slab_weight=physical_slab_weight*allocation
+        if abs(floor_weight_from_assembled-expected_applied_slab_weight)>max(
+                .01,abs(expected_applied_slab_weight)*1e-8):
+            raise ValueError(
+                "SLAB SELF-WEIGHT DOUBLE/OMISSION RISK: original source slab area*"
+                "thickness*unit weight, after pattern multipliers, is "
+                f"{expected_applied_slab_weight:.6f} kN but actual OpenSees "
+                f"self_weight_floor load vectors total {floor_weight_from_assembled:.6f} kN")
     beam_delta=float(beam.get("potential_offset_reduction_kN",0))
     beam_gross=float(beam.get("gross_beam_weight_kN",0))
     if not all(math.isfinite(x) and x>=0 for x in (beam_delta,beam_gross)):
@@ -148,6 +173,11 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
               "INDEPENDENT_ETABS_MATERIAL_LIST_REQUIRED"),
           native_beam_proof=native_beam_proof,
           single_count_pattern_audit=pattern_count,
+          physical_slab_gross_self_weight_kN=physical_slab_weight,
+          expected_full_gravity_slab_self_weight_kN=expected_applied_slab_weight,
+          actual_applied_slab_self_weight_kN=floor_weight_from_assembled,
+          slab_source_conservation_verified=(slab_physical is not None and
+              expected_applied_slab_weight is not None),
           geometric_joint_ownership_audit=(
               {"policy":joint.get("policy"),
                "gross_RCC_weight_kN":joint.get("gross_RCC_weight_kN"),
@@ -159,6 +189,8 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
           active_native_model_identity="NOT_VERIFIED_BY_THIS_OFFLINE_AUDIT")
     if pattern_count is None:
         info["status"]="LEGACY_EXPORT_SINGLE_COUNT_NOT_VERIFIED"
+    elif slab_physical is None:
+        info["status"]="LEGACY_EXPORT_SLAB_PHYSICAL_WEIGHT_NOT_VERIFIED"
     elif pattern_count.get("status")!="SELF_WEIGHT_PATTERN_ACCOUNTING_PASS_NOT_JOINT_SOLID_VALIDATED":
         info["status"]="SELF_WEIGHT_PATTERN_ACCOUNTING_NOT_VERIFIED"
     if info["unclassified_components"]:
