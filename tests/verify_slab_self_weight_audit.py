@@ -54,7 +54,7 @@ class SlabWeightAuditTests(unittest.TestCase):
 
     def test_missing_floor_cell_area_fails_not_auto_fixes(self):
         self.cells[1]["area"]=17.
-        with self.assertRaisesRegex(ValueError,"Duplicated/omitted"):
+        with self.assertRaisesRegex(ValueError,"Mesh slab cell area differs"): 
             self.run_audit()
 
     def test_overlapping_two_source_slabs_blocks_single_count(self):
@@ -76,7 +76,7 @@ class SlabWeightAuditTests(unittest.TestCase):
                 dict(kind="shell",index=0,category="FLOOR",
                      gross_weight_kN=67.5,net_weight_kN=62.5,
                      overlap_with_COLUMN_m3=.12,
-                     overlap_with_SHEAR_WALL_m3=.08),
+                     **{"overlap_with_SHEAR WALL_m3":.08}),
                 dict(kind="shell",index=1,category="FLOOR",
                      gross_weight_kN=67.5,net_weight_kN=67.5)
             ])
