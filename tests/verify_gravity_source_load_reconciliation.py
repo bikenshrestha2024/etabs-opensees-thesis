@@ -47,13 +47,20 @@ class SourceLoadAuditTests(unittest.TestCase):
             ("ETABS_OpenSees_Beam_Weight_Reconciliation.json",self.beam),
             ("Gravity_Single_Count_Self_Weight_Audit.json",
              {"status":"SELF_WEIGHT_PATTERN_ACCOUNTING_PASS_NOT_JOINT_SOLID_VALIDATED",
-              "full_DL_LL_physical_self_weight_coefficient":1.0})]:
+              "full_DL_LL_physical_self_weight_coefficient":1.0,
+              "etabs_pattern_rows":[
+                  {"pattern":"Self Weight","etabs_self_weight_multiplier":1.0}]}),
+            ("Gravity_Slab_Self_Weight_Audit.json",
+             {"gross_slab_self_weight_kN":0.0})]:
             (self.root/filename).write_text(json.dumps(value),encoding="utf8")
         self.fake=types.ModuleType("OpenSees_Complete_Export_V118")
         def apply(data,cfg,profile,types):
             self.assertEqual(profile,"GRAVITY_1.0D_1.0L")
             factors={"Self Weight":1.,"Live":1.}
-            ledger={"Self Weight":120.,"Live":20.}
+            ledger={"Self Weight":sum(float(x["downward_kN"])
+                       for x in data["load_provenance"] if x["pattern"]=="Self Weight"),
+                    "Live":sum(float(x["downward_kN"])
+                       for x in data["load_provenance"] if x["pattern"]=="Live")}
             data["gravity_by_pattern_kN"]=ledger
             data["total_downward_load_kN"]=sum(ledger.values())
             return {"profile":profile,"factors":factors}
@@ -87,6 +94,30 @@ class SourceLoadAuditTests(unittest.TestCase):
         (self.root/"Gravity_Single_Count_Self_Weight_Audit.json").unlink()
         info=self.run_audit()
         self.assertEqual(info["status"],"LEGACY_EXPORT_SINGLE_COUNT_NOT_VERIFIED")
+
+    def test_physical_slab_15kn_matches_applied_source_nodes(self):
+        self.data["load_provenance"].append(
+            dict(pattern="Self Weight",component="self_weight_floor",
+                 source="AREA:57",node=4,downward_kN=15.))
+        (self.root/"OpenSees_Complete_Model_Data_V118.json").write_text(
+            json.dumps(self.data),encoding="utf8")
+        (self.root/"Gravity_Slab_Self_Weight_Audit.json").write_text(
+            json.dumps({"gross_slab_self_weight_kN":15.}),encoding="utf8")
+        info=self.run_audit()
+        self.assertEqual(info["actual_applied_slab_self_weight_kN"],15.)
+        self.assertEqual(info["expected_full_gravity_slab_self_weight_kN"],15.)
+        self.assertTrue(info["slab_source_conservation_verified"])
+
+    def test_slab_double_weight_or_omission_is_rejected(self):
+        (self.root/"Gravity_Slab_Self_Weight_Audit.json").write_text(
+            json.dumps({"gross_slab_self_weight_kN":15.}),encoding="utf8")
+        with self.assertRaisesRegex(ValueError,"SLAB SELF-WEIGHT DOUBLE/OMISSION"):
+            self.run_audit()
+
+    def test_legacy_slab_export_does_not_claim_validated_source(self):
+        (self.root/"Gravity_Slab_Self_Weight_Audit.json").unlink()
+        info=self.run_audit()
+        self.assertEqual(info["status"],"LEGACY_EXPORT_SLAB_PHYSICAL_WEIGHT_NOT_VERIFIED")
 
     def test_no_source_ledger_fails_closed(self):
         self.data.pop("load_provenance")
