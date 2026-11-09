@@ -35,6 +35,48 @@ def _find_actual(names):
         re.search(r"(?i)\bEQ[XY]\b",name)
         or re.search(r"(?i)^EQ[XY][+\-]",name))]
 
+def _db_display_snapshot(sap):
+    """Snapshot DatabaseTables output selection; Results.Setup is separate."""
+    db=sap.DatabaseTables
+    raw=db.GetLoadCasesSelectedForDisplay()
+    if not isinstance(raw,(list,tuple)) or len(raw)<3 or raw[-1] not in (0,None):
+        raise RuntimeError("CSI DatabaseTables case selector mismatch: "+repr(raw)[:250])
+    n=int(raw[0]);cases=list(raw[1])
+    if len(cases)!=n:raise RuntimeError("DatabaseTables case count mismatch")
+    getcombos=getattr(db,"GetLoadCombinationsSelectedForDisplay",None)
+    combos=[]
+    if getcombos is not None:
+        other=getcombos()
+        if not isinstance(other,(list,tuple)) or len(other)<3 or other[-1] not in (0,None):
+            raise RuntimeError("CSI DatabaseTables combo selector mismatch")
+        combos=list(other[1])
+        if len(combos)!=int(other[0]):raise RuntimeError("DatabaseTables combo count mismatch")
+    return dict(cases=cases,combos=combos,combos_available=getcombos is not None)
+
+
+def _db_select_case(sap,case):
+    db=sap.DatabaseTables
+    result=db.SetLoadCasesSelectedForDisplay([case])
+    if isinstance(result,(list,tuple)):result=result[-1]
+    if result not in (0,None):raise RuntimeError("Set database case selector failed: "+str(result))
+    if hasattr(db,"SetLoadCombinationsSelectedForDisplay"):
+        code=db.SetLoadCombinationsSelectedForDisplay([])
+        if isinstance(code,(list,tuple)):code=code[-1]
+        if code not in (0,None):raise RuntimeError("Clear database combos failed")
+
+
+def _db_restore(sap,snapshot):
+    if snapshot is None:return
+    db=sap.DatabaseTables
+    result=db.SetLoadCasesSelectedForDisplay(snapshot["cases"])
+    if isinstance(result,(list,tuple)):result=result[-1]
+    if result not in (0,None):raise RuntimeError("Restore database case selections failed")
+    if snapshot["combos_available"]:
+        code=db.SetLoadCombinationsSelectedForDisplay(snapshot["combos"])
+        if isinstance(code,(list,tuple)):code=code[-1]
+        if code not in (0,None):raise RuntimeError("Restore database combos failed")
+
+
 def export_eq_pdelta_native_evidence(sap,out_dir,*,log=None,max_rows=1000000):
     """Query existing ETABS saved case responses and display tables.
 
@@ -43,6 +85,13 @@ def export_eq_pdelta_native_evidence(sap,out_dir,*,log=None,max_rows=1000000):
     """
     out=Path(out_dir);out.mkdir(parents=True,exist_ok=True)
     before=_snapshot(sap)
+    db_before=None
+    db_selection_status="NOT_CHECKED"
+    try:
+        db_before=_db_display_snapshot(sap)
+        db_selection_status="NATIVE_TABLE_DISPLAY_SNAPSHOT"
+    except Exception as selection_err:
+        db_selection_status="UNAVAILABLE: "+type(selection_err).__name__+": "+str(selection_err)
     events=[]
     log=log or (lambda *_args,**_kwargs:None)
     try:
@@ -56,10 +105,19 @@ def export_eq_pdelta_native_evidence(sap,out_dir,*,log=None,max_rows=1000000):
                       exact_native_cases=case_names,
                       selected_eq_case_names=selected,
                       selected_case_count=len(selected),
+                      table_display_selection_status=db_selection_status,
                       table_catalog=catalog,events=events,
                       status="SOURCE_EVIDENCE_NOT_STRUCTURAL_VALIDATION",
                       disclaimer="Only existing saved results; no ETABS model, load case or solver changes.")
         for case in selected:
+            table_case_selected=False
+            if db_before is not None:
+                try:
+                    _db_select_case(sap,case)
+                    table_case_selected=True
+                except Exception as filter_exc:
+                    events.append(dict(case=case,type="TABLE_DISPLAY_SELECTION",
+                        status="BLOCKED",error=str(filter_exc)))
             try:
                 _select(sap,case)
                 all_base=_base(sap,case)
@@ -81,6 +139,19 @@ def export_eq_pdelta_native_evidence(sap,out_dir,*,log=None,max_rows=1000000):
                 key=row["key"]
                 try:
                     fields,records=_get_native_table(sap,key)
+                    normalized=[str(x).replace(" ","").replace("_","").lower()
+                                for x in fields]
+                    idx=next((i for i,value in enumerate(normalized)
+                              if value in ("outputcase","loadcase","case")),None)
+                    response_table=any(term in key.lower() for term in (
+                        "story shear","story forces","story drift",
+                        "displacement","base reaction"))
+                    if response_table and idx is None:
+                        raise ValueError("Missing exact output-case column: "+key)
+                    if response_table and not table_case_selected:
+                        raise ValueError("Native DatabaseTables case selection unverified")
+                    if idx is not None:
+                        records=[v for v in records if str(v[idx])==case]
                     if len(records)>max_rows:
                         raise ValueError(f"{len(records)} rows exceed explicit {max_rows} audit limit")
                     filename="case_"+hashlib.sha256(
@@ -91,6 +162,8 @@ def export_eq_pdelta_native_evidence(sap,out_dir,*,log=None,max_rows=1000000):
                     events.append(dict(case=case,type="NATIVE_TABLE",table_key=key,
                                        fields=fields,records=len(records),
                                        file=filename,sha256=_sha(path),
+                                       native_case_column=fields[idx] if idx is not None else None,
+                                       display_selection_verified=table_case_selected,
                                        status="EXPORTED_RAW_NOT_NORMALIZED"))
                 except Exception as exc:
                     events.append(dict(case=case,type="NATIVE_TABLE",table_key=key,
@@ -116,4 +189,7 @@ def export_eq_pdelta_native_evidence(sap,out_dir,*,log=None,max_rows=1000000):
             json.dumps(manifest,indent=2,default=str),encoding="utf-8")
         return manifest
     finally:
-        _restore(sap,before)
+        try:
+            _db_restore(sap,db_before)
+        finally:
+            _restore(sap,before)
