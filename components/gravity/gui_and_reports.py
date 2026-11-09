@@ -112,6 +112,8 @@ class GravityAnalysisGUI:
         self.wall_support_strategy_var=tk.StringVar(value="ETABS Reaction Validation (32 nodes)")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
+        self.gravity_operation_state=tk.StringVar(value="IDLE | No gravity solver or exporter running")
+        self._gravity_busy=False
         self._build()
         self.wall_support_strategy_var.trace_add(
             "write", lambda *_: self._read_code_inputs(show_error=False)
@@ -123,6 +125,96 @@ class GravityAnalysisGUI:
             folder=Path(self.model_var.get()).parent if self.model_var.get() else Path(r'D:/Thesis Opensees/Etabs Nodes Export')
             autoselect_inputs(self,folder,'gravity_model_script')
         self.win.after_idle(populate_saved)
+
+    def _set_gravity_operation(self,state,detail=""):
+        """Running status independent of the report/status text (Tk main thread)."""
+        self.gravity_operation_state.set(state+" | "+str(detail))
+        if state=="RUNNING":
+            self.gravity_busy_bar.start(15)
+        else:
+            self.gravity_busy_bar.stop()
+
+    def _rebuild_verified_clear_beam(self):
+        """Recreate model in a new folder; never change original EDB/export."""
+        if self._gravity_busy:
+            messagebox.showwarning("Another process running",
+                                   "Finish the current gravity process first.",
+                                   parent=self.win)
+            return
+        model=Path(self.model_var.get()).expanduser()
+        if not model.is_file():
+            messagebox.showerror("Select source model","Select the current exported model first.",parent=self.win)
+            return
+        native=filedialog.askopenfilename(
+            parent=self.win,title="Original ETABS frame/material assignment workbook",
+            filetypes=[("Excel native source","*.xlsx"),("All files","*.*")])
+        if not native:return
+        destination=filedialog.askdirectory(
+            parent=self.win,
+            title="Choose parent directory for NEW verified clear-beam source export")
+        if not destination:return
+        source=model.resolve().parent
+        import datetime as _dt
+        new=Path(destination).resolve()/(
+            "Verified_Clear_Beam_"+_dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+        # In an exported copy the runtime contains components but not tools.
+        # Run the rebuilt source implementation from the current updated repo.
+        current_root=Path(__file__).resolve().parents[2]
+        script=current_root/"tools"/"REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py"
+        if not script.is_file():
+            messagebox.showerror("Current code required",
+                "The selected GUI is running from an older saved runtime. "
+                "Open the UPDATED GitHub repository, run tools/"
+                "REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py from that repository, "
+                "then select its new Gravity_Model.py in this GUI.\n"
+                "Missing: "+str(script),parent=self.win)
+            return
+        self._gravity_busy=True
+        self._set_gravity_operation("RUNNING","Verifying native ETABS workbook and rebuilding source")
+        self._gravity_action_log("CORRECTED_EXPORT_START",
+            "Old source="+str(source)+" | new target="+str(new))
+        def worker():
+            try:
+                command=[str(self.python_var.get()),"-u",str(script),
+                    "--source-dir",str(source),
+                    "--assignment-workbook",str(native),
+                    "--dest-dir",str(new)]
+                proc=subprocess.run(command,cwd=str(current_root),
+                    text=True,capture_output=True,errors="replace",encoding="utf-8")
+                logfile=new/"CLEAR_BEAM_REBUILD_GUI.log"
+                if new.is_dir():
+                    logfile.write_text(proc.stdout+"\n"+proc.stderr,
+                                       encoding="utf-8")
+                success=proc.returncode==0 and (
+                    new/"OpenSees_Complete_Gravity_Model.py").is_file()
+                msg=(proc.stderr or proc.stdout or "No process output")[-4000:]
+                def finished():
+                    self._gravity_busy=False
+                    if success:
+                        self.model_var.set(str(new/"OpenSees_Complete_Gravity_Model.py"))
+                        self._set_gravity_operation("FINISHED",
+                            "New source ready; gravity not yet solved | "+str(new))
+                        self.status_var.set("NEW verified clear-beam source selected. "
+                            "Read both support lists and run the 32-node gravity again.")
+                        self._gravity_action_log("CORRECTED_EXPORT_FINISHED",str(new))
+                        messagebox.showinfo("New corrected model",
+                            "Native ETABS beam evidence checked and new model generated.\n"
+                            "Old gravity results are unchanged.\n"
+                            "Now click Read BOTH support lists, then rerun gravity.\n"+
+                            str(new),parent=self.win)
+                    else:
+                        self._set_gravity_operation("BLOCKED",msg)
+                        self._gravity_action_log("CORRECTED_EXPORT_BLOCKED",msg)
+                        messagebox.showerror("Clear-beam rebuild blocked",msg,parent=self.win)
+                self.win.after(0,finished)
+            except Exception as exc:
+                issue=str(exc)
+                def failed():
+                    self._gravity_busy=False
+                    self._set_gravity_operation("BLOCKED",issue)
+                    self._gravity_action_log("CORRECTED_EXPORT_BLOCKED",issue)
+                self.win.after(0,failed)
+        threading.Thread(target=worker,daemon=True).start()
 
     def _browse_file(self, variable, title, filetypes):
         p = filedialog.askopenfilename(parent=self.win, title=title, filetypes=filetypes)
@@ -613,6 +705,8 @@ class GravityAnalysisGUI:
         self.batch_run_button=ttk.Button(bar,text="Run 76 + 97 supports | full gravity",
                    command=self.run_both_wall_supports)
         self.batch_run_button.pack(side="left",padx=5)
+        ttk.Button(bar,text="REBUILD verified beam weight in NEW folder",
+                   command=self._rebuild_verified_clear_beam).pack(side="left",padx=5)
         ttk.Label(bar,text="Selected condition: ").pack(side="left",padx=(12,2))
         ttk.Label(bar,textvariable=self.gravity_profile_var).pack(side="left")
         ttk.Label(bar,textvariable=self.wall_support_strategy_var).pack(side="left",padx=8)
@@ -627,6 +721,10 @@ class GravityAnalysisGUI:
             except Exception as exc:messagebox.showerror('Slab load path',str(exc),parent=self.win)
         ttk.Button(actions,text='Slab load path + formulas',command=load_path).pack(side='left',padx=4)
         ttk.Button(actions, text="Open output folder", command=self._open_output_folder).pack(side="left", padx=8)
+        self.gravity_busy_bar=ttk.Progressbar(root,mode="indeterminate")
+        self.gravity_busy_bar.pack(fill="x",padx=5,pady=(0,2))
+        ttk.Label(root,textvariable=self.gravity_operation_state,
+                  wraplength=1100).pack(fill="x",padx=5,pady=(0,2))
         ttk.Label(root, textvariable=self.status_var,wraplength=1100).pack(fill="x",pady=(0,5))
         self.nb = ttk.Notebook(root); self.nb.pack(fill="both", expand=True)
         self.plot_tab = ttk.Frame(self.nb); self.nb.add(self.plot_tab, text="Matplotlib results")
@@ -751,13 +849,37 @@ class GravityAnalysisGUI:
         return model, out, py, supports, expected, steps
 
     def run(self):
+        if self._gravity_busy:
+            messagebox.showwarning("Gravity busy","Wait until RUNNING changes to FINISHED/BLOCKED.",parent=self.win)
+            return
         try: model, out, py, supports, total, steps = self._inputs()
         except Exception as exc:
             messagebox.showerror("Gravity inputs need review", str(exc), parent=self.win); return
+        source_cfg=model.parent/"OpenSees_Complete_Model_Config_V118.json"
+        if source_cfg.is_file():
+            cfg=json.loads(source_cfg.read_text(encoding="utf-8-sig"))
+            if cfg.get("etabs_beam_weight_policy")!="ETABS_BEAM_CLEAR_LENGTH":
+                self._set_gravity_operation("BLOCKED",
+                    "OLD gross-beam model: ETABS mass/weight mismatch remains ~8652.444 kN")
+                messagebox.showerror("Old gross beam model cannot validate ETABS",
+                    "This exported model still uses GROSS_SECTION_LENGTH. "
+                    "A prior GitHub code change cannot retrofit its saved data.\n"
+                    "Click REBUILD verified beam weight in NEW folder and select "
+                    "the original ETABS material/assignment workbook.\n"
+                    "Then run primary 32-node gravity again.",parent=self.win)
+                return
+            proof=model.parent/"ETABS_Native_Assignment_Gravity_Quantity_Audit.json"
+            if not proof.is_file():
+                self._set_gravity_operation("BLOCKED","New source lacks native ETABS beam proof")
+                messagebox.showerror("Missing native ETABS weight proof",
+                    str(proof),parent=self.win)
+                return
         if not self.coverage_confirmed.get():
             messagebox.showerror("Gravity load coverage not confirmed", "Review the generated model and verify the total downward load against the project load ledger. The code-derived line-load total may omit slab, wall, self-weight, FVD/BRB or other loads. Confirm coverage before running.", parent=self.win); return
+        self._gravity_busy=True
         self.run_button.configure(state="disabled")
         self.batch_run_button.configure(state="disabled")
+        self._set_gravity_operation("RUNNING",self.gravity_profile_var.get()+" | "+self._selected_wall_support_strategy())
         self.status_var.set("RUNNING | "+self.gravity_profile_var.get()+" | "+self._selected_wall_support_strategy())
         self.log.delete("1.0", "end")
         self._gravity_action_log("GRAVITY_START","Selected model: "+str(model))
@@ -1012,6 +1134,11 @@ class GravityAnalysisGUI:
             self.win.after(0, lambda: self._finished({"ok": False, "error": str(exc)}, detail, out))
 
     def _finished(self, payload, log_text, out):
+        self._gravity_busy=False
+        self._set_gravity_operation(
+            "FINISHED" if payload.get("ok") else "BLOCKED",
+            "Solver completed; post-run engineering comparison pending" if payload.get("ok")
+            else str(payload.get("error","Solver failure")))
         self.run_button.configure(state="normal")
         self.batch_run_button.configure(state="normal")
         self._gravity_action_log("GRAVITY_SOLVER","Full OpenSees console log follows")
