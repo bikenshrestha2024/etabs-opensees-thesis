@@ -1,7 +1,7 @@
 """Static inventory of the ACTIVE OpenSeesPy thesis research repository.
 
 No native OpenSees execution; never edits/moves/renames model files.
-Reads only local source filenames and Python AST. JSON is reproducible,
+Reads local source filenames, parses AST and compiles without execution. JSON is reproducible,
 but source counts are version-specific. Run from the repository root:
     python tools/audit_active_repository.py --output audit/active_inventory.json
 
@@ -41,6 +41,7 @@ CANONICAL = {
     19: "19_AUDIT_LOAD_CONNECTIONS.py",
     20: "20_TRACE_FAILED_ELEMENT.py",
     21: "21_NLTHA_TRIAGE.py",
+    22: "22_NBC105_INPUT_SYNC.py",
     27: "27_COMPARE_OUTRIGGERS.py",
     29: "29_NATIVE_DEVICE_BENCHMARK.py",
     30: "30_CALIBRATE_FVD_FROM_TEST.py",
@@ -49,6 +50,7 @@ CANONICAL = {
     34: "34_NBC105_RC_DUAL_C_D_TARGETS.py",
     35: "35_SOIL_C_NLTHA_PREFLIGHT.py",
     36: "36_SOIL_C_NLTHA_RUN_MATRIX.py",
+    37: "37_THESIS_EVIDENCE_DASHBOARD.py",
 }
 STAGE = [
     ("00", "Target and source provenance", "Target workbook, soil C, Z/I, SeismoMatch SHA"),
@@ -69,13 +71,16 @@ def _sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def inspect_one_python(path, root=ROOT):
-    """Parse active Python syntax and return functions/imports; never execute it."""
+    """Parse and compile Python syntax and return symbols; never execute it."""
     source = path.read_text(encoding="utf-8-sig", errors="replace")
     rel = path.relative_to(root).as_posix()
     data = dict(path=rel, lines=len(source.splitlines()), sha256=_sha(path),
                 parse_status="OK", classes=[], functions=[], imports=[])
     try:
         parsed = ast.parse(source, filename=str(path))
+        # AST parsing alone accepts repeated keywords and misplaced break/return.
+        # Compilation catches those import failures without running model code.
+        compile(parsed, str(path), "exec", dont_inherit=True)
     except SyntaxError as exc:
         data.update(parse_status="SYNTAX_ERROR", syntax_line=exc.lineno,
                     syntax_error=str(exc.msg))
@@ -94,6 +99,7 @@ def inspect_one_python(path, root=ROOT):
 def inventory(root=ROOT):
     root = Path(root)
     entries = []
+    entries.extend(inspect_one_python(p, root) for p in sorted(root.glob("*.py")))
     for folder in SOURCE_ROOTS:
         target = root / folder
         if target.exists():
@@ -134,7 +140,7 @@ def inventory(root=ROOT):
                    for n,name,evidence in STAGE],
         "warnings": [
             "Duplicate NN root launchers are compatibility aliases: do not bulk rename.",
-            "Static AST parse is not a line-by-line semantic/engineering review.",
+            "Static parsing/compilation is not a line-by-line semantic/engineering review.",
             "Archived Saved_Project_ trees are not the currently maintained modules.",
             "First-step X core-wall failure and member experimental calibration remain unresolved.",
             "Do not label a passing source-PGA/spectrum check NBC compliant NLTHA."

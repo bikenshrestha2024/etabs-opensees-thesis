@@ -2,8 +2,9 @@
 import csv
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
-from components.validation.gravity_reactions_3d import load_rows
+from components.validation.gravity_reactions_3d import load_rows, create_audit
 
 HEADERS = ["ETABS Unique Name", "ETABS Label", "OpenSees Node Tag",
            "X (m)", "Y (m)", "Z (m)", "ETABS FZ (kN)",
@@ -43,6 +44,19 @@ class TestGravity3DMapping(unittest.TestCase):
             f.write("264,47,42,12,12,0,0,0,0\n")
         with self.assertRaisesRegex(ValueError, "duplicate"):
             load_rows(self.path)
+
+    def test_html_traces_keep_labels_separate_from_hover_evidence(self):
+        try:
+            import plotly.offline
+        except ImportError:
+            self.skipTest("Plotly is optional for CSV mapping; required for HTML export")
+        with patch.object(plotly.offline, "plot") as render:
+            create_audit(self.path, Path(self.temp.name)/"output")
+        figure = render.call_args.args[0]
+        self.assertEqual(len(figure.data), 5)
+        self.assertIn("264", figure.data[0].text)
+        self.assertIn("OpenSees node 9", figure.data[0].hovertext[0])
+        self.assertIn("UNVERIFIED", figure.data[0].hovertext[0])
 
 if __name__ == "__main__":
     unittest.main()

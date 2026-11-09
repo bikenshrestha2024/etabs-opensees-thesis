@@ -30,7 +30,7 @@ See [dashboard guide](../programs/37_THESIS_EVIDENCE_DASHBOARD.md).
 
 ## Root numbering policy
 
-- `01–20` canonical code paths are listed in [the original 01–20 mapping](../../00_READ_FIRST_RUN_ORDER.md).
+- Current canonical tools are listed in [the launcher index](../programs/00_PROGRAM_INDEX.md). Begin with the [start page](../../00_READ_FIRST_RUN_ORDER.md).
 - **Historical aliases currently duplicate numeric prefixes** (for example, `01_START_ETABS_TO_OPENSEES.py` versus `01_WORKFLOW_START.py`, and `17_LITERATURE_COMPONENT_DEMO.py` versus `17_BUILDING_FULL_NONLINEAR.py`). Sorting root file names alphabetically is **not** a verified analysis order.
 - **Do not mechanically rename historical aliases or internal `components/` imports**. A safe migration requires an import/call graph, launcher smoke tests, known Windows references and retained source hashes.
 - All *new* engineering code goes into stable named packages under `components/`, not `V171, V172` root forks; new numbered launchers require the guide and test.
@@ -44,7 +44,7 @@ python tools/audit_active_repository.py --output "D:/Thesis/Review/Active_Reposi
 python tests/verify_active_repository_audit.py
 ```
 
-The JSON contains **module names, code line counts, SHA256, top-level symbol/line map, imports, syntax exceptions, missing individual guides, canonical launcher existence and duplicate-number aliases**. It is a static coverage register, not actual semantic line review, experimental calibration or NBC compliance.
+The JSON contains **module names, code line counts, SHA256, top-level symbol/line map, imports, syntax exceptions, missing individual guides, canonical launcher existence and duplicate-number aliases**. Root launchers and compatibility facades are compiled as well as components, tests and tools, without executing them. It is a static coverage register, not actual semantic line review, experimental calibration or NBC compliance.
 
 For each module, after the static index, add a review ledger item with: exact lines, structural hypothesis, unit conventions, source clause/DOI, native test, accepted model state, reviewer and remaining blocker.
 

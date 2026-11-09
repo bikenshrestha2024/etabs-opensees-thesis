@@ -67,6 +67,7 @@ class GravityNodeAuditTests(unittest.TestCase):
             self.assertIn("ETABS ID mapping",wb.sheetnames)
             self.assertIn("Largest differences",wb.sheetnames)
             self.assertEqual(wb["All OpenSees nodes"].max_row,5)
+            wb.close()
 
     def test_exact_source_76_node_workbook_and_critical_ranking(self):
         from openpyxl import load_workbook
@@ -97,6 +98,7 @@ class GravityNodeAuditTests(unittest.TestCase):
             book=load_workbook(Path(root)/"Gravity_76_Source_Support_Reactions.xlsx")
             self.assertIn("Nodes 1-76",book.sheetnames)
             self.assertEqual(book["Nodes 1-76"].max_row,4)
+            book.close()
             self.assertTrue((Path(root)/"Gravity_76_Critical_Reaction_Nodes.csv").exists())
             no_etabs=export_fixed_source_support_reactions(
                 Path(root)/"no_etabs",os_data,topo,None,expected_tags=[1,2,3])

@@ -1,0 +1,39 @@
+name: Repository compilation and navigation
+
+on:
+  pull_request:
+    paths: ['*.py', 'components/**', 'tools/**', 'tests/**', 'docs/**', '00_READ_FIRST_RUN_ORDER.md', '.github/workflows/repository-integrity.yml']
+  push:
+    branches: [main]
+    paths: ['*.py', 'components/**', 'tools/**', 'tests/**', 'docs/**', '00_READ_FIRST_RUN_ORDER.md', '.github/workflows/repository-integrity.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: repository-review
+          create-args: >-
+            -c conda-forge
+            python=3.12
+            plotly
+          cache-environment: true
+      - name: Compile active sources and verify workflow navigation
+        shell: micromamba-shell {0}
+        run: |
+          python tools/audit_active_repository.py --output audit/active_inventory.json --fail-on-missing-canonical
+          python -m unittest tests.verify_active_repository_audit tests.verify_gravity_reactions_3d -v
+      - name: Archive static inventory (not engineering validation)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-repository-inventory
+          path: audit/active_inventory.json
+          if-no-files-found: warn

@@ -11,6 +11,11 @@ This offline module creates a Plotly-based interactive base-reaction display usi
 
 ## Outputs
 
+Node ID labels use Plotly `text`; detailed mapped reactions and restraint evidence
+use `hovertext`. These channels must remain separate. The HTML trace regression
+in `tests/verify_gravity_reactions_3d.py` checks both using the actual Plotly trace
+constructor; it does not establish native ETABS/OpenSees agreement.
+
 * `Gravity_Base_Reactions_3D.html`: offline HTML, dropdown for ETABS reactions, OpenSees original support model, OpenSees continuous wall-base model and both signed differences.
 * `Gravity_3D_Restraint_Audit.csv`: point mapping, native restraint status, reactions and differences.
 * `Gravity_3D_Restraint_Audit.json`: totals, native restraint coverage and validation warnings.

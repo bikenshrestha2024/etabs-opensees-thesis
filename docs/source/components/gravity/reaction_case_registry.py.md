@@ -27,6 +27,23 @@ The same applied gravity loads are used for all three modes, assuming identical 
 * Keep each native per-node reaction in `Gravity_Result_V110.json`; the registry only indexes its verified sum, it does not modify model data.
 * The single 32-node result uses `Gravity_Reaction_Diagnostic/<timestamp>`. Both 76/97 cases retain their isolated `Gravity_Wall_Base_Comparison/<timestamp>/<mode>` output folders.
 
+## Common output location and consumers (2026-11-09)
+
+All three support strategies register under the output root selected in the GUI.
+`Gravity_Case_Reaction_Index.json` is the machine index and
+`Gravity_Output_Index.txt` is its readable companion, listing the model, support
+count, actual result path and indexing time. Result files remain separate so a
+diagnostic case cannot masquerade as the original-support case. Historical entries
+are rechecked; an index entry alone is not a validation certificate.
+
+PDF action export, direct ETABS comparison and the evidence ZIP button resolve
+the selected model/profile/support condition through `current_case`. They must not
+assume `Gravity_Result_V110.json` sits in the parent output directory, nor silently
+pick the most recently modified case. Unindexed older results require a new run.
+
+Regression: `tests.verify_gravity_case_reaction_registry` covers the nested 32-node
+case, all three indexed locations, stale inputs and profile isolation.
+
 ## Sources
 
 * [OpenSeesPy reactions command](https://openseespydoc.readthedocs.io/en/latest/src/reactions.html)

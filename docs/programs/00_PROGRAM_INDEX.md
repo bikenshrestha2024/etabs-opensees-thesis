@@ -1,6 +1,6 @@
 # 00 — Numbered program index
 
-All **20 root program launchers** have work-order names. Material/component validation precedes nonlinear building work. The program numbers are navigational and do not certify structural validity.
+The table lists the current canonical launchers. Numeric IDs are stable navigation labels; gaps are intentional. Material/component validation precedes nonlinear building work. The program numbers are navigational and do not certify structural validity.
 
 | Step | Launcher | Guide | Function |
 |---|---|---|---|
@@ -24,10 +24,22 @@ All **20 root program launchers** have work-order names. Material/component vali
 | 18 | [`18_NONLINEAR_PERFORMANCE.py`](../../18_NONLINEAR_PERFORMANCE.py) | [Guide](18_NONLINEAR_PERFORMANCE.md) | Performance criteria and results |
 | 19 | [`19_AUDIT_LOAD_CONNECTIONS.py`](../../19_AUDIT_LOAD_CONNECTIONS.py) | [Guide](19_AUDIT_LOAD_CONNECTIONS.md) | Load-path and connectivity audit |
 | 20 | [`20_TRACE_FAILED_ELEMENT.py`](../../20_TRACE_FAILED_ELEMENT.py) | [Guide](20_TRACE_FAILED_ELEMENT.md) | Trace failed solver element |
-
 | 21 | [`21_NLTHA_TRIAGE.py`](../../21_NLTHA_TRIAGE.py) | [Guide](21_NLTHA_TRIAGE.md) | NLTHA isolated diagnostic configuration and evidence review |
 
+| 22 | [`22_NBC105_INPUT_SYNC.py`](../../22_NBC105_INPUT_SYNC.py) | [Guide](22_NBC105_OPENSEES_FIRST_INPUT_SYNC.md) | Synchronize NBC inputs from current OpenSees and reviewed sources |
+| 27 | [`27_COMPARE_OUTRIGGERS.py`](../../27_COMPARE_OUTRIGGERS.py) | [Guide](27_M0_M6_OUTRIGGER_COMPARISON.md) | Compare completed M0-M6 cases with identity and completion gates |
+| 29 | [`29_NATIVE_DEVICE_BENCHMARK.py`](../../29_NATIVE_DEVICE_BENCHMARK.py) | [Guide](29_NATIVE_FVD_BRB_RECORDER_VALIDATION.md) | Native FVD/BRB recorder benchmark |
+| 30 | [`30_CALIBRATE_FVD_FROM_TEST.py`](../../30_CALIBRATE_FVD_FROM_TEST.py) | [Guide](30_FVD_EXPERIMENTAL_CALIBRATION.md) | Fit FVD parameters to supplied experimental data |
+| 32 | [`32_NBC105_PAIR_SPECTRUM_AUDIT.py`](../../32_NBC105_PAIR_SPECTRUM_AUDIT.py) | [Guide](32_NBC105_PAIR_SPECTRUM_AUDIT.md) | Audit paired motion spectra and scaling evidence |
+| 33 | [`33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py`](../../33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py) | [Guide](33_NBC105_XY_YX_VERTICAL_AND_SCALE_GUIDE.md) | Review XY/YX and vertical-action applicability |
+| 34 | [`34_NBC105_RC_DUAL_C_D_TARGETS.py`](../../34_NBC105_RC_DUAL_C_D_TARGETS.py) | [Guide](34_NBC105_RC_DUAL_SOIL_C_D_TARGETS.md) | Generate distinct RC-dual Soil C and D targets |
+| 35 | [`35_SOIL_C_NLTHA_PREFLIGHT.py`](../../35_SOIL_C_NLTHA_PREFLIGHT.py) | [Guide](35_SOIL_C_PRIMARY_NLTHA_RUNBOOK.md) | Preflight Soil C motion and model evidence |
+| 36 | [`36_SOIL_C_NLTHA_RUN_MATRIX.py`](../../36_SOIL_C_NLTHA_RUN_MATRIX.py) | [Guide](36_SOIL_C_M0_M6_RUN_MATRIX.md) | Plan the Soil C M0-M6 run matrix; does not run analyses |
+| 37 | [`37_THESIS_EVIDENCE_DASHBOARD.py`](../../37_THESIS_EVIDENCE_DASHBOARD.py) | [Guide](37_THESIS_EVIDENCE_DASHBOARD.md) | Inspect evidence status and hashes; does not approve results |
+
 Legacy filenames remain functional as launch aliases. Underlying components, external records and saved outputs have not been renamed. The nonlinear transient failure is still an open issue.
+
+The machine-readable launcher list is `CANONICAL` in [the inventory tool](../../tools/audit_active_repository.py). The documentation regression checks this table against that list and checks its local links.
 
 [File migration map](../00_WORK_ORDER_RENAME_MAP.md) · [Organization policy](../00_REPOSITORY_ORGANIZATION.md)
 
