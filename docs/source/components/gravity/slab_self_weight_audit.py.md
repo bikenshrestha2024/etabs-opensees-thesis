@@ -68,7 +68,19 @@ The reported earlier 8,680.475 kN global discrepancy broke down in the earlier m
 
 **NBC 105:2025 Clause 3.6** contains the **structural load combinations**; neither this clause nor 3.4 tells an ETABS/OpenSees converter to delete 150 mm of beam concrete at every slab junction. The volume and joint ownership rules above are **source-model reconstruction and geometry-consistency engineering**, not a codally prescribed reduction.
 
-## 7. Provenance and source documentation
+## 7. Cross-check actual applied OpenSees slab self-weight
+
+During each gravity run, `components/gravity/source_load_reconciliation.py` independently checks both sides of a slab-weight identity:
+
+`W_slab,expected = sum(A_source × t_physical × gamma) × sum(ETABS_pattern_self_weight_multiplier × selected_gravity_profile_factor)`
+
+`W_slab,actual = sum(all load_provenance downward_kN tagged self_weight_floor × selected_gravity_profile_factor)`
+
+It **raises a blocking error** on any discrepancy, rather than scaling the slab load to achieve gravity equilibrium. It separately checks that the complete applied source-load ledger equals the un-factorized/selected assembled nodal force vectors. The structural response is still not certified equivalent to ETABS merely because this accounting identity passes.
+
+Old exports without `Gravity_Slab_Self_Weight_Audit.json` cannot claim a complete slab single-count check; the code reports `LEGACY_EXPORT_SLAB_PHYSICAL_WEIGHT_NOT_VERIFIED`. Re-export from the original EDB to obtain the new audit. The source load audit reports `actual_applied_slab_self_weight_kN` and `expected_full_gravity_slab_self_weight_kN` in its JSON and Excel.
+
+## 8. Provenance and source documentation
 
 * Official Government of Nepal NBC 105:2025 PDF (DUDBC / Kathmandu eBPS):
   https://ebps.kathmandu.gov.np/UploadFiles/NBC_105_2025_Sesmic_Design.pdf
@@ -89,7 +101,7 @@ The reported earlier 8,680.475 kN global discrepancy broke down in the earlier m
 * Michael H. Scott (2022), *Element Self-Weight*, OpenSees Digital:
   https://openseesdigital.com/2022/11/02/element-self-weight/
 
-## 8. What the new evidence means
+## 9. What the new evidence means
 
 Outputs are saved in the original model export folder and included in the gravity evidence bundle:
 
