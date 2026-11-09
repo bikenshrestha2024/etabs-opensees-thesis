@@ -1033,6 +1033,16 @@ class GravityAnalysisGUI:
                     f"difference={independent-native_total:.6f} kN | "
                     f"hypothetical after verified beam offset={detailed['post_offset_total_hypothesis_kN']:.6f} kN "
                     "(hypothesis only; source ETABS beam-weight proof required)")
+            # Each gravity run now owns its joint overlap evidence; do not
+            # infer an ETABS weight rule from this geometry-only diagnostic.
+            overlap=detailed.get("joint_overlap_run_evidence", {})
+            self._gravity_action_log("GRAVITY_JOINT_OVERLAP_GATE",
+                f"status={overlap.get('status', 'NOT_RECORDED')} | "
+                f"potential={overlap.get('potential_overlap_kN')} kN | "
+                f"applied correction={overlap.get('applied_gravity_correction_kN')} kN | "
+                f"source SHA256={overlap.get('source_sha256')}")
+            for evidence_path in overlap.get("files", []):
+                self._gravity_action_log("GRAVITY_JOINT_OVERLAP_FILE", evidence_path)
             for suffix in ("json","xlsx"):
                 self._gravity_action_log("GRAVITY_SOURCE_AUDIT_FILE",
                     str(out/("Gravity_Source_Components_Audit."+suffix)))
