@@ -71,6 +71,26 @@ class OfflineEtabsGravityTests(unittest.TestCase):
             self.assertIn("Evidence gates",wb.sheetnames)
             self.assertEqual(wb["Additional fixed wall nodes"].max_row,2)
         finally:wb.close()
+    def test_current_primary_32_diagnostic_is_compared_without_faking_zero_nodes(self):
+        data=json.loads(self.a.read_text())
+        data["wall_support_strategy"]="ETABS_NONZERO_REACTION_DIAGNOSTIC"
+        # Only one of two ETABS-mapped points is an actual restrained
+        # reaction in this synthetic 32-style case.
+        data["reactions"]=data["reactions"][:1]
+        data["report"]["support_vertical_reaction_kN"]=130.0
+        data["report"]["applied_vertical_load_kN"]=130.0
+        primary=self.root/"primary.json"
+        primary.write_text(json.dumps(data))
+        report=compare_etabs_export(
+            self.xlsx,self.root/"mapping.json",primary,self.b,
+            source_strategy="ETABS_NONZERO_REACTION_DIAGNOSTIC")
+        self.assertEqual(report["source_strategy"],"ETABS_NONZERO_REACTION_DIAGNOSTIC")
+        self.assertEqual(report["matched_source_nodes"],1)
+        self.assertEqual(report["unmapped_or_missing_reactions"],1)
+        missing=[r for r in report["rows"] if r["etabs_unique_name"]=="1"][0]
+        self.assertIsNone(missing["opensees_source_Rz_kN"])
+        self.assertEqual(missing["status"],"NO_OPENSEES_REACTION_AT_MAPPED_NODE")
+
     def test_etabs_header_with_embedded_newline_units(self):
         wb=Workbook();ws=wb.active;ws.title="Joint Reactions"
         ws.append(["Story","Label","Unique Name","Output Case","FZ\nkN"])
