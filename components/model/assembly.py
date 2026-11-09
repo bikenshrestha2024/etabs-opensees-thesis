@@ -599,6 +599,15 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                 wa=v0+(v1-v0)*(a-lo)/(hi-lo); wb=v0+(v1-v0)*(b-lo)/(hi-lo)
                 source_context=dict(source='FRAME:'+obj,component='frame_load')
                 line(pat,seg,[wa*x for x in vector],[wb*x for x in vector],a-seg['start'],b-seg['start'])
+        from components.model.single_count_self_weight import audit_self_weight_patterns
+        self_weight_policy_audit=audit_self_weight_patterns(
+            loads.get('etabs_load_pattern_self_weight_multipliers',[]),
+            cfg['gravity_factors'],cfg['mass_factors'],
+            beam_weight_policy=beam_weight_policy,
+            joint_volume_policy=volume_policy)
+        _write(folder/'Gravity_Single_Count_Self_Weight_Audit.json',
+               self_weight_policy_audit)
+        report['single_count_self_weight_audit']=self_weight_policy_audit
         for r in loads.get('etabs_load_pattern_self_weight_multipliers',[]):
             mult=r.get('multiplier')
             if mult is None: raise ValueError(f"Missing self-weight multiplier for {r.get('pattern')}")
@@ -682,6 +691,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         payload=dict(config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest(),nodes=nodes,frames=frame_elements,shells=shells,gravity=gravity,unfactored_patterns=patterns,nodal_mass=nodal_mass,supports=supports,
                      diaphragms=groups,total_downward_load_kN=total,gravity_by_pattern_kN=ledger,base_z_m=base_z)
         payload['load_provenance']=load_provenance
+        payload['single_count_self_weight_audit']=self_weight_policy_audit
         payload['joint_volume_weight_policy']=volume_policy
         payload['etabs_beam_weight_policy']=beam_weight_policy
         payload['etabs_beam_weight_audit']=report['etabs_beam_weight_audit']
