@@ -44,18 +44,47 @@ def _table_catalog(sap):
 
 
 def _get_native_table(sap,key):
-    # Standard CSI OAPI signature: Key, FieldKeyList, GroupName,
-    # TableVersion, FieldsKeysIncluded, NumberRecords, TableData, ret.
-    raw=_tuple_success(
-        sap.DatabaseTables.GetTableForDisplayArray(str(key),[],"",0,[],0,[]),
-        8,"GetTableForDisplayArray "+str(key))
-    fields=[str(x) for x in raw[4]]
-    count=int(raw[5])
-    flat=list(raw[6])
-    if count<0 or not fields and count:
+    """Normalize CSI comtypes' actual OUT-parameter tuple, as seen in ETABS v23.
+
+    Signature INPUTS: TableKey, FieldKeyList, GroupName, TableVersion,
+                      FieldsKeysIncluded, NumberRecords, TableData.
+    Actual comtypes RETURNS on this installation:
+        (FieldKeyList_or_GroupName, TableVersion,
+         FieldsKeysIncluded, NumberRecords, TableData, retcode)
+    This is SIX items, not the eight synthetic inputs+outputs assumed by V01.
+    Never index result[4] for field names: result[4] is flattened data.
+    """
+    raw=sap.DatabaseTables.GetTableForDisplayArray(
+        str(key),[],"",0,[],0,[])
+    if not isinstance(raw,(list,tuple)):
+        raise RuntimeError("GetTableForDisplayArray "+str(key)+
+                           ": CSI returned non-tuple "+repr(type(raw)))
+    if len(raw)==6:
+        # Verified directly against user ETABS v23 log 2026-11-09 22:10:47.
+        version,header,number,data,code=raw[1],raw[2],raw[3],raw[4],raw[5]
+    elif len(raw)==8:
+        # Some wrappers retain supplied arguments in the output tuple.
+        version,header,number,data,code=raw[3],raw[4],raw[5],raw[6],raw[7]
+    else:
+        raise RuntimeError("GetTableForDisplayArray "+str(key)+
+                           ": unsupported tuple length "+str(len(raw))+
+                           " (expected six or eight)")
+    if code not in (0,None):
+        raise RuntimeError("GetTableForDisplayArray "+str(key)+
+                           ": CSI retcode="+repr(code))
+    try:
+        fields=[str(x) for x in header]
+        count=int(number)
+        flat=list(data)
+    except (TypeError,ValueError) as exc:
+        raise ValueError("Invalid CSI fields/count/data for "+str(key)) from exc
+    if count<0 or (not fields and count):
         raise ValueError("Invalid ETABS table header for "+str(key))
     if len(flat)!=count*len(fields):
-        raise ValueError("Native ETABS table flattened length mismatch: "+str(key))
+        raise ValueError("Native ETABS table flattened length mismatch: "+
+                         str(key)+" | nrows="+str(count)+
+                         " | ncols="+str(len(fields))+
+                         " | flat="+str(len(flat)))
     return fields,[flat[i*len(fields):(i+1)*len(fields)] for i in range(count)]
 
 
