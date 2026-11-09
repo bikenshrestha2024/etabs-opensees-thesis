@@ -58,12 +58,12 @@ def audit_self_weight_patterns(records, gravity_factors, mass_factors, *,
             f"{physical:.8f} (>1), so the same model geometry is counted "
             "more than once in full 1D+1L. Correct original ETABS load patterns "
             "and re-export; never subtract support reactions to conceal it.")
-    if configured>1+eps:
-        raise ValueError("DOUBLE COUNT RISK: configured self-weight coefficient "
-                         f"{configured:.8f} (>1) for the same physical geometry.")
+    # A code-prescribed strength combination (e.g. 1.2D) legitimately
+    # amplifies the load above physical weight. That is NOT geometric
+    # double-counting and must never be treated as such.
     if mass>1+eps:
-        raise ValueError("DOUBLE COUNT RISK: mass from self-weight coefficient "
-                         f"{mass:.8f} (>1) for the same physical geometry.")
+        raise ValueError("SEISMIC MASS REVIEW REQUIRED: mass from self-weight "
+                         f"coefficient {mass:.8f} (>1) of physical weight.")
     if (beam_weight_policy=="ETABS_BEAM_CLEAR_LENGTH"
             and joint_volume_policy=="VERIFIED_SINGLE_OWNER"):
         raise ValueError("DOUBLE SUBTRACTION: beam clear length plus joint volume")
