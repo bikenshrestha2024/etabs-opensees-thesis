@@ -21,18 +21,19 @@ class SlabWeightAuditTests(unittest.TestCase):
         self.records=[
             dict(dimension="area_polygon",category="FLOOR",
                  etabs_object="Slab-A",node_tags=[1,2,3,4])]
+        self.mesh_nodes=dict(self.original_nodes,
+                             **{}) # preserve original source coordinates
+        self.mesh_nodes.update({5:[3.,0.,3.],6:[3.,6.,3.]})
         self.prop=dict(thickness=.15,weight=25.)
         self.cells=[
             dict(category="FLOOR",object="Slab-A",
-                 area=18.,properties=self.prop,nodes=[1,2,3,4]),
+                 area=18.,properties=self.prop,nodes=[1,5,6,4]),
             dict(category="FLOOR",object="Slab-A",
-                 area=18.,properties=self.prop,nodes=[1,2,3,4])]
-        # This deliberately uses only cell areas for area auditing;
-        # a separate source-coordinate mesh consistency audit is needed
-        # to establish the actual shape of the finite elements.
+                 area=18.,properties=self.prop,nodes=[5,2,3,6])]
     def run_audit(self,ledger=None):
         return audit_slab_self_weight(
             self.cells,self.records,self.original_nodes,
+            mesh_nodes=self.mesh_nodes,
             joint_volume_ledger=ledger,output_dir=self.root)
 
     def test_36m2_slab_weight_135kN_and_mesh_conserves(self):
@@ -45,6 +46,11 @@ class SlabWeightAuditTests(unittest.TestCase):
         self.assertEqual(report["hypothetical_full_overlap_net_beam_depth_m"],.65)
         self.assertTrue((self.root/"Gravity_Slab_Self_Weight_Audit.xlsx").is_file())
         self.assertTrue((self.root/"Gravity_Slab_Self_Weight_Audit.csv").is_file())
+
+    def test_duplicate_child_polygon_same_total_area_fails(self):
+        self.cells[1]["nodes"]=[1,5,6,4]
+        with self.assertRaisesRegex(ValueError,"DUPLICATE/OVERLAPPING"):
+            self.run_audit()
 
     def test_missing_floor_cell_area_fails_not_auto_fixes(self):
         self.cells[1]["area"]=17.
