@@ -157,6 +157,10 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
                "interpretation":"GEOMETRY AUDIT; never add to the beam clear-length deduction"}
               if joint else None),
           active_native_model_identity="NOT_VERIFIED_BY_THIS_OFFLINE_AUDIT")
+    if pattern_count is None:
+        info["status"]="LEGACY_EXPORT_SINGLE_COUNT_NOT_VERIFIED"
+    elif pattern_count.get("status")!="SELF_WEIGHT_PATTERN_ACCOUNTING_PASS_NOT_JOINT_SOLID_VALIDATED":
+        info["status"]="SELF_WEIGHT_PATTERN_ACCOUNTING_NOT_VERIFIED"
     if info["unclassified_components"]:
         info["status"]="SOURCE_COMPONENT_CLASSIFICATION_INCOMPLETE"
     out.mkdir(parents=True,exist_ok=True)
