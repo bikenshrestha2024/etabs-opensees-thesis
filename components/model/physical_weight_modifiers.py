@@ -144,11 +144,8 @@ def review_physical_weight_modifiers(native,patterns,output_dir):
         issues.extend(native.get("errors") or ["Native modifier evidence incomplete"])
     nonunit_weight=[x for x in issues if "WEIGHT modifier=" in x]
     if nonunit_weight:
-        # Do not knowingly calculate wrong physical weight.
-        raise ValueError("NONUNITY NATIVE ETABS WEIGHT MODIFIER; "
-                         "do not silently force physical weight=100%: "+
-                         " | ".join(nonunit_weight[:8]))
-    if issues:
+        status="SOURCE_NATIVE_WEIGHT_MODIFIER_CONFLICT"
+    elif issues:
         status="NATIVE_WEIGHT_OR_MASS_EVIDENCE_INCOMPLETE"
     report=dict(schema="gravity-physical-stiffness-mass-separation-v1",
         status=status,mode="READ_ONLY_GRAVITY_ACCOUNTING",
@@ -160,7 +157,10 @@ def review_physical_weight_modifiers(native,patterns,output_dir):
         native_extraction_complete=bool(native.get("complete")),
         evidence_issues=issues,modifiers=rows,patterns=pattern_rows,
         physical_self_weight_not_scaled_by_cracked_section=True,
-        source_weight_modifier_verified=(status=="NATIVE_WEIGHT_MODIFIERS_VERIFIED"))
+        source_weight_modifier_verified=(
+            bool(native.get("complete")) and len(rows)>0 and not nonunit_weight
+            and all("modifier array unverified" not in issue for issue in issues)),
+        source_weight_conflict=bool(nonunit_weight))
     out=Path(output_dir);out.mkdir(parents=True,exist_ok=True)
     (out/"Gravity_Physical_Weight_Modifier_Audit.json").write_text(
         json.dumps(report,indent=2),encoding="utf-8")
