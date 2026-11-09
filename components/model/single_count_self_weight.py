@@ -32,25 +32,41 @@ def audit_self_weight_patterns(records, gravity_factors, mass_factors, *,
         if not pattern or pattern in seen:
             raise ValueError("Duplicate or empty ETABS self-weight pattern "+pattern)
         seen.add(pattern)
-        if pattern not in gravity_factors or pattern not in mass_factors:
-            raise ValueError("Missing pattern factors for self-weight "+pattern)
+        # Zero-source-weight load patterns (including EQX, EQY) are
+        # audited but do not require a gravity or seismic mass factor.
+        # Nonzero source weight still demands two explicitly verified factors.
         try:
             m=float(rec["multiplier"])
-            gf=float(gravity_factors[pattern])
-            mf=float(mass_factors[pattern])
         except (TypeError,ValueError,KeyError) as exc:
-            raise ValueError("Invalid ETABS self-weight pattern record "+pattern) from exc
-        if not all(math.isfinite(x) for x in (m,gf,mf)):
-            raise ValueError("Nonfinite self-weight allocation in "+pattern)
-        if m<0 or gf<0 or mf<0:
-            raise ValueError("Negative self-weight or pattern factor requires separate reviewed treatment: "+pattern)
+            raise ValueError("Invalid ETABS self-weight multiplier for "+pattern) from exc
+        if not math.isfinite(m) or m<0:
+            raise ValueError("Invalid/negative self-weight multiplier for "+pattern)
+        zero_without_factors=(m==0 and
+             (pattern not in gravity_factors or pattern not in mass_factors))
+        if zero_without_factors:
+            gf=mf=None
+            applied_gravity=applied_mass=0.
+        else:
+            if pattern not in gravity_factors or pattern not in mass_factors:
+                raise ValueError("Missing pattern factors for NONZERO self-weight "+pattern)
+            try:
+                gf=float(gravity_factors[pattern])
+                mf=float(mass_factors[pattern])
+            except (TypeError,ValueError,KeyError) as exc:
+                raise ValueError("Invalid ETABS self-weight factors for "+pattern) from exc
+            if not all(math.isfinite(v) and v>=0 for v in (gf,mf)):
+                raise ValueError("Nonfinite/negative self-weight factor for "+pattern)
+            applied_gravity=m*gf
+            applied_mass=m*mf
         physical+=m
-        configured+=m*gf
-        mass+=m*mf
+        configured+=applied_gravity
+        mass+=applied_mass
         rows.append(dict(pattern=pattern,etabs_self_weight_multiplier=m,
                          configured_gravity_factor=gf,seismic_mass_factor=mf,
-                         configured_weight_coefficient=m*gf,
-                         mass_weight_coefficient=m*mf))
+                         configured_weight_coefficient=applied_gravity,
+                         mass_weight_coefficient=applied_mass,
+                         factor_status=('ZERO_SELF_WEIGHT_NO_FACTORS_NEEDED' if zero_without_factors
+                                        else 'EXPLICIT_FACTORS_VERIFIED')))
     eps=1e-8
     if physical>1+eps:
         raise ValueError(
