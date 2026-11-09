@@ -120,15 +120,21 @@ def reconcile_joint_weight_scenarios(source_folder, output_folder,
     # Distinct, EXCLUSIVE interpretations: beam clear-span and geometric RCC
     # union cannot be subtracted together because their footprints intersect.
     # An applied correction under either route needs native ETABS quantities.
+    # The CURRENT model may already use the independently verified
+    # clear-length beam policy. Never subtract beam offsets a second time.
+    current_clear = beam.get("policy") == "ETABS_BEAM_CLEAR_LENGTH"
+    gross_reference = applied + clear_candidate if current_clear else applied
+    clear_reference = gross_reference - clear_candidate
     scenarios = [
-        dict(id="CURRENT_ASSEMBLED", total_kN=applied, correction_kN=0.,
-             applied=True, interpretation="Current solved gravity; no proposed deductions"),
-        dict(id="BEAM_CLEAR_LENGTH_ONLY", total_kN=applied-clear_candidate,
-             correction_kN=clear_candidate, applied=False,
-             interpretation="Only original source beam end offsets; ETABS weight rule unverified"),
+        dict(id="CURRENT_ASSEMBLED",total_kN=applied,
+             correction_kN=(clear_candidate if current_clear else 0.),
+             applied=True,interpretation="Actual solved gravity under exported source policy"),
+        dict(id="BEAM_CLEAR_LENGTH_ONLY",total_kN=clear_reference,
+             correction_kN=clear_candidate,applied=current_clear,
+             interpretation="Source beam clear-length applied ONLY if policy enabled by native quantity proof"),
         dict(id="GEOMETRIC_RCC_SINGLE_OWNER_ONLY",
-             total_kN=applied-overlap, correction_kN=overlap, applied=False,
-             interpretation="Disjoint RCC box union; source insertion and ETABS rule unverified"),
+             total_kN=gross_reference-overlap,correction_kN=overlap,
+             applied=False,interpretation="Separate gross-source geometric RCC union hypothesis; never combined with clear beam deduction"),
     ]
     for item in scenarios:
         item["etabs_minus_scenario_kN"] = (
@@ -136,7 +142,7 @@ def reconcile_joint_weight_scenarios(source_folder, output_folder,
         item["scenario_minus_etabs_kN"] = (
             item["total_kN"]-etabs if etabs is not None else None)
         item["geometry_validated"] = bool(ledger.get("geometry_verified", False))
-        item["etabs_material_quantity_validated"] = False
+        item["etabs_material_quantity_validated"] = False  # see separate native assignment audit
         item["accepted_weight_correction"] = False
     reasons = [
         "Full floor-to-floor columns and walls are represented in source gross volumes; their union with slabs and beams may overlap.",
