@@ -71,6 +71,9 @@ on:
       - 'components/gravity/gui_and_reports.py'
       - 'components/gravity/reaction_case_registry.py'
       - 'components/gravity/source_load_reconciliation.py'
+      - 'components/gravity/joint_overlap_review.py'
+      - 'tests/verify_joint_overlap_review.py'
+      - 'docs/source/components/gravity/joint_overlap_review.py.md'
       - 'tests/verify_gravity_source_load_reconciliation.py'
       - 'tests/verify_gravity_case_reaction_registry.py'
       - 'components/ui/plot_utilities.py'
@@ -287,6 +290,7 @@ jobs:
           python tests/verify_gravity_support_scenarios.py
           python tests/verify_gravity_case_reaction_registry.py
           python tests/verify_gravity_source_load_reconciliation.py
+          python tests/verify_joint_overlap_review.py
           python tests/verify_single_count_self_weight.py
           python tests/verify_gravity_etabs_offline.py
           python tests/verify_standalone_offline_gravity.py
