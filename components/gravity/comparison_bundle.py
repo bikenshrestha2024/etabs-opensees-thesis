@@ -19,6 +19,7 @@ SELECTED = (
     "ETABS_OpenSees_Beam_Weight_Reconciliation.json",
     "ETABS_OpenSees_Beam_Weight_Reconciliation.csv",
     "ETABS_Frame_End_Offset_Weight_Audit.csv",
+    "Gravity_Single_Count_Self_Weight_Audit.json",
     "OpenSees_Joint_Volume_Ownership_Audit.json",
     "OpenSees_Joint_Volume_Ownership_Audit.csv",
     "OpenSees_Complete_Model_Data_V118.json",
