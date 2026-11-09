@@ -539,6 +539,43 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                 repr(missing_native_shs)+
                 '. Sharp-corner tube properties are an unvalidated fallback; '
                 're-export from ETABS v23 for full brace mass equivalence.')
+        # For this source EDB, a native ETABS assignment XLSX can establish
+        # original per-beam length/offset identity and independent Material
+        # List weight. A boolean user flag alone is NOT adequate proof.
+        # Explicit beam-clear mode is a NEW export, never an in-place change
+        # to an existing solved OpenSees gravity/NLTHA model.
+        if beam_weight_policy=='ETABS_BEAM_CLEAR_LENGTH':
+            evidence_path=(cfg.get('etabs_native_assignment_workbook_path')
+                           or os.environ.get('ETABS_GRAVITY_ASSIGNMENT_WORKBOOK','')).strip()
+            if not evidence_path:
+                raise ValueError('Clear-length beam self-weight requires exact '
+                    'native ETABS assignment XLSX path and independent per-object audit')
+            gross_candidate,_=build_beam_weight_audit(
+                segments,meta.get('frames',{}),policy='GROSS_SECTION_LENGTH')
+            candidate_path=folder/'ETABS_Beam_Weight_Candidate_Gross_Source.json'
+            _write(candidate_path,gross_candidate)
+            from components.validation.etabs_assignment_gravity_audit import (
+                audit_native_assignment_workbook)
+            native_proof=audit_native_assignment_workbook(
+                evidence_path,folder,candidate_path)
+            if (native_proof.get('opensees_beam_crosswalk_status')
+                    !='SOURCE_IDS_OFFSETS_AND_TOTAL_MATCH'
+                    or native_proof.get('clear_candidate_matches_native_quantity') is not True):
+                raise ValueError('Native ETABS beam source identity/quantity gate '
+                                 'FAILED: no corrected model exported')
+            # The independent native workbook satisfies the numerical
+            # confirmation input; retain the source config flag as an
+            # additional affirmative user/reviewer decision.
+            if cfg['etabs_clear_beam_weight_confirmed'] is not True:
+                raise ValueError('Native quantities match, but source config '
+                    'etabs_clear_beam_weight_confirmed is not explicitly true')
+            report['native_etabs_beam_quantity_proof']={
+                'status':native_proof['opensees_beam_crosswalk_status'],
+                'workbook_sha256':native_proof['source_workbook_sha256'],
+                'native_beam_weight_kN':native_proof['beam_weight_kN'],
+                'native_beam_object_count':native_proof['native_beam_objects'],
+                'candidate_weight_kN':native_proof['opensees_beam_clear_weight_candidate_kN'],
+                'applied_to_new_export_only':True}
         beam_weight_audit,beam_weight_intervals=build_beam_weight_audit(
             segments,meta.get('frames',{}),
             policy=beam_weight_policy,
