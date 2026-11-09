@@ -159,7 +159,9 @@ def review_physical_weight_modifiers(native,patterns,output_dir):
         physical_self_weight_not_scaled_by_cracked_section=True,
         source_weight_modifier_verified=(
             bool(native.get("complete")) and len(rows)>0 and not nonunit_weight
+            and abs(total_coefficient-1)<=1e-9
             and all("modifier array unverified" not in issue for issue in issues)),
+        full_gravity_weight_allocation_unity=abs(total_coefficient-1)<=1e-9,
         source_weight_conflict=bool(nonunit_weight))
     out=Path(output_dir);out.mkdir(parents=True,exist_ok=True)
     (out/"Gravity_Physical_Weight_Modifier_Audit.json").write_text(
