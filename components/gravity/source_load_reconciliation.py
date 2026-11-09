@@ -293,6 +293,7 @@ def source_load_audit(model_folder,gravity_profile,output_folder,*,etabs_total_k
                 str(out/"Gravity_Joint_Weight_Reconciliation.json"),
                 str(out/"Gravity_Joint_Weight_Scenarios.csv"),
                 str(out/"Gravity_Joint_Weight_By_Solid.csv"),
+                str(out/"Gravity_Original_ETABS_Object_Quantities.csv"),
             ],
         }
     else:
