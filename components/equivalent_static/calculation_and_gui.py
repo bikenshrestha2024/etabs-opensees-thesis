@@ -441,6 +441,8 @@ class ESMGui:
         self.python_exe=tk.StringVar(value=sys.executable)
         self.last_runners=[]
         self.status=tk.StringVar(value="Select a verified story-weight CSV, enter project/code inputs, then run the in-house Python NBC calculation.")
+        self.esm_operation_state=tk.StringVar(value="IDLE | No ESM process running")
+        self._esm_busy=False
         self._build()
         from OpenSees_Complete_Export_V118 import autoselect_inputs
         autoselect_inputs(self, export_dir, 'modal_model_script')
@@ -454,6 +456,55 @@ class ESMGui:
         # valid. Do not automatically obscure input diagnostics with a COM error.
         self.awx.trace_add('write',lambda *_:self._show_empirical())
         self.awy.trace_add('write',lambda *_:self._show_empirical())
+
+    def _set_esm_operation(self,state,detail=""):
+        """Main Tk thread only; independent of verbose console status."""
+        self.esm_operation_state.set(str(state)+" | "+str(detail))
+        if state=="RUNNING":
+            self.esm_busy_bar.start(12)
+        else:
+            self.esm_busy_bar.stop()
+
+    def _bundle_esm_evidence(self):
+        """Collect source, original Excel and saved ESM results in one ZIP."""
+        if self._esm_busy:
+            messagebox.showwarning("ESM task running",
+                "Another ESM operation is running. Wait for its FINISHED/BLOCKED status.",
+                parent=self.root)
+            return
+        self._esm_busy=True
+        self._set_esm_operation("RUNNING","Collecting local ESM validation evidence")
+        def worker():
+            try:
+                from components.equivalent_static.evidence_bundle import (
+                    bundle_esm_validation)
+                result=bundle_esm_validation(
+                    self.export_dir,self.outdir.get(),self.outdir.get(),
+                    progress=lambda msg:self.root.after(0,
+                        lambda m=str(msg):self._set_esm_operation("RUNNING",m)))
+                def success():
+                    self._esm_busy=False
+                    label="FINISHED" if not result["manifest"]["missing_required"] else "INCOMPLETE"
+                    self._set_esm_operation(label,
+                        "ZIP: "+result["upload_zip"]+
+                        " | missing required: "+str(len(result["manifest"]["missing_required"])))
+                    self.status.set("ESM evidence: "+result["upload_zip"])
+                    messagebox.showinfo("ESM validation evidence",
+                        "Evidence collection "+label+"\n"+
+                        "ZIP: "+result["upload_zip"]+"\n"+
+                        "Files: "+str(result["manifest"]["total_collected"])+"\n"+
+                        "Missing required: "+repr(result["manifest"]["missing_required"])+
+                        "\n\nThe archive is NOT ETABS/OpenSees design acceptance.",
+                        parent=self.root)
+                self.root.after(0,success)
+            except Exception as exc:
+                problem=str(exc)
+                def failed():
+                    self._esm_busy=False
+                    self._set_esm_operation("BLOCKED",problem)
+                    messagebox.showerror("ESM evidence failed",problem,parent=self.root)
+                self.root.after(0,failed)
+        threading.Thread(target=worker,daemon=True).start()
 
     def _run_etabs_linked(self):
         """Use the uploaded original Excel/ETABS engine, without touching RS scaling."""
@@ -470,12 +521,21 @@ class ESMGui:
         out=filedialog.askdirectory(parent=self.root,title="Output directory for NEW populated Excel and audit",
                                      initialdir=self.outdir.get() if Path(self.outdir.get()).is_dir() else str(Path.home()))
         if not out: return
+        if self._esm_busy:
+            messagebox.showwarning("ETABS-linked ESM","Another ESM task is running.",
+                parent=self.root)
+            return
+        self._esm_busy=True
+        self._set_esm_operation("RUNNING","ETABS-linked workbook / source identity")
         self.status.set("ETABS linked ESM: reading model and populating a new Excel copy (no RS scaling).")
         def task():
             try:
                 target,audit,coeff=run_etabs_excel(source,workbook,engine,out,
                     log=lambda msg:self.root.after(0,lambda m=str(msg):self.status.set(m)))
                 def success():
+                    self._esm_busy=False
+                    self._set_esm_operation("FINISHED",
+                        "Original ETABS Excel calculation: "+str(target))
                     self.status.set("ETABS linked Excel ready: "+str(target)+" | provenance "+str(audit))
                     messagebox.showinfo("ETABS Linked ESM",f"Populated original Excel method:\n{target}\n\nAudit:\n{audit}\n\nOpenSees Direct remains available in the dropdown.",parent=self.root)
                     # [REF NBC105-2025 §5.1.2] the computed Aw/T were previously
@@ -493,9 +553,14 @@ class ESMGui:
                 self.root.after(0,success)
             except Exception as exc:
                 error=str(exc)
+                self.root.after(0,lambda:self._finish_linked_failure(error))
                 self.root.after(0,lambda:messagebox.showerror("ETABS Linked ESM failed",error,parent=self.root))
                 self.root.after(0,lambda:self.status.set("ETABS linked ESM FAILED: "+error))
         threading.Thread(target=task,daemon=True).start()
+
+    def _finish_linked_failure(self,error):
+        self._esm_busy=False
+        self._set_esm_operation("BLOCKED",error)
 
     def _field(self,parent,label,var,row,col=0,width=18):
         ttk.Label(parent,text=label).grid(row=row,column=col,sticky="w",padx=5,pady=4)
@@ -515,10 +580,17 @@ class ESMGui:
         ttk.Button(footer,text='Sync from OpenSees model',command=self._sync_opensees_inputs).pack(side='left',padx=3)
         ttk.Button(footer,text='Check live ETABS geometry (read-only)',command=lambda:self._sync_opensees_inputs(etabs=True)).pack(side='left',padx=3)
         ttk.Button(footer,text='Preliminary Rayleigh run (X/Y)',command=self._run_rayleigh).pack(side='left',padx=3)
+        ttk.Button(footer,text='Bundle ALL ESM validation evidence ZIP',
+                   command=self._bundle_esm_evidence).pack(side='left',padx=3)
         for button in footer.winfo_children():button.pack_forget()
         for index,button in enumerate(footer.winfo_children()):
             button.grid(row=index//3,column=index%3,sticky='ew',padx=3,pady=3)
         for column in range(3):footer.columnconfigure(column,weight=1)
+        self.esm_busy_bar=ttk.Progressbar(footer,mode='indeterminate')
+        self.esm_busy_bar.grid(row=4,column=0,columnspan=3,sticky='ew',padx=6,pady=2)
+        ttk.Label(footer,textvariable=self.esm_operation_state,
+                  wraplength=920).grid(row=5,column=0,columnspan=3,
+                                       sticky='w',padx=6,pady=2)
         from OpenSees_Research_UI_V123 import scrollable_form
         top=scrollable_form(self.root)
         ttk.Label(top,text="NBC 105:2025 EQUIVALENT STATIC ANALYSIS",font=("Segoe UI",16,"bold")).pack(anchor="w")
