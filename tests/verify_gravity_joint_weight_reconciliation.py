@@ -24,13 +24,13 @@ class QuantityReconciliationTests(unittest.TestCase):
             "potentially_duplicated_RCC_weight_kN": 5,
             "overlap_pair_weight_kN": {"BEAM_OVERLAPS_COLUMN": 5},
             "rows": [
-                dict(category="COLUMN", gross_weight_kN=40,
+                dict(category="COLUMN", object="C1", kind="frame", gross_weight_kN=40,
                      net_weight_kN=40, removed_weight_kN=0),
-                dict(category="SHEAR WALL", gross_weight_kN=30,
+                dict(category="SHEAR WALL", object="W1", kind="shell", gross_weight_kN=30,
                      net_weight_kN=30, removed_weight_kN=0),
-                dict(category="FLOOR", gross_weight_kN=30,
+                dict(category="FLOOR", object="S1", kind="shell", gross_weight_kN=30,
                      net_weight_kN=30, removed_weight_kN=0),
-                dict(category="BEAM", gross_weight_kN=50,
+                dict(category="BEAM", object="B1", kind="frame", gross_weight_kN=50,
                      net_weight_kN=45, removed_weight_kN=5),
             ],
             "unsupported_items": [
@@ -73,6 +73,8 @@ class QuantityReconciliationTests(unittest.TestCase):
         self.assertFalse(alternatives[2]["applied"])
         self.assertEqual(result["automatic_gravity_correction_kN"], 0)
         self.assertEqual(result["original_beam_objects"], 1)
+        self.assertEqual(result["original_RCC_source_objects"], 4)
+        self.assertTrue((self.out/"Gravity_Original_ETABS_Object_Quantities.csv").is_file())
         self.assertEqual(result["beam_finite_element_segments"], 1)
         self.assertEqual(result["applied_gravity_components_kN"]["self_weight_brace"], 7)
         for filename in ("Gravity_Joint_Weight_Reconciliation.json",
