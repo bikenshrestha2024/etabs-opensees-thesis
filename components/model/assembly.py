@@ -596,7 +596,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         from components.gravity.slab_self_weight_audit import audit_slab_self_weight
         slab_weight_audit=audit_slab_self_weight(
             shells,topology['elements'],source_nodes,
-            joint_volume_ledger=volume_ledger,output_dir=folder)
+            mesh_nodes=nodes,joint_volume_ledger=volume_ledger,output_dir=folder)
         report['slab_weight_audit']={
             k:v for k,v in slab_weight_audit.items() if k!='records'}
         report['warnings'].append(
