@@ -1055,6 +1055,14 @@ class GravityAnalysisGUI:
                 f"source SHA256={overlap.get('source_sha256')}")
             for evidence_path in overlap.get("files", []):
                 self._gravity_action_log("GRAVITY_JOINT_OVERLAP_FILE", evidence_path)
+            quantities=detailed.get("joint_weight_scenarios", {})
+            self._gravity_action_log("GRAVITY_JOINT_WEIGHT_SCENARIOS",
+                f"status={quantities.get('status', 'NOT_RECORDED')} | "
+                f"geometric overlap={quantities.get('rcc_potential_overlap_kN')} kN | "
+                f"beam end-zone candidate={quantities.get('beam_end_offset_candidate_kN')} kN | "
+                "these are mutually EXCLUSIVE hypotheses; NO automatic correction")
+            for item in quantities.get("files", []):
+                self._gravity_action_log("GRAVITY_JOINT_WEIGHT_FILE", item)
             if detailed.get("status")!="SOURCE_LEDGER_RECONCILED_NOT_ETABS_VALIDATED":
                 raise ValueError("Source audit status="+str(detailed.get("status"))+
                     "; rebuild from native ETABS export before claiming single-count validation")
