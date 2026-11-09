@@ -33,7 +33,7 @@ def _area_quad(coords):
 
 
 def audit_slab_self_weight(shells,source_elements,source_nodes, *,
-                           joint_volume_ledger=None,output_dir):
+                           mesh_nodes,joint_volume_ledger=None,output_dir):
     """Confirm one source shell physical area * thickness * unit weight.
 
     [REF docs/source/components/gravity/slab_self_weight_audit.py.md]
@@ -66,6 +66,55 @@ def audit_slab_self_weight(shells,source_elements,source_nodes, *,
     records=[]
     for obj,parts in sorted(cells.items()):
         physical_area=original[obj]
+        # Verify the actual geometry of every child quadrilateral, not merely
+        # the sum of stated cell['area']. The exporter uses a conforming u-v
+        # grid on each source parallelogram: every child is one rectangle in
+        # parent local coordinates. Detect duplicate cells, overlap and holes.
+        original_object=next(e for e in source_elements
+            if e.get("dimension")=="area_polygon"
+            and e.get("category")=="FLOOR"
+            and str(e["etabs_object"])==obj)
+        parent=[source_nodes[int(n)] for n in original_object["node_tags"]]
+        aa=[parent[1][i]-parent[0][i] for i in range(3)]
+        bb=[parent[3][i]-parent[0][i] for i in range(3)]
+        ab=sum(aa[i]*bb[i] for i in range(3))
+        a2=sum(q*q for q in aa)
+        b2=sum(q*q for q in bb)
+        det=a2*b2-ab*ab
+        if det<=1e-12:raise ValueError("Degenerate original floor plane "+obj)
+        rectangles=[]
+        for index,cell in parts:
+            corners=[]
+            for nid in cell["nodes"]:
+                p=mesh_nodes[int(nid)]
+                d=[p[i]-parent[0][i] for i in range(3)]
+                da=sum(d[i]*aa[i] for i in range(3))
+                db=sum(d[i]*bb[i] for i in range(3))
+                u=(da*b2-db*ab)/det
+                v=(db*a2-da*ab)/det
+                # Reject off-plane shell or outside original ETABS polygon.
+                normal=[aa[1]*bb[2]-aa[2]*bb[1],
+                        aa[2]*bb[0]-aa[0]*bb[2],
+                        aa[0]*bb[1]-aa[1]*bb[0]]
+                distance=abs(sum(d[i]*normal[i] for i in range(3)))/physical_area
+                if distance>1e-7 or min(u,v)<-1e-8 or max(u,v)>1+1e-8:
+                    raise ValueError("Child slab node outside parent source polygon "+
+                                     obj+" node "+str(nid))
+                corners.append((u,v))
+            U=sorted(set(round(u,8) for u,v in corners))
+            V=sorted(set(round(v,8) for u,v in corners))
+            if len(U)!=2 or len(V)!=2 or {tuple((round(u,8),round(v,8)))
+                                          for u,v in corners}!={(x,y) for x in U for y in V}:
+                raise ValueError("Non-grid-aligned slab child requires native ETABS mesh "+obj)
+            expected_cell_area=physical_area*(U[1]-U[0])*(V[1]-V[0])
+            if abs(expected_cell_area-float(cell["area"]))>max(1e-8,expected_cell_area*1e-6):
+                raise ValueError("Mesh slab cell area differs from physical polygon "+obj)
+            rectangles.append((U[0],U[1],V[0],V[1]))
+        for i,(u0,u1,v0,v1) in enumerate(rectangles):
+            for x0,x1,y0,y1 in rectangles[:i]:
+                if min(u1,x1)-max(u0,x0)>1e-8 and min(v1,y1)-max(v0,y0)>1e-8:
+                    raise ValueError("DUPLICATE/OVERLAPPING shell mesh slab cells in "+
+                                     obj+"; source weight counted more than once")
         mesh_area=sum(float(cell["area"]) for _,cell in parts)
         if abs(physical_area-mesh_area)>max(1e-8,physical_area*1e-7):
             raise ValueError(
