@@ -91,6 +91,47 @@ class OfflineEtabsGravityTests(unittest.TestCase):
         self.assertIsNone(missing["opensees_source_Rz_kN"])
         self.assertEqual(missing["status"],"NO_OPENSEES_REACTION_AT_MAPPED_NODE")
 
+    def test_registry_driven_current_32_76_97_offline_workbooks(self):
+        import hashlib
+        from components.validation.gravity_etabs_latest import run
+        model=self.root/"OpenSees_Complete_Gravity_Model.py"
+        model.write_text("# immutable synthetic source for provenance test\\n",encoding="utf-8")
+        modelhash=hashlib.sha256(model.read_bytes()).hexdigest()
+        # The source model's mapping is the existing fixture.
+        reg={}
+        for mode,count in (("ETABS_NONZERO_REACTION_DIAGNOSTIC",32),
+                           ("ETABS_SOURCE_SUPPORTS",76),
+                           ("CONTINUOUS_WALL_BASE_FIXED",97)):
+            result=self.root/(mode+".json")
+            nodes=[dict(tag=i,x_m=float(i),y_m=0.,z_m=0.) for i in range(1,count+1)]
+            reactions=[dict(node_tag=i,rz_kN=(100. if i==10 else
+                             200. if i==11 else 0.)) for i in range(1,count+1)]
+            result.write_text(json.dumps(dict(
+                ok=True,gravity_profile="GRAVITY_1.0D_1.0L",
+                wall_support_strategy=mode,nodes=nodes,reactions=reactions,
+                report=dict(applied_vertical_load_kN=300.,
+                            support_vertical_reaction_kN=300.))))
+            reg[mode+"|GRAVITY_1.0D_1.0L"]=dict(
+                scenario=mode,profile="GRAVITY_1.0D_1.0L",
+                status="SOLVED_REACTIONS_NOT_ETABS_VALIDATED",
+                support_tags=list(range(1,count+1)),
+                model_path=str(model),model_sha256=modelhash,
+                input_sha256={"OpenSees_Complete_Gravity_Model.py":modelhash},
+                result_path=str(result))
+        registry=self.root/"Gravity_Case_Reaction_Index.json"
+        registry.write_text(json.dumps(reg))
+        # Set mapping node tags 10/11 exactly as used by both source cases.
+        out=run(self.xlsx,self.root/"mapping.json",registry,self.root/"offline_current")
+        self.assertTrue((out/"PRIMARY_32"/"ETABS_Offline_Gravity_Comparison.xlsx").is_file())
+        self.assertTrue((out/"ETABS_NODE_POSITION_76"/"ETABS_Offline_Gravity_Comparison.xlsx").is_file())
+        manifest=json.loads((out/"OFFLINE_GRAVITY_32_76_97_INDEX.json").read_text())
+        self.assertEqual(manifest["results"]["PRIMARY_32"]["difference_kN"],0.)
+        self.assertEqual(manifest["results"]["ETABS_NODE_POSITION_76"]["difference_kN"],0.)
+        reg["ETABS_SOURCE_SUPPORTS|GRAVITY_1.0D_1.0L"]["model_sha256"]="stale"
+        registry.write_text(json.dumps(reg))
+        with self.assertRaisesRegex(ValueError,"model SHA256"):
+            run(self.xlsx,self.root/"mapping.json",registry,self.root/"stale")
+
     def test_etabs_header_with_embedded_newline_units(self):
         wb=Workbook();ws=wb.active;ws.title="Joint Reactions"
         ws.append(["Story","Label","Unique Name","Output Case","FZ\nkN"])
