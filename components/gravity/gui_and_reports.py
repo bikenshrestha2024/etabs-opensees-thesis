@@ -116,6 +116,9 @@ class GravityAnalysisGUI:
         self.gravity_operation_state=tk.StringVar(value="IDLE | No gravity solver or exporter running")
         self._gravity_busy=False
         self._build()
+        # Native ETABS/source point restraint is the defensible default;
+        # 32 nonzero points is only a deliberately selected diagnostic.
+        self.wall_support_strategy_var.set("ETABS Node Position (76 nodes)")
         self.wall_support_strategy_var.trace_add(
             "write", lambda *_: self._read_code_inputs(show_error=False)
             if self.model_var.get() else self._refresh_case_reaction())
@@ -135,8 +138,13 @@ class GravityAnalysisGUI:
         else:
             self.gravity_busy_bar.stop()
 
-    def _rebuild_verified_clear_beam(self):
-        """Recreate model in a new folder; never change original EDB/export."""
+    def _rebuild_verified_clear_beam(self, *, auto=False):
+        """Recreate model in a new folder; never change original EDB/export.
+
+        Auto mode is for the primary Run button only when a source has an
+        explicitly unverified/gross beam policy. The required source workbook
+        remains independently verified; no arbitrary guess is permitted.
+        """
         if self._gravity_busy:
             messagebox.showwarning("Another process running",
                                    "Finish the current gravity process first.",
@@ -162,9 +170,10 @@ class GravityAnalysisGUI:
                 "not NBC105_RS_Scaling or the gravity reactions summary.",
                 parent=self.win)
             return
-        destination=filedialog.askdirectory(
-            parent=self.win,
-            title="Choose parent directory for NEW verified clear-beam source export")
+        destination=(str(model.resolve().parent.parent) if auto else
+            filedialog.askdirectory(
+                parent=self.win,
+                title="Choose parent directory for NEW verified clear-beam source export"))
         if not destination:return
         source=model.resolve().parent
         import datetime as _dt
@@ -192,6 +201,30 @@ class GravityAnalysisGUI:
         # Run the rebuilt source implementation from the current updated repo.
         current_root=Path(__file__).resolve().parents[2]
         script=current_root/"tools"/"REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py"
+        if not script.is_file():
+            # Automatically find the user's downloaded *updated* repository.
+            # Never execute an arbitrary PATH script; require matching modules.
+            candidates=[]
+            home=Path.home()
+            candidates.extend([
+                home/"Downloads"/"etabs-opensees-thesis-main",
+                home/"Downloads"/"etabs-opensees-thesis",
+                home/"Documents"/"GitHub"/"etabs-opensees-thesis",
+                home/"etabs-opensees-thesis",
+            ])
+            for item in (home/"Downloads", home/"Documents"):
+                if item.is_dir():
+                    candidates.extend(sorted(
+                        (d for d in item.glob("etabs-opensees-thesis*") if d.is_dir()),
+                        key=lambda d:d.stat().st_mtime,reverse=True))
+            for candidate in candidates:
+                found=candidate/"tools"/"REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py"
+                if (found.is_file() and
+                    (candidate/"components"/"model"/"assembly.py").is_file() and
+                    (candidate/"components"/"validation"/"etabs_assignment_gravity_audit.py").is_file()):
+                    script=found
+                    self._gravity_action_log("AUTO_REBUILD_SCRIPT",str(script))
+                    break
         if not script.is_file():
             # An old saved runtime does not own the live repository tools/.
             # Ask for the existing verified script instead of falsely looking
@@ -251,8 +284,14 @@ class GravityAnalysisGUI:
                         self._set_gravity_operation("FINISHED",
                             "New source ready; gravity not yet solved | "+str(new))
                         self.status_var.set("NEW verified clear-beam source selected. "
-                            "Read both support lists and run the 32-node gravity again.")
+                            "Automatically refreshing gravity support lists and source loads.")
                         self._gravity_action_log("CORRECTED_EXPORT_FINISHED",str(new))
+                        self._read_code_inputs(show_error=False)
+                        if auto:
+                            self._gravity_action_log("AUTO_REBUILD_AND_RUN",
+                                "Source rebuilt; running with verified selected support scenario.")
+                            self.run()
+                            return
                         messagebox.showinfo("New corrected model",
                             "Native ETABS beam evidence checked and new model generated.\n"
                             "Old gravity results are unchanged.\n"
@@ -949,6 +988,13 @@ class GravityAnalysisGUI:
         if source_cfg.is_file():
             cfg=json.loads(source_cfg.read_text(encoding="utf-8-sig"))
             if cfg.get("etabs_beam_weight_policy")!="ETABS_BEAM_CLEAR_LENGTH":
+                if (self.etabs_native_assignment_var.get().strip() and
+                    Path(self.etabs_native_assignment_var.get().strip()).is_file()):
+                    self._gravity_action_log("AUTO_REBUILD_REQUIRED",
+                        "Gross-beam source rejected; native assignment workbook supplied; "
+                        "starting immutable clear-beam rebuild before gravity.")
+                    self._rebuild_verified_clear_beam(auto=True)
+                    return
                 self._set_gravity_operation("BLOCKED",
                     "OLD gross-beam model: ETABS mass/weight mismatch remains ~8652.444 kN")
                 messagebox.showerror("Old gross beam model cannot validate ETABS",
