@@ -465,6 +465,38 @@ class ESMGui:
         else:
             self.esm_busy_bar.stop()
 
+    def _auto_bundle_seismic_review(self):
+        """Package current ETABS-linked and OpenSees ESM evidence automatically.
+
+        The worker runs off the Tk thread. Missing independent ETABS response
+        evidence is explicit; no ETABS model is modified or results invented.
+        """
+        import threading
+        if getattr(self,"_review_bundle_running",False):
+            self.status.set(self.status.get()+
+                "\\nESM review archive already being built; existing run remains available.")
+            return
+        self._review_bundle_running=True
+        source=Path(self.export_dir)
+        output=Path(self.outdir.get())
+        def worker():
+            try:
+                from components.validation.seismic_review_bundle import bundle_seismic_review
+                result=bundle_seismic_review(source,output,method="ESM")
+                def finished():
+                    self._review_bundle_running=False
+                    self.status.set(self.status.get()+
+                        "\\n[ESM_AUTO_REVIEW_ZIP] "+result["zip"])
+                self.root.after(0,finished)
+            except Exception as exc:
+                reason=str(exc)
+                def failed():
+                    self._review_bundle_running=False
+                    self.status.set(self.status.get()+
+                        "\\n[ESM_AUTO_REVIEW_FAILED] "+reason)
+                self.root.after(0,failed)
+        threading.Thread(target=worker,daemon=True).start()
+
     def _bundle_esm_evidence(self):
         """Collect source, original Excel and saved ESM results in one ZIP."""
         if self._esm_busy:
@@ -541,6 +573,7 @@ class ESMGui:
                     self._set_esm_operation("FINISHED",
                         "Original ETABS Excel calculation: "+str(target))
                     self.status.set("ETABS linked Excel ready: "+str(target)+" | provenance "+str(audit))
+                    self._auto_bundle_seismic_review()
                     messagebox.showinfo("ETABS Linked ESM",f"Populated original Excel method:\n{target}\n\nAudit:\n{audit}\n\nOpenSees Direct remains available in the dropdown.",parent=self.root)
                     # [REF NBC105-2025 §5.1.2] the computed Aw/T were previously
                     # discarded; offer them to the form with their EDB identity.
@@ -1468,6 +1501,7 @@ class ESMGui:
                 str(len(failures))+" blocked state cases")
             self.status.set(f"Completed in {elapsed:.2f} s | Location={self.location.get()} | soil={self.soil.get()} | Z={self.Z.get()} ({self.z_source.get()})\n"+"\n".join(summaries)+note+f"\nCreated: {files}")
             self.run_button.configure(state="normal" if Path(self.model_script.get()).is_file() else "disabled")
+            self._auto_bundle_seismic_review()
             messagebox.showinfo("NBC 105 ESM calculation",f"Created {len(self.last_runners)} case runner(s) and documented force profiles.\n" + ("Blocked: "+" | ".join(failures) if failures else "Review inputs before running the exported cases.") + "\n\nUse Plots or Open output folder to inspect the results.")
         except Exception as exc:
             self._set_esm_operation("BLOCKED",str(exc))
@@ -1509,6 +1543,7 @@ class ESMGui:
                     " of "+str(len(outcomes))+" OpenSees earthquake cases converged")
                 lines=[f"{name}: {'SUCCESS' if code==0 else 'FAILED'} | {log}" for name,code,log in outcomes]
                 self.status.set("OpenSeesPy earthquake cases finished.\n"+"\n".join(lines))
+                self._auto_bundle_seismic_review()
                 if all(code==0 for _,code,_ in outcomes): messagebox.showinfo("ESM analysis complete",self.status.get())
                 else: messagebox.showerror("ESM analysis needs review",self.status.get())
             self.root.after(0,done)
