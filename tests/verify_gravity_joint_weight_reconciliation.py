@@ -41,7 +41,7 @@ class QuantityReconciliationTests(unittest.TestCase):
         self.beam = {
             "schema": "beam-self-weight-end-offset-v1",
             "policy": "GROSS_SECTION_LENGTH", "beam_count": 1,
-            "rows": [{"etabs_object": "B1"}],
+            "rows": [{"etabs_object": "B1", "gross_weight_kN": 50.0}],
             "gross_beam_weight_kN": 50,
             "selected_beam_weight_kN": 50,
             "potential_offset_reduction_kN": 10,
