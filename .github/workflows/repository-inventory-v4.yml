@@ -1,0 +1,55 @@
+name: V4 repository inventory safety
+
+on:
+  pull_request:
+    paths:
+      - "tools/audit_repository_structure_v4.py"
+      - "tests/verify_repository_structure_audit_v4.py"
+      - ".github/workflows/repository-inventory-v4.yml"
+  push:
+    branches:
+      - "refactor/v4-inventory-and-compatibility-baseline-20261110"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile audit and unit tests without importing project runtime
+        run: python -m py_compile tools/audit_repository_structure_v4.py tests/verify_repository_structure_audit_v4.py
+      - name: Run offline regression tests
+        run: python -m unittest discover -s tests -p 'verify_repository_structure_audit_v4.py' -v
+      - name: Generate repository inventory (non-mutating)
+        run: python tools/audit_repository_structure_v4.py --output "$RUNNER_TEMP/repository-v4-audit"
+      - name: Verify output schemas
+        env:
+          AUDIT_DIR: ${{ runner.temp }}/repository-v4-audit
+        run: |
+          python - <<'PY'
+          import csv, json, os
+          from pathlib import Path
+          root = Path(os.environ["AUDIT_DIR"])
+          summary = json.loads((root / "AUDIT_SUMMARY.json").read_text())
+          with (root / "REPOSITORY_FILE_INVENTORY.csv").open(newline="", encoding="utf-8") as source:
+              rows = list(csv.DictReader(source))
+          assert summary["tracked_file_count"] == len(rows)
+          assert summary["missing_local_count"] == 0
+          assert all(len(row["sha256"]) == 64 for row in rows)
+          assert (root / "IMPORT_GRAPH.json").is_file()
+          assert (root / "EXACT_DUPLICATE_CANDIDATES.json").is_file()
+          print(summary)
+          PY
+      - name: Upload review reports (no private model evidence)
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-v4-audit
+          path: ${{ runner.temp }}/repository-v4-audit/
+          retention-days: 14
