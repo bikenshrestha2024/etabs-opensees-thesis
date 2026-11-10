@@ -1,0 +1,2 @@
+# DeepSeek task context (manually attach)
+Use `engineering/rules/CORE_RULES.md`, `engineering/rules/ENGINEERING_GATES.md` and `engineering/rules/MODULE_BOUNDARIES.md`. Follow original ETABS-OpenSees decisions, search first, preserve validated code and report exact tests. This file is NOT guaranteed to auto-load in DeepSeek products; paste/link its content as task context. Never infer numerical acceptance from syntax checks.

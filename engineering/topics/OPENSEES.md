@@ -1,0 +1,4 @@
+# OpenSees/OpenSeesPy tasks
+Current entry points: `components/model/`, `components/sections/`, `components/gravity/`, `components/modal/`, `components/response_spectrum/`, `components/nonlinear_time_history/`, `components/shared/`. Verify actual imports before moving them.
+Separate (1) model assembly, (2) element/material definitions, (3) loads and constraints, (4) gravity/modal/ESM/RSA/PDelta, (5) NLTHA, (6) recorders/postprocessing, (7) verification.
+Stand-alone goal: import and execute identical OpenSees engine without any CSI/COM/ETABS dependency, accepting a versioned neutral model. Do not replace SFI-MVLEM or custom macro-wall elements with elastic shells without explicit capability errors; confirm current binary support. Core-wall first-step failure near tag 110280 remains unresolved pending source mapping and ZERO/X/Y/XY tests.

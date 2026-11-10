@@ -1,0 +1,4 @@
+# ETABS tasks
+Current executable/canonical source must be confirmed before each modification. Start at [program index](../../docs/programs/00_PROGRAM_INDEX.md), `OpenSees_Complete_Export_V118.py`, `components/validation/`, `components/inputs/` and `tools/ETABS_EQX_EQY_PDELTA_EXPORT.py`.
+Tasks: source EDB identity, geometry/section/material native assignment, beam offsets, loads/mass source and self-weight, shell/wall openings, diaphragm constraints, gravity/reaction extraction, EQX/EQY PDelta native cases, base and story shear, displacements/drift.
+Read-only CSI API extraction on original EDB. ETABS v23 native GetTableForDisplayArray wrappers need actual tuple/header/record validation. Save/export a working copy for any authorized analysis; never silently run ETABS. Every result must retain case/step/direction, native units, SHA and errors.

@@ -1,3 +1,5 @@
+> **ETABS–OpenSees Thesis — New beginner task navigation:** [Start with ETABS, OpenSees, integration, Python, AI token-saving and research](engineering/README_START_HERE.md). See [governance rules](engineering/rules/CORE_RULES.md), [module owners](engineering/registry/CANONICAL_MODULES.csv) and [migration status](engineering/migration/ORGANIZATION_PHASE_1.md). This organizational overlay preserves existing launchers and solver modules; ETABS-free standalone OpenSees remains a future, gated milestone.
+
 # ETABS to OpenSeesPy - NBC 105:2025 thesis research
 
 **[00 — Ordered launchers](00_READ_FIRST_RUN_ORDER.md)** · **[Per-program manuals](docs/programs/00_PROGRAM_INDEX.md)** · **[Historical rename map](docs/00_WORK_ORDER_RENAME_MAP.md)** · **[Baseline handoff](START_HERE_V167.md)**

@@ -1,0 +1,3 @@
+# Python and Windows developer tasks
+Environment: Windows, Spyder, Python 3.12, conda-forge preferred; maintain verified ETABS v23 and OpenSeesPy environments separately if required. Before launch, verify `sys.executable`, working directory, project root/import path and source export version. Do not repeat the missing `components` import failure by running a detached root-dependent script from Downloads without installing the package or setting a verified PYTHONPATH.
+Use `tests/` and task-specific `tools/`; do not add another application named *_latest. Label solver/process progress RUNNING, FINISHED, BLOCKED and MISMATCH independently from model validation. Store run logs and evidence manifests together. Do not claim a Windows native run from a Linux CI syntax check.

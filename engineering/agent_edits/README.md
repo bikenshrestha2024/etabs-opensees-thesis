@@ -1,0 +1,2 @@
+# Actual editor manifests
+Create a dated JSON entry only when an actual edit is made. Fields: UTC, task, observed editor/provider/model or UNKNOWN, base/head SHA, branch, edited_paths, existing-code search, tests (commands/results), scientific gates and linked PR. Self-reported metadata is not forensic proof. No credentials, raw chat or private source paths. This governance documentation change was performed with ChatGPT through the GitHub connector; its final branch commit and PR will be referenced in the PR rather than inventing identity proof here.
