@@ -74,7 +74,9 @@ def _write_template(root, source_export, results_root, method, issues):
     target.parent.mkdir(parents=True,exist_ok=True)
     try:
         from components.validation.etabs_comparison import collect, FIELDS
-        rows=collect(source_export,issues,results_root=results_root)
+        rows=[row for row in collect(
+            source_export,issues,results_root=results_root)
+            if row.get("method")==method]
     except (ValueError,KeyError,OSError) as exc:
         rows=[];issues.append("Normalized source collection blocked: "+str(exc))
     try:
