@@ -14,8 +14,9 @@ from pathlib import Path
 import shutil
 import zipfile
 
-ALLOWED={".py",".json",".jsonl",".csv",".tsv",".xlsx",".xlsm",
-         ".txt",".log",".md",".pdf",".png",".svg",".html",".htm"}
+ALLOWED={".py",".json",".jsonl",".csv",".tsv",".xlsx",".xlsm",".xls",
+         ".txt",".log",".md",".pdf",".png",".svg",".html",".htm",
+         ".h5",".hdf5",".npz",".npy",".parquet",".sqlite",".db"}
 INTERESTING=("esm","nbc105","rayleigh","mrsm","modal","spectrum",
              "drift","displace","reaction","equivalence","etabs",
              "provenance","mass","pdelta","response","story","storey")
@@ -184,7 +185,9 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
         name=rel.as_posix()
         if (method=="ESM" and
                 not any(s in name.casefold() for s in
-                        ("esm","nbc105","rayleigh","response","etabs_linked","comparison","input_sync"))):
+                        ("esm","nbc105","rayleigh","etabs_linked",
+                         "comparison","input_sync","pdelta",
+                         "response_recorder_index"))):
             continue
         if (method=="MRSM" and
                 not any(s in name.casefold() for s in
