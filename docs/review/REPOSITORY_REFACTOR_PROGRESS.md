@@ -1,6 +1,6 @@
 # Repository refactor progress — V4 baseline
 
-**State:** Phase 1 started — read-only inventory tooling introduced; no physical model or numerical solver edited.
+**State:** Phase 1 in progress — read-only inventory, GUI/dynamic-call candidate reports, AST duplicate audit and GitHub CI added; no physical model or numerical solver edited.
 
 **Source main commit:** `a7e26466c1613fb0db32cee88c322444167d5343` (2026-11-10)
 
@@ -25,9 +25,18 @@
 - `tests/verify_repository_structure_audit_v4.py`: offline tests for cautionary classifications, non-executing AST imports, fixture ZIP-free output and duplicate grouping.
 - This ledger.
 
+## Work completed after initial baseline (2026-11-10)
+- `.github/workflows/repository-inventory-v4.yml`: Python 3.12 compilation, offline unittest, full checkout read-only inventory, schema/hash assertions and 14-day audit artifact.
+- Extended `tools/audit_repository_structure_v4.py` with `GUI_ACTION_INVENTORY.csv`, `DYNAMIC_REFERENCE_AUDIT.csv`, `AST_DUPLICATE_CANDIDATES.json` (candidate reports; never deletion approval).
+- Extended `tests/verify_repository_structure_audit_v4.py` with static GUI/dynamic reference and normalized AST equivalence fixtures.
+- `docs/architecture/V4_SAFE_MIGRATION_CROSSWALK.md`: existing shared components and V4 navigation, without copying or moving active engines.
+- Current implementation code was checked against `components/ui/output_folder.py`, Gravity and ESM evidence modules, seismic review bundler and `engineering/registry/CANONICAL_MODULES.csv`. These exist and must be extended, not duplicated.
+- Latest verified audit-test commit: `409eb8cdea4633e61c5444e76b2af366e64c2df6`; GitHub Actions run `42849406492` COMPLETED SUCCESS. See https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/42849406492.
+
 ## Verification performed
 - GitHub API verified new files and commits on isolated feature branch.
-- **NOT RUN:** local Python tests, Windows Spyder, ETABS COM, OpenSees, numerical regressions.
+- **PASS on GitHub Actions:** Python 3.12 compile, offline test fixtures, complete tracked-file audit generation and output-schema checks for commit `409eb8cde`. See workflow run URL above. Audit artifact is downloadable from the run.
+- **NOT RUN:** Windows Spyder GUI, ETABS COM, OpenSees native model, numerical engineering regressions.
 - Repository inventory outputs are generated on a local clone with:
   `python tools/audit_repository_structure_v4.py --output docs/architecture/generated`
 - Run tests using: `python -m unittest discover -s tests -p verify_repository_structure_audit_v4.py`
@@ -35,6 +44,6 @@
 
 ## Limitations and immediate next action
 - This first audit intentionally does **not** claim dynamic import coverage, source equivalence, redundancy safety, or all requested per-file metadata.
-- Next: execute offline tests and inventory on a full checkout; review generated CSV/tree; add targeted AST symbol and dynamic-callsite analysis; inspect PR #15 overlap and merge strategy before GUI refactoring.
-- Native engineering validation and first-step wall element 110280 diagnosis remain unresolved.
+- Next: download full CI audit artifact, inspect duplicate candidate groups, add precise runtime-path and callback ownership mapping, reconcile PR #15 before changing GUI or physically migrating modules. Current static reports are only screening candidates.
+- Native engineering validation and first-step wall element 110280 diagnosis remain unresolved. No equivalence, reduction in duplicate runtime implementations, or speed improvement has been demonstrated.
 - Do not automatically merge into main.
