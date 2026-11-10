@@ -381,6 +381,33 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                 missing.append({"file":"offline_etabs/","required":False,
                                 "reason":"Offline ETABS comparison not run"})
 
+        # Include ALL actual outputs from the selected and dual solver runs
+        # under their corresponding case folders. A fixed historic list of
+        # filenames omits later recorder/diagnostic formats. Do not traverse
+        # the entire project, the source EDB, or the upload folder itself.
+        allowed_run_suffixes={
+            ".json",".csv",".xlsx",".xlsm",".png",".pdf",
+            ".html",".txt",".log",".py",".jsonl"}
+        run_roots=[("selected_gravity_full",gravity_dir)]
+        if dual_run_dir is not None:
+            run_roots.extend([
+                ("source_76_full",dual_run_dir/"ETABS_SOURCE_SUPPORTS"),
+                ("continuous_97_full",dual_run_dir/"CONTINUOUS_WALL_BASE_FIXED")])
+        existing_sources={item.get("source") for item in files}
+        for label,run_root in run_roots:
+            if not run_root.is_dir():continue
+            for candidate in sorted(run_root.rglob("*")):
+                if (not candidate.is_file() or candidate.is_symlink() or
+                    candidate.suffix.lower() not in allowed_run_suffixes):
+                    continue
+                rel=candidate.relative_to(run_root)
+                if len(rel.parts)>5 or "Gravity_Evidence_Upload" in rel.parts:
+                    continue
+                if str(candidate) in existing_sources:continue
+                add(candidate,"all_case_outputs/"+label+"/"+rel.as_posix())
+                existing_sources.add(str(candidate))
+        # Optional absent legacy outputs are not missing observed results.
+        # Retain their exact names as metadata, without fabricating files.
         # Direct ETABS extraction is saved beside the OpenSees gravity output.
         # Include current comparison evidence in the same archive when present.
         direct=comparison_root/"Gravity_ETABS_OpenSees_Direct"
@@ -570,6 +597,11 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                "comparison_root":str(comparison_root),
                "source_model_sha256":model_hash,"source_etabs_json":str(etabs_json) if etabs_json else None,
                "source_files":files,"missing":missing,"oversize_skipped":oversize,
+               "missing_required_count":sum(bool(x.get("required")) for x in missing),
+               "not_produced_optional_count":sum(not bool(x.get("required")) for x in missing),
+               "missing_required": [x for x in missing if x.get("required")],
+               "not_produced_optional": [x for x in missing if not x.get("required")],
+               "missing_is_not_synonymous_with_packaging_failure":True,
                "packaged_files":package_members,
                "output_zip":str(output_dir/(bundle_name+".zip")),
                "output_folder":str(dest),
