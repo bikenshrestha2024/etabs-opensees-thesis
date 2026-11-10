@@ -43,6 +43,18 @@ class RepositoryInventoryTests(unittest.TestCase):
             )
             self.assertEqual(module.imports_of(source), ["os", "pathlib"])
 
+    def test_ast_duplicates_are_only_candidates(self):
+        with tempfile.TemporaryDirectory() as folder:
+            p = Path(folder) / "two.py"
+            p.write_text(
+                "def first(x):\n    return x * 3\n\n"
+                "def second(x):\n    return x * 3\n",
+                encoding="utf-8",
+            )
+            found = module.ast_duplicate_candidates(p, "two.py")
+            self.assertEqual(len(found), 2)
+            self.assertEqual(found[0]["ast_sha256"], found[1]["ast_sha256"])
+
     def test_gui_and_dynamic_calls_are_static_only(self):
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / "gui.py"
