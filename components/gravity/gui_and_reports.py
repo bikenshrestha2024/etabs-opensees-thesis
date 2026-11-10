@@ -86,6 +86,7 @@ class GravityAnalysisGUI:
         self.win.minsize(920, 650)
         self.model_var = tk.StringVar()
         self.output_var = tk.StringVar(value=str(Path.cwd() / "OpenSees_Analysis_Results" / "Gravity_Results"))
+        self._output_is_automatic = True
         self.comparison_output_var = tk.StringVar(value="")
         self.etabs_gravity_json_var = tk.StringVar(value="")
         self.etabs_full_table_var=tk.StringVar(value="")
@@ -124,6 +125,7 @@ class GravityAnalysisGUI:
             if self.model_var.get() else self._refresh_case_reaction())
         self.output_var.trace_add("write", lambda *_: self._refresh_case_reaction())
         self.model_var.trace_add("write", lambda *_: self._refresh_case_reaction())
+        self.model_var.trace_add("write", lambda *_: self._sync_default_output_root())
         def populate_saved():
             from OpenSees_Complete_Export_V118 import autoselect_inputs
             folder=Path(self.model_var.get()).parent if self.model_var.get() else Path(r'D:/Thesis Opensees/Etabs Nodes Export')
@@ -386,9 +388,23 @@ class GravityAnalysisGUI:
         except Exception as exc:
             messagebox.showerror("Could not open output folder", str(exc), parent=self.win)
 
+    def _sync_default_output_root(self):
+        """Use selected model's own analysis folder unless user overrides it."""
+        if not self._output_is_automatic:
+            return
+        selected = self.model_var.get().strip()
+        if not selected:
+            return
+        from components.inputs.project_workbooks import analysis_output_folder, source_limit_state
+        export_dir = Path(selected).expanduser().parent
+        state, _ = source_limit_state(export_dir)
+        self.output_var.set(str(analysis_output_folder(export_dir, state or "ULS") / "Gravity"))
+
     def _browse_dir(self):
         p = filedialog.askdirectory(parent=self.win, title="Choose one folder for all gravity outputs")
-        if p: self.output_var.set(p)
+        if p:
+            self._output_is_automatic = False
+            self.output_var.set(p)
 
     def _gravity_action_log(self,stage,message):
         """Add bounded timestamped action messages to the existing Run log.
