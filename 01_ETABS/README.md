@@ -7,3 +7,5 @@
 **Workflow:** read original EDB/assignment tables with source hashes -> audit geometry, offsets, self-weight, mass, load patterns and effective stiffness -> export documented neutral input -> compare native result tables. **Never mutate the original EDB**.
 
 [Beginner instructions](../engineering/topics/ETABS.md) · [program index](../docs/programs/00_PROGRAM_INDEX.md) · [validation gates](../engineering/rules/ENGINEERING_GATES.md)
+
+**Spyder gravity rebuild fix:** [No-argument GUI selector, original ETABS native workbook requirements and 32-support rerun instructions](../docs/review/20261109_GRAVITY_CLEAR_BEAM_ESM_NATIVE_REMEDIATION.md#spyder-2026-11-10--no-argument-rebuild-procedure). Select the NEW source export folder; do not rerun the old gross-beam model.
