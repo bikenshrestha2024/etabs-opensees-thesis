@@ -515,49 +515,18 @@ class ESMGui:
         threading.Thread(target=worker,daemon=True).start()
 
     def _bundle_esm_evidence(self):
-        """Collect source, original Excel and saved ESM results in one ZIP."""
-        if self._esm_busy:
-            messagebox.showwarning("ESM task running",
-                "Another ESM operation is running. Wait for its FINISHED/BLOCKED status.",
-                parent=self.root)
+        """One-click rerun of the automatic, SHA-deduplicated review ZIP.
+
+        No extra folder selection and no ambiguous native case inference.
+        Current model and analysis output paths are taken from selected GUI.
+        """
+        if getattr(self,"_review_bundle_running",False):
+            self.status.set("Review ZIP creation is already running; see output folder.")
             return
-        native_evidence=filedialog.askdirectory(
-            parent=self.root,
-            title="OPTIONAL: Choose native ETABS EQX/EQY/PDelta evidence folder (Cancel to omit)")
-        self._esm_busy=True
-        self._set_esm_operation("RUNNING","Collecting local ESM validation evidence")
-        def worker():
-            try:
-                from components.equivalent_static.evidence_bundle import (
-                    bundle_esm_validation)
-                result=bundle_esm_validation(
-                    self.export_dir,self.outdir.get(),self.outdir.get(),
-                    native_etabs_evidence=native_evidence or None,
-                    progress=lambda msg:self.root.after(0,
-                        lambda m=str(msg):self._set_esm_operation("RUNNING",m)))
-                def success():
-                    self._esm_busy=False
-                    label="FINISHED" if not result["manifest"]["missing_required"] else "INCOMPLETE"
-                    self._set_esm_operation(label,
-                        "ZIP: "+result["upload_zip"]+
-                        " | missing required: "+str(len(result["manifest"]["missing_required"])))
-                    self.status.set("ESM evidence: "+result["upload_zip"])
-                    messagebox.showinfo("ESM validation evidence",
-                        "Evidence collection "+label+"\n"+
-                        "ZIP: "+result["upload_zip"]+"\n"+
-                        "Files: "+str(result["manifest"]["total_collected"])+"\n"+
-                        "Missing required: "+repr(result["manifest"]["missing_required"])+
-                        "\n\nThe archive is NOT ETABS/OpenSees design acceptance.",
-                        parent=self.root)
-                self.root.after(0,success)
-            except Exception as exc:
-                problem=str(exc)
-                def failed():
-                    self._esm_busy=False
-                    self._set_esm_operation("BLOCKED",problem)
-                    messagebox.showerror("ESM evidence failed",problem,parent=self.root)
-                self.root.after(0,failed)
-        threading.Thread(target=worker,daemon=True).start()
+        self._auto_bundle_seismic_review()
+        self.status.set(self.status.get()+
+            "\\nReview ZIP creation started automatically; find the latest "
+            "path in Seismic_Review_Packages/LATEST_ESM_REVIEW.txt.")
 
     def _run_etabs_linked(self):
         """Use the uploaded original Excel/ETABS engine, without touching RS scaling."""
