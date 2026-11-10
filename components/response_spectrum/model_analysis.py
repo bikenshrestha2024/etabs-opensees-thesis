@@ -245,7 +245,7 @@ def launch(parent,folder):
     from OpenSees_Project_Inputs_V123 import import_project_inputs
     from OpenSees_Research_UI_V123 import scrollable_form
     win=tk.Toplevel(parent);win.title('Model MRSM — SLS / ULS, reports and deformation');win.geometry('1100x820');form=scrollable_form(win)
-    from components.inputs.project_workbooks import source_limit_state,require_source_state
+    from components.inputs.project_workbooks import source_limit_state,require_source_state,analysis_output_folder
     model_state,model_state_evidence=source_limit_state(folder)
     initial_state=model_state or 'ULS'
     root=Path(__file__).parents[2]
