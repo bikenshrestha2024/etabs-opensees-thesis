@@ -77,9 +77,54 @@ def module_candidates(rel: str) -> set[str]:
     return candidates
 
 
+
+def inspect_gui_and_dynamic(path: Path, rel: str) -> tuple[list[dict], list[dict]]:
+    """Report possible GUI action bindings and dynamic loads; never execute source.
+
+    A static hint is not proof a widget exists or a callback is reachable.
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+    except (OSError, SyntaxError, UnicodeError):
+        return [], []
+    actions: list[dict] = []
+    dynamic: list[dict] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        target = ast.unparse(node.func)
+        last = target.rsplit(".", 1)[-1]
+        if last in {"Button", "CTkButton", "ttk.Button", "QPushButton", "add_command"} or target.endswith(".Button"):
+            kws = {kw.arg: kw.value for kw in node.keywords if kw.arg}
+            callbacks = [kw for kw in ("command", "callback", "clicked") if kw in kws]
+            if callbacks:
+                actions.append({
+                    "source_file": rel, "line": node.lineno,
+                    "widget_constructor": target,
+                    "label_expression": ast.unparse(kws.get("text", kws.get("label"))) if ("text" in kws or "label" in kws) else "",
+                    "callback_expression": "; ".join(ast.unparse(kws[x]) for x in callbacks),
+                    "classification": "STATIC_CANDIDATE_NEEDS_RUNTIME_REVIEW",
+                })
+        if last in {"import_module", "__import__", "exec", "eval", "runpy", "getattr", "load_source"}:
+            dynamic.append({
+                "source_file": rel, "line": node.lineno,
+                "expression": ast.unparse(node)[:600],
+                "classification": "DYNAMIC_OR_REFLECTIVE_CALL_REVIEW",
+            })
+    return actions, dynamic
+
+
+def write_table(path: Path, headers: list[str], rows: list[dict]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=headers)
+        writer.writeheader()
+        writer.writerows(rows)
+
 def generate(root: Path, output: Path) -> dict:
     paths = tracked_files(root)
     rows: list[dict] = []
+    gui_actions: list[dict] = []
+    dynamic_calls: list[dict] = []
     by_digest: dict[str, list[str]] = defaultdict(list)
     module_paths: dict[str, set[str]] = defaultdict(set)
     for rel in paths:
@@ -107,6 +152,10 @@ def generate(root: Path, output: Path) -> dict:
                 hasher.update(chunk)
         digest = hasher.hexdigest()
         by_digest[digest].append(rel)
+        if path.suffix.lower() == ".py":
+            actions, dynamic = inspect_gui_and_dynamic(path, rel)
+            gui_actions.extend(actions)
+            dynamic_calls.extend(dynamic)
         rows.append({
             "relative_path": rel, "extension": path.suffix.lower(),
             "size_bytes": path.stat().st_size, "sha256": digest,
@@ -134,6 +183,17 @@ def generate(root: Path, output: Path) -> dict:
         row["imported_by"] = sorted(reverse[row["relative_path"]])
         row["duplicate_group"] = dup_ids.get(row["sha256"], "")
     output.mkdir(parents=True, exist_ok=True)
+    write_table(
+        output / "GUI_ACTION_INVENTORY.csv",
+        ["source_file", "line", "widget_constructor", "label_expression",
+         "callback_expression", "classification"],
+        gui_actions,
+    )
+    write_table(
+        output / "DYNAMIC_REFERENCE_AUDIT.csv",
+        ["source_file", "line", "expression", "classification"],
+        dynamic_calls,
+    )
     with (output / "REPOSITORY_FILE_INVENTORY.csv").open(
         "w", newline="", encoding="utf-8"
     ) as f:
@@ -182,12 +242,15 @@ def generate(root: Path, output: Path) -> dict:
         "source_commit": meta, "tracked_file_count": len(rows),
         "python_file_count": sum(x["extension"] == ".py" for x in rows),
         "exact_duplicate_groups": len(duplicates),
+        "static_gui_candidates": len(gui_actions),
+        "dynamic_call_candidates": len(dynamic_calls),
         "missing_local_count": sum(x["git_status"] == "MISSING_LOCAL" for x in rows),
         "limitations": [
             "SHA matches are candidate duplicates; not safe deletion approvals.",
             "Imports are static AST references; dynamic imports, strings, external launchers and runtime paths require manual review.",
             "No ETABS/OpenSees execution or engineering equivalence is tested.",
             "No file is moved, deleted, or rewritten by the audit.",
+            "GUI bindings and dynamic calls are conservative static candidates, not complete UI/event coverage.",
         ],
     }
     (output / "AUDIT_SUMMARY.json").write_text(
