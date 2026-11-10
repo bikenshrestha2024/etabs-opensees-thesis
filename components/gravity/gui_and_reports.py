@@ -156,6 +156,17 @@ class GravityAnalysisGUI:
             return
         native=self.etabs_native_assignment_var.get().strip()
         if not native:
+            # The completed ETABS full-table workbook may also contain the
+            # original native material/frame/offset assignment sheets. Prefer
+            # this previously selected candidate to another file dialog;
+            # the native rebuild script independently verifies every sheet.
+            candidate=self.etabs_full_table_var.get().strip()
+            if candidate and Path(candidate).is_file() and Path(candidate).suffix.lower() in (".xlsx",".xlsm"):
+                native=candidate
+                self.etabs_native_assignment_var.set(native)
+                self._gravity_action_log("AUTO_NATIVE_ASSIGNMENT_CANDIDATE",
+                    "Reusing user-selected full ETABS export; sheet-level proof still required: "+native)
+        if not native:
             native=filedialog.askopenfilename(
                 parent=self.win,
                 title="Original ETABS frame/material assignment workbook",
@@ -988,8 +999,10 @@ class GravityAnalysisGUI:
         if source_cfg.is_file():
             cfg=json.loads(source_cfg.read_text(encoding="utf-8-sig"))
             if cfg.get("etabs_beam_weight_policy")!="ETABS_BEAM_CLEAR_LENGTH":
-                if (self.etabs_native_assignment_var.get().strip() and
-                    Path(self.etabs_native_assignment_var.get().strip()).is_file()):
+                if ((self.etabs_native_assignment_var.get().strip() and
+                    Path(self.etabs_native_assignment_var.get().strip()).is_file()) or
+                    (self.etabs_full_table_var.get().strip() and
+                    Path(self.etabs_full_table_var.get().strip()).is_file())):
                     self._gravity_action_log("AUTO_REBUILD_REQUIRED",
                         "Gross-beam source rejected; native assignment workbook supplied; "
                         "starting immutable clear-beam rebuild before gravity.")
