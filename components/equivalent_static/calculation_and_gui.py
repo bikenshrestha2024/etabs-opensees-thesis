@@ -204,7 +204,7 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         ax[0].barh([r["height_m"] for r in floors],[r["lateral_force_kN"] for r in floors],height=max(0.15,0.35*min(r["height_m"] for r in floors)))
         ax[0].set(title="NBC 105:2025 floor forces",xlabel="Fi (kN)",ylabel="Height (m)"); ax[0].grid(axis="x",alpha=.25)
         ax[1].step([sum(x["lateral_force_kN"] for x in floors[i:]) for i in range(len(floors))],[r["height_m"] for r in floors],where="mid")
-        ax[1].set(title="Storey shear",xlabel="Vi (kN)",ylabel="Height (m)"); ax[1].grid(alpha=.25)
+        ax[1].set(title="Cumulative applied floor force (NOT recovered story shear)",xlabel="Σ Fi above level (kN)",ylabel="Height (m)"); ax[1].grid(alpha=.25)
         fig.suptitle(f"{'COMPARISON ONLY | ' if not result.get('code_eligible',True) else ''}{result['limit_state']} {direction} | Z={result['zoning_factor_Z']:g} | soil {result['soil_type']} | V={result['base_shear_kN']:.3f} kN")
         fig.savefig(out_png,dpi=180); plt.close(fig)
     except ImportError:
