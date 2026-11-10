@@ -597,6 +597,12 @@ class ESMGui:
         footer=ttk.Frame(self.root,padding=8);footer.pack(side='bottom',fill='x')
         ttk.Button(footer,text='1. Calculate + export',command=self._calculate).pack(side='left',padx=3)
         ttk.Button(footer,text='ETABS Linked: populate original Excel',command=self._run_etabs_linked).pack(side='left',padx=3)
+        ttk.Button(footer,text='Compare ETABS vs ESM/MRSM responses',
+                   command=lambda:__import__(
+                       'components.validation.etabs_comparison',
+                       fromlist=['launch']).launch(
+                           self.root,self.export_dir,
+                           results_root=self.outdir.get())).pack(side='left',padx=3)
         self.run_button=ttk.Button(footer,text='2. Run exported cases',command=self._run_generated,state='disabled');self.run_button.pack(side='left',padx=3)
         ttk.Button(footer,text='Open output folder',command=self._open_export_folder).pack(side='left',padx=3)
         ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
