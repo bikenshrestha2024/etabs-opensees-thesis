@@ -333,6 +333,16 @@ def launch(parent,folder):
                 except Exception as e:append('[FAILED] '+str(e)+'\n')
                 finally:
                     ledger.finish_pending("Batch interrupted or case completion was not reported; inspect state log")
+                    # Automatically consolidate real MRSM output in a single
+                    # upload folder/ZIP, clearly separated from ETABS native
+                    # responses. No missing native case is inferred.
+                    try:
+                        from components.validation.seismic_review_bundle import bundle_seismic_review
+                        target=analysis_output_folder(folder,states[-1])
+                        package=bundle_seismic_review(folder,target,method="MRSM")
+                        append("[MRSM_AUTO_REVIEW_ZIP] "+package["zip"]+"\\n")
+                    except Exception as pack_exc:
+                        append("[MRSM_REVIEW_PACKAGING_FAILED] "+str(pack_exc)+"\\n")
                     try:win.after(0,lambda:button.configure(state='normal'))
                     except (tk.TclError,RuntimeError):pass
             threading.Thread(target=worker,daemon=True).start()
@@ -343,4 +353,7 @@ def launch(parent,folder):
     add_open_output_button(actions,lambda:str(output),window=win)
     ttk.Button(actions,text='Saved SLS / ULS charts + Excel',command=lambda:__import__('OpenSees_MRSM_Reports_V134').launch(win,output)).pack(side='left',padx=4)
     ttk.Button(actions,text='Deformation / node DOFs',command=lambda:__import__('OpenSees_Response_Checks_V132').launch_response_viewer(win,output)).pack(side='left')
+    ttk.Button(actions,text='Compare true ETABS modal/MRSM results',
+        command=lambda:__import__('components.validation.etabs_comparison',
+            fromlist=['launch']).launch(win,folder)).pack(side='left',padx=4)
     win._mrsm_fields=fields;win._mrsm_log=log;return win
