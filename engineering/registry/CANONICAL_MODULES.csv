@@ -9,5 +9,6 @@ modal,components/modal/analysis.py,EXISTING,modal solver,NOT_REVIEWED
 response_spectrum,components/response_spectrum/model_analysis.py,EXISTING,RSA source,NOT_REVIEWED
 nltha,components/nonlinear_time_history/runner_and_gui.py,EXISTING,NLTHA run orchestration and GUI split candidate,NOT_REVIEWED
 shared_recorders,components/shared/response_recorders.py,EXISTING,common output recording,NOT_REVIEWED
-standalone_opensees_engine,,NEW_WITH_JUSTIFICATION,ETABS-independent shared numerical core only after migration tests,NOT_IMPLEMENTED
-neutral_model_schema,,NEW_WITH_JUSTIFICATION,versioned exchange schema only after source field audit,NOT_IMPLEMENTED
+standalone_opensees_engine,src/opensees_engine/standalone.py,EXTEND,ETABS-free opt-in elastic 2-node benchmark only; production migration still required,PROTOTYPE_STATIC_TEST_PENDING
+neutral_model_schema,src/thesis_core/neutral_model.py,EXTEND,strict v0.1 benchmark-only contract; full 3D model support not implemented,PROTOTYPE_STATIC_TEST_PENDING
+etabs_api_adapter,src/etabs_adapter/bridge.py,EXTEND,optional lazy routing to original CSI/native extractor functions,STATIC_TEST_PENDING

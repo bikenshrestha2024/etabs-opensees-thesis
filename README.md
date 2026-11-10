@@ -1,3 +1,5 @@
+> **Task-separated navigation (Phase 2):** [ETABS](01_ETABS/README.md) · [OpenSees](02_OPENSEES/README.md) · [Integration](03_INTEGRATION/README.md) · [Python](04_PYTHON/README.md) · [AI/Token saving](05_AI_TOKEN_SAVING/README.md) · [Research](06_RESEARCH/README.md). [Python ownership and duplicate baseline](engineering/registry/INVENTORY_INTERPRETATION.md) · [Standalone benchmark scope](02_OPENSEES/README.md). The existing numerical launchers are **unchanged**; do not interpret a static inspection as ETABS/OpenSees solver validation.
+
 > **ETABS–OpenSees Thesis — New beginner task navigation:** [Start with ETABS, OpenSees, integration, Python, AI token-saving and research](engineering/README_START_HERE.md). See [governance rules](engineering/rules/CORE_RULES.md), [module owners](engineering/registry/CANONICAL_MODULES.csv) and [migration status](engineering/migration/ORGANIZATION_PHASE_1.md). This organizational overlay preserves existing launchers and solver modules; ETABS-free standalone OpenSees remains a future, gated milestone.
 
 # ETABS to OpenSeesPy - NBC 105:2025 thesis research

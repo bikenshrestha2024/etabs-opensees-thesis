@@ -1,3 +1,5 @@
+> **Task-separated navigation (Phase 2):** [ETABS](01_ETABS/README.md) · [OpenSees](02_OPENSEES/README.md) · [Integration](03_INTEGRATION/README.md) · [Python](04_PYTHON/README.md) · [AI/Token saving](05_AI_TOKEN_SAVING/README.md) · [Research](06_RESEARCH/README.md). [Python ownership and duplicate baseline](engineering/registry/INVENTORY_INTERPRETATION.md) · [Standalone benchmark scope](02_OPENSEES/README.md). The existing numerical launchers are **unchanged**; do not interpret a static inspection as ETABS/OpenSees solver validation.
+
 # V138 - compact gravity view, ULS/SLS comparison and staged building trial
 
 Launch RUN_ETABS_TO_OPENSEES.py. Rebuild the saved export to refresh its runtime. Older releases remain intact. No live D: files were changed by this work.
