@@ -517,8 +517,8 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                         candidate.get("gravity_profile")=="GRAVITY_1.0D_1.0L" and
                         len(candidate.get("reactions",[]))==76):
                         # Reject cross-model and cross-load substitution.
-                        selected_script=Path(payload.get("model_script","")).name
-                        candidate_script=Path(candidate.get("model_script","")).name
+                        selected_script=str(payload.get("model_script","")).replace("\\\\","/").casefold()
+                        candidate_script=str(candidate.get("model_script","")).replace("\\\\","/").casefold()
                         expected=payload.get("report",{}).get("applied_vertical_load_kN")
                         actual=candidate.get("report",{}).get("applied_vertical_load_kN")
                         if (selected_script==candidate_script and
