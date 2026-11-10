@@ -43,6 +43,21 @@ class RepositoryInventoryTests(unittest.TestCase):
             )
             self.assertEqual(module.imports_of(source), ["os", "pathlib"])
 
+    def test_gui_and_dynamic_calls_are_static_only(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "gui.py"
+            source.write_text(
+                "import importlib\n"
+                "Button(text='Gravity', command=self.run_gravity)\n"
+                "importlib.import_module('components.gravity')\n",
+                encoding="utf-8",
+            )
+            actions, dynamic = module.inspect_gui_and_dynamic(source, "gui.py")
+            self.assertEqual(len(actions), 1)
+            self.assertEqual(actions[0]["callback_expression"], "self.run_gravity")
+            self.assertEqual(len(dynamic), 1)
+            self.assertIn("import_module", dynamic[0]["expression"])
+
     def test_inventory_is_non_destructive_and_marks_dupes_as_candidates(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
