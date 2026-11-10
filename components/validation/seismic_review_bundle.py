@@ -59,12 +59,19 @@ for item in audit["duplicates"]:
     if not target.is_relative_to(root) or not original.is_relative_to(root):
         raise ValueError("Unsafe alias path")
     if not original.is_file():raise FileNotFoundError(original)
-    digest=hashlib.sha256(original.read_bytes()).hexdigest()
+    h=hashlib.sha256()
+    with original.open("rb") as stream:
+        for block in iter(lambda:stream.read(1048576),b""):
+            h.update(block)
+    digest=h.hexdigest()
     if digest!=item["sha256"]:raise ValueError("Checksum mismatch: "+str(original))
     target.parent.mkdir(parents=True,exist_ok=True)
     shutil.copy2(original,target)
-    if hashlib.sha256(target.read_bytes()).hexdigest()!=digest:
-        raise ValueError("Copied file hash mismatch")
+    h=hashlib.sha256()
+    with target.open("rb") as stream:
+        for block in iter(lambda:stream.read(1048576),b""):
+            h.update(block)
+    if h.hexdigest()!=digest:raise ValueError("Copied file hash mismatch")
 print("Restored",len(audit["duplicates"]),"duplicate files; unique content unchanged.")
 '''
 
