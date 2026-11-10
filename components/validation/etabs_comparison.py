@@ -75,18 +75,68 @@ def collect(folder, issues=None):
                 add('MRSM',state,case,axis,r['story_number'],'drift_ratio',
                     'ratio','CQC_design_unscaled_by_7_5',r.get('design_drift_ratio'),p)
     for p in sorted(root.rglob('NBC105_ESM_OpenSees_Response_*.json')):
+        if 'Response_META_' in p.name:continue
         document=json.loads(p.read_text(encoding='utf-8-sig'))
-        if not isinstance(document,dict) or not accepted(document,p,document.get('limit_state')):
-            issues.append(str(p)+': legacy ESM response without model/state provenance excluded; re-export with fingerprint before direct comparison')
+        if isinstance(document,list):
+            meta=p.with_name(p.name.replace('OpenSees_Response_',
+                                            'OpenSees_Response_META_'))
+            if not meta.is_file():
+                issues.append(str(p)+': legacy ESM list lacks matching model SHA256 sidecar; not imported')
+                continue
+            proof=json.loads(meta.read_text(encoding='utf-8-sig'))
+            rr=document
+        elif isinstance(document,dict):
+            proof=document
+            rr=document.get('rows',document.get('stories',[]))
+        else:
+            issues.append(str(p)+': non-object/list ESM response')
             continue
-        rr=document.get('rows',document.get('stories',[]))
-        for r in rr:
-            for key,metric,unit in [
-                ('U_design_m','displacement','m'),
-                ('design_drift_ratio','drift_ratio','ratio'),
-                ('story_shear_kN','story_shear','kN')]:
-                add('ESM',state,r.get('response_case',p.stem),r.get('direction',''),
-                    r.get('height_m',''),metric,unit,'static_design',r.get(key),p)
+        if not accepted(proof,p,proof.get('limit_state')):
+            continue
+        for record in rr:
+            # Keep applied cumulative floor force separate from the
+            # recovered ETABS story-section shear; they are not identical.
+            loc=record.get('story_number')
+            if loc is None:
+                issues.append(str(p)+': response row without story_number excluded')
+                continue
+            case=record.get('response_case',proof.get('response_case',p.stem))
+            axis=proof.get('axis',record.get('direction',''))
+            add('ESM',state,case,axis,loc,'displacement','m',
+                'static_design',record.get('U_design_m'),p)
+            add('ESM',state,case,axis,loc,'drift_ratio','ratio',
+                'static_design',record.get('design_drift_ratio'),p)
+            add('ESM',state,case,axis,loc,'story_shear','kN',
+                'applied_floor_force_cumulative_NOT_recovered',
+                record.get('story_shear_kN'),p)
+    # Optional full-node static displacement comparison. The ETABS point
+    # name is the only supported location key; generated mesh nodes without
+    # native ETABS counterparts remain in raw CSV, not invented matches.
+    for p in sorted(root.rglob('NBC105_ESM_All_Node_Displacements_*.csv')):
+        with p.open('r',newline='',encoding='utf-8-sig') as f:
+            records=list(csv.DictReader(f))
+        if not records:continue
+        first=records[0]
+        if not accepted({'model_sha256':first.get('model_sha256')},
+                        p,first.get('limit_state')):
+            continue
+        for record in records:
+            if record.get('model_sha256')!=expected:
+                issues.append(str(p)+': mixed model hash at node '+str(record.get('opensees_node_tag')))
+                continue
+            point=record.get('etabs_point_name')
+            if not point:continue
+            case=record.get('response_case','')
+            axis='X' if '_X' in case else 'Y' if '_Y' in case else ''
+            if not axis:
+                issues.append(str(p)+': missing X/Y direction for node '+str(point))
+                continue
+            key='du_x_m' if axis=='X' else 'du_y_m'
+            design_key='design_du_x_m' if axis=='X' else 'design_du_y_m'
+            add('ESM',state,case,axis,point,'displacement','m',
+                'static_elastic_increment',record.get(key),p)
+            add('ESM',state,case,axis,point,'displacement','m',
+                'static_design_increment',record.get(design_key),p)
     return rows
 
 def compare(rows, etabs, policy=None):
