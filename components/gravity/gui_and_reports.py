@@ -566,9 +566,14 @@ class GravityAnalysisGUI:
                 "Upload gravity evidence to ChatGPT",
                 "ZIP FOR UPLOAD:\n"+paths["upload_zip"]+
                 "\n\nFull index:\n"+paths["exact_file_paths"]+
-                "\n\nMissing: "+str(len(report["missing"]))+
+                "\n\nMISSING REQUIRED: "+
+                    str(len(report.get("missing_required",[])))+
+                " | Not generated / optional: "+
+                    str(len(report.get("unavailable_optional",[])))+
                 " | Oversize: "+str(len(report["oversize_skipped"]))+
-                "\nReview the manifest for excluded evidence.",parent=self.win)
+                "\nOptional historical files are not missing solved outputs. "
+                "Review the manifest for individual engineering gates.",
+                parent=self.win)
         except Exception as exc:
             self._gravity_action_log("EVIDENCE_EXPORT_ERROR",str(exc))
             messagebox.showerror("Gravity evidence bundle",str(exc),parent=self.win)
