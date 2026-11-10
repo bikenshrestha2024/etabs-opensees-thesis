@@ -121,6 +121,8 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
                           diagnostic_only=True):
     """Build one output folder and one ZIP for source, OpenSees, ETABS and comparison.
 
+    [REF docs/source/components/validation/seismic_review_bundle.py.md]
+
     - Never reads or changes an EDB.
     - Maximum ZIP member size is not silently capped (ZIP64).
     - Byte-for-byte duplicate files are represented by explicit aliases and
