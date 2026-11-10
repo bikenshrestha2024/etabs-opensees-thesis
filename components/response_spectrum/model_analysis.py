@@ -355,5 +355,7 @@ def launch(parent,folder):
     ttk.Button(actions,text='Deformation / node DOFs',command=lambda:__import__('OpenSees_Response_Checks_V132').launch_response_viewer(win,output)).pack(side='left')
     ttk.Button(actions,text='Compare true ETABS modal/MRSM results',
         command=lambda:__import__('components.validation.etabs_comparison',
-            fromlist=['launch']).launch(win,folder)).pack(side='left',padx=4)
+            fromlist=['launch']).launch(
+            win,folder,results_root=analysis_output_folder(
+                folder,fields['limit_state'].get()))).pack(side='left',padx=4)
     win._mrsm_fields=fields;win._mrsm_log=log;return win
