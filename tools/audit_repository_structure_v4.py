@@ -33,7 +33,7 @@ def tracked_files(root: Path) -> list[str]:
     )
     return sorted({
         item.decode("utf-8", errors="surrogateescape")
-        for item in result.stdout.split(b"\\0") if item
+        for item in result.stdout.split(b"\0") if item
     })
 
 
@@ -152,11 +152,11 @@ def generate(root: Path, output: Path) -> dict:
             node = node.setdefault(part, {})
         node[Path(rel).name] = None
     (output / "REPOSITORY_TREE.json").write_text(
-        json.dumps(hierarchy, indent=2, ensure_ascii=False) + "\\n",
+        json.dumps(hierarchy, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
     (output / "REPOSITORY_TREE.txt").write_text(
-        "\\n".join(paths) + "\\n", encoding="utf-8"
+        "\n".join(paths) + "\n", encoding="utf-8"
     )
     duplicates = [
         {"sha256": sha, "classification": "exact_bytes_only_not_safe_to_delete",
@@ -165,14 +165,14 @@ def generate(root: Path, output: Path) -> dict:
         if len(members) > 1
     ]
     (output / "EXACT_DUPLICATE_CANDIDATES.json").write_text(
-        json.dumps(duplicates, indent=2) + "\\n", encoding="utf-8"
+        json.dumps(duplicates, indent=2) + "\n", encoding="utf-8"
     )
     (output / "IMPORT_GRAPH.json").write_text(
         json.dumps({
             row["relative_path"]: {
                 "imports": row["imports"], "imported_by": row["imported_by"]
             } for row in rows if row["extension"] == ".py"
-        }, indent=2) + "\\n", encoding="utf-8",
+        }, indent=2) + "\n", encoding="utf-8",
     )
     meta = subprocess.run(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
@@ -191,7 +191,7 @@ def generate(root: Path, output: Path) -> dict:
         ],
     }
     (output / "AUDIT_SUMMARY.json").write_text(
-        json.dumps(summary, indent=2) + "\\n", encoding="utf-8"
+        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
     )
     return summary
 
