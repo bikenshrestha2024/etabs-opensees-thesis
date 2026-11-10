@@ -2,7 +2,8 @@
 """Rebuild verified clear-length gravity source in a NEW directory.
 
 No ETABS EDB write, no in-place mutation, no solver, no implicit code PASS.
-Run in Spyder as script with arguments or from Anaconda Prompt.
+Run in Spyder with no arguments to choose source/workbook/output via GUI.
+CLI with all three explicit arguments still works for reproducible batch use.
 """
 from __future__ import annotations
 import argparse
@@ -11,6 +12,7 @@ import json
 import shutil
 import sys
 from datetime import datetime, timezone
+from typing import Optional
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -22,23 +24,167 @@ def digest(path):
         for block in iter(lambda:f.read(1024*1024),b""):h.update(block)
     return h.hexdigest()
 
+REQUIRED_SHEETS=(
+    "Material List by Object Type",
+    "Material List by Section Prop",
+    "Frame Assigns - Summary",
+    "Frame Assigns - End Len Offsets",
+    "Frame Assigns - Insertion Point",
+    "Area Assigns - Insertion Point",
+    "Load Pattern Definitions",
+    "Shell Uniform Load Sets",
+)
+SOURCE_REQUIRED_FILES=(
+    "OpenSees_Element_Connectivity.json",
+    "OpenSees_Section_Assignment_Audit.json",
+    "OpenSees_Load_Conversion_Audit.json",
+    "OpenSees_Source_Model_Metadata_V118.json",
+    "OpenSees_Complete_Model_Config_V118.json",
+)
+
+
+def _verify_before_creating_output(source, workbook, target):
+    """Fail closed before creating an output folder or changing source files."""
+    source=Path(source).expanduser().resolve()
+    workbook=Path(workbook).expanduser().resolve()
+    target=Path(target).expanduser().resolve()
+    if not source.is_dir():
+        raise FileNotFoundError(
+            "Source must be the FOLDER containing the existing OpenSees "
+            "export JSON and OpenSees_Complete_Gravity_Model.py: "+str(source))
+    if not workbook.is_file() or workbook.suffix.lower() not in (".xlsx",".xlsm"):
+        raise FileNotFoundError(
+            "Select an ORIGINAL ETABS full-assignment Excel workbook (.xlsx/.xlsm); "
+            "not the NBC calculation or gravity-results workbook: "+str(workbook))
+    if target.exists():
+        raise FileExistsError("Refusing to overwrite existing destination: "+str(target))
+    if target==source or source in target.parents:
+        raise ValueError("Destination must NOT be within the original source export")
+    if not target.parent.is_dir():
+        raise FileNotFoundError("Selected output parent does not exist: "+str(target.parent))
+    missing=[str(source/name) for name in SOURCE_REQUIRED_FILES
+             if not (source/name).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "Selected source is NOT a complete export; missing:\n"+
+            "\n".join(missing)+
+            "\nSelect the folder containing OpenSees_Element_Connectivity.json.")
+    # The original ETA BS Material List and beam offset tables are required,
+    # not just an arbitrary workbook with ETABS in its filename.
+    from openpyxl import load_workbook
+    book=load_workbook(workbook,read_only=True,data_only=True)
+    try:
+        missing_sheets=[s for s in REQUIRED_SHEETS if s not in book.sheetnames]
+    finally:
+        book.close()
+    if missing_sheets:
+        raise ValueError(
+            "Workbook does not contain the native ETABS assignment evidence. "
+            "Missing sheets: "+", ".join(missing_sheets)+
+            ". Export the full model tables from ETABS, including Material List, "
+            "Frame Assignments and End Length Offsets.")
+    # Reading the source config is a prerequisite; no policy is applied to
+    # the source. The new folder is generated from an independent copied file.
+    config=json.loads(
+        (source/"OpenSees_Complete_Model_Config_V118.json").read_text(
+            encoding="utf-8-sig"))
+    if not isinstance(config,dict):
+        raise ValueError("Source model config must be a JSON object")
+    if config.get("joint_volume_weight_policy") not in ("AUDIT_ONLY",None):
+        raise ValueError(
+            "Source uses a different joint-volume ownership policy; avoid "
+            "double beam overlap subtraction. Review it before rebuilding.")
+    return source,workbook,target
+
+
+def _choose_in_spyder():
+    """A no-argument interactive path; never runs ETABS or the gravity solver."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog, messagebox
+    except ImportError as exc:
+        raise RuntimeError(
+            "Tkinter GUI unavailable; run with --source-dir, "
+            "--assignment-workbook and --dest-dir.") from exc
+    root=tk.Tk()
+    root.withdraw()
+    try:
+        messagebox.showinfo(
+            "Verified clear-beam source rebuild",
+            "1. Select the ORIGINAL source-export FOLDER containing the "
+            "OpenSees_Element_Connectivity.json file.\n"
+            "2. Select the original FULL ETABS native assignment workbook "
+            "(Material List, Frame Summary and End Offsets).\n"
+            "3. Choose a parent output folder. A NEW timestamped folder "
+            "will be created.\n\n"
+            "No EDB will be saved, no existing model overwritten, "
+            "and gravity will NOT be run.",parent=root)
+        source=filedialog.askdirectory(
+            parent=root,title="Step 1/3 — Source folder containing ETABS export JSON")
+        if not source:return None
+        workbook=filedialog.askopenfilename(
+            parent=root,title="Step 2/3 — Original full ETABS assignment XLSX",
+            filetypes=[("Original ETABS assignment workbook","*.xlsx *.xlsm"),
+                       ("All files","*.*")])
+        if not workbook:return None
+        parent=filedialog.askdirectory(
+            parent=root,title="Step 3/3 — Parent directory for NEW corrected export")
+        if not parent:return None
+        name="Verified_Clear_Beam_"+datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        return (source,workbook,str(Path(parent)/name))
+    finally:
+        root.destroy()
+
+
+def _resolve_inputs(argv=None):
+    parser=argparse.ArgumentParser(
+        description="Spyder: run with no arguments to open three selection "
+        "dialogs; CLI: provide ALL three flags.")
+    parser.add_argument("--source-dir",default=None)
+    parser.add_argument("--assignment-workbook",default=None)
+    parser.add_argument("--dest-dir",default=None)
+    args=parser.parse_args(argv)
+    supplied=(args.source_dir,args.assignment_workbook,args.dest_dir)
+    if all(supplied):
+        return supplied
+    if any(supplied):
+        parser.error("Provide ALL three flags together; no mixing CLI and dialogs.")
+    return _choose_in_spyder()
+
+
+def main(argv=None):
+    selection=_resolve_inputs(argv)
+    if selection is None:
+        print("[CANCELLED] No files changed; no gravity model generated.",flush=True)
+        return None
+    source,workbook,target=selection
+    print("[START] Source: "+str(Path(source).resolve()),flush=True)
+    print("[START] Workbook: "+Path(workbook).name,flush=True)
+    print("[START] New export: "+str(Path(target).resolve()),flush=True)
+    try:
+        result=rebuild_verified_clear_beam(source,workbook,target)
+    except Exception as exc:
+        print("[BLOCKED] "+type(exc).__name__+": "+str(exc),flush=True)
+        print("Original ETABS model and source export remain unchanged.",flush=True)
+        raise
+    print("[FINISHED] Verified clear-beam SOURCE export generated.",flush=True)
+    print("[PENDING] 32-support gravity solver NOT RUN; ETABS reaction "
+          "agreement NOT VALIDATED.",flush=True)
+    print("[NEXT] In gravity GUI choose the NEW "
+          "OpenSees_Complete_Gravity_Model.py under:\n"+str(Path(target).resolve()),
+          flush=True)
+    print("[EVIDENCE] "+str(Path(target).resolve()/
+                          "CLEAR_BEAM_REBUILD_STATUS.json"),flush=True)
+    return result
+
+
 def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destination_dir):
-    source=Path(source_dir).resolve()
-    native=Path(native_assignment_workbook).resolve()
-    target=Path(destination_dir).resolve()
-    if not source.is_dir() or not native.is_file():
-        raise FileNotFoundError("Source export directory and original ETABS assignment workbook are required")
-    if target.exists() or source==target or source in target.parents and source.name==target.name:
-        raise FileExistsError("Target must be a brand-new directory; never overwrite gravity/NLTHA source data")
-    required=("OpenSees_Element_Connectivity.json",
-              "OpenSees_Section_Assignment_Audit.json",
-              "OpenSees_Load_Conversion_Audit.json",
-              "OpenSees_Source_Model_Metadata_V118.json",
-              "OpenSees_Complete_Model_Config_V118.json")
-    for name in required:
-        if not (source/name).is_file():
-            raise FileNotFoundError("Original ETABS source export missing "+name)
+    source,native,target=_verify_before_creating_output(
+        source_dir,native_assignment_workbook,destination_dir)
+    print("[RUNNING] Preflight source JSON and native ETABS Excel tables verified.",
+          flush=True)
     target.mkdir(parents=True,exist_ok=False)
+    print('[RUNNING] New destination created; copying original source evidence.',flush=True)
     copied=[]
     audit={"status":"REBUILD_RUNNING","original_source_dir":str(source),
            "original_assignment_workbook":native.name,
@@ -75,6 +221,7 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
             json.dumps(cfg,indent=2,default=str),encoding="utf-8")
         audit["status"]="ASSEMBLING_VERIFIED_CORRECTED_EXPORT"
         write_status()
+        print("[RUNNING] Native beam-ID/offset audit and new OpenSees assembly.",flush=True)
         from components.model.assembly import prepare_complete_export
         result=prepare_complete_export(target,runtime_dir=ROOT)
         report_file=target/"OpenSees_Complete_Export_Report_V118.json"
@@ -110,11 +257,4 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         raise
 
 if __name__=="__main__":
-    parser=argparse.ArgumentParser()
-    parser.add_argument("--source-dir",required=True)
-    parser.add_argument("--assignment-workbook",required=True)
-    parser.add_argument("--dest-dir",required=True)
-    args=parser.parse_args()
-    result=rebuild_verified_clear_beam(
-        args.source_dir,args.assignment_workbook,args.dest_dir)
-    print(json.dumps(result,indent=2))
+    main()
