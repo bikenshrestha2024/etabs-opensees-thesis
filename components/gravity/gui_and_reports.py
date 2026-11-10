@@ -89,6 +89,7 @@ class GravityAnalysisGUI:
         self.comparison_output_var = tk.StringVar(value="")
         self.etabs_gravity_json_var = tk.StringVar(value="")
         self.etabs_full_table_var=tk.StringVar(value="")
+        self.etabs_native_assignment_var=tk.StringVar(value="")
         self.etabs_case_var = tk.StringVar(value="1. DL + LL")
         self.allow_alternate_edb = tk.BooleanVar(value=False)
         self.launch_etabs_for_gravity = tk.BooleanVar(value=True)
@@ -145,18 +146,48 @@ class GravityAnalysisGUI:
         if not model.is_file():
             messagebox.showerror("Select source model","Select the current exported model first.",parent=self.win)
             return
-        native=filedialog.askopenfilename(
-            parent=self.win,title="Original ETABS frame/material assignment workbook",
-            filetypes=[("Excel native source","*.xlsx"),("All files","*.*")])
-        if not native:return
+        native=self.etabs_native_assignment_var.get().strip()
+        if not native:
+            native=filedialog.askopenfilename(
+                parent=self.win,
+                title="Original ETABS frame/material assignment workbook",
+                filetypes=[("Original ETABS full assignment Excel","*.xlsx *.xlsm"),
+                           ("All files","*.*")])
+            if not native:return
+            self.etabs_native_assignment_var.set(native)
+        native_file=Path(native).expanduser()
+        if not native_file.is_file() or native_file.suffix.lower() not in (".xlsx",".xlsm"):
+            messagebox.showerror("Assignment workbook required",
+                "Select the ORIGINAL ETABS full assignment Excel workbook, "
+                "not NBC105_RS_Scaling or the gravity reactions summary.",
+                parent=self.win)
+            return
         destination=filedialog.askdirectory(
             parent=self.win,
             title="Choose parent directory for NEW verified clear-beam source export")
         if not destination:return
         source=model.resolve().parent
         import datetime as _dt
-        new=Path(destination).resolve()/(
-            "Verified_Clear_Beam_"+_dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+        parent_dir=Path(destination).resolve()
+        if parent_dir==source or source in parent_dir.parents:
+            proposed=source.parent/(
+                "Verified_Clear_Beam_"+_dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+            approved=messagebox.askyesno(
+                "Create separate export beside original source?",
+                "Your selected destination is INSIDE the original ETABS export folder. "
+                "The rebuild refuses to put a corrected source inside a source "
+                "used for other gravity/ESM calculations.\n\n"
+                "Create this NEW SIBLING folder instead?\n"+str(proposed)+
+                "\n\nNo existing model or ETABS EDB will be changed.",
+                parent=self.win)
+            if not approved:
+                self._set_gravity_operation("CANCELLED",
+                    "Select an output folder OUTSIDE the original export")
+                return
+            new=proposed
+        else:
+            new=parent_dir/(
+                "Verified_Clear_Beam_"+_dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
         # In an exported copy the runtime contains components but not tools.
         # Run the rebuilt source implementation from the current updated repo.
         current_root=Path(__file__).resolve().parents[2]
@@ -706,6 +737,21 @@ class GravityAnalysisGUI:
             lambda:self._browse_file(self.etabs_full_table_var,
                 "Choose original analyzed ETABS full-table export",
                 [("ETABS Excel or CSV","*.xlsx *.xlsm *.csv"),("All files","*.*")]))
+        self._path_row(form,
+            "Original ETABS frame/material assignment XLSX (BEAM WEIGHT SOURCE)",
+            self.etabs_native_assignment_var,
+            lambda:self._browse_file(
+                self.etabs_native_assignment_var,
+                "Select ORIGINAL ETABS material/section/frame/end-offset assignment workbook",
+                [("ETABS native assignment Excel","*.xlsx *.xlsm"),
+                 ("All files","*.*")]))
+        ttk.Label(form,
+            text="Separate from the completed ETABS Joint Reactions workbook. "
+                 "Required for the clear-beam rebuild: Material List by Object Type, "
+                 "Frame Assigns - Summary and End Len Offsets. "
+                 "Original workbook is READ ONLY; source hash and beam crosswalk are audited.",
+            wraplength=1070,foreground="#9a3412",
+            anchor="w",justify="left").pack(anchor="w",pady=(0,4))
         ttk.Button(form,text="Compare saved ETABS tables vs BOTH OpenSees gravity cases (no ETABS API)",
                    command=self._offline_etabs_table_compare).pack(anchor="w",pady=(3,5))
         self._path_row(form, "ETABS gravity results JSON (optional)", self.etabs_gravity_json_var,
