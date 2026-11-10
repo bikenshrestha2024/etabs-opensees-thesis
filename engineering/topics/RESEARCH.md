@@ -1,0 +1,4 @@
+# Thesis, code and literature
+Review `Research_Components/02_MODELLING_BASIS.md`, `docs/00_RESEARCH_REFERENCES.md`, `docs/00_THESIS_ACCEPTANCE_GATES.md` and current module source guides before any numerical change.
+M0–M6 conventional/damped outriggers, belt/cap configurations; ULS/SLS; XY/YX matched horizontal components; Soil C source; core wall openings and asymmetry. Original workbook Aw/T1 and source cell/EDB hashes are adopted reference (not universally code certified). Preserve measured vs inferred parameter source for Concrete01/02/CM, Steel02/MPF, SFI-MVLEM, BRB and FVD.
+Every code reference must give verified official edition, clause, engineering interpretation, affected symbol/path and whether implementation was checked. No invented DOI or full copyrighted standards. Planned NLTHA configurations and unverified experiments are NOT finished results.

@@ -1,0 +1,13 @@
+domain,existing_canonical_path,status,proposed_role,verification_state
+etabs_source_export,OpenSees_Complete_Export_V118.py,EXISTING,ETABS source adapter pending ownership review,NOT_REVIEWED
+model_assembly,components/model/assembly.py,EXISTING,neutral model conversion candidate NOT migrated,NOT_REVIEWED
+section_mapping,components/sections/definitions.py,EXISTING,section definitions and mapping,NOT_REVIEWED
+gravity_solver,components/gravity/solver_stack.py,EXISTING,gravity analysis with separate ETABS comparison,NOT_REVIEWED
+gravity_etabs_comparison,components/gravity/comparison_bundle.py,EXISTING,primary reaction evidence,NOT_REVIEWED
+equivalent_static,components/equivalent_static/calculation_and_gui.py,EXISTING,ESM calculation and GUI adapter separation candidate,NOT_REVIEWED
+modal,components/modal/analysis.py,EXISTING,modal solver,NOT_REVIEWED
+response_spectrum,components/response_spectrum/model_analysis.py,EXISTING,RSA source,NOT_REVIEWED
+nltha,components/nonlinear_time_history/runner_and_gui.py,EXISTING,NLTHA run orchestration and GUI split candidate,NOT_REVIEWED
+shared_recorders,components/shared/response_recorders.py,EXISTING,common output recording,NOT_REVIEWED
+standalone_opensees_engine,,NEW_WITH_JUSTIFICATION,ETABS-independent shared numerical core only after migration tests,NOT_IMPLEMENTED
+neutral_model_schema,,NEW_WITH_JUSTIFICATION,versioned exchange schema only after source field audit,NOT_IMPLEMENTED
