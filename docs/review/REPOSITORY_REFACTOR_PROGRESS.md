@@ -74,3 +74,16 @@ CI follow-up: compilation/navigation and clear-beam workflows passed. The first
 quality run found missing reference tags on three public helpers; tags were
 added and all four reference-tag tests passed locally. The six new source/force
 regressions are now included in the quality workflow.
+
+## User-directed publication follow-up
+
+The user authorized merging the implementation into main, publishing the
+supplied Excel workbooks, consolidating workbook paths under excel/, and
+using 01.py as the main launcher. 68 workbooks are catalogued; 63 existing
+ones retain identical bytes. The 530969448-byte full export uses Git LFS.
+Canonical launcher order and portable source/runtime handling were updated.
+See EXCEL_AND_LAUNCHER_PUBLICATION_DECISIONS.md for scope, compatibility,
+engineering limitations and the explicit publication authorization.
+
+Publication regression: 214 tests and 5 subtests passed; reference tags passed;
+419-module static inventory clean; Git LFS object integrity verified locally.

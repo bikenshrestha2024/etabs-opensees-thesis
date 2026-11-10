@@ -41,3 +41,8 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 - Rayleigh imports are matched to state, model hash, seismic weight hash and Aw. No change to the source ETABS data or original workbook is allowed.
 
 **New checks:** `tests/verify_esm_aw_period_provenance.py` and `tests/verify_nbc105_periods.py`; synthetic regression proof only. See [full professional parameter manual](../../../review/20261105_PROFESSIONAL_STRUCTURAL_ENGINEERING_PROVENANCE_MANUAL.md). Old baseline SHA is historical, not the current source blob.
+
+Publication extension: the resolver also reads excel/SOURCE_REGISTRY.json with
+paths relative to the registry. Git LFS pointers are reported with a pull
+instruction. copy_project_workbooks copies the three established small inputs
+to export/excel/source and retains verified references to larger source files.

@@ -1,0 +1,20 @@
+{
+  "tool": "OpenAI Codex desktop",
+  "exact_model": "UNKNOWN",
+  "timestamp_utc": "2026-11-10T17:58:04.612633+00:00",
+  "branch": "fix/primary-gravity-seismic-inputs",
+  "base_sha": "601365c3d63dc1fa7edc1e066856387059687d35",
+  "user_authorization": "Publish all current implementation work to main; include supplied Excel files; centralize all workbooks under excel; main launcher 01; ordered navigation.",
+  "classification": "EXTEND canonical inputs and launcher; byte-preserving workbook relocation; no solver physics change",
+  "workbook_count": 68,
+  "existing_workbooks_moved": 63,
+  "new_source_workbooks_added": 3,
+  "new_verification_workbooks_added": 2,
+  "large_file_storage": "Git LFS; full ETABS workbook retains original 530969448 bytes",
+  "catalog": "excel/WORKBOOK_CATALOG.json",
+  "compatibility": "old launcher delegates; explicit non-overwriting legacy workbook restore tool",
+  "local_tests": "214 passed; 5 subtests passed; reference-tag checks 4 passed; Git LFS fsck OK",
+  "native_solver_effect": "No new numerical changes or acceptance claims",
+  "main_merge_status": "User authorized; execute after current-head checks pass",
+  "source_inventory": "419 active modules; no missing canonical launchers, source guides or syntax errors"
+}

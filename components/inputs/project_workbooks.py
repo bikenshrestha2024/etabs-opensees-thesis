@@ -32,7 +32,9 @@ def registered_project_source(export_dir, role):
                 h.update(block)
         return h.hexdigest()
     locations = [Path(export_dir)/'project_sources.private.json',
-                 Path(__file__).resolve().parents[2]/'project_sources.private.json']
+                 Path(__file__).resolve().parents[2]/'project_sources.private.json',
+                 Path(export_dir)/'excel'/'SOURCE_REGISTRY.json',
+                 Path(__file__).resolve().parents[2]/'excel'/'SOURCE_REGISTRY.json']
     if os.environ.get('OPENSEES_PROJECT_SOURCES'):
         locations.insert(0, Path(os.environ['OPENSEES_PROJECT_SOURCES']))
     current = _source_edb_path(export_dir)
@@ -48,10 +50,53 @@ def registered_project_source(export_dir, role):
         if not entry:
             continue
         path = Path(entry['path'])
+        if not path.is_absolute():path=registry.parent/path
+        if path.is_file():
+            with path.open('rb') as stream:
+                if stream.read(64).startswith(b'version https://git-lfs.github.com/spec/v1'):
+                    raise ValueError('Workbook is a Git LFS pointer; run git lfs pull in the repository: '+str(path))
         if not path.is_file() or digest(path) != entry.get('sha256'):
             raise ValueError('Registered source changed or missing: '+role)
         return str(path.resolve())
     return None
+
+
+def copy_project_workbooks(runtime_dir, export_dir):
+    """Copy small calculator inputs to a new export; reference large sources.
+
+    Source workbooks remain read-only. Only the three established calculator/
+    scaling names are copied, never the large full-table export or historical
+    evidence. A fresh private registry preserves verified absolute references.
+    [REF docs/source/components/inputs/project_workbooks.py.md]
+    """
+    import shutil
+    import hashlib
+    source=Path(runtime_dir)/'excel'/'source'
+    if not source.is_dir():source=Path(runtime_dir)/'Project_Input_Workbooks'
+    target=Path(export_dir)/'excel'/'source'
+    copied=[]
+    for name in (CALCULATOR,SCALING,SERVICE_SCALING):
+        path=source/name
+        if path.is_file():
+            target.mkdir(parents=True,exist_ok=True)
+            dest=target/name
+            if path.resolve()!=dest.resolve():shutil.copy2(path,dest)
+            copied.append(str(dest))
+    registry=Path(export_dir)/'project_sources.private.json'
+    current=_source_edb_path(export_dir)
+    if current and Path(current).is_file() and not registry.exists():
+        entries={}
+        for role in ('nbc_calculator','nbc_engine','etabs_assignment','etabs_full_table','slab_load_path','etabs_linked_audit'):
+            path=registered_project_source(export_dir,role)
+            if path:
+                path=Path(path)
+                if path.name in (CALCULATOR,SCALING,SERVICE_SCALING) and (target/path.name).is_file():path=target/path.name
+                with path.open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
+                entries[role]={'path':str(path.resolve()),'sha256':sha}
+        if entries:
+            with Path(current).open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
+            registry.write_text(json.dumps({'source_edb_sha256':sha,'sources':entries},indent=2),encoding='utf-8')
+    return copied
 
 def _source_edb_path(export_dir):
     folder=Path(export_dir)
@@ -516,9 +561,9 @@ def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
     from zipfile import BadZipFile
     export_dir=Path(export_dir);root=Path(root)
     selected=export_dir/'NBC105_Workbook_Source.json'
-    roots=[export_dir/'Project_Input_Workbooks',export_dir,
+    roots=[export_dir/'excel'/'source',export_dir/'Project_Input_Workbooks',export_dir,
            export_dir.parent/'Project_Input_Workbooks',export_dir.parent,
-           root/'Project_Input_Workbooks',root,
+           root/'excel'/'source',root/'Project_Input_Workbooks',root,
            Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
     candidates=[]
     if selected.is_file():
@@ -587,9 +632,9 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     # stored in adjacent folders rather than inside the same export folder.
     # Search a bounded directory set, and validate sheet + B4 model identity
     # before choosing anything. Never recursively search an entire drive.
-    search=[export_dir/'Project_Input_Workbooks',export_dir,
+    search=[export_dir/'excel'/'source',export_dir/'Project_Input_Workbooks',export_dir,
             export_dir.parent/'Project_Input_Workbooks',export_dir.parent,
-            root/'Project_Input_Workbooks',root]
+            root/'excel'/'source',root/'Project_Input_Workbooks',root]
     selected=export_dir/'NBC105_Workbook_Source.json'
     if selected.is_file():
         names=json.loads(selected.read_text(encoding='utf-8-sig'))

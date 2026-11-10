@@ -10,3 +10,9 @@
 **Native evidence needed:** project ETABS model and openings schedule, verified frame/wall reinforcement and confinement, source gravity/mass, individual FSAM cyclic wall element and full 3D core. Do not repair a nonfinite value by silently inventing stiffness or altering source geometry. [P0 review](../../../review/01_WALL_GEOMETRY_MATERIALS_FIRST_STEP.md).
 
 Source: [OpenSees E-SFI 3D](https://opensees.github.io/OpenSeesDocumentation/user/manual/model/elements/E_SFI_MVLEM_3D.html); [NBC 105:2025](https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf) §§9.3.1–9.3.3.
+
+2026-11-10 publication: runtime workbook packaging delegates to
+`copy_project_workbooks` in the canonical inputs module. New exports receive
+only the three small calculator/scaling workbooks under excel/source and a
+verified private source registry where available. Large ETABS tables remain
+referenced. No model assembly, stiffness or solver equations changed.

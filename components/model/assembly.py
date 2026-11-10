@@ -873,9 +873,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
     wall_sources=runtime_dir/'wall_validation_sources'
     if wall_sources.is_dir() and wall_sources.resolve()!=(runtime/'wall_validation_sources').resolve():
         shutil.copytree(wall_sources,runtime/'wall_validation_sources',dirs_exist_ok=True)
-    books=runtime_dir/'Project_Input_Workbooks'
-    target_books=folder/'Project_Input_Workbooks'
-    if books.is_dir() and books.resolve()!=target_books.resolve():shutil.copytree(books,target_books,dirs_exist_ok=True)
+    from components.inputs.project_workbooks import copy_project_workbooks
+    copy_project_workbooks(runtime_dir,folder)
     for bundle_name in ('Material_Catalog','Research_Components'):
         bundle=runtime_dir/bundle_name
         if bundle.is_dir() and bundle.resolve()!=(runtime/bundle_name).resolve():

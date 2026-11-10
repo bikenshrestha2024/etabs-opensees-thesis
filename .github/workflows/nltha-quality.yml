@@ -168,6 +168,7 @@ on:
       - 'components/equivalent_static/calculation_and_gui.py'
       - 'components/inputs/project_workbooks.py'
       - 'tests/test_project_source_reuse.py'
+      - 'tests/test_excel_publication.py'
       - 'components/inputs/etabs_periods.py'
       - 'docs/review/20261106_ESM_SHIFTED_SCALING_ROWS_Codex.md'
       - 'tests/verify_nbc105_periods.py'
@@ -275,6 +276,7 @@ on:
       - 'components/equivalent_static/**'
       - 'components/inputs/project_workbooks.py'
       - 'tests/test_project_source_reuse.py'
+      - 'tests/test_excel_publication.py'
       - 'components/inputs/etabs_periods.py'
       - 'docs/review/20261106_ESM_SHIFTED_SCALING_ROWS_Codex.md'
       - 'tests/verify_esm_aw_period_provenance.py'
@@ -414,4 +416,4 @@ jobs:
           python tests/verify_nbc105_dual_target.py
           python tests/verify_expanded_workbench_tabs.py
           python tests/verify_readiness_dashboard.py
-          python -m pytest tests/test_project_source_reuse.py -q
+          python -m pytest tests/test_project_source_reuse.py tests/test_excel_publication.py -q
