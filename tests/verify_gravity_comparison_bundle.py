@@ -101,6 +101,9 @@ class GravityBundleTests(unittest.TestCase):
                            ("CONTINUOUS_WALL_BASE_FIXED",76)):
             (dual/name/"Gravity_Result_V110.json").write_text(
                 json.dumps(report(count,name)),encoding="utf8")
+        (dual/"ETABS_SOURCE_SUPPORTS"/"Gravity_Response").mkdir()
+        (dual/"ETABS_SOURCE_SUPPORTS"/"Gravity_Response"/"Source_76_Load_Path.csv").write_text(
+            "source,force_kN\\nmember,76\\n",encoding="utf8")
         # The native table has 32 nonzero source reactions and 44 zeros.
         # They are legitimate recorded zeros, not absent data.
         etabs=self.root/"native_etabs.json"
