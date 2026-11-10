@@ -65,4 +65,7 @@ and internal base mesh constraints against the preserved 32-node main case;
 compare new recovered frame/shell interfaces with native section cuts under
 the same load discretization. Do not tune support reactions to fit totals.
 
-Last completed commit: pending final commit of this checkpoint.
+Last completed implementation commit: `c6585598d72d480cb42d164868ff7bce154cd890`.
+Draft PR: https://github.com/bikenshrestha2024/etabs-opensees-thesis/pull/17
+Final source/test state: 197 tests plus 5 subtests passed; native Tk workbook
+and offline ETABS reaction-comparison exports completed.
