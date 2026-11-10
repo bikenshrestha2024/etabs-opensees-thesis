@@ -41,6 +41,14 @@ def collect(folder, issues=None, *, results_root=None):
             return False
         return True
     state=selected_state
+    # A review ZIP is a snapshot of already recorded responses, not a
+    # second independent solver run. Exclude all extracted package copies
+    # from normalized comparisons to avoid false duplicate cases.
+    def current_result(path):
+        return not any(part.startswith((
+            'Seismic_Review_Packages','ESM_Validation_Evidence_',
+            'Gravity_Evidence_Upload','Gravity_ETABS_OpenSees_Evidence'))
+            for part in Path(path).parts)
     p=analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
     if not p.is_file():
         p=root/('Modal_'+state)/'NBC105_Modal_V111.json'
@@ -56,6 +64,7 @@ def collect(folder, issues=None, *, results_root=None):
                 add('MODAL',state,'MODAL',axis,'ALL','cumulative_mass','percent','modal_mass',
                     d.get('cumulative_U'+axis+'_percent'),p)
     for p in sorted(root.rglob('MRSM_Results_V132.json')):
+        if not current_result(p):continue
         document=json.loads(p.read_text(encoding='utf-8-sig'))
         if not isinstance(document,dict):
             issues.append(str(p)+': unexpected MRSM structure')
@@ -76,6 +85,7 @@ def collect(folder, issues=None, *, results_root=None):
                 add('MRSM',state,case,axis,r['story_number'],'drift_ratio',
                     'ratio','CQC_design_unscaled_by_7_5',r.get('design_drift_ratio'),p)
     for p in sorted(root.rglob('NBC105_ESM_OpenSees_Response_*.json')):
+        if not current_result(p):continue
         if 'Response_META_' in p.name:continue
         document=json.loads(p.read_text(encoding='utf-8-sig'))
         if isinstance(document,list):
@@ -114,6 +124,7 @@ def collect(folder, issues=None, *, results_root=None):
     # name is the only supported location key; generated mesh nodes without
     # native ETABS counterparts remain in raw CSV, not invented matches.
     for p in sorted(root.rglob('NBC105_ESM_All_Node_Displacements_*.csv')):
+        if not current_result(p):continue
         with p.open('r',newline='',encoding='utf-8-sig') as f:
             records=list(csv.DictReader(f))
         if not records:continue
