@@ -1,0 +1,258 @@
+[
+  {
+    "sha": "0176b638238c37b1e84f051c0b8efb7a7d71bf4f",
+    "ref": "refs/heads/backup/pre-root-version-archive-20261103"
+  },
+  {
+    "sha": "d46e4f2926be68f3a54620d3d4939ce90dcc06dc",
+    "ref": "refs/heads/backup/pre-v169-nltha-qa-20261103"
+  },
+  {
+    "sha": "36bb4163ecaeac459570cfe0ce8550c468927df7",
+    "ref": "refs/heads/backup/pre-v170-documentation-and-device-guards"
+  },
+  {
+    "sha": "ed3890693c2279c5d088b5f350fcbadb2565b231",
+    "ref": "refs/heads/backup/pre-workorder-rename-20261103"
+  },
+  {
+    "sha": "d0ff5201c961c19701e0af94ce13bd5070cb6031",
+    "ref": "refs/heads/bikenshrestha2024-openseespy-validation"
+  },
+  {
+    "sha": "c9fc326f277d4ec02bdb6aa3ff6548951fa0f695",
+    "ref": "refs/heads/codex/gravity-dead-live-comparison"
+  },
+  {
+    "sha": "0b6b086ae653746211265c5e1f7670eebf5c4b07",
+    "ref": "refs/heads/codex/workflow-review-20261109"
+  },
+  {
+    "sha": "8c4c064a5d4c5663837fe810b7c69513eb4b0d01",
+    "ref": "refs/heads/diagnostics/v169-first-step-evidence"
+  },
+  {
+    "sha": "b83eb9bf2defbeb6e3d44572db2c4eb0aa57e418",
+    "ref": "refs/heads/feat/esm-explicit-excel-master-reference-20261106"
+  },
+  {
+    "sha": "35d9a1bfdd86f9db258b206a09dd575aaa251bb3",
+    "ref": "refs/heads/feat/nbc105-opening-deduction-etabs-crosscheck-20261106"
+  },
+  {
+    "sha": "2acaab3b8a05f9774b0a9babb3fb52d8c37794d3",
+    "ref": "refs/heads/feat/nbc105-torsion-validation-protocol-20261105"
+  },
+  {
+    "sha": "e1f9d17bd7aefb59babf477ce927947e20271eed",
+    "ref": "refs/heads/feat/opensees-first-nbc105-excel-sync-20261106"
+  },
+  {
+    "sha": "76e3ccea97e889e638cdd1b5758f981ef0bd4d2b",
+    "ref": "refs/heads/feat/verified-floor-end-torsion-extraction-20261105"
+  },
+  {
+    "sha": "ec90dced9a2fd953f9392401b19fedaed85511e7",
+    "ref": "refs/heads/feature/direct-etabs-api-equivalence-20261105"
+  },
+  {
+    "sha": "8bce24707a57f94a1e39595bf9b9f118add72e10",
+    "ref": "refs/heads/fix/esm-aw-period-provenance-20261104"
+  },
+  {
+    "sha": "3e4c15381ecbdd83aa686442319da2c30157533f",
+    "ref": "refs/heads/fix/esm-badzip-invalid-xlsx-source-isolation-20261106"
+  },
+  {
+    "sha": "02abd66294ada0321e4a14cca9d157e04d8a5a09",
+    "ref": "refs/heads/fix/esm-blank-aw-source-import-20261106"
+  },
+  {
+    "sha": "35e11331a0ca405a91a7a8219082e307dafb52e6",
+    "ref": "refs/heads/fix/esm-blank-copy-source-both-rayleigh-20261105"
+  },
+  {
+    "sha": "0e647435852068d686412171246bfcdde29c3af9",
+    "ref": "refs/heads/fix/esm-continuous-pier-diagnostic-prefill-20261106"
+  },
+  {
+    "sha": "3e0f0b9df6b1e91635f94c7b838ec8a1d857f9f7",
+    "ref": "refs/heads/fix/esm-first-story-wall-slice-audit-20261106"
+  },
+  {
+    "sha": "4595daee5488db8186f73c5a6cef3bc24b0f26eb",
+    "ref": "refs/heads/fix/esm-output-safety-period-metadata-20261105"
+  },
+  {
+    "sha": "8c48751dd60fa973a466cf05e2f5fe9ba99c1d37",
+    "ref": "refs/heads/fix/esm-rayleigh-blank-preflight-20261106"
+  },
+  {
+    "sha": "140f5e4b5e360cc29bfad9e789a309f2e2ebf68e",
+    "ref": "refs/heads/fix/esm-shifted-scaling-source-labelled-20261106"
+  },
+  {
+    "sha": "e5163e73e54f4f67b09a6f776323261ca79c21ac",
+    "ref": "refs/heads/fix/esm-single-model-single-limit-state-20261105"
+  },
+  {
+    "sha": "435b212edad34e649a4fc0648557cb0b70de3026",
+    "ref": "refs/heads/fix/high-priority-audit-findings-20261105"
+  },
+  {
+    "sha": "5c6a47c781500aaa6048be3dcab9ce8f5d7fd266",
+    "ref": "refs/heads/fix/mrsm-gui-materials"
+  },
+  {
+    "sha": "37c9310dda81fa8a205ba88a74211a0555127325",
+    "ref": "refs/heads/fix/reconcile-v170-modal-cancel-linear-trials-20261106"
+  },
+  {
+    "sha": "a0ba031895f0b9a0f68b7ae5ec841219253d5f4f",
+    "ref": "refs/heads/fix/v169-wall-first-step-diagnostic-evidence-20261105"
+  },
+  {
+    "sha": "a8991c4243111dbb00da19a2a045b9918532674d",
+    "ref": "refs/heads/fix/v170-modal-mrsm-linear-trials"
+  },
+  {
+    "sha": "25bd25f9b231d7afefbd7bdaf09a781c4047aa2d",
+    "ref": "refs/heads/improve/damping-energy-viz"
+  },
+  {
+    "sha": "df69ae625c97a971fe7846536123f1141be1d600",
+    "ref": "refs/heads/main"
+  },
+  {
+    "sha": "146a35a5a3dfbbb61da9ecdddd0f38969d534750",
+    "ref": "refs/heads/review/current-head-ledger-20261104"
+  },
+  {
+    "sha": "5365b99ccd29f6db77806de06baf09f2fe1a72fd",
+    "ref": "refs/heads/review/thesis-evidence-and-timestep"
+  },
+  {
+    "sha": "51bcce558e1e7b4b167b62673826bcc0ca7d10c8",
+    "ref": "refs/heads/review/verified-per-file-ledger-20261104"
+  },
+  {
+    "sha": "8c4c064a5d4c5663837fe810b7c69513eb4b0d01",
+    "ref": "refs/pull/1/head"
+  },
+  {
+    "sha": "ec90dced9a2fd953f9392401b19fedaed85511e7",
+    "ref": "refs/pull/10/head"
+  },
+  {
+    "sha": "c9fc326f277d4ec02bdb6aa3ff6548951fa0f695",
+    "ref": "refs/pull/11/head"
+  },
+  {
+    "sha": "35e11331a0ca405a91a7a8219082e307dafb52e6",
+    "ref": "refs/pull/12/head"
+  },
+  {
+    "sha": "e5163e73e54f4f67b09a6f776323261ca79c21ac",
+    "ref": "refs/pull/13/head"
+  },
+  {
+    "sha": "2acaab3b8a05f9774b0a9babb3fb52d8c37794d3",
+    "ref": "refs/pull/14/head"
+  },
+  {
+    "sha": "76e3ccea97e889e638cdd1b5758f981ef0bd4d2b",
+    "ref": "refs/pull/15/head"
+  },
+  {
+    "sha": "435b212edad34e649a4fc0648557cb0b70de3026",
+    "ref": "refs/pull/16/head"
+  },
+  {
+    "sha": "a0ba031895f0b9a0f68b7ae5ec841219253d5f4f",
+    "ref": "refs/pull/17/head"
+  },
+  {
+    "sha": "02abd66294ada0321e4a14cca9d157e04d8a5a09",
+    "ref": "refs/pull/18/head"
+  },
+  {
+    "sha": "3e0f0b9df6b1e91635f94c7b838ec8a1d857f9f7",
+    "ref": "refs/pull/19/head"
+  },
+  {
+    "sha": "a8991c4243111dbb00da19a2a045b9918532674d",
+    "ref": "refs/pull/2/head"
+  },
+  {
+    "sha": "37c9310dda81fa8a205ba88a74211a0555127325",
+    "ref": "refs/pull/20/head"
+  },
+  {
+    "sha": "8c48751dd60fa973a466cf05e2f5fe9ba99c1d37",
+    "ref": "refs/pull/21/head"
+  },
+  {
+    "sha": "e1f9d17bd7aefb59babf477ce927947e20271eed",
+    "ref": "refs/pull/22/head"
+  },
+  {
+    "sha": "0e647435852068d686412171246bfcdde29c3af9",
+    "ref": "refs/pull/23/head"
+  },
+  {
+    "sha": "3e4c15381ecbdd83aa686442319da2c30157533f",
+    "ref": "refs/pull/24/head"
+  },
+  {
+    "sha": "140f5e4b5e360cc29bfad9e789a309f2e2ebf68e",
+    "ref": "refs/pull/25/head"
+  },
+  {
+    "sha": "35d9a1bfdd86f9db258b206a09dd575aaa251bb3",
+    "ref": "refs/pull/26/head"
+  },
+  {
+    "sha": "b83eb9bf2defbeb6e3d44572db2c4eb0aa57e418",
+    "ref": "refs/pull/27/head"
+  },
+  {
+    "sha": "25bd25f9b231d7afefbd7bdaf09a781c4047aa2d",
+    "ref": "refs/pull/28/head"
+  },
+  {
+    "sha": "5c6a47c781500aaa6048be3dcab9ce8f5d7fd266",
+    "ref": "refs/pull/29/head"
+  },
+  {
+    "sha": "8986a59e9c8e4785ddab079cebfd25abd02bf0df",
+    "ref": "refs/pull/3/head"
+  },
+  {
+    "sha": "0b6b086ae653746211265c5e1f7670eebf5c4b07",
+    "ref": "refs/pull/30/head"
+  },
+  {
+    "sha": "268cd88a821ca64aa85c5ae5420e30deb195bd8d",
+    "ref": "refs/pull/4/head"
+  },
+  {
+    "sha": "5365b99ccd29f6db77806de06baf09f2fe1a72fd",
+    "ref": "refs/pull/5/head"
+  },
+  {
+    "sha": "51bcce558e1e7b4b167b62673826bcc0ca7d10c8",
+    "ref": "refs/pull/6/head"
+  },
+  {
+    "sha": "146a35a5a3dfbbb61da9ecdddd0f38969d534750",
+    "ref": "refs/pull/7/head"
+  },
+  {
+    "sha": "8bce24707a57f94a1e39595bf9b9f118add72e10",
+    "ref": "refs/pull/8/head"
+  },
+  {
+    "sha": "4595daee5488db8186f73c5a6cef3bc24b0f26eb",
+    "ref": "refs/pull/9/head"
+  }
+]

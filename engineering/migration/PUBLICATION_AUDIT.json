@@ -1,0 +1,1732 @@
+{
+  "source": "bikenshrestha2024/opensees-nbc105-research",
+  "baseline": "df69ae625c97a971fe7846536123f1141be1d600",
+  "scope": "All objects reachable from captured mirror refs; pattern screening, not a comprehensive secret or legal audit",
+  "objects": {
+    "commit": 814,
+    "tree": 2933,
+    "blob": 3010
+  },
+  "blob_bytes": 457453564,
+  "tracked_files": 2584,
+  "finding_counts": {
+    "PRIVATE_WINDOWS_PATH": 242,
+    "REDISTRIBUTION_REVIEW_FILE": 42
+  },
+  "findings": [
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "27b96c91abb7429f509a35cc978d7778d27d3b06",
+      "path": "27_COMPARE_OUTRIGGERS.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c78798290b1066f0f62a4d994469aab43bd4856c",
+      "path": "29_NATIVE_DEVICE_BENCHMARK.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3201bf465c81173581367db40563a0c8a9777db9",
+      "path": "30_CALIBRATE_FVD_FROM_TEST.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "0580fcd634342fb4a61abb4d4c9cebd7ae3c9941",
+      "path": "34_NBC105_RC_DUAL_C_D_TARGETS.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "cba0dcf2cdae5050bd202283b1548c0dc7e020af",
+      "path": "35_SOIL_C_NLTHA_PREFLIGHT.py",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "27cbc543005b9405cc04566f5581474e3f159efb",
+      "path": "36_SOIL_C_NLTHA_RUN_MATRIX.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a61a5ce3c55f1e5e12ee75b4944bc79f15ea4434",
+      "path": "37_THESIS_EVIDENCE_DASHBOARD.py",
+      "matches": 2
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "5bae988a3a6c3930a66fb9bdd9fc30deae273782",
+      "path": "Calibration_Steel02/results/Native_Curve_Export/Material_Curve_V151.xlsx",
+      "bytes": 26317
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "2f7e090e539682014d126a54af0bcb67a03306f9",
+      "path": "Diagnostic_Evidence/diagnose_nl_first_step.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "1ee3a754e6f17a6c54f60b1be0c9577b3f4581c0",
+      "path": "Diagnostic_Evidence/diagnose_nl_force.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "37154fea2646e0bdcf6ed82c7b687bca5d1299ad",
+      "path": "New_Export_Viewer_Diagnostic/OpenSees_Element_Connectivity.json",
+      "matches": 1
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "c9662443e1b59791e75b708b08bebd6cb1829170",
+      "path": "New_Export_Viewer_Diagnostic/OpenSees_ID_and_Support_Audit.xlsx",
+      "bytes": 142911
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "b06a69be299e5256b94ea943fab3d523bda63ab0",
+      "path": "Project_Input_Workbooks/NBC105_2025_Seismic_Calculator_ETABS_Direct Interaction - Copy.xlsx",
+      "bytes": 2000217
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "92b5e98d76de08bd2a6752c993b3e82e3cdf952f",
+      "path": "Project_Input_Workbooks/SERVICE LOAD  - NEPAL - 3 - BELT TRUSS, OUTRIGGER CAP TRUSS_NBC105_RS_Scaling_2.xlsx",
+      "bytes": 2004604
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "d63941f0ab82fe4f3c10d6e74695a8c43c5f133f",
+      "path": "Project_Input_Workbooks/ULTIMATE LOAD  - NEPAL - 3 - BELT TRUSS, OUTRIGGER CAP TRUSS_NBC105_RS_Scaling.xlsx",
+      "bytes": 2004612
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "24438fa290596332e3b7f0af62505cb4d4adb7d1",
+      "path": "Regression_Test_V148.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a92f69e79026e7738a05b703174ed1b7ce47099e",
+      "path": "Reproducibility_Checks_V141/gui_v141.py",
+      "matches": 1
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "7fcbb68f24efae7c7bb65f761ea9f493cb0733ec",
+      "path": "Research_Components/results/Components_20261028_061102/BRB/Parameter_Study.xlsx",
+      "bytes": 10360
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "429dfd875193cfeebdaf5ef63393fd04f17da7af",
+      "path": "Research_Components/results/Components_20261028_061102/Concrete01/Parameter_Study.xlsx",
+      "bytes": 16262
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "6bf108c130f3423cb95b644d7fe4b307063b19c3",
+      "path": "Research_Components/results/Components_20261028_061102/Concrete02/Parameter_Study.xlsx",
+      "bytes": 16228
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "6d7892b73f61035c250145f34618f3588b029c7f",
+      "path": "Research_Components/results/Components_20261028_061102/ConcreteCM/Parameter_Study.xlsx",
+      "bytes": 21816
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "86288f502610e56e0f74d415b01b9bda05185858",
+      "path": "Research_Components/results/Components_20261028_061102/FVD/Parameter_Study.xlsx",
+      "bytes": 169875
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "77daa075708e9777a560372af299b9ee4bfb8c8e",
+      "path": "Research_Components/results/Components_20261028_061102/SFI_MVLEM_3D/Parameter_Study.xlsx",
+      "bytes": 10346
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "64568ca0c429590aac5e3fe87860e5a0d359369a",
+      "path": "Research_Components/results/Components_20261028_061102/Steel02/Parameter_Study.xlsx",
+      "bytes": 14835
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "d2303bc70bfbcc65a8d767faa20d3a09d5e10f61",
+      "path": "Research_Components/results/Components_20261028_061102/SteelMPF/Parameter_Study.xlsx",
+      "bytes": 14993
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "b6f85d7440b5519d0f1ff9c67a5c1e9cd112680a",
+      "path": "Research_Components/results/Components_20261028_062223/BRB/Parameter_Study.xlsx",
+      "bytes": 10361
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "a800c61cc26ff2c0577a8563cf5cb575cf8bec85",
+      "path": "Research_Components/results/Components_20261028_062223/Concrete01/Parameter_Study.xlsx",
+      "bytes": 16263
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "f205074ce8b87ad46d9842dbdd0b61ff06e57f1a",
+      "path": "Research_Components/results/Components_20261028_062223/Concrete02/Parameter_Study.xlsx",
+      "bytes": 16228
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "90d9793dc9dc28cb8c3bf04140ae8cc1716a8df9",
+      "path": "Research_Components/results/Components_20261028_062223/ConcreteCM/Parameter_Study.xlsx",
+      "bytes": 21817
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "2607a7f09918c459169fa15d3b9787b263ea2e48",
+      "path": "Research_Components/results/Components_20261028_062223/FVD/Parameter_Study.xlsx",
+      "bytes": 169876
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "8f17756b43e06603842ad4052f891b3518e872ed",
+      "path": "Research_Components/results/Components_20261028_062223/SFI_MVLEM_3D/Parameter_Study.xlsx",
+      "bytes": 10346
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "90421764bc29fe357bd5fc3223e08134980ccf34",
+      "path": "Research_Components/results/Components_20261028_062223/Steel02/Parameter_Study.xlsx",
+      "bytes": 14836
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "8fb00c80e01b9d9ffa43d4f7bbbb6777d0bec9a5",
+      "path": "Research_Components/results/Components_20261028_062223/SteelMPF/Parameter_Study.xlsx",
+      "bytes": 14993
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "fa609e1e4bf1dc49955127527f96e2a1c963b89e",
+      "path": "Saved_Project_V156/Gravity_Storey_Load_Breakdown_V131.xlsx",
+      "bytes": 7396044
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "754a42205d9f8b05d9a14fe5ad5b4f8283d7d075",
+      "path": "Saved_Project_V156/OpenSees_Analysis_Results/Case_Review_V142/All_Case_Review_V142.xlsx",
+      "bytes": 16521
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "0069da70110bcb0e5c3f9e18313e83d7cfe31c47",
+      "path": "Saved_Project_V156/OpenSees_Analysis_Results/Design_Checks_V135/Design_Check_Report_V135.xlsx",
+      "bytes": 70288
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "9c360cbaf893cfe6473ea6e77a7412e93cce0b61",
+      "path": "Saved_Project_V156/OpenSees_Area_Section_Assignment_Audit.json",
+      "matches": 1
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "62b4823998977e5adbbe25adadfcb2c6a4c00fe4",
+      "path": "Saved_Project_V156/OpenSees_ID_and_Support_Audit.xlsx",
+      "bytes": 142912
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ce8319891bfea88e63148d587eaa2dc582d31238",
+      "path": "Saved_Project_V156/OpenSees_Load_Conversion_Audit.json",
+      "matches": 1
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "e671f0d88429af777a96dc153a9e9afcce1dbc71",
+      "path": "Saved_Project_V156/OpenSees_Property_Element_Load_Audit_V125.xlsx",
+      "bytes": 935325
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3fad0b61798238c7345b577d1cf90cdfab8a3188",
+      "path": "Saved_Project_V156/OpenSees_Runtime_V118/START_HERE_V139.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f9988082b3439940eef60ee785dc87514c1585ba",
+      "path": "Saved_Project_V156/OpenSees_Runtime_V118/components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c044ade978b2a430d593ba910860c908f0b5672c",
+      "path": "Saved_Project_V156/OpenSees_Runtime_V118/components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "0a5cbec4723e2d80a646904d22ac1d0fcbb62d59",
+      "path": "Saved_Project_V156/OpenSees_Runtime_V118/components/inputs/analysis_autofill.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5a99580f42ef88361afdae94ad6645fdba843eff",
+      "path": "Saved_Project_V156/OpenSees_Runtime_V118/components/inputs/project_workbooks.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "8698c2cad0904267bd98d37cfcd5dbdbf4610617",
+      "path": "Saved_Project_V156/OpenSees_Runtime_V118/components/inputs/records.py",
+      "matches": 16
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "1c459a2bf897491566c88c37f6864781ed69f337",
+      "path": "Saved_Project_V156/OpenSees_Runtime_V118/components/modal/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c218b368845f0a2d9eea77e64aee9676036c7c06",
+      "path": "Saved_Project_V156/OpenSees_Runtime_V118/components/ui/application.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3ae43573a461fc979280a24bb50ca5c65304b0fc",
+      "path": "Saved_Project_V156/OpenSees_Section_Assignment_Audit.json",
+      "matches": 1
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "55200462b485cf3c8f65da06c4d53782a3d6a3d9",
+      "path": "Saved_Project_V156/Slab_Load_Path_Formulas_V141.xlsx",
+      "bytes": 7179933
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "8f9fd3b8228497518179e72adad0fe84f7c18187",
+      "path": "Startup_Logs/LATEST.txt",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "54fa0d500d33018ebde0d39a134920a84b10f1c7",
+      "path": "Startup_Logs/startup_20261029_065525_606026.log",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "22b21a7722bc34b4d6a60444e6627044eb2e31ad",
+      "path": "Startup_Logs/startup_20261031_072122_780927.log",
+      "matches": 7
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e519bc2c6332052c1df4302bdcc5aaecbb898401",
+      "path": "Verification_V143/test_v143.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c4154fbfaeeeffb005899745c9822dbd55afa906",
+      "path": "Verification_V144/gui_v144.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "fa8988c35409959bb167aa20ab47438fa0dede0c",
+      "path": "Verification_V144/test_v144.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "038c027350dced503d91d7d0a36ee3aed8426d02",
+      "path": "Verification_V146/test_v146.py",
+      "matches": 3
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "831850a8512a0f8a13172be984ea9a37c633b422",
+      "path": "Verification_V150/Native/Walls/SFI_original/native_process.log",
+      "matches": 2
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "8288dffbfa92eb45222ac7943141468bda15001a",
+      "path": "Verification_V159/Fit_Steel02/Parameter_Study.xlsx",
+      "bytes": 17526
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "e8b426221c4a613fdfd9623cfa67f1acf004e89d",
+      "path": "Verification_V159/Official_Concrete01/Parameter_Study.xlsx",
+      "bytes": 19200
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "8d9656e560756d98d0aab7e1bc159bb042149c80",
+      "path": "Verification_V159/Official_Concrete02/Parameter_Study.xlsx",
+      "bytes": 20266
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "a875526c0b2c6b7bb5b191f5193ec96447d8101c",
+      "path": "Verification_V159/Official_ConcreteCM/Parameter_Study.xlsx",
+      "bytes": 23509
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "e9c55ca5f6d17c21c25829e23690ec05680782c2",
+      "path": "Verification_V159/Official_FVD/Parameter_Study.xlsx",
+      "bytes": 171363
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "b06677a344101f426d09ea7d807b9a052d527c0e",
+      "path": "Verification_V159/Official_SteelMPF/Parameter_Study.xlsx",
+      "bytes": 17410
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "019ba85a19ac43ffa61ccc1895b590baf4c377d4",
+      "path": "Verification_V159/PEER_Web_ConcreteCM/Parameter_Study.xlsx",
+      "bytes": 23505
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "30e422299dfe5a5959dec5862c7a62dd6609df4d",
+      "path": "Verification_V159/PEER_Web_ESFI_Patch/run.log",
+      "matches": 4
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "7ac1288686e5d389cc1bcfaa2752439b8a45dbcd",
+      "path": "Verification_V159/PEER_Web_SteelMPF/Parameter_Study.xlsx",
+      "bytes": 15987
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "53f7977999b18af4a9ecc2adb13e792520d4bd99",
+      "path": "Viewer_Preview_V141/OpenSees_ID_and_Support_Audit.xlsx",
+      "bytes": 142911
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "f33327d55a2430893549c014c9f877f7a48845f5",
+      "path": "Worked_Example_V132/Gravity_Storey_Load_Breakdown_V131.xlsx",
+      "bytes": 179818
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "d07025f68bb83e31211985dd36300ec3721f7c35",
+      "path": "Worked_Example_V132/ULS_ESM_Comparison/NBC105_ESM_Calculation_ULS_X+_E0_V111.xlsx",
+      "bytes": 9052
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "1bc6befd1f701004d1ee03a46209f6b558e9f609",
+      "path": "Worked_Example_V132/ULS_ESM_Comparison/NBC105_ESM_OpenSees_Response_ULS_X+_E0.xlsx",
+      "bytes": 9546
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f02e90bcc108263f550181bf555aa33d629cbad5",
+      "path": "Worked_Example_V132/ULS_ESM_Comparison/NBC105_ESM_OpenSees_Run_ULS_X+_E0.log",
+      "matches": 3
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5e22a30ce71f1eff3e742d5c28b4e85acfd825eb",
+      "path": "Worked_Example_V133/V133_Full_Model_LTH.log",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "b6d570d1f683c18aa33ff61649b4f7889cb91a30",
+      "path": "Worked_Example_V133/V133_Synthetic_Nonlinear_Modal.log",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "bafce62a024204dd09c0352b6fa018bf6838c86e",
+      "path": "Worked_Example_V133/V133_Synthetic_Nonlinear_Pipeline.log",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e396c5d04f0eee01f3ea99eb00ab4b3f920caf12",
+      "path": "Worked_Example_V134/Completed_Linear_Run/NBC105_Linear_Time_History_Input_Record_Audit_V115.csv",
+      "matches": 2
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "fc39553001311e158fad52fcb06dcd96613395a5",
+      "path": "Worked_Example_V134/MRSM_SLS/MRSM_Results_V134.xlsx",
+      "bytes": 2152692
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "de82c39fbeefcbba7f2cf611418dabfcb2094b90",
+      "path": "Worked_Example_V134/MRSM_ULS/MRSM_Results_V134.xlsx",
+      "bytes": 2140461
+    },
+    {
+      "kind": "REDISTRIBUTION_REVIEW_FILE",
+      "blob": "01c2234d0c0d3ac7f43de192be85a9cc16705fd3",
+      "path": "Worked_Example_V135/Design_Check_Report_V135.xlsx",
+      "bytes": 89695
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "37f281eb05762b6c6b3d61d8139e034584b05a27",
+      "path": "Worked_Example_V138/V138_FiveFibers.log",
+      "matches": 7
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3cdc8e9be87c2fa7c876e662197b718d51722ce4",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "08307816496d4c6ff5290611061ab9bdc786addd",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ee3958331c599c647872acec7cb5e64db4eee0f6",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "b8d4f27b0f546a20f5caba2b10f677ae30396f4e",
+      "path": "components/inputs/analysis_autofill.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5e1f0824970b0d36b75ecc1563af5a476b3b722c",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c05b0cf4590f2ce81507c2b1affbb7beb8659a5b",
+      "path": "components/inputs/records.py",
+      "matches": 16
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "9eaa4cfc2711cd92b4a4372ca1cc4830d1a52f8d",
+      "path": "components/modal/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3001d8d449de412b83773c56563ec78faccaf2de",
+      "path": "components/ui/application.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "fe03bdd486f180c1dd47d71ae5974e257f94bf3c",
+      "path": "docs/ground_motions/seismomatch_20261104/RUNBOOK.md",
+      "matches": 6
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "15c5ddae33be09308594136faf436881a4f0e0e3",
+      "path": "docs/programs/22_NBC105_OPENSEES_FIRST_INPUT_SYNC.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "7a4116622451c5aa935f2d1c61d1874883c7d6f6",
+      "path": "docs/programs/29_NATIVE_FVD_BRB_RECORDER_VALIDATION.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "9e193e385b20933801d32649ae614b353dcd5056",
+      "path": "docs/programs/30_FVD_EXPERIMENTAL_CALIBRATION.md",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c63ba3e3cc998cdbaa48b4cbf36d5f0f52b95970",
+      "path": "docs/programs/32_NBC105_PAIR_SPECTRUM_AUDIT.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5a05c67866600abc3c918e38776ff3abf3127ca9",
+      "path": "docs/programs/33_NBC105_XY_YX_VERTICAL_AND_SCALE_GUIDE.md",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "de70c0a3ecc3c012151b439bfeb58b953d2e8453",
+      "path": "docs/programs/34_NBC105_RC_DUAL_SOIL_C_D_TARGETS.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "2ad691d9b4d6f44036257de2d15c78799bfaa6d3",
+      "path": "docs/programs/35_SOIL_C_PRIMARY_NLTHA_RUNBOOK.md",
+      "matches": 8
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "15dee8ca39094d9c0ba47bbd6c26822c367d4d10",
+      "path": "docs/programs/36_SOIL_C_M0_M6_RUN_MATRIX.md",
+      "matches": 10
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d0d12b2e07c99d1a9e0e72b7bed59d24be5ff450",
+      "path": "docs/programs/37_THESIS_EVIDENCE_DASHBOARD.md",
+      "matches": 3
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "fd8f9ed21151196aec83297487fa291a5ee4faec",
+      "path": "docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f5cb1c62404e9cca43018980f9c6c8b0d1c8e099",
+      "path": "docs/review/04_FOUR_VALIDATION_WORKSTREAMS.md",
+      "matches": 15
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "adb7d28c2f24520ef8b42f2e5382257f2daeff3a",
+      "path": "docs/review/20261106_ESM_RAYLEIGH_BLANK_SETUP_RECOVERY.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "6696fbb3ebd603a9107d7cd678996e9ec1e6937a",
+      "path": "docs/review/20261106_ESM_WALL_PROFILE_SCREENSHOT_TRIAGE.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c71cfa02ec1995cd3b71f48ccf201800bd1f470d",
+      "path": "docs/review/20261106_RECONCILED_V169_V170.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c1e8aeab759c1c93b813f6e88c6d4cb5ffc56eca",
+      "path": "docs/review/20261109_GRAVITY_CLEAR_BEAM_ESM_NATIVE_REMEDIATION.md",
+      "matches": 3
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e530d60b1e7e90b7f8193fa8cf42424bf5362ebd",
+      "path": "docs/review/CONFIRMED_NATIVE_ETABS_BEAM_WEIGHT_20261109.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "b06b6b1cc86779c4bd251c415d4740551b5afb21",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "dc6f4c6cb5968da5c32b194cf496d9a99157d0a8",
+      "path": "docs/review/OPENSEES_EQ_PDELTA_SAME_DOMAIN_TANGENT_DIAGNOSTIC_20261109.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "959280cf5427b0e7305ad43917ba30be83045300",
+      "path": "docs/source/Gravity_Safe_Engineering_Review_V1.py.md",
+      "matches": 3
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a57a504f9f156b155545c306ee747b2e42e05724",
+      "path": "docs/validation/etabs_direct/README.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "16aa623cfd58c367fe33173a72e7e4f3d1b7b006",
+      "path": "tests/verify_esm_aw_period_provenance.py",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "fc14bcd305d1e441c5b7c4d4cb6dd24ab701ee5c",
+      "path": "tests/verify_nbc105_periods.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "790d70eb066c64a99e2b6ac948b1b25d0d6f9c3e",
+      "path": "tools/export_dashboard.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "03500b004f72f004acafedc15405c03895b961ec",
+      "path": "tools/plot_results.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "76ba55e9442d3ff5bd5d175ad6bdc5dc7cbd8ba3",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "93f266636a937e6f5006573919a0172024cef0c6",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f7bf26651f8e58e444e60451a86dd27c99ac5cf2",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "70ba030c69c5e8f7bb00bea4d80b366e14998a16",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5e6cbb5518efdd6c547d6ea56bde3435c3461ec0",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ac40e336ea70e0b37acc0504323b8e4a7a650bdb",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3ef1d7df070b525329488af7a4abed067d326f5f",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5a15b84760e4f1a98e6553fc7e8c2c2dff34cc06",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a44004088a164cef15fdb5480e0d963797a8875a",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "4c2449a2e397ad3943ef8ff0598cbb1b9c475224",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "884d6e8ee9fb00b9b7f931ab1e0867e9acb0fcba",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "b6eb8d6890c36cc9985c6601250e74ebd82a1567",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "4f0c47172b48c537a308679c9d70bd4387e0d382",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "13d2d44dafeb78dc523ba43a5a605882cb3e6165",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5ed38b24fe8c4f997818cf75b2cb390f6c3796b7",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d622ba431388e9fca7244ea8f5a1e7501a2131ad",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "deb96b173e72f82458275ba43ac17cb42d9226b7",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f944d5aa7209389fa3b9a05ea5f1653a8eeb097a",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "85f5e67082ecdb8bd59bffc55ba8ab07130ccb01",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "1af983e36198cee31e7419a41ec2b3ae8fe31d33",
+      "path": "docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "618ad3bf25f9a0056ba237a297eabf452aa4f083",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "05fea44c0f9a1f188788966a97875c8ae913d129",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "97b1f28c8c0503524955f4331e4470f061f0f86c",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "10a9c7783a10bae0a789d59df20a038dbc5a64f9",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "574a1ad16b6fac57dc416df579669c741ab7b71a",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "82d6318210f4a2461916dd7c5bb19f6770d2f293",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5a7eb6b836ee0a5414331169ec244b5606d65d30",
+      "path": "components/ui/application.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f03dd2fdd1d25927426daf5671001e3af4c9b775",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "1698f43c79f2499046393b0c343c40282e41157f",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f1a89716b40ff1f0fdae5cd863e5cceeb411fba6",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "158f339ad3806dcbc6f71976f8631ca5797f0735",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "95d71ab63f854793c7443404cbfcb58f347d4fcc",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "042bbc41f1759cb33cce51c64e46d59493fd75fb",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "b31193e8ba5f17e415cdda6b5e15bfecf2d4f6a4",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a5d79a7af3e1e312e6cb21bc71e325886e4f914a",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "0b081cf9f432671c2221023215b8f1830708a9df",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5805bdb77249422928d2a004d447de2c9100de25",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "52114f2daef8b0dfd96106883a87ab45282b8f4a",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "07475253c28febd3863cb5d10c75796aa07e0824",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "6f11765b41a2fbca3f7c221a6a0b206bb50242a6",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "8f69a9a97bf9550ebab69f1972375382857a4750",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "bee14b1167cc40248770ecb80969529124d6522b",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "6f55d96f0a60a5fcfe77fcbaf6f6f2abd6c81d3b",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e5d8d01b1f2709d44f2081d0df4473c5c4dbc112",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f47f9e2d2c3990141fcb05239877fa719cbcc170",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "95933d64b0fa5d14e0e5e55685e768cfc6d3a261",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "8ac5fb4f7c2e163fd83907e16cf0663cd47dee36",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d283bbc2909f5c15be20c6c48c458fb8198f75ed",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e69fd3ecbd9bddd241135f2b1669f1f64aac6a5f",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "b6609427b12d4848e36d361992a35193fef75b14",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "fe6261886d8f923e2302e3e48085e730442919ec",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "5f0ce68ada6daa45772819736d14a8f12b048d69",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "01bb847c41fe54f46617a64524ca60419dcc2bea",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d263845b267a481735d18e8bc26d297056a0f34b",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "99b5997f048cc76f7740da8b5e4a34df0d0e2d33",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ce119073b9d702657076ac9b82abe5d0f22ff2e8",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a63f73ea886526ea75a28fc032854a312011567b",
+      "path": "docs/source/Gravity_Safe_Engineering_Review_V1.py.md",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "da15d4233d8b6bccff465142ebb346be6202135e",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "0daa4f68e1fbab82c9bbbf146bec1ca7c74dbb16",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "335e90f6e32809a8e7495d4c4bbcdfb004b51524",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c61cbdd35c0a501f3380a33d806de8733375176d",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "6b3f3d86713cc3af72d443b8aff4a0a492a76128",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e4effefd34eca6e77e8eea362dc722803b7c52d9",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f8e2e15a575da8d60fe819938a4b8e29a68368b9",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "9719acabe5979cbade1d259f4f697be49ad9aff3",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ad6d2b781385e2fa19395aea2491c285099fa248",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "b499405fd896cef7125224252b82bf71ce18d399",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "bfc9f372575d68cfc06dfac97f233de8ef70c731",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "88ef042d8f2068aa8de017bcc3d02f000a61d52c",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e2b7f38b2e35995ba23350cd64ca88f5c1f49b5e",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "224c650b8881949533f511c3bc3eaf6b0408ae81",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "328220a5500f72092315416caeb215cfcb25d055",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "51901fbb1ca78b34b2c330e021399e81c0cd7279",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ac299c8f7dce8e8ff1c66e6162f66510d5fd86a8",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e858f9c4f5ecb6bdb09701826fb46f410788869d",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3bebe0fd4839b57ba88a97fabd85f25ddf98600b",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "57f731c977d51220ddfa68866e58eedbb6286cc4",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a13d0b57f779231c8dd7787d721fe5a30625e432",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d9c4f10ca5c0b42434116765db3b7619c8a6d5b3",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "2eb0871b48a19e7cb5d9c6650d969aa4dd2cda0f",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "193b784fb183b7ace32363e2ef83b247543bba9b",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "795d87e136de83510e97f1cc4b438fb8223e5eab",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "1d160328d190d24546f98dbf906e072ad950372e",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "40c6fd56d184114042736b6545163aaf65f179eb",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "09479181c011ad597ab0edec4512860307ab6981",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d7f19bb257ae8972ed644f4277b58b3321edfab7",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "49598aae84d58dcb78c909e6d864116581720a52",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ffadd527fb91e2ebf87cad35c242f3ba55a95802",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "933cb48bea617812bc8f02a49e6a60e86f94c1ba",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "7f96375d68d240889c617fbbe69f4ae7314dc4cf",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "0905f7ca0eece6335eb1e78de7e09836d7f4c7f1",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "02089ff1c1cf45ab0e80e80e519a38e4c7fb9f5e",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "411293e6cd3286c68424879c02f6048b7e6db032",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "eb60ecd18afe88faf42830c901a3f0a5976feb90",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "4be29f77d8cec5492ac72e32688401571966cb90",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "4f44d0cde5d2b471a42e6073065f1a07717810ad",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ff49af4e2560c47a5a0bbbc3cf9d98875aee615d",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "dd07fed9cd0a25ba5384b2faf9874ba4b650b78e",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "6bc84bb3db8dd6acd033a689e9c17b9b134d9413",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ce31db8bd2a22544c1318f04c48388ece194baca",
+      "path": "docs/review/GRAVITY_ETABS_COMPARISON.md",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "0f158f99523ef4842ae6ef632c954b3ac9775dd8",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3bbb9b7f7da76e668a122120554c57623fa41fd8",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "dc070c6fcace76837e9cb0697ad76ece180ba73c",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e313c2d0397c10ba01e441d43a4348dbb0bf47a0",
+      "path": "components/gravity/comparison_bundle.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "05de2fb0d5a91641fb4ea9ddb5ef7e0edb45d4b3",
+      "path": "components/gravity/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "51be59cdd2bfeb9dd6d17e04977a35e8ac725703",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "0851155b4f5dcbc9020c37b878694100e1cbfa74",
+      "path": "components/modal/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "94c7985e38460c9c61d6a4139719b3f918ca7c30",
+      "path": "components/ui/application.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "6bac0653753fc9d8d871a6dc4e9daa21b5bc32ec",
+      "path": "components/ui/application.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "6b04203f2317f8623c103a6136a54c7e24864d88",
+      "path": "docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "066e8be3ba4a2b01ed512f0ae89611fa516a3e90",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "2944fe592a345dc6b7aa55927028d6a020629c5e",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "308946e4d1242785aa82409190a00fcfaa7beb55",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e600440fdfc07178e6e6210c1f074b6af0b4135e",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e1d74d89cc8eaa303a8d8766b619aac31f51e1a0",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "82670a53e710a0fa69d44cf8728c8af459fc048a",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e673ad875bdc4a31b1f1275322a8891eac7eb5de",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3c44ea5de802c3f3f789aa6b59d040e41fc3dbb3",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a37e699e9ec1c889989cd3b248c0de99561c0592",
+      "path": "tests/verify_esm_aw_period_provenance.py",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "b8688409e2831740dc12da5435124af3119037c6",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "01a79faab552399a9676fbc3991d3e772522bcc3",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "9a05dded282fc1a75131f589d543639fd46e2d5e",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "69661d17835ca68d0034604206e4dd3a77c95808",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3148b337250ad442d0c7cc11327a31238a854064",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "19379924149fcbdcc10f255ea340190a09bb373c",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "4d70084c3e491cb3d8ed1b70c555ff754f17d47e",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "1b2980f66e17747ddb6ca76717938503ef451e2b",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "2a8a968d4ee6411ee0896eae8fff3add73bcbd39",
+      "path": "components/modal/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "3534663110186c028f23a075cd52390f40635c5c",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c162cdc344ab5d7eba2a7911a8a5bd3cb89e60ff",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c3149c100b41ba76557db934d61eae983aad1f74",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "35eedf6fe62b06f25c42df59ae9e2282322a9035",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "e9f869eb73c8c64fc24cdabb23b09e43107695be",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "24f8c37e70af7237e1e5f89e8301c0cdb5b9ce02",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d2f9ead8d2b68c9019aeab4f14ff370286e329c2",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a3a68fd0abce2ddd1c13dbeef4a3ebba29a34b44",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "4a85b8b5c0eee786cd896a076716deba94e0fbb6",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "680e8532ef838fb98125196cd15a85eff6f9150c",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "65ff21cbaf1c0ffe10448da747670c7db1c2b9d0",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a1d68c9c9c4e3680d4d789792aa0a88832350a22",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "0e4c1f8f067b826fda5bb58a02134718081b13f4",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d7efd23f70cfabcee08bc89e8ef93c0683a74d40",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "52d8c64d27a9f69f20bc9d229118625773c37226",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a4477fe7ee5e6918c4c4a2b59a428a3dd1295bcc",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "bccbe4d11f4c223a9c2d2a42cddefd3355533cdf",
+      "path": "tests/verify_esm_aw_period_provenance.py",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "21d2bf4f0a75d1786d45e83aa44a330666f34731",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "61243e8a009c0f4806b793c1c178b3b1cc70d633",
+      "path": "tests/verify_esm_aw_period_provenance.py",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "59ad846fc85d6433a05e76b510a768335c69dd60",
+      "path": "tests/verify_esm_aw_period_provenance.py",
+      "matches": 4
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "c1908cefad61428535f1372b9114d36837896771",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "4255d430e7edce1d0903947de02b89c8257cdc54",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d8c4acced6eaf6b3b57cf608eadefc985cd44083",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "7fa25b152078d65fe65c964dcd48e18587a0872a",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "d4f0f41c16482cde5a89ece1f01a1e258fb96cdb",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "dae5e3dcb3003bc56823167427cfcb7ec65c0b21",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "13bafcf41eeb52944a564cb9f1b248f269a7a2a5",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "7abb5e4d8b606507639b71149478bdf9fc5d8799",
+      "path": "components/modal/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "28f18202fffe1161bdb83fb856156b2ba46bb132",
+      "path": "docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "467cc7b3a22f3e3c315848cb2516136a49ba09b5",
+      "path": "docs/ground_motions/seismomatch_20261104/RUNBOOK.md",
+      "matches": 6
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "bc6a2187d2db099b9cde31b3525c8c1623058369",
+      "path": "docs/ground_motions/seismomatch_20261104/00_METHOD_AND_REPRODUCIBILITY.md",
+      "matches": 2
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "161215192a5a81092db6bc79f54170bde1996848",
+      "path": "components/ui/application.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "800e8aee0264cd4a5b303eb1cc14397be9b37d8c",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "f3bf76e4224a3669ff9a4932f66eac9eee919230",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "0a6d2c9359cf5b4c495a5ac23854ea33c1496c4b",
+      "path": "components/modal/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "242d203e9ae80124bf3d5123acdbb5136240427b",
+      "path": "components/inputs/project_workbooks.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "05bf36fad2fa731e8bb8a035b84104ac1eb2a4e6",
+      "path": "components/modal/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "a90fbf6c6744bfad12c9cb72d78fb2e1669bd4bd",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "ef42e07b1a5b41407a5a30a2873470403f240a94",
+      "path": "components/modal/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "cf83b42b4ea3838ce2617290fa4d491d0960f095",
+      "path": "components/equivalent_static/calculation_and_gui.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "164efffe1827260db2e3a979687aaf3109fbdae8",
+      "path": "V170_WORKFLOW_FIXES.md",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "b64e55e02be1abfc88c0963cd74c9fbfa70e3ce9",
+      "path": "components/modal/gui_and_reports.py",
+      "matches": 1
+    },
+    {
+      "kind": "PRIVATE_WINDOWS_PATH",
+      "blob": "2c0ecfb2c0546e2eb730d974bf259f3048d2ea59",
+      "path": "components/ui/application.py",
+      "matches": 1
+    }
+  ],
+  "publication_status": "HOLD_FOR_ACCESS_AND_REDISTRIBUTION_REVIEW",
+  "root_license_present": false,
+  "source_modified": false,
+  "publication_decision": {
+    "status": "USER_AUTHORIZED_PUBLIC_HISTORY_PUBLICATION",
+    "date": "2026-11-10",
+    "decision": "Keep public and publish original history, including the flagged paths and Excel files",
+    "rights_verification": "Not independently established; authorization is not verification of redistribution rights"
+  },
+  "status": "USER_AUTHORIZED_PUBLIC_HISTORY_PUBLICATION"
+}
