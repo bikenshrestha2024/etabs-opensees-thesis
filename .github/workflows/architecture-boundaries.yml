@@ -1,0 +1,37 @@
+name: Architecture boundaries and standalone schema
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/verify_standalone_neutral_model.py'
+      - 'tests/verify_module_boundaries.py'
+      - 'tests/verify_etabs_adapter_boundary.py'
+      - 'tools/audit_module_boundaries.py'
+      - '.github/workflows/architecture-boundaries.yml'
+  workflow_dispatch:
+jobs:
+  static-independent-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile only new isolated architecture modules
+        run: python -m compileall -q src/thesis_core src/opensees_engine src/etabs_adapter tools/audit_module_boundaries.py tests/verify_standalone_neutral_model.py tests/verify_module_boundaries.py tests/verify_etabs_adapter_boundary.py
+      - name: Independent neutral schema and fake OpenSees solver tests
+        run: python -m unittest discover -s tests -p 'verify_standalone_neutral_model.py' -v
+      - name: ETABS optional adapter boundary tests
+        run: python -m unittest discover -s tests -p 'verify_etabs_adapter_boundary.py' -v
+      - name: Module routing and forbidden-import tests
+        run: python -m unittest discover -s tests -p 'verify_module_boundaries.py' -v
+      - name: Static audit (NO native ETABS/OpenSees execution)
+        run: python tools/audit_module_boundaries.py --out /tmp/thesis-static-boundaries
+      - name: Upload static audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-boundary-static-evidence
+          path: /tmp/thesis-static-boundaries/
+          if-no-files-found: ignore
