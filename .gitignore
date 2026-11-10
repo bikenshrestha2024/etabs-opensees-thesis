@@ -4,3 +4,4 @@ __pycache__/
 *.temp
 *.bak
 *.pdf
+project_sources.private.json

@@ -1,5 +1,14 @@
 # project_workbooks.py — source documentation
 
+2026-11-10 extension: `registered_project_source(export_dir, role)` reads
+`project_sources.private.json` in the selected export or code root, or the
+`OPENSEES_PROJECT_SOURCES` location. It checks the current EDB and registered
+source SHA256 before returning a path; changed sources raise ValueError.
+Roles: etabs_assignment, etabs_full_table, nbc_calculator, nbc_engine and optional
+etabs_linked_audit. No source file is changed. Unscoped drive-specific workbook
+discovery was removed. `_calculator_sync_summary` reads original-engine
+labelled adopted T1 (seconds) and Aw (m²), separately from modal/Rayleigh data.
+
 **Python source:** [components/inputs/project_workbooks.py](../../../../components/inputs/project_workbooks.py)
 **Git baseline content SHA:** 7fa25b152078d65fe65c964dcd48e18587a0872a
 **Subsystem:** ETABS/source inputs and earthquake motions

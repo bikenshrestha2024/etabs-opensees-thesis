@@ -1,7 +1,7 @@
-"""Offline ETABS reaction-based base node selection for a diagnostic gravity case.
+"""Offline ETABS reaction-based node selection for the primary gravity case.
 
 Does not infer actual CSI PointObj.GetRestraint from zero FZ. This is a
-deliberate sensitivity scenario, not a replica of native support conditions.
+user-selected main case; native support equivalence remains independently checked.
 [REF docs/review/GRAVITY_REACTION_FILTER_DIAGNOSTIC.md]
 """
 from __future__ import annotations
@@ -99,10 +99,10 @@ def classify_supports(etabs_table, connectivity, original_supports, *, tolerance
                  released_opensees_nodes=excluded,mapping=details,
                  project_primary_support_tags=list(PROJECT_PRIMARY_32),
                  user_confirmed_32_exact_match=True,
-                 project_primary_status="SELECTED_AS_MAIN_DIAGNOSTIC_NOT_NATIVE_RESTRAINT_VERIFIED",
+                 project_primary_status="PRIMARY_GRAVITY_CASE_NATIVE_RESTRAINT_EQUIVALENCE_PENDING",
                  source_table=str(Path(etabs_table).resolve()),
                  source_sha256=hashlib.sha256(Path(etabs_table).read_bytes()).hexdigest(),
-                 warning="DIAGNOSTIC ONLY: ETABS FZ=0 does not demonstrate free UZ or six free DOFs. "
+                 warning="Primary gravity case: ETABS FZ=0 alone does not demonstrate free UZ or six free DOFs. "
                          "Retain 76- and 97-support runs. Review native source restraints "
                          "and internal wall-edge mesh constraints for acceptance.")
     return selected,audit
@@ -154,7 +154,7 @@ def export_primary_32_comparison(gravity_result, audit_json, output_dir):
     global_diff=open_total-etabs_total
     # Report diagnostics without converting a numerical match to structural acceptance.
     summary=dict(
-        mode=MODE,classification="PRIMARY_PROJECT_REACTION_FILTER_DIAGNOSTIC",
+        mode=MODE,classification="PRIMARY_PROJECT_GRAVITY_CASE",
         original_ETABS_case=PROFILE,expected_support_count=32,
         matched_support_count=len(rows),
         etabs_total_FZ_kN=etabs_total,opensees_total_FZ_kN=open_total,

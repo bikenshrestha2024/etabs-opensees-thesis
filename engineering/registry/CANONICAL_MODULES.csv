@@ -12,3 +12,5 @@ shared_recorders,components/shared/response_recorders.py,EXISTING,common output 
 standalone_opensees_engine,src/opensees_engine/standalone.py,EXTEND,ETABS-free opt-in elastic 2-node benchmark only; production migration still required,PROTOTYPE_STATIC_TEST_PENDING
 neutral_model_schema,src/thesis_core/neutral_model.py,EXTEND,strict v0.1 benchmark-only contract; full 3D model support not implemented,PROTOTYPE_STATIC_TEST_PENDING
 etabs_api_adapter,src/etabs_adapter/bridge.py,EXTEND,optional lazy routing to original CSI/native extractor functions,STATIC_TEST_PENDING
+project_source_registry,components/inputs/project_workbooks.py,EXTEND,private SHA256-scoped input reuse and original calculator output reader,FOCUSED_TESTS_PASSED
+gravity_load_path_response,components/gravity/load_path_formulas.py,EXTEND,recorded element interface forces and signed joint balance,NATIVE_32_RUN_CHECKED_NOT_ETABS_EQUIVALENT

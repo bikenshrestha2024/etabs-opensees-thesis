@@ -1,0 +1,38 @@
+{
+  "tool": "OpenAI Codex desktop",
+  "exact_model": "UNKNOWN",
+  "timestamp_utc": "2026-11-10T17:39:04.455681+00:00",
+  "branch": "fix/primary-gravity-seismic-inputs",
+  "base_sha": "a7e26466c1613fb0db32cee88c322444167d5343",
+  "classification": "EXTEND existing modules; preserve solver physics and historical identifiers",
+  "changed_paths": [
+    ".gitignore",
+    "components/equivalent_static/calculation_and_gui.py",
+    "components/gravity/etabs_reaction_support_filter.py",
+    "components/gravity/gui_and_reports.py",
+    "components/gravity/load_path_formulas.py",
+    "components/gravity/validation_scorecard.py",
+    "components/inputs/aw_sources.py",
+    "components/inputs/project_workbooks.py",
+    "components/response_spectrum/model_analysis.py",
+    "docs/source/components/gravity/load_path_formulas.py.md",
+    "docs/source/components/inputs/project_workbooks.py.md",
+    "engineering/registry/CANONICAL_MODULES.csv",
+    "tests/test_project_source_reuse.py",
+    "docs/review/PRIMARY_GRAVITY_SEISMIC_INPUT_INVESTIGATION.md",
+    "docs/review/REPOSITORY_REFACTOR_PROGRESS.md",
+    "engineering/agent_edits/2026-11-10/primary-gravity-seismic-inputs.json"
+  ],
+  "tests": {
+    "gravity_esm_mrsm_regression": "197 passed, 5 subtests passed",
+    "static_inventory": "416 modules; no missing launchers/guides or syntax errors",
+    "native_tk": "32 default and both source inputs; workbook export with recovered interface/joint sheets",
+    "native_opensees": "32 supports; full gravity; 14262 element vectors;11097 joints; residual 3.97e-10 kN",
+    "saved_vs_rerun": "max all-node displacement difference 0.0 m; max support Fz difference 0.0 kN",
+    "native_etabs_solve": "NOT_EXECUTED",
+    "full_seismic_rerun": "NOT_EXECUTED"
+  },
+  "engineering_effect": "Recorders/defaults/reporting/input-source fixes. No solver/load/mass/material/restraint equations altered. Individual native support mismatch unresolved.",
+  "reviewer_status": "DRAFT_ENGINEERING_REVIEW_REQUIRED",
+  "private_sources_uploaded": false
+}
