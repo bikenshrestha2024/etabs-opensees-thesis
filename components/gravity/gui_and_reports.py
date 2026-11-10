@@ -162,12 +162,37 @@ class GravityAnalysisGUI:
         current_root=Path(__file__).resolve().parents[2]
         script=current_root/"tools"/"REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py"
         if not script.is_file():
-            messagebox.showerror("Current code required",
-                "The selected GUI is running from an older saved runtime. "
-                "Open the UPDATED GitHub repository, run tools/"
-                "REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py from that repository, "
-                "then select its new Gravity_Model.py in this GUI.\n"
-                "Missing: "+str(script),parent=self.win)
+            # An old saved runtime does not own the live repository tools/.
+            # Ask for the existing verified script instead of falsely looking
+            # under C:/Users/User/tools. Never silently fall back to an
+            # arbitrary similarly named file on PATH or in Downloads.
+            messagebox.showinfo("Choose current GitHub rebuild script",
+                "This gravity GUI is running from an older saved runtime.\n"
+                "Browse to your UPDATED etabs-opensees-thesis repository, "
+                "then select:\n"
+                "tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py\n\n"
+                "The script will run with its own repository components. "
+                "Your existing source export and ETABS EDB remain unchanged.",
+                parent=self.win)
+            chosen=filedialog.askopenfilename(
+                parent=self.win,
+                title="Select tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py from UPDATED repo",
+                filetypes=[("Python source","*.py")])
+            if not chosen:return
+            script=Path(chosen).expanduser().resolve()
+        current_root=script.parent.parent
+        if (script.name!="REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py"
+                or script.parent.name!="tools"
+                or not (current_root/"components"/"model"/"assembly.py").is_file()
+                or not (current_root/"components"/"validation"/
+                        "etabs_assignment_gravity_audit.py").is_file()):
+            messagebox.showerror("Incorrect rebuild script",
+                "Select the script located inside the NEW GitHub repository:\n"
+                ".../etabs-opensees-thesis/tools/"
+                "REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py\n\n"
+                "It must have the matching components/model and "
+                "components/validation modules.\nSelected: "+str(script),
+                parent=self.win)
             return
         self._gravity_busy=True
         self._set_gravity_operation("RUNNING","Verifying native ETABS workbook and rebuilding source")
