@@ -4,7 +4,7 @@ import csv,json,math,time
 FIELDS=['method','limit_state','case','axis','location','metric','unit','basis']
 GUIDE='Export ETABS tables for the SAME model, mass source, effective stiffness, diaphragm, restraints, gravity/P-Delta, modes, damping, spectrum units, eccentricity and combinations. Normalize rows to this template. Modes must be paired by shape/participation, not only mode number. MRSM CQC envelopes are not signed simultaneous actions. No reinforcement-demand engine is claimed.'
 
-def collect(folder, issues=None):
+def collect(folder, issues=None, *, results_root=None):
     """Collect ONLY current-model, source-state-matched result evidence.
 
     Historical model outputs without a model hash remain on disk but are not
@@ -15,7 +15,8 @@ def collect(folder, issues=None):
     from components.inputs.project_workbooks import (
         analysis_output_folder, source_limit_state)
     folder=Path(folder)
-    root=folder/'OpenSees_Analysis_Results'
+    root=(Path(results_root).expanduser().resolve() if results_root is not None
+          else folder/'OpenSees_Analysis_Results')
     rows=[]
     issues=[] if issues is None else issues
     model=folder/'OpenSees_Complete_Model_Data_V118.json'
