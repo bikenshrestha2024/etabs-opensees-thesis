@@ -36,6 +36,7 @@ ESM_TERMS=("NBC105_ESM_","NBC105_OpenSees_","NBC105_Input_",
 EXT={".json",".csv",".xlsx",".txt",".log",".png",".pdf",".md"}
 
 def sha(path):
+    """[REF docs/source/components/equivalent_static/evidence_bundle.py.md] Synthetic evidence and source contract; not native acceptance."""
     h=hashlib.sha256()
     with Path(path).open("rb") as f:
         for chunk in iter(lambda:f.read(1048576),b""):
@@ -45,6 +46,7 @@ def sha(path):
 def bundle_esm_validation(source_export,esm_output,save_under,progress=None,
                           max_file_bytes=150*1024*1024,
                           native_etabs_evidence=None):
+    """[REF docs/source/components/equivalent_static/evidence_bundle.py.md] Synthetic evidence and source contract; not native acceptance."""
     src=Path(source_export).resolve()
     outputs=Path(esm_output).resolve()
     if not src.is_dir():raise FileNotFoundError("Model source export: "+str(src))

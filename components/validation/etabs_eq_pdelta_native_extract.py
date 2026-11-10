@@ -88,6 +88,8 @@ def export_eq_pdelta_native_evidence(sap,out_dir,*,log=None,max_rows=1000000):
 
     ETABS DatabaseTables availability and headers vary by version.
     Missing results and table/API failures are explicit evidence.
+    
+    [REF docs/source/components/validation/etabs_eq_pdelta_native_extract.py.md]
     """
     out=Path(out_dir);out.mkdir(parents=True,exist_ok=True)
     before=_snapshot(sap)

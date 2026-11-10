@@ -46,7 +46,9 @@ def _read_rows(path):
 def compare_saved_case(*,etabs_csv,opensees_csv,output_dir,axis,
                         etabs_case,opensees_case,contract_issues=(),
                         metadata=None):
-    """Never invent a PASS when source case physics or data are unverified."""
+    """Never invent a PASS when source case physics or data are unverified.
+    [REF docs/source/components/validation/eq_pdelta_comparison.py.md]
+    """
     axis=str(axis).upper()
     if axis not in ("X","Y"):raise ValueError("Axis must be X or Y")
     details=dict(metadata or {})

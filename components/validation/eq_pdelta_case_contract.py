@@ -18,6 +18,7 @@ CASE_LABELS={
 }
 
 def initial_pattern_factors(axis, sign=1):
+    """[REF docs/source/components/validation/eq_pdelta_case_contract.py.md] Synthetic evidence and source contract; not native acceptance."""
     axis=str(axis).upper()
     if axis not in CASE_LABELS or sign not in (-1,1):
         raise ValueError("Axis X/Y and sign +/-1 required")
@@ -28,6 +29,8 @@ def check_etabs_case_contract(case, *, axis, role, initial_case=None):
 
     case is a caller-extracted dictionary using explicit normalized fields;
     no COM data is presumed to be present when called.
+    
+    [REF docs/source/components/validation/eq_pdelta_case_contract.py.md]
     """
     axis=str(axis).upper()
     if axis not in CASE_LABELS or role not in ("initial_positive","initial_negative","dependent_positive","plain"):
@@ -87,7 +90,9 @@ def check_etabs_case_contract(case, *, axis, role, initial_case=None):
 
 def compare_pdelta_stiffness_response(*, plain_roof_m, dependent_roof_m,
                                      plain_base_kN, dependent_base_kN):
-    """Signed numerical comparison; stiffness difference is NOT a code PASS."""
+    """Signed numerical comparison; stiffness difference is NOT a code PASS.
+    [REF docs/source/components/validation/eq_pdelta_case_contract.py.md]
+    """
     values=[float(v) for v in (plain_roof_m,dependent_roof_m,
                                 plain_base_kN,dependent_base_kN)]
     if not all(math.isfinite(v) for v in values):

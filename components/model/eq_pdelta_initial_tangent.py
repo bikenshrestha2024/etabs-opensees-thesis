@@ -52,7 +52,9 @@ def _read_force_rows(file, axis):
     return rows
 
 def audit_inputs(folder,esm_csv,etabs_joint_table,axis):
-    """Fail closed before importing/running OpenSees if evidence incomplete."""
+    """Fail closed before importing/running OpenSees if evidence incomplete.
+    [REF docs/source/components/model/eq_pdelta_initial_tangent.py.md]
+    """
     axis=str(axis).upper()
     if axis not in ("X","Y"):raise ValueError("X/Y required")
     source=Path(folder).resolve()
@@ -102,6 +104,8 @@ def run_source_equivalent_initial_and_tangent(
     Source initial load: 1.2(SelfWeight+FloorFinish+Partition+Wall)
     + 0.5 Live + 1.5 signed EQ. Subsequent EQ increment has factor 1.0
     about tangent at the previously converged initial state.
+    
+    [REF docs/source/components/model/eq_pdelta_initial_tangent.py.md]
     """
     pre=audit_inputs(folder,esm_csv,etabs_joint_table,axis)
     out=Path(output_dir).resolve()
