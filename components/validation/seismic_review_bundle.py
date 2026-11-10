@@ -68,13 +68,13 @@ print("Restored",len(audit["duplicates"]),"duplicate files; unique content uncha
 '''
 
 
-def _write_template(root, source_export, method, issues):
+def _write_template(root, source_export, results_root, method, issues):
     """Create editable ETABS comparison Excel with no invented native results."""
     target=root/"Comparisons"/"ETABS_OpenSees_Response_Check_Template.xlsx"
     target.parent.mkdir(parents=True,exist_ok=True)
     try:
         from components.validation.etabs_comparison import collect, FIELDS
-        rows=collect(source_export,issues)
+        rows=collect(source_export,issues,results_root=results_root)
     except (ValueError,KeyError,OSError) as exc:
         rows=[];issues.append("Normalized source collection blocked: "+str(exc))
     try:
@@ -204,7 +204,7 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
             "Independent native ETABS earthquake results unavailable: "
             "the included Excel sheet is a comparison input template, not ETABS output")
     if include_comparison_template:
-        t=_write_template(package,source,method,manifest["warnings"])
+        t=_write_template(package,source,output,method,manifest["warnings"])
         if t:
             manifest["collected"].append({
                 "path":"Comparisons/"+t.name,"bytes":t.stat().st_size,
