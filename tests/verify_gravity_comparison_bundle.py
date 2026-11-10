@@ -73,6 +73,67 @@ class GravityBundleTests(unittest.TestCase):
                 "/opensees/OpenSees_Applied_Nodal_Gravity_Summary.json")
                 for key in keys))
 
+    def test_dual_source_76_not_replaced_by_selected_32(self):
+        # Regression: evidence selected from primary 32 cannot substitute
+        # for source 76; ETABS zero vs OpenSees nonzero stays a mismatch.
+        model=self.export/"OpenSees_Element_Connectivity.json"
+        points=[{"opensees_node_tag":i,"etabs_point_name":str(i),
+                 "coordinates_m":[float(i),0.0,0.0]}
+                for i in range(1,77)]
+        model.write_text(json.dumps({"node_map":points}),encoding="utf8")
+        dual=self.root/"dual";(dual/"ETABS_SOURCE_SUPPORTS").mkdir(parents=True)
+        (dual/"CONTINUOUS_WALL_BASE_FIXED").mkdir(parents=True)
+        def report(count, strategy):
+            result=dict(self.sample,
+                model_script=str(self.export/"OpenSees_Complete_Gravity_Model.py"),
+                gravity_profile="GRAVITY_1.0D_1.0L",
+                wall_support_strategy=strategy,
+                nodes=[{"tag":i,"x_m":float(i),"y_m":0.0,"z_m":0.0,
+                        "ux_m":0,"uy_m":0,"uz_m":0}
+                       for i in range(1,77)],
+                reactions=[{"node_tag":i,"rx_kN":0,"ry_kN":0,"rz_kN":76/count}
+                           for i in range(1,count+1)],
+                report={"applied_vertical_load_kN":76.0})
+            return result
+        self.gravity.joinpath("Gravity_Result_V110.json").write_text(
+            json.dumps(report(32,"ETABS_NONZERO_REACTION_DIAGNOSTIC")))
+        for name,count in (("ETABS_SOURCE_SUPPORTS",76),
+                           ("CONTINUOUS_WALL_BASE_FIXED",76)):
+            (dual/name/"Gravity_Result_V110.json").write_text(
+                json.dumps(report(count,name)),encoding="utf8")
+        # The native table has 32 nonzero source reactions and 44 zeros.
+        # They are legitimate recorded zeros, not absent data.
+        etabs=self.root/"native_etabs.json"
+        etabs.write_text(json.dumps({"joint_reactions":[
+            {"point":str(i),"x_m":float(i),"y_m":0.0,"z_m":0.0,
+             "rz_global_kN":76/32 if i<=32 else 0.0,
+             "global_z_basis":"GLOBAL_Z_VERIFIED"}
+            for i in range(1,77)]}),encoding="utf8")
+        audit,archive=export_bundle(
+            self.export,self.gravity,self.root/"out_dual",
+            etabs_json=etabs,dual_run_dir=dual)
+        with zipfile.ZipFile(archive) as zipped:
+            n=next(x for x in zipped.namelist()
+                   if x.endswith("node_audit_76/Gravity_76_Source_Support_Reactions.json"))
+            result=json.loads(zipped.read(n))
+            self.assertEqual(result["matched_count"],76)
+            self.assertEqual(result["missing_or_unverified"],0)
+            self.assertEqual(result["selected_result_source"],
+                             "dual_run/ETABS_SOURCE_SUPPORTS")
+            self.assertEqual(result["etabs_zero_opensees_nonzero_count"],44)
+            self.assertEqual(result["engineering_gate"],
+                             "RESTRAINED_NODE_REACTION_MISMATCH")
+            self.assertTrue(any(
+                item["file"]=="node_audit_76/ETABS_ZERO_VS_OPENSEES_NONZERO"
+                for item in audit["missing_required"]))
+            self.assertTrue(any(
+                "all_case_outputs/source_76_full/" in name
+                for name in zipped.namelist()))
+        self.assertEqual(audit["missing_required_count"],
+                         len(audit["missing_required"]))
+        self.assertEqual(audit["not_produced_optional_count"],
+                         len(audit["not_produced_optional"]))
+
     def test_failure_not_mislabeled_as_good_evidence(self):
         self.sample["ok"]=False
         (self.gravity/"Gravity_Result_V110.json").write_text(json.dumps(self.sample))
