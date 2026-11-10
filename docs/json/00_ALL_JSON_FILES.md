@@ -506,5 +506,11 @@ Generated from directly parsed local JSON content. Each original JSON receives a
 | archive/previous_versions/VERIFICATION/VERIFICATION_V123.json | [Schema](files/archive/previous_versions/VERIFICATION/VERIFICATION_V123.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
 | archive/previous_versions/VERIFICATION/VERIFICATION_V124.json | [Schema](files/archive/previous_versions/VERIFICATION/VERIFICATION_V124.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
 | archive/previous_versions/VERIFICATION/VERIFICATION_V125.json | [Schema](files/archive/previous_versions/VERIFICATION/VERIFICATION_V125.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
+| engineering/migration/ACTIVE_INVENTORY.json | [Schema](files/engineering/migration/ACTIVE_INVENTORY.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
+| engineering/migration/LEDGER_VALIDATION.json | [Schema](files/engineering/migration/LEDGER_VALIDATION.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
+| engineering/migration/PUBLICATION_AUDIT.json | [Schema](files/engineering/migration/PUBLICATION_AUDIT.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
+| engineering/migration/SOURCE_REFS.json | [Schema](files/engineering/migration/SOURCE_REFS.json.md) | ETABS_MODEL_OR_SOURCE_METADATA | PARSED |
+| examples/EQ_PDelta_4Case_Input_TEMPLATE.json | [Schema](files/examples/EQ_PDelta_4Case_Input_TEMPLATE.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
+| tests/data/ref_tag_baseline.json | [Schema](files/tests/data/ref_tag_baseline.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
 | wall_validation_sources/SOURCE_MANIFEST.json | [Schema](files/wall_validation_sources/SOURCE_MANIFEST.json.md) | FILE_PROVENANCE_MANIFEST | PARSED |
 | wall_validation_sources/Unconfined_Core_Input_Template.json | [Schema](files/wall_validation_sources/Unconfined_Core_Input_Template.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
