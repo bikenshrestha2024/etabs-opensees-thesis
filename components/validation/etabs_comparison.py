@@ -157,7 +157,7 @@ def compare(rows, etabs, policy=None):
     return evaluate(rows, etabs, FIELDS, policy)
 
 
-def save(folder,etabs_path=None,etabs_rows=None,policy=None):
+def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None):
     """Export source-normalized CSV and Excel comparisons.
 
     Existing CSV users remain supported. Direct ETABS API results are passed
@@ -166,10 +166,11 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None):
     is gated by the explicitly approved policy, not assumed.
     """
     start=time.perf_counter();folder=Path(folder)
-    out=folder/'OpenSees_Analysis_Results/ETABS_Comparison_V148'
+    out=(Path(results_root).expanduser().resolve() if results_root is not None
+         else folder/'OpenSees_Analysis_Results')/'ETABS_Comparison_V148'
     out.mkdir(parents=True,exist_ok=True)
     source_issues=[]
-    rows=collect(folder,source_issues)
+    rows=collect(folder,source_issues,results_root=results_root)
     (out/'Comparison_Source_Exclusions.json').write_text(json.dumps(source_issues,indent=2),encoding='utf-8')
     def write(p,rr,fields):
         with p.open('w',newline='',encoding='utf-8-sig') as h:
@@ -208,7 +209,7 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None):
     return result,out
 
 
-def launch(parent,folder):
+def launch(parent,folder,results_root=None):
  import tkinter as tk
  from tkinter import ttk,filedialog,messagebox
  win=tk.Toplevel(parent);win.title('ETABS comparison - modal / ESM / MRSM');win.geometry('1200x750');path=tk.StringVar();status=tk.StringVar();latest={'rows':None,'out':None,'etabs_rows':None,'policy':None};bar=ttk.Frame(win);bar.pack(fill='x');ttk.Entry(bar,textvariable=path,width=75).pack(side='left')
@@ -219,11 +220,22 @@ def launch(parent,folder):
  def direct_api():
   """Attach to the selected, already-open source .EDB in a COM STA thread."""
   import threading
-  chosen=filedialog.askopenfilename(parent=win,title='Select the exact source ETABS EDB',filetypes=[('ETABS model','*.edb')])
+  from components.inputs.project_workbooks import _source_edb_path
+  known=_source_edb_path(folder)
+  chosen=(str(Path(known).resolve()) if known and Path(known).is_file() else
+          filedialog.askopenfilename(parent=win,title='Select exact source ETABS EDB',
+                                     filetypes=[('ETABS model','*.edb')]))
   if not chosen:return
-  config=filedialog.askopenfilename(parent=win,title='Select verified case-and-story mapping JSON',filetypes=[('Mapping JSON','*.json')])
+  mapping_dir=(Path(results_root).expanduser().resolve() if results_root is not None
+               else Path(folder)/'OpenSees_Analysis_Results')/'ETABS_Comparison_V148'
+  previous=mapping_dir/'ETABS_API_Mapping_SELECTED.json'
+  config=(str(previous) if previous.is_file() and
+          json.loads(previous.read_text(encoding='utf-8-sig')).get('source_edb')==str(chosen)
+          else filedialog.askopenfilename(
+              parent=win,title='Select verified case-and-story mapping JSON',
+              filetypes=[('Mapping JSON','*.json')]))
   if not config:
-   template=Path(folder)/'OpenSees_Analysis_Results/ETABS_Comparison_V148/ETABS_API_Mapping_TEMPLATE.json'
+   template=mapping_dir/'ETABS_API_Mapping_TEMPLATE.json'
    template.parent.mkdir(parents=True,exist_ok=True)
    from components.validation.etabs_direct_api import mapping_template
    template.write_text(json.dumps(mapping_template(chosen),indent=2),encoding='utf-8')
@@ -239,12 +251,15 @@ def launch(parent,folder):
      if Path(mapping.get('source_edb','')).resolve()!=Path(chosen).resolve():
       raise ValueError('Selected EDB and mapping JSON source_edb differ.')
      extracted=connect_and_extract(folder,mapping)
-     compared,out=save(folder,etabs_rows=extracted,policy=mapping)
+     compared,out=save(folder,etabs_rows=extracted,policy=mapping,
+                      results_root=results_root)
      from components.validation.etabs_direct_api import fingerprint
      provenance={"edb_path":str(Path(chosen).resolve()),"edb_sha256":fingerprint(chosen),
                  "mapping_path":str(Path(config).resolve()),
                  "row_count":len(extracted),"assumptions_verified":bool(mapping.get('assumptions_verified'))}
      (out/'ETABS_API_Provenance.json').write_text(json.dumps(provenance,indent=2),encoding='utf-8')
+     (out/'ETABS_API_Mapping_SELECTED.json').write_text(
+         json.dumps(mapping,indent=2),encoding='utf-8')
     finally:comtypes.CoUninitialize()
     def done():
      latest.update(rows=compared,out=out,etabs_rows=extracted,policy=mapping)
@@ -263,8 +278,10 @@ def launch(parent,folder):
  for c in cols:tree.heading(c,text=c);tree.column(c,width=150,stretch=False)
  def refresh():
   try:
-   rows,out=(save(folder,path.get()) if path.get() else
-             (save(folder,etabs_rows=latest['etabs_rows'],policy=latest['policy']) if latest['etabs_rows'] is not None else save(folder)))
+   rows,out=(save(folder,path.get(),results_root=results_root) if path.get() else
+             (save(folder,etabs_rows=latest['etabs_rows'],policy=latest['policy'],
+                   results_root=results_root) if latest['etabs_rows'] is not None
+              else save(folder,results_root=results_root)))
    tree.delete(*tree.get_children())
    for r in rows:tree.insert('','end',values=[r.get(c,'') for c in cols])
    status.set(str(len(rows))+' saved quantities. Template and report: '+str(out))
@@ -273,8 +290,9 @@ def launch(parent,folder):
   selected=tree.selection()
   if not selected:messagebox.showinfo('Select quantity','Select a comparison row first.',parent=win);return
   key=tree.item(selected[0],'values')
-  rows=(save(folder,path.get())[0] if path.get() else
-        latest['rows'] if latest['rows'] is not None else save(folder)[0])
+  rows=(save(folder,path.get(),results_root=results_root)[0] if path.get() else
+        latest['rows'] if latest['rows'] is not None
+        else save(folder,results_root=results_root)[0])
   subset=[r for r in rows if all(str(r.get(k,''))==key[cols.index(k)] for k in ('method','limit_state','case','axis','metric','unit','basis'))]
   from matplotlib.figure import Figure
   from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg,NavigationToolbar2Tk
