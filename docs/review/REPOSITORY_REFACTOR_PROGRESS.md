@@ -69,3 +69,8 @@ Last completed implementation commit: `c6585598d72d480cb42d164868ff7bce154cd890`
 Draft PR: https://github.com/bikenshrestha2024/etabs-opensees-thesis/pull/17
 Final source/test state: 197 tests plus 5 subtests passed; native Tk workbook
 and offline ETABS reaction-comparison exports completed.
+
+CI follow-up: compilation/navigation and clear-beam workflows passed. The first
+quality run found missing reference tags on three public helpers; tags were
+added and all four reference-tag tests passed locally. The six new source/force
+regressions are now included in the quality workflow.

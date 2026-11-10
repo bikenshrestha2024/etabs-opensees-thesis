@@ -21,6 +21,7 @@ def registered_project_source(export_dir, role):
 
     Registry paths stay private. No filename-based model equivalence is inferred.
     Missing registrations return None; changed registered inputs raise ValueError.
+    [REF docs/source/components/inputs/project_workbooks.py.md]
     """
     import os
     import hashlib

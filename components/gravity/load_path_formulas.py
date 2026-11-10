@@ -11,6 +11,7 @@ def recovered_vertical_transfers(payload, elevations_m):
     Lower-node resisting Fz is reported with its solver sign. This is a
     discrete interface resultant, not an interior-joint support reaction or
     interpolation through an element. Incomplete force vectors are rejected.
+    [REF docs/source/components/gravity/load_path_formulas.py.md]
     """
     import math
     nodes={int(n['tag']):n for n in payload['nodes']}
@@ -40,6 +41,7 @@ def vertical_joint_balance(payload, applied_fz_kN):
 
     Forces in kN, downward applied loads negative. Interior residuals are
     equilibrium checks, not support reactions. Requires all frame/shell ends.
+    [REF docs/source/components/gravity/load_path_formulas.py.md]
     """
     import math
     recovered_vertical_transfers(payload, [])  # completeness gate

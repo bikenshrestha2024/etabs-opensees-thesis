@@ -21,7 +21,8 @@
     "tests/test_project_source_reuse.py",
     "docs/review/PRIMARY_GRAVITY_SEISMIC_INPUT_INVESTIGATION.md",
     "docs/review/REPOSITORY_REFACTOR_PROGRESS.md",
-    "engineering/agent_edits/2026-11-10/primary-gravity-seismic-inputs.json"
+    "engineering/agent_edits/2026-11-10/primary-gravity-seismic-inputs.json",
+    ".github/workflows/nltha-quality.yml"
   ],
   "tests": {
     "gravity_esm_mrsm_regression": "197 passed, 5 subtests passed",
@@ -30,7 +31,9 @@
     "native_opensees": "32 supports; full gravity; 14262 element vectors;11097 joints; residual 3.97e-10 kN",
     "saved_vs_rerun": "max all-node displacement difference 0.0 m; max support Fz difference 0.0 kN",
     "native_etabs_solve": "NOT_EXECUTED",
-    "full_seismic_rerun": "NOT_EXECUTED"
+    "full_seismic_rerun": "NOT_EXECUTED",
+    "reference_tags": "4 passed after resolving initial CI missing-tag failure",
+    "new_source_tests_in_ci": "pytest test_project_source_reuse.py added to workflow; local 6 passed"
   },
   "engineering_effect": "Recorders/defaults/reporting/input-source fixes. No solver/load/mass/material/restraint equations altered. Individual native support mismatch unresolved.",
   "reviewer_status": "DRAFT_ENGINEERING_REVIEW_REQUIRED",
