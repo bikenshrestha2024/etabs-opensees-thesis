@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
+import copy
 import hashlib
 import json
 import subprocess
@@ -120,11 +121,34 @@ def write_table(path: Path, headers: list[str], rows: list[dict]) -> None:
         writer.writeheader()
         writer.writerows(rows)
 
+
+def ast_duplicate_candidates(path: Path, rel: str) -> list[dict]:
+    """Normalize symbol names for comparison; equality is NOT proof of safety."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+    except (OSError, SyntaxError, UnicodeError):
+        return []
+    results: list[dict] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        clone = copy.deepcopy(node)
+        clone.name = "_CANONICAL_SYMBOL_"
+        # Keep annotations, bodies, decorators, default arguments and docstrings.
+        normalized = ast.dump(clone, annotate_fields=True, include_attributes=False)
+        results.append({
+            "file": rel, "line": node.lineno, "name": node.name,
+            "kind": type(node).__name__,
+            "ast_sha256": hashlib.sha256(normalized.encode("utf-8")).hexdigest(),
+        })
+    return results
+
 def generate(root: Path, output: Path) -> dict:
     paths = tracked_files(root)
     rows: list[dict] = []
     gui_actions: list[dict] = []
     dynamic_calls: list[dict] = []
+    symbol_candidates: list[dict] = []
     by_digest: dict[str, list[str]] = defaultdict(list)
     module_paths: dict[str, set[str]] = defaultdict(set)
     for rel in paths:
@@ -156,6 +180,7 @@ def generate(root: Path, output: Path) -> dict:
             actions, dynamic = inspect_gui_and_dynamic(path, rel)
             gui_actions.extend(actions)
             dynamic_calls.extend(dynamic)
+            symbol_candidates.extend(ast_duplicate_candidates(path, rel))
         rows.append({
             "relative_path": rel, "extension": path.suffix.lower(),
             "size_bytes": path.stat().st_size, "sha256": digest,
@@ -188,6 +213,18 @@ def generate(root: Path, output: Path) -> dict:
         ["source_file", "line", "widget_constructor", "label_expression",
          "callback_expression", "classification"],
         gui_actions,
+    )
+    symbols_by_sha: dict[str, list[dict]] = defaultdict(list)
+    for symbol in symbol_candidates:
+        symbols_by_sha[symbol["ast_sha256"]].append(symbol)
+    ast_groups = [
+        {"ast_sha256": key, "classification": "SYNTAX_EQUIVALENCE_ONLY",
+         "symbols": matches}
+        for key, matches in sorted(symbols_by_sha.items())
+        if len(matches) > 1
+    ]
+    (output / "AST_DUPLICATE_CANDIDATES.json").write_text(
+        json.dumps(ast_groups, indent=2) + "\n", encoding="utf-8"
     )
     write_table(
         output / "DYNAMIC_REFERENCE_AUDIT.csv",
@@ -243,6 +280,7 @@ def generate(root: Path, output: Path) -> dict:
         "python_file_count": sum(x["extension"] == ".py" for x in rows),
         "exact_duplicate_groups": len(duplicates),
         "static_gui_candidates": len(gui_actions),
+        "ast_duplicate_candidate_groups": len(ast_groups),
         "dynamic_call_candidates": len(dynamic_calls),
         "missing_local_count": sum(x["git_status"] == "MISSING_LOCAL" for x in rows),
         "limitations": [
