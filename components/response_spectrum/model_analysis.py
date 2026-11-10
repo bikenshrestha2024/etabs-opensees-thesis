@@ -268,15 +268,36 @@ def launch(parent,folder):
             messagebox.showwarning('Source state mismatch',str(exc),parent=win)
             return
         v=import_project_inputs(root,folder,state)['values']
-        period_values,_=mrsm_period_defaults(folder,v,state)
+        period_values,note=mrsm_period_defaults(folder,v,state)
+        period_status.set(note)
         for name,key in [('soil','soil'),('Z','Z'),('I','I'),('rmu','rmu'),('omegau','omegau'),('omegas','omegas')]:
             if key in v:fields[name].set(str(v[key]))
         for axis in ('X','Y'):
             fields['T1_'+axis].set(str(period_values['T1_'+axis]) if period_values['T1_'+axis] else '')
     fields['limit_state'].trace_add('write',refresh)
-    ttk.Label(form,text=period_note,wraplength=1000).pack(anchor='w',pady=3)
+    period_status=tk.StringVar(value=period_note)
+    ttk.Label(form,textvariable=period_status,wraplength=1000).pack(anchor='w',pady=3)
+    def refresh_verified_periods():
+        """Recheck the selected source and limit state; do not use eigenperiods."""
+        state=fields['limit_state'].get()
+        try:
+            require_source_state(folder,state)
+            verified=import_project_inputs(root,folder,state)['values']
+            periods,note=mrsm_period_defaults(folder,verified,state)
+            for axis in ('X','Y'):
+                value=periods['T1_'+axis]
+                fields['T1_'+axis].set(str(value) if value else '')
+            period_status.set(note)
+            if not all(periods['T1_'+axis] for axis in ('X','Y')):
+                messagebox.showwarning('MRSM periods need verified inputs',
+                    note+'\n\nModal eigenperiods cannot replace adopted design periods.',
+                    parent=win)
+        except Exception as exc:
+            period_status.set('Period source blocked: '+str(exc))
+            messagebox.showerror('MRSM period source',str(exc),parent=win)
     ttk.Label(form,text='Each state runs X and Y, with E0 / Eplus / Eminus cases (6 cases/state). E0 is centered; Eplus/Eminus are signed 5% perpendicular-breadth eccentric inertia cases. Soil selection requires site evidence. Acceleration conversion is internal for the kN-m-s model. Workbook / PNG / PDF are exported automatically.',wraplength=1000).pack(anchor='w',pady=6)
     actions=ttk.Frame(form);actions.pack(fill='x');output=Path(folder)/'OpenSees_Analysis_Results'
+    ttk.Button(actions,text='Refresh verified T1 X/Y',command=refresh_verified_periods).pack(side='left',padx=4)
     log_value=tk.StringVar()
     from OpenSees_Research_UI_V123 import copyable_log
     from components.shared.case_status import panel,CaseLedger
