@@ -4,7 +4,7 @@ import csv,json,math,time
 FIELDS=['method','limit_state','case','axis','location','metric','unit','basis']
 GUIDE='Export ETABS tables for the SAME model, mass source, effective stiffness, diaphragm, restraints, gravity/P-Delta, modes, damping, spectrum units, eccentricity and combinations. Normalize rows to this template. Modes must be paired by shape/participation, not only mode number. MRSM CQC envelopes are not signed simultaneous actions. No reinforcement-demand engine is claimed.'
 
-def collect(folder, issues=None):
+def collect(folder, issues=None, *, results_root=None):
     """Collect ONLY current-model, source-state-matched result evidence.
 
     Historical model outputs without a model hash remain on disk but are not
@@ -15,7 +15,8 @@ def collect(folder, issues=None):
     from components.inputs.project_workbooks import (
         analysis_output_folder, source_limit_state)
     folder=Path(folder)
-    root=folder/'OpenSees_Analysis_Results'
+    root=(Path(results_root).expanduser().resolve() if results_root is not None
+          else folder/'OpenSees_Analysis_Results')
     rows=[]
     issues=[] if issues is None else issues
     model=folder/'OpenSees_Complete_Model_Data_V118.json'
@@ -40,6 +41,14 @@ def collect(folder, issues=None):
             return False
         return True
     state=selected_state
+    # A review ZIP is a snapshot of already recorded responses, not a
+    # second independent solver run. Exclude all extracted package copies
+    # from normalized comparisons to avoid false duplicate cases.
+    def current_result(path):
+        return not any(part.startswith((
+            'Seismic_Review_Packages','ESM_Validation_Evidence_',
+            'Gravity_Evidence_Upload','Gravity_ETABS_OpenSees_Evidence'))
+            for part in Path(path).parts)
     p=analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
     if not p.is_file():
         p=root/('Modal_'+state)/'NBC105_Modal_V111.json'
@@ -55,6 +64,7 @@ def collect(folder, issues=None):
                 add('MODAL',state,'MODAL',axis,'ALL','cumulative_mass','percent','modal_mass',
                     d.get('cumulative_U'+axis+'_percent'),p)
     for p in sorted(root.rglob('MRSM_Results_V132.json')):
+        if not current_result(p):continue
         document=json.loads(p.read_text(encoding='utf-8-sig'))
         if not isinstance(document,dict):
             issues.append(str(p)+': unexpected MRSM structure')
@@ -75,18 +85,70 @@ def collect(folder, issues=None):
                 add('MRSM',state,case,axis,r['story_number'],'drift_ratio',
                     'ratio','CQC_design_unscaled_by_7_5',r.get('design_drift_ratio'),p)
     for p in sorted(root.rglob('NBC105_ESM_OpenSees_Response_*.json')):
+        if not current_result(p):continue
+        if 'Response_META_' in p.name:continue
         document=json.loads(p.read_text(encoding='utf-8-sig'))
-        if not isinstance(document,dict) or not accepted(document,p,document.get('limit_state')):
-            issues.append(str(p)+': legacy ESM response without model/state provenance excluded; re-export with fingerprint before direct comparison')
+        if isinstance(document,list):
+            meta=p.with_name(p.name.replace('OpenSees_Response_',
+                                            'OpenSees_Response_META_'))
+            if not meta.is_file():
+                issues.append(str(p)+': legacy ESM list lacks matching model SHA256 sidecar; not imported')
+                continue
+            proof=json.loads(meta.read_text(encoding='utf-8-sig'))
+            rr=document
+        elif isinstance(document,dict):
+            proof=document
+            rr=document.get('rows',document.get('stories',[]))
+        else:
+            issues.append(str(p)+': non-object/list ESM response')
             continue
-        rr=document.get('rows',document.get('stories',[]))
-        for r in rr:
-            for key,metric,unit in [
-                ('U_design_m','displacement','m'),
-                ('design_drift_ratio','drift_ratio','ratio'),
-                ('story_shear_kN','story_shear','kN')]:
-                add('ESM',state,r.get('response_case',p.stem),r.get('direction',''),
-                    r.get('height_m',''),metric,unit,'static_design',r.get(key),p)
+        if not accepted(proof,p,proof.get('limit_state')):
+            continue
+        for record in rr:
+            # Keep applied cumulative floor force separate from the
+            # recovered ETABS story-section shear; they are not identical.
+            loc=record.get('story_number')
+            if loc is None:
+                issues.append(str(p)+': response row without story_number excluded')
+                continue
+            case=record.get('response_case',proof.get('response_case',p.stem))
+            axis=proof.get('axis',record.get('direction',''))
+            add('ESM',state,case,axis,loc,'displacement','m',
+                'static_design',record.get('U_design_m'),p)
+            add('ESM',state,case,axis,loc,'drift_ratio','ratio',
+                'static_design',record.get('design_drift_ratio'),p)
+            add('ESM',state,case,axis,loc,'story_shear','kN',
+                'applied_floor_force_cumulative_NOT_recovered',
+                record.get('story_shear_kN'),p)
+    # Optional full-node static displacement comparison. The ETABS point
+    # name is the only supported location key; generated mesh nodes without
+    # native ETABS counterparts remain in raw CSV, not invented matches.
+    for p in sorted(root.rglob('NBC105_ESM_All_Node_Displacements_*.csv')):
+        if not current_result(p):continue
+        with p.open('r',newline='',encoding='utf-8-sig') as f:
+            records=list(csv.DictReader(f))
+        if not records:continue
+        first=records[0]
+        if not accepted({'model_sha256':first.get('model_sha256')},
+                        p,first.get('limit_state')):
+            continue
+        for record in records:
+            if record.get('model_sha256')!=expected:
+                issues.append(str(p)+': mixed model hash at node '+str(record.get('opensees_node_tag')))
+                continue
+            point=record.get('etabs_point_name')
+            if not point:continue
+            case=record.get('response_case','')
+            axis='X' if '_X' in case else 'Y' if '_Y' in case else ''
+            if not axis:
+                issues.append(str(p)+': missing X/Y direction for node '+str(point))
+                continue
+            key='du_x_m' if axis=='X' else 'du_y_m'
+            design_key='design_du_x_m' if axis=='X' else 'design_du_y_m'
+            add('ESM',state,case,axis,point,'displacement','m',
+                'static_elastic_increment',record.get(key),p)
+            add('ESM',state,case,axis,point,'displacement','m',
+                'static_design_increment',record.get(design_key),p)
     return rows
 
 def compare(rows, etabs, policy=None):
@@ -95,7 +157,7 @@ def compare(rows, etabs, policy=None):
     return evaluate(rows, etabs, FIELDS, policy)
 
 
-def save(folder,etabs_path=None,etabs_rows=None,policy=None):
+def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None):
     """Export source-normalized CSV and Excel comparisons.
 
     Existing CSV users remain supported. Direct ETABS API results are passed
@@ -104,10 +166,11 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None):
     is gated by the explicitly approved policy, not assumed.
     """
     start=time.perf_counter();folder=Path(folder)
-    out=folder/'OpenSees_Analysis_Results/ETABS_Comparison_V148'
+    out=(Path(results_root).expanduser().resolve() if results_root is not None
+         else folder/'OpenSees_Analysis_Results')/'ETABS_Comparison_V148'
     out.mkdir(parents=True,exist_ok=True)
     source_issues=[]
-    rows=collect(folder,source_issues)
+    rows=collect(folder,source_issues,results_root=results_root)
     (out/'Comparison_Source_Exclusions.json').write_text(json.dumps(source_issues,indent=2),encoding='utf-8')
     def write(p,rr,fields):
         with p.open('w',newline='',encoding='utf-8-sig') as h:
@@ -146,7 +209,7 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None):
     return result,out
 
 
-def launch(parent,folder):
+def launch(parent,folder,results_root=None):
  import tkinter as tk
  from tkinter import ttk,filedialog,messagebox
  win=tk.Toplevel(parent);win.title('ETABS comparison - modal / ESM / MRSM');win.geometry('1200x750');path=tk.StringVar();status=tk.StringVar();latest={'rows':None,'out':None,'etabs_rows':None,'policy':None};bar=ttk.Frame(win);bar.pack(fill='x');ttk.Entry(bar,textvariable=path,width=75).pack(side='left')
@@ -157,11 +220,22 @@ def launch(parent,folder):
  def direct_api():
   """Attach to the selected, already-open source .EDB in a COM STA thread."""
   import threading
-  chosen=filedialog.askopenfilename(parent=win,title='Select the exact source ETABS EDB',filetypes=[('ETABS model','*.edb')])
+  from components.inputs.project_workbooks import _source_edb_path
+  known=_source_edb_path(folder)
+  chosen=(str(Path(known).resolve()) if known and Path(known).is_file() else
+          filedialog.askopenfilename(parent=win,title='Select exact source ETABS EDB',
+                                     filetypes=[('ETABS model','*.edb')]))
   if not chosen:return
-  config=filedialog.askopenfilename(parent=win,title='Select verified case-and-story mapping JSON',filetypes=[('Mapping JSON','*.json')])
+  mapping_dir=(Path(results_root).expanduser().resolve() if results_root is not None
+               else Path(folder)/'OpenSees_Analysis_Results')/'ETABS_Comparison_V148'
+  previous=mapping_dir/'ETABS_API_Mapping_SELECTED.json'
+  config=(str(previous) if previous.is_file() and
+          json.loads(previous.read_text(encoding='utf-8-sig')).get('source_edb')==str(chosen)
+          else filedialog.askopenfilename(
+              parent=win,title='Select verified case-and-story mapping JSON',
+              filetypes=[('Mapping JSON','*.json')]))
   if not config:
-   template=Path(folder)/'OpenSees_Analysis_Results/ETABS_Comparison_V148/ETABS_API_Mapping_TEMPLATE.json'
+   template=mapping_dir/'ETABS_API_Mapping_TEMPLATE.json'
    template.parent.mkdir(parents=True,exist_ok=True)
    from components.validation.etabs_direct_api import mapping_template
    template.write_text(json.dumps(mapping_template(chosen),indent=2),encoding='utf-8')
@@ -177,12 +251,15 @@ def launch(parent,folder):
      if Path(mapping.get('source_edb','')).resolve()!=Path(chosen).resolve():
       raise ValueError('Selected EDB and mapping JSON source_edb differ.')
      extracted=connect_and_extract(folder,mapping)
-     compared,out=save(folder,etabs_rows=extracted,policy=mapping)
+     compared,out=save(folder,etabs_rows=extracted,policy=mapping,
+                      results_root=results_root)
      from components.validation.etabs_direct_api import fingerprint
      provenance={"edb_path":str(Path(chosen).resolve()),"edb_sha256":fingerprint(chosen),
                  "mapping_path":str(Path(config).resolve()),
                  "row_count":len(extracted),"assumptions_verified":bool(mapping.get('assumptions_verified'))}
      (out/'ETABS_API_Provenance.json').write_text(json.dumps(provenance,indent=2),encoding='utf-8')
+     (out/'ETABS_API_Mapping_SELECTED.json').write_text(
+         json.dumps(mapping,indent=2),encoding='utf-8')
     finally:comtypes.CoUninitialize()
     def done():
      latest.update(rows=compared,out=out,etabs_rows=extracted,policy=mapping)
@@ -201,8 +278,10 @@ def launch(parent,folder):
  for c in cols:tree.heading(c,text=c);tree.column(c,width=150,stretch=False)
  def refresh():
   try:
-   rows,out=(save(folder,path.get()) if path.get() else
-             (save(folder,etabs_rows=latest['etabs_rows'],policy=latest['policy']) if latest['etabs_rows'] is not None else save(folder)))
+   rows,out=(save(folder,path.get(),results_root=results_root) if path.get() else
+             (save(folder,etabs_rows=latest['etabs_rows'],policy=latest['policy'],
+                   results_root=results_root) if latest['etabs_rows'] is not None
+              else save(folder,results_root=results_root)))
    tree.delete(*tree.get_children())
    for r in rows:tree.insert('','end',values=[r.get(c,'') for c in cols])
    status.set(str(len(rows))+' saved quantities. Template and report: '+str(out))
@@ -211,8 +290,9 @@ def launch(parent,folder):
   selected=tree.selection()
   if not selected:messagebox.showinfo('Select quantity','Select a comparison row first.',parent=win);return
   key=tree.item(selected[0],'values')
-  rows=(save(folder,path.get())[0] if path.get() else
-        latest['rows'] if latest['rows'] is not None else save(folder)[0])
+  rows=(save(folder,path.get(),results_root=results_root)[0] if path.get() else
+        latest['rows'] if latest['rows'] is not None
+        else save(folder,results_root=results_root)[0])
   subset=[r for r in rows if all(str(r.get(k,''))==key[cols.index(k)] for k in ('method','limit_state','case','axis','metric','unit','basis'))]
   from matplotlib.figure import Figure
   from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg,NavigationToolbar2Tk

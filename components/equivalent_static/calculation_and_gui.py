@@ -360,6 +360,26 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "with open(os.path.join(OUTPUT_DIR,'NBC105_ESM_OpenSees_Response_'+ESM_CASE+'.json'),'w',encoding='utf-8') as f: json.dump(ESM_RESPONSE,f,indent=2)",
         "with open(os.path.join(OUTPUT_DIR,'NBC105_ESM_OpenSees_Response_'+ESM_CASE+'.csv'),'w',newline='',encoding='utf-8-sig') as f:",
         "    import csv; w=csv.DictWriter(f,fieldnames=list(ESM_RESPONSE[0]) if ESM_RESPONSE else []); w.writeheader(); w.writerows(ESM_RESPONSE)",
+        # Independent per-node displacement ledger and explicit provenance.
+        "import hashlib as _hashlib",
+        "_hash=_hashlib.sha256()",
+        "with open(MODEL_DATA_PATH,'rb') as _sf:",
+        "    for _block in iter(lambda:_sf.read(1048576),b''): _hash.update(_block)",
+        "_digest=_hash.hexdigest()",
+        "ESM_META={'schema':'esm-response-source-v1','model_sha256':_digest,'limit_state':LIMIT_STATE,'axis':ESM_DIRECTION,'response_case':ESM_CASE,'story_shear_basis':'SUM_OF_APPLIED_FLOOR_LOADS_NOT_RECOVERED_SECTION_CUT','gravity_baseline_subtracted':True,'source_model':MODEL_DATA_PATH}",
+        "with open(os.path.join(OUTPUT_DIR,'NBC105_ESM_OpenSees_Response_META_'+ESM_CASE+'.json'),'w',encoding='utf-8') as f: json.dump(ESM_META,f,indent=2)",
+        "ESM_NODE_MAP={}",
+        "TOPO_PATH=os.path.join(os.path.dirname(MODEL_BUILDER_SCRIPT),'OpenSees_Element_Connectivity.json')",
+        "if os.path.isfile(TOPO_PATH):",
+        "    with open(TOPO_PATH,encoding='utf-8-sig') as tf: topo=json.load(tf)",
+        "    ESM_NODE_MAP={str(r['opensees_node_tag']):r.get('etabs_point_name') for r in topo.get('node_map',[]) if r.get('opensees_node_tag') is not None}",
+        "ESM_ALL_NODE_ROWS=[]",
+        "for node in ops.getNodeTags():",
+        "    nid=int(node);cur=list(ops.nodeDisp(nid));init=ALL_GRAVITY_U[nid];xyz=MODEL_DATA['nodes'].get(str(nid),[None,None,None])",
+        "    d=[float(cur[j])-float(init[j]) for j in range(3)]",
+        "    ESM_ALL_NODE_ROWS.append(dict(opensees_node_tag=nid,etabs_point_name=ESM_NODE_MAP.get(str(nid)),x_m=xyz[0],y_m=xyz[1],z_m=xyz[2],du_x_m=d[0],du_y_m=d[1],du_z_m=d[2],design_du_x_m=d[0]*displacement_factor,design_du_y_m=d[1]*displacement_factor,response_case=ESM_CASE,limit_state=LIMIT_STATE,model_sha256=_digest))",
+        "with open(os.path.join(OUTPUT_DIR,'NBC105_ESM_All_Node_Displacements_'+ESM_CASE+'.csv'),'w',newline='',encoding='utf-8-sig') as f:",
+        "    import csv;writer=csv.DictWriter(f,fieldnames=list(ESM_ALL_NODE_ROWS[0]) if ESM_ALL_NODE_ROWS else ['opensees_node_tag']);writer.writeheader();writer.writerows(ESM_ALL_NODE_ROWS)",
         "ESM_BASE_CURVE_PATH=os.path.join(OUTPUT_DIR,'NBC105_ESM_BaseShear_RoofDisplacement_'+ESM_CASE+'.csv')",
         "with open(ESM_BASE_CURVE_PATH,'w',newline='',encoding='utf-8-sig') as f:",
         "    import csv; w=csv.DictWriter(f,fieldnames=['load_factor','time_s','base_shear_kN','roof_displacement_m']); w.writeheader(); w.writerows(ESM_BASE_CURVE)",
@@ -369,7 +389,7 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "    SUPPORT_REACTION_ROWS.append(dict(node_tag=n,Fx_kN=values[0],Fy_kN=values[1],Fz_kN=values[2],Mx_kNm=values[3],My_kNm=values[4],Mz_kNm=values[5]))",
         "with open(os.path.join(OUTPUT_DIR,'NBC105_ESM_Support_Reactions_'+ESM_CASE+'.csv'),'w',newline='',encoding='utf-8-sig') as f:",
         "    import csv; w=csv.DictWriter(f,fieldnames=list(SUPPORT_REACTION_ROWS[0]) if SUPPORT_REACTION_ROWS else ['node_tag']); w.writeheader(); w.writerows(SUPPORT_REACTION_ROWS)",
-        "with open(os.path.join(OUTPUT_DIR,'Response_Recorder_Index_'+ESM_CASE+'.json'),'w',encoding='utf-8') as f: json.dump({'analysis':'equivalent_static','files':[{'name':os.path.basename(ESM_BASE_CURVE_PATH),'channels':['accepted load factor','base shear','roof displacement']},{'name':'NBC105_ESM_OpenSees_Response_'+ESM_CASE+'.csv','channels':['story displacement','story drift','story shear','secant story stiffness']},{'name':'NBC105_ESM_Support_Reactions_'+ESM_CASE+'.csv','channels':['incremental support forces and moments']}],'notes':['The base-shear/roof-displacement curve is the converged linear static load-control path, not a nonlinear pushover capacity curve.']},f,indent=2)",
+        "with open(os.path.join(OUTPUT_DIR,'Response_Recorder_Index_'+ESM_CASE+'.json'),'w',encoding='utf-8') as f: json.dump({'analysis':'equivalent_static','files':[{'name':os.path.basename(ESM_BASE_CURVE_PATH),'channels':['accepted load factor','base shear','roof displacement']},{'name':'NBC105_ESM_OpenSees_Response_'+ESM_CASE+'.csv','channels':['story displacement','story drift','story shear','secant story stiffness']},{'name':'NBC105_ESM_Support_Reactions_'+ESM_CASE+'.csv','channels':['incremental support forces and moments']},{'name':'NBC105_ESM_All_Node_Displacements_'+ESM_CASE+'.csv','channels':['every node displacement increment and ETABS original source ID']},{'name':'NBC105_ESM_OpenSees_Response_META_'+ESM_CASE+'.json','channels':['model SHA256 and response provenance']}],'notes':['The base-shear/roof-displacement curve is the converged linear static load-control path, not a nonlinear pushover capacity curve.']},f,indent=2)",
         "try:",
         "    import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt",
         "    fig, ax=plt.subplots(1,5,figsize=(20,6),constrained_layout=True); h=[r['height_m'] for r in ESM_RESPONSE]",
@@ -465,50 +485,51 @@ class ESMGui:
         else:
             self.esm_busy_bar.stop()
 
-    def _bundle_esm_evidence(self):
-        """Collect source, original Excel and saved ESM results in one ZIP."""
-        if self._esm_busy:
-            messagebox.showwarning("ESM task running",
-                "Another ESM operation is running. Wait for its FINISHED/BLOCKED status.",
-                parent=self.root)
+    def _auto_bundle_seismic_review(self):
+        """Package current ETABS-linked and OpenSees ESM evidence automatically.
+
+        The worker runs off the Tk thread. Missing independent ETABS response
+        evidence is explicit; no ETABS model is modified or results invented.
+        """
+        import threading
+        if getattr(self,"_review_bundle_running",False):
+            self.status.set(self.status.get()+
+                "\\nESM review archive already being built; existing run remains available.")
             return
-        native_evidence=filedialog.askdirectory(
-            parent=self.root,
-            title="OPTIONAL: Choose native ETABS EQX/EQY/PDelta evidence folder (Cancel to omit)")
-        self._esm_busy=True
-        self._set_esm_operation("RUNNING","Collecting local ESM validation evidence")
+        self._review_bundle_running=True
+        source=Path(self.export_dir)
+        output=Path(self.outdir.get())
         def worker():
             try:
-                from components.equivalent_static.evidence_bundle import (
-                    bundle_esm_validation)
-                result=bundle_esm_validation(
-                    self.export_dir,self.outdir.get(),self.outdir.get(),
-                    native_etabs_evidence=native_evidence or None,
-                    progress=lambda msg:self.root.after(0,
-                        lambda m=str(msg):self._set_esm_operation("RUNNING",m)))
-                def success():
-                    self._esm_busy=False
-                    label="FINISHED" if not result["manifest"]["missing_required"] else "INCOMPLETE"
-                    self._set_esm_operation(label,
-                        "ZIP: "+result["upload_zip"]+
-                        " | missing required: "+str(len(result["manifest"]["missing_required"])))
-                    self.status.set("ESM evidence: "+result["upload_zip"])
-                    messagebox.showinfo("ESM validation evidence",
-                        "Evidence collection "+label+"\n"+
-                        "ZIP: "+result["upload_zip"]+"\n"+
-                        "Files: "+str(result["manifest"]["total_collected"])+"\n"+
-                        "Missing required: "+repr(result["manifest"]["missing_required"])+
-                        "\n\nThe archive is NOT ETABS/OpenSees design acceptance.",
-                        parent=self.root)
-                self.root.after(0,success)
+                from components.validation.seismic_review_bundle import bundle_seismic_review
+                result=bundle_seismic_review(source,output,method="ESM")
+                def finished():
+                    self._review_bundle_running=False
+                    self.status.set(self.status.get()+
+                        "\\n[ESM_AUTO_REVIEW_ZIP] "+result["zip"])
+                self.root.after(0,finished)
             except Exception as exc:
-                problem=str(exc)
+                reason=str(exc)
                 def failed():
-                    self._esm_busy=False
-                    self._set_esm_operation("BLOCKED",problem)
-                    messagebox.showerror("ESM evidence failed",problem,parent=self.root)
+                    self._review_bundle_running=False
+                    self.status.set(self.status.get()+
+                        "\\n[ESM_AUTO_REVIEW_FAILED] "+reason)
                 self.root.after(0,failed)
         threading.Thread(target=worker,daemon=True).start()
+
+    def _bundle_esm_evidence(self):
+        """One-click rerun of the automatic, SHA-deduplicated review ZIP.
+
+        No extra folder selection and no ambiguous native case inference.
+        Current model and analysis output paths are taken from selected GUI.
+        """
+        if getattr(self,"_review_bundle_running",False):
+            self.status.set("Review ZIP creation is already running; see output folder.")
+            return
+        self._auto_bundle_seismic_review()
+        self.status.set(self.status.get()+
+            "\\nReview ZIP creation started automatically; find the latest "
+            "path in Seismic_Review_Packages/LATEST_ESM_REVIEW.txt.")
 
     def _run_etabs_linked(self):
         """Use the uploaded original Excel/ETABS engine, without touching RS scaling."""
@@ -541,6 +562,7 @@ class ESMGui:
                     self._set_esm_operation("FINISHED",
                         "Original ETABS Excel calculation: "+str(target))
                     self.status.set("ETABS linked Excel ready: "+str(target)+" | provenance "+str(audit))
+                    self._auto_bundle_seismic_review()
                     messagebox.showinfo("ETABS Linked ESM",f"Populated original Excel method:\n{target}\n\nAudit:\n{audit}\n\nOpenSees Direct remains available in the dropdown.",parent=self.root)
                     # [REF NBC105-2025 §5.1.2] the computed Aw/T were previously
                     # discarded; offer them to the form with their EDB identity.
@@ -575,6 +597,12 @@ class ESMGui:
         footer=ttk.Frame(self.root,padding=8);footer.pack(side='bottom',fill='x')
         ttk.Button(footer,text='1. Calculate + export',command=self._calculate).pack(side='left',padx=3)
         ttk.Button(footer,text='ETABS Linked: populate original Excel',command=self._run_etabs_linked).pack(side='left',padx=3)
+        ttk.Button(footer,text='Compare ETABS vs ESM/MRSM responses',
+                   command=lambda:__import__(
+                       'components.validation.etabs_comparison',
+                       fromlist=['launch']).launch(
+                           self.root,self.export_dir,
+                           results_root=self.outdir.get())).pack(side='left',padx=3)
         self.run_button=ttk.Button(footer,text='2. Run exported cases',command=self._run_generated,state='disabled');self.run_button.pack(side='left',padx=3)
         ttk.Button(footer,text='Open output folder',command=self._open_export_folder).pack(side='left',padx=3)
         ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
@@ -1468,6 +1496,7 @@ class ESMGui:
                 str(len(failures))+" blocked state cases")
             self.status.set(f"Completed in {elapsed:.2f} s | Location={self.location.get()} | soil={self.soil.get()} | Z={self.Z.get()} ({self.z_source.get()})\n"+"\n".join(summaries)+note+f"\nCreated: {files}")
             self.run_button.configure(state="normal" if Path(self.model_script.get()).is_file() else "disabled")
+            self._auto_bundle_seismic_review()
             messagebox.showinfo("NBC 105 ESM calculation",f"Created {len(self.last_runners)} case runner(s) and documented force profiles.\n" + ("Blocked: "+" | ".join(failures) if failures else "Review inputs before running the exported cases.") + "\n\nUse Plots or Open output folder to inspect the results.")
         except Exception as exc:
             self._set_esm_operation("BLOCKED",str(exc))
@@ -1509,6 +1538,7 @@ class ESMGui:
                     " of "+str(len(outcomes))+" OpenSees earthquake cases converged")
                 lines=[f"{name}: {'SUCCESS' if code==0 else 'FAILED'} | {log}" for name,code,log in outcomes]
                 self.status.set("OpenSeesPy earthquake cases finished.\n"+"\n".join(lines))
+                self._auto_bundle_seismic_review()
                 if all(code==0 for _,code,_ in outcomes): messagebox.showinfo("ESM analysis complete",self.status.get())
                 else: messagebox.showerror("ESM analysis needs review",self.status.get())
             self.root.after(0,done)

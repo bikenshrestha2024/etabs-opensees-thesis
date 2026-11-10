@@ -236,6 +236,11 @@ on:
       # pass the same broad Python quality checks BEFORE merging, not just
       # after landing on main.
       - 'components/gravity/**'
+      - 'components/validation/seismic_review_bundle.py'
+      - 'components/validation/etabs_comparison.py'
+      - 'components/equivalent_static/calculation_and_gui.py'
+      - 'components/response_spectrum/model_analysis.py'
+      - 'tests/verify_seismic_review_bundle.py'
       - 'components/validation/gravity_node_comparison.py'
       - 'tests/verify_gravity_comparison_bundle.py'
       - 'tests/verify_gravity_node_comparison.py'
@@ -313,6 +318,8 @@ jobs:
           python tests/verify_v169_wall_triage_evidence.py
           python tests/verify_device_parameter_finiteness.py
           python tests/verify_gravity_comparison_bundle.py
+          python tests/verify_seismic_review_bundle.py
+          python -m py_compile components/validation/seismic_review_bundle.py
           python tests/verify_gravity_validation_scorecard.py
           python tests/verify_linear_shell_stiffness.py
           python tests/verify_safe_gravity_engineering_review.py
