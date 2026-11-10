@@ -27,6 +27,8 @@ def audit_native_assignment_workbook(workbook_path, output_folder,
 
     DO NOT interpret 'Auto' as a user-verified beam self-weight rule.
     Source workbook and output are local; do not publish workbook bytes.
+    
+    [REF docs/source/components/validation/etabs_assignment_gravity_audit.py.md]
     """
     from openpyxl import load_workbook
     source=Path(workbook_path).expanduser().resolve()

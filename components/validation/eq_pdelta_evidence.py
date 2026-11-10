@@ -42,6 +42,8 @@ def verify_eq_pdelta_evidence(index_path, output_dir):
 
     Index has X and Y entries; values must be actual native ETABS / OpenSees
     evidence, not guessed case labels or inferred analysis settings.
+    
+    [REF docs/source/components/validation/eq_pdelta_evidence.py.md]
     """
     index_file=Path(index_path).resolve()
     index=_json(index_file)

@@ -48,6 +48,8 @@ def reconcile_joint_weight_scenarios(source_folder, output_folder,
 
     Source RCC geometrical assumptions are NOT sufficient for activating a
     quantity correction. Reject contradictory ledgers, no fitted adjustments.
+    
+    [REF docs/source/components/gravity/joint_weight_reconciliation.py.md]
     """
     src = Path(source_folder).expanduser().resolve()
     out = Path(output_folder).expanduser().resolve()

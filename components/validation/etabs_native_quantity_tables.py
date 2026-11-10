@@ -93,6 +93,8 @@ def export_native_quantity_tables(sap,output_dir,*,log=None):
 
     This is diagnostic extraction, not a material list solver and does not
     independently prove the ETABS object weight convention.
+    
+    [REF docs/source/components/validation/etabs_native_quantity_tables.py.md]
     """
     out=Path(output_dir)
     out.mkdir(parents=True,exist_ok=True)

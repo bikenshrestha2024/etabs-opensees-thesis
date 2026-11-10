@@ -4,6 +4,7 @@ from contextlib import ExitStack
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from components.validation import etabs_eq_pdelta_native_extract as module
@@ -32,7 +33,7 @@ class ETABSEQNativeTests(unittest.TestCase):
                 ["Story","Output Case","Vx"],[["Story1","EQX","10"]])))
             stack.enter_context(patch.object(module,"_restore",
                 side_effect=lambda *_:restore.append(True)))
-            result=module.export_eq_pdelta_native_evidence(object(),tmp)
+            result=module.export_eq_pdelta_native_evidence(SimpleNamespace(LoadCases=object()),tmp)
             self.assertEqual(result["selected_case_count"],6)
             self.assertEqual(len(restore),1)
             self.assertEqual(select.call_count,6)
@@ -53,7 +54,7 @@ class ETABSEQNativeTests(unittest.TestCase):
             stack.enter_context(patch.object(module,"_restore",
                 side_effect=lambda *_:restored.append(True)))
             with self.assertRaisesRegex(RuntimeError,"CSI API failed"):
-                module.export_eq_pdelta_native_evidence(object(),tmp)
+                module.export_eq_pdelta_native_evidence(SimpleNamespace(LoadCases=object()),tmp)
             self.assertEqual(restored,[True])
 
 if __name__=="__main__":

@@ -36,6 +36,7 @@ ESM_TERMS=("NBC105_ESM_","NBC105_OpenSees_","NBC105_Input_",
 EXT={".json",".csv",".xlsx",".txt",".log",".png",".pdf",".md"}
 
 def sha(path):
+    """[REF docs/source/components/equivalent_static/evidence_bundle.py.md] Synthetic evidence and source contract; not native acceptance."""
     h=hashlib.sha256()
     with Path(path).open("rb") as f:
         for chunk in iter(lambda:f.read(1048576),b""):
@@ -45,6 +46,7 @@ def sha(path):
 def bundle_esm_validation(source_export,esm_output,save_under,progress=None,
                           max_file_bytes=150*1024*1024,
                           native_etabs_evidence=None):
+    """[REF docs/source/components/equivalent_static/evidence_bundle.py.md] Synthetic evidence and source contract; not native acceptance."""
     src=Path(source_export).resolve()
     outputs=Path(esm_output).resolve()
     if not src.is_dir():raise FileNotFoundError("Model source export: "+str(src))
@@ -103,6 +105,22 @@ def bundle_esm_validation(source_export,esm_output,save_under,progress=None,
             target="esm_results/"+relative
             if (root/target).exists():continue
             include(file,target)
+    # Generated OpenSees ESM runner scripts (*.py) must accompany the force
+    # profiles. The generic evidence extension filter intentionally excludes
+    # arbitrary Python source: only the six exact generated runner prefixes
+    # are eligible. This is an archive of scripts, NOT proof they were run.
+    for location,label in ((src,"source"),(outputs,"esm")):
+        for runner in sorted(location.glob(
+                "OpenSees_NBC105_ESM_Load_And_Static_Analysis_*.py")):
+            include(runner,"generated_runners/"+label+"/"+runner.name)
+    manifest["generated_runner_count"]=sum(
+        1 for x in manifest["files"]
+        if x["path"].startswith("generated_runners/"))
+    manifest["generated_runner_execution_status"]="NOT_INFERRED_FROM_SCRIPT_EXISTENCE"
+    if not manifest["generated_runner_count"]:
+        manifest["missing_optional"].append(
+            "No generated ESM Python runner source found; cannot reproduce "
+            "unexecuted case generation from this ZIP alone")
     for file in sorted(src.glob("*ETABS_LINKED_ESM*")):
         if file.is_file() and file.suffix.lower() in EXT:
             include(file,"etabs_linked_excel/"+file.name)
@@ -174,6 +192,12 @@ def bundle_esm_validation(source_export,esm_output,save_under,progress=None,
                for r in manifest["files"]):
         manifest["missing_optional"].append(
             "Original ETABS-linked Aw/T source provenance not found in selected model/output folders")
+    manifest["generated_force_profiles_only"]=bool(
+        any("NBC105_ESM_Force_Profile_" in r["path"]
+            for r in manifest["files"]))
+    # A plotted cumulative sum of applied lateral storey forces is not
+    # OpenSees-recovered section-cut shear, roof displacement or drift.
+    manifest["story_shear_plot_type"]="SUM_OF_APPLIED_FORCES_NOT_SOLVED_SECTION_CUT"
     if not any("NBC105_ESM_OpenSees_Response_" in r["path"]
                for r in manifest["files"]):
         manifest["missing_required"].append(
