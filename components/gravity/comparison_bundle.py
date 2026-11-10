@@ -58,12 +58,10 @@ EXTRA = ("ETABS_Nonzero_Reaction_Support_Audit.json",
          "Gravity_Joint_Type_Overlap_Review.xlsx",
          "Gravity_Joint_Type_Overlap_Solids.csv",
          "ETABS_Native_Assignment_Gravity_Quantity_Audit.json",
-         "ETABS_Native_Assignment_Gravity_Quantity_Audit.json",
     "Gravity_Joint_Weight_Reconciliation.json",
          "Gravity_Joint_Weight_Scenarios.csv",
          "Gravity_Joint_Weight_By_Solid.csv",
          "Gravity_Original_ETABS_Object_Quantities.csv",
-    "Gravity_Original_ETABS_Object_Quantities.csv",
          "Gravity_Result_V110.json", "Gravity_Run_V110.log",
          "Gravity_Results_V110.xlsx", "Gravity_GUI_Actions.log",
          "Gravity_Run_V110.py")
@@ -383,6 +381,33 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                 missing.append({"file":"offline_etabs/","required":False,
                                 "reason":"Offline ETABS comparison not run"})
 
+        # Include ALL actual outputs from the selected and dual solver runs
+        # under their corresponding case folders. A fixed historic list of
+        # filenames omits later recorder/diagnostic formats. Do not traverse
+        # the entire project, the source EDB, or the upload folder itself.
+        allowed_run_suffixes={
+            ".json",".csv",".xlsx",".xlsm",".png",".pdf",
+            ".html",".txt",".log",".py",".jsonl"}
+        run_roots=[("selected_gravity_full",gravity_dir)]
+        if dual_run_dir is not None:
+            run_roots.extend([
+                ("source_76_full",dual_run_dir/"ETABS_SOURCE_SUPPORTS"),
+                ("continuous_97_full",dual_run_dir/"CONTINUOUS_WALL_BASE_FIXED")])
+        existing_sources={item.get("source") for item in files}
+        for label,run_root in run_roots:
+            if not run_root.is_dir():continue
+            for candidate in sorted(run_root.rglob("*")):
+                if (not candidate.is_file() or candidate.is_symlink() or
+                    candidate.suffix.lower() not in allowed_run_suffixes):
+                    continue
+                rel=candidate.relative_to(run_root)
+                if len(rel.parts)>5 or "Gravity_Evidence_Upload" in rel.parts:
+                    continue
+                if str(candidate) in existing_sources:continue
+                add(candidate,"all_case_outputs/"+label+"/"+rel.as_posix())
+                existing_sources.add(str(candidate))
+        # Optional absent legacy outputs are not missing observed results.
+        # Retain their exact names as metadata, without fabricating files.
         # Direct ETABS extraction is saved beside the OpenSees gravity output.
         # Include current comparison evidence in the same archive when present.
         direct=comparison_root/"Gravity_ETABS_OpenSees_Direct"
@@ -478,13 +503,53 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             source_topology=json.loads(topology_path.read_text(encoding="utf-8-sig"))
             etabs_source=(json.loads(etabs_json.read_text(encoding="utf-8-sig"))
                           if etabs_json is not None and etabs_json.is_file() else None)
+            # The selected result may be the 32-support diagnostic. Its
+            # reactions MUST NOT stand in for the genuine 76-source-support
+            # solution when both are present in the comparison archive.
+            audit_payload=payload
+            audit_case_source="selected_gravity_result"
+            if dual_run_dir is not None:
+                source_case=dual_run_dir/"ETABS_SOURCE_SUPPORTS"/"Gravity_Result_V110.json"
+                if source_case.is_file():
+                    candidate=json.loads(source_case.read_text(encoding="utf-8-sig"))
+                    if (candidate.get("ok") is True and
+                        candidate.get("wall_support_strategy")=="ETABS_SOURCE_SUPPORTS" and
+                        candidate.get("gravity_profile")=="GRAVITY_1.0D_1.0L" and
+                        len(candidate.get("reactions",[]))==76):
+                        # Reject cross-model and cross-load substitution.
+                        selected_script=str(payload.get("model_script","")).replace("\\\\","/").casefold()
+                        candidate_script=str(candidate.get("model_script","")).replace("\\\\","/").casefold()
+                        expected=payload.get("report",{}).get("applied_vertical_load_kN")
+                        actual=candidate.get("report",{}).get("applied_vertical_load_kN")
+                        if (selected_script==candidate_script and
+                            expected is not None and actual is not None and
+                            abs(float(expected)-float(actual))<=max(
+                                1e-5,abs(float(expected))*1e-8)):
+                            audit_payload=candidate
+                            audit_case_source="dual_run/ETABS_SOURCE_SUPPORTS"
             audit76=export_fixed_source_support_reactions(
-                stage/"node_audit_76",payload,source_topology,etabs_source)
+                stage/"node_audit_76",audit_payload,source_topology,etabs_source)
+            audit76["selected_result_source"]=audit_case_source
+            # The output of export_fixed_source_support_reactions is generated
+            # before these provenance annotations; update saved JSON only.
+            audit_path=stage/"node_audit_76"/"Gravity_76_Source_Support_Reactions.json"
+            audit_path.write_text(json.dumps(audit76,indent=2,allow_nan=False),
+                                  encoding="utf-8")
             if audit76["missing_or_unverified"]:
                 missing.append({"file":"node_audit_76/ETABS_REACTION_MATCHES",
                     "required":True,
                     "reason":str(audit76["missing_or_unverified"])+
-                         " of 76 source support points unverified; see status per row."})
+                         " of 76 source support points unverified; actual case="+
+                         audit_case_source+"; see status per row."})
+            elif audit76.get("etabs_zero_opensees_nonzero_count",0):
+                # A known physical disagreement is NOT a missing file. Record
+                # as an explicit non-acceptance gate, not a packaging failure.
+                missing.append({"file":"node_audit_76/ETABS_ZERO_VS_OPENSEES_NONZERO",
+                    "required":True,"type":"ENGINEERING_MISMATCH",
+                    "reason":str(audit76["etabs_zero_opensees_nonzero_count"])+
+                        " ETABS zero-Rz points have nonzero OpenSees source "
+                        "support reactions. Investigate ETABS internal auto-mesh "
+                        "and source boundary conditions; no reaction was altered."})
         except (OSError,ValueError,TypeError,KeyError,ImportError) as exc:
             missing.append({"file":"node_audit_76/Gravity_76_Source_Support_Reactions.csv",
                 "required":True,"reason":type(exc).__name__+": "+str(exc)})
@@ -532,6 +597,11 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                "comparison_root":str(comparison_root),
                "source_model_sha256":model_hash,"source_etabs_json":str(etabs_json) if etabs_json else None,
                "source_files":files,"missing":missing,"oversize_skipped":oversize,
+               "missing_required_count":sum(bool(x.get("required")) for x in missing),
+               "not_produced_optional_count":sum(not bool(x.get("required")) for x in missing),
+               "missing_required": [x for x in missing if x.get("required")],
+               "not_produced_optional": [x for x in missing if not x.get("required")],
+               "missing_is_not_synonymous_with_packaging_failure":True,
                "packaged_files":package_members,
                "output_zip":str(output_dir/(bundle_name+".zip")),
                "output_folder":str(dest),

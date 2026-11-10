@@ -232,6 +232,14 @@ on:
       - 'tests/verify_material_source_sets.py'
   pull_request:
     paths:
+      # Gravity evidence and cross-solver foundation reaction changes must
+      # pass the same broad Python quality checks BEFORE merging, not just
+      # after landing on main.
+      - 'components/gravity/**'
+      - 'components/validation/gravity_node_comparison.py'
+      - 'tests/verify_gravity_comparison_bundle.py'
+      - 'tests/verify_gravity_node_comparison.py'
+      - 'docs/review/20261110_PRIMARY32_SOURCE76_CONTINUOUS97_REACTION_ROOT_CAUSE.md'
       - 'components/nonlinear_time_history/damping_regions.py'
       - 'components/nonlinear_time_history/energy_balance.py'
       - 'components/model/section_tags.py'

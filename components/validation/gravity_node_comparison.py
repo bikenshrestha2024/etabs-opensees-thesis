@@ -308,8 +308,22 @@ def export_fixed_source_support_reactions(folder, opensees, topology, etabs=None
               if etabs is not None and all(x.get("rz_global_kN") is not None
                       for x in etabs_by_point.values()) else None)
     matched=len(ranked)
+    # A geometrically matched ETABS point with zero saved joint reaction
+    # and a significant source-restraint OpenSees reaction is a PHYSICAL
+    # discrepancy, not a missing file, and never a validated zero.
+    zero_mismatch=[x for x in results
+        if x["status"]=="MATCHED_GLOBAL_Z" and
+        abs(float(x["etabs_Rz_kN"]))<=1e-6 and
+        abs(float(x["opensees_Rz_kN"]))>1e-3]
     report=dict(schema="gravity-source-76-support-v1",
         source="OpenSees original ETABS_SOURCE_SUPPORTS gravity run, not continuous-wall sensitivity",
+        etabs_zero_opensees_nonzero_count=len(zero_mismatch),
+        etabs_zero_opensees_nonzero_tags=[
+            x["opensees_node"] for x in zero_mismatch],
+        sum_abs_node_difference_kN=sum(
+            x["abs_difference_kN"] for x in ranked),
+        engineering_gate=("RESTRAINED_NODE_REACTION_MISMATCH"
+            if zero_mismatch else "GEOMETRY_MATCHED_NOT_STRUCTURALLY_VALIDATED"),
         expected_opensees_tags=tags,
         expected_count=len(tags),matched_count=matched,
         missing_or_unverified=len(tags)-matched,
@@ -342,6 +356,9 @@ def export_fixed_source_support_reactions(folder, opensees, topology, etabs=None
             ("Expected OpenSees tags",f"{min(tags)}–{max(tags)} ({len(tags)} requested)"),
             ("Verified one-to-one comparison",matched),
             ("Missing / unverified",len(tags)-matched),
+            ("ETABS zero / OpenSees nonzero nodes",len(zero_mismatch)),
+            ("Total absolute nodal discrepancy kN",report["sum_abs_node_difference_kN"]),
+            ("Engineering gate",report["engineering_gate"]),
             ("OpenSees reaction sum kN",op_total),
             ("ETABS extracted reaction sum kN",et_total),
             ("Structural equivalence","NOT VALIDATED"),
