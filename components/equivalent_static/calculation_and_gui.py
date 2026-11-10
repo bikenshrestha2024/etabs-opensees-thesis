@@ -534,8 +534,15 @@ class ESMGui:
     def _run_etabs_linked(self):
         """Use the uploaded original Excel/ETABS engine, without touching RS scaling."""
         from components.equivalent_static.etabs_linked_excel import run_etabs_excel
-        source=filedialog.askopenfilename(parent=self.root,title="Select ETABS EDB (read-only)",
-                                            filetypes=[("ETABS model","*.edb")])
+        from components.inputs.project_workbooks import _source_edb_path, require_source_state
+        # Prefer exact source EDB from the current export, rather than asking
+        # the operator to locate the same model again at every invocation.
+        require_source_state(self.export_dir,self.state.get())
+        source=_source_edb_path(self.export_dir)
+        if not source or not Path(source).is_file():
+            source=filedialog.askopenfilename(parent=self.root,
+                title="Select exact source ETABS EDB (read-only)",
+                filetypes=[("ETABS model","*.edb")])
         if not source: return
         workbook=filedialog.askopenfilename(parent=self.root,title="Select original NBC105 Excel calculator",
                                               filetypes=[("Excel calculator","*.xlsx")])
@@ -543,9 +550,9 @@ class ESMGui:
         engine=filedialog.askopenfilename(parent=self.root,title="Select original ETABS NBC105 integrated Python engine",
                                            filetypes=[("Python engine","*.py")])
         if not engine: return
-        out=filedialog.askdirectory(parent=self.root,title="Output directory for NEW populated Excel and audit",
-                                     initialdir=self.outdir.get() if Path(self.outdir.get()).is_dir() else str(Path.home()))
-        if not out: return
+        # One source-scoped folder per workflow; manual output override from
+        # the ESM main window remains respected. No further directory dialog.
+        out=str(Path(self.outdir.get()).expanduser()/"ETABS_Linked_ESM")
         if self._esm_busy:
             messagebox.showwarning("ETABS-linked ESM","Another ESM task is running.",
                 parent=self.root)
