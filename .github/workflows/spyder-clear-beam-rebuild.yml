@@ -1,0 +1,28 @@
+name: Spyder clear-beam rebuild launcher
+on:
+  pull_request:
+    paths:
+      - 'tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py'
+      - 'components/gravity/gui_and_reports.py'
+      - 'tests/verify_spyder_clear_beam_rebuild.py'
+      - '.github/workflows/spyder-clear-beam-rebuild.yml'
+  workflow_dispatch:
+jobs:
+  rebuild-launcher-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated CI Excel parser dependency
+        run: python -m pip install openpyxl==3.1.5
+      - name: Compile only changed launcher, GUI, and test files
+        run: python -m py_compile tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py components/gravity/gui_and_reports.py tests/verify_spyder_clear_beam_rebuild.py
+      - name: Run no-ETABS, no-GUI, no-OpenSees tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p verify_spyder_clear_beam_rebuild.py -v
+      - name: State native engineering verification boundary
+        run: echo "Static and mocked preflight passed; native ETABS source crosswalk and 32-support OpenSees gravity are NOT run in GitHub CI."

@@ -1,5 +1,56 @@
 # 2026-11-09 | 32-point gravity correction, native ETABS v23 API fix, and consolidated ESM evidence
 
+## Spyder 2026-11-10 — no-argument rebuild procedure
+
+Running the OLD `REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py` with plain
+`%runfile ... --wdir` caused `SystemExit: 2`, because the CLI required
+`--source-dir`, `--assignment-workbook` and `--dest-dir`.
+This was an INPUT-LAUNCHER error, **not** an ETABS or OpenSees solver failure.
+
+The corrected script in the new **`etabs-opensees-thesis`** repository supports
+plain Spyder execution **without any arguments**:
+
+```python
+%runfile C:/Users/User/Downloads/etabs-opensees-thesis-main/tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py --wdir
+```
+
+This path is the user's pictured ZIP-extracted local tree. After downloading
+the latest main version, select:
+1. Source **folder** holding `OpenSees_Element_Connectivity.json`,
+   `OpenSees_Section_Assignment_Audit.json`, `OpenSees_Load_Conversion_Audit.json`,
+   `OpenSees_Source_Model_Metadata_V118.json`, and
+   `OpenSees_Complete_Model_Config_V118.json`.
+2. **Original native ETABS full assignment workbook** with Material List
+   by Object Type, Section Property List, Frame Summary, End Offsets,
+   Insertion Point and load-pattern tables. The NBC Aw/T1 or gravity
+   reaction workbook alone does not satisfy this source requirement.
+3. Parent output folder. A timestamped
+   `Verified_Clear_Beam_YYYYMMDD_HHMMSS_ffffff` directory is created;
+   the original export remains unchanged.
+
+The script checks source files, workbook sheets and source joint-volume
+policy *before creating output*. It then applies the native beam
+ID/length/offset/self-weight crosswalk in a new export. It does NOT start
+ETABS, analyze gravity or rewrite the original EDB. The target contains
+`CLEAR_BEAM_REBUILD_STATUS.json`: only
+`EXPORT_VERIFIED_NOT_GRAVITY_SOLVED` means the source is ready for the
+NEXT analysis step. `BLOCKED` keeps original inputs unchanged.
+
+If you run an older **gravity GUI** from a saved runtime, it previously
+searched incorrectly under `C:/Users/User/tools/`. The updated GUI
+now offers a file picker to select the actual
+`.../etabs-opensees-thesis/tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py`.
+Directly running the updated rebuild file in Spyder also bypasses the
+old GUI's script-location problem.
+
+**Next:** in the gravity GUI choose the NEW
+`OpenSees_Complete_Gravity_Model.py`, reload the original 32 support
+selection, verify the new applied load, solve and independently compare
+every foundation reaction with original ETABS native tables. The historic
+8,652.444-kN global discrepancy remains **PENDING native rerun**.
+
+---
+
 ## Why the Nov 9 21:58 solver still reported excess
 
 The uploaded `Gravity_ETABS_OpenSees_Evidence_V04(5).zip` is internally consistent
@@ -34,7 +85,7 @@ and a NEW target folder. The latest repository includes
 ```powershell
 git pull origin main
 conda activate etabs_env312
-cd C:\path\to\opensees-nbc105-research
+cd C:\path\to\etabs-opensees-thesis
 python tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py ^
   --source-dir "D:\Thesis Opensees\ETABS  3 - BELT TRUSS, OUTRIGGER CAP TRUSS 11-9-2026\7" ^
   --assignment-workbook "C:\Users\User\Downloads\<YOUR ORIGINAL ETABS ASSIGNMENT WORKBOOK>.xlsx" ^
