@@ -43,7 +43,11 @@ def create_gravity_scorecard(export_dir,gravity_dir,comparison_root,missing,over
     native_beam=_read(export_dir/"ETABS_Native_Assignment_Gravity_Quantity_Audit.json")
     union=_read(export_dir/"OpenSees_Joint_Volume_Ownership_Audit.json")
     run=_read(gravity_dir/"Gravity_Result_V110.json")
-    direct_path=comparison_root/"Gravity_ETABS_OpenSees_Direct"/"Direct_Gravity_Comparison.json"
+    # Prefer the exact selected run, never recursively pick an unrelated case
+    # whose total reaction happens to match (32/76/97 share the same load).
+    candidates=[gravity_dir/"Gravity_ETABS_OpenSees_Direct"/"Direct_Gravity_Comparison.json",
+                comparison_root/"Gravity_ETABS_OpenSees_Direct"/"Direct_Gravity_Comparison.json"]
+    direct_path=next((p for p in candidates if p.is_file()),candidates[0])
     direct=_read(direct_path)
 
     rows=[]

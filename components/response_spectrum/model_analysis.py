@@ -216,6 +216,19 @@ def mrsm_period_defaults(folder, values, state='ULS'):
     required=("awx","awy","rayleigh_tx","rayleigh_ty")
     missing=[key for key in required if values.get(key) in (None,"")]
     if missing:
+        # The user's original ETABS-linked calculator already contains
+        # attributed adopted design periods; never substitute them as modal
+        # or Rayleigh results. Reuse only a source/state-matched audit.
+        if (folder/'OpenSees_Complete_Model_Data_V118.json').is_file():
+            from components.inputs.aw_sources import latest_linked_reference
+            reference,_=latest_linked_reference(folder,state)
+            if reference:
+                adopted=reference['values']
+                return {'T1_X':adopted['workbook_adopted_tx'],
+                        'T1_Y':adopted['workbook_adopted_ty']}, (
+                    'Original ETABS-linked workbook adopted design-period references; '
+                    'fresh Rayleigh evidence unavailable. Research comparison only. '
+                    'Source: '+reference['source_workbook'])
         return {"T1_X":"","T1_Y":""}, ("Validated period defaults unavailable; "
                 "missing source-model fields: "+", ".join(missing)+
                 ". Run the preliminary Rayleigh analysis (ESM window) for this state, "
@@ -276,7 +289,7 @@ def launch(parent,folder):
     fields['limit_state'].trace_add('write',refresh)
     ttk.Label(form,text=period_note,wraplength=1000).pack(anchor='w',pady=3)
     ttk.Label(form,text='Each state runs X and Y, with E0 / Eplus / Eminus cases (6 cases/state). E0 is centered; Eplus/Eminus are signed 5% perpendicular-breadth eccentric inertia cases. Soil selection requires site evidence. Acceleration conversion is internal for the kN-m-s model. Workbook / PNG / PDF are exported automatically.',wraplength=1000).pack(anchor='w',pady=6)
-    actions=ttk.Frame(form);actions.pack(fill='x');output=Path(folder)/'OpenSees_Analysis_Results'
+    actions=ttk.Frame(form);actions.pack(fill='x');output=analysis_output_folder(folder,initial_state)
     log_value=tk.StringVar()
     from OpenSees_Research_UI_V123 import copyable_log
     from components.shared.case_status import panel,CaseLedger
@@ -348,6 +361,16 @@ def launch(parent,folder):
             threading.Thread(target=worker,daemon=True).start()
         except Exception as e:messagebox.showerror('MRSM inputs',str(e),parent=win)
     button=ttk.Button(actions,text='Run selected state(s)',command=run);button.pack(side='left')
+    def export_zip():
+        def worker():
+            try:
+                from components.validation.seismic_review_bundle import bundle_seismic_review
+                package=bundle_seismic_review(folder,output,method='MRSM')
+                append('[MRSM_REVIEW_ZIP] '+package['zip']+'\n')
+            except Exception as exc:
+                append('[MRSM_REVIEW_PACKAGING_FAILED] '+str(exc)+'\n')
+        threading.Thread(target=worker,daemon=True).start()
+    ttk.Button(actions,text='Export full evidence ZIP',command=export_zip).pack(side='left')
     # [REF components/ui/output_folder.py] shared output-folder action.
     from components.ui.output_folder import add_open_output_button
     add_open_output_button(actions,lambda:str(output),window=win)

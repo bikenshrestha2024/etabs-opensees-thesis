@@ -1,5 +1,14 @@
 # project_workbooks.py — source documentation
 
+2026-11-10 extension: `registered_project_source(export_dir, role)` reads
+`project_sources.private.json` in the selected export or code root, or the
+`OPENSEES_PROJECT_SOURCES` location. It checks the current EDB and registered
+source SHA256 before returning a path; changed sources raise ValueError.
+Roles: etabs_assignment, etabs_full_table, nbc_calculator, nbc_engine and optional
+etabs_linked_audit. No source file is changed. Unscoped drive-specific workbook
+discovery was removed. `_calculator_sync_summary` reads original-engine
+labelled adopted T1 (seconds) and Aw (m²), separately from modal/Rayleigh data.
+
 **Python source:** [components/inputs/project_workbooks.py](../../../../components/inputs/project_workbooks.py)
 **Git baseline content SHA:** 7fa25b152078d65fe65c964dcd48e18587a0872a
 **Subsystem:** ETABS/source inputs and earthquake motions
@@ -32,3 +41,8 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 - Rayleigh imports are matched to state, model hash, seismic weight hash and Aw. No change to the source ETABS data or original workbook is allowed.
 
 **New checks:** `tests/verify_esm_aw_period_provenance.py` and `tests/verify_nbc105_periods.py`; synthetic regression proof only. See [full professional parameter manual](../../../review/20261105_PROFESSIONAL_STRUCTURAL_ENGINEERING_PROVENANCE_MANUAL.md). Old baseline SHA is historical, not the current source blob.
+
+Publication extension: the resolver also reads excel/SOURCE_REGISTRY.json with
+paths relative to the registry. Git LFS pointers are reported with a pull
+instruction. copy_project_workbooks copies the three established small inputs
+to export/excel/source and retains verified references to larger source files.

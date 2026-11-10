@@ -1,6 +1,6 @@
 # Start here - ETABS to OpenSeesPy research workflow
 
-Run **`01_WORKFLOW_START.py`** from the complete checkout for the main GUI.
+Run **`01.py`** from the complete checkout for the main GUI.
 For individual tools, use the [current launcher index](docs/programs/00_PROGRAM_INDEX.md).
 Keep the package intact, including `components/`, runtime facades and source guides.
 
@@ -29,3 +29,5 @@ position or NBC compliance.
 [First Windows test](docs/00_TEST_MAIN_AFTER_MERGE.md) ·
 [Historical rename map](docs/00_WORK_ORDER_RENAME_MAP.md) ·
 [Review ledger](docs/review/ledger/README.md)
+
+[Clean numbered launcher list](launchers/README.md) · [All Excel workbooks](excel/README.md)

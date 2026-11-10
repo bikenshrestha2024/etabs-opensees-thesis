@@ -1,5 +1,16 @@
 # load_path_formulas.py — source documentation
 
+2026-11-10 extension: `recovered_vertical_transfers(payload, elevations_m)`
+uses recorded six-DOF global element resisting forces (kN/kN-m). It sums lower
+faces of elements crossing a horizontal mesh interface just above a given
+elevation. Direct loads at/below that interface are separate. It is not an
+arbitrary within-element section-cut interpolation. `vertical_joint_balance`
+reports signed element Fz minus applied Fz minus support Rz at every joint.
+Free-joint residuals are not foundation reactions. Both require complete frame
+and shell vectors and reject incomplete old results. These functions read data
+only and never modify the solver. The native isolated primary-case regression
+recorded 14262 vectors and closed 11097 vertical joint balances within 4e-10 kN.
+
 **Python source:** [components/gravity/load_path_formulas.py](../../../../components/gravity/load_path_formulas.py)
 **Git baseline content SHA:** 245bd43de57522753fe561a705ccd742d75de851
 **Subsystem:** Gravity-load and support equilibration

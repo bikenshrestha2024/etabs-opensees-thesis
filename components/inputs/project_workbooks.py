@@ -16,6 +16,88 @@ SCALING='ULTIMATE LOAD  - NEPAL - 3 - BELT TRUSS, OUTRIGGER CAP TRUSS_NBC105_RS_
 
 SERVICE_SCALING='SERVICE LOAD  - NEPAL - 3 - BELT TRUSS, OUTRIGGER CAP TRUSS_NBC105_RS_Scaling_2.xlsx'
 
+def registered_project_source(export_dir, role):
+    """Resolve explicitly registered local sources, checking EDB and file hashes.
+
+    Registry paths stay private. No filename-based model equivalence is inferred.
+    Missing registrations return None; changed registered inputs raise ValueError.
+    [REF docs/source/components/inputs/project_workbooks.py.md]
+    """
+    import os
+    import hashlib
+    def digest(path):
+        h = hashlib.sha256()
+        with Path(path).open('rb') as stream:
+            for block in iter(lambda: stream.read(1048576), b''):
+                h.update(block)
+        return h.hexdigest()
+    locations = [Path(export_dir)/'project_sources.private.json',
+                 Path(__file__).resolve().parents[2]/'project_sources.private.json',
+                 Path(export_dir)/'excel'/'SOURCE_REGISTRY.json',
+                 Path(__file__).resolve().parents[2]/'excel'/'SOURCE_REGISTRY.json']
+    if os.environ.get('OPENSEES_PROJECT_SOURCES'):
+        locations.insert(0, Path(os.environ['OPENSEES_PROJECT_SOURCES']))
+    current = _source_edb_path(export_dir)
+    for registry in locations:
+        if not registry.is_file():
+            continue
+        data = json.loads(registry.read_text(encoding='utf-8-sig'))
+        if not current or not Path(current).is_file():
+            continue
+        if digest(current) != data.get('source_edb_sha256'):
+            continue
+        entry = data.get('sources', {}).get(role)
+        if not entry:
+            continue
+        path = Path(entry['path'])
+        if not path.is_absolute():path=registry.parent/path
+        if path.is_file():
+            with path.open('rb') as stream:
+                if stream.read(64).startswith(b'version https://git-lfs.github.com/spec/v1'):
+                    raise ValueError('Workbook is a Git LFS pointer; run git lfs pull in the repository: '+str(path))
+        if not path.is_file() or digest(path) != entry.get('sha256'):
+            raise ValueError('Registered source changed or missing: '+role)
+        return str(path.resolve())
+    return None
+
+
+def copy_project_workbooks(runtime_dir, export_dir):
+    """Copy small calculator inputs to a new export; reference large sources.
+
+    Source workbooks remain read-only. Only the three established calculator/
+    scaling names are copied, never the large full-table export or historical
+    evidence. A fresh private registry preserves verified absolute references.
+    [REF docs/source/components/inputs/project_workbooks.py.md]
+    """
+    import shutil
+    import hashlib
+    source=Path(runtime_dir)/'excel'/'source'
+    if not source.is_dir():source=Path(runtime_dir)/'Project_Input_Workbooks'
+    target=Path(export_dir)/'excel'/'source'
+    copied=[]
+    for name in (CALCULATOR,SCALING,SERVICE_SCALING):
+        path=source/name
+        if path.is_file():
+            target.mkdir(parents=True,exist_ok=True)
+            dest=target/name
+            if path.resolve()!=dest.resolve():shutil.copy2(path,dest)
+            copied.append(str(dest))
+    registry=Path(export_dir)/'project_sources.private.json'
+    current=_source_edb_path(export_dir)
+    if current and Path(current).is_file() and not registry.exists():
+        entries={}
+        for role in ('nbc_calculator','nbc_engine','etabs_assignment','etabs_full_table','slab_load_path','etabs_linked_audit'):
+            path=registered_project_source(export_dir,role)
+            if path:
+                path=Path(path)
+                if path.name in (CALCULATOR,SCALING,SERVICE_SCALING) and (target/path.name).is_file():path=target/path.name
+                with path.open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
+                entries[role]={'path':str(path.resolve()),'sha256':sha}
+        if entries:
+            with Path(current).open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
+            registry.write_text(json.dumps({'source_edb_sha256':sha,'sources':entries},indent=2),encoding='utf-8')
+    return copied
+
 def _source_edb_path(export_dir):
     folder=Path(export_dir)
     for name in ('OpenSees_Element_Connectivity.json','OpenSees_Section_Assignment_Audit.json'):
@@ -360,6 +442,38 @@ def _scaling_summary(ws):
     return source,fields
 
 
+def _calculator_sync_summary(wb):
+    """Read labelled numeric outputs written by the original ETABS engine.
+
+    These are adopted design periods, never measured modal/Rayleigh periods.
+    Read-only; no Excel calculation or formula replacement is performed.
+    """
+    source='';fields={}
+    for name in (wb.sheetnames if hasattr(wb,'sheetnames') else wb):
+        if not name.startswith('ETABS_'):
+            continue
+        for row in wb[name].iter_rows(min_row=1,max_row=12,max_col=2):
+            if len(row)>1 and str(row[0].value).strip()=='Source EDB':
+                candidate=str(row[1].value or '').strip()
+                if source and source!=candidate:
+                    raise ValueError('Calculator has conflicting source EDB summaries')
+                source=candidate
+    if 'ETABS Sync' in wb:
+        axis=None
+        for row in wb['ETABS Sync'].iter_rows(min_row=18,max_row=60,max_col=2):
+            if len(row)<2:continue
+            label=str(row[0].value or '').strip()
+            if label in ('X DIRECTION','Y DIRECTION'):
+                axis=label[0].lower();continue
+            if axis is None:continue
+            key={'Aw (m²)':'aw'+axis,'Adopted T1 (s)':'workbook_adopted_t'+axis}.get(label)
+            if key:
+                value=row[1].value
+                if isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) and value>0:
+                    fields[key]=(value,'ETABS Sync!'+row[1].coordinate)
+    return source,fields
+
+
 def read_explicit_excel_calculation(workbook_path, export_dir, limit_state):
     """Opt-in direct EXCEL-method values; preserve source EDB discrepancy.
 
@@ -383,9 +497,12 @@ def read_explicit_excel_calculation(workbook_path, export_dir, limit_state):
     except (BadZipFile,OSError,ValueError) as exc:
         raise ValueError(f'Cannot read Excel workbook {path}: {type(exc).__name__}: {exc}') from exc
     try:
-        if 'SCALING SUMMARY' not in wb:
-            raise ValueError(f'Workbook has no SCALING SUMMARY sheet: {path}')
-        source,fields=_scaling_summary(wb['SCALING SUMMARY'])
+        if 'SCALING SUMMARY' in wb:
+            source_sheet='SCALING SUMMARY'
+            source,fields=_scaling_summary(wb['SCALING SUMMARY'])
+        else:
+            source_sheet='ETABS Sync'
+            source,fields=_calculator_sync_summary(wb)
     finally:
         wb.close()
     if not source:
@@ -427,7 +544,7 @@ def read_explicit_excel_calculation(workbook_path, export_dir, limit_state):
             'BYTE_IDENTICAL_EDB_REFERENCE' if identical else
             'DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY')
     return dict(values=values,cells=cells,source_workbook=str(path),
-                source_sheet='SCALING SUMMARY',workbook_source_edb=source,
+                source_sheet=source_sheet,workbook_source_edb=source,
                 current_export_source_edb=current,source_identity=status,
                 limit_state=state,
                 code_accepted=False,
@@ -444,9 +561,9 @@ def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):
     from zipfile import BadZipFile
     export_dir=Path(export_dir);root=Path(root)
     selected=export_dir/'NBC105_Workbook_Source.json'
-    roots=[export_dir/'Project_Input_Workbooks',export_dir,
+    roots=[export_dir/'excel'/'source',export_dir/'Project_Input_Workbooks',export_dir,
            export_dir.parent/'Project_Input_Workbooks',export_dir.parent,
-           root/'Project_Input_Workbooks',root,
+           root/'excel'/'source',root/'Project_Input_Workbooks',root,
            Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
     candidates=[]
     if selected.is_file():
@@ -515,15 +632,16 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     # stored in adjacent folders rather than inside the same export folder.
     # Search a bounded directory set, and validate sheet + B4 model identity
     # before choosing anything. Never recursively search an entire drive.
-    search=[export_dir/'Project_Input_Workbooks',export_dir,
+    search=[export_dir/'excel'/'source',export_dir/'Project_Input_Workbooks',export_dir,
             export_dir.parent/'Project_Input_Workbooks',export_dir.parent,
-            root/'Project_Input_Workbooks',root,
-            Path(r'D:/Thesis/Main Python Programs/Excel Sheets')]
+            root/'excel'/'source',root/'Project_Input_Workbooks',root]
     selected=export_dir/'NBC105_Workbook_Source.json'
     if selected.is_file():
         names=json.loads(selected.read_text(encoding='utf-8-sig'))
         explicit=[Path(p) for p in names.get('workbooks',[]) if Path(p).is_file()]
     else:explicit=[]
+    registered=registered_project_source(export_dir,'nbc_calculator')
+    if registered:explicit.insert(0,Path(registered))
 
     candidates=[]
     for directory in search:

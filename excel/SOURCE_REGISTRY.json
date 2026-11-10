@@ -1,0 +1,22 @@
+{
+  "schema": "project-sources-v1",
+  "source_edb_sha256": "8d09a2367fcdf17f969c77226d17a8668ab7989122aea59f6328aabbca9434bc",
+  "sources": {
+    "etabs_assignment": {
+      "path": "source/Assignment ETABS Storey 3 Outrigger Belt Truss Cap Truss ULS Case.xlsx",
+      "sha256": "a92cbf4dd9950dc22944e017cc6a5a8c855bc725561f984f5685389a888a0793"
+    },
+    "etabs_full_table": {
+      "path": "source/Storey 3 Outrigger Belt Truss Cap Truss ETABS full export ULS Case_compressed.xlsx",
+      "sha256": "9ca7f5c146ca8247e2b228c7995e766791486b87dc87c81d7b099090c779c191"
+    },
+    "slab_load_path": {
+      "path": "source/Slab_Load_Path_Formulas_V141.xlsx",
+      "sha256": "a13323f8f0a023ee08f23adc62e658a22496959afc40de07792330ac5f3cefc8"
+    },
+    "nbc_calculator": {
+      "path": "source/NBC105_2025_Seismic_Calculator_ETABS_Direct Interaction - Copy.xlsx",
+      "sha256": "5166139e7496e6433d2cf20be4be8990a6a2ba47cacde1685032f245854c2bef"
+    }
+  }
+}

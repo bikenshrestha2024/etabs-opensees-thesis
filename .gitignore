@@ -4,3 +4,13 @@ __pycache__/
 *.temp
 *.bak
 *.pdf
+project_sources.private.json
+# Distributed workbooks live only in excel/. Analysis/legacy copies stay local.
+*.xlsx
+*.xlsm
+*.xls
+*.xlsb
+!excel/**/*.xlsx
+!excel/**/*.xlsm
+!excel/**/*.xls
+!excel/**/*.xlsb

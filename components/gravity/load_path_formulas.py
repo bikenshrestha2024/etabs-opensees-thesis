@@ -2,6 +2,67 @@
 from pathlib import Path
 import json
 
+
+def recovered_vertical_transfers(payload, elevations_m):
+    """Recover global Fz at horizontal mesh boundaries from static end forces.
+
+    Uses OpenSees eleForce, six DOFs per node (kN, kN-m). The cut is just
+    above each elevation; only elements crossing that boundary contribute.
+    Lower-node resisting Fz is reported with its solver sign. This is a
+    discrete interface resultant, not an interior-joint support reaction or
+    interpolation through an element. Incomplete force vectors are rejected.
+    [REF docs/source/components/gravity/load_path_formulas.py.md]
+    """
+    import math
+    nodes={int(n['tag']):n for n in payload['nodes']}
+    edges={int(e['tag']):list(map(int,e['nodes'])) for e in payload['elements']}
+    forces={int(e['tag']):e for e in payload.get('global_end_forces',[])}
+    if set(forces)!=set(edges) or payload.get('missing_global_forces'):
+        raise ValueError('Complete frame and shell global end forces required; rerun gravity with current recorder')
+    rows=[]
+    for level in sorted(set(map(float,elevations_m))):
+        total=0.;count=0
+        for tag,tags in edges.items():
+            z=[float(nodes[n]['z_m']) for n in tags]
+            if min(z)>level+1e-7 or max(z)<=level+1e-7:continue
+            e=forces[tag];v=e['forces']
+            if list(map(int,e['nodes']))!=tags or len(v)!=6*len(tags):
+                raise ValueError('Global end-force node ordering/length mismatch')
+            if not all(math.isfinite(float(x)) for x in v):raise ValueError('Nonfinite element force')
+            total+=sum(float(v[6*i+2]) for i,zz in enumerate(z) if zz<=level+1e-7)
+            count+=1
+        rows.append(dict(elevation_m=level,crossing_elements=count,lower_face_resisting_Fz_kN=total,
+                         basis='RECOVERED_GLOBAL_ELEMENT_END_FORCES_AT_MESH_INTERFACE'))
+    return rows
+
+
+def vertical_joint_balance(payload, applied_fz_kN):
+    """Signed static joint balance: element Fz minus applied Fz minus reaction.
+
+    Forces in kN, downward applied loads negative. Interior residuals are
+    equilibrium checks, not support reactions. Requires all frame/shell ends.
+    [REF docs/source/components/gravity/load_path_formulas.py.md]
+    """
+    import math
+    recovered_vertical_transfers(payload, [])  # completeness gate
+    totals={int(n['tag']):0. for n in payload['nodes']}
+    for element in payload['global_end_forces']:
+        tags=element['nodes'];values=element['forces']
+        if len(values)!=6*len(tags):raise ValueError('Invalid global force vector')
+        for i,tag in enumerate(tags):
+            fz=float(values[6*i+2])
+            if not math.isfinite(fz):raise ValueError('Nonfinite element force')
+            totals[int(tag)]+=fz
+    reactions={int(r['node_tag']):float(r['rz_kN']) for r in payload['reactions']}
+    applied={int(k):float(v) for k,v in applied_fz_kN.items()}
+    rows=[]
+    for node in payload['nodes']:
+        tag=int(node['tag']);force=applied.get(tag,0.);reaction=reactions.get(tag,0.)
+        rows.append(dict(node_tag=tag,z_m=node['z_m'],is_support=tag in reactions,
+                         element_resisting_Fz_kN=totals[tag],applied_Fz_kN=force,
+                         support_Rz_kN=reaction,residual_Fz_kN=totals[tag]-force-reaction))
+    return rows
+
 def add_formula_audit(wb,folder,data=None,cfg=None):
     from openpyxl.styles import Font,PatternFill
     from openpyxl.workbook.properties import CalcProperties

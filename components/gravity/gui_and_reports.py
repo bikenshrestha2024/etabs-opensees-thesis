@@ -66,12 +66,19 @@ def _runner_source(model_script, result_path, support_nodes, applied_kN, nsteps,
         "        except Exception: continue",
         "        if len(en) >= 2: elements.append({'tag':e, 'nodes':en})",
         "    local_forces = []",
+        "    global_end_forces = []; missing_global_forces = []",
+        "    for e in element_tags:",
+        "        try:",
+        "            en=[int(n) for n in ops.eleNodes(e)]; gf=[float(v) for v in ops.eleForce(e)]",
+        "            if len(gf)!=6*len(en): raise ValueError('Expected six global end-force DOFs per node')",
+        "            global_end_forces.append({'tag':int(e),'nodes':en,'forces':gf})",
+        "        except Exception as exc: missing_global_forces.append({'tag':int(e),'reason':str(exc)})",
         "    for e in element_tags:",
         "        try: values = [float(x) for x in ops.eleResponse(e, 'localForce')]",
         "        except Exception: continue",
         "        if len(values) == 12:",
         "            local_forces.append({'tag':int(e), 'N_i_kN':values[0], 'Vy_i_kN':values[1], 'Vz_i_kN':values[2], 'T_i_kNm':values[3], 'My_i_kNm':values[4], 'Mz_i_kNm':values[5], 'N_j_kN':values[6], 'Vy_j_kN':values[7], 'Vz_j_kN':values[8], 'T_j_kNm':values[9], 'My_j_kNm':values[10], 'Mz_j_kNm':values[11]})",
-        "    RESULT_PATH.write_text(json.dumps({'ok':True,'model_script':str(MODEL_SCRIPT),'report':report,'gravity_profile':GRAVITY_PROFILE,'wall_support_strategy':WALL_SUPPORT_STRATEGY,'added_wall_support_tags':ADDED_WALL_SUPPORTS,'support_node_tags':SUPPORT_NODES,'nodes':nodes,'reactions':reactions,'elements':elements,'local_forces':local_forces}, indent=2), encoding='utf-8')",
+        "    RESULT_PATH.write_text(json.dumps({'ok':True,'model_script':str(MODEL_SCRIPT),'report':report,'gravity_profile':GRAVITY_PROFILE,'wall_support_strategy':WALL_SUPPORT_STRATEGY,'added_wall_support_tags':ADDED_WALL_SUPPORTS,'support_node_tags':SUPPORT_NODES,'nodes':nodes,'reactions':reactions,'elements':elements,'local_forces':local_forces,'global_end_forces':global_end_forces,'missing_global_forces':missing_global_forces}, indent=2), encoding='utf-8')",
         "except Exception as exc:",
         "    RESULT_PATH.write_text(json.dumps({'ok':False,'error':str(exc),'traceback':traceback.format_exc()}, indent=2), encoding='utf-8')",
         "    traceback.print_exc(); sys.exit(1)",
@@ -116,19 +123,49 @@ class GravityAnalysisGUI:
         self.gravity_operation_state=tk.StringVar(value="IDLE | No gravity solver or exporter running")
         self._gravity_busy=False
         self._build()
-        # Native ETABS/source point restraint is the defensible default;
-        # 32 nonzero points is only a deliberately selected diagnostic.
-        self.wall_support_strategy_var.set("ETABS Node Position (76 nodes)")
+        # User-selected primary case; retain legacy scenario keys for saved results.
+        self.wall_support_strategy_var.set("ETABS Reaction Validation (32 nodes)")
         self.wall_support_strategy_var.trace_add(
             "write", lambda *_: self._read_code_inputs(show_error=False)
             if self.model_var.get() else self._refresh_case_reaction())
         self.output_var.trace_add("write", lambda *_: self._refresh_case_reaction())
         self.model_var.trace_add("write", lambda *_: self._refresh_case_reaction())
+        self.model_var.trace_add("write", lambda *_: self._populate_registered_sources())
         def populate_saved():
             from OpenSees_Complete_Export_V118 import autoselect_inputs
             folder=Path(self.model_var.get()).parent if self.model_var.get() else Path(r'D:/Thesis Opensees/Etabs Nodes Export')
             autoselect_inputs(self,folder,'gravity_model_script')
         self.win.after_idle(populate_saved)
+
+    def _populate_registered_sources(self):
+        from components.inputs.project_workbooks import registered_project_source
+        if not self.model_var.get():
+            return
+        try:
+            for role, variable in (("etabs_full_table", self.etabs_full_table_var),
+                                   ("etabs_assignment", self.etabs_native_assignment_var)):
+                if not variable.get():
+                    value = registered_project_source(Path(self.model_var.get()).parent, role)
+                    if value:
+                        variable.set(value)
+        except (OSError, ValueError) as exc:
+            self.status_var.set('Source registration requires review: '+str(exc))
+
+    def _view_saved_case(self):
+        """Display only the selected fingerprint-checked saved 32/76/97 run."""
+        try:
+            result = self._selected_result_path()
+            from OpenSees_Research_UI_V123 import gravity_figures, embed_figures
+            payload = json.loads(result.read_text(encoding='utf-8-sig'))
+            # Plot generation also writes PNG/PDF: keep saved run evidence intact.
+            import tempfile
+            with tempfile.TemporaryDirectory(prefix='gravity_view_') as temporary:
+                figures, _, _ = gravity_figures(payload, Path(temporary))
+            embed_figures(self.plot_tab, figures)
+            self.nb.select(self.plot_tab)
+            self.status_var.set('Viewing saved '+str(payload['wall_support_strategy'])+' | '+str(result))
+        except (OSError, ValueError) as exc:
+            messagebox.showerror('Saved gravity case', str(exc), parent=self.win)
 
     def _set_gravity_operation(self,state,detail=""):
         """Running status independent of the report/status text (Tk main thread)."""
@@ -762,7 +799,7 @@ class GravityAnalysisGUI:
         ttk.Combobox(wall_row,textvariable=self.wall_support_strategy_var,
             state="readonly",width=38,
             values=("ETABS Reaction Validation (32 nodes)","ETABS Node Position (76 nodes)","Continuous Wall Base (97 nodes)")).pack(side="left")
-        ttk.Label(wall_row,text="Nonzero ETABS reaction = diagnostic only; node position retains 76 original supports; separate 97-node continuous case remains unchanged.",
+        ttk.Label(wall_row,text="32 reaction-bearing nodes: primary gravity case. 76 original supports and 97 continuous wall-base supports: sensitivity cases. Joint agreement is checked separately.",
                   wraplength=485).pack(side="left",padx=8)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
@@ -811,7 +848,7 @@ class GravityAnalysisGUI:
                           "Select matching ETABS gravity results JSON", [("JSON", "*.json")]))
         ttk.Button(form, text="Read BOTH support lists and gravity load (original ETABS table required for reaction filter)", command=self._read_code_inputs).pack(anchor="w", pady=(4, 2))
         separate=ttk.Frame(form);separate.pack(fill="x",pady=(3,2))
-        ttk.Label(separate,text="ETABS Reaction Validation — nonzero FZ diagnostic").grid(row=0,column=0,sticky="w",padx=4)
+        ttk.Label(separate,text="Primary gravity — 32 ETABS reaction-bearing joints").grid(row=0,column=0,sticky="w",padx=4)
         ttk.Entry(separate,textvariable=self.reaction_support_var,width=98,state="readonly").grid(row=0,column=1,sticky="ew",padx=4)
         ttk.Label(separate,textvariable=self.reaction_support_verification_var,wraplength=300).grid(row=0,column=2,sticky="w",padx=4)
         ttk.Label(separate,text="ETABS Node Position — original 76 mapped supports").grid(row=1,column=0,sticky="w",padx=4)
@@ -852,6 +889,7 @@ class GravityAnalysisGUI:
         ttk.Label(bar,textvariable=self.wall_support_strategy_var).pack(side="left",padx=8)
         actions=ttk.Frame(root); actions.pack(fill="x",pady=(0,7))
         ttk.Button(actions,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
+        ttk.Button(actions,text="View selected 32 / 76 / 97 saved case",command=self._view_saved_case).pack(side="left",padx=5)
         ttk.Button(actions,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
         ttk.Button(actions,text="Bundle gravity evidence ZIP",command=self._export_comparison_bundle).pack(side="left",padx=5)
         def load_path():
@@ -1522,6 +1560,30 @@ class GravityAnalysisGUI:
         data_path=model_dir/'OpenSees_Complete_Model_Data_V118.json'
         if topology_path.is_file() and data_path.is_file():
             topo=json.loads(topology_path.read_text(encoding='utf-8-sig'));domain=json.loads(data_path.read_text(encoding='utf-8-sig'))
+            transfer_sheet=wb.create_sheet('Recovered floor Fz')
+            try:
+                from components.gravity.load_path_formulas import recovered_vertical_transfers,vertical_joint_balance
+                elevations=[domain['base_z_m']]+[d['master_xyz'][2] for d in domain['diaphragms']]
+                transfers=recovered_vertical_transfers(payload,elevations)
+                transfer_sheet.append(list(transfers[0]) if transfers else ['No floor interfaces'])
+                for row in transfers:transfer_sheet.append(list(row.values()))
+                (out/'Gravity_Recovered_Floor_Fz.json').write_text(json.dumps(transfers,indent=2),encoding='utf-8')
+                from components.model.assembly import apply_gravity_profile
+                cfg=json.loads((model_dir/'OpenSees_Complete_Model_Config_V118.json').read_text(encoding='utf-8-sig'))
+                meta=json.loads((model_dir/'OpenSees_Source_Model_Metadata_V118.json').read_text(encoding='utf-8-sig'))
+                apply_gravity_profile(domain,cfg,payload['gravity_profile'],meta.get('pattern_types',{}))
+                applied={}
+                for pattern in domain['gravity'].values():
+                    for tag,vector in pattern.items():applied[tag]=applied.get(tag,0.)+vector[2]
+                if abs(-sum(applied.values())-report['applied_vertical_load_kN'])>0.01:
+                    raise ValueError('Selected source ledger does not match solved applied gravity')
+                joint_rows=vertical_joint_balance(payload,applied)
+                joint_sheet=wb.create_sheet('Joint vertical balance')
+                joint_sheet.append(list(joint_rows[0]))
+                for row in joint_rows:joint_sheet.append(list(row.values()))
+                (out/'Gravity_Joint_Vertical_Balance.json').write_text(json.dumps(joint_rows,indent=2),encoding='utf-8')
+            except (ValueError,OSError,KeyError) as exc:
+                transfer_sheet.append(['NOT_RECORDED',str(exc)])
             names={str(n['opensees_node_tag']):n['etabs_point_name'] for n in topo['node_map']}
             for r in reactions:
                 tag=str(r['node_tag']);coord=domain['nodes'].get(tag,[])

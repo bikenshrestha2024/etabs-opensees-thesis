@@ -59,6 +59,9 @@ def edb_identity(current_edb, audit):
     if not current_edb:
         return 'UNKNOWN_CURRENT_EDB'
     if _norm(current_edb) == _norm(audit.get('source_edb')):
+        if Path(str(current_edb)).is_file() and audit.get('source_edb_sha256'):
+            if _sha256(current_edb)!=audit['source_edb_sha256']:
+                return 'DIFFERENT_EDB'
         return 'SAME_EDB_PATH'
     path = Path(str(current_edb))
     if audit.get('source_edb_sha256') and path.is_file():
@@ -122,9 +125,11 @@ def latest_linked_reference(export_dir, state, *, search_dirs=()):
     [REF NBC105-2025 §5.1.2; Excel method decision register] Only SAME or
     BYTE_IDENTICAL EDB identity is returned for automatic filling.
     """
-    from components.inputs.project_workbooks import _source_edb_path, analysis_output_folder
+    from components.inputs.project_workbooks import _source_edb_path, analysis_output_folder, registered_project_source
     dirs = [analysis_output_folder(export_dir, state), *map(Path, search_dirs)]
     found = []
+    registered=registered_project_source(export_dir,'etabs_linked_audit')
+    if registered:found.append(Path(registered))
     for d in dirs:
         if Path(d).is_dir():
             found += list(Path(d).glob(LINKED_PATTERN)) + list(Path(d).glob('*/' + LINKED_PATTERN))
