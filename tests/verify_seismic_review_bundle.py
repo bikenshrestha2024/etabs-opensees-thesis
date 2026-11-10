@@ -48,6 +48,50 @@ class SeismicReviewBundleTests(unittest.TestCase):
             self.assertFalse(manifest["independent_ETABS_response_verified"])
         self.assertTrue(Path(r["folder"]).is_dir())
 
+    def test_current_hash_verified_esm_story_and_node_rows_only(self):
+        import csv
+        from components.validation.etabs_comparison import collect
+        model=self.src/"OpenSees_Complete_Model_Data_V118.json"
+        digest=hashlib.sha256(model.read_bytes()).hexdigest()
+        (self.src/"OpenSees_Element_Connectivity.json").write_text(
+            json.dumps({"source_edb":"D:/Thesis/ULTIMATE LOAD - TEST.EDB",
+                        "node_map":[{"opensees_node_tag":1,
+                                     "etabs_point_name":"P-1"}]}))
+        response=self.out/"NBC105_ESM_OpenSees_Response_ULS_X+_E0.json"
+        response.write_text(json.dumps([{"story_number":3,"height_m":11.2,
+            "response_case":"ULS_X+_E0","U_design_m":.002,
+            "design_drift_ratio":.0003,"story_shear_kN":3000.}]))
+        meta=self.out/"NBC105_ESM_OpenSees_Response_META_ULS_X+_E0.json"
+        meta.write_text(json.dumps({"model_sha256":digest,
+            "limit_state":"ULS","axis":"X","response_case":"ULS_X+_E0"}))
+        node=self.out/"NBC105_ESM_All_Node_Displacements_ULS_X+_E0.csv"
+        with node.open("w",newline="",encoding="utf-8") as f:
+            writer=csv.DictWriter(f,fieldnames=["opensees_node_tag",
+                "etabs_point_name","model_sha256","limit_state","response_case",
+                "du_x_m","design_du_x_m"])
+            writer.writeheader()
+            writer.writerow({"opensees_node_tag":1,"etabs_point_name":"P-1",
+                "model_sha256":digest,"limit_state":"ULS",
+                "response_case":"ULS_X+_E0","du_x_m":.001,
+                "design_du_x_m":.002})
+        issues=[]
+        before=collect(self.src,issues,results_root=self.out)
+        self.assertTrue(any(x["metric"]=="displacement" and
+            x["location"]=="P-1" and x["basis"]=="static_elastic_increment"
+            for x in before))
+        self.assertTrue(any(x["metric"]=="story_shear" and
+            x["basis"]=="applied_floor_force_cumulative_NOT_recovered"
+            for x in before))
+        self.assertFalse(any(x["metric"]=="story_shear" and
+            x["basis"]=="static_design" for x in before))
+        bundle_seismic_review(self.src,self.out,method="ESM")
+        after=collect(self.src,[],results_root=self.out)
+        self.assertEqual(before,after)
+        meta.write_text(json.dumps({"model_sha256":"wrong",
+            "limit_state":"ULS","axis":"X","response_case":"ULS_X+_E0"}))
+        rejected=collect(self.src,[],results_root=self.out)
+        self.assertFalse(any(x["location"]=="3" for x in rejected))
+
     def test_mrsm_no_overwrite_or_archive_recursion(self):
         first=bundle_seismic_review(self.src,self.out,method="MRSM")
         sha=hashlib.sha256(Path(first["zip"]).read_bytes()).hexdigest()
