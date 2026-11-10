@@ -54,6 +54,11 @@ class RepositoryInventoryTests(unittest.TestCase):
                 ["git", "-C", str(root), "add", "components/a.py", "components/b.py"],
                 check=True,
             )
+            subprocess.run(
+                ["git", "-C", str(root), "-c", "user.name=Inventory Test",
+                 "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture"],
+                check=True,
+            )
             out = root / "REPORTS"
             summary = module.generate(root, out)
             self.assertEqual(summary["tracked_file_count"], 2)
