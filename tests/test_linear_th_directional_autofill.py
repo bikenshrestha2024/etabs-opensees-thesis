@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
 import sys
+import ast
 
 from components.inputs.analysis_autofill import populate_linear
 
@@ -124,6 +125,22 @@ class AutoSelectRefreshRegression(unittest.TestCase):
                 }), patch.object(analysis_autofill,"populate_linear") as sync:
                 analysis_autofill.populate_available(app,folder,role="linear_model_script")
             sync.assert_not_called()
+
+
+class TimeHistoryGUIRefreshWiringTests(unittest.TestCase):
+    def test_both_windows_use_one_deferred_refresh_per_model_or_state_change(self):
+        root = Path(__file__).resolve().parents[1]
+        for relative in ("components/linear_time_history/runner_and_gui.py",
+                         "components/nonlinear_time_history/runner_and_gui.py"):
+            with self.subTest(relative=relative):
+                source=(root/relative).read_text(encoding="utf-8-sig")
+                ast.parse(source,filename=relative)
+                self.assertIn("def _queue_period_refresh(self):",source)
+                self.assertIn("def _apply_period_refresh(self):",source)
+                self.assertIn("self.win.after_idle(self._apply_period_refresh)",source)
+                self.assertIn("self.model.trace_add('write',lambda *_:self._queue_period_refresh())",source)
+                self.assertIn("self.ls.trace_add('write',lambda *_:self._queue_period_refresh())",source)
+                self.assertNotIn("self.win.after_idle(lambda:__import__('OpenSees_Linear_Autofill_V124')",source)
 
 
 if __name__ == "__main__":
