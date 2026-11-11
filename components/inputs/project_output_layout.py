@@ -18,6 +18,7 @@ MODULES = (
 
 
 def sha256_file(path):
+    """[REF docs/source/components/inputs/project_output_layout.py.md] File byte digest only."""
     h = hashlib.sha256()
     with Path(path).open("rb") as reader:
         for block in iter(lambda: reader.read(1048576), b""):
@@ -27,7 +28,8 @@ def sha256_file(path):
 
 def create_project_layout(source_edb, selected_output_root, *,
                           create_analysis_directories=True):
-    """Create stable subfolders beneath the exact user-selected output root.
+    """[REF docs/source/components/inputs/project_output_layout.py.md]
+    Create stable subfolders beneath the exact user-selected output root.
 
     Source SHA changes are a blocker: a directory once bound to an EDB cannot
     silently be rebound to a different EDB. An existing legacy result tree is
@@ -78,7 +80,8 @@ def create_project_layout(source_edb, selected_output_root, *,
 
 
 def case_folder(layout, module, case_id, *, limit_state=None):
-    """Resolve a case folder under its canonical module without traversal."""
+    """[REF docs/source/components/inputs/project_output_layout.py.md]
+    Resolve a case folder under its canonical module without traversal."""
     from re import fullmatch
     name = str(module).strip()
     if name not in MODULES:
