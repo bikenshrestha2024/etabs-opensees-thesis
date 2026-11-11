@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from types import SimpleNamespace
+import sys
 
 from components.inputs.analysis_autofill import populate_linear
 
@@ -82,6 +83,47 @@ class LinearAdoptedPeriodTests(unittest.TestCase):
                 populate_linear(app, folder)
             self.assertIn("RESEARCH ONLY", " ".join(imported["notes"]))
             self.assertAlmostEqual(float(app.t1x.get()), 2.0385)
+
+
+class AutoSelectRefreshRegression(unittest.TestCase):
+    def test_successful_autoselect_still_refreshes_both_directional_periods(self):
+        from components.inputs import analysis_autofill
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            model = folder / "OpenSees_Complete_Nonlinear_Model.py"
+            model.write_text("# synthetic offline fixture",encoding="utf-8")
+            app = gui()
+            app.model = Field(str(model))
+            app._output_is_automatic = False
+            app.project_input_audit = {}
+            lines = []
+            app.log = SimpleNamespace(insert=lambda *_args: lines.append(_args))
+            def selector(_gui, _folder, _role):
+                return True  # Regression: previously skipped populate_linear.
+            with patch.dict(sys.modules, {
+                    "OpenSees_Complete_Export_V118":
+                    SimpleNamespace(autoselect_inputs=selector)
+                }), patch.object(analysis_autofill,"populate_linear",
+                    return_value={"values": {}, "notes":["synced T1 X/Y"]}) as sync:
+                analysis_autofill.populate_available(
+                    app,folder,role="nonlinear_model_script")
+            sync.assert_called_once_with(app,folder)
+
+    def test_missing_model_does_not_invent_periods(self):
+        from components.inputs import analysis_autofill
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            app=gui()
+            app.model=Field(str(folder / "absent.py"))
+            app._output_is_automatic=False
+            app.project_input_audit={}
+            app.log=SimpleNamespace(insert=lambda *_args: None)
+            with patch.dict(sys.modules, {
+                    "OpenSees_Complete_Export_V118":
+                    SimpleNamespace(autoselect_inputs=lambda *_: True)
+                }), patch.object(analysis_autofill,"populate_linear") as sync:
+                analysis_autofill.populate_available(app,folder,role="linear_model_script")
+            sync.assert_not_called()
 
 
 if __name__ == "__main__":
