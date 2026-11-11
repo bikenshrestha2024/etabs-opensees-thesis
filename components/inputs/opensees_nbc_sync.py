@@ -158,6 +158,9 @@ def _source_snapshot(export_dir,state):
         'wall_aw_profile':profile,
         'continuous_pier_diagnostic':diagnostic,
         'grouped_wall_aw_review':grouped,
+        'historical_ubc_seaoc_user_example':(
+            __import__('components.inputs.grouped_wall_aw',
+                fromlist=['wall_aw_example']).wall_aw_example()),
         'grouped_wall_aw_error':grouping_error,
         'opening_reduction_audit':(
             opening_reduction_audit(profile,height)
@@ -407,7 +410,24 @@ def export_sync_report(report, output_dir, template=None):
         ('Candidate Aw (m²)',report['aw_candidate_m2']['X'],report['aw_candidate_m2']['Y']),
         ('Evidence status',report['aw_evidence']['X']['status'],report['aw_evidence']['Y']['status']),
         ('Rayleigh period (s)',report['rayleigh_s']['X'],report['rayleigh_s']['Y']),
-        ('REVIEW REQUIRED','Provisional through-height piers are NOT an NBC approved Aw.')
+        ('Continuous-pier diagnostic Aw (m²)',
+         (report.get('continuous_pier_diagnostic') or {}).get('aw_candidate_m2',{}).get('X'),
+         (report.get('continuous_pier_diagnostic') or {}).get('aw_candidate_m2',{}).get('Y')),
+        ('Reviewed source-matched grouped Aw (m²)',
+         (report.get('grouped_wall_aw_review') or {}).get('aw_candidate_m2',{}).get('X'),
+         (report.get('grouped_wall_aw_review') or {}).get('aw_candidate_m2',{}).get('Y')),
+        ('ILLUSTRATIVE example: 4 X doors + 3 solid Y walls (m²)',
+         (report.get('historical_ubc_seaoc_user_example') or {}).get('X'),
+         (report.get('historical_ubc_seaoc_user_example') or {}).get('Y')),
+        ('Grouped wall status',
+         (report.get('grouped_wall_aw_review') or {}).get('status',
+                  'NO_SOURCE_MATCHED_GROUP_MANIFEST'),
+         report.get('grouped_wall_aw_error') or ''),
+        ('REFERENCE: UBC 1997 §1628/§1630.2.2 and SEAOC Vol I Example 19',
+         'Historical net-minimum-area and gross-length analogy, NOT NBC acceptance'),
+        ('REVIEW REQUIRED',
+         'Verify original ULS/SLS EDB, first-storey door/spandrel grouping; '
+         'continuous piers and illustrative values are not accepted NBC Aw.')
     ]
     for row in rows:ws.append(list(row))
     ws.append([])
