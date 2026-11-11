@@ -54,10 +54,11 @@ def classify(path, relative=None):
     if any(x.startswith(("etabs_comparison", "gravity_case_comparison",
                          "gravity_wall_base_comparison")) for x in parts[:-1]):
         return "Comparisons"
-    if any(x.startswith(("mrsm_", "mrsm-")) for x in parts[:-1]):
-        return "MRSM"
+    # Nested modal caches within MRSM case folders remain modal evidence.
     if any(x.startswith(("modal_", "modal-")) for x in parts[:-1]):
         return "Modal"
+    if any(x.startswith(("mrsm_", "mrsm-")) for x in parts[:-1]):
+        return "MRSM"
     if any(x.startswith(("gravity_", "gravity-")) for x in parts[:-1]):
         return "Gravity"
     if any(x.startswith(("etabs_linked_esm", "aw_reconciliation", "nbc105_input_sync"))
