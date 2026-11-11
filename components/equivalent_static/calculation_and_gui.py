@@ -552,9 +552,9 @@ class ESMGui:
                                     ' | manifest '+result['manifest'])
                     messagebox.showinfo(
                         'Organized result ZIPs',
-                        'Upload all modules:\\n'+result['zip_files']['ALL_MODULES']+
-                        '\\n\\nSeparate modules and manifest:\\n'+result['folder']+
-                        '\\n\\nOriginal analysis outputs remain unchanged.',
+                        'Upload all modules:\n'+result['zip_files']['ALL_MODULES']+
+                        '\n\nSeparate modules and manifest:\n'+result['folder']+
+                        '\n\nOriginal analysis outputs remain unchanged.',
                         parent=self.root)
                 self.root.after(0,done)
             except Exception as exc:
