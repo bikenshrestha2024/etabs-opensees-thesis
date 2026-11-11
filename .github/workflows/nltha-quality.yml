@@ -392,6 +392,7 @@ jobs:
           python tests/verify_etabs_direct_equivalence.py
           python tests/verify_audit_repairs_20261105.py
           python tests/verify_mrsm_period_source.py
+          python tests/test_linear_th_directional_autofill.py
           python tests/verify_esm_output_safety.py
           python tests/verify_esm_dual_module.py
           python tests/verify_thesis_evidence_dashboard.py
