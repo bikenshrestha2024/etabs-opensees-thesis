@@ -111,7 +111,7 @@ class GravityAnalysisGUI:
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
         self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
-        self.wall_support_strategy_var=tk.StringVar(value="ETABS Reaction Validation (32 nodes)")
+        self.wall_support_strategy_var=tk.StringVar(value="Primary ETABS-matched set (32 nodes)")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self.gravity_operation_state=tk.StringVar(value="IDLE | No gravity solver or exporter running")
@@ -777,8 +777,8 @@ class GravityAnalysisGUI:
         ttk.Label(wall_row,text="Gravity wall-base supports:").pack(side="left",padx=(0,6))
         ttk.Combobox(wall_row,textvariable=self.wall_support_strategy_var,
             state="readonly",width=38,
-            values=("ETABS Reaction Validation (32 nodes)","ETABS Node Position (76 nodes)","Continuous Wall Base (97 nodes)")).pack(side="left")
-        ttk.Label(wall_row,text="Nonzero ETABS reaction = diagnostic only; node position retains 76 original supports; separate 97-node continuous case remains unchanged.",
+            values=("Primary ETABS-matched set (32 nodes)","ETABS Node Position (76 nodes)","Continuous Wall Base (97 nodes)")).pack(side="left")
+        ttk.Label(wall_row,text="32 mapped nodes = PRIMARY selected comparison case (individual reaction equivalence NOT certified); 76 original support locations and 97 continuous supports are distinct sensitivity cases.",
                   wraplength=485).pack(side="left",padx=8)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
@@ -827,7 +827,7 @@ class GravityAnalysisGUI:
                           "Select matching ETABS gravity results JSON", [("JSON", "*.json")]))
         ttk.Button(form, text="Read BOTH support lists and gravity load (original ETABS table required for reaction filter)", command=self._read_code_inputs).pack(anchor="w", pady=(4, 2))
         separate=ttk.Frame(form);separate.pack(fill="x",pady=(3,2))
-        ttk.Label(separate,text="ETABS Reaction Validation — nonzero FZ diagnostic").grid(row=0,column=0,sticky="w",padx=4)
+        ttk.Label(separate,text="Primary ETABS-matched support set — 32 selected nodes").grid(row=0,column=0,sticky="w",padx=4)
         ttk.Entry(separate,textvariable=self.reaction_support_var,width=98,state="readonly").grid(row=0,column=1,sticky="ew",padx=4)
         ttk.Label(separate,textvariable=self.reaction_support_verification_var,wraplength=300).grid(row=0,column=2,sticky="w",padx=4)
         ttk.Label(separate,text="ETABS Node Position — original 76 mapped supports").grid(row=1,column=0,sticky="w",padx=4)
@@ -840,7 +840,7 @@ class GravityAnalysisGUI:
         ttk.Entry(inputs, textvariable=self.load_var, width=16, state="readonly").grid(row=0, column=3, sticky="w", padx=4)
         ttk.Label(inputs, text="Support case (solved reaction)").grid(row=1, column=0, sticky="w", padx=4, pady=(5,0))
         ttk.Combobox(inputs, textvariable=self.wall_support_strategy_var, state="readonly", width=39,
-            values=("ETABS Reaction Validation (32 nodes)",
+            values=("Primary ETABS-matched set (32 nodes)",
                     "ETABS Node Position (76 nodes)",
                     "Continuous Wall Base (97 nodes)")).grid(row=1, column=1, sticky="w", padx=4, pady=(5,0))
         ttk.Label(inputs, text="Solved vertical support reaction (kN)").grid(
@@ -1076,8 +1076,9 @@ class GravityAnalysisGUI:
         [REF docs/review/GRAVITY_ETABS_COMPARISON.md]
         """
         return {
-            "ETABS Reaction Validation (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+            "Primary ETABS-matched set (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
             "ETABS Reaction Validation": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+            "ETABS Reaction Validation (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
             "ETABS Node Position (76 nodes)": "ETABS_SOURCE_SUPPORTS",
             "ETABS Node Position / Continuous": "ETABS_SOURCE_SUPPORTS",
             "Continuous Wall Base (97 nodes)": "CONTINUOUS_WALL_BASE_FIXED",
@@ -1104,7 +1105,7 @@ class GravityAnalysisGUI:
                  "restraints?\n\n"
                  "1) ETABS Node Position (original 76 supports)\n"
                  "2) Continuous Wall Base (97 supports)\n\n"
-                 "The separate ETABS Reaction Validation diagnostic is RUN individually.\n\n"
+                 "The primary 32-node ETABS-matched case is RUN individually; physical equivalence remains unverified.\n\n"
                  "The second case is a foundation boundary-condition sensitivity "
                  "study, NOT a validated raft/soil model. Existing results are "
                  "not overwritten.",parent=self.win):
