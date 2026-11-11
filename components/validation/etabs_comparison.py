@@ -284,7 +284,18 @@ def launch(parent,folder,results_root=None):
               else save(folder,results_root=results_root)))
    tree.delete(*tree.get_children())
    for r in rows:tree.insert('','end',values=[r.get(c,'') for c in cols])
-   status.set(str(len(rows))+' saved quantities. Template and report: '+str(out))
+   if not rows:
+    audit=out/'Comparison_Source_Exclusions.json'
+    reasons=json.loads(audit.read_text(encoding='utf-8')) if audit.is_file() else []
+    status.set('NO COMPARABLE SAVED RESULTS. Check model SHA256, limit state, response-run completion and export folder. Exclusions: '+str(audit))
+    tree.insert('','end',values=('NO_DATA','','','','','No source-matched OpenSees responses','','','', '', '', 'NOT_COMPARABLE'))
+    (out/'NO_COMPARABLE_RESULTS.txt').write_text(
+        'No source-model and limit-state-matched OpenSees response was imported.\\n'
+        'Do not interpret an empty comparison as zero structural response.\\n'
+        'Check excluded files in Comparison_Source_Exclusions.json.\\n'
+        'Reasons: '+json.dumps(reasons,indent=2),encoding='utf-8')
+   else:
+    status.set(str(len(rows))+' saved quantities. Template and report: '+str(out))
   except Exception as e:messagebox.showerror('Comparison inputs',str(e),parent=win)
  def plot():
   selected=tree.selection()
@@ -294,6 +305,9 @@ def launch(parent,folder,results_root=None):
         latest['rows'] if latest['rows'] is not None
         else save(folder,results_root=results_root)[0])
   subset=[r for r in rows if all(str(r.get(k,''))==key[cols.index(k)] for k in ('method','limit_state','case','axis','metric','unit','basis'))]
+  if not subset:
+   messagebox.showwarning('No solved response','No verified source-matched response series for this selection. Review Comparison_Source_Exclusions.json; do not plot invented zeros.',parent=win)
+   return
   from matplotlib.figure import Figure
   from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg,NavigationToolbar2Tk
   panel=tk.Toplevel(win);panel.title('Exact case comparison: '+key[2]);panel.geometry('950x650');fig=Figure(figsize=(9,6),layout='constrained');ax=fig.add_subplot();x=list(range(len(subset)));ax.plot(x,[r['value'] for r in subset],marker='o',label='OpenSees')
