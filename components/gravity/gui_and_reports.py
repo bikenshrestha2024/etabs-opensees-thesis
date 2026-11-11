@@ -167,6 +167,112 @@ class GravityAnalysisGUI:
         except (OSError, ValueError) as exc:
             messagebox.showerror('Saved gravity case', str(exc), parent=self.win)
 
+    def _select_reaction_nodes(self):
+        """Inspect and export an exact subset of SAVED support reactions.
+
+        This viewer never changes restraint topology or re-solves gravity.
+        Unselected nodes remain in the original immutable run JSON.
+        """
+        try:
+            result = self._selected_result_path()
+            payload = json.loads(result.read_text(encoding="utf-8-sig"))
+            reactions = payload.get("reactions", [])
+            if not reactions:
+                raise ValueError("Selected gravity result contains no support reactions.")
+            import csv
+            from matplotlib.figure import Figure
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+            win = tk.Toplevel(self.win)
+            win.title("Select gravity reaction nodes — saved solution only")
+            win.geometry("1040x720")
+            toolbar = ttk.Frame(win)
+            toolbar.pack(fill="x", padx=8, pady=6)
+            query = tk.StringVar()
+            ttk.Label(toolbar, text="Search node tag").pack(side="left")
+            ttk.Entry(toolbar, textvariable=query, width=22).pack(side="left", padx=4)
+            node_list = tk.Listbox(win, selectmode="extended", exportselection=False,
+                                   height=10)
+            sy = ttk.Scrollbar(win, orient="vertical", command=node_list.yview)
+            node_list.configure(yscrollcommand=sy.set)
+            sy.pack(side="right", fill="y")
+            node_list.pack(fill="x", padx=8, pady=4)
+            ordered = sorted(reactions, key=lambda r: int(r["node_tag"]))
+            visible = []
+            selected_tags = set()
+            def refresh(*_):
+                selected_tags.update(
+                    int(visible[i]["node_tag"]) for i in node_list.curselection())
+                node_list.delete(0, "end")
+                visible.clear()
+                for row in ordered:
+                    tag = int(row["node_tag"])
+                    if query.get().strip().casefold() not in str(tag).casefold():
+                        continue
+                    visible.append(row)
+                    node_list.insert("end", f"Node {tag}  Rz={float(row['rz_kN']):.5g} kN")
+                for i, row in enumerate(visible):
+                    if int(row["node_tag"]) in selected_tags:
+                        node_list.selection_set(i)
+            query.trace_add("write", refresh)
+            refresh()
+            plot_host = ttk.Frame(win)
+            plot_host.pack(fill="both", expand=True, padx=8, pady=6)
+            controls = ttk.Frame(win)
+            controls.pack(fill="x", padx=8, pady=6)
+            def choose_all():
+                node_list.selection_set(0, "end")
+                selected_tags.update(int(row["node_tag"]) for row in visible)
+            def clear_all():
+                selected_tags.clear()
+                node_list.selection_clear(0, "end")
+            def selected():
+                selected_tags.update(int(visible[i]["node_tag"]) for i in node_list.curselection())
+                return [r for r in ordered if int(r["node_tag"]) in selected_tags]
+            def draw():
+                rows = selected()
+                if not rows:
+                    messagebox.showwarning("Select nodes", "Select at least one support node.", parent=win)
+                    return
+                for child in plot_host.winfo_children():
+                    child.destroy()
+                fig = Figure(figsize=(10, 5), layout="constrained")
+                ax = fig.add_subplot()
+                tags = [int(r["node_tag"]) for r in rows]
+                ax.bar(range(len(rows)), [float(r["rz_kN"]) for r in rows])
+                ax.set_xticks(range(len(rows)), [str(t) for t in tags], rotation=80)
+                ax.set(xlabel="OpenSees support node tag",
+                       ylabel="Rz (kN)", title="Saved gravity — selected node reactions")
+                ax.grid(axis="y", alpha=0.25)
+                canvas = FigureCanvasTkAgg(fig, master=plot_host)
+                canvas.get_tk_widget().pack(fill="both", expand=True)
+                NavigationToolbar2Tk(canvas, plot_host)
+                canvas.draw()
+            def export():
+                rows = selected()
+                if not rows:
+                    messagebox.showwarning("Select nodes", "No selected nodes to export.", parent=win)
+                    return
+                from tkinter import filedialog
+                target = filedialog.asksaveasfilename(
+                    parent=win, defaultextension=".csv",
+                    initialfile="Gravity_Selected_Node_Reactions.csv",
+                    filetypes=[("CSV", "*.csv")])
+                if not target:
+                    return
+                with open(target, "w", newline="", encoding="utf-8-sig") as h:
+                    writer = csv.DictWriter(
+                        h, fieldnames=["node_tag", "rx_kN", "ry_kN", "rz_kN"])
+                    writer.writeheader()
+                    writer.writerows({k: r.get(k, "") for k in writer.fieldnames}
+                                     for r in rows)
+            ttk.Button(controls, text="Select all filtered", command=choose_all).pack(side="left")
+            ttk.Button(controls, text="Clear selection", command=clear_all).pack(side="left")
+            ttk.Button(controls, text="Plot selected nodes", command=draw).pack(side="left")
+            ttk.Button(controls, text="Export selected CSV", command=export).pack(side="left")
+            ttk.Label(controls, text="Source: saved run, not ETABS-validated").pack(side="right")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            messagebox.showerror("Reaction node viewer", str(exc), parent=self.win)
+
     def _compare_three_saved_cases(self):
         """Review 32/76/97 as distinct solver states; never change model restraints."""
         try:
@@ -1016,6 +1122,8 @@ class GravityAnalysisGUI:
         ttk.Label(root, textvariable=self.status_var,wraplength=1100).pack(fill="x",pady=(0,5))
         self.nb = ttk.Notebook(root); self.nb.pack(fill="both", expand=True)
         self.plot_tab = ttk.Frame(self.nb); self.nb.add(self.plot_tab, text="Matplotlib results")
+        ttk.Button(self.plot_tab, text="Select support nodes / plot saved Rz",
+                   command=self._select_reaction_nodes).pack(anchor="w", padx=5, pady=3)
         self.storey_tab = ttk.Frame(self.nb); self.nb.add(self.storey_tab,text="Storey load breakdown")
         ttk.Button(self.storey_tab,text="Load / refresh storey ledger",command=self._show_storey_loads).pack(anchor="w")
         ttk.Button(self.storey_tab,text="Plot classified loads / filter source detail",command=lambda:__import__('OpenSees_Gravity_Source_Review_V133').launch(self.win,Path(self.model_var.get()).parent)).pack(anchor="w")
