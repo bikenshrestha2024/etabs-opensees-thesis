@@ -8,6 +8,7 @@ import math
 
 
 def verify_storey_coverage(model_diaphragms, ledger_rows):
+    """[REF docs/source/components/modal/rayleigh_ledger_audit.py.md] Source contract and engineering limitations in linked guide."""
     """Reject stale, incomplete, duplicated or mismapped Rayleigh ledgers."""
     expected = [(int(d["storey_number"]), int(d["master_tag"])) for d in model_diaphragms]
     actual = [(int(r["story_number"]), int(r["master_node_tag"])) for r in ledger_rows]
@@ -26,6 +27,7 @@ def verify_storey_coverage(model_diaphragms, ledger_rows):
 
 
 def verify_rayleigh_sum(rows, *, g=9.81):
+    """[REF docs/source/components/modal/rayleigh_ledger_audit.py.md] Source contract and engineering limitations in linked guide."""
     """Recalculate Rayleigh T from all participating storeys in SI units.
 
     Each row has weight_kN, force_kN and incremental displacement_m.
