@@ -112,6 +112,54 @@ def _registered_source(runtime_root, edb, role, export_dir=None):
     return None
 
 
+def audit_optional_gui_workbooks(runtime_root, export_dir, edb, *, log=None):
+    """Noninteractive audit only; conversion is driven by the immutable EDB.
+
+    A registered workbook with a mismatched SHA is NEVER accepted. This
+    preflight only records evidence availability. Missing optional Excel data
+    cannot stop ETABS OAPI conversion or be mislabeled native validation.
+    """
+    runtime_root = Path(runtime_root).resolve()
+    export_dir = Path(export_dir).resolve()
+    edb = Path(edb).resolve()
+    if not edb.is_file():
+        raise FileNotFoundError("Selected source EDB does not exist: " + str(edb))
+    sha = digest(edb)
+    roles = ("etabs_full_table", "etabs_assignment", "nbc_calculator", "slab_load_path")
+    rows = {}
+    for role in roles:
+        found = _registered_source(runtime_root, edb, role, export_dir)
+        if found is None:
+            rows[role] = {"status": "NOT_REGISTERED_OPTIONAL"}
+            continue
+        path, expected, registry, edb_hash = found
+        if edb_hash != sha:
+            raise ValueError("EDB SHA changed during source audit")
+        if not path.is_file():
+            status = "MISSING_OPTIONAL_WORKBOOK"
+        elif is_lfs_pointer(path):
+            status = "GIT_LFS_POINTER_ONLY"
+        elif digest(path) != expected:
+            status = "SHA256_MISMATCH_NOT_ACCEPTED"
+        else:
+            status = "SHA256_VERIFIED"
+        rows[role] = {"status": status, "registry": str(registry),
+                      "expected_sha256": expected}
+        if log:
+            log("[OPTIONAL_WORKBOOK] " + role + ": " + status)
+    result = {"source_edb_sha256": sha, "roles": rows,
+              "evidence_status": ("AVAILABLE" if all(
+                  r["status"] == "SHA256_VERIFIED" for r in rows.values()
+              ) else "INCOMPLETE_OPTIONAL_GRAVITY_VALIDATION"),
+              "conversion_blocked": False}
+    # A private sidecar preserves source identity without copying original
+    # ETABS or Excel bytes into the public Git repository.
+    export_dir.mkdir(parents=True, exist_ok=True)
+    target = export_dir / "Optional_Workbook_Conversion_Audit.json"
+    target.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    return result
+
+
 def ensure_gui_workbooks(runtime_root, export_dir, edb, *, parent, log=None):
     """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md]
 
