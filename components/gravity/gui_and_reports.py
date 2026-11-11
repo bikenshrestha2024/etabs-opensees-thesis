@@ -540,6 +540,41 @@ class GravityAnalysisGUI:
         p = filedialog.askopenfilename(parent=self.win, title=title, filetypes=filetypes)
         if p: variable.set(p)
 
+    def _organize_existing_gravity_cases(self):
+        """[REF docs/source/components/gravity/reaction_case_registry.py.md]
+        Publish previously solved cases without re-running any structural solver.
+        """
+        try:
+            from components.gravity.reaction_case_registry import (
+                SCENARIO_SUPPORTS, current_case, publish_gravity_case_index)
+            model = self.model_var.get().strip()
+            if not model or not Path(model).is_file():
+                raise ValueError("Select the original completed generated gravity model.")
+            root = Path(self.output_var.get()).expanduser().resolve()
+            profiles = ("GRAVITY_1.0D_1.0L", "AS_CONFIGURED")
+            published = []
+            for profile in profiles:
+                for scenario in SCENARIO_SUPPORTS:
+                    record = current_case(root, model, scenario=scenario,
+                                          profile=profile)
+                    if record:
+                        published.append(str(publish_gravity_case_index(root, record)))
+            if not published:
+                raise ValueError("No matching 32/76/97 source-hash verified "
+                                 "saved cases in the selected output root.")
+            self._gravity_action_log("GRAVITY_ORGANIZED_INDEX",
+                                     "\\n".join(published))
+            self.status_var.set(f"Organized {len(published)} saved gravity cases; "
+                                "original large solver files remain unchanged.")
+            messagebox.showinfo("Gravity case folders created",
+                "Organized case indexes and lightweight preview plots:\\n" +
+                "\\n".join(published) +
+                "\\n\\nFull solver files remain at their registered source paths.",
+                parent=self.win)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            messagebox.showerror("Organize gravity cases", str(exc),
+                                 parent=self.win)
+
     def _selected_result_path(self):
         """Resolve the selected model/profile/support case through its checked index.
 
@@ -1113,6 +1148,8 @@ class GravityAnalysisGUI:
                    command=self._compare_three_saved_cases).pack(side="left",padx=4)
         ttk.Button(review,text="Export member-action PDF pages",
                    command=self._export_all_pages).pack(side="left",padx=4)
+        ttk.Button(review,text="Organize existing 32 / 76 / 97 outputs",
+                   command=self._organize_existing_gravity_cases).pack(side="left",padx=4)
         validation=action_row(actions)
         ttk.Button(validation,text="Audit support DOFs / rigid end zones",
                    command=self._audit_native_equivalence).pack(side="left",padx=4)
