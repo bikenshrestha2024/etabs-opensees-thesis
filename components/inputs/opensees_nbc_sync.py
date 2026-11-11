@@ -381,6 +381,53 @@ def read_etabs_wall_profile(export_dir, *, sap=None):
             except Exception:pass
 
 
+def export_wall_grouping_review_template(export_dir, state):
+    """[REF docs/source/components/inputs/grouped_wall_aw.py.md]
+    Export source-matched *unapproved* wall grouping template for review.
+    The auto-consumed manifest has a different filename: this operation
+    never creates or approves wall groups on the engineer's behalf.
+    """
+    from components.inputs.grouped_wall_aw import INPUT_NAME
+    snap=_source_snapshot(export_dir, state)
+    source=Path(snap['source_edb'])
+    if not source.is_file():
+        raise FileNotFoundError("Original selected EDB must exist locally")
+    profile=snap.get('wall_aw_profile')
+    if not profile or not profile.get('rows'):
+        raise ValueError("No first-storey wall slices were exported for grouping review")
+    out=Path(export_dir)/"REVIEW_MAIN"/"02_ESM"
+    out.mkdir(parents=True, exist_ok=True)
+    destination=out/"NBC105_Wall_Grouping_TEMPLATE.json"
+    if destination.exists():
+        raise FileExistsError("Existing grouping template retained: "+str(destination))
+    payload={
+        "classification": "UNREVIEWED_TEMPLATE_DO_NOT_AUTO_ADOPT",
+        "instructions": (
+            "Inspect each first-storey slice and map each structural wall as "
+            "one whole connected wall group with axis/plane/thickness/start/end. "
+            "Do not assume two piers are coupled solely because close together. "
+            "Validate doorway positions and head spandrels from native EDB. "
+            "When genuinely verified, copy only required input keys to " +
+            INPUT_NAME + " at the selected ETABS export root. "
+            "Source-matched grouping still requires professional acceptance."
+        ),
+        "source_edb_sha256": _hash(source),
+        "assembled_model_sha256": snap["assembled_model_sha256"],
+        "limit_state": state,
+        "height_m": float(snap['seismic_height_m']),
+        "wall_groups": [],
+        "source_slice_geometry_for_manual_mapping": profile['rows'],
+        "historical_reference_example": snap.get('historical_ubc_seaoc_user_example'),
+        "diagnostic_continuous_pier": snap.get('continuous_pier_diagnostic'),
+    }
+    # _source_snapshot only exports code-adopted roof/storey H on a complete model.
+    # A first-storey height is NOT a valid replacement for full building H.
+    if not snap.get('wall_aw_profile'):
+        raise ValueError("Cannot establish wall profile")
+    destination.write_text(json.dumps(payload,indent=2),encoding="utf-8")
+    return destination
+
+
 def export_sync_report(report, output_dir, template=None):
     """Write local JSON + a NEW Excel copy; original source never overwritten."""
     from openpyxl import Workbook,load_workbook
