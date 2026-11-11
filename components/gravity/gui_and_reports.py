@@ -128,6 +128,10 @@ class GravityAnalysisGUI:
         self.wall_support_strategy_var.trace_add(
             "write", lambda *_: self._read_code_inputs(show_error=False)
             if self.model_var.get() else self._refresh_case_reaction())
+        self.wall_support_strategy_var.trace_add(
+            "write", lambda *_: self.gravity_plot_identity.set(
+                "SELECTION CHANGED — plots below may belong to a PREVIOUS setup. "
+                "Click Load selected setup plots before interpreting any figure."))
         self.output_var.trace_add("write", lambda *_: self._refresh_case_reaction())
         self.model_var.trace_add("write", lambda *_: self._refresh_case_reaction())
         self.model_var.trace_add("write", lambda *_: self._populate_registered_sources())
@@ -157,6 +161,19 @@ class GravityAnalysisGUI:
             result = self._selected_result_path()
             from OpenSees_Research_UI_V123 import gravity_figures, embed_figures
             payload = json.loads(result.read_text(encoding='utf-8-sig'))
+            scenario=self._selected_wall_support_strategy()
+            expected={"ETABS_NONZERO_REACTION_DIAGNOSTIC":32,
+                      "ETABS_SOURCE_SUPPORTS":76,
+                      "CONTINUOUS_WALL_BASE_FIXED":97}[scenario]
+            actual=len(payload.get("reactions", []))
+            if payload.get("wall_support_strategy") != scenario or actual != expected:
+                raise ValueError("Stored case is not the selected support setup: "
+                                 f"requested={scenario}/{expected}, solved="
+                                 f"{payload.get('wall_support_strategy')}/{actual}")
+            self.gravity_plot_identity.set(
+                f"SAVED CASE: {scenario} | {actual} supports | "
+                f"gravity={payload.get('gravity_profile')} | source={result} | "
+                "numerical solve only; ETABS equivalence is NOT certified")
             # Plot generation also writes PNG/PDF: keep saved run evidence intact.
             import tempfile
             with tempfile.TemporaryDirectory(prefix='gravity_view_') as temporary:
@@ -1126,8 +1143,21 @@ class GravityAnalysisGUI:
         # Keep selector controls in a persistent parent ABOVE that canvas host.
         plot_toolbar = ttk.Frame(self.plot_tab)
         plot_toolbar.pack(fill="x", padx=5, pady=3)
+        ttk.Label(plot_toolbar, text="Display saved setup:").pack(side="left", padx=(0, 5))
+        ttk.Combobox(plot_toolbar, textvariable=self.wall_support_strategy_var,
+            values=("Primary ETABS-matched set (32 nodes)",
+                    "ETABS Node Position (76 nodes)",
+                    "Continuous Wall Base (97 nodes)"),
+            state="readonly", width=38).pack(side="left", padx=4)
+        ttk.Button(plot_toolbar, text="Load selected setup plots",
+                   command=self._view_saved_case).pack(side="left", padx=4)
         ttk.Button(plot_toolbar, text="Select support nodes / plot saved Rz",
-                   command=self._select_reaction_nodes).pack(side="left")
+                   command=self._select_reaction_nodes).pack(side="left", padx=4)
+        self.gravity_plot_identity = tk.StringVar(
+            value="Choose 32 / 76 / 97 and load a completed case. "
+                  "Different support sets are NOT equivalent physical boundary conditions.")
+        ttk.Label(self.plot_tab, textvariable=self.gravity_plot_identity,
+                  foreground="#9a3412", wraplength=1080).pack(fill="x", padx=8)
         self.plot_canvas_frame = ttk.Frame(self.plot_tab)
         self.plot_canvas_frame.pack(fill="both", expand=True)
         self.storey_tab = ttk.Frame(self.nb); self.nb.add(self.storey_tab,text="Storey load breakdown")
