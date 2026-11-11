@@ -173,6 +173,9 @@ on:
       - 'docs/validation/etabs_direct/**'
       - 'components/equivalent_static/calculation_and_gui.py'
       - 'components/inputs/project_workbooks.py'
+      - 'components/inputs/project_output_layout.py'
+      - 'components/inputs/lfs_workbook_recovery.py'
+      - 'tests/test_project_output_layout_v171.py'
       - 'tests/test_project_source_reuse.py'
       - 'tests/test_excel_publication.py'
       - 'components/inputs/etabs_periods.py'
@@ -385,6 +388,7 @@ jobs:
           python tests/verify_review_ledger.py
           python tests/verify_section_tags.py
           python tests/verify_ref_tags.py
+          python -m unittest discover -s tests -p 'test_project_output_layout_v171.py' -v
           MPLBACKEND=Agg python tests/verify_plot_and_dashboard.py
           # Native checks are SKIPPED (not passed) when OpenSeesPy is absent.
           python tests/verify_damping_regions.py
