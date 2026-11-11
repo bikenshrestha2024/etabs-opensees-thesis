@@ -371,6 +371,22 @@ def launch(parent,folder):
                 append('[MRSM_REVIEW_PACKAGING_FAILED] '+str(exc)+'\n')
         threading.Thread(target=worker,daemon=True).start()
     ttk.Button(actions,text='Export full evidence ZIP',command=export_zip).pack(side='left')
+    def export_organized_zip():
+        """[REF docs/source/components/ui/organized_results.py.md] Keep legacy MRSM paths."""
+        def worker():
+            try:
+                from components.ui.organized_results import publish_organized_results
+                selected=analysis_output_folder(folder,fields['limit_state'].get())
+                result=publish_organized_results(selected)
+                append('[ORGANIZED_ALL_MODULE_ZIP] '+
+                       result['zip_files']['ALL_MODULES']+'\\n')
+                append('[ORGANIZED_MANIFEST] '+result['manifest']+'\\n')
+            except Exception as exc:
+                append('[ORGANIZED_EXPORT_FAILED] '+str(exc)+'\\n')
+        threading.Thread(target=worker,daemon=True).start()
+    ttk.Button(actions,text='Export organized module ZIPs',
+               command=export_organized_zip).pack(side='left',padx=4)
+
     # [REF components/ui/output_folder.py] shared output-folder action.
     from components.ui.output_folder import add_open_output_button
     add_open_output_button(actions,lambda:str(output),window=win)
