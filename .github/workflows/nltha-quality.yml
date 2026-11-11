@@ -338,6 +338,8 @@ jobs:
           if-no-files-found: warn
       - name: Run non-native NLTHA and device quality checks
         run: |
+          mkdir -p audit
+          exec > >(tee audit/nltha_quality.log) 2>&1
           export PYTHONPATH="$PWD"
           python tests/verify_thesis_nltha_quality.py
           python tests/verify_v169_wall_triage_evidence.py
@@ -441,3 +443,11 @@ jobs:
           python tests/verify_expanded_workbench_tabs.py
           python tests/verify_readiness_dashboard.py
           python -m pytest tests/test_project_source_reuse.py tests/test_excel_publication.py -q
+
+      - name: Archive non-native quality failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nltha-python-quality-diagnostics
+          path: audit/nltha_quality.log
+          if-no-files-found: warn
