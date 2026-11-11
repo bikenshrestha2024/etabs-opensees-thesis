@@ -82,6 +82,32 @@ class TestGroupedWallArea(unittest.TestCase):
         self.assertAlmostEqual(result["aw_candidate_m2"]["X"],
                                100 * .6 * (.2 + .9**2))
 
+    def test_template_export_never_creates_approval_manifest(self):
+        from unittest.mock import patch
+        from components.inputs.opensees_nbc_sync import export_wall_grouping_review_template
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            edb = root / "active.EDB"
+            edb.write_bytes(b"source bytes")
+            snapshot = {
+                "source_edb": str(edb),
+                "assembled_model_sha256": "b"*64,
+                "wall_aw_profile": self.profile,
+                "wall_aw_height_m": 95.,
+                "historical_ubc_seaoc_user_example": wall_aw_example(),
+                "continuous_pier_diagnostic": _continuous_wall_pier_diagnostic(95, self.profile),
+            }
+            with patch("components.inputs.opensees_nbc_sync._source_snapshot", return_value=snapshot):
+                template = export_wall_grouping_review_template(root, "ULS")
+            payload = json.loads(template.read_text())
+            self.assertEqual(payload["wall_groups"], [])
+            self.assertEqual(payload["height_m"], 95)
+            self.assertTrue(payload["source_slice_geometry_for_manual_mapping"])
+            self.assertFalse((root / INPUT_NAME).exists())
+            with patch("components.inputs.opensees_nbc_sync._source_snapshot", return_value=snapshot):
+                with self.assertRaises(FileExistsError):
+                    export_wall_grouping_review_template(root, "ULS")
+
     def test_zero_or_full_opening_rejected(self):
         with self.assertRaises(ValueError):
             wall_aw_example(opening_width_m=6)
