@@ -800,7 +800,7 @@ class NonlinearTimeHistoryGUI:
         self.x_count = ttk.Label(xrow, text=f"{len(self.x_record_paths)} files selected (SeismoMatch PEER text)")
         self.x_count.pack(side="left", fill="x", expand=True)
         ttk.Button(xrow, text="Select X records…", command=self._select_x_records).pack(side="left", padx=(5, 0))
-        self._entry(inputs, "Common X record scale factor", self.x_scale)
+        ttk.Button(inputs, text="Inspect exact selected X/Y record durations (read-only)",\n                   command=self._show_record_durations).pack(anchor="w", pady=(3, 5))\n        self._entry(inputs, "Common X record scale factor", self.x_scale)
         ttk.Label(inputs, text="X-only screening remains available separately; those records are not substituted for missing Y components. Pair defaults preserve the user-supplied PEER/SeismoMatch time histories and parse each component's own time step and units.", wraplength=1040, foreground="#45556b").pack(anchor="w", pady=(2, 5))
         self._entry(inputs, "Story master-node CSV", self.stories, lambda: self._browse(self.stories, "file", "Select story master-node mapping"))
         self._entry(inputs, "NLTHA readiness manifest", self.readiness, lambda: self._browse(self.readiness, "file", "Select completed OpenSees_Model_Readiness_V116.json"))
@@ -880,6 +880,70 @@ class NonlinearTimeHistoryGUI:
             populate_spectrum(app,self)
         except Exception as exc:
             messagebox.showerror("NBC spectrum tool", f"Could not open the V115 site-spectrum module:\n{exc}", parent=self.win)
+
+    def _show_record_durations(self):
+        """Preview actual record durations without starting or approving NLTHA.
+
+        Uses the same PEER/SeismoMatch parser as the solver; duration is
+        (sample_count - 1) * sample_interval, not NPTS * DT. The two
+        component durations remain distinct; an XY/YX case covers the
+        longer component interval and must not silently trim or pad inputs.
+        """
+        from tkinter.scrolledtext import ScrolledText
+        try:
+            x_only = self.motion_mode.get() == LTH_X_ONLY_MODE
+            config = {
+                "motion_mode": "X_ONLY_SCREENING" if x_only else "PAIRED_3D",
+                "peer_x_paths": self.x_record_paths,
+                "x_scale_factor": float(self.x_scale.get()),
+                "pair_scale_factor": float(self.pair_scale.get()),
+                "use_preloaded_peer_pairs": not x_only and not self.manifest.get().strip(),
+                "peer_pairs": LTH_DEFAULT_PEER_PAIRS,
+                "motion_manifest": self.manifest.get().strip(),
+                "story_nodes_csv": self.stories.get().strip(),
+                "model_script": self.model.get().strip(),
+                "torsion_sensitive": True,
+                "preliminary_selection": True,
+            }
+            if not x_only:
+                config.update(self.pair_selector.config())
+            if not config["story_nodes_csv"]:
+                raise ValueError("Select the story master-node CSV first; the shared input preflight needs it.")
+            motions, _ = _read_inputs(config)
+            lines = ["READ-ONLY GROUND MOTION DURATION AUDIT",
+                     "Duration = (NPTS - 1) × DT. No record editing, trimming or scaling.",
+                     "These are input durations, not completed analysis durations.", ""]
+            for motion in motions:
+                nx = len(motion["x"])
+                dx = float(motion["dt_x"])
+                tx = (nx - 1) * dx
+                lines.append(f"{motion['pair_id']} | X: NPTS={nx}, DT={dx:.8g} s, duration={tx:.6f} s")
+                if motion.get("mode") != "X_ONLY":
+                    ny = len(motion["y"])
+                    dy = float(motion["dt_y"])
+                    ty = (ny - 1) * dy
+                    lines.append(f"    Y: NPTS={ny}, DT={dy:.8g} s, duration={ty:.6f} s | "
+                                 f"XY/YX case interval={max(tx, ty):.6f} s")
+                    if abs(tx - ty) > max(dx, dy):
+                        lines.append("    REVIEW: X/Y durations differ; verify pair provenance and end behavior.")
+                requested = float(self.trial_duration.get())
+                analyzed, full, status = _analysis_duration_s(
+                    motion, "X_ONLY" if motion.get("mode") == "X_ONLY" else "XY", requested)
+                lines.append(f"    Planned analysis={analyzed:.6f} s / full={full:.6f} s | {status}")
+                lines.append("")
+            dialog = tk.Toplevel(self.win)
+            dialog.title("NLTHA — verified component and pair record durations")
+            dialog.geometry("900x580")
+            view = ScrolledText(dialog, wrap="none", font=("Consolas", 10))
+            view.pack(fill="both", expand=True, padx=8, pady=8)
+            view.insert("1.0", "\\n".join(lines))
+            view.configure(state="disabled")
+            ttk.Button(dialog, text="Copy duration audit",
+                       command=lambda: (dialog.clipboard_clear(),
+                                        dialog.clipboard_append("\\n".join(lines)))).pack(pady=4)
+            ttk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=4)
+        except Exception as exc:
+            messagebox.showerror("Ground-motion duration preflight", str(exc), parent=self.win)
 
     def _select_x_records(self):
         paths = filedialog.askopenfilenames(title="Select matched X-direction SeismoMatch / PEER text records", parent=self.win, filetypes=[("Earthquake text records", "*.txt *.AT2 *.at2"), ("All files", "*.*")])
