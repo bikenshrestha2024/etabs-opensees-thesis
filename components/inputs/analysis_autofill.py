@@ -11,7 +11,7 @@ def populate_linear(gui, folder):
     from OpenSees_Project_Inputs_V123 import import_project_inputs
     folder=Path(folder)
     for attr in ('t1x','t1y','p1','p2','tnx','tny'):getattr(gui,attr).set('')
-    inputs=import_project_inputs(Path(__file__).parent,folder,gui.ls.get())
+    inputs=import_project_inputs(Path(__file__).resolve().parents[2],folder,gui.ls.get())
     gui.project_input_audit=inputs;v=inputs['values']
     for axis in ('x','y'):
         value=v.get('workbook_adopted_t'+axis)
@@ -129,7 +129,7 @@ def populate_available(gui,folder=None,role='linear_model_script'):
 
 def populate_site(app,folder=None):
     from OpenSees_Project_Inputs_V123 import import_project_inputs
-    folder=Path(folder or r'D:/Thesis Opensees/Etabs Nodes Export');inputs=import_project_inputs(Path(__file__).parent,folder);v=inputs['values']
+    folder=Path(folder or r'D:/Thesis Opensees/Etabs Nodes Export');inputs=import_project_inputs(Path(__file__).resolve().parents[2],folder);v=inputs['values']
     if hasattr(app,'omegas') and 'omegas' in v:app.omegas.set(str(v['omegas']))
     for target,source in [('soil','soil'),('z','Z'),('imp','I'),('rmu','rmu'),('omega','omegau'),('t1x','workbook_adopted_tx'),('t1y','workbook_adopted_ty')]:
         if source in v:getattr(app,target).set(str(v[source]))
