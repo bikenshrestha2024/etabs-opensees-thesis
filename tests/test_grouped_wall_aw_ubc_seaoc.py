@@ -72,6 +72,16 @@ class TestGroupedWallArea(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "fingerprint mismatch"):
                 source_matched_grouping(root, "ULS", self.profile, 95, edb, "c"*64)
 
+    def test_length_height_ratio_capped_at_point_nine(self):
+        # A 100 m connected wall in a 50 m building uses the explicit .9 cap.
+        profile = _wall_aw_profile(
+            50, 0, 3, [("X", 0., .6, 0., 100., 0., 3.)])
+        groups = [dict(id="long", axis="X", plane_m=0,
+                       thickness_m=.6, start_m=0, end_m=100)]
+        result = grouped_wall_aw(profile, 50, groups)
+        self.assertAlmostEqual(result["aw_candidate_m2"]["X"],
+                               100 * .6 * (.2 + .9**2))
+
     def test_zero_or_full_opening_rejected(self):
         with self.assertRaises(ValueError):
             wall_aw_example(opening_width_m=6)
