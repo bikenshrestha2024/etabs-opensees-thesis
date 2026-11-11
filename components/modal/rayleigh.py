@@ -39,6 +39,9 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     model=folder/'OpenSees_Complete_Model_Data_V118.json'
     with (folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').open(encoding='utf-8-sig') as stream:rows=list(csv.DictReader(stream))
     if not rows:raise ValueError('Reconciled seismic story weights are required.')
+    from components.modal.rayleigh_ledger_audit import verify_storey_coverage, verify_rayleigh_sum
+    with model.open(encoding='utf-8-sig') as stream: model_data=json.load(stream)
+    covered_storeys=verify_storey_coverage(model_data['diaphragms'],rows)
     rows.sort(key=lambda r:float(r['height_m']))
     heights=[float(r['height_m']) for r in rows]
     weights=[float(r['dead_load_kN'])+.6*float(r['storage_live_load_kN'])+.3*float(r['other_live_load_kN']) for r in rows]
@@ -82,8 +85,11 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         if not math.isfinite(denominator) or denominator<=0:raise ValueError(f'{axis} Rayleigh denominator is nonpositive or non-finite; inspect displacement signs and constraints.')
         if not math.isfinite(numerator) or numerator<=0:raise ValueError(f'{axis} Rayleigh numerator is nonpositive or non-finite; inspect seismic weights and displacements.')
         period=2*math.pi*math.sqrt(numerator/denominator)
+        audit=verify_rayleigh_sum([{'weight_kN':w,'force_kN':f,'displacement_m':d} for w,f,d in zip(weights,forces,u)])
+        if audit['storey_count'] != covered_storeys or not math.isclose(period,audit['period_s'],rel_tol=1e-10):
+            raise RuntimeError(f'{axis}: incomplete or inconsistent all-storey Rayleigh reconstruction')
         if not math.isfinite(period) or period<=0:raise ValueError(f'{axis} Rayleigh period is nonpositive or non-finite.')
-        result[axis]=dict(Aw_m2=aw,empirical_period_s=empirical,amplified_empirical_s=1.25*empirical,period_s=period,adopted_period_s=min(period,1.25*empirical),rows=[dict(story=r['story_name'],height_m=float(r['height_m']),master_node=n,weight_kN=w,force_kN=f,displacement_m=d) for r,n,w,f,d in zip(rows,masters,weights,forces,u)])
+        result[axis]=dict(Aw_m2=aw,empirical_period_s=empirical,amplified_empirical_s=1.25*empirical,period_s=period,adopted_period_s=min(period,1.25*empirical),storey_audit=audit,rows=[dict(story=r['story_name'],height_m=float(r['height_m']),master_node=n,weight_kN=w,force_kN=f,displacement_m=d) for r,n,w,f,d in zip(rows,masters,weights,forces,u)])
         sheet=wb.create_sheet(axis+' Rayleigh');sheet.append(['Story','Height (m)','Master node','Wi (kN)','Fi (kN)','di (m)','Wi di2 (kN m2)','Fi di (kN m)'])
         for r in result[axis]['rows']:sheet.append([r['story'],r['height_m'],r['master_node'],r['weight_kN'],r['force_kN'],r['displacement_m'],r['weight_kN']*r['displacement_m']**2,r['force_kN']*r['displacement_m']])
         summary.append([axis,aw,empirical,1.25*empirical,period,min(period,1.25*empirical)])
