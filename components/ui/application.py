@@ -2213,7 +2213,7 @@ def convert_model(edb, outdir, log, include_live=True):
 # ============================================================================
 class App:
     def __init__(self,root):
-        self.root=root; root.title("ETABS → OpenSeesPy | NBC 105 Workflow — V161 literature materials and component research")
+        self.root=root; root.title("ETABS → OpenSeesPy | NBC 105 Workflow — 2026-11-11 source and gravity routing fixes")
         root.geometry("1480x940"); root.minsize(1180,760); root.configure(bg="#eef2f7")
         source_folder=Path(__file__).resolve().parent/'components'
         if not source_folder.is_dir():source_folder=Path(__file__).resolve().parent/'OpenSees_Runtime_V118/components'
