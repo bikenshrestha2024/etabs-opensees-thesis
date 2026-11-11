@@ -49,6 +49,7 @@ def _offset(raw):
 
 
 def assess(source_folder, *, primary_audit=None):
+    """[REF docs/source/components/validation/gravity_native_equivalence_preflight.py.md] Source contract and engineering limitations in linked guide."""
     """Assess evidence without changing supports, stiffness, or load cases.
 
     Input exported model data must be the ORIGINAL assembled source-support
@@ -152,6 +153,7 @@ def assess(source_folder, *, primary_audit=None):
 
 
 def export(source_folder, output_folder, *, primary_audit=None):
+    """[REF docs/source/components/validation/gravity_native_equivalence_preflight.py.md] Source contract and engineering limitations in linked guide."""
     """Write new audit outputs atomically; never overwrite an existing audit."""
     report = assess(source_folder, primary_audit=primary_audit)
     target = Path(output_folder).expanduser().resolve()
@@ -187,6 +189,7 @@ def export(source_folder, output_folder, *, primary_audit=None):
 
 
 def main(argv=None):
+    """[REF docs/source/components/validation/gravity_native_equivalence_preflight.py.md] Source contract and engineering limitations in linked guide."""
     import argparse
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("export_folder",help="Saved ETABS-to-OpenSees export folder")
