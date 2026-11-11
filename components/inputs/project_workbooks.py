@@ -58,10 +58,12 @@ def registered_project_source(export_dir, role):
                 recovered, reason = recover_lfs_pointer(
                     path, expected_sha256=entry.get('sha256'))
                 if not recovered:
-                    raise ValueError('Workbook contains only a Git LFS pointer ('+
-                        reason+'): '+str(path)+
-                        '. Open the main ETABS conversion GUI to select your '
-                        'original source workbook if automatic recovery is unavailable.')
+                    from components.inputs.lfs_workbook_recovery import (
+                        select_original_workbook_for_registered_pointer)
+                    path = select_original_workbook_for_registered_pointer(
+                        pointer=path, expected_sha256=entry.get('sha256'),
+                        export_dir=export_dir, edb_hash=data['source_edb_sha256'],
+                        role=role, status=reason)
         if not path.is_file() or digest(path) != entry.get('sha256'):
             raise ValueError('Registered source changed or missing: '+role)
         return str(path.resolve())
