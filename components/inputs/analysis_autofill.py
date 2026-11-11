@@ -116,8 +116,17 @@ def populate_available(gui,folder=None,role='linear_model_script'):
         if output_is_automatic and hasattr(gui,'output'):
             from components.inputs.project_workbooks import analysis_output_folder
             gui.output.set(str(analysis_output_folder(folder,gui.ls.get())))
-        if not autoselect_inputs(gui,folder,role):
-            if hasattr(gui,'model') and gui.model.get():populate_linear(gui,folder)
+        # The auto-selector only locates files. It cannot be relied upon to
+        # recompute NBC §5.1 directional T1 from the current export/state.
+        # Always synchronize period fields after selecting the model, including
+        # when the auto-selector returns True. Do not equate Rayleigh damping
+        # calibration eigenperiods (p1/p2) with adopted design T1 X/Y.
+        selected = bool(autoselect_inputs(gui,folder,role))
+        model_path = Path(gui.model.get()) if hasattr(gui,'model') and gui.model.get() else None
+        if model_path is not None and model_path.is_file():
+            # The selected model owns the period source, not the initial
+            # project folder from which the chooser was launched.
+            populate_linear(gui,model_path.resolve().parent)
         if old_output and hasattr(gui,'output') and not output_is_automatic:gui.output.set(old_output)
         if hasattr(gui,'log') and hasattr(gui.log,'insert'):
             notes=getattr(gui,'project_input_audit',{}).get('notes',[])
