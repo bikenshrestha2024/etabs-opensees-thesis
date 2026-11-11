@@ -58,12 +58,12 @@ def registered_project_source(export_dir, role):
                 recovered, reason = recover_lfs_pointer(
                     path, expected_sha256=entry.get('sha256'))
                 if not recovered:
-                    from components.inputs.lfs_workbook_recovery import (
-                        select_original_workbook_for_registered_pointer)
-                    path = select_original_workbook_for_registered_pointer(
-                        pointer=path, expected_sha256=entry.get('sha256'),
-                        export_dir=export_dir, edb_hash=data['source_edb_sha256'],
-                        role=role, status=reason)
+                    # Registered optional evidence is not a physical EDB input.
+                    # Conversion's copy_project_workbooks() calls this resolver:
+                    # never launch a Tk dialog from an implicit copy step.
+                    # Explicit gravity/source validation still checks original
+                    # workbook identity and cannot mark missing evidence PASS.
+                    return None
         if not path.is_file() or digest(path) != entry.get('sha256'):
             raise ValueError('Registered source changed or missing: '+role)
         return str(path.resolve())
