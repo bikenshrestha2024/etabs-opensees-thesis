@@ -1812,6 +1812,11 @@ class GravityAnalysisGUI:
         nodes=payload['nodes'];reactions=payload['reactions'];edges=payload['elements'];report=payload['report']
         local_forces=payload.get('local_forces',[])
         figures,figure_paths,scale=gravity_figures(payload,out)
+        self.gravity_plot_identity.set(
+            f"PLOTTED SOLVED CASE: {payload.get('wall_support_strategy')} | "
+            f"supports={len(payload.get('reactions', []))} | "
+            f"profile={payload.get('gravity_profile')} | output={out} | "
+            "ETABS physical equivalence NOT certified")
         embed_figures(self.plot_canvas_frame,figures)
         xlsx = out / "Gravity_Results_V110.xlsx"
         wb = Workbook(); ws = wb.active; ws.title = "Summary"
