@@ -993,7 +993,7 @@ class GravityAnalysisGUI:
         validation=action_row(actions)
         ttk.Button(validation,text="Audit support DOFs / rigid end zones",
                    command=self._audit_native_equivalence).pack(side="left",padx=4)
-        ttk.Button(validation,text="Extract ETABS and compare gravity",
+        ttk.Button(validation,text="Extract ETABS + compare gravity",
                    command=self._direct_etabs_gravity_compare).pack(side="left",padx=4)
         def load_path():
             try:
