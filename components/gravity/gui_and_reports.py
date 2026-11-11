@@ -167,6 +167,32 @@ class GravityAnalysisGUI:
         except (OSError, ValueError) as exc:
             messagebox.showerror('Saved gravity case', str(exc), parent=self.win)
 
+    def _compare_three_saved_cases(self):
+        """Review 32/76/97 as distinct solver states; never change model restraints."""
+        try:
+            if self._gravity_busy:
+                raise ValueError('Finish the current gravity solver/exporter first.')
+            from components.gravity.three_case_comparison import export_case_comparison
+            from OpenSees_Research_UI_V123 import embed_figures
+            report, out, figure = export_case_comparison(
+                self.output_var.get(), self.model_var.get(),
+                profile=self.gravity_profile_var.get())
+            embed_figures(self.plot_tab, [('32 / 76 / 97 support comparison', figure)])
+            self.nb.select(self.plot_tab)
+            self.status_var.set('Independent solved-case comparison: '+
+                ', '.join(report['available_cases'])+' | '+str(out)+
+                ' | NOT ETABS EQUIVALENCE')
+            self._gravity_action_log('THREE_CASE_COMPARISON',str(out))
+            messagebox.showinfo('Gravity support-case comparison',
+                'Saved comparison Excel, JSON, CSV, PNG and PDF:\\n'+str(out)+
+                '\\n\\nUnavailable cases:\\n'+
+                ('\\n'.join(report['missing_cases']) if report['missing_cases'] else 'None')+
+                '\\n\\nThis does NOT verify ETABS support fixities or local reactions.',
+                parent=self.win)
+        except Exception as exc:
+            self._gravity_action_log('THREE_CASE_COMPARISON_ERROR',str(exc))
+            messagebox.showerror('Gravity support-case comparison',str(exc),parent=self.win)
+
     def _audit_native_equivalence(self):
         """Produce a NEW source-specific restraint/end-offset audit; no model edit."""
         try:
@@ -918,6 +944,7 @@ class GravityAnalysisGUI:
         actions=ttk.Frame(root); actions.pack(fill="x",pady=(0,7))
         ttk.Button(actions,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
         ttk.Button(actions,text="View selected 32 / 76 / 97 saved case",command=self._view_saved_case).pack(side="left",padx=5)
+        ttk.Button(actions,text="Compare solved 32 / 76 / 97 + Excel",command=self._compare_three_saved_cases).pack(side="left",padx=5)
         ttk.Button(actions,text="Audit ETABS support DOFs + rigid end zones",
                    command=self._audit_native_equivalence).pack(side="left",padx=5)
         ttk.Button(actions,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
