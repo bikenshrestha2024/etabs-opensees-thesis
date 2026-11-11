@@ -95,7 +95,7 @@ def _walk(root, *, destination):
 
 
 def publish_organized_results(results_root, *, gravity_root=None,
-                              include_unclassified=False):
+                              include_unclassified=True):
     """[REF docs/source/components/ui/organized_results.py.md] Create dated folder and ZIPs.
 
     results_root is the existing source/model/state output folder (e.g. ULS...).
