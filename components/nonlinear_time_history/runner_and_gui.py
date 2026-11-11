@@ -729,6 +729,26 @@ class NonlinearTimeHistoryGUI:
         self.win.after_idle(lambda:populate_available(self,role='nonlinear_model_script'))
         self.model.trace_add('write',lambda *unused:self.win.after_idle(lambda:__import__('OpenSees_Linear_Autofill_V124').populate_linear(self,Path(self.model.get()).parent)) if self.model.get() else None)
         self.ls.trace_add('write',lambda *unused:populate_available(self,role='nonlinear_model_script'))
+        # Keep nonlinear directional T1 synchronized with the same model/state
+        # source as linear TH and MRSM. This does not validate nonlinear
+        # initial-tangent stiffness or waive the separate readiness gate.
+        self.model.trace_add('write',lambda *_:self._refresh_known())
+
+    def _refresh_known(self):
+        """[REF components/inputs/analysis_autofill.py] Recompute source-bound periods."""
+        path = Path(self.model.get()) if self.model.get() else None
+        if path is None or not path.is_file():
+            return
+        try:
+            from OpenSees_Linear_Autofill_V124 import populate_linear
+            if self._output_is_automatic:
+                from components.inputs.project_workbooks import analysis_output_folder
+                self.output.set(str(analysis_output_folder(path.resolve().parent,self.ls.get())))
+            result = populate_linear(self,path.resolve().parent)
+            self.log.insert('end','[NLTHA PERIOD SOURCE] ' +
+                            ' '.join(result.get('notes',[])) + '\\n')
+        except Exception as exc:
+            self.log.insert('end','[NLTHA PERIOD SOURCE BLOCKED] '+str(exc)+'\n')
 
     def _browse(self, variable, kind, title):
         if kind == "file": value = filedialog.askopenfilename(title=title, parent=self.win, filetypes=[("CSV files", "*.csv"), ("Python files", "*.py"), ("All files", "*.*")])
@@ -806,6 +826,7 @@ class NonlinearTimeHistoryGUI:
         ttk.Label(params, text="T1 is from NBC §5.1 (lesser adopted period); Tn is the highest mode needed for 90% mass participation in each axis. Obtain/verify these in the Modal Analysis GUI. The chosen Rayleigh calibration periods and checked modal damping must keep all inspected modes ≤5%.", wraplength=1060, foreground="#8a3412").pack(anchor="w", pady=(5, 0))
         ttk.Label(root, text="Readiness is intentionally strict: the nonlinear model must already contain the reviewed ETABS geometry, wall opening mesh and coupling beams, calibrated wall/frame materials, compatible slab/diaphragm representation, reconciled area/frame loads and seismic mass, completed gravity/P-Delta, modal checks, and the selected SHS/FVD/BRB scenario. This tool freezes that completed gravity state with loadConst(time=0) and runs nonlinear Newmark. It cannot make a missing ETABS-to-OpenSees subsystem complete. The manifest is an explicit user checklist, not an automatic certification.", wraplength=1060, foreground="#8a3412").pack(anchor="w", pady=(0, 8))
         ttk.Button(root, text="NBC site spectrum + optional X/Y scale diagnostic (A–D)", command=self._open_spectrum_tool).pack(anchor="w", pady=(0, 6))
+        ttk.Button(root,text='Refresh known project / modal parameters',command=self._refresh_known).pack(anchor='w',pady=(0,6))
         ttk.Checkbutton(root, text="RUN_NONLINEAR_TIME_HISTORY = True  —  enable execution (default False)", variable=self.execute).pack(anchor="w", pady=(0, 4))
         run_row = ttk.Frame(root); run_row.pack(anchor="w", pady=(0, 8))
         ttk.Button(run_row, text="Run NBC Nonlinear Time-History Cases", command=self._run).pack(side="left")
