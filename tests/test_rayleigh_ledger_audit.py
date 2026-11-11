@@ -29,7 +29,7 @@ class TestRayleighLedgerAudit(unittest.TestCase):
                    {"weight_kN": 200., "force_kN": 20., "displacement_m": 0.01}]
         answer = verify_rayleigh_sum(records)
         self.assertEqual(answer["storey_count"], 2)
-        self.assertAlmostEqual(answer["period_s"], 2 * math.pi * math.sqrt(0.001 / (9.81 * 0.3)))
+        self.assertAlmostEqual(answer["period_s"], 2 * math.pi * math.sqrt(0.03 / (9.81 * 0.3)))
         self.assertEqual(answer["status"], "NUMERICAL_RECONSTRUCTION_ONLY")
 
     def test_missing_or_invalid_values_rejected(self):
