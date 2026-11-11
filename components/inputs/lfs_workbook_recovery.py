@@ -113,7 +113,8 @@ def _registered_source(runtime_root, edb, role, export_dir=None):
 
 
 def audit_optional_gui_workbooks(runtime_root, export_dir, edb, *, log=None):
-    """Noninteractive audit only; conversion is driven by the immutable EDB.
+    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md]
+    Noninteractive audit only; conversion is driven by the immutable EDB.
 
     A registered workbook with a mismatched SHA is NEVER accepted. This
     preflight only records evidence availability. Missing optional Excel data
