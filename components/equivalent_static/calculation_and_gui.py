@@ -655,6 +655,8 @@ class ESMGui:
         ttk.Button(footer,text='Excel sources…',command=self._choose_workbooks).pack(side='left',padx=3)
         ttk.Button(footer,text='Use original Excel Aw/T (research)',command=self._use_explicit_excel_calculation).pack(side='left',padx=3)
         ttk.Button(footer,text='Audit Excel vs continuous-pier Aw',command=self._audit_wall_aw).pack(side='left',padx=3)
+        ttk.Button(footer,text='Create doorway wall Aw grouping REVIEW template',
+                   command=self._export_grouped_wall_aw_template).pack(side='left',padx=3)
         ttk.Button(footer,text='Why are Aw/period fields blank?',command=self._show_source_diagnostics).pack(side='left',padx=3)
         ttk.Button(footer,text='Sync from OpenSees model',command=self._sync_opensees_inputs).pack(side='left',padx=3)
         ttk.Button(footer,text='Check live ETABS geometry (read-only)',command=lambda:self._sync_opensees_inputs(etabs=True)).pack(side='left',padx=3)
@@ -757,6 +759,28 @@ class ESMGui:
         ttk.Label(top,text="Workflow: ETABS exports provide story weights, elevations and diaphragm tags. This dialog calculates NBC actions and can execute a complete user-selected OpenSeesPy model-builder script. It does not directly open an ETABS EDB; ETABS API periods can be read when ETABS is open and its modal case has been run.",foreground="#8a341c",wraplength=1100).pack(anchor="w",pady=5)
         if self.path.get(): self._load_story_metadata(self.path.get())
         if self.story_source_note:self.status.set(self.story_source_note)
+
+    def _export_grouped_wall_aw_template(self):
+        """[REF docs/source/components/inputs/grouped_wall_aw.py.md]
+        Create a source-geometry review TEMPLATE; never an adopted Aw manifest.
+        """
+        try:
+            from components.inputs.opensees_nbc_sync import export_wall_grouping_review_template
+            state=self.state.get().strip().upper()
+            if state not in ('ULS','SLS'):
+                raise ValueError("Select exact ULS or SLS state first.")
+            path=export_wall_grouping_review_template(self.export_dir,state)
+            self.status.set("Wall grouping REVIEW template: "+str(path))
+            messagebox.showinfo(
+                "NBC Aw grouping — engineer review required",
+                "Saved source-matched wall slice template:\n"+str(path)+
+                "\n\nDo not adopt the illustrated 6m walls without checking "
+                "each actual source EDB wall and coupling beam. After checking "
+                "all first-storey wall groups, populate the reviewed manifest "
+                "described in the source guide; only then rerun OpenSees sync.",
+                parent=self.root)
+        except Exception as exc:
+            messagebox.showerror("Wall grouping review template",str(exc),parent=self.root)
 
     def _audit_wall_aw(self):
         """Compare original Excel and geometric candidates without altering NBC inputs."""
