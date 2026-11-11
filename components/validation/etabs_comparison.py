@@ -47,7 +47,8 @@ def collect(folder, issues=None, *, results_root=None):
     def current_result(path):
         return not any(part.startswith((
             'Seismic_Review_Packages','ESM_Validation_Evidence_',
-            'Gravity_Evidence_Upload','Gravity_ETABS_OpenSees_Evidence'))
+            'Gravity_Evidence_Upload','Gravity_ETABS_OpenSees_Evidence',
+            'Organized_Results','ETABS_Comparison_V148'))
             for part in Path(path).parts)
     p=analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
     if not p.is_file():
