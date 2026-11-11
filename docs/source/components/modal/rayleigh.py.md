@@ -21,3 +21,19 @@ Relevant register IDs: R10. Consult [research reference register](../../../00_RE
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+## November 11, 2026: all-storey and source-model safeguards
+
+The preliminary X/Y Rayleigh runner now calls the all-storey audit helper
+([source guide](rayleigh_ledger_audit.py.md)) to reject duplicated or missing
+model diaphragm/master-node records and independently reconstruct the
+period from every recorded `Wi`, `Fi`, `di`. The original exported V123
+compatibility entry is preserved. This is still **not** confirmation that
+every seismic-mass-bearing floor was recorded in the original ETABS export.
+
+The `Aw` inputs must be source-matched original workbook values or
+explicitly labelled engineering diagnostics. Never infer NBC §5.1.2
+acceptance from a continuous-through-height geometric projection.
+ETABS model-identity, stiffness/P-Delta, gravity, first-storey wall
+openings, centre-of-mass coordinates and torsion-suppressed displacement
+must be checked independently before declaring physical equivalence.
