@@ -174,6 +174,15 @@ def export(source_folder, output_folder, *, primary_audit=None):
         "and auto offsets, then rerun 32/76/97 cases in isolated directories.\n"
         "Never change native source EDB, gravity loads or stiffness to fit reactions.\n"
         "Blockers: "+json.dumps(summary["blockers"],indent=2)+"\n",encoding="utf-8")
+    # Include just the small forensic evidence, not private source datasets.
+    # The new run directory makes this ZIP non-overwriting by construction.
+    from zipfile import ZipFile, ZIP_DEFLATED
+    with ZipFile(target / "GRAVITY_NATIVE_EQUIVALENCE_UPLOAD.zip",
+                 "x",compression=ZIP_DEFLATED) as archive:
+        for name in ("GRAVITY_NATIVE_EQUIVALENCE_PREFLIGHT.json",
+                     "SOURCE_SUPPORT_DOF_VS_PRIMARY32.csv",
+                     "ETABS_END_ZONE_STIFFNESS_REVIEW.csv","READ_FIRST.txt"):
+            archive.write(target / name,arcname=name)
     return report
 
 
