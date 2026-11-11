@@ -534,6 +534,38 @@ class ESMGui:
             "\\nReview ZIP creation started automatically; find the latest "
             "path in Seismic_Review_Packages/LATEST_ESM_REVIEW.txt.")
 
+    def _export_organized_evidence(self):
+        """[REF docs/source/components/ui/organized_results.py.md] Publish copies only."""
+        if getattr(self,'_organized_export_busy',False):
+            self.status.set('Categorized ZIP export is already running.')
+            return
+        self._organized_export_busy=True
+        self.status.set('Creating categorized Gravity / ESM / Modal / MRSM evidence copies…')
+        def task():
+            try:
+                from components.ui.organized_results import publish_organized_results
+                output=Path(self.outdir.get())
+                result=publish_organized_results(output)
+                def done():
+                    self._organized_export_busy=False
+                    self.status.set('ORGANIZED ZIP: '+result['zip_files']['ALL_MODULES']+
+                                    ' | manifest '+result['manifest'])
+                    messagebox.showinfo(
+                        'Organized result ZIPs',
+                        'Upload all modules:\\n'+result['zip_files']['ALL_MODULES']+
+                        '\\n\\nSeparate modules and manifest:\\n'+result['folder']+
+                        '\\n\\nOriginal analysis outputs remain unchanged.',
+                        parent=self.root)
+                self.root.after(0,done)
+            except Exception as exc:
+                error=str(exc)
+                def failed():
+                    self._organized_export_busy=False
+                    self.status.set('ORGANIZED EXPORT FAILED: '+error)
+                    messagebox.showerror('Organized results export',error,parent=self.root)
+                self.root.after(0,failed)
+        threading.Thread(target=task,daemon=True).start()
+
     def _run_etabs_linked(self):
         """Use the uploaded original Excel/ETABS engine, without touching RS scaling."""
         from components.equivalent_static.etabs_linked_excel import run_etabs_excel
@@ -628,6 +660,9 @@ class ESMGui:
         ttk.Button(footer,text='Preliminary Rayleigh run (X/Y)',command=self._run_rayleigh).pack(side='left',padx=3)
         ttk.Button(footer,text='Bundle ALL ESM validation evidence ZIP',
                    command=self._bundle_esm_evidence).pack(side='left',padx=3)
+        ttk.Button(footer,text='Export organized module ZIPs',
+                   command=self._export_organized_evidence).pack(side='left',padx=3)
+
         for button in footer.winfo_children():button.pack_forget()
         for index,button in enumerate(footer.winfo_children()):
             button.grid(row=index//3,column=index%3,sticky='ew',padx=3,pady=3)
