@@ -1075,7 +1075,8 @@ class ESMGui:
                         "PRESERVED (candidate NOT applied)")
                 elif value is not None and evidence in (
                     'OPEN_SEES_GEOMETRY_CANDIDATE_REVIEW_REQUIRED',
-                    'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC'):
+                    'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC',
+                    'SOURCE_MATCHED_GROUPED_WALL_AREA_REVIEW_REQUIRED'):
                     # Prefill the source-derived *diagnostic* to enable a
                     # preliminary comparison, never silent NBC acceptance.
                     var.set(f'{value:.10g}')
@@ -1109,6 +1110,25 @@ class ESMGui:
                         f"excluded projected contribution="
                         f"{reduction['excluded_noncontinuous_Aw_m2']:.8g} m². "
                         "NOT the vertical opening area or approved NBC Aw.")
+            grouped=report.get('grouped_wall_aw_review')
+            illustrative=report.get('historical_ubc_seaoc_user_example') or {}
+            if grouped:
+                lines.append(
+                    "SOURCE-MATCHED GROUPED WALL AREA (UBC 1997 §1628/§1630.2.2; "
+                    "SEAOC Example 19 historical precedent): "
+                    f"Aw-X={grouped['aw_candidate_m2']['X']:.9g} m²; "
+                    f"Aw-Y={grouped['aw_candidate_m2']['Y']:.9g} m². "
+                    "Engineering wall grouping review required; NOT NBC acceptance.")
+                lines.append("Grouped wall source: "+str(grouped['source_manifest']))
+            else:
+                lines.append(
+                    "ILLUSTRATIVE SEAOC/UBC NET-AREA + GROSS-LENGTH EXAMPLE: "
+                    f"4 X door walls Aw-X={illustrative.get('X')} m²; "
+                    f"3 solid Y walls Aw-Y={illustrative.get('Y')} m². "
+                    "Example ONLY, NOT adopted, no EDB-verified wall grouping.")
+            if report.get('grouped_wall_aw_error'):
+                lines.append('SOURCE GROUPING BLOCKED: '+
+                             str(report['grouped_wall_aw_error']))
             if etabs:
                 fallback=report.get('etabs_fallback',{})
                 lines.append('ETABS read-only fallback: '+str(fallback.get('status')))
