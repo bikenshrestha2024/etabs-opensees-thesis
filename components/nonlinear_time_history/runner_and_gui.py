@@ -936,11 +936,11 @@ class NonlinearTimeHistoryGUI:
             dialog.geometry("900x580")
             view = ScrolledText(dialog, wrap="none", font=("Consolas", 10))
             view.pack(fill="both", expand=True, padx=8, pady=8)
-            view.insert("1.0", "\\n".join(lines))
+            view.insert("1.0", "\n".join(lines))
             view.configure(state="disabled")
             ttk.Button(dialog, text="Copy duration audit",
                        command=lambda: (dialog.clipboard_clear(),
-                                        dialog.clipboard_append("\\n".join(lines)))).pack(pady=4)
+                                        dialog.clipboard_append("\n".join(lines)))).pack(pady=4)
             ttk.Button(dialog, text="Close", command=dialog.destroy).pack(pady=4)
         except Exception as exc:
             messagebox.showerror("Ground-motion duration preflight", str(exc), parent=self.win)
