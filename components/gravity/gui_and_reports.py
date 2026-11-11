@@ -167,6 +167,34 @@ class GravityAnalysisGUI:
         except (OSError, ValueError) as exc:
             messagebox.showerror('Saved gravity case', str(exc), parent=self.win)
 
+    def _audit_native_equivalence(self):
+        """Produce a NEW source-specific restraint/end-offset audit; no model edit."""
+        try:
+            from components.validation.gravity_native_equivalence_preflight import export
+            model=Path(self.model_var.get()).expanduser().resolve()
+            if not model.is_file():
+                raise FileNotFoundError("Select the original assembled OpenSees gravity model")
+            root=Path(self.output_var.get()).expanduser().resolve()
+            stamp=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            output=root/"Gravity_Native_Equivalence_Preflight"/stamp
+            # Matching original source metadata must be in the selected model
+            # export folder.  Do NOT select arbitrary previous reactions by glob.
+            report=export(model.parent,output)
+            self._gravity_action_log("NATIVE_EQUIVALENCE_PREFLIGHT",str(output))
+            self.status_var.set("Native boundary/end-zone audit: "+str(output)+
+                                " | Structural equivalence NOT VALIDATED")
+            messagebox.showinfo("ETABS/OpenSees stiffness + support preflight",
+                "Native source restraints and rigid end-zone audit saved:\n"+
+                str(output)+"\n\nOriginally restrained but excluded by the 32-node case: "+
+                str(report["released_by_primary32_count"])+
+                "\nNative rigid end zones needing stiffness review: "+
+                str(report["native_frame_rigid_end_zone_review_count"])+
+                "\n\nThis is a read-only audit, NOT an ETABS equivalence pass.",
+                parent=self.win)
+        except Exception as exc:
+            self._gravity_action_log("NATIVE_EQUIVALENCE_PREFLIGHT_ERROR",str(exc))
+            messagebox.showerror("Native equivalence audit",str(exc),parent=self.win)
+
     def _set_gravity_operation(self,state,detail=""):
         """Running status independent of the report/status text (Tk main thread)."""
         self.gravity_operation_state.set(state+" | "+str(detail))
@@ -890,6 +918,8 @@ class GravityAnalysisGUI:
         actions=ttk.Frame(root); actions.pack(fill="x",pady=(0,7))
         ttk.Button(actions,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
         ttk.Button(actions,text="View selected 32 / 76 / 97 saved case",command=self._view_saved_case).pack(side="left",padx=5)
+        ttk.Button(actions,text="Audit ETABS support DOFs + rigid end zones",
+                   command=self._audit_native_equivalence).pack(side="left",padx=5)
         ttk.Button(actions,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
         ttk.Button(actions,text="Bundle gravity evidence ZIP",command=self._export_comparison_bundle).pack(side="left",padx=5)
         def load_path():
