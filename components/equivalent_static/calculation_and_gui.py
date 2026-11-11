@@ -1644,6 +1644,20 @@ class ESMGui:
         self._esm_cancel_requested = False
         self._esm_running = True
         self._esm_active_proc = None
+        self._esm_case_started = None
+        self._esm_active_case = None
+        self._esm_active_log = None
+        def heartbeat():
+            if not self._esm_running:
+                return
+            proc = self._esm_active_proc
+            if proc is not None and proc.poll() is None:
+                elapsed = time.monotonic() - (self._esm_case_started or time.monotonic())
+                self._set_esm_operation(
+                    "RUNNING", f"PID={proc.pid} | {self._esm_active_case} | "
+                    f"elapsed={elapsed:.0f} s | log={self._esm_active_log}")
+            self.root.after(1000, heartbeat)
+        self.root.after(1000, heartbeat)
         self.run_button.configure(state="disabled")
         self.esm_cancel_button.configure(state="normal")
         self._set_esm_operation("RUNNING", f"0/{len(scripts)} ESM cases")
@@ -1671,17 +1685,24 @@ class ESMGui:
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, encoding="utf-8", errors="replace", bufsize=1, env=env)
                         self._esm_active_proc = proc
+                        self._esm_case_started = started
+                        self._esm_active_case = f"{index}/{len(scripts)} {script.stem}"
+                        self._esm_active_log = str(log_path)
                         self.root.after(0, lambda i=index, n=len(scripts), p=proc.pid:
                             self._set_esm_operation("RUNNING", f"Case {i}/{n} | PID {p}"))
                         def watch():
                             nonlocal timed_out
                             while proc.poll() is None:
-                                if self._esm_cancel_requested:
-                                    proc.terminate()
-                                    return
-                                if time.monotonic() - started > timeout_seconds:
-                                    timed_out = True
-                                    proc.terminate()
+                                if self._esm_cancel_requested or time.monotonic() - started > timeout_seconds:
+                                    if not self._esm_cancel_requested:
+                                        timed_out = True
+                                    try:
+                                        proc.terminate()
+                                        proc.wait(timeout=10)
+                                    except subprocess.TimeoutExpired:
+                                        proc.kill()
+                                    except OSError:
+                                        pass
                                     return
                                 time.sleep(0.5)
                         threading.Thread(target=watch, daemon=True).start()
