@@ -722,6 +722,20 @@ class ESMGui:
         if self.story_source_note:self.status.set(self.story_source_note)
 
     def _view_plots(self):
+        # Do not present Python-generated applied-force charts as solved ETABS
+        # base reactions, story shears, displacements or drift.
+        if self.esm_module.get() == "ETABS Linked Equivalent Static":
+            messagebox.showinfo(
+                "ETABS-linked ESM: calculation versus structural response",
+                "The linked workbook contains the original NBC/ETABS-linked "
+                "calculation and source provenance. It does NOT by itself "
+                "contain a completed ETABS lateral analysis.\\n\\n"
+                "For verified base shear, recovered storey shear, displacement "
+                "and drift, use 'Compare ETABS vs ESM/MRSM responses' and "
+                "supply completed, same-model ETABS results. OpenSees direct "
+                "force profiles are plotted separately.",
+                parent=self.root)
+            return
         from OpenSees_Results_UI_V127 import esm_comparison
         esm_comparison(self.root,self.outdir.get())
         try:
@@ -733,8 +747,8 @@ class ESMGui:
             if not paths:raise ValueError('Calculate cases first to create force-profile figures.')
             figures=[]
             for path in paths:
-                fig=Figure(figsize=(10,6),layout='constrained');ax=fig.add_subplot();ax.imshow(image.imread(path));ax.axis('off');figures.append((path.stem.replace('NBC105_ESM_Force_Profile_',''),fig))
-            window=tk.Toplevel(self.root);window.title('NBC force profiles | Matplotlib');window.geometry('1250x850');window._esm_output_folder=self.outdir.get();__import__('OpenSees_Case_Selection_V134').profiles(window,figures)
+                fig=Figure(figsize=(10,6),layout='constrained');ax=fig.add_subplot();ax.imshow(image.imread(path));ax.axis('off');figures.append((('APPLIED FORCES | ' if 'Force_Profile' in path.name else 'SOLVER RESPONSE | ')+path.stem.replace('NBC105_ESM_Force_Profile_',''),fig))
+            window=tk.Toplevel(self.root);window.title('OpenSees Direct ESM | applied force and separately solved response profiles');window.geometry('1250x850');window._esm_output_folder=self.outdir.get();__import__('OpenSees_Case_Selection_V134').profiles(window,figures)
         except Exception as exc:messagebox.showerror('Result plots',str(exc))
 
     def _state_changed(self):
