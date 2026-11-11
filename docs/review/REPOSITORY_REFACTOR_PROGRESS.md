@@ -87,3 +87,15 @@ engineering limitations and the explicit publication authorization.
 
 Publication regression: 214 tests and 5 subtests passed; reference tags passed;
 419-module static inventory clean; Git LFS object integrity verified locally.
+
+
+## V4 follow-up checkpoint — 2026-11-11 (draft PR #18)
+
+- **Source:** main `62d4450eccc98126e0489abd352f0c39bcb7d7c1` (newer than draft PR #15 base). Draft PR: https://github.com/bikenshrestha2024/etabs-opensees-thesis/pull/18.
+- **Primary selection:** Gravity GUI displays "Primary ETABS-matched set (32 nodes)" by default, but all legacy `ETABS_NONZERO_REACTION_DIAGNOSTIC` scenario IDs, saved-case formats and support nodes are untouched. Individual joint equivalence remains unverified.
+- **ESM periods:** Workbook-adopted T1 X/Y now shown immediately beside Aw as read-only labelled values, separately from ETABS measured eigenperiods, OpenSees Rayleigh and computed design-action period. No period value hardcoded or used as a substitute.
+- **Main entry:** README, program index and start guides present the existing `01_WORKFLOW_START.py` as canonical. The `01.py` alias and original launcher code are retained byte-for-byte.
+- **Regression:** GitHub Actions run `42942405420` passed source compilation and four offline checks: https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/42942405420.
+- **No edits:** Original EDB, original workbooks, gravity loads, supports, stiffness, model assembly, analysis algorithms, numerical output files, analysis ZIPs or earthquake records.
+- **Next native acceptance gate:** compare ETABS source auto end-offset/rigid factors and actual 32-node base constraints with OpenSees model; reproduce joint 263/264 reaction difference 3041.265778 kN and check joint 718 Uz before any physical correction. Use recovered frame/shell interface and story load audits already in main. Continue with independent modal/ESM/MRSM comparison and source provenance verification.
+- **NOT verified by this PR:** Spyder GUI on Windows, ETABS v23 COM run, OpenSees numerical regression, any ETABS-equivalence or code-compliance gate.
