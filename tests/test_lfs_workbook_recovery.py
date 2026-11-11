@@ -91,3 +91,56 @@ def test_no_git_does_not_try_network_for_pointer(tmp_path):
     runtime,edb,original,pointer=_setup(tmp_path)
     ok,reason=recover_lfs_pointer(pointer,expected_sha256=_sha(original.read_bytes()))
     assert not ok and reason=="ARCHIVE_WITHOUT_GIT_METADATA"
+
+
+def test_downstream_registry_pointer_prompts_and_remembers_original(tmp_path,monkeypatch):
+    """Manifest may only exist after conversion starts: picker still works."""
+    from components.inputs.project_workbooks import registered_project_source
+    runtime,edb,original,pointer=_setup(tmp_path)
+    export=tmp_path/"export"
+    export.mkdir()
+    (export/"OpenSees_Element_Connectivity.json").write_text(
+        json.dumps({"source_edb": str(edb)}))
+    # The resolver's repository registry lives under its own module root.
+    # Override the file-based lookup by invoking in a copied isolated
+    # version of the resolver's code with a controlled module path.
+    import components.inputs.project_workbooks as pw
+    class FakeFile:
+        def __init__(self,path): self._path=path
+        def resolve(self): return self._path
+    monkeypatch.setattr(pw,"__file__",str(runtime/"components"/"inputs"/"project_workbooks.py"))
+    tk=types.ModuleType("tkinter")
+    tk._default_root=object()
+    picks=[]
+    tk.filedialog=types.SimpleNamespace(askopenfilename=lambda **kw: (
+        picks.append(kw),str(original))[1])
+    tk.messagebox=types.SimpleNamespace(showwarning=lambda *a,**k:None)
+    monkeypatch.setitem(sys.modules,"tkinter",tk)
+    got=registered_project_source(export,"etabs_full_table")
+    assert got==str(original.resolve())
+    assert len(picks)==1
+    private=json.loads((export/"project_sources.private.json").read_text())
+    assert private["sources"]["etabs_full_table"]["sha256"]==_sha(original.read_bytes())
+    # The second attempt must pick the stored full-size original, no dialog.
+    got2=registered_project_source(export,"etabs_full_table")
+    assert got2==got and len(picks)==1
+
+
+def test_downstream_registry_rejects_wrong_workbook(tmp_path,monkeypatch):
+    from components.inputs.project_workbooks import registered_project_source
+    import components.inputs.project_workbooks as pw
+    runtime,edb,original,pointer=_setup(tmp_path)
+    export=tmp_path/"export"
+    export.mkdir()
+    (export/"OpenSees_Element_Connectivity.json").write_text(
+        json.dumps({"source_edb":str(edb)}))
+    monkeypatch.setattr(pw,"__file__",str(runtime/"components"/"inputs"/"project_workbooks.py"))
+    original.write_bytes(b"NOT_THE_REGISTERED_XLSX")
+    tk=types.ModuleType("tkinter")
+    tk._default_root=object()
+    tk.filedialog=types.SimpleNamespace(askopenfilename=lambda **kw:str(original))
+    tk.messagebox=types.SimpleNamespace(showwarning=lambda *a,**k:None)
+    monkeypatch.setitem(sys.modules,"tkinter",tk)
+    with pytest.raises(ValueError,match="SHA256"):
+        registered_project_source(export,"etabs_full_table")
+    assert not (export/"project_sources.private.json").exists()
