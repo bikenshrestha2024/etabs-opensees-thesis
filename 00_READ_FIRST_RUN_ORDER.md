@@ -1,6 +1,6 @@
 # Start here - ETABS to OpenSeesPy research workflow
 
-Run **`01.py`** from the complete checkout for the main GUI.
+Run **`01_WORKFLOW_START.py`** from the complete checkout for the main GUI. The additional `01.py` is preserved as a compatible alias, not the canonical workflow label.
 For individual tools, use the [current launcher index](docs/programs/00_PROGRAM_INDEX.md).
 Keep the package intact, including `components/`, runtime facades and source guides.
 
