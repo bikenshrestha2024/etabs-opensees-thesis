@@ -39,7 +39,32 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     model=folder/'OpenSees_Complete_Model_Data_V118.json'
     with (folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').open(encoding='utf-8-sig') as stream:rows=list(csv.DictReader(stream))
     if not rows:raise ValueError('Reconciled seismic story weights are required.')
-    from components.modal.rayleigh_ledger_audit import verify_storey_coverage, verify_rayleigh_sum
+    try:
+        from components.modal.rayleigh_ledger_audit import verify_storey_coverage, verify_rayleigh_sum
+    except ModuleNotFoundError:
+        # Older independently exported OpenSees_Runtime_V118 bundles may not
+        # contain newly introduced optional helper files. Keep this historical
+        # launcher operational without changing its numerical model.
+        def verify_storey_coverage(diaps, ledger):
+            expected=[(int(d['storey_number']),int(d['master_tag'])) for d in diaps]
+            actual=[(int(r['story_number']),int(r['master_node_tag'])) for r in ledger]
+            if (not expected or len(set(expected))!=len(expected) or
+                len(set(actual))!=len(actual) or
+                len({tag for _,tag in expected})!=len(expected) or
+                len({tag for _,tag in actual})!=len(actual) or set(expected)!=set(actual)):
+                raise ValueError('Incomplete or duplicated Rayleigh diaphragm master ledger')
+            return len(actual)
+        def verify_rayleigh_sum(story_rows, *, g=9.81):
+            vals=[(float(r['weight_kN']),float(r['force_kN']),float(r['displacement_m'])) for r in story_rows]
+            if not vals or any(not all(math.isfinite(t) for t in row) or row[0]<=0 or row[1]<=0 for row in vals):
+                raise ValueError('Invalid Rayleigh storey terms')
+            num=math.fsum(w*d*d for w,f,d in vals)
+            den=g*math.fsum(f*d for w,f,d in vals)
+            if not math.isfinite(g) or g<=0 or num<=0 or den<=0:
+                raise ValueError('Invalid Rayleigh period denominator')
+            return {'storey_count':len(vals),'period_s':2*math.pi*math.sqrt(num/den),
+                    'status':'NUMERICAL_RECONSTRUCTION_ONLY'}
+
     with model.open(encoding='utf-8-sig') as stream: model_data=json.load(stream)
     covered_storeys=verify_storey_coverage(model_data['diaphragms'],rows)
     rows.sort(key=lambda r:float(r['height_m']))
