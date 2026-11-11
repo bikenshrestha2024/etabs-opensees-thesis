@@ -800,7 +800,9 @@ class NonlinearTimeHistoryGUI:
         self.x_count = ttk.Label(xrow, text=f"{len(self.x_record_paths)} files selected (SeismoMatch PEER text)")
         self.x_count.pack(side="left", fill="x", expand=True)
         ttk.Button(xrow, text="Select X records…", command=self._select_x_records).pack(side="left", padx=(5, 0))
-        ttk.Button(inputs, text="Inspect exact selected X/Y record durations (read-only)",\n                   command=self._show_record_durations).pack(anchor="w", pady=(3, 5))\n        self._entry(inputs, "Common X record scale factor", self.x_scale)
+        ttk.Button(inputs, text="Inspect exact selected X/Y record durations (read-only)",
+                   command=self._show_record_durations).pack(anchor="w", pady=(3, 5))
+        self._entry(inputs, "Common X record scale factor", self.x_scale)
         ttk.Label(inputs, text="X-only screening remains available separately; those records are not substituted for missing Y components. Pair defaults preserve the user-supplied PEER/SeismoMatch time histories and parse each component's own time step and units.", wraplength=1040, foreground="#45556b").pack(anchor="w", pady=(2, 5))
         self._entry(inputs, "Story master-node CSV", self.stories, lambda: self._browse(self.stories, "file", "Select story master-node mapping"))
         self._entry(inputs, "NLTHA readiness manifest", self.readiness, lambda: self._browse(self.readiness, "file", "Select completed OpenSees_Model_Readiness_V116.json"))
