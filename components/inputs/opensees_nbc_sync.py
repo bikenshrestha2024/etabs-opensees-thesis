@@ -103,6 +103,36 @@ def _source_snapshot(export_dir,state):
         else:
             approved[axis]=None
             evidence[axis]={'status':'NO_SOURCE_VERIFIED_WALL_INDEX'}
+    # Optional, manually reviewed connected-wall grouping based on original
+    # first-storey source slices. This does NOT mutate the continuous-pier
+    # diagnostic or override an EDB-matched original Excel calculation.
+    from components.inputs.grouped_wall_aw import source_matched_grouping
+    grouped=None
+    grouping_error=None
+    try:
+        grouped=source_matched_grouping(
+            folder, state, profile, v.get("wall_aw_height_m"),
+            _source_edb_path(folder), _hash(model))
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        grouping_error=str(exc)
+    if grouped is not None:
+        for axis in ('X','Y'):
+            candidate=_positive(grouped['aw_candidate_m2'].get(axis))
+            if candidate is not None:
+                evidence[axis]['historical_ubc_seaoc_grouped_candidate_m2']=candidate
+                evidence[axis]['historical_grouped_status']=grouped['status']
+                evidence[axis]['code_accepted']=False
+                # Source-matched explicit grouping is a more relevant NBC
+                # area *candidate* for perforated walls than independently
+                # weighted small piers, but never a code PASS.
+                approved[axis]=candidate
+                evidence[axis]['status']=grouped['status']
+        data['notes'].append(
+            'Source-matched grouped-wall Aw candidate uses minimum first-storey '
+            'area and overall wall length (UBC/SEAOC precedent); engineering '
+            'review REQUIRED, not equivalent to physical coupling verification.')
+    if grouping_error:
+        data['notes'].append('WALL_GROUPING_REVIEW_BLOCKED: ' + grouping_error)
     roof_height=None
     stories=None
     try:
@@ -127,6 +157,8 @@ def _source_snapshot(export_dir,state):
         'aw_evidence':evidence,
         'wall_aw_profile':profile,
         'continuous_pier_diagnostic':diagnostic,
+        'grouped_wall_aw_review':grouped,
+        'grouped_wall_aw_error':grouping_error,
         'opening_reduction_audit':(
             opening_reduction_audit(profile,height)
             if diagnostic is not None else None),
