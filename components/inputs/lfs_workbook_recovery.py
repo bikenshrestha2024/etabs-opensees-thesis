@@ -84,12 +84,14 @@ def recover_lfs_pointer(path, *, expected_sha256, timeout_seconds=180, log=None)
         return False, "GIT_LFS_RECOVERY_UNAVAILABLE"
 
 
-def _registered_source(runtime_root, edb, role):
+def _registered_source(runtime_root, edb, role, export_dir=None):
     """Pick only SHA-bound sources matching the selected physical EDB."""
     root = Path(runtime_root).resolve()
     edb_hash = digest(edb)
-    locations = [root / "project_sources.private.json",
-                 root / "excel" / "SOURCE_REGISTRY.json"]
+    locations = ([Path(export_dir).resolve() / "project_sources.private.json"]
+                 if export_dir is not None else [])
+    locations.extend([root / "project_sources.private.json",
+                      root / "excel" / "SOURCE_REGISTRY.json"])
     for registry in locations:
         if not registry.is_file():
             continue
@@ -120,7 +122,7 @@ def ensure_gui_workbooks(runtime_root, export_dir, edb, *, parent, log=None):
     if not edb.is_file():
         raise FileNotFoundError("Selected ETABS source EDB does not exist: "+str(edb))
     for role in ("etabs_full_table","etabs_assignment","nbc_calculator","slab_load_path"):
-        found = _registered_source(runtime_root, edb, role)
+        found = _registered_source(runtime_root, edb, role, export_dir)
         if found is None:
             continue
         path, expected, registry, edb_hash = found

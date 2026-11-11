@@ -144,3 +144,21 @@ def test_downstream_registry_rejects_wrong_workbook(tmp_path,monkeypatch):
     with pytest.raises(ValueError,match="SHA256"):
         registered_project_source(export,"etabs_full_table")
     assert not (export/"project_sources.private.json").exists()
+
+
+def test_preflight_reuses_private_original_after_first_selection(tmp_path, monkeypatch):
+    """The user should not browse again for the same EDB and verified source."""
+    runtime, edb, original, pointer = _setup(tmp_path)
+    tk = types.ModuleType("tkinter")
+    dialogs = []
+    tk.filedialog = types.SimpleNamespace(askopenfilename=lambda **k: (
+        dialogs.append(1), str(original))[1])
+    tk.messagebox = types.SimpleNamespace(showwarning=lambda *a, **k: None)
+    monkeypatch.setitem(sys.modules, "tkinter", tk)
+    out = tmp_path / "export"
+    ensure_gui_workbooks(runtime, out, edb, parent=None)
+    ensure_gui_workbooks(runtime, out, edb, parent=None)
+    assert len(dialogs) == 1
+    assert is_lfs_pointer(pointer)
+    private = json.loads((out / "project_sources.private.json").read_text())
+    assert private["sources"]["etabs_full_table"]["path"] == str(original.resolve())
