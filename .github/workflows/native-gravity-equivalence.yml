@@ -1,0 +1,32 @@
+name: Native gravity equivalence preflight safety
+
+on:
+  pull_request:
+    paths:
+      - "components/validation/gravity_native_equivalence_preflight.py"
+      - "components/gravity/gui_and_reports.py"
+      - "tests/test_gravity_native_equivalence_preflight.py"
+      - ".github/workflows/native-gravity-equivalence.yml"
+  push:
+    branches:
+      - "fix/gravity-equivalence-native-boundary-offset-preflight-20261111"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax / no native program execution
+        run: python -m py_compile components/gravity/gui_and_reports.py components/validation/gravity_native_equivalence_preflight.py tests/test_gravity_native_equivalence_preflight.py
+      - name: Install offline test requirements
+        run: python -m pip install --disable-pip-version-check pytest openpyxl
+      - name: Test source DOF and ETABS rigid end zone classification
+        run: python -m pytest -q tests/test_gravity_native_equivalence_preflight.py
