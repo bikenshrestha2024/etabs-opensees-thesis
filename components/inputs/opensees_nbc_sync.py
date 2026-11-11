@@ -24,7 +24,13 @@ from components.inputs.project_workbooks import (
 
 def _hash(path):
     p=Path(path)
-    return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+    if not p.is_file():
+        return None
+    digest=hashlib.sha256()
+    with p.open("rb") as reader:
+        for chunk in iter(lambda:reader.read(1048576),b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _positive(value):
@@ -151,6 +157,7 @@ def _source_snapshot(export_dir,state):
         'story_weights_sha256':_hash(ledger),
         'source_export_directory':str(folder),
         'story_count':stories,'seismic_height_m':roof_height,
+        'wall_aw_height_m':v.get('wall_aw_height_m'),
         'source_parameters':{k:v.get(k) for k in
             ('soil','Z','I','rmu','omegau','omegas','period_factor')},
         'aw_candidate_m2':approved,
@@ -414,7 +421,7 @@ def export_wall_grouping_review_template(export_dir, state):
         "source_edb_sha256": _hash(source),
         "assembled_model_sha256": snap["assembled_model_sha256"],
         "limit_state": state,
-        "height_m": float(snap['seismic_height_m']),
+        "height_m": float(snap['wall_aw_height_m']),
         "wall_groups": [],
         "source_slice_geometry_for_manual_mapping": profile['rows'],
         "historical_reference_example": snap.get('historical_ubc_seaoc_user_example'),
