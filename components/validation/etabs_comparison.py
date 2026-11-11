@@ -254,10 +254,18 @@ def launch(parent,folder,results_root=None):
   mapping_dir=(Path(results_root).expanduser().resolve() if results_root is not None
                else Path(folder)/'OpenSees_Analysis_Results')/'ETABS_Comparison_V148'
   previous=mapping_dir/'ETABS_API_Mapping_SELECTED.json'
-  if auto and (not previous.is_file() or
-     json.loads(previous.read_text(encoding='utf-8-sig')).get('source_edb')!=str(chosen)):
-   status.set('AUTO: no verified EDB-specific ETABS mapping; use Direct ETABS API first.')
-   return
+  if auto:
+   provenance=mapping_dir/'ETABS_API_Provenance.json'
+   from components.validation.etabs_direct_api import fingerprint
+   recorded=(json.loads(provenance.read_text(encoding='utf-8-sig'))
+             if provenance.is_file() else {})
+   source_hash=fingerprint(chosen)
+   if (not previous.is_file() or
+       json.loads(previous.read_text(encoding='utf-8-sig')).get('source_edb')!=str(chosen) or
+       recorded.get('edb_sha256')!=source_hash):
+    status.set('AUTO: no prior SHA-verified ETABS API mapping for this exact '
+               'EDB; use Direct ETABS API once to review case mapping.')
+    return
   config=(str(previous) if previous.is_file() and
           json.loads(previous.read_text(encoding='utf-8-sig')).get('source_edb')==str(chosen)
           else filedialog.askopenfilename(
