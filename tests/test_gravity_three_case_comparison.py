@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from components.gravity.three_case_comparison import collect_cases
+from components.gravity.three_case_comparison import collect_cases, export_case_comparison
 
 
 class TestThreeCaseGravity(unittest.TestCase):
@@ -33,6 +33,36 @@ class TestThreeCaseGravity(unittest.TestCase):
         self.assertEqual(set(available), {"32", "76"})
         self.assertEqual(len(missing), 1)
         self.assertIn("97", missing[0])
+
+    def test_partial_cases_export_missing_as_blank_not_keyerror(self):
+        def current(_root, _model, *, scenario, profile):
+            if scenario == "CONTINUOUS_WALL_BASE_FIXED":
+                return None
+            n = 32 if scenario == "ETABS_NONZERO_REACTION_DIAGNOSTIC" else 76
+            result = self.root / ("case_" + str(n) + ".json")
+            result.write_text(json.dumps({
+                "ok": True,
+                "reactions": [{"node_tag": i, "rz_kN": 100.0 / n}
+                              for i in range(n)],
+                "nodes": [{"tag": i, "ux_m": 0.0, "uy_m": 0.0,
+                           "uz_m": -0.001, "z_m": 0.0}
+                          for i in range(n)]
+            }))
+            return {"result_path": str(result), "applied_load_kN": 100.0,
+                    "summed_reaction_kN": 100.0,
+                    "equilibrium_error_percent": 0.0}
+        with patch("components.gravity.three_case_comparison.current_case", side_effect=current):
+            report, directory, _figure = export_case_comparison(self.root, self.model)
+        self.assertEqual(set(report["available_cases"]), {"32", "76"})
+        import csv
+        with (directory / "Support_Reactions_32_76_97.csv").open(encoding="utf-8-sig") as fp:
+            rows = list(csv.DictReader(fp))
+        self.assertEqual(len(rows), 76)
+        self.assertIn("rz_32_kN", rows[0])
+        self.assertIn("rz_76_kN", rows[0])
+        self.assertIn("rz_97_kN", rows[0])
+        self.assertEqual(rows[0]["rz_97_kN"], "")
+        self.assertEqual(rows[50]["rz_32_kN"], "")
 
     def test_load_discrepancy_is_blocker(self):
         def current(_root, _model, *, scenario, profile):
