@@ -22,8 +22,8 @@ class HistoryReviewExportTests(unittest.TestCase):
             self.assertTrue((root / "case" / "response.csv").is_file())
             self.assertEqual(manifest["status"], "REVIEW_EVIDENCE_NOT_ENGINEERING_ACCEPTANCE")
             with ZipFile(zip_path) as z:
-                self.assertIn("case/response.csv", z.namelist())
-                self.assertIn("case/run.log", z.namelist())
+                self.assertIn("Linear_Time_History/Tables/case/response.csv", z.namelist())
+                self.assertIn("Linear_Time_History/Logs/case/run.log", z.namelist())
                 self.assertNotIn("private.pem", z.namelist())
                 self.assertNotIn("old.zip", z.namelist())
                 details = json.loads(z.read("REVIEW_EVIDENCE_MANIFEST.json"))
@@ -33,6 +33,19 @@ class HistoryReviewExportTests(unittest.TestCase):
             self.assertNotEqual(newer, zip_path)
             with ZipFile(newer) as z:
                 self.assertNotIn(zip_path.name, z.namelist())
+
+    def test_latest_run_selected_without_unrelated_modules(self):
+        from components.ui.history_review_tools import choose_history_run_folder
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            lth = root / "LTH_ULS_Trial_0001"
+            esm = root / "ESM"
+            lth.mkdir();esm.mkdir()
+            (lth / "NBC105_Linear_Time_History_Summary_V115.json").write_text("{}")
+            (esm / "NBC105_ESM_Calculation.json").write_text("{}")
+            self.assertEqual(choose_history_run_folder(root, "linear"), lth)
+            with self.assertRaises(FileNotFoundError):
+                choose_history_run_folder(root, "nonlinear")
 
     def test_rejects_unrecognized_module(self):
         with tempfile.TemporaryDirectory() as folder:
