@@ -64,6 +64,35 @@ def populate_linear(gui, folder):
             if not model_matches or not implementation_matches:
                 inputs['notes'].append('UNVERIFIED STARTING REFERENCE: saved modal model/code fingerprint differs or is absent. Values are visible for inspection, not certified current. Rerun Modal audit for this selected export/state; nonlinear initial eigenanalysis and readiness checks remain required.')
             else:inputs['notes'].append('Model and numerical implementation fingerprints match the selected elastic modal case. Nonlinear initial stiffness is still checked separately.')
+    # The MRSM and LTH windows must use the same NBC §5.1.3 adopted
+    # directional T1 source. Previously this window cleared T1 X/Y, then
+    # relied on project inputs that can be blank when an EDB path differs.
+    # [REF components/response_spectrum/model_analysis.py mrsm_period_defaults]
+    # [REF NBC105-2025 §5.1.2–5.1.3] Empirical periods are NOT modal eigenperiods.
+    try:
+        from components.response_spectrum.model_analysis import mrsm_period_defaults
+        directional, period_note = mrsm_period_defaults(folder, v, gui.ls.get())
+        for axis in ('x', 'y'):
+            candidate = directional.get('T1_' + axis.upper())
+            if candidate not in (None, ''):
+                number = float(candidate)
+                if math.isfinite(number) and number > 0:
+                    getattr(gui, 't1' + axis).set(format(number, '.12g'))
+        inputs['notes'].append('Linear TH directional adopted T1: ' + period_note)
+        if 'research comparison only' in period_note.casefold():
+            inputs['notes'].append(
+                'RESEARCH ONLY: original linked workbook T1 was not derived '
+                'from a fresh current-model Rayleigh run. Validate the EDB '
+                'identity, Aw and directional periods before accepting TH.')
+        if not all(getattr(gui, 't1' + axis).get().strip()
+                   for axis in ('x', 'y')):
+            inputs['notes'].append(
+                'BLOCKED T1: no complete source-reviewed X/Y periods; '
+                'run ESM preliminary Rayleigh X/Y and refresh this window.')
+    except Exception as exc:
+        inputs['notes'].append(
+            'Directional period synchronization failed; T1 fields require '
+            'manual reviewed input: ' + str(exc))
     gui.project_input_audit=inputs
     return inputs
 
