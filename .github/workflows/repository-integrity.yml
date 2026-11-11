@@ -30,6 +30,7 @@ jobs:
         run: |
           python tools/audit_active_repository.py --output audit/active_inventory.json --fail-on-missing-canonical
           python -m unittest tests.verify_active_repository_audit tests.verify_gravity_reactions_3d -v
+          python -m unittest discover -s tests -p 'test_project_output_layout_v171.py' -v
       - name: Archive static inventory (not engineering validation)
         if: always()
         uses: actions/upload-artifact@v4
