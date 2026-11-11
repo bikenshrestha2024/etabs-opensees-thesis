@@ -167,3 +167,56 @@ def ensure_gui_workbooks(runtime_root, export_dir, edb, *, parent, log=None):
         private.write_text(json.dumps(data,indent=2),encoding="utf-8")
         if log:
             log("[LFS] Source-verified "+role+" selected in private registry (original unchanged).")
+
+
+def select_original_workbook_for_registered_pointer(
+    *, pointer, expected_sha256, export_dir, edb_hash, role, status):
+    """Interactive fallback at the *actual* registered-source resolution point.
+
+    The main GUI preflight can miss a source that is resolved only after the
+    converter has written current-model manifests. Do not fail there with a
+    suggestion to reopen the GUI; use the already-open Tk root, and register
+    the verified original workbook for the next run.
+    """
+    import tkinter as tk
+    from tkinter import filedialog, messagebox
+    root = getattr(tk, "_default_root", None)
+    if root is None:
+        raise ValueError(
+            "Workbook is a Git LFS pointer (" + str(status) + "): " + str(pointer) +
+            ". Interactive original workbook selection is unavailable. "
+            "Use the main ETABS GUI or provide a verified private source registry.")
+    messagebox.showwarning(
+        "Select original ETABS workbook",
+        "The repository ZIP contains a Git LFS pointer, not the actual workbook.\n\n"
+        "Automatic LFS recovery: " + str(status) + "\n\n"
+        "Select your ORIGINAL workbook for " + str(role) +
+        ". It must match the registered SHA256. Your EDB and source Excel "
+        "files will not be edited.", parent=root)
+    selected = filedialog.askopenfilename(
+        parent=root, title="Original source workbook: " + Path(pointer).name,
+        filetypes=[("Excel workbooks", "*.xlsx"), ("All files", "*.*")])
+    if not selected:
+        raise FileNotFoundError("Original Excel workbook not selected for " +
+                                str(role) + "; ETABS conversion stopped safely.")
+    source = Path(selected).resolve()
+    if not source.is_file() or is_lfs_pointer(source):
+        raise ValueError("Selected file is missing or itself a Git LFS pointer: " +
+                         str(source))
+    if digest(source) != expected_sha256:
+        raise ValueError("Selected original workbook SHA256 does not match the "
+                         "EDB-bound source registry for " + str(role) +
+                         ". No unverified workbook was substituted.")
+    private = Path(export_dir).resolve() / "project_sources.private.json"
+    if private.is_file():
+        data = json.loads(private.read_text(encoding="utf-8-sig"))
+        if data.get("source_edb_sha256") != edb_hash:
+            raise ValueError("Existing private registry is for a different EDB; "
+                             "refusing to change it: " + str(private))
+    else:
+        data = {"source_edb_sha256": edb_hash, "sources": {}}
+    data.setdefault("sources", {})[role] = {
+        "path": str(source), "sha256": expected_sha256}
+    private.parent.mkdir(parents=True, exist_ok=True)
+    private.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return source
