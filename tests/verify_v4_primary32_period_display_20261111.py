@@ -31,7 +31,7 @@ class V4PrimaryGravityAndESMDisplayTests(unittest.TestCase):
         self.assertIn('"ETABS Reaction Validation (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC"', s)
         self.assertIn('"ETABS Node Position (76 nodes)"', s)
         self.assertIn('"Continuous Wall Base (97 nodes)"', s)
-        self.assertIn("individual ETABS reactions are NOT yet equivalent", s)
+        self.assertIn("Joint agreement is checked separately", s)
         self.assertIn("def _view_saved_case(self):", s)
 
     def test_workbook_design_periods_not_mislabeled_eigenperiods(self):
