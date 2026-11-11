@@ -27,7 +27,8 @@ from pathlib import Path
 LINKED_PATTERN = '*_ETABS_LINKED_ESM.provenance.json'
 CONDITION_STATE = {'ultimate': 'ULS', 'service': 'SLS'}
 GEOMETRY_STATUSES = ('OPEN_SEES_GEOMETRY_CANDIDATE_REVIEW_REQUIRED',
-                     'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC')
+                     'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC',
+                     'SOURCE_MATCHED_GROUPED_WALL_AREA_REVIEW_REQUIRED')
 
 
 def _positive(value):
@@ -183,7 +184,10 @@ def resolve_aw(export_dir, state):
             out['labels'][axis] = status.replace('_', ' ') + ' (OpenSees geometry; not NBC accepted)'
         else:
             out['labels'][axis] = 'not filled: ' + status
-    out['method'] = 'OPEN_SEES_GEOMETRY_CANDIDATE'
+    out['method'] = ('SOURCE_MATCHED_GROUPED_WALL_AREA_REVIEW_REQUIRED'
+                     if any(out['labels'].get(axis, '').startswith(
+                         'SOURCE MATCHED GROUPED WALL AREA') for axis in ('X','Y'))
+                     else 'OPEN_SEES_GEOMETRY_CANDIDATE')
     out['evidence'] = snap['aw_evidence']
     out['assembled_model_sha256'] = snap['assembled_model_sha256']
     return out
