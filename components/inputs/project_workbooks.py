@@ -52,9 +52,16 @@ def registered_project_source(export_dir, role):
         path = Path(entry['path'])
         if not path.is_absolute():path=registry.parent/path
         if path.is_file():
-            with path.open('rb') as stream:
-                if stream.read(64).startswith(b'version https://git-lfs.github.com/spec/v1'):
-                    raise ValueError('Workbook is a Git LFS pointer; run git lfs pull in the repository: '+str(path))
+            from components.inputs.lfs_workbook_recovery import (
+                is_lfs_pointer, recover_lfs_pointer)
+            if is_lfs_pointer(path):
+                recovered, reason = recover_lfs_pointer(
+                    path, expected_sha256=entry.get('sha256'))
+                if not recovered:
+                    raise ValueError('Workbook contains only a Git LFS pointer ('+
+                        reason+'): '+str(path)+
+                        '. Open the main ETABS conversion GUI to select your '
+                        'original source workbook if automatic recovery is unavailable.')
         if not path.is_file() or digest(path) != entry.get('sha256'):
             raise ValueError('Registered source changed or missing: '+role)
         return str(path.resolve())
