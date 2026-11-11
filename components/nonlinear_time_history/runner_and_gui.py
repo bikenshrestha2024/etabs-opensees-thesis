@@ -915,6 +915,9 @@ class NonlinearTimeHistoryGUI:
             lines = ["READ-ONLY GROUND MOTION DURATION AUDIT",
                      "Duration = (NPTS - 1) × DT. No record editing, trimming or scaling.",
                      "These are input durations, not completed analysis durations.", ""]
+            total_full_case_seconds = 0.0
+            total_selected_analysis_seconds = 0.0
+            total_orientation_runs = 0
             for motion in motions:
                 nx = len(motion["x"])
                 dx = float(motion["dt_x"])
@@ -932,7 +935,19 @@ class NonlinearTimeHistoryGUI:
                 analyzed, full, status = _analysis_duration_s(
                     motion, "X_ONLY" if motion.get("mode") == "X_ONLY" else "XY", requested)
                 lines.append(f"    Planned analysis={analyzed:.6f} s / full={full:.6f} s | {status}")
+                orientation_count = 1 if motion.get("mode") == "X_ONLY" else 2
+                total_orientation_runs += orientation_count
+                total_full_case_seconds += full * orientation_count
+                total_selected_analysis_seconds += analyzed * orientation_count
                 lines.append("")
+            lines.extend([
+                "TOTALS (SUM OF INDEPENDENT CASE SIMULATION INTERVALS)",
+                f"Selected records/pairs: {len(motions)}",
+                f"Selected orientations: {total_orientation_runs}",
+                f"Full-case cumulative integration duration: {total_full_case_seconds:.3f} s",
+                f"Requested cumulative integration duration: {total_selected_analysis_seconds:.3f} s",
+                "This is NOT elapsed CPU/wall-clock time or a code acceptance result.",
+            ])
             dialog = tk.Toplevel(self.win)
             dialog.title("NLTHA — verified component and pair record durations")
             dialog.geometry("900x580")
