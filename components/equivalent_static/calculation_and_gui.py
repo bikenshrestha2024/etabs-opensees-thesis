@@ -738,9 +738,9 @@ class ESMGui:
                 f"Y Excel={y['original_excel_aw_m2']:.8g}, "
                 f"continuous={y['continuous_pier_diagnostic_m2']}; "+str(folder))
             messagebox.showinfo('NBC 105 Aw reconciliation',
-                'Read-only original Excel / current-source wall diagnostic saved:\\n'+
-                str(folder)+'\\n\\nA wall-by-wall match remains blocked unless '
-                'both sources have verified common physical wall IDs.\\n'
+                'Read-only original Excel / current-source wall diagnostic saved:\n'+
+                str(folder)+'\n\nA wall-by-wall match remains blocked unless '
+                'both sources have verified common physical wall IDs.\n'
                 'No source EDB or Excel calculation was changed.',
                 parent=self.root)
         except Exception as exc:
@@ -755,7 +755,7 @@ class ESMGui:
                 "ETABS-linked ESM: calculation versus structural response",
                 "The linked workbook contains the original NBC/ETABS-linked "
                 "calculation and source provenance. It does NOT by itself "
-                "contain a completed ETABS lateral analysis.\\n\\n"
+                "contain a completed ETABS lateral analysis.\n\n"
                 "For verified base shear, recovered storey shear, displacement "
                 "and drift, use 'Compare ETABS vs ESM/MRSM responses' and "
                 "supply completed, same-model ETABS results. OpenSees direct "
