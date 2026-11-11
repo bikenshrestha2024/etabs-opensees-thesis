@@ -41,8 +41,9 @@ def collect_cases(output_root, model_path, profile="GRAVITY_1.0D_1.0L"):
 
 
 def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L"):
-    """[REF docs/source/components/gravity/three_case_comparison.py.md] Source contract and engineering limitations in linked guide."""
-    """Write comparisons and plots from real registered solver responses only."""
+    """[REF docs/source/components/gravity/three_case_comparison.py.md]
+
+    Write comparisons and plots from real registered solver responses only."""
     available, missing = collect_cases(output_root, model_path, profile)
     root = Path(output_root) / "Gravity_Case_Comparison"
     root.mkdir(parents=True, exist_ok=True)
