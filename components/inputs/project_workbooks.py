@@ -16,7 +16,7 @@ SCALING='ULTIMATE LOAD  - NEPAL - 3 - BELT TRUSS, OUTRIGGER CAP TRUSS_NBC105_RS_
 
 SERVICE_SCALING='SERVICE LOAD  - NEPAL - 3 - BELT TRUSS, OUTRIGGER CAP TRUSS_NBC105_RS_Scaling_2.xlsx'
 
-def registered_project_source(export_dir, role):
+def registered_project_source(export_dir, role, *, missing_lfs='error'):
     """Resolve explicitly registered local sources, checking EDB and file hashes.
 
     Registry paths stay private. No filename-based model equivalence is inferred.
@@ -58,12 +58,19 @@ def registered_project_source(export_dir, role):
                 recovered, reason = recover_lfs_pointer(
                     path, expected_sha256=entry.get('sha256'))
                 if not recovered:
-                    # Registered optional evidence is not a physical EDB input.
-                    # Conversion's copy_project_workbooks() calls this resolver:
-                    # never launch a Tk dialog from an implicit copy step.
-                    # Explicit gravity/source validation still checks original
-                    # workbook identity and cannot mark missing evidence PASS.
-                    return None
+                    # Conversion's optional workbook-copy stage must never ask
+                    # for a private XLSX; explicit ETABS/gravity verification
+                    # still rejects LFS pointers and cannot silently PASS.
+                    if missing_lfs == 'skip':
+                        return None
+                    if missing_lfs != 'error':
+                        raise ValueError("Unsupported missing_lfs policy")
+                    raise ValueError(
+                        "Registered workbook is a Git LFS pointer; git lfs pull "
+                        "requires an actual clone and matching SHA256: " +
+                        str(path) + " (" + str(reason) + "). "
+                        "Select the original workbook only in the explicit "
+                        "gravity-native validation workflow.")
         if not path.is_file() or digest(path) != entry.get('sha256'):
             raise ValueError('Registered source changed or missing: '+role)
         return str(path.resolve())
@@ -96,7 +103,7 @@ def copy_project_workbooks(runtime_dir, export_dir):
     if current and Path(current).is_file() and not registry.exists():
         entries={}
         for role in ('nbc_calculator','nbc_engine','etabs_assignment','etabs_full_table','slab_load_path','etabs_linked_audit'):
-            path=registered_project_source(export_dir,role)
+            path=registered_project_source(export_dir,role,missing_lfs='skip')
             if path:
                 path=Path(path)
                 if path.name in (CALCULATOR,SCALING,SERVICE_SCALING) and (target/path.name).is_file():path=target/path.name
