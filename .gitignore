@@ -14,3 +14,21 @@ project_sources.private.json
 !excel/**/*.xlsm
 !excel/**/*.xls
 !excel/**/*.xlsb
+
+# Local tokens / credentials (tracked files must be revoked and untracked separately)
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+*.credentials
+*.token
+*.secrets.json
+
+# Potentially confidential generated analysis and audit packages
+Review_ZIPs/
+*_Review_UPLOAD.zip
+*security_history_private*
+security_history_private.json
