@@ -99,3 +99,32 @@ Publication regression: 214 tests and 5 subtests passed; reference tags passed;
 - **No edits:** Original EDB, original workbooks, gravity loads, supports, stiffness, model assembly, analysis algorithms, numerical output files, analysis ZIPs or earthquake records.
 - **Next native acceptance gate:** compare ETABS source auto end-offset/rigid factors and actual 32-node base constraints with OpenSees model; reproduce joint 263/264 reaction difference 3041.265778 kN and check joint 718 Uz before any physical correction. Use recovered frame/shell interface and story load audits already in main. Continue with independent modal/ESM/MRSM comparison and source provenance verification.
 - **NOT verified by this PR:** Spyder GUI on Windows, ETABS v23 COM run, OpenSees numerical regression, any ETABS-equivalence or code-compliance gate.
+
+## 2026-11-11 — Gravity / ESM / Modal corrective checkpoint
+
+Current source HEAD at start: `d0b9b2e1b2c097081aa9abd7fe42266199e29a69`.
+Changes committed directly to `main` in this checkpoint:
+
+- Gravity: `components/gravity/three_case_comparison.py` and GUI action produce an explicitly source-fingerprint-checked comparison of separately solved 32/76/97 support scenarios, with no changed physical restraints. Added synthetic regression test and source guide.
+- ESM: `components/equivalent_static/aw_reconciliation.py` and GUI action compare source-EDB-matched original Excel contributions with the separate OpenSees continuous-pier diagnostic. They intentionally reject unmatched EDBs and do not claim wall-by-wall equivalence where identifiers are missing. Label ETABS-linked workbook plots separately from solved OpenSees response plots.
+- Modal: `components/modal/rayleigh_ledger_audit.py` and `components/modal/rayleigh.py` check unique/exported diaphragm coverage, independently reconstruct Rayleigh quotient X/Y, and record numeric audit terms. Preserve V123 compatibility.
+- Compare: `components/validation/etabs_comparison.py` reports empty solved-response evidence instead of presenting a blank table as zero response.
+- Source guides and [REF] annotations added for new modules and existing untagged LFS/native-gravity audit modules.
+- Fixed ESM GUI literal newline escape regression found by CI at `28f02159`, corrected at `393ccdc4`.
+
+### Engineering acceptance NOT established
+
+- 32-primary support reactions globally balance ETABS, but local mapped reaction/stiffness/load-path differences remain. Native ETABS 6DOF restraint/edge-mesh/1,367 rigid-offset evidence is required.
+- Original Excel X Aw approx 1.95829363 m² versus continuous-pier geometric X approx 1.93063712 m²; Y approx 2.20308033 m² in both. No common first-storey wall-ID and opening mapping yet proves the exact source of X difference.
+- Native solved ETABS ESM/MRSM story shear, drift, displacement, reaction and mass/stiffness equivalence not demonstrated. An Excel worksheet and applied floor-force diagram are NOT solved structural response data.
+- Preliminary Rayleigh solver still needs full ETABS mass-bearing level inventory, physical stiffness, centre-of-mass, and torsion checks; matching exported diaphragm tags alone is insufficient.
+- Windows ETABS v23/OpenSeesPy actual-model numerical and GUI verification not executed in Linux CI; separately run ULS and SLS and preserve evidence.
+
+### Next reproducible engineering check
+
+1. On the source-matched model, complete separate gravity cases 32/76/97; click **Compare solved 32 / 76 / 97 + Excel**, then run native six-DOF support/end-offset preflight and map the largest per-joint errors.
+2. In the ESM GUI, run ETABS-linked original Excel (same verified EDB), then **Audit Excel vs continuous-pier Aw**; inspect source registers and identify actual opening/pier physical IDs before changing any Aw calculation.
+3. For X and Y and each ULS/SLS stiffness state, run all-storey Rayleigh and matching native ETABS modal/MRSM response cases; compare only same-case, same-unit, same-model results using the current comparison GUI.
+4. Review status from GitHub Actions for the newest commit. A syntax/documentation CI pass is not full ETABS-equivalence acceptance.
+
+Preserve all original source EDB, original Excel workbooks, old launchers, native records, results ZIPs and prior output paths. No structural model changes were performed in this checkpoint.
