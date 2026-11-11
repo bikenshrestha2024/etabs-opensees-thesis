@@ -172,7 +172,11 @@ def source_matched_grouping(export_dir, state, profile, height_m,
     edb = Path(source_edb) if source_edb else None
     if not edb or not edb.is_file():
         raise ValueError("Missing original EDB for grouped wall source verification")
-    digest = hashlib.sha256(edb.read_bytes()).hexdigest()
+    hasher = hashlib.sha256()
+    with edb.open("rb") as reader:
+        for chunk in iter(lambda: reader.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
     data = json.loads(manifest.read_text(encoding="utf-8-sig"))
     if (data.get("source_edb_sha256") != digest or
         data.get("assembled_model_sha256") != assembled_model_sha256 or
