@@ -621,6 +621,7 @@ class ESMGui:
         ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
         ttk.Button(footer,text='Excel sources…',command=self._choose_workbooks).pack(side='left',padx=3)
         ttk.Button(footer,text='Use original Excel Aw/T (research)',command=self._use_explicit_excel_calculation).pack(side='left',padx=3)
+        ttk.Button(footer,text='Audit Excel vs continuous-pier Aw',command=self._audit_wall_aw).pack(side='left',padx=3)
         ttk.Button(footer,text='Why are Aw/period fields blank?',command=self._show_source_diagnostics).pack(side='left',padx=3)
         ttk.Button(footer,text='Sync from OpenSees model',command=self._sync_opensees_inputs).pack(side='left',padx=3)
         ttk.Button(footer,text='Check live ETABS geometry (read-only)',command=lambda:self._sync_opensees_inputs(etabs=True)).pack(side='left',padx=3)
@@ -632,7 +633,7 @@ class ESMGui:
             button.grid(row=index//3,column=index%3,sticky='ew',padx=3,pady=3)
         for column in range(3):footer.columnconfigure(column,weight=1)
         self.esm_busy_bar=ttk.Progressbar(footer,mode='indeterminate')
-        self.esm_busy_bar.grid(row=4,column=0,columnspan=3,sticky='ew',padx=6,pady=2)
+        self.esm_busy_bar.grid(row=5,column=0,columnspan=3,sticky='ew',padx=6,pady=2)
         ttk.Label(footer,textvariable=self.esm_operation_state,
                   wraplength=920).grid(row=5,column=0,columnspan=3,
                                        sticky='w',padx=6,pady=2)
@@ -720,6 +721,31 @@ class ESMGui:
         ttk.Label(top,text="Workflow: ETABS exports provide story weights, elevations and diaphragm tags. This dialog calculates NBC actions and can execute a complete user-selected OpenSeesPy model-builder script. It does not directly open an ETABS EDB; ETABS API periods can be read when ETABS is open and its modal case has been run.",foreground="#8a341c",wraplength=1100).pack(anchor="w",pady=5)
         if self.path.get(): self._load_story_metadata(self.path.get())
         if self.story_source_note:self.status.set(self.story_source_note)
+
+    def _audit_wall_aw(self):
+        """Compare original Excel and geometric candidates without altering NBC inputs."""
+        try:
+            from components.equivalent_static.aw_reconciliation import export_reconciliation
+            state=self.state.get().strip().upper()
+            if state not in ('ULS','SLS'):
+                raise ValueError('Select one ULS or SLS state to audit Aw provenance.')
+            output=Path(self.outdir.get())/'Aw_Reconciliation'
+            report,folder=export_reconciliation(self.export_dir,state,output)
+            x=report['axes']['X'];y=report['axes']['Y']
+            self.status.set(
+                f"Aw comparison (not code acceptance): X Excel={x['original_excel_aw_m2']:.8g}, "
+                f"continuous={x['continuous_pier_diagnostic_m2']}; "
+                f"Y Excel={y['original_excel_aw_m2']:.8g}, "
+                f"continuous={y['continuous_pier_diagnostic_m2']}; "+str(folder))
+            messagebox.showinfo('NBC 105 Aw reconciliation',
+                'Read-only original Excel / current-source wall diagnostic saved:\\n'+
+                str(folder)+'\\n\\nA wall-by-wall match remains blocked unless '
+                'both sources have verified common physical wall IDs.\\n'
+                'No source EDB or Excel calculation was changed.',
+                parent=self.root)
+        except Exception as exc:
+            messagebox.showerror('Aw reconciliation requires source verification',
+                                 str(exc),parent=self.root)
 
     def _view_plots(self):
         # Do not present Python-generated applied-force charts as solved ETABS
