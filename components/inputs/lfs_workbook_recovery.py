@@ -17,6 +17,7 @@ LFS_MAGIC = b"version https://git-lfs.github.com/spec/v1"
 
 
 def is_lfs_pointer(path):
+    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md] Source contract and engineering limitations in linked guide."""
     path = Path(path)
     if not path.is_file():
         return False
@@ -25,6 +26,7 @@ def is_lfs_pointer(path):
 
 
 def digest(path):
+    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md] Source contract and engineering limitations in linked guide."""
     h = hashlib.sha256()
     with Path(path).open("rb") as handle:
         for chunk in iter(lambda:handle.read(1024 * 1024), b""):
@@ -41,6 +43,7 @@ def _checkout(path):
 
 
 def recover_lfs_pointer(path, *, expected_sha256, timeout_seconds=180, log=None):
+    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md] Source contract and engineering limitations in linked guide."""
     """Try git lfs pull in place, verify bytes, report nonfatal failure.
 
     No direct arbitrary download URLs or manual credential prompts.
@@ -109,6 +112,7 @@ def _registered_source(runtime_root, edb, role, export_dir=None):
 
 
 def ensure_gui_workbooks(runtime_root, export_dir, edb, *, parent, log=None):
+    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md] Source contract and engineering limitations in linked guide."""
     """Recover (or browse for) only registered LFS-pointer source workbooks.
 
     The dialog is triggered only after automatic Git LFS fails; exact source
@@ -173,6 +177,7 @@ def ensure_gui_workbooks(runtime_root, export_dir, edb, *, parent, log=None):
 
 def select_original_workbook_for_registered_pointer(
     *, pointer, expected_sha256, export_dir, edb_hash, role, status):
+    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md] Source contract and engineering limitations in linked guide."""
     """Interactive fallback at the *actual* registered-source resolution point.
 
     The main GUI preflight can miss a source that is resolved only after the
