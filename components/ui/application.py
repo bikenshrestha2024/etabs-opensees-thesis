@@ -2928,6 +2928,15 @@ class App:
             with open(self._log_path,"w",encoding="utf-8") as lf:
                 lf.write(f"ETABS to OpenSeesPy conversion log\nStarted: {time.strftime('%Y-%m-%d %H:%M:%S')}\nSource EDB: {self.edb.get().strip()}\n\n")
             self.log(f"Detailed timestamped log: {self._log_path}")
+            from components.inputs.project_output_layout import create_project_layout
+            context = create_project_layout(self.edb.get().strip(), log_dir)
+            self.log("[PROJECT_SOURCE] EDB SHA256: " +
+                     context["source_edb_sha256"])
+            self.log("[PROJECT_OUTPUT] Root: " + context["output_root"] +
+                     " | Manifest: " +
+                     str(log_dir / "00_SOURCE_MANIFEST" / "PROJECT_CONTEXT.json"))
+            self.log("[PROJECT_OUTPUT] Existing legacy analysis locations are "
+                     "preserved until module output readers are migrated.")
             # Core conversion uses the selected EDB through ETABS OAPI, NOT a
             # historical full-table XLSX. A Git LFS pointer or absent optional
             # workbook must not interrupt geometry/section/load extraction.
