@@ -697,6 +697,39 @@ class GravityAnalysisGUI:
         self.status_var.set("UPLOAD ZIP: "+paths["upload_zip"])
         return report,paths
 
+    def _export_organized_evidence(self):
+        """[REF docs/source/components/ui/organized_results.py.md] Snapshot only."""
+        if self._gravity_busy:
+            messagebox.showwarning('Gravity busy','Finish the solver before packaging results.',
+                                   parent=self.win)
+            return
+        from components.inputs.project_workbooks import analysis_output_folder,source_limit_state
+        from components.ui.organized_results import publish_organized_results
+        try:
+            model=Path(self.model_var.get()).expanduser().resolve()
+            if not model.is_file():
+                raise FileNotFoundError('Choose the current generated OpenSees gravity model.')
+            state,_=source_limit_state(model.parent)
+            root=analysis_output_folder(model.parent,state or 'ULS')
+            gravity=Path(self.output_var.get()).expanduser().resolve()
+            if not root.is_dir():
+                root=gravity
+                optional=None
+            else:
+                optional=gravity if gravity.is_dir() and gravity!=root else None
+            report=publish_organized_results(root,gravity_root=optional)
+            self._gravity_action_log('ORGANIZED_ALL_MODULE_ZIP',
+                                     report['zip_files']['ALL_MODULES'])
+            self.status_var.set('Categorized review ZIP: '+report['zip_files']['ALL_MODULES'])
+            messagebox.showinfo('Organized analysis evidence',
+                'All-module upload ZIP: '+report['zip_files']['ALL_MODULES']+
+                ' | Manifest: '+report['manifest']+
+                ' | Original solver outputs remain unchanged.',
+                parent=self.win)
+        except Exception as exc:
+            self._gravity_action_log('ORGANIZED_EXPORT_ERROR',str(exc))
+            messagebox.showerror('Organized evidence',str(exc),parent=self.win)
+
     def _export_comparison_bundle(self):
         """Prepare one central evidence ZIP and log its exact upload location."""
         try:
@@ -949,6 +982,7 @@ class GravityAnalysisGUI:
                    command=self._audit_native_equivalence).pack(side="left",padx=5)
         ttk.Button(actions,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
         ttk.Button(actions,text="Bundle gravity evidence ZIP",command=self._export_comparison_bundle).pack(side="left",padx=5)
+        ttk.Button(actions,text='Export organized all-module ZIPs',command=self._export_organized_evidence).pack(side='left',padx=5)
         def load_path():
             try:
                 path=__import__('OpenSees_Load_Path_V141').export(Path(self.model_var.get()).parent)
