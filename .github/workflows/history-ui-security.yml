@@ -1,0 +1,44 @@
+name: History GUI and public-source security checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'components/ui/history_review_tools.py'
+      - 'components/ui/history_results.py'
+      - 'components/linear_time_history/runner_and_gui.py'
+      - 'components/nonlinear_time_history/runner_and_gui.py'
+      - 'tests/test_history_review_tools.py'
+      - 'tools/security_audit.py'
+      - '.github/workflows/history-ui-security.yml'
+  pull_request:
+    paths:
+      - 'components/ui/history_review_tools.py'
+      - 'components/ui/history_results.py'
+      - 'components/linear_time_history/runner_and_gui.py'
+      - 'components/nonlinear_time_history/runner_and_gui.py'
+      - 'tests/test_history_review_tools.py'
+      - 'tools/security_audit.py'
+
+permissions:
+  contents: read
+
+jobs:
+  python-and-secret-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile modified modules (syntax only)
+        run: |
+          python -m py_compile components/ui/history_review_tools.py components/ui/history_results.py components/linear_time_history/runner_and_gui.py components/nonlinear_time_history/runner_and_gui.py tools/security_audit.py
+      - name: Verify local review archives
+        run: python -m unittest discover -s tests -p 'test_history_review_tools.py' -v
+      - name: Redacted tracked-source secret scan
+        run: python tools/security_audit.py --repo .
