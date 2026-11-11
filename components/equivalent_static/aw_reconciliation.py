@@ -15,6 +15,7 @@ from components.inputs.aw_sources import (
 
 
 def reconcile(export_dir, state, *, audit_path=None):
+    """[REF docs/source/components/equivalent_static/aw_reconciliation.py.md] Source contract and engineering limitations in linked guide."""
     from components.inputs.project_workbooks import _source_edb_path
     from components.inputs.opensees_nbc_sync import _source_snapshot
     current_edb = _source_edb_path(export_dir)
@@ -76,6 +77,7 @@ def reconcile(export_dir, state, *, audit_path=None):
 
 
 def export_reconciliation(export_dir, state, output_dir, *, audit_path=None):
+    """[REF docs/source/components/equivalent_static/aw_reconciliation.py.md] Source contract and engineering limitations in linked guide."""
     report = reconcile(export_dir, state, audit_path=audit_path)
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
