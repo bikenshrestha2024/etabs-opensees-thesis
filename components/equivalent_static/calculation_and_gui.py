@@ -649,6 +649,7 @@ class ESMGui:
                            self.root,self.export_dir,
                            results_root=self.outdir.get())).pack(side='left',padx=3)
         self.run_button=ttk.Button(footer,text='2. Run exported cases',command=self._run_generated,state='disabled');self.run_button.pack(side='left',padx=3)
+        self.esm_cancel_button=ttk.Button(footer,text='Cancel ESM batch',command=self._cancel_generated,state='disabled');self.esm_cancel_button.pack(side='left',padx=3)
         ttk.Button(footer,text='Open output folder',command=self._open_export_folder).pack(side='left',padx=3)
         ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
         ttk.Button(footer,text='Excel sources…',command=self._choose_workbooks).pack(side='left',padx=3)
@@ -1610,47 +1611,129 @@ class ESMGui:
             self._set_esm_operation("BLOCKED",str(exc))
             self.status.set("Blocked: "+str(exc)); messagebox.showerror("ESM calculation blocked",str(exc))
 
+    def _cancel_generated(self):
+        """Cancel the current case without killing the Tk application."""
+        self._esm_cancel_requested = True
+        proc = getattr(self, "_esm_active_proc", None)
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.terminate()
+            except OSError:
+                pass
+        self.status.set("Cancellation requested. Current case is stopping; earlier evidence is retained.")
+
     def _run_generated(self):
+        if getattr(self, "_esm_running", False):
+            return
         if not self.last_runners:
-            messagebox.showerror("No generated cases","Calculate the selected ESM case(s) first."); return
+            messagebox.showerror("No generated cases", "Calculate the selected ESM case(s) first.")
+            return
         if not Path(self.model_script.get()).is_file():
-            messagebox.showerror("Model builder required","Select a complete OpenSeesPy model-building script first."); return
+            messagebox.showerror("Model builder required", "Select a complete OpenSeesPy model-building script.")
+            return
         if not Path(self.python_exe.get()).is_file():
-            messagebox.showerror("Python executable required","Select the Python executable with OpenSeesPy installed."); return
+            messagebox.showerror("Python required", "Select the Python executable with OpenSeesPy.")
+            return
+        output = Path(self.outdir.get()).resolve()
+        output.mkdir(parents=True, exist_ok=True)
+        scripts = [Path(p).resolve() for p in self.last_runners]
+        missing = [str(p) for p in scripts if not p.is_file()]
+        if missing:
+            messagebox.showerror("Missing exported cases", "\n".join(missing))
+            return
+        self._esm_cancel_requested = False
+        self._esm_running = True
+        self._esm_active_proc = None
         self.run_button.configure(state="disabled")
-        self._set_esm_operation("RUNNING",
-            "OpenSeesPy analysis | 0 of "+str(len(self.last_runners))+" cases")
-        self.status.set("Running OpenSeesPy ESM case(s)… per-case logs are being written to the output folder.")
+        self.esm_cancel_button.configure(state="normal")
+        self._set_esm_operation("RUNNING", f"0/{len(scripts)} ESM cases")
+        self.status.set("Starting ESM child-process batch; progress and errors saved per case.")
+        import datetime
+        batch_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        batch_folder = output / "ESM_Runner_Status" / batch_id
+        batch_folder.mkdir(parents=True, exist_ok=False)
+        state_file = batch_folder / "CASE_STATUS.json"
         def worker():
-            outcomes=[]
-            for script in self.last_runners:
-                try:
-                    proc=subprocess.Popen([self.python_exe.get(),'-u',script],cwd=self.outdir.get(),stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True, env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'}, encoding='utf-8')
-                    chunks=[]
-                    for line in proc.stdout:
-                        chunks.append(line);self.root.after(0,lambda text=line:self.status.set(text.rstrip()))
-                    proc.wait();proc.stdout=''.join(chunks);proc.stderr='' 
-                    self.root.after(0,lambda script=script:self._set_esm_operation(
-                        "RUNNING","Finished case "+Path(script).stem+
-                        " | collecting solver status"))
-                    log_path=Path(self.outdir.get())/("GUI_Run_"+Path(script).stem+".log")
-                    safe_write(log_path,"COMMAND: "+repr([self.python_exe.get(),script])+"\nRETURN CODE: "+str(proc.returncode)+"\n--- STDOUT ---\n"+proc.stdout+"\n--- STDERR ---\n"+proc.stderr)
-                    outcomes.append((Path(script).name,proc.returncode,str(log_path)))
-                except Exception as exc:
-                    outcomes.append((Path(script).name,-999,str(exc)))
-            def done():
-                self.run_button.configure(state="normal")
-                completed=bool(outcomes) and all(code==0 for _,code,_ in outcomes)
-                self._set_esm_operation("FINISHED" if completed else "BLOCKED",
-                    str(sum(code==0 for _,code,_ in outcomes))+
-                    " of "+str(len(outcomes))+" OpenSees earthquake cases converged")
-                lines=[f"{name}: {'SUCCESS' if code==0 else 'FAILED'} | {log}" for name,code,log in outcomes]
-                self.status.set("OpenSeesPy earthquake cases finished.\n"+"\n".join(lines))
-                self._auto_bundle_seismic_review()
-                if all(code==0 for _,code,_ in outcomes): messagebox.showinfo("ESM analysis complete",self.status.get())
-                else: messagebox.showerror("ESM analysis needs review",self.status.get())
-            self.root.after(0,done)
-        threading.Thread(target=worker,daemon=True).start()
+            outcomes = []
+            try:
+                for index, script in enumerate(scripts, 1):
+                    if self._esm_cancel_requested:
+                        break
+                    started = time.monotonic()
+                    log_path = batch_folder / ("GUI_Run_" + script.stem + ".log")
+                    proc = None
+                    timeout_seconds = 7200  # fail visibly instead of waiting forever
+                    timed_out = False
+                    try:
+                        args = [self.python_exe.get(), "-u", str(script)]
+                        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
+                        proc = subprocess.Popen(args, cwd=str(output),
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace", bufsize=1, env=env)
+                        self._esm_active_proc = proc
+                        self.root.after(0, lambda i=index, n=len(scripts), p=proc.pid:
+                            self._set_esm_operation("RUNNING", f"Case {i}/{n} | PID {p}"))
+                        def watch():
+                            nonlocal timed_out
+                            while proc.poll() is None:
+                                if self._esm_cancel_requested:
+                                    proc.terminate()
+                                    return
+                                if time.monotonic() - started > timeout_seconds:
+                                    timed_out = True
+                                    proc.terminate()
+                                    return
+                                time.sleep(0.5)
+                        threading.Thread(target=watch, daemon=True).start()
+                        # The log is streamed to disk: no unbounded in-memory
+                        # stdout accumulation and no Tk widgets touched from worker.
+                        with log_path.open("w", encoding="utf-8") as sink:
+                            sink.write("COMMAND: " + repr(args) + "\nPID: " + str(proc.pid) + "\n")
+                            for line in proc.stdout:
+                                sink.write(line)
+                                sink.flush()
+                            proc.wait()
+                            sink.write("\nRETURN CODE: " + str(proc.returncode) + "\n")
+                        rc = proc.returncode
+                        status = ("CANCELLED" if self._esm_cancel_requested
+                                  else "TIMEOUT" if timed_out else
+                                  "SUCCESS" if rc == 0 else "FAILED")
+                        message = str(log_path)
+                    except Exception as exc:
+                        rc, status, message = -999, "FAILED", str(exc)
+                    finally:
+                        self._esm_active_proc = None
+                    entry = {"case": script.name, "status": status,
+                             "return_code": rc, "log": str(log_path),
+                             "elapsed_s": round(time.monotonic() - started, 3),
+                             "error": message if status == "FAILED" else ""}
+                    outcomes.append(entry)
+                    state_file.write_text(json.dumps(outcomes, indent=2), encoding="utf-8")
+                    self.root.after(0, lambda i=index, n=len(scripts), e=entry:
+                        self.status.set(f"{i}/{n} | {e['case']} | {e['status']} | "
+                                        f"{e['elapsed_s']} s | {e['log']}"))
+                    if status in ("CANCELLED", "TIMEOUT"):
+                        break
+            finally:
+                def done():
+                    self._esm_running = False
+                    self._esm_active_proc = None
+                    self.run_button.configure(state="normal")
+                    self.esm_cancel_button.configure(state="disabled")
+                    passed = sum(x["status"] == "SUCCESS" for x in outcomes)
+                    completed = len(outcomes) == len(scripts) and passed == len(scripts)
+                    self._set_esm_operation("FINISHED" if completed else "BLOCKED",
+                        f"{passed}/{len(scripts)} returned exit 0 | {state_file}")
+                    self.status.set("ESM batch complete. Status manifest: " + str(state_file))
+                    self._auto_bundle_seismic_review()
+                    if completed:
+                        messagebox.showinfo("ESM child processes finished",
+                            f"{passed}/{len(scripts)} returned exit 0. Review engineering gates separately.\n{state_file}")
+                    else:
+                        messagebox.showwarning("ESM batch incomplete",
+                            f"{passed}/{len(scripts)} returned exit 0. Remaining cases were not validated.\n{state_file}")
+                self.root.after(0, done)
+        threading.Thread(target=worker, daemon=True).start()
 
 
 def main():
