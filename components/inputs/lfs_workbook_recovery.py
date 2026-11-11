@@ -194,7 +194,7 @@ def select_original_workbook_for_registered_pointer(
     if root is None:
         raise ValueError(
             "Workbook is a Git LFS pointer (" + str(status) + "): " + str(pointer) +
-            ". Interactive original workbook selection is unavailable. "
+            ". Automatic git lfs pull requires a real Git checkout and cannot operate on a ZIP without .git metadata. Interactive original workbook selection is unavailable. "
             "Use the main ETABS GUI or provide a verified private source registry.")
     messagebox.showwarning(
         "Select original ETABS workbook",
