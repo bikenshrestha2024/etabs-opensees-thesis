@@ -43,8 +43,9 @@ def _checkout(path):
 
 
 def recover_lfs_pointer(path, *, expected_sha256, timeout_seconds=180, log=None):
-    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md] Source contract and engineering limitations in linked guide."""
-    """Try git lfs pull in place, verify bytes, report nonfatal failure.
+    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md]
+
+    Try git lfs pull in place, verify bytes, report nonfatal failure.
 
     No direct arbitrary download URLs or manual credential prompts.
     A failed/absent Git LFS process leaves the pointer in place.
@@ -112,8 +113,9 @@ def _registered_source(runtime_root, edb, role, export_dir=None):
 
 
 def ensure_gui_workbooks(runtime_root, export_dir, edb, *, parent, log=None):
-    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md] Source contract and engineering limitations in linked guide."""
-    """Recover (or browse for) only registered LFS-pointer source workbooks.
+    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md]
+
+    Recover (or browse for) only registered LFS-pointer source workbooks.
 
     The dialog is triggered only after automatic Git LFS fails; exact source
     SHA256 and EDB identity are mandatory. Overrides are written solely to a
@@ -177,8 +179,9 @@ def ensure_gui_workbooks(runtime_root, export_dir, edb, *, parent, log=None):
 
 def select_original_workbook_for_registered_pointer(
     *, pointer, expected_sha256, export_dir, edb_hash, role, status):
-    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md] Source contract and engineering limitations in linked guide."""
-    """Interactive fallback at the *actual* registered-source resolution point.
+    """[REF docs/source/components/inputs/lfs_workbook_recovery.py.md]
+
+    Interactive fallback at the *actual* registered-source resolution point.
 
     The main GUI preflight can miss a source that is resolved only after the
     converter has written current-model manifests. Do not fail there with a
