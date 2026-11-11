@@ -76,7 +76,7 @@ def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L")
         for label, _ in CASES:
             r = reactions_by_case.get(label, {}).get(tag)
             row["rz_" + label + "_kN"] = float(r["rz_kN"]) if r else None
-        if row["rz_32_kN"] is not None and row["rz_76_kN"] is not None:
+        if row.get("rz_32_kN") is not None and row.get("rz_76_kN") is not None:
             row["delta_76_minus_32_kN"] = row["rz_76_kN"] - row["rz_32_kN"]
         else:
             row["delta_76_minus_32_kN"] = None
