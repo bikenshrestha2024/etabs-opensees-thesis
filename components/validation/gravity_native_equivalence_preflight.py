@@ -49,8 +49,9 @@ def _offset(raw):
 
 
 def assess(source_folder, *, primary_audit=None):
-    """[REF docs/source/components/validation/gravity_native_equivalence_preflight.py.md] Source contract and engineering limitations in linked guide."""
-    """Assess evidence without changing supports, stiffness, or load cases.
+    """[REF docs/source/components/validation/gravity_native_equivalence_preflight.py.md]
+
+    Assess evidence without changing supports, stiffness, or load cases.
 
     Input exported model data must be the ORIGINAL assembled source-support
     configuration, not a model mutated in memory by the 32-node scenario.
@@ -153,8 +154,9 @@ def assess(source_folder, *, primary_audit=None):
 
 
 def export(source_folder, output_folder, *, primary_audit=None):
-    """[REF docs/source/components/validation/gravity_native_equivalence_preflight.py.md] Source contract and engineering limitations in linked guide."""
-    """Write new audit outputs atomically; never overwrite an existing audit."""
+    """[REF docs/source/components/validation/gravity_native_equivalence_preflight.py.md]
+
+    Write new audit outputs atomically; never overwrite an existing audit."""
     report = assess(source_folder, primary_audit=primary_audit)
     target = Path(output_folder).expanduser().resolve()
     if target.exists() and any(target.iterdir()):
