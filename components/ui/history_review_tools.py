@@ -19,6 +19,7 @@ def attach_text_scrollbar(parent, text):
     """Pack a Text widget and its vertical/horizontal scrollbar in a shared frame.
 
     text must have parent as its Tk master. The GUI/event loop owns all widgets.
+    [REF components/ui/history_results.py] GUI scroll interaction convention.
     """
     from tkinter import ttk
     text.configure(wrap="none")
@@ -38,6 +39,7 @@ def choose_history_run_folder(folder, analysis):
 
     Do not automatically archive unrelated Gravity/ESM/MRSM folders merely
     because the GUI stores a common analysis-results root.
+    [REF docs/review/20261111_HISTORY_GUI_SECURITY_AND_PHYSICS.md] Review-only source isolation.
     """
     root = Path(folder).expanduser().resolve(strict=True)
     if not root.is_dir():
@@ -82,6 +84,7 @@ def export_review_zip(output_dir, analysis, *, max_file_bytes=512 * 1024 * 1024)
     Excludes symbolic links, existing archives, hidden files, generated ZIPs,
     and unusually large files. Manifest records exclusions, file SHA256 and
     explicit diagnostic/non-acceptance status. No original file is moved.
+    [REF engineering/rules/PROVENANCE.md] Immutable source evidence and hashes.
     """
     root = Path(output_dir).expanduser().resolve(strict=True)
     if not root.is_dir():
@@ -129,7 +132,10 @@ def export_review_zip(output_dir, analysis, *, max_file_bytes=512 * 1024 * 1024)
 
 
 def export_review_zip_dialog(parent, output_dir, analysis):
-    """User-triggered local export with privacy confirmation and clear errors."""
+    """User-triggered local export with privacy confirmation and clear errors.
+
+    [REF engineering/rules/CORE_RULES.md] Keep source data private and unmodified.
+    """
     from tkinter import messagebox
     try:
         selected_run = choose_history_run_folder(output_dir, analysis)
