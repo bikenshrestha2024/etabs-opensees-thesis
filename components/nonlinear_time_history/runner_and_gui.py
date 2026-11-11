@@ -746,7 +746,7 @@ class NonlinearTimeHistoryGUI:
                 self.output.set(str(analysis_output_folder(path.resolve().parent,self.ls.get())))
             result = populate_linear(self,path.resolve().parent)
             self.log.insert('end','[NLTHA PERIOD SOURCE] ' +
-                            ' '.join(result.get('notes',[])) + '\\n')
+                            ' '.join(result.get('notes',[])) + '\n')
         except Exception as exc:
             self.log.insert('end','[NLTHA PERIOD SOURCE BLOCKED] '+str(exc)+'\n')
 
