@@ -2928,6 +2928,13 @@ class App:
             with open(self._log_path,"w",encoding="utf-8") as lf:
                 lf.write(f"ETABS to OpenSeesPy conversion log\nStarted: {time.strftime('%Y-%m-%d %H:%M:%S')}\nSource EDB: {self.edb.get().strip()}\n\n")
             self.log(f"Detailed timestamped log: {self._log_path}")
+            # A GitHub ZIP may have LFS pointer text in place of a 531 MB XLSX.
+            # Recover automatically in a real clone; otherwise ask for the
+            # original checksum-verified file before starting ETABS extraction.
+            from components.inputs.lfs_workbook_recovery import ensure_gui_workbooks
+            ensure_gui_workbooks(
+                Path(__file__).resolve().parents[2],
+                log_dir,self.edb.get().strip(),parent=self.root,log=self.log)
             result=convert_model(self.edb.get().strip(),self.out.get().strip(),self.log,self.include_live.get())
             self._last_exports=result
             report_path=Path(self.out.get())/'OpenSees_Complete_Export_Report_V118.json'

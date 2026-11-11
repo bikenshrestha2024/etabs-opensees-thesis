@@ -24,7 +24,17 @@ python 01.py
 ```
 
 A GitHub ZIP download can contain an LFS pointer instead of the workbook.
-The GUI detects this and explains that `git lfs pull` is required.
+The **main ETABS conversion GUI now checks the source workbook automatically**:
+in a true Git checkout with Git LFS installed it runs a targeted `git lfs pull`
+and independently verifies the workbook SHA256. In a GitHub ZIP without
+Git metadata, or when Git LFS fails, it opens a file selector for the
+**original unmodified Excel workbook**, validates its SHA256 against the
+EDB-bound source registry, and saves the chosen path to the private
+`<export>/project_sources.private.json` (never to tracked registry JSON).
+A missing, changed, cancelled or mismatched source blocks conversion; the
+GUI never treats a pointer as a legitimate XLSX. Manual Git commands are
+optional, not prerequisites. The existing ordered `01_WORKFLOW_START.py`
+and `01.py` launchers remain unchanged.
 [GitHub's ordinary file limit](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github)
 requires LFS for a file this large.
 
