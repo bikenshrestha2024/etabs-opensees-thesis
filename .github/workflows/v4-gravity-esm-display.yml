@@ -1,0 +1,35 @@
+name: V4 GUI label and launcher provenance safety
+
+on:
+  pull_request:
+    paths:
+      - "components/gravity/gui_and_reports.py"
+      - "components/equivalent_static/calculation_and_gui.py"
+      - "01_WORKFLOW_START.py"
+      - "01.py"
+      - "00_READ_FIRST_RUN_ORDER.md"
+      - "docs/programs/00_PROGRAM_INDEX.md"
+      - "tests/verify_v4_primary32_period_display_20261111.py"
+      - ".github/workflows/v4-gravity-esm-display.yml"
+  push:
+    branches:
+      - "fix/v4-current-main-period-display-launcher-docs-20261111"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile modified GUI and test modules
+        run: |
+          python -m py_compile components/gravity/gui_and_reports.py components/equivalent_static/calculation_and_gui.py tests/verify_v4_primary32_period_display_20261111.py
+      - name: Verify GUI labels and backwards-compatible launcher paths offline
+        run: python -m unittest discover -s tests -p 'verify_v4_primary32_period_display_20261111.py' -v
