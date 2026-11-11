@@ -1,0 +1,31 @@
+name: Auto LFS workbook recovery regression
+
+on:
+  pull_request:
+    paths:
+      - "components/inputs/lfs_workbook_recovery.py"
+      - "components/inputs/project_workbooks.py"
+      - "components/ui/application.py"
+      - "tests/test_lfs_workbook_recovery.py"
+      - ".github/workflows/auto-lfs-workbook-recovery.yml"
+  push:
+    branches: ["fix/auto-lfs-workbook-recovery-20261111"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-etabs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m py_compile components/inputs/lfs_workbook_recovery.py components/inputs/project_workbooks.py components/ui/application.py tests/test_lfs_workbook_recovery.py
+      - run: python -m pip install --disable-pip-version-check pytest
+      - run: python -m pytest -q tests/test_lfs_workbook_recovery.py
