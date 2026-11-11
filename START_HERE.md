@@ -2,7 +2,7 @@
 
 # V138 - compact gravity view, ULS/SLS comparison and staged building trial
 
-Launch 01.py. Rebuild the saved export to refresh its runtime. Older releases remain intact. No live D: files were changed by this work.
+Launch `01_WORKFLOW_START.py` (the original ordered entry point). `01.py` remains available as a compatibility wrapper. Rebuild the saved export to refresh its runtime. Older releases remain intact. No live D: files were changed by this work.
 
 ## Gravity view
 Plot controls now occupy two compact rows above the chart, with a narrow navigation row below. Camera presets and zoom remain available. The 3D model is enlarged with its physical aspect ratio retained. A native 1200x850 window check measured a 1196x705 plot canvas. Its size still depends on the available window height and screen scaling; no model geometry is stretched to fill the horizontal space.
