@@ -727,12 +727,22 @@ class NonlinearTimeHistoryGUI:
         from OpenSees_Linear_Autofill_V124 import populate_available
         ttk.Button(self.win,text='Refresh available project inputs',command=lambda:populate_available(self,role='nonlinear_model_script')).pack(anchor='w')
         self.win.after_idle(lambda:populate_available(self,role='nonlinear_model_script'))
-        self.model.trace_add('write',lambda *unused:self.win.after_idle(lambda:__import__('OpenSees_Linear_Autofill_V124').populate_linear(self,Path(self.model.get()).parent)) if self.model.get() else None)
-        self.ls.trace_add('write',lambda *unused:populate_available(self,role='nonlinear_model_script'))
-        # Keep nonlinear directional T1 synchronized with the same model/state
-        # source as linear TH and MRSM. This does not validate nonlinear
-        # initial-tangent stiffness or waive the separate readiness gate.
-        self.model.trace_add('write',lambda *_:self._refresh_known())
+        # Initial selection comes from the export manifest. Coalesce model and
+        # ULS/SLS changes into one deferred source-specific period refresh.
+        # Modal elastic periods remain references, not NLTHA stiffness approval.
+        self._period_refresh_queued = False
+        self.model.trace_add('write',lambda *_:self._queue_period_refresh())
+        self.ls.trace_add('write',lambda *_:self._queue_period_refresh())
+
+    def _queue_period_refresh(self):
+        if self._period_refresh_queued:
+            return
+        self._period_refresh_queued = True
+        self.win.after_idle(self._apply_period_refresh)
+
+    def _apply_period_refresh(self):
+        self._period_refresh_queued = False
+        self._refresh_known()
 
     def _refresh_known(self):
         """[REF components/inputs/analysis_autofill.py] Recompute source-bound periods."""
