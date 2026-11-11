@@ -563,13 +563,13 @@ class GravityAnalysisGUI:
                 raise ValueError("No matching 32/76/97 source-hash verified "
                                  "saved cases in the selected output root.")
             self._gravity_action_log("GRAVITY_ORGANIZED_INDEX",
-                                     "\\n".join(published))
+                                     "\n".join(published))
             self.status_var.set(f"Organized {len(published)} saved gravity cases; "
                                 "original large solver files remain unchanged.")
             messagebox.showinfo("Gravity case folders created",
-                "Organized case indexes and lightweight preview plots:\\n" +
-                "\\n".join(published) +
-                "\\n\\nFull solver files remain at their registered source paths.",
+                "Organized case indexes and lightweight preview plots:\n" +
+                "\n".join(published) +
+                "\n\nFull solver files remain at their registered source paths.",
                 parent=self.win)
         except (OSError, ValueError, KeyError, TypeError) as exc:
             messagebox.showerror("Organize gravity cases", str(exc),
