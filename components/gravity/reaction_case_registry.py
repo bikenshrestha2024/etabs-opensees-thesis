@@ -101,6 +101,73 @@ def checked_reaction_result(payload, model_path, *, scenario, profile,
         status="SOLVED_REACTIONS_NOT_ETABS_VALIDATED")
 
 
+def publish_gravity_case_index(output_root, record):
+    """[REF docs/source/components/gravity/reaction_case_registry.py.md]
+    Publish navigable case evidence in the project-selected Gravity folder.
+
+    Keep historical solver files exactly where their registered absolute paths
+    point; duplicate only small read-only plot previews and the case summary.
+    Never copy source EDB, original private spreadsheets or complete results.
+    """
+    from shutil import copy2
+    root = Path(output_root).resolve()
+    # The configured analysis root is .../<selection>/OpenSees_Analysis_Results/
+    # <ULS-or-SLS_model>. Fall back to the selected output itself for standalone
+    # gravity workflows without that recognizable parent.
+    selection = None
+    for ancestor in (root, *root.parents):
+        if ancestor.name == "OpenSees_Analysis_Results":
+            selection = ancestor.parent
+            break
+    if selection is None:
+        selection = root
+    destination_root = selection / "02_GRAVITY"
+    case_path = Path(record["result_path"]).resolve()
+    scenario = record["scenario"]
+    if scenario not in SCENARIO_SUPPORTS:
+        raise ValueError("Unrecognized gravity case identity")
+    # Case path hash avoids collisions even if run folders share a timestamp.
+    short = hashlib.sha256(str(case_path).encode("utf-8")).hexdigest()[:12]
+    case_dir = destination_root / scenario / (case_path.parent.name + "_" + short)
+    case_dir.mkdir(parents=True, exist_ok=True)
+    summary = {
+        "status": "SOLVER_RESULT_INDEXED_NOT_ETABS_VALIDATED",
+        "support_strategy": scenario,
+        "support_count": record["support_count"],
+        "gravity_profile": record["profile"],
+        "model_sha256": record["model_sha256"],
+        "result_path": str(case_path),
+        "original_full_run_folder": str(case_path.parent),
+        "applied_load_kN": record["applied_load_kN"],
+        "summed_reaction_kN": record["summed_reaction_kN"],
+        "equilibrium_error_percent": record["equilibrium_error_percent"],
+    }
+    (case_dir / "CASE_SUMMARY.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8")
+    (case_dir / "README_FIRST.txt").write_text(
+        "GRAVITY CASE — " + scenario + "\n" +
+        "Number of restrained support nodes: " + str(record["support_count"]) + "\n" +
+        "Full native solver reports and plots remain at:\n" +
+        str(case_path.parent) + "\n" +
+        "This directory is an organized INDEX + lightweight previews.\n" +
+        "Numerical equilibrium is not ETABS/OpenSees physical equivalence.\n",
+        encoding="utf-8")
+    (case_dir / "OPEN_FULL_LEGACY_RUN.url").write_text(
+        "[InternetShortcut]\nURL=" + case_path.parent.as_uri() + "\n",
+        encoding="utf-8")
+    for preview in ("Gravity_Reactions_V123.png",
+                    "Gravity_Deformation_V123.png"):
+        original = case_path.parent / preview
+        if original.is_file() and original.stat().st_size <= 20_000_000:
+            copy2(original, case_dir / preview)
+    (destination_root / "LATEST_GRAVITY_CASES.json").write_text(
+        json.dumps({"status": "INDEX_ONLY_NOT_ETABS_VALIDATED",
+                    "last_case": str(case_dir),
+                    "legacy_case_index": str(root / INDEX_NAME)}, indent=2),
+        encoding="utf-8")
+    return case_dir
+
+
 def register_case(output_root, run_result_path, model_path, *,
                   scenario, profile, expected_support_tags=None):
     """Index only a successful native solver result with a valid SHA256.
@@ -141,6 +208,14 @@ def register_case(output_root, run_result_path, model_path, *,
     text_tmp=text_path.with_suffix(".txt.tmp")
     text_tmp.write_text("\n".join(lines),encoding="utf-8")
     text_tmp.replace(text_path)
+    # Index creation is deterministic and preserves the full legacy record.
+    # Failure to build an optional preview must not invalidate solver evidence.
+    try:
+        publish_gravity_case_index(output_root, record)
+    except (OSError, ValueError) as exc:
+        (output_root / "Gravity_Organized_Index_Warning.txt").write_text(
+            "The solver result is preserved; organized preview failed: " +
+            str(exc), encoding="utf-8")
     return record
 
 
