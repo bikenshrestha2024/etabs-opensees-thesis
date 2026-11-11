@@ -974,22 +974,41 @@ class GravityAnalysisGUI:
         ttk.Label(bar,text="Selected condition: ").pack(side="left",padx=(12,2))
         ttk.Label(bar,textvariable=self.gravity_profile_var).pack(side="left")
         ttk.Label(bar,textvariable=self.wall_support_strategy_var).pack(side="left",padx=8)
-        actions=ttk.Frame(root); actions.pack(fill="x",pady=(0,7))
-        ttk.Button(actions,text="Export all action pages",command=self._export_all_pages).pack(side="left",padx=5)
-        ttk.Button(actions,text="View selected 32 / 76 / 97 saved case",command=self._view_saved_case).pack(side="left",padx=5)
-        ttk.Button(actions,text="Compare solved 32 / 76 / 97 + Excel",command=self._compare_three_saved_cases).pack(side="left",padx=5)
-        ttk.Button(actions,text="Audit ETABS support DOFs + rigid end zones",
-                   command=self._audit_native_equivalence).pack(side="left",padx=5)
-        ttk.Button(actions,text="Extract ETABS + compare gravity",command=self._direct_etabs_gravity_compare).pack(side="left",padx=5)
-        ttk.Button(actions,text="Bundle gravity evidence ZIP",command=self._export_comparison_bundle).pack(side="left",padx=5)
-        ttk.Button(actions,text='Export organized all-module ZIPs',command=self._export_organized_evidence).pack(side='left',padx=5)
+        # Keep actions visible at normal Windows DPI by grouping them into
+        # short functional rows; never depend on horizontal clipping to reach
+        # the support-case selector, comparison or evidence export controls.
+        actions=ttk.LabelFrame(root,text="Saved responses and engineering comparisons")
+        actions.pack(fill="x",pady=(0,3))
+        def action_row(parent):
+            row=ttk.Frame(parent)
+            row.pack(fill="x",padx=5,pady=2)
+            return row
+        review=action_row(actions)
+        ttk.Button(review,text="View saved 32 / 76 / 97 case",
+                   command=self._view_saved_case).pack(side="left",padx=4)
+        ttk.Button(review,text="Compare solved 32 / 76 / 97 + Excel",
+                   command=self._compare_three_saved_cases).pack(side="left",padx=4)
+        ttk.Button(review,text="Export member-action PDF pages",
+                   command=self._export_all_pages).pack(side="left",padx=4)
+        validation=action_row(actions)
+        ttk.Button(validation,text="Audit support DOFs / rigid end zones",
+                   command=self._audit_native_equivalence).pack(side="left",padx=4)
+        ttk.Button(validation,text="Extract ETABS and compare gravity",
+                   command=self._direct_etabs_gravity_compare).pack(side="left",padx=4)
         def load_path():
             try:
                 path=__import__('OpenSees_Load_Path_V141').export(Path(self.model_var.get()).parent)
                 __import__('os').startfile(str(path))
             except Exception as exc:messagebox.showerror('Slab load path',str(exc),parent=self.win)
-        ttk.Button(actions,text='Slab load path + formulas',command=load_path).pack(side='left',padx=4)
-        ttk.Button(actions, text="Open output folder", command=self._open_output_folder).pack(side="left", padx=8)
+        ttk.Button(validation,text="Slab load path / formulas",
+                   command=load_path).pack(side="left",padx=4)
+        outputs=action_row(actions)
+        ttk.Button(outputs,text="Bundle gravity evidence ZIP",
+                   command=self._export_comparison_bundle).pack(side="left",padx=4)
+        ttk.Button(outputs,text="Export all-module ZIPs",
+                   command=self._export_organized_evidence).pack(side="left",padx=4)
+        ttk.Button(outputs,text="Open output folder",
+                   command=self._open_output_folder).pack(side="left",padx=4)
         self.gravity_busy_bar=ttk.Progressbar(root,mode="indeterminate")
         self.gravity_busy_bar.pack(fill="x",padx=5,pady=(0,2))
         ttk.Label(root,textvariable=self.gravity_operation_state,
