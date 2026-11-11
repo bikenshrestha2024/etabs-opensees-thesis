@@ -32,11 +32,16 @@ def test_all_distributed_workbooks_are_catalogued_under_excel():
 
 def test_main_launcher_delegates_and_keeps_previous_names():
     from tools.audit_active_repository import CANONICAL
-    assert CANONICAL[1]=='01.py'
+    assert CANONICAL[1]=='01_WORKFLOW_START.py'
     with patch('runpy.run_path') as start:
         exec(compile((ROOT/'01.py').read_text(),'01.py','exec'),{'__name__':'__main__','__file__':str(ROOT/'01.py')})
     start.assert_called_once_with(str(ROOT/'RUN_ETABS_TO_OPENSEES.py'),run_name='__main__')
     assert (ROOT/'01_WORKFLOW_START.py').is_file()
+    with patch('runpy.run_path') as ordered_start:
+        exec(compile((ROOT/'01_WORKFLOW_START.py').read_text(),
+                     '01_WORKFLOW_START.py','exec'),
+             {'__name__':'__main__','__file__':str(ROOT/'01_WORKFLOW_START.py')})
+    ordered_start.assert_called_once_with(str(ROOT/'01.py'),run_name='__main__')
 
 
 def test_restore_is_planned_then_byte_exact_and_never_overwrites(tmp_path):
