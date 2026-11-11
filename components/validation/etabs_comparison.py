@@ -26,6 +26,24 @@ def collect(folder, issues=None, *, results_root=None):
     selected_state,state_note=source_limit_state(folder)
     if selected_state is None:
         raise ValueError('Cannot prove one-model/one-state ETABS comparison: '+state_note)
+    # Search the selected output root and the canonical source-bound root.
+    # Existing strict model hash/limit-state gates still reject stale evidence.
+    scan_roots = [root]
+    for candidate in (analysis_output_folder(folder, selected_state),
+                      folder / 'OpenSees_Analysis_Results'):
+        candidate = Path(candidate).resolve()
+        if candidate.is_dir() and candidate not in scan_roots:
+            scan_roots.append(candidate)
+    def scan(pattern):
+        seen = set()
+        for base in scan_roots:
+            if not base.is_dir():
+                continue
+            for path in sorted(base.rglob(pattern)):
+                resolved = path.resolve()
+                if resolved not in seen:
+                    seen.add(resolved)
+                    yield path
     def add(method,state,case,axis,loc,metric,unit,basis,value,file):
         if value is not None and math.isfinite(float(value)):
             rows.append(dict(method=method,limit_state=state,case=case,axis=axis,
@@ -64,7 +82,7 @@ def collect(folder, issues=None, *, results_root=None):
             for axis in ('X','Y'):
                 add('MODAL',state,'MODAL',axis,'ALL','cumulative_mass','percent','modal_mass',
                     d.get('cumulative_U'+axis+'_percent'),p)
-    for p in sorted(root.rglob('MRSM_Results_V132.json')):
+    for p in scan('MRSM_Results_V132.json'):
         if not current_result(p):continue
         document=json.loads(p.read_text(encoding='utf-8-sig'))
         if not isinstance(document,dict):
@@ -85,7 +103,7 @@ def collect(folder, issues=None, *, results_root=None):
                     'm','CQC_design_unscaled_by_7_5',r.get('design_displacement_m'),p)
                 add('MRSM',state,case,axis,r['story_number'],'drift_ratio',
                     'ratio','CQC_design_unscaled_by_7_5',r.get('design_drift_ratio'),p)
-    for p in sorted(root.rglob('NBC105_ESM_OpenSees_Response_*.json')):
+    for p in scan('NBC105_ESM_OpenSees_Response_*.json'):
         if not current_result(p):continue
         if 'Response_META_' in p.name:continue
         document=json.loads(p.read_text(encoding='utf-8-sig'))
@@ -124,7 +142,7 @@ def collect(folder, issues=None, *, results_root=None):
     # Optional full-node static displacement comparison. The ETABS point
     # name is the only supported location key; generated mesh nodes without
     # native ETABS counterparts remain in raw CSV, not invented matches.
-    for p in sorted(root.rglob('NBC105_ESM_All_Node_Displacements_*.csv')):
+    for p in scan('NBC105_ESM_All_Node_Displacements_*.csv'):
         if not current_result(p):continue
         with p.open('r',newline='',encoding='utf-8-sig') as f:
             records=list(csv.DictReader(f))
@@ -172,6 +190,9 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None)
     out.mkdir(parents=True,exist_ok=True)
     source_issues=[]
     rows=collect(folder,source_issues,results_root=results_root)
+    if not rows:
+        source_issues.append('ZERO_SOURCE_MATCHED_ROWS: Check result location, '
+                             'model SHA, limit state and completed solver outputs.')
     (out/'Comparison_Source_Exclusions.json').write_text(json.dumps(source_issues,indent=2),encoding='utf-8')
     def write(p,rr,fields):
         with p.open('w',newline='',encoding='utf-8-sig') as h:
@@ -218,11 +239,14 @@ def launch(parent,folder,results_root=None):
   p=filedialog.askopenfilename(parent=win,title='Normalized ETABS CSV',filetypes=[('CSV','*.csv')])
   if p:path.set(p)
  ttk.Button(bar,text='Select ETABS CSV',command=browse).pack(side='left')
- def direct_api():
+ def direct_api(auto=False):
   """Attach to the selected, already-open source .EDB in a COM STA thread."""
   import threading
   from components.inputs.project_workbooks import _source_edb_path
   known=_source_edb_path(folder)
+  if auto and (not known or not Path(known).is_file()):
+   status.set('AUTO: original source EDB missing; read-only ETABS API not attempted.')
+   return
   chosen=(str(Path(known).resolve()) if known and Path(known).is_file() else
           filedialog.askopenfilename(parent=win,title='Select exact source ETABS EDB',
                                      filetypes=[('ETABS model','*.edb')]))
@@ -230,11 +254,18 @@ def launch(parent,folder,results_root=None):
   mapping_dir=(Path(results_root).expanduser().resolve() if results_root is not None
                else Path(folder)/'OpenSees_Analysis_Results')/'ETABS_Comparison_V148'
   previous=mapping_dir/'ETABS_API_Mapping_SELECTED.json'
+  if auto and (not previous.is_file() or
+     json.loads(previous.read_text(encoding='utf-8-sig')).get('source_edb')!=str(chosen)):
+   status.set('AUTO: no verified EDB-specific ETABS mapping; use Direct ETABS API first.')
+   return
   config=(str(previous) if previous.is_file() and
           json.loads(previous.read_text(encoding='utf-8-sig')).get('source_edb')==str(chosen)
           else filedialog.askopenfilename(
               parent=win,title='Select verified case-and-story mapping JSON',
               filetypes=[('Mapping JSON','*.json')]))
+  if auto and not config:
+   status.set('AUTO: source-specific mapping not available.')
+   return
   if not config:
    template=mapping_dir/'ETABS_API_Mapping_TEMPLATE.json'
    template.parent.mkdir(parents=True,exist_ok=True)
@@ -315,4 +346,7 @@ def launch(parent,folder,results_root=None):
   if any(r.get('etabs_value') is not None for r in subset):ax.plot(x,[r.get('etabs_value') if r.get('etabs_value') is not None else float('nan') for r in subset],marker='x',label='ETABS')
   ax.set(xlabel='Location / mode',ylabel=key[5]+' ('+key[6]+')',title=key[0]+' '+key[1]+' '+key[2]+' | '+key[7]);ax.set_xticks(x,[r['location'] for r in subset],rotation=60);ax.legend();ax.grid(alpha=.2);canvas=FigureCanvasTkAgg(fig,master=panel);canvas.get_tk_widget().pack(fill='both',expand=True);NavigationToolbar2Tk(canvas,panel);canvas.draw()
  ttk.Button(bar,text='Plot selected case / metric',command=plot).pack(side='left')
- ttk.Button(bar,text='Refresh / export CSV' ,command=refresh).pack(side='left');refresh();return win
+ ttk.Button(bar,text='Refresh / export CSV' ,command=refresh).pack(side='left')
+ refresh()
+ win.after(400,lambda:direct_api(auto=True))
+ return win
