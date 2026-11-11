@@ -33,6 +33,48 @@ def attach_text_scrollbar(parent, text):
     return yscroll, xscroll
 
 
+def choose_history_run_folder(folder, analysis):
+    """Choose newest run containing a matching config, log or summary.
+
+    Do not automatically archive unrelated Gravity/ESM/MRSM folders merely
+    because the GUI stores a common analysis-results root.
+    """
+    root = Path(folder).expanduser().resolve(strict=True)
+    if not root.is_dir():
+        raise NotADirectoryError(root)
+    module = {"linear": "Linear", "nonlinear": "Nonlinear"}[analysis]
+    candidates = [
+        p for p in root.rglob("*")
+        if p.is_file() and not p.is_symlink()
+        and "Review_ZIPs" not in p.parts
+        and module + "_Time_History_" in p.name
+        and (p.name.endswith(".log") or p.name.endswith(".json"))
+        and any(token in p.name for token in ("RunConfig", "Run_V", "Summary"))
+    ]
+    if not candidates:
+        raise FileNotFoundError(
+            "No matching " + module + " Time History run found below " + str(root)
+            + ". Run or select the correct analysis output first.")
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return candidates[0].parent
+
+
+def _category(path):
+    suffix = path.suffix.lower()
+    name = path.name.lower()
+    if suffix == ".log" or "error" in name or "timing" in name:
+        return "Logs"
+    if any(token in name for token in ("runconfig", "input_record", "source_provenance")):
+        return "Inputs"
+    if suffix in {".png", ".jpg", ".jpeg", ".svg"}:
+        return "Plots"
+    if suffix == ".pdf":
+        return "Reports"
+    if suffix in {".csv", ".xlsx", ".xls", ".tsv"}:
+        return "Tables"
+    return "Analysis"
+
+
 def export_review_zip(output_dir, analysis, *, max_file_bytes=512 * 1024 * 1024):
     """Archive existing local run evidence, not source models or external records.
 
@@ -75,8 +117,10 @@ def export_review_zip(output_dir, analysis, *, max_file_bytes=512 * 1024 * 1024)
                 with path.open("rb") as stream:
                     for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                         digest.update(chunk)
-                archive.write(path, arcname=rel)
-                manifest["files"].append({"path": rel, "bytes": size, "sha256": digest.hexdigest()})
+                arcname = analysis + "/" + _category(path) + "/" + rel
+                archive.write(path, arcname=arcname)
+                manifest["files"].append({"path": rel, "archive_path": arcname,
+                                           "bytes": size, "sha256": digest.hexdigest()})
             archive.writestr("REVIEW_EVIDENCE_MANIFEST.json", json.dumps(manifest, indent=2))
     except Exception:
         dest.unlink(missing_ok=True)
@@ -87,16 +131,21 @@ def export_review_zip(output_dir, analysis, *, max_file_bytes=512 * 1024 * 1024)
 def export_review_zip_dialog(parent, output_dir, analysis):
     """User-triggered local export with privacy confirmation and clear errors."""
     from tkinter import messagebox
+    try:
+        selected_run = choose_history_run_folder(output_dir, analysis)
+    except (OSError, ValueError, KeyError) as exc:
+        messagebox.showerror("Review ZIP requires a matching history run", str(exc), parent=parent)
+        return None
     if not messagebox.askyesno(
         "Export local review evidence",
-        "Create a ZIP from the selected analysis output folder? It may contain "
-        "model paths, project details and structural results. Inspect the ZIP "
-        "before sharing. This does NOT establish NBC compliance.",
+        "Export this analysis run only?\\n\\n" + str(selected_run)
+        + "\\n\\nIt may contain local model paths and project details. "
+          "Inspect the ZIP before sharing. This does NOT establish NBC compliance.",
         parent=parent,
     ):
         return None
     try:
-        dest, manifest = export_review_zip(output_dir, analysis)
+        dest, manifest = export_review_zip(selected_run, analysis)
     except (OSError, ValueError, KeyError) as exc:
         messagebox.showerror("Review ZIP export failed", str(exc), parent=parent)
         return None
