@@ -128,3 +128,31 @@ Changes committed directly to `main` in this checkpoint:
 4. Review status from GitHub Actions for the newest commit. A syntax/documentation CI pass is not full ETABS-equivalence acceptance.
 
 Preserve all original source EDB, original Excel workbooks, old launchers, native records, results ZIPs and prior output paths. No structural model changes were performed in this checkpoint.
+
+## 2026-11-11 — organized evidence export extension (no legacy output migration)
+
+A separate method-oriented **snapshot publisher** is now available in
+`components/ui/organized_results.py`. New Gravity, ESM and MRSM GUI buttons
+create dated `Organized_Results/<timestamp>/` folder snapshots with
+`Gravity/`, `ESM/`, `Modal/`, `MRSM/`, `Comparisons/`, and
+`Unclassified/` folders, per-method `*_Review_UPLOAD.zip` files,
+`ALL_MODULES_Review_UPLOAD.zip`, `EVIDENCE_MANIFEST.json`, and
+`LATEST_ORGANIZED_RESULT.txt` at the snapshot parent level.
+
+This is intentionally **not** an in-place rename of active solver folders:
+historical JSON indices, runner output paths, response viewers and downstream
+scripts still read the original locations; new category folders contain
+SHA256-verified copies. It does not attempt to merge unrelated model/state
+runs, include `.EDB` contents in ZIP, or invent SLS/native ETABS responses.
+
+Non-native regression: `tests/test_organized_results.py`. GitHub Actions
+NLTHA Python quality workflow run `42968205156` completed successfully,
+including this test, on commit `934f8779`. Windows ETABS v23 GUI end-to-end
+and large model integration are still pending.
+
+The saved MRSM screenshots from 11:01 AM show six ULS cases complete with
+gravity and sparse eigen-analysis, but SLS result panels blank (SLS was not
+run); the ETABS comparison table has unpaired OpenSees-only responses and
+the deformation graphic is a CQC envelope illustration, not a physical
+time-history animation. These require further data and UI tests independent
+of folder organization.
