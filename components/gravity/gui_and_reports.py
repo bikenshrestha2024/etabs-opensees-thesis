@@ -161,7 +161,7 @@ class GravityAnalysisGUI:
             import tempfile
             with tempfile.TemporaryDirectory(prefix='gravity_view_') as temporary:
                 figures, _, _ = gravity_figures(payload, Path(temporary))
-            embed_figures(self.plot_tab, figures)
+            embed_figures(self.plot_canvas_frame, figures)
             self.nb.select(self.plot_tab)
             self.status_var.set('Viewing saved '+str(payload['wall_support_strategy'])+' | '+str(result))
         except (OSError, ValueError) as exc:
@@ -283,7 +283,7 @@ class GravityAnalysisGUI:
             report, out, figure = export_case_comparison(
                 self.output_var.get(), self.model_var.get(),
                 profile=self.gravity_profile_var.get())
-            embed_figures(self.plot_tab, [('32 / 76 / 97 support comparison', figure)])
+            embed_figures(self.plot_canvas_frame, [('32 / 76 / 97 support comparison', figure)])
             self.nb.select(self.plot_tab)
             self.status_var.set('Independent solved-case comparison: '+
                 ', '.join(report['available_cases'])+' | '+str(out)+
@@ -1122,8 +1122,14 @@ class GravityAnalysisGUI:
         ttk.Label(root, textvariable=self.status_var,wraplength=1100).pack(fill="x",pady=(0,5))
         self.nb = ttk.Notebook(root); self.nb.pack(fill="both", expand=True)
         self.plot_tab = ttk.Frame(self.nb); self.nb.add(self.plot_tab, text="Matplotlib results")
-        ttk.Button(self.plot_tab, text="Select support nodes / plot saved Rz",
-                   command=self._select_reaction_nodes).pack(anchor="w", padx=5, pady=3)
+        # The embedded plot utility destroys its own children at refresh.
+        # Keep selector controls in a persistent parent ABOVE that canvas host.
+        plot_toolbar = ttk.Frame(self.plot_tab)
+        plot_toolbar.pack(fill="x", padx=5, pady=3)
+        ttk.Button(plot_toolbar, text="Select support nodes / plot saved Rz",
+                   command=self._select_reaction_nodes).pack(side="left")
+        self.plot_canvas_frame = ttk.Frame(self.plot_tab)
+        self.plot_canvas_frame.pack(fill="both", expand=True)
         self.storey_tab = ttk.Frame(self.nb); self.nb.add(self.storey_tab,text="Storey load breakdown")
         ttk.Button(self.storey_tab,text="Load / refresh storey ledger",command=self._show_storey_loads).pack(anchor="w")
         ttk.Button(self.storey_tab,text="Plot classified loads / filter source detail",command=lambda:__import__('OpenSees_Gravity_Source_Review_V133').launch(self.win,Path(self.model_var.get()).parent)).pack(anchor="w")
@@ -1739,7 +1745,7 @@ class GravityAnalysisGUI:
         nodes=payload['nodes'];reactions=payload['reactions'];edges=payload['elements'];report=payload['report']
         local_forces=payload.get('local_forces',[])
         figures,figure_paths,scale=gravity_figures(payload,out)
-        embed_figures(self.plot_tab,figures)
+        embed_figures(self.plot_canvas_frame,figures)
         xlsx = out / "Gravity_Results_V110.xlsx"
         wb = Workbook(); ws = wb.active; ws.title = "Summary"
         rows = [
