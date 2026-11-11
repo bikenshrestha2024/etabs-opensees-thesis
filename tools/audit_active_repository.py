@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOTS = ("components", "tests", "tools")
 CANONICAL = {
-    1: "01.py",
+    1: "01_WORKFLOW_START.py",
     2: "02_INPUT_READINESS.py",
     3: "03_MATERIAL_PARAMETER_SETUP.py",
     4: "04_LITERATURE_MATERIAL_PROFILES.py",
