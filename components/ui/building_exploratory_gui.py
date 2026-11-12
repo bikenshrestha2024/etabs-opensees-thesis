@@ -90,8 +90,8 @@ def launch(parent,model_folder,output_folder=None):
     tracked_members=tk.StringVar(value='')
     ttk.Label(settings,text='Additional brace/device tags (comma-separated)').pack(side='left',padx=(8,2))
     ttk.Entry(settings,textvariable=tracked_members,width=22).pack(side='left')
-    full=tk.BooleanVar(value=True);basis=tk.StringVar(value='PUBLISHED_REFERENCE')
-    steel_transition=tk.StringVar(value='OPENSEES_DOCUMENTED')
+    full=tk.BooleanVar(value=True);basis=tk.StringVar(value='PEER_2015_12_SINGLE_SOURCE')
+    steel_transition=tk.StringVar(value='PEER_APPENDIX_EXACT')
     brace_fy=tk.StringVar(value='345');brace_b=tk.StringVar(value='.01')
     materialbar=ttk.LabelFrame(win,text='Material basis and sensitivity');materialbar.pack(fill='x',padx=8,pady=(4,0))
     ttk.Checkbutton(materialbar,text='Nonlinear FSAM walls (unconfined core web)',variable=full).pack(side='left')
@@ -103,6 +103,32 @@ def launch(parent,model_folder,output_folder=None):
     ttk.Entry(materialbar,textvariable=brace_fy,width=8).pack(side='left')
     ttk.Label(materialbar,text='Steel01 b').pack(side='left',padx=(6,2))
     ttk.Entry(materialbar,textvariable=brace_b,width=6).pack(side='left')
+    provenance_label=ttk.Label(win,text=(
+        'Material source: PEER 2015/12 Appendix B.3 (concrete/steel specimen); '
+        '3D E-SFI element comes from Kolozvari–Lopez–Massone 2023. '
+        'FSAM ratios, frame bar layouts, brace grade and devices remain assumptions '
+        'until individually documented. A 0.1 s or single-storey trial is diagnostic only.'
+    ),foreground='#8a3412',wraplength=1050)
+    provenance_label.pack(anchor='w',padx=8,pady=(2,4))
+    def describe_basis(*_):
+        key=basis.get()
+        if key=='PEER_2015_12_SINGLE_SOURCE':
+            provenance_label.configure(text=(
+                'PEER 2015/12 Appendix B.3 supplies wall concrete and steel '
+                'and transferred frame material strengths. NOT a 3D model '
+                'calibration: element constants, FSAM bar ratios, SHS, devices '
+                'and Concrete01 post-peak terms are separately assumed.'))
+        elif key=='PUBLISHED_REFERENCE':
+            provenance_label.configure(text=(
+                'MIXED-SOURCE research model: PEER wall materials, unrelated '
+                'frame example/nominal steel, documented SteelMPF transition, '
+                'analyst brace parameters. Do not call it one-paper validation.'))
+        else:
+            provenance_label.configure(text=(
+                'M30/Fe500 is a nominal parametric sensitivity model, not '
+                'published experimental calibration or project test evidence.'))
+    basis.trace_add('write',describe_basis)
+    describe_basis()
     # [REF V168_FIRST_STEP_DIAGNOSTICS.md; components/ui/exploratory_options.py]
     # Probe, damping and case-identity settings previously only in RunConfig.json.
     from components.ui.exploratory_options import DAMPING_MODES,EXCITATIONS,VARIANTS,build_options,describe,event_name
