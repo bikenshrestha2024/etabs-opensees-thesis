@@ -55,3 +55,10 @@ Regressions: `tests/verify_esm_output_safety.py` (seven synthetic tests). No nat
 **This does not recalculate or alter the original ETABS-linked Excel engine.** That historical workbook preserves the older X=1.9582936m² four-6m interpretation. On verified `EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY`, the GUI now creates a **separate** `*_GROUPED_WALL_REVIEW.xlsx` beside the generated ETABS-linked workbook, recording historical X and verified two-12m X (2.0731745m²), respective Y, the discrepancy and actual source SHA. The original ETABS-linked generated workbook is unchanged (its registered hash remains meaningful); the grouped review is **research source-matched, not NBC structural acceptance**. If source verification fails, no new alternative wall area is silently created. This helper runs in Windows with existing OpenPyXL dependency; do not commit project-owned XLSX to the public repository.
 
 Synthetic arithmetic regressions: `tests/test_esm_section6_arithmetic.py` (ULS/SLS Ch, C, Cd, W, V, k, floor sum). Physical native EDB tests still outstanding.
+
+
+## 2026-11-12 source-period labels and export status
+
+Historical workbook adopted periods are now explicitly labelled **reference only**, distinct from the current computed §5.1.1 OpenSees Rayleigh period and §5.1.3 minimum adopted design period. Importing the original workbook no longer automatically checks the advanced `use_workbook_periods` fallback. User opt-in remains possible for explicitly labelled historical research when current Rayleigh evidence is absent; source state/matching constraints are unchanged. For the 2026-11-12 run: historical workbook X≈2.0385674s differs from current adopted X≈1.9812809s, and historical Y≈1.9219798s matches coincidentally.
+
+The GUI button names now explicitly show `Complete ESM export ZIP (all evidence)` and verified comparison action. The pre-existing status bar now reports ZIP **EXPORTING / EXPORTED / FAILED** distinctly, rather than the only proof being a log line. Packaging status is not native solver acceptance.
