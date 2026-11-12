@@ -304,6 +304,17 @@ def launch(parent,folder):
                 operation_bar.start(12)
             else:operation_bar.stop()
         win.after(0,render)
+    # Reopen status is sourced from a saved case ledger, not an assumed PASS.
+    previous_status=output/'MRSM_Batch_Status_V151.json'
+    if previous_status.is_file():
+        try:
+            previous=json.loads(previous_status.read_text(encoding='utf-8-sig'))
+            cases=previous.get('cases',[])
+            solved=sum(row.get('status')=='COMPLETED' for row in cases)
+            operation_status.set('SAVED RUN | '+str(solved)+'/'+str(len(cases))+
+                                 ' numerical cases completed; source/code checks remain separate')
+        except (OSError,ValueError,KeyError) as exc:
+            operation_status.set('REVIEW | Saved case ledger unreadable: '+str(exc))
     log_value=tk.StringVar()
     from OpenSees_Research_UI_V123 import copyable_log
     from components.shared.case_status import panel,CaseLedger
