@@ -63,6 +63,19 @@ class TestThreeCaseGravity(unittest.TestCase):
         self.assertIn("rz_97_kN", rows[0])
         self.assertEqual(rows[0]["rz_97_kN"], "")
         self.assertEqual(rows[50]["rz_32_kN"], "")
+        # The original exporter reversed (strategy, label) and silently
+        # wrote every displacement value as a blank. Verify actual numbers,
+        # including a legitimate missing-case blank for the 97-node case.
+        with (directory / "Common_Node_Displacements_32_76_97.csv").open(
+                encoding="utf-8-sig") as fp:
+            displacements = list(csv.DictReader(fp))
+        self.assertEqual(len(displacements), 32)
+        first = displacements[0]
+        self.assertAlmostEqual(
+            float(first["uz_m_ETABS_NONZERO_REACTION_DIAGNOSTIC"]), -0.001)
+        self.assertAlmostEqual(
+            float(first["uz_m_ETABS_SOURCE_SUPPORTS"]), -0.001)
+        self.assertEqual(first["uz_m_CONTINUOUS_WALL_BASE_FIXED"], "")
 
     def test_load_discrepancy_is_blocker(self):
         def current(_root, _model, *, scenario, profile):
