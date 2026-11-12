@@ -85,6 +85,32 @@ class LoadCasePurposeTests(unittest.TestCase):
         self.assertIn("INVALID_GRAVITY_FACTOR", issues)
         self.assertIn("MISSING_SEISMIC_MASS_FACTOR", issues)
 
+    def test_explicitly_empty_source_patterns_cannot_pass(self):
+        report = audit_load_case_purpose(
+            "SEISMIC_SOURCE", {"Dead": 1.0}, {"Dead": 1.0},
+            present_patterns={},
+        )
+        self.assertEqual(report["status"], "REVIEW_REQUIRED")
+        self.assertTrue(any(
+            "EMPTY_SOURCE_PATTERN_SET" in issue["issues"]
+            for issue in report["issues"]
+        ))
+
+    def test_all_empty_maps_fail_closed(self):
+        report = audit_load_case_purpose("AS_CONFIGURED", {}, {})
+        self.assertEqual(report["status"], "REVIEW_REQUIRED")
+        self.assertTrue(any(
+            "NO_LOAD_PATTERNS_TO_AUDIT" in issue["issues"]
+            for issue in report["issues"]
+        ))
+
+    def test_boolean_is_not_valid_numeric_factor(self):
+        report = audit_load_case_purpose(
+            "SEISMIC_SOURCE", {"Dead": True}, {"Dead": 1.0},
+        )
+        self.assertIn("INVALID_GRAVITY_FACTOR",
+                      report["issues"][0]["issues"])
+
     def test_profile_and_mass_are_separate(self):
         gravity = {name: GRAVITY_ONLY_FACTORS[category]
                    for name, category in self.names.items()}
