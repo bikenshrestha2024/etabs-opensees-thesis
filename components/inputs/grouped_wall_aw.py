@@ -55,6 +55,30 @@ def wall_aw_example(*, height_m=95.0, thickness_m=0.6,
     }
 
 
+
+def selected_two_12m_wall_reference():
+    """[REF docs/source/components/inputs/grouped_wall_aw.py.md]
+    User-selected 2026-11-12 calculation from stated geometry. Source-
+    matched exported NODE/SHELL geometry is required for actual selection.
+    This pure illustrative reference never overrides project evidence.
+    """
+    h=95.0
+    x_net=(12.0-2.0*2.0)*0.6
+    y_net=6.0*0.6
+    return {
+        "status":"ILLUSTRATIVE_REVIEWED_THESIS_GEOMETRY",
+        "policy":THESIS_WALL_POLICY,
+        "X":2.0*x_net*(0.2+(12.0/h)**2),
+        "Y":3.0*y_net*(0.2+(6.0/h)**2),
+        "H_m":h,
+        "x_wall_count":2,"x_gross_length_m":12.0,
+        "x_openings_per_wall":2,"x_opening_width_m":2.0,
+        "x_opening_height_m":2.3,"wall_thickness_m":0.6,
+        "y_wall_count":3,"y_wall_length_m":6.0,
+        "code_accepted":False
+    }
+
+
 def _union(intervals):
     result = []
     for a, b in sorted(intervals):
