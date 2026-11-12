@@ -86,10 +86,14 @@ def prepare(source_folder, output_folder, *, property_name=None):
     panel=select_first_storey_panel(json.loads(raw.decode('utf-8-sig')),
                                     property_name=property_name)
     peer=peer_single_source()
+    patch=json.loads((Path(__file__).resolve().parents[2]/'Material_Catalog'/'PEER_Web_ESFI_Patch.json').read_text(encoding='utf-8-sig'))
     report=dict(status='PREPARED_NOT_RUN',scope='ONE_SOURCE_FIRST_STOREY_WALL_QUAD',
         original_model_sha256=hashlib.sha256(raw).hexdigest(),
         panel=panel,material_basis='PEER_2015_12_SINGLE_SOURCE',
         concrete=peer['wall_concrete'],steel=peer['wall_steel'],fsam=peer['fsam'],
+        fsam_rho_x_assumed=float(patch['parameters']['rho_x']),
+        fsam_rho_y_assumed=float(patch['parameters']['rho_y']),
+        element_poisson_assumed=float(patch['parameters']['nu']),
         material_source_table=peer['rows'],specimen=peer['specimen'],
         source=peer['source'],source_locator='PEER 2015/12 Appendix B.3',
         element_source='https://doi.org/10.1016/j.engstruct.2023.116700',
@@ -137,12 +141,12 @@ def run(source_folder, output_folder, *, property_name=None):
             c[k]*(1000. if k in ('fpcc','Ec','ft') else 1.) for k in CM])
         for tag in (13,14):
             ops.nDMaterial('FSAM',tag,0.,11,11,12,
-                            float(f.get('rho_x',.0074)),float(f.get('rho_y',.0074)),
+                            data['fsam_rho_x_assumed'],data['fsam_rho_y_assumed'],
                             float(f['nu']),float(f['alpha']))
         w=float(panel['width_m']);t=float(panel['thickness_m'])
         ops.element('E_SFI_MVLEM_3D',21,1,2,3,4,2,
                     '-thick',t,t,'-width',w/2,w/2,'-mat',13,14,
-                    '-CoR',0.4,'-ThickMod',0.63,'-Poisson',float(f['nu']))
+                    '-CoR',0.4,'-ThickMod',0.63,'-Poisson',data['element_poisson_assumed'])
         axis=1 if panel['horizontal_axis']=='X' else 2
         ops.timeSeries('Linear',1);ops.pattern('Plain',1,1)
         # Unit load only; this is a deterministic tangent/implementation check,
@@ -174,7 +178,7 @@ def run(source_folder, output_folder, *, property_name=None):
     return result
 
 
-def main():
+def _main():
     parser=argparse.ArgumentParser(description='Single source first-storey wall QUAD diagnostic; research only')
     parser.add_argument('--source',required=True)
     parser.add_argument('--output',required=True)
@@ -188,4 +192,4 @@ def main():
 
 
 if __name__=='__main__':
-    main()
+    _main()
