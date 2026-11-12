@@ -366,6 +366,8 @@ class GravityAnalysisGUI:
             "RUNNING":("#155e75","#e0f2fe"),
             "FINISHED":("#166534","#dcfce7"),
             "BLOCKED":("#991b1b","#fee2e2"),
+            "MISMATCH":("#991b1b","#fee2e2"),
+            "CANCELLED":("#92400e","#fef3c7"),
             "IDLE":("#374151","#f3f4f6"),
         }
         if hasattr(self,"gravity_operation_badge"):
