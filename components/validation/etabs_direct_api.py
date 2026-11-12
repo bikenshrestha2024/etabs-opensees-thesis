@@ -98,8 +98,6 @@ def validate_mapping(mapping):
             "A list of nodes, results or metadata is not a verified case mapping. "
             "Generate ETABS_API_Mapping_TEMPLATE.json in the comparison window, "
             "fill its actual ETABS case/story identifiers, and reselect it.")
-    if not isinstance(mapping.get("source_edb"), str) or not mapping["source_edb"].strip():
-        raise ValueError("Mapping must declare the exact original source_edb path.")
     cases=mapping.get("cases")
     if not isinstance(cases,list) or not cases:
         raise ValueError("Provide at least one explicit ETABS case mapping.")
