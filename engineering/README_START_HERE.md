@@ -3,6 +3,9 @@
 Thesis: *Time History Analysis of Damped Outrigger System in High Rise Building with Asymmetric Plan*. Research variants M0 through M6 compare conventional/damped outriggers, belt and cap trusses in an asymmetric RC high-rise.
 
 ## Choose your topic
+
+**Thesis discrepancy and independent verification:** [07 — Review backbone](../07_REVIEW_MAIN/README.md) (numbered entry), with all authoritative cases retained in [REVIEW_MAIN](../REVIEW_MAIN/README.md).
+
 | Area | Start with | Implementation currently located in |
 | --- | --- | --- |
 | ETABS | [Source and native result extraction](topics/ETABS.md) | Existing root exporters, `components/validation/` |
