@@ -46,3 +46,12 @@ Source review of `_calculate` identified an unverified/blank `model_script` path
 A separate mismatch existed when a combined SLS case used its SLS period `result.period_s` but the output `period_selection.Rayleigh_T1_X_s/Y_s` described the ULS GUI periods. `state_rayleigh_provenance` now attaches the matching SLS imported evidence to SLS outputs and labels the evidence state. These are program integrity corrections, not proof that source modal/period properties are physically correct.
 
 Regressions: `tests/verify_esm_output_safety.py` (seven synthetic tests). No native ETABS comparison is asserted.
+
+
+## 2026-11-12 complete §6 calculation audit added to every generated direct ESM workbook
+
+`write_outputs` now includes `NBC 5-6 Derivation` with the source-period, Ch, Z, I, C(T), Cs(T), Rmu, Ωu, Ωs, Cd(T1), W, V, k, distribution denominator, full floor force sum and V–ΣFi. It also states force polarity, eccentricity and that P–Delta initial/final physical response remains independently gated. `Storey Formula Audit` lists each source-story `Wi,hi,Wi*hi^k,normalized fraction, Fi, cumulative applied force` and source master node. This is distinct from physical recovered floor shears; original direct ESM JSON and CSV still record individual floor forces.
+
+**This does not recalculate or alter the original ETABS-linked Excel engine.** That historical workbook preserves the older X=1.9582936m² four-6m interpretation. On verified `EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY`, the GUI now creates a **separate** `*_GROUPED_WALL_REVIEW.xlsx` beside the generated ETABS-linked workbook, recording historical X and verified two-12m X (2.0731745m²), respective Y, the discrepancy and actual source SHA. The original ETABS-linked generated workbook is unchanged (its registered hash remains meaningful); the grouped review is **research source-matched, not NBC structural acceptance**. If source verification fails, no new alternative wall area is silently created. This helper runs in Windows with existing OpenPyXL dependency; do not commit project-owned XLSX to the public repository.
+
+Synthetic arithmetic regressions: `tests/test_esm_section6_arithmetic.py` (ULS/SLS Ch, C, Cd, W, V, k, floor sum). Physical native EDB tests still outstanding.
