@@ -9,3 +9,7 @@
 **Run:** `python -m unittest discover -s tests -p 'test_nbc105_load_case_purpose.py' -v`.
 
 **Gate:** test success is not an engineering acceptance or full gravity validation.
+
+## 2026-11-12 edge-case regression expansion
+
+Added tests reject explicitly empty source patterns, completely empty factor maps and Boolean factors. They test only factor-audit reporting, not the correctness of native OpenSees loads.

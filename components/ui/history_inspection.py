@@ -194,6 +194,10 @@ def choose_default_history_scope(scopes, previously_selected=""):
     [REF docs/source/components/ui/history_inspection.py.md]
     """
     scopes = sorted(set(scopes))
+    # "All analyses (mixed)" is an explicit UI selection, not a real folder.
+    # Preserve it across Refresh instead of silently switching back to LTH.
+    if previously_selected == "All analyses (mixed)":
+        return previously_selected
     if previously_selected in scopes:
         return previously_selected
     lth = [name for name in scopes if name.upper().startswith(("LTH_", "LINEAR_TIME_HISTORY"))]

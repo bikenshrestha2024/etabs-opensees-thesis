@@ -10,3 +10,7 @@
 **Command:** `python -m unittest discover -s tests -p 'test_history_inspection_scopes.py' -v`.
 
 **Limitations:** correct path grouping is not numerical convergence, physical source equivalence or code compliance. Real Windows Tk speed and picker behavior are still pending native inspection.
+
+## 2026-11-12 refreshed control behavior
+
+Additional test confirms the explicit `All analyses (mixed)` selection persists after the browser refreshes; initial default selection remains the linear study when available. This is a UI/metadata test, not a native response test.

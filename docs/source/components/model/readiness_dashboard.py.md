@@ -21,3 +21,15 @@ Units are not inferred from filenames. Reviewer claims and actual native solver/
 **Where:** `components/model/readiness_dashboard.py`. **Which:** only evidence files in allowed project locations; no new source discovery and no change to code acceptance. **Who:** software maintainer validates hash correctness and reviewer validates source identity.
 
 **Limitation:** like any snapshot, a file modified while being hashed may invalidate project identity; don't change evidence during signed analysis.
+
+## 2026-11-12 — incomplete checklist and cross-project model fail-closed fix
+
+**What:** `audit(folder, model_script)` no longer reports an overall model-bound sign-off when a draft contains only an arbitrary subset of the required review keys. It also refuses sign-off when a manually selected model file is outside the selected project directory (or missing). The model may still be inspected without approval.
+
+**Why:** an `approved_for_nltha: true` flag plus one checked item is insufficient for full project-model readiness. Reusing a signed draft from another project must not silently claim current-project sign-off.
+
+**When:** each readiness refresh, project switch or model selection. **Where:** `components/model/readiness_dashboard.py`, `tests/verify_readiness_dashboard.py`. **How:** require all `REVIEW_KEYS` across the twelve groups, true values and substantive evidence strings; require the model to be under the selected project folder, and retain source model SHA comparison. The report still labels any recorded signoff a *claim*, not physical model verification.
+
+**Which:** an exact nonlinear builder file, model-bound draft SHA and all defined review keys; code never modifies materials, loads or native model. **Who:** software maintainer tests behavior; the project engineer documents evidence; the independent structural reviewer decides engineering acceptance.
+
+**Regression:** `python -m unittest tests.verify_readiness_dashboard -v`; new cases cover subset-checklist false approval and external-project model selection. **Limits:** no native full-model analysis, no automatic engineering approval, and no replacement for independent material validation.

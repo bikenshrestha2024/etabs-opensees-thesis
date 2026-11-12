@@ -26,6 +26,13 @@ class HistoryScopeTests(unittest.TestCase):
             "EXPLORATORY_FRAME_NL",
         )
 
+    def test_explicit_mixed_scope_survives_refresh(self):
+        scopes = ["LTH_ULS_Trial", "EXPLORATORY_FRAME_NL"]
+        self.assertEqual(
+            choose_default_history_scope(scopes, "All analyses (mixed)"),
+            "All analyses (mixed)",
+        )
+
     def test_current_folder_with_saved_history_is_selected(self):
         self.assertEqual(
             choose_default_history_scope(["(This directory)", "record_inputs"]),
