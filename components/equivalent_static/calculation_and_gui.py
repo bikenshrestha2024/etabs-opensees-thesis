@@ -1085,9 +1085,14 @@ class ESMGui:
             # Keep it as a separate diagnostic, even when a user clicks Sync.
             preserved=getattr(self,'excel_direct_reference',None)
             preserved_status=(preserved or {}).get('source_identity')
+            verified_grouping=((report.get('grouped_wall_aw_review') or {})
+                .get('status')=='EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY')
             keep_original=bool(preserved and preserved_status in (
                 'SAME_EDB_PATH_REFERENCE','SAME_EDB_SHA256',
-                'SAME_EDB_SHA256_REFERENCE'))
+                'SAME_EDB_SHA256_REFERENCE') and not verified_grouping)
+            # Project decision takes priority over a historical 4x6m Excel
+            # calculation ONLY when exported 2x12m geometry passes. Original
+            # source Excel remains untouched, even when GUI inputs change.
             statuses=[]
             for axis,var in (('X',self.awx),('Y',self.awy)):
                 value=report['aw_candidate_m2'][axis]
@@ -1100,7 +1105,8 @@ class ESMGui:
                 elif value is not None and evidence in (
                     'OPEN_SEES_GEOMETRY_CANDIDATE_REVIEW_REQUIRED',
                     'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC',
-                    'SOURCE_MATCHED_GROUPED_WALL_AREA_REVIEW_REQUIRED'):
+                    'SOURCE_MATCHED_GROUPED_WALL_AREA_REVIEW_REQUIRED',
+                    'EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY'):
                     # Prefill the source-derived *diagnostic* to enable a
                     # preliminary comparison, never silent NBC acceptance.
                     var.set(f'{value:.10g}')
@@ -1143,7 +1149,15 @@ class ESMGui:
                     f"Aw-X={grouped['aw_candidate_m2']['X']:.9g} m²; "
                     f"Aw-Y={grouped['aw_candidate_m2']['Y']:.9g} m². "
                     "Engineering wall grouping review required; NOT NBC acceptance.")
-                lines.append("Grouped wall source: "+str(grouped['source_manifest']))
+                lines.append("Grouped wall source: "+str(
+                    grouped.get('source_manifest') or
+                    "first-storey exported OpenSees nodes/shells, model SHA256 "+
+                    str(grouped.get('assembled_model_sha256'))))
+                if verified_grouping:
+                    lines.append(
+                        "REVIEWED GEOMETRY: 2 connected 12m X walls (two 2m doors "
+                        "each); 3 continuous 6m Y walls. Previous 6m Excel Aw "
+                        "remains historical evidence; NOT physically recertified.")
             else:
                 lines.append(
                     "ILLUSTRATIVE SEAOC/UBC NET-AREA + GROSS-LENGTH EXAMPLE: "
