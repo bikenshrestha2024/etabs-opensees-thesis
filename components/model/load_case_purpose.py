@@ -83,9 +83,23 @@ def audit_load_case_purpose(profile, gravity_factors, mass_factors,
         expected_gravity = None
 
     overrides = category_overrides or {}
+    # None means the caller intentionally requests a factor-map audit.
+    # An explicitly supplied but empty source-pattern collection is NOT
+    # equivalent to confirming that the building has no load patterns.
     patterns = sorted(set(present_patterns) if present_patterns is not None
                       else (set(gravity_factors) | set(mass_factors)))
     rows, errors = [], []
+    if not patterns:
+        errors.append({
+            "pattern": "(no source patterns)",
+            "issues": ["NO_LOAD_PATTERNS_TO_AUDIT"],
+        })
+    if present_patterns is not None and not present_patterns:
+        if not any("NO_LOAD_PATTERNS_TO_AUDIT" in e["issues"] for e in errors):
+            errors.append({
+                "pattern": "(empty source-pattern collection)",
+                "issues": ["EMPTY_SOURCE_PATTERN_SET"],
+            })
     for pattern in patterns:
         category = classify_load_pattern(
             pattern, explicit_category=overrides.get(pattern))
@@ -100,7 +114,7 @@ def audit_load_case_purpose(profile, gravity_factors, mass_factors,
         ):
             if value is None:
                 violations.append(f"MISSING_{label.upper()}_FACTOR")
-            elif not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            elif isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
                 violations.append(f"INVALID_{label.upper()}_FACTOR")
             elif expected is not None and not math.isclose(
                 float(value), expected, abs_tol=tolerance, rel_tol=0.0
