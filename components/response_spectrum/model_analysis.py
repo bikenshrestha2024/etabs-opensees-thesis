@@ -290,6 +290,20 @@ def launch(parent,folder):
     ttk.Label(form,text=period_note,wraplength=1000).pack(anchor='w',pady=3)
     ttk.Label(form,text='Each state runs X and Y, with E0 / Eplus / Eminus cases (6 cases/state). E0 is centered; Eplus/Eminus are signed 5% perpendicular-breadth eccentric inertia cases. Soil selection requires site evidence. Acceleration conversion is internal for the kN-m-s model. Workbook / PNG / PDF are exported automatically.',wraplength=1000).pack(anchor='w',pady=6)
     actions=ttk.Frame(form);actions.pack(fill='x');output=analysis_output_folder(folder,initial_state)
+    operation_status=tk.StringVar(value="READY | No MRSM batch running")
+    operation_label=ttk.Label(form,textvariable=operation_status,wraplength=1030,
+                              foreground='#165879')
+    operation_label.pack(fill='x',pady=3)
+    operation_bar=ttk.Progressbar(form,mode='indeterminate')
+    operation_bar.pack(fill='x',pady=2)
+    def operation(stage,detail):
+        # All state and widget updates are applied on Tk's UI thread.
+        def render():
+            operation_status.set(stage+' | '+detail)
+            if stage in ('RUNNING','EXPORTING'):
+                operation_bar.start(12)
+            else:operation_bar.stop()
+        win.after(0,render)
     log_value=tk.StringVar()
     from OpenSees_Research_UI_V123 import copyable_log
     from components.shared.case_status import panel,CaseLedger
@@ -313,6 +327,7 @@ def launch(parent,folder):
             cfg['nmodes']=int(cfg['nmodes'])
             for k in ['Z','I','rmu','omegau','omegas','T1_X','T1_Y','damping']:cfg[k]=float(cfg[k])
             states=[cfg['limit_state']];button.configure(state='disabled')
+            operation('RUNNING','Gravity → eigenmodes → CQC responses for '+', '.join(states))
             ledger=CaseLedger(output/"MRSM_Batch_Status_V151.json",[state+" "+axis+"_"+ecc for state in states for axis in ("X","Y") for ecc in ("E0","Eplus","Eminus")]);board["ledger"]=ledger;board["cancelled"]=False
             def worker():
                 try:
@@ -321,6 +336,7 @@ def launch(parent,folder):
                     for state in states:
                         if board.get("cancelled"):break
                         append('[STATE START] '+state+' | gravity/preload, eigenanalysis, modal RSA, CQC, force scaling, drift and export.\n')
+                        operation('RUNNING',state+' | gravity and modal CQC stages underway')
                         current=dict(cfg,limit_state=state,gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'));out=analysis_output_folder(folder,state)/('MRSM_'+state+('' if current['gravity_profile']=='AS_CONFIGURED' else '_'+current['gravity_profile']));out.mkdir(parents=True,exist_ok=True);path=out/'MRSM_Config_V132.json';path.write_text(json.dumps(current,indent=2),encoding='utf-8')
                         script="import sys,json;sys.path.insert(0,"+repr(str(root))+");from OpenSees_Model_Response_Spectrum_V132 import run_model_spectrum;run_model_spectrum("+repr(str(Path(folder).resolve()))+",json.load(open("+repr(str(path.resolve()))+",encoding='utf-8')),"+repr(str(out.resolve()))+")"
                         with (out/'MRSM_Run_V132.log').open('w',encoding='utf-8') as stream:
@@ -349,6 +365,7 @@ def launch(parent,folder):
                     # Automatically consolidate real MRSM output in a single
                     # upload folder/ZIP, clearly separated from ETABS native
                     # responses. No missing native case is inferred.
+                    operation('EXPORTING','Case execution ended; collecting auditable MRSM evidence ZIP')
                     try:
                         from components.validation.seismic_review_bundle import bundle_seismic_review
                         target=analysis_output_folder(folder,states[-1])
@@ -356,19 +373,25 @@ def launch(parent,folder):
                         append("[MRSM_AUTO_REVIEW_ZIP] "+package["zip"]+"\\n")
                     except Exception as pack_exc:
                         append("[MRSM_REVIEW_PACKAGING_FAILED] "+str(pack_exc)+"\\n")
+                    statuses=[row['status'] for row in ledger.rows.values()]
+                    stage=('COMPLETED' if statuses and all(x=='COMPLETED' for x in statuses) else 'REVIEW REQUIRED')
+                    operation(stage,str(sum(x=='COMPLETED' for x in statuses))+'/'+str(len(statuses))+' numerical cases completed; native ETABS equivalence remains separate')
                     try:win.after(0,lambda:button.configure(state='normal'))
                     except (tk.TclError,RuntimeError):pass
             threading.Thread(target=worker,daemon=True).start()
         except Exception as e:messagebox.showerror('MRSM inputs',str(e),parent=win)
     button=ttk.Button(actions,text='Run selected state(s)',command=run);button.pack(side='left')
     def export_zip():
+        operation('EXPORTING','Creating MRSM review ZIP from existing saved results')
         def worker():
             try:
                 from components.validation.seismic_review_bundle import bundle_seismic_review
                 package=bundle_seismic_review(folder,output,method='MRSM')
                 append('[MRSM_REVIEW_ZIP] '+package['zip']+'\n')
+                operation('EXPORTED','MRSM review ZIP: '+package['zip'])
             except Exception as exc:
                 append('[MRSM_REVIEW_PACKAGING_FAILED] '+str(exc)+'\n')
+                operation('FAILED','MRSM review ZIP creation: '+str(exc))
         threading.Thread(target=worker,daemon=True).start()
     ttk.Button(actions,text='Export full evidence ZIP',command=export_zip).pack(side='left')
     def export_organized_zip():
