@@ -117,14 +117,16 @@ class GravityAnalysisGUI:
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
         self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
-        self.wall_support_strategy_var=tk.StringVar(value="Primary ETABS-matched set (32 nodes)")
+        self.wall_support_strategy_var=tk.StringVar(value="76 source-restraint nodes (reference)")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self.gravity_operation_state=tk.StringVar(value="IDLE | No gravity solver or exporter running")
         self._gravity_busy=False
         self._build()
-        # User-selected primary case; retain legacy scenario keys for saved results.
-        self.wall_support_strategy_var.set("Primary ETABS-matched set (32 nodes)")
+        # Use source-export restraints as the default reference case. Earlier
+        # 32-node results remain load-redistribution diagnostics; changing
+        # report selection never modifies an existing solver output.
+        self.wall_support_strategy_var.set("76 source-restraint nodes (reference)")
         self.wall_support_strategy_var.trace_add(
             "write", lambda *_: self._read_code_inputs(show_error=False)
             if self.model_var.get() else self._refresh_case_reaction())
@@ -1043,8 +1045,8 @@ class GravityAnalysisGUI:
         ttk.Label(wall_row,text="Gravity wall-base supports:").pack(side="left",padx=(0,6))
         ttk.Combobox(wall_row,textvariable=self.wall_support_strategy_var,
             state="readonly",width=38,
-            values=("Primary ETABS-matched set (32 nodes)","ETABS Node Position (76 nodes)","Continuous Wall Base (97 nodes)")).pack(side="left")
-        ttk.Label(wall_row,text="32 reaction-bearing nodes: primary gravity case. 76 original supports and 97 continuous wall-base supports: sensitivity cases. Joint agreement is checked separately.",
+            values=("32 nonzero-reaction nodes (diagnostic)","76 source-restraint nodes (reference)","97 wall-base idealization (sensitivity)")).pack(side="left")
+        ttk.Label(wall_row,text="76 exported source restraints are the default ETABS-equivalence candidate; 32 releases 44 formerly restrained wall nodes, and 97 fixes 21 extra mesh nodes. Both are diagnostics, NOT equivalent models.",
                   wraplength=485).pack(side="left",padx=8)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
@@ -1106,9 +1108,9 @@ class GravityAnalysisGUI:
         ttk.Entry(inputs, textvariable=self.load_var, width=16, state="readonly").grid(row=0, column=3, sticky="w", padx=4)
         ttk.Label(inputs, text="Support case (solved reaction)").grid(row=1, column=0, sticky="w", padx=4, pady=(5,0))
         ttk.Combobox(inputs, textvariable=self.wall_support_strategy_var, state="readonly", width=39,
-            values=("Primary ETABS-matched set (32 nodes)",
-                    "ETABS Node Position (76 nodes)",
-                    "Continuous Wall Base (97 nodes)")).grid(row=1, column=1, sticky="w", padx=4, pady=(5,0))
+            values=("32 nonzero-reaction nodes (diagnostic)",
+                    "76 source-restraint nodes (reference)",
+                    "97 wall-base idealization (sensitivity)")).grid(row=1, column=1, sticky="w", padx=4, pady=(5,0))
         ttk.Label(inputs, text="Solved vertical support reaction (kN)").grid(
             row=1,column=2,sticky="w",padx=4,pady=(5,0))
         ttk.Entry(inputs,textvariable=self.solved_reaction_var,state="readonly",width=22).grid(
@@ -1182,9 +1184,9 @@ class GravityAnalysisGUI:
         plot_toolbar.pack(fill="x", padx=5, pady=3)
         ttk.Label(plot_toolbar, text="Display saved setup:").pack(side="left", padx=(0, 5))
         ttk.Combobox(plot_toolbar, textvariable=self.wall_support_strategy_var,
-            values=("Primary ETABS-matched set (32 nodes)",
-                    "ETABS Node Position (76 nodes)",
-                    "Continuous Wall Base (97 nodes)"),
+            values=("32 nonzero-reaction nodes (diagnostic)",
+                    "76 source-restraint nodes (reference)",
+                    "97 wall-base idealization (sensitivity)"),
             state="readonly", width=38).pack(side="left", padx=4)
         ttk.Button(plot_toolbar, text="Load selected setup plots",
                    command=self._view_saved_case).pack(side="left", padx=4)
@@ -1389,11 +1391,14 @@ class GravityAnalysisGUI:
         [REF docs/review/GRAVITY_ETABS_COMPARISON.md]
         """
         return {
+            "32 nonzero-reaction nodes (diagnostic)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
             "Primary ETABS-matched set (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
             "ETABS Reaction Validation": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
             "ETABS Reaction Validation (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+            "76 source-restraint nodes (reference)": "ETABS_SOURCE_SUPPORTS",
             "ETABS Node Position (76 nodes)": "ETABS_SOURCE_SUPPORTS",
             "ETABS Node Position / Continuous": "ETABS_SOURCE_SUPPORTS",
+            "97 wall-base idealization (sensitivity)": "CONTINUOUS_WALL_BASE_FIXED",
             "Continuous Wall Base (97 nodes)": "CONTINUOUS_WALL_BASE_FIXED",
             "Continuous Wall Base (97)": "CONTINUOUS_WALL_BASE_FIXED",
             "ETABS_SOURCE_SUPPORTS": "ETABS_SOURCE_SUPPORTS",
