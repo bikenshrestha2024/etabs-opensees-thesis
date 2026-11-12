@@ -222,6 +222,10 @@ def _source_snapshot(export_dir,state):
         'historical_ubc_seaoc_user_example':(
             __import__('components.inputs.grouped_wall_aw',
                 fromlist=['wall_aw_example']).wall_aw_example()),
+        'selected_two_12m_aw_reference':(
+            __import__('components.inputs.grouped_wall_aw',
+                fromlist=['selected_two_12m_wall_reference'])
+                .selected_two_12m_wall_reference()),
         'grouped_wall_aw_error':grouping_error,
         'opening_reduction_audit':(
             opening_reduction_audit(profile,height)
@@ -524,9 +528,16 @@ def export_sync_report(report, output_dir, template=None):
         ('Reviewed source-matched grouped Aw (m²)',
          (report.get('grouped_wall_aw_review') or {}).get('aw_candidate_m2',{}).get('X'),
          (report.get('grouped_wall_aw_review') or {}).get('aw_candidate_m2',{}).get('Y')),
-        ('ILLUSTRATIVE example: 4 X doors + 3 solid Y walls (m²)',
+        ('USER SELECTED: 2 connected 12m X walls + 3 solid Y walls (m²)',
+         (report.get('selected_two_12m_aw_reference') or {}).get('X'),
+         (report.get('selected_two_12m_aw_reference') or {}).get('Y')),
+        ('PREVIOUS METHOD: 4 independent 6m X panels (m²)',
          (report.get('historical_ubc_seaoc_user_example') or {}).get('X'),
          (report.get('historical_ubc_seaoc_user_example') or {}).get('Y')),
+        ('Export node geometry verification',
+         (report.get('source_node_wall_geometry_verification') or {}).get(
+             'classification','NOT_VERIFIED'),
+         (report.get('grouped_wall_aw_review') or {}).get('policy','')),
         ('Grouped wall status',
          (report.get('grouped_wall_aw_review') or {}).get('status',
                   'NO_SOURCE_MATCHED_GROUP_MANIFEST'),
