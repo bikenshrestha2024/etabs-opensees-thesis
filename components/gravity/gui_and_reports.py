@@ -353,8 +353,27 @@ class GravityAnalysisGUI:
             messagebox.showerror("Native equivalence audit",str(exc),parent=self.win)
 
     def _set_gravity_operation(self,state,detail=""):
-        """Running status independent of the report/status text (Tk main thread)."""
-        self.gravity_operation_state.set(state+" | "+str(detail))
+        """Make solver/export process state obvious without implying ETABS acceptance.
+
+        [REF REVIEW_MAIN/01_GRAVITY/20261112_GRAVITY_GUI_AND_LOAD_PATH_EVIDENCE_REVIEW.md]
+        These colors describe the process only. Green is not an
+        engineering validation, even if internal equilibrium passes.
+        """
+        self.gravity_operation_state.set(
+            state+" | "+str(detail)+
+            " | PROCESS STATUS ONLY — ETABS equivalence not inferred")
+        colors={
+            "RUNNING":("#155e75","#e0f2fe"),
+            "FINISHED":("#166534","#dcfce7"),
+            "BLOCKED":("#991b1b","#fee2e2"),
+            "MISMATCH":("#991b1b","#fee2e2"),
+            "CANCELLED":("#92400e","#fef3c7"),
+            "IDLE":("#374151","#f3f4f6"),
+        }
+        if hasattr(self,"gravity_operation_badge"):
+            foreground,background=colors.get(state,colors["IDLE"])
+            self.gravity_operation_badge.configure(
+                fg=foreground,bg=background)
         if state=="RUNNING":
             self.gravity_busy_bar.start(15)
         else:
@@ -1140,47 +1159,59 @@ class GravityAnalysisGUI:
         ttk.Label(bar,text="Selected condition: ").pack(side="left",padx=(12,2))
         ttk.Label(bar,textvariable=self.gravity_profile_var).pack(side="left")
         ttk.Label(bar,textvariable=self.wall_support_strategy_var).pack(side="left",padx=8)
-        # Keep actions visible at normal Windows DPI by grouping them into
-        # short functional rows; never depend on horizontal clipping to reach
-        # the support-case selector, comparison or evidence export controls.
-        actions=ttk.LabelFrame(root,text="Saved responses and engineering comparisons")
-        actions.pack(fill="x",pady=(0,3))
-        def action_row(parent):
-            row=ttk.Frame(parent)
-            row.pack(fill="x",padx=5,pady=2)
-            return row
-        review=action_row(actions)
-        ttk.Button(review,text="View saved 32 / 76 / 97 case",
-                   command=self._view_saved_case).pack(side="left",padx=4)
-        ttk.Button(review,text="Compare solved 32 / 76 / 97 + Excel",
-                   command=self._compare_three_saved_cases).pack(side="left",padx=4)
-        ttk.Button(review,text="Export member-action PDF pages",
-                   command=self._export_all_pages).pack(side="left",padx=4)
-        ttk.Button(review,text="Organize existing 32 / 76 / 97 outputs",
-                   command=self._organize_existing_gravity_cases).pack(side="left",padx=4)
-        validation=action_row(actions)
-        ttk.Button(validation,text="Audit support DOFs / rigid end zones",
-                   command=self._audit_native_equivalence).pack(side="left",padx=4)
-        ttk.Button(validation,text="Extract ETABS + compare gravity",
-                   command=self._direct_etabs_gravity_compare).pack(side="left",padx=4)
+        # Three single-purpose action pages keep launch actions discoverable
+        # without duplicating prominent call-to-action buttons across rows.
+        # All existing callbacks remain unchanged; only their grouping changes.
+        actions=ttk.LabelFrame(root,text="2. Results, independent verification and evidence")
+        actions.pack(fill="x",pady=(0,4))
+        action_tabs=ttk.Notebook(actions)
+        action_tabs.pack(fill="x",padx=6,pady=5)
+        results_page=ttk.Frame(action_tabs,padding=6)
+        verification_page=ttk.Frame(action_tabs,padding=6)
+        exports_page=ttk.Frame(action_tabs,padding=6)
+        action_tabs.add(results_page,text="Review saved results")
+        action_tabs.add(verification_page,text="Verify ETABS and load path")
+        action_tabs.add(exports_page,text="Reports and evidence")
+        def action_button(parent,text,command,row,col):
+            control=ttk.Button(parent,text=text,command=command)
+            control.grid(row=row,column=col,sticky="ew",padx=4,pady=4)
+            return control
+        for page in (results_page,verification_page,exports_page):
+            page.columnconfigure(0,weight=1,uniform="actions")
+            page.columnconfigure(1,weight=1,uniform="actions")
+        action_button(results_page,"Open saved 32 / 76 / 97 case",
+                      self._view_saved_case,0,0)
+        action_button(results_page,"Compare saved support scenarios + Excel",
+                      self._compare_three_saved_cases,0,1)
+        action_button(results_page,"Organize existing 32 / 76 / 97 outputs",
+                      self._organize_existing_gravity_cases,1,0)
+        action_button(verification_page,"Audit support DOFs and rigid zones",
+                      self._audit_native_equivalence,0,0)
+        action_button(verification_page,"Extract ETABS and compare gravity",
+                      self._direct_etabs_gravity_compare,0,1)
         def load_path():
             try:
                 path=__import__('OpenSees_Load_Path_V141').export(Path(self.model_var.get()).parent)
                 __import__('os').startfile(str(path))
-            except Exception as exc:messagebox.showerror('Slab load path',str(exc),parent=self.win)
-        ttk.Button(validation,text="Slab load path / formulas",
-                   command=load_path).pack(side="left",padx=4)
-        outputs=action_row(actions)
-        ttk.Button(outputs,text="Bundle gravity evidence ZIP",
-                   command=self._export_comparison_bundle).pack(side="left",padx=4)
-        ttk.Button(outputs,text="Export all-module ZIPs",
-                   command=self._export_organized_evidence).pack(side="left",padx=4)
-        ttk.Button(outputs,text="Open output folder",
-                   command=self._open_output_folder).pack(side="left",padx=4)
+            except Exception as exc:
+                messagebox.showerror('Slab load path',str(exc),parent=self.win)
+        action_button(verification_page,"Slab load path / formulas",
+                      load_path,1,0)
+        action_button(exports_page,"Export member-action PDF pages",
+                      self._export_all_pages,0,0)
+        action_button(exports_page,"Bundle gravity evidence ZIP",
+                      self._export_comparison_bundle,0,1)
+        action_button(exports_page,"Export all-module ZIPs",
+                      self._export_organized_evidence,1,0)
+        action_button(exports_page,"Open output folder",
+                      self._open_output_folder,1,1)
         self.gravity_busy_bar=ttk.Progressbar(root,mode="indeterminate")
         self.gravity_busy_bar.pack(fill="x",padx=5,pady=(0,2))
-        ttk.Label(root,textvariable=self.gravity_operation_state,
-                  wraplength=1100).pack(fill="x",padx=5,pady=(0,2))
+        self.gravity_operation_badge=tk.Label(
+            root,textvariable=self.gravity_operation_state,
+            fg="#374151",bg="#f3f4f6",anchor="w",
+            font=("Segoe UI",10,"bold"),wraplength=1100,padx=8,pady=5)
+        self.gravity_operation_badge.pack(fill="x",padx=5,pady=(0,3))
         ttk.Label(root, textvariable=self.status_var,wraplength=1100).pack(fill="x",pady=(0,5))
         self.nb = ttk.Notebook(root); self.nb.pack(fill="both", expand=True)
         self.plot_tab = ttk.Frame(self.nb); self.nb.add(self.plot_tab, text="Matplotlib results")
@@ -1217,8 +1248,22 @@ class GravityAnalysisGUI:
         grid.rowconfigure(0,weight=1);grid.columnconfigure(0,weight=1)
         self.storey_tree.grid(row=0,column=0,sticky="nsew");sy.grid(row=0,column=1,sticky="ns");sx.grid(row=1,column=0,sticky="ew")
         self.log_tab = ttk.Frame(self.nb); self.nb.add(self.log_tab, text="Run log")
-        self.log = tk.Text(self.log_tab, wrap="word", height=16); self.log.pack(fill="both", expand=True)
-        ttk.Button(self.log_tab,text="Copy entire log",command=lambda:(self.win.clipboard_clear(),self.win.clipboard_append(self.log.get("1.0","end-1c")))).pack(anchor="w")
+        log_tools=ttk.Frame(self.log_tab);log_tools.pack(fill="x",padx=5,pady=3)
+        ttk.Button(log_tools,text="Copy entire log",command=lambda:(
+            self.win.clipboard_clear(),
+            self.win.clipboard_append(self.log.get("1.0","end-1c")))).pack(side="left",padx=3)
+        ttk.Button(log_tools,text="Scroll to start",command=lambda:self.log.yview_moveto(0)).pack(side="left",padx=3)
+        ttk.Button(log_tools,text="Scroll to latest",command=lambda:self.log.yview_moveto(1)).pack(side="left",padx=3)
+        log_frame=ttk.Frame(self.log_tab);log_frame.pack(fill="both",expand=True,padx=5,pady=(0,5))
+        log_frame.columnconfigure(0,weight=1)
+        log_frame.rowconfigure(0,weight=1)
+        self.log=tk.Text(log_frame,wrap="none",height=16,undo=False)
+        log_y=ttk.Scrollbar(log_frame,orient="vertical",command=self.log.yview)
+        log_x=ttk.Scrollbar(log_frame,orient="horizontal",command=self.log.xview)
+        self.log.configure(yscrollcommand=log_y.set,xscrollcommand=log_x.set)
+        self.log.grid(row=0,column=0,sticky="nsew")
+        log_y.grid(row=0,column=1,sticky="ns")
+        log_x.grid(row=1,column=0,sticky="ew")
         self._canvas = None
 
     def _show_storey_loads(self):

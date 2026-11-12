@@ -1,4 +1,4 @@
-> **NBC 105 load-purpose distinction:** [Full gravity versus seismic weight and LTH preload](NBC105_2025_LOAD_CASE_PURPOSE_GUIDE.md). Intentional changes in live-load participation are not direct ETABS/OpenSees error evidence.
+> **Gravity P0:** [Latest 32/76/97 source and support redistribution evidence, load-path manual sources and UI workflow correction](../REVIEW_MAIN/01_GRAVITY/20261112_GRAVITY_GUI_AND_LOAD_PATH_EVIDENCE_REVIEW.md). Global equilibrium is confirmed; foundation reaction and element load-transfer equivalence remain unresolved.\n\n> **NBC 105 load-purpose distinction:** [Full gravity versus seismic weight and LTH preload](NBC105_2025_LOAD_CASE_PURPOSE_GUIDE.md). Intentional changes in live-load participation are not direct ETABS/OpenSees error evidence.
 
 > **New Kobe linear-history evidence:** [full XY/YX pair review, drift and modal provenance](../REVIEW_MAIN/05_LINEAR_TH/20261112_KOBE_FULL_PAIR_TIMING_DRIFT_AND_PERIOD_AUDIT.md). Both cases completed; performance and engineering acceptance remain distinct.
 
