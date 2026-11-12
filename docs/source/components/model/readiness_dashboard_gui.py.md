@@ -23,3 +23,5 @@ Units are not inferred from filenames. Reviewer claims and actual native solver/
 **Limitations:** no cancellation of an already-started disk hash (stale results are discarded). No native Windows/Tk benchmark has been performed; solver performance is unchanged by this UI implementation. No model/material approval is automated.
 
 **Refresh backpressure:** A 100-ms Tk poll applies results. A single per-window daemon worker coalesces queued refreshes to the latest selection; obsolete completed results are discarded. The worker exits when the window is destroyed. No background thread touches Tk widgets.
+
+**In-app documentation:** the `Knowledge base — 5W1H` action opens the repository's offline `KNOWLEDGE_BASE/README.md` using the OS default handler. It never modifies any analysis source or readiness claim.
