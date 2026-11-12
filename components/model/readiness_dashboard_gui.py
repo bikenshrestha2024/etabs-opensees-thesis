@@ -12,7 +12,7 @@ import subprocess
 import sys
 import webbrowser
 
-from components.model.readiness_dashboard import audit, export_report
+from components.model.readiness_dashboard import audit, export_report, discover_project_model
 
 
 def launch(parent, folder):
@@ -51,9 +51,20 @@ def launch(parent, folder):
     model_row = ttk.Frame(outer)
     model_row.pack(fill="x", pady=3)
     ttk.Label(model_row, text="Model builder:").pack(side="left")
-    model_var = tk.StringVar(value="")
+    discovered_model, discovered_status = discover_project_model(project)
+    model_var = tk.StringVar(value=str(discovered_model) if discovered_model else "")
+    model_selection_status = tk.StringVar(
+        value=("Auto-detected standard nonlinear builder for inspection only; "
+               "not an approved model."
+               if discovered_model else
+               "No standard nonlinear builder found; choose the model explicitly.")
+    )
     ttk.Entry(model_row, textvariable=model_var).pack(side="left", fill="x", expand=True, padx=6)
 
+    ttk.Label(
+        outer, textvariable=model_selection_status, foreground="#9a6318",
+        wraplength=1120
+    ).pack(anchor="w", pady=2)
     overview = tk.StringVar(value="No source-model audit completed")
     ttk.Label(outer, textvariable=overview, font=("Segoe UI", 10, "bold"),
               wraplength=1120).pack(anchor="w", pady=(7, 6))
@@ -93,6 +104,12 @@ def launch(parent, folder):
         path = filedialog.askdirectory(parent=win, title="Select ETABS export project folder")
         if path:
             project_var.set(path)
+            discovered, _ = discover_project_model(path)
+            model_var.set(str(discovered) if discovered else "")
+            model_selection_status.set(
+                "Auto-detected standard nonlinear builder for inspection only."
+                if discovered else
+                "Model not detected in this project folder; choose model explicitly.")
             refresh()
 
     def choose_model():
@@ -101,6 +118,7 @@ def launch(parent, folder):
             filetypes=[("Python model-builder", "*.py"), ("All files", "*.*")])
         if path:
             model_var.set(path)
+            model_selection_status.set("Model manually selected; model review is still required.")
             refresh()
 
     def refresh():
