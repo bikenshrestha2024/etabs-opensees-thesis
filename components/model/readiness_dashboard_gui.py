@@ -189,10 +189,10 @@ def launch(parent, folder):
                     detail.configure(state="normal")
                     detail.delete("1.0", "end")
                     detail.insert("end",
-                        "Project: " + result["project_folder"] + "\\n" +
-                        "Model: " + str(result["model_script"]) + "\\n" +
-                        "SHA256: " + str(result["model_sha256"]) + "\\n\\n" +
-                        "A sign-off claim is not a verified physical model.\\n\\n" +
+                        "Project: " + result["project_folder"] + "\n" +
+                        "Model: " + str(result["model_script"]) + "\n" +
+                        "SHA256: " + str(result["model_sha256"]) + "\n\n" +
+                        "A sign-off claim is not a verified physical model.\n\n" +
                         "Choose a workstream for file paths and next actions.")
                     detail.configure(state="disabled")
             win.after(100, poll_results)
@@ -290,7 +290,7 @@ def launch(parent, folder):
         messagebox.showinfo(
             description,
             "Started a separate diagnostic process. Inspect its actual log and "
-            "output before assessing readiness.\\n" + str(logfile),
+            "output before assessing readiness.\n" + str(logfile),
             parent=win)
 
     def open_materials():
