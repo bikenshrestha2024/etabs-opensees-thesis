@@ -10,4 +10,13 @@ Private chat bundle only; no implicit license to republish to a public repositor
 | L004 | 1-s2.0-S235201242200532X-main_2.pdf | 10.1016/j.istruc.2022.06.051 | Chalarca, Filiatrault, Perrone; Structures 43 (2022), 388–406; accepted 2022-06-21 |
 | L005 | Paper_EngStruc-Bayesianinferenceforcalibrationandvalidation_2.pdf | 10.1016/j.engstruct.2021.112386 | Birrell et al.; Engineering Structures 243 (2021) 112386; online 2021-06-17 |
 
+## New uploads (2026-11-12)
+
+| ID | Original file | DOI | PDF inspection | SHA256 |
+|---|---|---|---|---|
+| L029 | 41062_2024_1574_Author_2.pdf | 10.1007/s41062-024-01574-7 | 25-page author proof, parsed; copyright/license not verified | `e00df98f84749f8635d39eb4a77376f597767cac07bb1b598d949ece90905526` |
+| L030 | tackle-damperfulltext_2.pdf | 10.1016/j.engstruct.2024.118927 | PDF parser fails on xref/pages; manuscript body **not verified** from uploaded bytes; title and metadata verified from publisher | `f92b71f01b7cdeb78d941c6f53417f6c60f65f0d790cb8554a472fb31a07f406` |
+
+Two-file private package: `LITERATURE_New_Uploads_Private_20261112.zip` supplied in the conversation. Its placement is not a GitHub repository path.
+
 The private ZIP has PDFs with original filenames and machine-computed SHA256 manifest. Do not confuse original local PDF availability with a publicly reusable open-access work.
