@@ -25,7 +25,7 @@
 
 Add new works by unique DOI; preserve existing stable IDs. On each citation refresh store *source, UTC retrieval date, count, and methodology*. Keep the catalog useful offline: URLs are references; private PDFs must not be silently pushed. See [existing curated source registry](../docs/00_RESEARCH_REFERENCES.md) for R01–R13 linkage.
 
-The curated master catalog includes 30 works. The automated source audit also detects additional DOIs and reports uncatalogued sources separately; a matched DOI alone does not mean full metadata has been verified. Incomplete bibliographic fields represent **outstanding verification**, not implied completeness.
+The curated master catalog includes 36 works. The automated source audit also detects additional DOIs and reports uncatalogued sources separately; a matched DOI alone does not mean full metadata has been verified. Incomplete bibliographic fields represent **outstanding verification**, not implied completeness.
 
 ## Classification folders
 
@@ -56,3 +56,9 @@ Each classification folder contains both the curated human-facing README and an 
 - **L030** Rouhani, Aghayari and Mousavi (2024), DOI 10.1016/j.engstruct.2024.118927, is classified under FVD. The uploaded tackle-damper PDF could not be parsed due to structural PDF errors; bibliographic identity is verified through publisher, but local PDF quality is flagged.
 
 The uploaded papers remain in a **private chat ZIP**, not the public repository. See [upload inventory](UPLOAD_INVENTORY.md).
+
+## Current audit summary (2026-11-12)
+
+The GitHub Actions scanner completed an active-text scan of **844 tracked source files**, discovered **285 distinct DOI/URL strings** and generated **2,092 category-expanded source locations** without read errors. The original resulting list contained **44 unregistered DOI strings**; a subsequent six-source publisher-verification pass matched several of those, and later scan output is authoritative for remaining count. This is an **inventory**, not a complete bibliometric verification: plain author-year mentions are not captured unless accompanied by DOI/URL.
+
+[Open GitHub Actions execution evidence](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/workflows/literature-citation-audit.yml).
