@@ -16,6 +16,7 @@
 | `docs/source/` | Detailed guide per Python module | New/changed module | Trace command behavior | Code author + engineer |
 | `KNOWLEDGE_BASE/` | Cross-disciplinary 5W1H discovery and navigation | New module responsibility or method | No duplicated executable implementations | Documentation maintainer |
 | `engineering/registry/` | Canonical module ownership and migration contracts | Before moving/renaming canonical code | Traceable ownership | Architecture reviewer |
+| `07_REVIEW_MAIN/` | Numbered entry point to thesis reviews | Use when navigating the top-level 01–07 folders | Avoid moving historical evidence and breaking links | Engineering reviewer |
 | `REVIEW_MAIN/` | Missing evidence, discrepancies and decisions | Every unresolved physics/results discrepancy | Avoids hiding failed cases | Engineering reviewer |
 | `archive/`, `Saved_Project_V156/` | Historical context | Reproduction only | Immutable compatibility evidence | Repository maintainer |
 

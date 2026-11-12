@@ -4,6 +4,9 @@
 
 ## Start here
 
+- [07 — Thesis review backbone](../07_REVIEW_MAIN/README.md) — numbered directory gateway for all discrepancy and independent verification cases; original REVIEW_MAIN records remain authoritative.
+
+
 - [Workflow cards (CSV)](01_WORKFLOWS/WORKFLOW_CARDS.csv) — fifteen code-linked modules with all requested questions, owner roles, prerequisites and acceptance gates.
 - [Folder architecture](02_REPOSITORY_STRUCTURE/README.md) — where files belong, canonical location, how to add new files safely and what must not move.
 - [UI speed and accuracy](03_UI_PERFORMANCE/README.md) — background evidence hashing, stale results, feedback and native solver speed gates.
