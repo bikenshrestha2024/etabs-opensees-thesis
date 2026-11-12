@@ -37,9 +37,14 @@ def reconcile(export_dir, state, *, audit_path=None):
     for axis in ("X", "Y"):
         record = audit["coefficients"][axis]
         excel_aw = float(record["Aw_m2"])
-        snapshot_aw = snapshot["aw_candidate_m2"].get(axis)
+        selected = snapshot["aw_candidate_m2"].get(axis)
+        diagnostic = (snapshot.get("continuous_pier_diagnostic") or {}).get(
+            "aw_candidate_m2") or {}
+        continuous = diagnostic.get(axis)
+        continuous = float(continuous) if continuous is not None else None
+        grouped = (snapshot.get("grouped_wall_aw_review") or {})
+        selected = float(selected) if selected is not None else None
         snap = snapshot["opening_reduction_audit"]["axes"][axis]
-        continuous = float(snapshot_aw) if snapshot_aw is not None else None
         rows = record.get("original_excel_row_contributions", [])
         contributions = [float(r["Aw_contribution_m2"]) for r in rows
                          if r.get("Aw_contribution_m2") is not None]
@@ -49,6 +54,13 @@ def reconcile(export_dir, state, *, audit_path=None):
             raise ValueError(axis + " workbook wall contributions do not reconstruct Aw")
         axes[axis] = {
             "original_excel_aw_m2": excel_aw,
+            "selected_two_12m_aw_m2": selected,
+            "selected_grouping_status": grouped.get("status"),
+            "old_excel_minus_selected_m2": (
+                excel_aw-selected if selected is not None else None),
+            "continuous_minus_selected_m2": (
+                continuous-selected if continuous is not None and
+                selected is not None else None),
             "original_workbook_adopted_period_s": float(record["T1_s"]),
             "continuous_pier_diagnostic_m2": continuous,
             "gross_projected_diagnostic_m2": snap["gross_projected_Aw_m2"],
@@ -70,7 +82,8 @@ def reconcile(export_dir, state, *, audit_path=None):
         "assembled_model_sha256": snapshot["assembled_model_sha256"],
         "axes": axes,
         "caution": ("The NBC first-storey Aw index, gross geometric projection, and "
-                    "through-height continuous-pier diagnostic are different measures. "
+                    "through-height continuous-pier diagnostic and the verified " 
+                    "two-12m structural-wall calculation are distinct measures. "
                     "Without a shared verified object-to-pier/opening map, individual "
                     "contribution differences cannot be assigned to a specific wall.")
     }
@@ -87,17 +100,22 @@ def export_reconciliation(export_dir, state, output_dir, *, audit_path=None):
     wb = Workbook()
     summary = wb.active
     summary.title = "Aw comparison"
-    summary.append(["Axis", "Original Excel Aw (m2)", "Continuous diagnostic (m2)",
-                    "Gross projection (m2)", "Excel minus continuous (m2)",
-                    "Excel adopted period (s)", "Interpretation"])
+    summary.append(["Axis", "Historical original Excel Aw (m2)",
+                    "SELECTED 2x12m structural wall Aw (m2)",
+                    "Continuous-pier diagnostic (m2)",
+                    "Gross projection (m2)", "Old Excel minus selected (m2)",
+                    "Continuous-pier minus selected (m2)",
+                    "Old Excel adopted period (s)", "Selected status"])
     for axis in ("X", "Y"):
         r = report["axes"][axis]
         summary.append([axis, r["original_excel_aw_m2"],
+                        r["selected_two_12m_aw_m2"],
                         r["continuous_pier_diagnostic_m2"],
                         r["gross_projected_diagnostic_m2"],
-                        r["excel_minus_continuous_m2"],
+                        r["old_excel_minus_selected_m2"],
+                        r["continuous_minus_selected_m2"],
                         r["original_workbook_adopted_period_s"],
-                        r["wall_by_wall_match_status"]])
+                        r["selected_grouping_status"]])
     excel_sheet = wb.create_sheet("EXCEL_ORIGINAL")
     excel_sheet.append(["Axis", "Excel row", "Length (m)", "Effective length (m)",
                         "Aw contribution (m2)", "Source cell references"])
