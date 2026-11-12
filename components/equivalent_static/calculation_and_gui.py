@@ -702,6 +702,17 @@ class ESMGui:
         ttk.Label(periodbox,text="Workbook adopted T1-Y (s)").grid(row=1,column=2,sticky="w",padx=5)
         ttk.Entry(periodbox,textvariable=self.excel_ty,state="readonly",width=18).grid(row=1,column=3,sticky="w",padx=5)
         self._field(periodbox,"Rayleigh T1-X (s)",self.rayleigh_tx,2,0,12); self._field(periodbox,"Rayleigh T1-Y (s)",self.rayleigh_ty,2,2,12)
+        # This action also exists in the bottom footer, which can be off-screen
+        # on laptops. Place it adjacent to the required directional inputs.
+        ttk.Button(periodbox,text="Run Preliminary Rayleigh (X/Y)",
+                   command=self._run_rayleigh).grid(
+                       row=2,column=4,columnspan=3,sticky="w",padx=5,pady=3)
+        ttk.Label(periodbox,text=(
+            "Required for NBC §5.1 directional design periods. "
+            "This is a period estimate, NOT Rayleigh damping calibration; "
+            "source-state ULS/SLS results cannot be interchanged."),
+            wraplength=390,foreground="#174a7e").grid(
+                row=13,column=0,columnspan=7,sticky="w",padx=5,pady=2)
         self._field(periodbox,"Adopted design T1-X (s)",self.adopted_tx,12,0,12)
         self._field(periodbox,"Adopted design T1-Y (s)",self.adopted_ty,12,2,12)
         self._field(periodbox,"Empirical multiplier (NBC 1.25)",self.period_factor,3,0,12)
