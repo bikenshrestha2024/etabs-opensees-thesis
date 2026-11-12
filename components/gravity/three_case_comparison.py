@@ -85,14 +85,14 @@ def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L")
     displacement_rows = []
     for tag in common_nodes:
         row = {"node_tag": tag}
-        for _strategy, label in CASES:
+        for strategy, label in CASES:
             # CASES stores (solver_strategy, display_count). The source
-            # node lookup is keyed by "32"/"76"/"97", not solver strategy.
-            # Using the strategy here previously exported ALL displacement
-            # fields as blanks even after three successful solver runs.
+            # node lookup uses "32"/"76"/"97", while public CSV columns
+            # retain the existing stable solver-strategy identifiers.
+            # Reversing the lookup previously made every column blank.
             n = nodes_by_case.get(label, {}).get(tag)
             for dof in ("ux_m", "uy_m", "uz_m"):
-                row[dof + "_" + label] = float(n[dof]) if n else None
+                row[dof + "_" + strategy] = float(n[dof]) if n else None
         displacement_rows.append(row)
     report = {"model_script": str(Path(model_path).resolve()),
               "gravity_profile": profile, "available_cases": list(available),
