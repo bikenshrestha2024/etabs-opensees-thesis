@@ -1,0 +1,74 @@
+DOI,Occurrences,Example_source_locations
+10.1002/1099-1794(200009)9:4,1,REVIEW_MAIN/02_ESM/Aw_Validation/20261112_ADDITIONAL_RC_SOURCES_REVIEW.md:11
+10.1002/1099-1794(200009)9:4%3c295::aid-tal153%3e3.0.co;2-9,1,REVIEW_MAIN/02_ESM/Aw_Validation/20261112_ADDITIONAL_RC_SOURCES_REVIEW.md:11
+10.1002/2475-8876.12120,1,components/validation/reference_library.py:186
+10.1002/2475-8876.12120](https://doi.org/10.1002/2475-8876.12120,1,docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:173
+10.1002/eqe.2622,1,components/validation/reference_library.py:142
+"10.1002/eqe.2622.',wraplength=1060).pack(anchor='w'",1,components/nonlinear_time_history/runner_and_gui.py:823
+10.1002/eqe.2622](https://onlinelibrary.wiley.com/doi/abs/10.1002/eqe.2622,1,DECISIONS_AND_SOURCES_V134.md:56
+10.1002/eqe.3072,2,Research_Components/02_MODELLING_BASIS.md:59; components/validation/reference_library.py:172
+10.1002/eqe.3072](https://doi.org/10.1002/eqe.3072,1,docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:161
+10.1002/eqe.4060:**,1,docs/audit/00_REPOSITORY_ENGINEERING_REVIEW_20261103.md:40
+10.1002/nme.1620210213](https://doi.org/10.1002/nme.1620210213,1,REVIEW_MAIN/01_GRAVITY/20261112_MESH_SUPPORT_AND_SLAB_TRANSFER_VALIDATION.md:62
+10.1002/tal.2003](https://doi.org/10.1002/tal.2003,2,REVIEW_MAIN/07_TIME_HISTORY/20261112_LINEAR_SPEED_AND_25_STOREY_SUBSTRUCTURE_GATE.md:86; docs/review/20261105_PROFESSIONAL_STRUCTURAL_ENGINEERING_PROVENANCE_MANUAL.md:118
+10.1002/tal.2077,1,docs/review/20261107_RESEARCH_IMPLEMENTATION_PRIORITIES.md:40
+10.1002/tal.413](https://doi.org/10.1002/tal.413,2,REVIEW_MAIN/07_TIME_HISTORY/20261112_LINEAR_SPEED_AND_25_STOREY_SUBSTRUCTURE_GATE.md:82; docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:144
+10.1007/978-3-030-80312-4_99,1,Calibration_References_V152/Source_Cards.json:7
+10.1007/s10518-025-02165-2:**,1,docs/audit/00_REPOSITORY_ENGINEERING_REVIEW_20261103.md:43
+10.1007/s10518-025-02353-0:**,1,docs/audit/00_REPOSITORY_ENGINEERING_REVIEW_20261103.md:42
+10.1007/s10518-026-02428-6:**,1,docs/audit/00_REPOSITORY_ENGINEERING_REVIEW_20261103.md:46
+10.1007/s11803-026-2370-8,1,docs/review/20261107_RESEARCH_IMPLEMENTATION_PRIORITIES.md:42
+10.1016/0168-874x(85)90003-4](https://doi.org/10.1016/0168-874x(85)90003-4,1,REVIEW_MAIN/01_GRAVITY/20261112_MESH_SUPPORT_AND_SLAB_TRANSFER_VALIDATION.md:63
+10.1016/j.engstruct.2004.07.005,2,REVIEW_MAIN/02_ESM/Aw_Validation/SOURCE_REGISTER.md:9; components/inputs/opensees_nbc_sync.py:642
+10.1016/j.engstruct.2004.07.005`**,1,REVIEW_MAIN/02_ESM/Aw_Validation/20261112_EXPORT_NODE_GEOMETRY_REVIEW_COMPLETED.md:79
+10.1016/j.engstruct.2019.05.078,1,components/validation/reference_library.py:179
+10.1016/j.engstruct.2019.05.078](https://doi.org/10.1016/j.engstruct.2019.05.078,1,docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:167
+10.1016/j.engstruct.2021.112868,20,Material_Catalog/M30_Fe500_BRB.json:49; Material_Catalog/M30_Fe500_Concrete01.json:47; Material_Catalog/M30_Fe500_Concrete02.json:50; Material_Catalog/M30_Fe500_ConcreteCM.json:52; Material_Catalog/M30_Fe500_FVD.json:46; Material_Catalog/M30_Fe500_SFI_MVLEM_3D.json:80; Material_Catalog/M30_Fe500_Steel02.json:49; Material_Catalog/M30_Fe500_SteelMPF.json:51; Material_Catalog/Official_FVD.json:46; Material_Catalog/PEER_Web_ESFI_Patch.json:80; Research_Components/02_MODELLING_BASIS.md:8; Research_Components/References.json:14; Research_Components/cards/BRB.json:49; Research_Components/cards/Concrete01.json:47; Research_Components/cards/Concrete02.json:50
+10.1016/j.engstruct.2021.113229](https://doi.org/10.1016/j.engstruct.2021.113229,1,REVIEW_MAIN/07_TIME_HISTORY/20261112_LINEAR_SPEED_AND_25_STOREY_SUBSTRUCTURE_GATE.md:84
+10.1016/j.engstruct.2021.113590,4,OpenSees_Material_Section_Library_V117.json:111; REVIEW_MAIN/07_TIME_HISTORY/20261112_LINEAR_SPEED_AND_25_STOREY_SUBSTRUCTURE_GATE.md:70; components/validation/material_benchmarks.py:21; components/validation/reference_library.py:128
+10.1016/j.engstruct.2023.116700',3,components/nonlinear_time_history/material_draft.py:54; components/nonlinear_time_history/one_storey_wall_probe.py:99; components/nonlinear_time_history/research_building_materials.py:330
+"10.1016/j.engstruct.2023.116700','documentation':'https://kkolozvari.github.io/e-sfi-mvlem-3d/','specimens':['sd-06-00','sd-06-45'],'status':'pending_experimental_reproduction','note':'author",1,components/validation/wall_validation.py:9
+10.1016/j.engstruct.2023.116700**,1,REVIEW_MAIN/06_NONLINEAR_TH/20261112_MATERIALS_TN90_AND_ONE_STOREY_TRIAGE.md:39
+10.1016/j.engstruct.2023.116700](https://doi.org/10.1016/j.engstruct.2023.116700,2,docs/programs/37_SOIL_C_NLTHA_JSON_SCHEMA.md:116; docs/review/20261105_PROFESSIONAL_STRUCTURAL_ENGINEERING_PROVENANCE_MANUAL.md:119
+10.1016/j.engstruct.2024.118774,1,docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md:74
+10.1016/j.engstruct.2025.121846,1,docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md:77
+10.1016/j.finel.2015.01.006,6,Material_Validation_Results_V149/Validation_Report_V149.json:150; Material_Validation_Results_V149/Walls/wall_validation.json:15; VISUAL_VALIDATION_V149.md:35; WALL_VALIDATION_V147.md:31; Wall_Validation_Lu_Full/wall_validation.json:15; Wall_Validation_Results/wall_validation.json:15
+"10.1016/j.finel.2015.01.006','documentation':'https://openseespydoc.readthedocs.io/en/latest/src/rcshearwall.html','repository':'https://github.com/zhuminjie/openseespydoc/tree/master/pyexamples','note':'published",1,components/validation/wall_validation.py:10
+10.1016/j.istruc.2026.112348](https://doi.org/10.1016/j.istruc.2026.112348,1,REVIEW_MAIN/07_TIME_HISTORY/20261112_LINEAR_SPEED_AND_25_STOREY_SUBSTRUCTURE_GATE.md:87
+10.1016/j.jcsr.2023.108415,1,components/validation/reference_library.py:193
+10.1016/j.jcsr.2023.108415](https://doi.org/10.1016/j.jcsr.2023.108415,1,docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:179
+10.1016/j.jobe.2021.102946,1,components/validation/reference_library.py:121
+10.1016/j.jobe.2023.107209](https://doi.org/10.1016/j.jobe.2023.107209,1,REVIEW_MAIN/07_TIME_HISTORY/20261112_LINEAR_SPEED_AND_25_STOREY_SUBSTRUCTURE_GATE.md:85
+10.1016/j.jobe.2026.115439](https://doi.org/10.1016/j.jobe.2026.115439,1,REVIEW_MAIN/07_TIME_HISTORY/20261112_LINEAR_SPEED_AND_25_STOREY_SUBSTRUCTURE_GATE.md:88
+10.1016/j.jweia.2021.104761](https://doi.org/10.1016/j.jweia.2021.104761,1,REVIEW_MAIN/07_TIME_HISTORY/20261112_LINEAR_SPEED_AND_25_STOREY_SUBSTRUCTURE_GATE.md:83
+10.1016/j.soildyn.2018.06.021,1,Research_Components/02_MODELLING_BASIS.md:60
+10.1016/s0141-0296(03)00041-5](https://doi.org/10.1016/s0141-0296(03)00041-5,1,REVIEW_MAIN/02_ESM/Aw_Validation/20261112_ADDITIONAL_RC_SOURCES_REVIEW.md:15
+10.1061/%28asce%290733-9445%281993%29119%3a7%282258%29,1,AXIAL_SHORTENING_LITERATURE_V124.md:80
+10.1061/(asce)0733-9445(1988)114:8(1804,20,Material_Catalog/M30_Fe500_BRB.json:37; Material_Catalog/M30_Fe500_Concrete01.json:35; Material_Catalog/M30_Fe500_Concrete02.json:38; Material_Catalog/M30_Fe500_ConcreteCM.json:40; Material_Catalog/M30_Fe500_FVD.json:34; Material_Catalog/M30_Fe500_SFI_MVLEM_3D.json:68; Material_Catalog/M30_Fe500_Steel02.json:37; Material_Catalog/M30_Fe500_SteelMPF.json:39; Material_Catalog/Official_FVD.json:34; Material_Catalog/PEER_Web_ESFI_Patch.json:68; Research_Components/02_MODELLING_BASIS.md:23; Research_Components/References.json:2; Research_Components/cards/BRB.json:37; Research_Components/cards/Concrete01.json:35; Research_Components/cards/Concrete02.json:38
+10.1061/(asce)0733-9445(1988)114:8(1827,23,Calibration_References_V152/Source_Cards.json:23; Calibration_Steel02/README.md:13; Material_Catalog/M30_Fe500_BRB.json:38; Material_Catalog/M30_Fe500_Concrete01.json:36; Material_Catalog/M30_Fe500_Concrete02.json:39; Material_Catalog/M30_Fe500_ConcreteCM.json:41; Material_Catalog/M30_Fe500_FVD.json:35; Material_Catalog/M30_Fe500_SFI_MVLEM_3D.json:69; Material_Catalog/M30_Fe500_Steel02.json:38; Material_Catalog/M30_Fe500_SteelMPF.json:40; Material_Catalog/Official_FVD.json:35; Material_Catalog/PEER_Web_ESFI_Patch.json:69; REVIEW_V151.md:16; Research_Components/02_MODELLING_BASIS.md:23; Research_Components/References.json:3
+10.1061/(asce)0733-9445(1988)114:8(1827)',1,components/validation/grade_cards.py:11
+10.1061/(asce)0733-9445(1998)124:4(426,2,REVIEW_MAIN/02_ESM/Aw_Validation/SOURCE_REGISTER.md:10; components/inputs/opensees_nbc_sync.py:643
+10.1061/(asce)0733-9445(1998)124:4(426)`**,1,REVIEW_MAIN/02_ESM/Aw_Validation/20261112_EXPORT_NODE_GEOMETRY_REVIEW_COMPLETED.md:80
+10.1061/(asce)0733-9445(2008)134:4(581,3,components/nonlinear_time_history/damping_regions.py:4; components/nonlinear_time_history/energy_balance.py:5; tests/verify_damping_regions.py:3
+10.1061/(asce)be.1943-5592.0000702,4,Calibration_References_V152/Source_Cards.json:31; Calibration_Steel02/Material_Register.json:19; Calibration_Steel02/README.md:13; components/validation/grade_cards.py:68
+10.1061/(asce)sc.1943-5576.0000210](https://doi.org/10.1061/(asce)sc.1943-5576.0000210,1,REVIEW_MAIN/02_ESM/Aw_Validation/20261112_ADDITIONAL_RC_SOURCES_REVIEW.md:14
+10.1061/(asce)st.1943-541x.0000247,21,Material_Catalog/M30_Fe500_BRB.json:50; Material_Catalog/M30_Fe500_Concrete01.json:48; Material_Catalog/M30_Fe500_Concrete02.json:51; Material_Catalog/M30_Fe500_ConcreteCM.json:53; Material_Catalog/M30_Fe500_FVD.json:47; Material_Catalog/M30_Fe500_SFI_MVLEM_3D.json:81; Material_Catalog/M30_Fe500_Steel02.json:50; Material_Catalog/M30_Fe500_SteelMPF.json:52; Material_Catalog/Official_FVD.json:47; Material_Catalog/PEER_Web_ESFI_Patch.json:81; Research_Components/02_MODELLING_BASIS.md:8; Research_Components/References.json:15; Research_Components/cards/BRB.json:50; Research_Components/cards/Concrete01.json:48; Research_Components/cards/Concrete02.json:51
+10.1061/(asce)st.1943-541x.0000247](https://doi.org/10.1061/(asce)st.1943-541x.0000247,1,docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:150
+10.1061/(asce)st.1943-541x.0001474,1,Research_Components/02_MODELLING_BASIS.md:60
+10.1061/(asce)st.1943-541x.0001492**,1,REVIEW_MAIN/06_NONLINEAR_TH/20261112_MATERIALS_TN90_AND_ONE_STOREY_TRIAGE.md:40
+10.1061/(asce)st.1943-541x.0002505,1,REVIEW_V151.md:14
+10.1061/(asce)st.1943-541x.0002505',1,components/validation/grade_cards.py:10
+10.1061/jsdeag.0005798](https://doi.org/10.1061/jsdeag.0005798,1,docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:139
+10.1108/eb023562](https://doi.org/10.1108/eb023562,1,REVIEW_MAIN/01_GRAVITY/20261112_MESH_SUPPORT_AND_SLAB_TRANSFER_VALIDATION.md:61
+10.1109/mcse.2011.66](https://doi.org/10.1109/mcse.2011.66,1,REVIEW_MAIN/07_TIME_HISTORY/20261112_LINEAR_SPEED_AND_25_STOREY_SUBSTRUCTURE_GATE.md:89
+10.1177/1369433216677122,1,Research_Components/02_MODELLING_BASIS.md:58
+10.1186/s40069-019-0352-1,1,MATERIAL_VALIDATION_GUIDE.md:70
+10.1193/051816eqs082m,1,components/validation/reference_library.py:165
+10.1193/051816eqs082m](https://doi.org/10.1193/051816eqs082m,1,docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:155
+10.14359/7444](https://www.concrete.org/publications/internationalconcreteabstractsportal.aspx?id=7444&m=details,1,AXIAL_SHORTENING_LITERATURE_V124.md:73
+10.21022/ijhrb.2017.6.1.73](https://global.ctbuh.org/resources/papers/3311-073-082%20%2001.sami%20s.%20matar.pdf,1,AXIAL_SHORTENING_LITERATURE_V124.md:87
+10.26021/16632,1,docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md:73
+10.31462/jseam.2026.735,1,Research_Components/02_MODELLING_BASIS.md:56
+10.3390/buildings16040711](https://doi.org/10.3390/buildings16040711,1,docs/programs/37_SOIL_C_NLTHA_JSON_SCHEMA.md:116
+10.3390/buildings16183751,1,docs/00_RESEARCH_REFERENCES.md:15
+10.3390/buildings16214188,1,docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md:76
