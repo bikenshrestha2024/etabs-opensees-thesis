@@ -7,6 +7,13 @@
 | L002 | Low-rise RC preliminary design; not directly transferable | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 | L006 | Concrete wall interaction and calibration | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 
+## Newly verified code-cited works (2026-11-12)
+
+| ID | Thesis use | Metadata |
+|---|---|---|
+| L031 | Mander et al. theoretical confined concrete | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+| L032 | Mander et al. experimental confined concrete | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+
 ## Evidence and transfer policy
 
 - Prefer original paper and measured specimens over derived example parameters.
