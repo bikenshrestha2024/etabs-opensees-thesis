@@ -49,13 +49,25 @@ def populate_linear(gui, folder):
         model_matches=result.get('model_sha256')==model_sha and model_sha is not None
         gui.modal_reference_status=dict(path=str(modal),state_matches=state_matches,model_matches=model_matches,implementation_matches=bool(implementation_matches),usage='VERIFIED ELASTIC REFERENCE' if state_matches and model_matches and implementation_matches else 'UNVERIFIED ELASTIC STARTING REFERENCE; nonlinear initial stiffness not validated')
         inputs['modal_reference_status']=gui.modal_reference_status
-        if not state_matches:
-            inputs['notes'].append('Saved modal stiffness state differs from the selected state. No directional Tn/damping periods imported; run Modal audit for this state.')
+        if not (state_matches and model_matches and implementation_matches):
+            # [REF docs/source/components/inputs/analysis_autofill.py.md]
+            # Periods of a different geometry/stiffness code or limit state
+            # cannot be used to calibrate production nonlinear Rayleigh damping.
+            inputs['notes'].append(
+                'ELASTIC MODAL SOURCE REJECTED for Tn/damping: model SHA, state, '
+                'or numerical-implementation fingerprint does not match. '
+                'No TnX/TnY, damping P1/P2 auto-populated. Rerun Modal on the '
+                'exact selected model and check NONLINEAR initial-tangent modes.')
         else:
             rows=[r for r in result.get('rows',[]) if math.isfinite(float(r.get('period_s',0))) and float(r.get('period_s',0))>0]
             for axis in ('x','y'):
                 reached=next((r for r in rows if float(r.get('U'+axis.upper()+'_cumulative_percent',0) or 0)>=90),None)
-                if reached:getattr(gui,'tn'+axis).set(str(reached['period_s']))
+                if reached:
+                    getattr(gui,'tn'+axis).set(str(reached['period_s']))
+                    inputs['notes'].append(axis.upper()+' Tn from MODE '+str(reached.get('mode','?'))+
+                        ' reaching 90% cumulative '+axis.upper()+' mass ('+
+                        str(reached.get('U'+axis.upper()+'_cumulative_percent'))+
+                        '%). Elastic-modal reference only; independently recompute nonlinear initial tangent.')
                 else:inputs['notes'].append(axis.upper()+' 90% mass threshold absent; directional Tn remains required.')
             selected=rows[:int(gui.nmodes.get())]
             if selected:
