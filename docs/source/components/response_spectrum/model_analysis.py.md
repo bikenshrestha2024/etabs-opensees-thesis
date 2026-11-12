@@ -21,3 +21,8 @@ Relevant register IDs: R10. Consult [research reference register](../../../00_RE
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+
+## 2026-11-12 visible run and export workflow
+
+The existing per-case `CaseLedger` remains authoritative. A top-level status field and indeterminate bar now report **READY / RUNNING / EXPORTING / EXPORTED / COMPLETED / FAILED / REVIEW REQUIRED** and on reopen show the stored `MRSM_Batch_Status_V151.json` completion count. Each stage status is written through the Tk UI thread. Numerical completion is not NBC design acceptance. Preserve model source state, six-case X/Y E0/Eplus/Eminus output, 76-source-supported production baseline pending original six-DOF restraint review, and full selected-model hash in ZIP.
