@@ -127,18 +127,27 @@ def launch(parent, folder):
     # Tk's event loop, and apply only the newest requested result on Tk's thread.
     # No worker is allowed to touch widgets or approve an engineering model.
     result_queue = queue.SimpleQueue()
+    requests_queue = queue.SimpleQueue()
     state["request_id"] = 0
     state["busy"] = False
 
-    def refresh():
-        folder_name = project_var.get().strip()
-        model_name = model_var.get().strip()
-        state["request_id"] += 1
-        request_id = state["request_id"]
-        state["report"] = None
-        state["busy"] = True
-        overview.set("Checking model and evidence in background — controls remain responsive.")
-        def worker():
+    def worker_loop():
+        """One worker per window; coalesce rapid refreshes to the latest request."""
+        while True:
+            job = requests_queue.get()
+            if job is None:
+                return
+            # Skip queued intermediate project selections. An in-progress
+            # audit completes normally but its obsolete result is discarded.
+            while True:
+                try:
+                    candidate = requests_queue.get_nowait()
+                except queue.Empty:
+                    break
+                if candidate is None:
+                    return
+                job = candidate
+            request_id, folder_name, model_name = job
             try:
                 if not folder_name:
                     raise ValueError("Select a project export folder")
@@ -150,7 +159,19 @@ def launch(parent, folder):
                 result_queue.put((request_id, audit(folder_path, model_name or None), None))
             except Exception as exc:
                 result_queue.put((request_id, None, str(exc)))
-        threading.Thread(target=worker, daemon=True, name="readiness-evidence-audit").start()
+
+    threading.Thread(
+        target=worker_loop, daemon=True, name="readiness-evidence-audit"
+    ).start()
+
+    def refresh():
+        folder_name = project_var.get().strip()
+        model_name = model_var.get().strip()
+        state["request_id"] += 1
+        state["report"] = None
+        state["busy"] = True
+        overview.set("Checking model and evidence in background — controls remain responsive.")
+        requests_queue.put((state["request_id"], folder_name, model_name))
 
     def poll_results():
         try:
@@ -340,6 +361,11 @@ def launch(parent, folder):
         ttk.Button(actions, text=caption, command=callback).pack(side="left", padx=3)
     ttk.Button(buttons, text="Close", command=win.destroy).pack(side="right", padx=3)
 
+    win.bind(
+        "<Destroy>",
+        lambda event: requests_queue.put(None) if event.widget is win else None,
+        add="+",
+    )
     win.after(100, poll_results)
     refresh()
     win._readiness_report = state
