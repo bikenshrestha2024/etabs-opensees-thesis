@@ -945,8 +945,17 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
 def apply_gravity_profile(data,cfg,profile,pattern_types=None):
     """Rebuild gravity only from unfactored loads; seismic mass stays unchanged."""
     from OpenSees_Storey_Gravity_V131 import classify
+    from components.model.load_case_purpose import audit_load_case_purpose
+    category_overrides=cfg.get('seismic_load_categories',{})
     if profile in ('AS_CONFIGURED','SEISMIC_SOURCE'):
-        return dict(profile=profile,factors=dict(cfg['gravity_factors']),scope='Configured gravity preload, separate from mass_factors. NBC 8.1.1.2 / 9.3.1.2 refer TH gravity to 5.2; this is not the 1.2D+1.5L gravity strength combination. Review occupancy, roof and selected analysis purpose.')
+        factors=dict(cfg['gravity_factors'])
+        purpose_audit=audit_load_case_purpose(
+            profile,factors,cfg['mass_factors'],
+            category_overrides=category_overrides,
+            present_patterns=data.get('unfactored_patterns',{}))
+        return dict(profile=profile,factors=factors,
+                    load_case_purpose_audit=purpose_audit,
+                    scope='SEISMIC: configured gravity preload and independently configured seismic mass factors. NBC 105:2025 Clause 5.2 Table 5-1 requires D=1.0, storage live=0.6, other live=0.3, roof live=0.0 for seismic weight. This is intentionally not equal to gravity-only 1.0D+1.0L; inspect pattern-level audit and P-Delta purpose.')
     allowed={'GRAVITY_1.0D_1.0L':(1.0,1.0),'GRAVITY_1.2D_1.5L':(1.2,1.5),'UPLIFT_0.9D':(.9,0.)}
     if profile not in allowed:raise ValueError('Unknown gravity profile '+profile)
     if not data.get('unfactored_patterns'):raise ValueError('Case-specific PDelta needs unfactored source patterns')
@@ -961,7 +970,12 @@ def apply_gravity_profile(data,cfg,profile,pattern_types=None):
     scope='Fresh combination preload with PDelta transformations; seismic mass retained from source mass factors'
     if profile=='GRAVITY_1.0D_1.0L':
         scope='Unfactored 100% dead plus 100% live gravity comparison, including assigned roof live; seismic mass factors unchanged. Match ETABS case and model.'
-    return dict(profile=profile,factors=factors,scope=scope)
+    purpose_audit=audit_load_case_purpose(
+        profile,factors,cfg['mass_factors'],
+        category_overrides=category_overrides,
+        present_patterns=data.get('unfactored_patterns',{}))
+    return dict(profile=profile,factors=factors,scope=scope,
+                load_case_purpose_audit=purpose_audit)
 
 
 def export_gravity_beam_actions(ops,data,folder,limit_state,mode):
@@ -1002,6 +1016,16 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
     profile=os.environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
     meta=_read(folder/'OpenSees_Source_Model_Metadata_V118.json')
     gravity_context=apply_gravity_profile(data,cfg,profile,meta.get('pattern_types',{}))
+    purpose_audit=gravity_context.get('load_case_purpose_audit',{})
+    print('[LOAD CASE PURPOSE] '+json.dumps({
+        'profile': profile,
+        'purpose': purpose_audit.get('purpose'),
+        'status': purpose_audit.get('status'),
+        'issue_count': len(purpose_audit.get('issues',[])),
+        'factors': gravity_context.get('factors',{}),
+        'seismic_mass_factors': cfg.get('mass_factors',{}),
+        'rule': purpose_audit.get('citation'),
+    },default=str),flush=True)
     requested_strategy=os.environ.get('OPENSEES_GRAVITY_WALL_SUPPORT_STRATEGY',
                                       'ETABS_SOURCE_SUPPORTS')
     # Only the gravity GUI opts in. Other modal/RSA/NLTHA runs retain the
