@@ -11,3 +11,13 @@ Units are not inferred from filenames. Reviewer claims and actual native solver/
 **References:** [NBC105 seismic index](https://dudbc.gov.np/pages/24231978/), PEER 2015/12 and [thesis gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module index](../../00_SOURCE_GUIDE_INDEX.md)
+
+## 2026-11-12 per-audit hash reuse
+
+**What:** within one refresh, the same evidence file is hashed once even if multiple workstreams require it. **When:** `audit(root, model)` computes file fingerprints. **Why:** reduce redundant file reads and runtime without changing physical evidence.
+
+**How:** local `Path.resolve()`→SHA-256 dictionary, discarded at the end of each audit; each new refresh computes new hashes. Verified with `tests/verify_readiness_dashboard.py::test_duplicate_evidence_is_hashed_once_per_audit`.
+
+**Where:** `components/model/readiness_dashboard.py`. **Which:** only evidence files in allowed project locations; no new source discovery and no change to code acceptance. **Who:** software maintainer validates hash correctness and reviewer validates source identity.
+
+**Limitation:** like any snapshot, a file modified while being hashed may invalidate project identity; don't change evidence during signed analysis.

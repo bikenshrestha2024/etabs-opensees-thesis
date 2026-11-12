@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from components.model.readiness_dashboard import GROUPS, audit, export_report, discover_project_model
 
@@ -42,6 +43,28 @@ class ReadinessTests(unittest.TestCase):
             discovered, status = discover_project_model(d)
             self.assertIsNone(discovered)
             self.assertEqual(status, "NO_PROJECT_NONLINEAR_BUILDER_FOUND")
+
+    def test_duplicate_evidence_is_hashed_once_per_audit(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            shared = root / "Accepted_History_Completion_Gate.json"
+            shared.write_text('{"scope":"test_only"}', encoding="utf-8")
+            from components.model import readiness_dashboard as module
+            actual = module._sha256
+            calls = []
+            def tracked_hash(path):
+                calls.append(Path(path).resolve())
+                return actual(path)
+            with patch.object(module, "_sha256", side_effect=tracked_hash):
+                report = module.audit(root)
+            self.assertEqual(calls.count(shared.resolve()), 1)
+            self.assertFalse(report["approved_for_nltha"])
+            self.assertEqual(
+                next(x for x in report["groups"] if x["id"] == "transient")
+                ["evidence"][0]["sha256"],
+                next(x for x in report["groups"] if x["id"] == "motions")
+                ["evidence"][0]["sha256"],
+            )
 
     def test_missing_model_no_automatic_approval(self):
         with tempfile.TemporaryDirectory() as d:
