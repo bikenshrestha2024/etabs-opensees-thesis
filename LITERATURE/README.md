@@ -25,4 +25,34 @@
 
 Add new works by unique DOI; preserve existing stable IDs. On each citation refresh store *source, UTC retrieval date, count, and methodology*. Keep the catalog useful offline: URLs are references; private PDFs must not be silently pushed. See [existing curated source registry](../docs/00_RESEARCH_REFERENCES.md) for R01–R13 linkage.
 
-The current catalog includes 28 works. Incomplete bibliographic fields represent **outstanding verification**, not implied completeness.
+The curated master catalog includes 30 works. The automated source audit also detects additional DOIs and reports uncatalogued sources separately; a matched DOI alone does not mean full metadata has been verified. Incomplete bibliographic fields represent **outstanding verification**, not implied completeness.
+
+## Classification folders
+
+- [FVD](FVD/README.md) — Maxwell dampers, viscous dampers, damper placement, connections
+- [BRB](BRB/README.md) — brace hysteresis, buckling restraint, fatigue
+- [Shear Wall](Shear_Wall/README.md) — FSAM, SFI-MVLEM-3D, E-SFI, openings
+- [Outrigger](Outrigger/README.md) — conventional, damped, belt/cap truss and position optimization
+- [Reinforcing Steel](Reinforcing_Steel/README.md) — Steel02/SteelMPF, cyclic sensitivity, calibration
+- [Concrete](Concrete/README.md) — Concrete01/02/CM, confinement and experiments
+- [Ground Motions](Ground_Motions/README.md) — accelerograms, spectral matching, bidirectional histories
+- [Codes and Standards](Codes_Standards/README.md) — NBC 105 and other standards
+- [OpenSees Methods](OpenSees_Methods/README.md) — element formulation and numerical implementation
+- [Material Calibration](Material_Calibration/README.md) — parameter uncertainty and benchmark reproduction
+
+## Actual repository-source citation audit
+
+- [Code citation occurrences](CODE_CITATION_OCCURRENCES.csv) — generated reference, category, source filename, **line number**, and matched curated ID where available
+- [Uncatalogued DOIs](UNCATALOGUED_DOIS.csv) — source-discovered DOIs not yet matched to an individually verified master record; these require bibliographic review
+- [Scan coverage](CODE_CITATION_SCAN_SCOPE.json) — actual counts, scope and exclusions
+- [Offline scanner](tools/audit_source_citations.py) — run from Python 3.12 with no third-party dependencies
+- [Automated workflow](../.github/workflows/literature-citation-audit.yml) — scans active tracked code/research text on relevant main-branch pushes; commits **only generated text indexes**, not PDFs
+
+Each classification folder contains both the curated human-facing README and an automatically generated CODE_REFERENCES.md with code locations. This automated scan catches DOI/URL literal citations; full author-year references, incomplete/malformed DOI strings, inaccessible content and paper citations embedded only in figures still require manual review.
+
+## Two new papers attached 2026-11-12
+
+- **L029** Naseri, Amini and Kazemi (2024), DOI 10.1007/s41062-024-01574-7, is classified under FVD and Outrigger. Uploaded copy is an **author proof**, not verified final typeset journal version or a license for redistribution.
+- **L030** Rouhani, Aghayari and Mousavi (2024), DOI 10.1016/j.engstruct.2024.118927, is classified under FVD. The uploaded tackle-damper PDF could not be parsed due to structural PDF errors; bibliographic identity is verified through publisher, but local PDF quality is flagged.
+
+The uploaded papers remain in a **private chat ZIP**, not the public repository. See [upload inventory](UPLOAD_INVENTORY.md).
