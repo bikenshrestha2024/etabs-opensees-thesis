@@ -1,8 +1,9 @@
 # Aw Validation — 2026-11-12
 
-**Status:** PREFERRED INTERPRETATION / NOT YET EDB VERIFIED.
+**Status (2026-11-12): EXPORTED NODE/SHELL GEOMETRY REVIEW COMPLETED; native ETABS equivalence and NBC design acceptance remain OPEN.**
 
-This text-only public review folder accompanies a **separate private ZIP of the user-supplied PDFs**. Do NOT commit those source PDFs, original EDB, original Excel, or internal paths to this public repository.
+This text-only public review folder accompanies a **separate private ZIP of the user-supplied PDFs**.
+The completed geometry review, computed directly from the user's uploaded original OpenSees model JSON and first-storey shell/node intervals, is [20261112_EXPORT_NODE_GEOMETRY_REVIEW_COMPLETED.md](20261112_EXPORT_NODE_GEOMETRY_REVIEW_COMPLETED.md). The former four-panel formula remains a historical sensitivity case, not the selected method. Do NOT commit those source PDFs, original EDB, original Excel, or internal paths to this public repository.
 
 ## Directional effective area, NBC 105:2025 §5.1.2
 
@@ -11,7 +12,7 @@ Assume seismic wall height H=95m and thickness t=0.6m, to be verified from the s
 | Case | Wall grouping | Minimum net horizontal area per wall | Whole-wall Lwi | Aw total (m²) | Status |
 |---|---|---:|---:|---:|---|
 | X old | Four independent 6m panels, 1 x 2m door each | 2.4m² | 6m | 1.958293629 | Alternative if actual wall separations |
-| **X candidate** | **Two parallel 12m continuous RC wall lines**, 2 x 2m doors each | **4.8m²** | **12m** | **2.073174515** | **Preferred; inspect native EDB** |
+| **X selected** | **Two parallel 12m continuous RC wall lines**, 2 x 2m doors each | **4.8m²** | **12m** | **2.073174515** | **SELECTED: exported shell/node geometry verified; original EDB still review-gated** |
 | X 24m | One fictitious straight 24m wall | 9.6m² | 24m | 2.532698061 | DO NOT ADOPT without one actual collinear wall |
 | Y unchanged | Three 6m solid Y walls | 3.6m² | 6m | 2.203080332 | Verify original 3 wall identities |
 
