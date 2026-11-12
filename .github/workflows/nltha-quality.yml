@@ -262,6 +262,7 @@ on:
       - 'tests/verify_one_storey_wall_probe.py'
       - 'tests/verify_peer_material_draft_isolation.py'
       - 'tests/verify_initial_nonlinear_period_audit.py'
+      - 'tests/verify_material_sensitivity.py'
       - 'components/inputs/analysis_autofill.py'
       - 'components/nonlinear_time_history/building_exploratory.py'
       - 'docs/source/components/nonlinear_time_history/building_exploratory.py.md'
@@ -427,6 +428,7 @@ jobs:
           python tests/verify_one_storey_wall_probe.py
           python tests/verify_peer_material_draft_isolation.py
           python tests/verify_initial_nonlinear_period_audit.py
+          python tests/verify_material_sensitivity.py
           python tests/verify_modal_cancel_status.py
           python tests/verify_v170_modern_reconciliation.py
           python tests/verify_nbc105_periods.py
