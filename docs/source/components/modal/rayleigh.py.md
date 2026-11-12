@@ -37,3 +37,13 @@ acceptance from a continuous-through-height geometric projection.
 ETABS model-identity, stiffness/P-Delta, gravity, first-storey wall
 openings, centre-of-mass coordinates and torsion-suppressed displacement
 must be checked independently before declaring physical equivalence.
+
+
+## 2026-11-12 full §5.1.1 spreadsheet reconstruction
+
+The native Rayleigh runner now writes live Excel formulas on each `X Rayleigh` and `Y Rayleigh` sheet: columns G/H are respectively `Wi*di²` and `Fi*di`; the sum line and `2*PI()*SQRT(SUM(G)/(9.81*SUM(H)))` independently reconstruct the Python result. Each sheet records reference-force scale and total, **reference force exponent k selected from EMPIRICAL T (not ESM design adopted period)**, state ULS/SLS, source model SHA256, reconciled weight-ledger SHA256 and a structural equivalence warning. Code also writes raw numerator, denominator, reference force sum and exponent in JSON.
+
+The reference-force profile is **not** the finally adopted NBC §6.3 force distribution whenever its k differs from k(T_design); do not silently equate or overwrite them. Reference-force amplitude cancels only for fixed linear stiffness and unchanged shape; check 0.5%, 1% and 2% cases for an unexpectedly nonlinear tangent. For current screenshots, X reference k≈1.542512, Y≈1.518792, whereas NBC adopted ESM X k≈1.740640, Y≈1.710990. Independently reproduce the 25 source `Wi Fi di` rows before accepting the displayed 3.89851s/5.59044s as verified physical periods.
+
+Source: NBC 105:2025 §5.1.1 printed p.28, https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf .
+Review: [20261112_RAYLEIGH_PERIOD_AND_NBC_SECTION6_FULL_AUDIT.md](../../../../REVIEW_MAIN/02_ESM/20261112_RAYLEIGH_PERIOD_AND_NBC_SECTION6_FULL_AUDIT.md).
