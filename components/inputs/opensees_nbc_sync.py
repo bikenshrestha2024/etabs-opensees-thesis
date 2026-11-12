@@ -109,36 +109,87 @@ def _source_snapshot(export_dir,state):
         else:
             approved[axis]=None
             evidence[axis]={'status':'NO_SOURCE_VERIFIED_WALL_INDEX'}
-    # Optional, manually reviewed connected-wall grouping based on original
-    # first-storey source slices. This does NOT mutate the continuous-pier
-    # diagnostic or override an EDB-matched original Excel calculation.
-    from components.inputs.grouped_wall_aw import source_matched_grouping
+    # The user selected two continuous 12m X walls after reviewing plan and
+    # elevation. Prefer that interpretation ONLY if the freshly exported
+    # shell/node FIRST-STOREY geometry verifies two aligned 2m doors per wall,
+    # a 2.3m opening head, three solid Y walls and H=95m. Original source
+    # Excel is kept separately as historical evidence, never edited.
+    from components.inputs.grouped_wall_aw import (
+        source_matched_grouping, verify_thesis_two_12m_wall_geometry)
     grouped=None
     grouping_error=None
+    native_geometry_check=None
+    source_edb=_source_edb_path(folder)
+    if not source_edb or not Path(source_edb).is_file():
+        grouping_error=("Current original source EDB unavailable: cannot "
+                        "mark the export as source-linked; no 12m auto adoption.")
+    elif not profile or not profile.get("rows"):
+        grouping_error="No first-storey node/shell profile for 12m X wall verification."
+    else:
+        try:
+            grouped=verify_thesis_two_12m_wall_geometry(
+                profile,v.get("wall_aw_height_m"))
+            grouped["source_edb"]=source_edb
+            grouped["source_edb_sha256"]=_hash(source_edb)
+            grouped["assembled_model_sha256"]=_hash(model)
+            native_geometry_check=grouped["wall_geometry_verification"]
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            grouping_error="TWO_12M_WALL_NODE_VERIFICATION_BLOCKED: "+str(exc)
+    # A previously approved manual wall grouping must not silently supersede
+    # the project decision. Compare it with source-derived geometry instead.
+    manual=None
+    manual_error=None
     try:
-        grouped=source_matched_grouping(
-            folder, state, profile, v.get("wall_aw_height_m"),
-            _source_edb_path(folder), _hash(model))
+        manual=source_matched_grouping(
+            folder,state,profile,v.get("wall_aw_height_m"),
+            source_edb,_hash(model))
+        if manual is not None and grouped is not None:
+            for axis in ('X','Y'):
+                if not math.isclose(
+                        float(manual["aw_candidate_m2"][axis]),
+                        float(grouped["aw_candidate_m2"][axis]),
+                        rel_tol=1e-6,abs_tol=1e-9):
+                    manual_error=(
+                        "OLD WALL GROUP MANIFEST CONFLICTS with source-derived "
+                        f"12m thesis policy in {axis}: manual="
+                        f"{manual['aw_candidate_m2'][axis]} m²; "
+                        f"source={grouped['aw_candidate_m2'][axis]} m². "
+                        "Original file unchanged; review before design use.")
+        elif manual is not None and grouped is None:
+            data["notes"].append(
+                "Manual wall grouping retained for inspection but cannot "
+                "override 12m policy without passing source node verification.")
     except (OSError, ValueError, TypeError, KeyError) as exc:
-        grouping_error=str(exc)
+        manual_error=str(exc)
     if grouped is not None:
         for axis in ('X','Y'):
-            candidate=_positive(grouped['aw_candidate_m2'].get(axis))
+            candidate=_positive(grouped["aw_candidate_m2"].get(axis))
             if candidate is not None:
-                evidence[axis]['historical_ubc_seaoc_grouped_candidate_m2']=candidate
-                evidence[axis]['historical_grouped_status']=grouped['status']
-                evidence[axis]['code_accepted']=False
-                # Source-matched explicit grouping is a more relevant NBC
-                # area *candidate* for perforated walls than independently
-                # weighted small piers, but never a code PASS.
+                old_workbook=evidence[axis].get("matching_workbook_candidate_m2")
+                evidence[axis].update({
+                    "historical_ubc_seaoc_grouped_candidate_m2":candidate,
+                    "historical_grouped_status":grouped["status"],
+                    "code_accepted":False,
+                    "user_selected_grouping":"TWO_CONNECTED_12M_X_WALL_LINES",
+                    "exported_node_geometry_verified":True,
+                    "previous_workbook_value_m2":old_workbook,
+                    "continuous_pier_diagnostic_m2":(
+                        diagnostic["aw_candidate_m2"].get(axis)
+                        if diagnostic is not None else None),
+                })
                 approved[axis]=candidate
-                evidence[axis]['status']=grouped['status']
-        data['notes'].append(
-            'Source-matched grouped-wall Aw candidate uses minimum first-storey '
-            'area and overall wall length (UBC/SEAOC precedent); engineering '
-            'review REQUIRED, not equivalent to physical coupling verification.')
+                evidence[axis]["status"]=grouped["status"]
+        data["notes"].append(
+            "PROJECT WALL DECISION 2026-11-12: two 12m X wall lines, "
+            "each with two 2m-wide floor-level doors and concrete above "
+            "2.3m, plus three solid 6m Y walls. Source exported shell/node "
+            "first-storey geometry matches. NBC empirical wall areas are "
+            "reviewed candidates; original EDB/model equivalence and "
+            "code acceptance are distinct engineering gates.")
     if grouping_error:
-        data['notes'].append('WALL_GROUPING_REVIEW_BLOCKED: ' + grouping_error)
+        data["notes"].append("WALL_GROUPING_REVIEW_BLOCKED: "+grouping_error)
+    if manual_error:
+        data["notes"].append("MANUAL_WALL_GROUP_REVIEW: "+manual_error)
     roof_height=None
     stories=None
     try:
@@ -165,6 +216,9 @@ def _source_snapshot(export_dir,state):
         'wall_aw_profile':profile,
         'continuous_pier_diagnostic':diagnostic,
         'grouped_wall_aw_review':grouped,
+        'source_node_wall_geometry_verification':native_geometry_check,
+        'historical_manual_grouping':manual,
+        'historical_manual_grouping_error':manual_error,
         'historical_ubc_seaoc_user_example':(
             __import__('components.inputs.grouped_wall_aw',
                 fromlist=['wall_aw_example']).wall_aw_example()),
