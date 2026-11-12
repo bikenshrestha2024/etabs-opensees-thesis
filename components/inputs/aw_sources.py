@@ -1,21 +1,27 @@
 """Labelled wall-index (Aw) source for the modal and ESM windows.
 
 [REF R10 NBC105-2025 §5.1.2 (Aw = sum Awi[0.2 + (Lwi/H)^2], Lwi/H <= 0.9)]
-[REF docs/review/20261106_THESIS_EXCEL_METHOD_DECISION_REGISTER.md (original Excel Aw/opening method is authoritative)]
+[REF docs/review/20261106_THESIS_EXCEL_METHOD_DECISION_REGISTER.md (historical original Excel decision, superseded for this thesis's verified 12m wall geometry)]
+[REF REVIEW_MAIN/02_ESM/Aw_Validation/20261112_EXPORT_NODE_GEOMETRY_REVIEW_COMPLETED.md]
 
-The modal audit and ESM forms showed blank Aw whenever no source-verified
-SCALING SUMMARY workbook for the *same* EDB existed, even after the user had
-run the ETABS-linked original Excel method or the OpenSees geometry sync.
-This module returns, in order of authority:
+2026-11-12 explicit author decision and source priority:
 
-1. ORIGINAL_EXCEL_METHOD_ETABS_LINKED: the newest ``*_ETABS_LINKED_ESM.provenance.json``
-   in the state's analysis folder whose source EDB is the export's source EDB
-   (same path or same SHA256), whose condition matches the limit state, and
-   whose direct ETABS thickness check did not fail.
-2. OpenSees geometry candidate from ``opensees_nbc_sync._source_snapshot``
-   (read-only), with its own evidence status, e.g.
-   PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC. Never NBC acceptance.
-Nothing is written or modified; values carry a label the GUI must display.
+1. For THIS thesis only: two continuous 12m X wall lines with two 2m
+   first-storey doors per wall and three continuous 6m Y walls. A calculated
+   ``EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY`` candidate is preferred
+   ONLY when the actual exported source shell/node geometry passes all checks.
+   This is an adopted empirical CALCULATION interpretation, not NBC code PASS.
+2. ORIGINAL_EXCEL_METHOD_ETABS_LINKED retains the historical original Excel
+   calculator Aw value (previous X four independent 6m panels), untouched,
+   including actual source workbook SHA256 and EDB/source identity.
+3. The original continuous-pier OpenSees Aw stays a separate geometrical
+   diagnostic. It independently weights 2m + 4m + 2m piers instead of
+   the whole 12m wall length and must not supersede the reviewed grouping.
+
+If the 12m source check fails, never insert a hard-coded 2.073m². Existing
+legacy reference behavior may be displayed with a discrepancy warning, but
+physical ETABS equivalence and structural NBC design acceptance remain open.
+No original XLSX, EDB, shell stiffness or dynamic results are modified.
 """
 from __future__ import annotations
 
@@ -28,7 +34,8 @@ LINKED_PATTERN = '*_ETABS_LINKED_ESM.provenance.json'
 CONDITION_STATE = {'ultimate': 'ULS', 'service': 'SLS'}
 GEOMETRY_STATUSES = ('OPEN_SEES_GEOMETRY_CANDIDATE_REVIEW_REQUIRED',
                      'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC',
-                     'SOURCE_MATCHED_GROUPED_WALL_AREA_REVIEW_REQUIRED')
+                     'SOURCE_MATCHED_GROUPED_WALL_AREA_REVIEW_REQUIRED',
+                     'EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY')
 
 
 def _positive(value):
