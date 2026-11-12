@@ -1,3 +1,5 @@
+> **Numbered top-level navigation:** [07 — Thesis review backbone](../07_REVIEW_MAIN/README.md). This existing `REVIEW_MAIN/` folder retains the authoritative issues and source links; no files or evidence were duplicated or moved.
+
 # REVIEW MAIN — Engineering discrepancy and validation register
 
 **Project:** ETABS → OpenSeesPy, NBC 105:2025 asymmetric RCC high-rise/outtrigger thesis. **Opened:** 2026-11-11. **Status:** ACTIVE; not a structural-design certificate.
