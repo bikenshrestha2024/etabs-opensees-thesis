@@ -25,3 +25,5 @@ An elastic model assumption must be physically verified before `Linear -factorOn
 ## UI consistency policy
 
 All analysis modules should eventually expose scroll, copy full log, ZIP export, stop/cancel child process, stage and full-record status, immutable file manifest, exact run path and troubleshooting entry point. Each change needs GUI regression plus real Windows test; do not replace stable controls wholesale.
+
+**Refresh backpressure:** The dashboard uses **one background audit worker per window** rather than a thread per Refresh click. Rapid project/model changes are coalesced; stale reports never overwrite newer selections. The worker exits after window destruction.
