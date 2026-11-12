@@ -38,8 +38,35 @@ Distinguish *minimum first-storey horizontal solid wall area* (net of the door o
 ```
 The wall groups above are **schema illustration only**: do not reuse coordinate values without checking the actual ETABS export. The reviewed manifest must include **every** relevant first-storey wall group, including Y walls. The source profile is compared slice-by-slice, and missing wall segments prevent adoption of the candidate. Missing, mismatched or invalid manifests leave pre-existing continuous-pier diagnostic untouched and record the problem.
 
+## 2026-11-12 selected project method — exported geometry REVIEW COMPLETED
+
+The researcher selected TWO **12.0m X structural walls** (two 2.0m floor-level circulation door openings per wall) rather than the historical FOUR 6m panel interpretation. The user confirms the RC concrete connection and door overlap; the generated source first-storey shell/node positions were also independently examined from `ESM_Review_20261111_192506_593398_UPLOAD.zip`.
+
+- X wall planes Y=6m and Y=12m; each extends X=6..18m. At z=0..2.3m each line has solid intervals X=[6,8], [10,14], [16,18]m. At z=2.3..3.8m each has continuous wall X=[6,18]m. Thickness=0.600m.
+- Three Y walls lie on X=6,12,18m, each with unperforated Y=6..12m. Source base=0m and full roof=95m.
+- Selected X: `AwX = 2 * [(12-2-2)*0.6] * [0.2+(12/95)^2] = 2.073174515 m²`.
+- Selected Y: `AwY = 3 * [6*0.6] * [0.2+(6/95)^2] = 2.203080332 m²`.
+- Earlier Excel using FOUR 6m X panels: `AwX = 1.958293629 m²`. Historic value only.
+- OpenSees original continuous-pier diagnostic: `AwX = 1.930637119 m²`, obtained by independently weighting per-plane lengths **2m + 4m + 2m** and omitting the 12m connected-wall length from the empirical factor. The shell material is present; the discrepancy is formula-grouping, not a detected shell-loss or imposed stiffness correction.
+
+The native geometry observation is documented in
+[`REVIEW_MAIN/02_ESM/Aw_Validation/20261112_EXPORT_NODE_GEOMETRY_REVIEW_COMPLETED.md`](../../../../REVIEW_MAIN/02_ESM/Aw_Validation/20261112_EXPORT_NODE_GEOMETRY_REVIEW_COMPLETED.md).
+
+### New functions / behavior
+
+- `verify_thesis_two_12m_wall_geometry(profile,H)` checks ALL first-storey elevation slices and source X/Y wall-plane coordinates against this **project-specific** policy: two X wall planes length12m, each with two 2m opening gaps to z=2.3m and continuous 12m wall above, three complete Y lines length6m, all t=0.6m and H=95m. It returns `EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY` and detailed intervals only if the checks pass; otherwise raises a source-geometry error. These dimensions are **verification conditions**, not values inserted into an unverified source model.
+- `selected_two_12m_wall_reference()` provides illustrative arithmetic for literature/reporting; it is NOT what sets actual source-derived Aw.
+- `opensees_nbc_sync._source_snapshot` selects the grouped *calculated* values when current source EDB exists, assembled model exists, and the generated first-storey geometry passes. The original Excel and old pier diagnostic are retained separately, along with a possible manually reviewed grouping that is checked for conflict.
+- `aw_sources.resolve_aw` prioritizes this reviewed-node grouped candidate over the historical 6m Excel source in modal/ESM windows. On a geometry mismatch, no two-12m source value is fabricated.
+- The ESM window's **Verify 2×12m Aw from exported nodes** button executes source synchronization; on success the GUI displays 2.073175/2.203080 for the existing project, and output JSON/Excel carries a dedicated geometry-review report.
+- `write_local_aw_review` automatically writes `REVIEW_MAIN/02_ESM/Aw_Validation/AwX_Node_Geometry_Decision_20261112.json` and `AW_ENGINEERING_DECISION.md` within each NEW selected sync run output directory. The original EDB and workbook remain untouched.
+
+**Important acceptance distinction:** `GEOMETRY_REVIEW_COMPLETED` does NOT imply that (1) the live ETABS .EDB bytes match export-time bytes, (2) reinforcement/coupling is structurally adequate, (3) ETABS and OpenSees wall stiffness/periods agree, or (4) NBC code design has been certified. The audit reports `code_accepted: false`.
+
+The optional manual grouping template described below is a *fallback for altered models*, not required to reproduce this user's verified geometry in the existing export.
+
 ## New ESM GUI workflow
-In the ESM module click **Create doorway wall Aw grouping REVIEW template**. The program writes `<selected ETABS export>/REVIEW_MAIN/02_ESM/NBC105_Wall_Grouping_TEMPLATE.json` containing the current EDB and assembled-model SHA256, NBC seismic wall height, all first-storey source shell slices, and an **empty** `wall_groups` array. It cannot be consumed as an adopted candidate. After independently reviewing the native ETABS wall IDs, planes, exact first-storey spans and connection above each door, create `<selected ETABS export>/NBC105_Wall_Grouping_Review.json` with only `source_edb_sha256`, `assembled_model_sha256`, `limit_state`, `height_m` and the **complete** reviewed `wall_groups` list. Re-run **Sync from OpenSees model**. Check new candidate and legacy pier values separately in the generated sync JSON/Excel and the ESM log; none is a code PASS without engineering sign-off. If the original ULS or SLS EDB has been modified, regenerate the export and grouping evidence; never copy a manifest across different source SHA hashes.
+When the actual exported source geometry does NOT match the selected thesis geometry, use **Manual wall grouping template (fallback)** in the ESM module. The program writes `<selected ETABS export>/REVIEW_MAIN/02_ESM/NBC105_Wall_Grouping_TEMPLATE.json` containing the current EDB and assembled-model SHA256, NBC seismic wall height, all first-storey source shell slices, and an **empty** `wall_groups` array. It cannot be consumed as an adopted candidate. After independently reviewing the native ETABS wall IDs, planes, exact first-storey spans and connection above each door, create `<selected ETABS export>/NBC105_Wall_Grouping_Review.json` with only `source_edb_sha256`, `assembled_model_sha256`, `limit_state`, `height_m` and the **complete** reviewed `wall_groups` list. Re-run **Sync from OpenSees model**. Check new candidate and legacy pier values separately in the generated sync JSON/Excel and the ESM log; none is a code PASS without engineering sign-off. If the original ULS or SLS EDB has been modified, regenerate the export and grouping evidence; never copy a manifest across different source SHA hashes.
 
 ## Safety / side effects
 Pure computation and optional local file read. No EDB modifications, no Excel edits, no OpenSees frame/wall stiffness changes, no native dynamic solver operations, no approval. The source-matched grouped result is surfaced under `grouped_wall_aw_review` in sync JSON. It may be shown as a reviewed candidate; downstream code may NOT promote its status to physical equivalence or code acceptance. Original Excel-linked adopted value remains authoritative only where **same EDB/limit state and workbook provenance** have independently been verified.
