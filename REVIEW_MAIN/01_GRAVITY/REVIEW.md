@@ -1,3 +1,5 @@
+> **Case-purpose distinction:** Full gravity comparison = 1.0 dead + 1.0 live (including roof live). Seismic weight = 1.0 dead + 0.6 storage live + 0.3 other live + 0 roof live (NBC 105:2025 §5.2 Table 5-1). Different resultant loads are expected; they must be compared with ETABS only under matched load cases. [Audited procedure](../../07_REVIEW_MAIN/NBC105_2025_LOAD_CASE_PURPOSE_GUIDE.md).
+
 # Gravity engineering review
 **RV-GRV-001 Support-reaction equivalence** — P0 OPEN_BLOCKER
 **RV-GRV-002 Load and weight equivalence** — P0 OPEN_HIGH
