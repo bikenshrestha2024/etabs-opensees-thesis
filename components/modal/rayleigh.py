@@ -114,9 +114,36 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         if audit['storey_count'] != covered_storeys or not math.isclose(period,audit['period_s'],rel_tol=1e-10):
             raise RuntimeError(f'{axis}: incomplete or inconsistent all-storey Rayleigh reconstruction')
         if not math.isfinite(period) or period<=0:raise ValueError(f'{axis} Rayleigh period is nonpositive or non-finite.')
-        result[axis]=dict(Aw_m2=aw,empirical_period_s=empirical,amplified_empirical_s=1.25*empirical,period_s=period,adopted_period_s=min(period,1.25*empirical),storey_audit=audit,rows=[dict(story=r['story_name'],height_m=float(r['height_m']),master_node=n,weight_kN=w,force_kN=f,displacement_m=d) for r,n,w,f,d in zip(rows,masters,weights,forces,u)])
+        result[axis]=dict(Aw_m2=aw,empirical_period_s=empirical,amplified_empirical_s=1.25*empirical,period_s=period,adopted_period_s=min(period,1.25*empirical),reference_force_exponent_k=k,reference_force_total_kN=sum(forces),rayleigh_numerator_kN_m2=numerator,rayleigh_denominator_gFiDi_kN_m2_s2=denominator,storey_audit=audit,rows=[dict(story=r['story_name'],height_m=float(r['height_m']),master_node=n,weight_kN=w,force_kN=f,displacement_m=d) for r,n,w,f,d in zip(rows,masters,weights,forces,u)])
         sheet=wb.create_sheet(axis+' Rayleigh');sheet.append(['Story','Height (m)','Master node','Wi (kN)','Fi (kN)','di (m)','Wi di2 (kN m2)','Fi di (kN m)'])
-        for r in result[axis]['rows']:sheet.append([r['story'],r['height_m'],r['master_node'],r['weight_kN'],r['force_kN'],r['displacement_m'],r['weight_kN']*r['displacement_m']**2,r['force_kN']*r['displacement_m']])
+        for rr in result[axis]['rows']:
+            excel_row=sheet.max_row+1
+            sheet.append([rr['story'],rr['height_m'],rr['master_node'],rr['weight_kN'],
+                          rr['force_kN'],rr['displacement_m'],
+                          f'=D{excel_row}*F{excel_row}^2',
+                          f'=E{excel_row}*F{excel_row}'])
+        end_row=sheet.max_row
+        sum_row=end_row+1
+        sheet.append(['SUM OF NBC §5.1.1 TERMS',None,None,None,None,None,
+                      f'=SUM(G2:G{end_row})',f'=SUM(H2:H{end_row})'])
+        period_row=sum_row+1
+        sheet.append(['INDEPENDENT EXCEL T_R (s)',
+                      f'=IF(H{sum_row}>0,2*PI()*SQRT(G{sum_row}/(9.81*H{sum_row})),"")'])
+        sheet.append(['SOLVER/PYTHON T_R (s)',period])
+        sheet.append(['EXCEL - PYTHON T_R (s)',
+                      f'=IF(B{period_row}="","",B{period_row}-B{period_row+1})'])
+        sheet.append(['Reference lateral load scale',reference_fraction])
+        sheet.append(['Reference Fi total (kN)',sum(forces)])
+        sheet.append(['Reference Fi shape exponent k',k])
+        sheet.append(['k basis','preliminary EMPIRICAL period; not iterative adopted k'])
+        sheet.append(['Source model SHA256',result['model_sha256']])
+        sheet.append(['Source weight ledger SHA256',result['story_weights_sha256']])
+        sheet.append(['Limit state',state])
+        sheet.append(['Elastic COM displacement','incremental from torsion-suppressed gravity baseline'])
+        sheet.append(['Independent verification', 'OPEN: native ETABS response and stiffness/restraint matching'])
+        for col,width in (('A',38),('B',21),('C',17),('D',20),
+                          ('E',20),('F',20),('G',24),('H',20)):
+            sheet.column_dimensions[col].width=width
         summary.append([axis,aw,empirical,1.25*empirical,period,min(period,1.25*empirical)])
         heights=[float(r['height_m']) for r in rows]
         axes[0].plot([v*1000 for v in u],heights,label=f'{axis}: T_R={period:.3f} s')
