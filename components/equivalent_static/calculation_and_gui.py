@@ -213,6 +213,56 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         from openpyxl import Workbook
         wb=Workbook(); ws=wb.active; ws.title="NBC ESM Summary"
         for row in (("Item","Value"),("Standard",result["standard"]),("Limit state",result["limit_state"]),("Location",result.get("location_name","")),("Z source",result.get("zoning_factor_source","")),("Z",result["zoning_factor_Z"]),("Soil type",result["soil_type"]),("Vs,30 (m/s)",result.get("vs30_m_s")),("Soil type from Vs,30",result.get("soil_type_from_vs30")),("N-SPT (blows/30 cm)",result.get("n_spt_blow_30cm")),("Soil type from N-SPT",result.get("soil_type_from_n_spt")),("Site subsoil status",result["site_subsoil_status"]),("T1 (s)",result["period_s"]),("Ch(T1)",result["spectral_shape_Ch"]),("Cd(T1)",result["design_coefficient_Cd"]),("Seismic weight W (kN)",result["total_seismic_weight_kN"]),("Base shear V (kN)",result["base_shear_kN"]),("Exponent k",result["period_exponent_k"]),("ESM eligibility",result["esm_eligibility"])): ws.append(row)
+        # Full intermediate coefficient and verification ledger for NBC §§5-6.
+        # Keep source-derived quantities separate from code acceptance.
+        trace=wb.create_sheet("NBC 5-6 Derivation")
+        for label, value, basis in (
+            ("Case",suffix,"ULS/SLS, force polarity and eccentricity"),
+            ("Aw-X m2",report.get("period_selection",{}).get("empirical_Aw_X_m2"),
+             "NBC §5.1.2; geometry must be independently verified"),
+            ("Aw-Y m2",report.get("period_selection",{}).get("empirical_Aw_Y_m2"),
+             "NBC §5.1.2; geometry must be independently verified"),
+            ("Directional design T1 s",result["period_s"],"NBC §5.1.1-§5.1.3, lesser of Rayleigh / 1.25 empirical"),
+            ("Ch(T1)",result["spectral_shape_Ch"],"NBC Figure 4-1(a), Table 4-1 ESM"),
+            ("Z",result["zoning_factor_Z"],"NBC §4.1.4; verify municipality/site"),
+            ("Importance I",result["importance_factor_I"] if "importance_factor_I" in result else
+             result.get("importance_factor_I", None),"NBC Table 4-4"),
+            ("C(T1) = Ch Z I",result["elastic_spectrum_C_k"],"NBC §4.1.1, NOT Cd"),
+            ("Cs(T1) = 0.20 C(T1)",0.20*result["elastic_spectrum_C_k"],"NBC §4.2"),
+            ("Rmu",result["ductility_factor_R_mu"],"NBC Table 5-2 ULS"),
+            ("Omega_u",result["overstrength_factor_Omega_u"],"NBC Table 5-2 ULS"),
+            ("Omega_s",result["overstrength_factor_Omega_s"],"NBC Table 5-2 SLS"),
+            ("Cd(T1)",result["design_coefficient_Cd"],"ULS C/(Rmu*Omega_u); SLS 0.20*C/Omega_s"),
+            ("Seismic weight W kN",result["total_seismic_weight_kN"],"NBC §5.2; not 1D+1L gravity"),
+            ("V = Cd*W kN",result["base_shear_kN"],"NBC §6.2"),
+            ("Period exponent k",result["period_exponent_k"],"NBC §6.3"),
+            ("Σ(Wi hi^k)",sum(x["seismic_weight_kN"]*x["height_m"]**result["period_exponent_k"] for x in result["stories"]),"NBC §6.3 denominator"),
+            ("ΣFi kN",result["total_floor_force_kN"],"NBC §6.3"),
+            ("V minus ΣFi kN",result["base_shear_kN"]-result["total_floor_force_kN"],"Independent distribution equilibrium"),
+            ("Force polarity",polarity,"Positive and negative earthquake require separate solved cases"),
+            ("Eccentricity m",0.05*float(breadth[0])*int(breadth[1]) if accidental else 0.0,"NBC §5.6; horizontal orthogonal offset"),
+            ("ESM eligibility",result["esm_eligibility"],"NBC §3.2.1, high-rise ULS is reference only"),
+            ("Initial P-Delta", "NOT ESTABLISHED BY THIS FORCE WORKBOOK",
+             "IS 16700:2023 §7.2(d) requires separate 1.2DL+0.5IL±1.5EL/WL cases"),
+            ("Native ETABS equivalence","NOT CERTIFIED", "Reactions, stiffness, loads and boundary constraints not fully matched"),
+        ):
+            trace.append([label,value,basis])
+        trace.column_dimensions["A"].width=36
+        trace.column_dimensions["B"].width=36
+        trace.column_dimensions["C"].width=86
+        trace.freeze_panes="A2"
+        algebra=wb.create_sheet("Storey Formula Audit")
+        algebra.append(["Story","hi (m)","Wi (kN)","Wi hi^k","Fraction","Fi (kN)","Cumulative applied Fi (kN)","Master node","Code basis"])
+        denom=sum(x["seismic_weight_kN"]*x["height_m"]**result["period_exponent_k"] for x in result["stories"])
+        for i,floor in enumerate(result["stories"]):
+            numerator=floor["seismic_weight_kN"]*floor["height_m"]**result["period_exponent_k"]
+            algebra.append([floor["story_name"],floor["height_m"],floor["seismic_weight_kN"],
+                numerator,numerator/denom,floor["lateral_force_kN"],
+                sum(v["lateral_force_kN"] for v in result["stories"][i:]),
+                floor.get("master_node_tag"),"NBC §6.3(1); applied profile not recovered ETABS shear"])
+        for col,width in {"A":19,"B":14,"C":17,"D":20,"E":17,"F":19,"G":29,"H":17,"I":63}.items():
+            algebra.column_dimensions[col].width=width
+        algebra.freeze_panes="A2"
         wf=wb.create_sheet("Storey Forces")
         with open(out_csv,newline="",encoding="utf-8-sig") as f:
             for row in csv.reader(f): wf.append(row)
