@@ -724,8 +724,8 @@ class ESMGui:
         # Persistent actions remain visible; only the long input form scrolls.
         footer=ttk.Frame(self.root,padding=8);footer.pack(side='bottom',fill='x')
         ttk.Button(footer,text='1. Calculate + export',command=self._calculate).pack(side='left',padx=3)
-        ttk.Button(footer,text='ETABS Linked: populate original Excel',command=self._run_etabs_linked).pack(side='left',padx=3)
-        ttk.Button(footer,text='Compare ETABS vs ESM/MRSM responses',
+        ttk.Button(footer,text='ETABS Excel (historical calculation)',command=self._run_etabs_linked).pack(side='left',padx=3)
+        ttk.Button(footer,text='Auto compare ETABS / OpenSees (verified)',
                    command=lambda:__import__(
                        'components.validation.etabs_comparison',
                        fromlist=['launch']).launch(
@@ -736,7 +736,7 @@ class ESMGui:
         ttk.Button(footer,text='Open output folder',command=self._open_export_folder).pack(side='left',padx=3)
         ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
         ttk.Button(footer,text='Excel sources…',command=self._choose_workbooks).pack(side='left',padx=3)
-        ttk.Button(footer,text='Use original Excel Aw/T (research)',command=self._use_explicit_excel_calculation).pack(side='left',padx=3)
+        ttk.Button(footer,text='Historical Excel Aw/T (reference)',command=self._use_explicit_excel_calculation).pack(side='left',padx=3)
         ttk.Button(footer,text='Audit Excel vs continuous-pier Aw',command=self._audit_wall_aw).pack(side='left',padx=3)
         ttk.Button(footer,text='Verify 2×12m Aw from exported nodes',
                    command=lambda:self._sync_opensees_inputs(etabs=False)
@@ -747,9 +747,9 @@ class ESMGui:
         ttk.Button(footer,text='Sync from OpenSees model',command=self._sync_opensees_inputs).pack(side='left',padx=3)
         ttk.Button(footer,text='Check live ETABS geometry (read-only)',command=lambda:self._sync_opensees_inputs(etabs=True)).pack(side='left',padx=3)
         ttk.Button(footer,text='Preliminary Rayleigh run (X/Y)',command=self._run_rayleigh).pack(side='left',padx=3)
-        ttk.Button(footer,text='Bundle ALL ESM validation evidence ZIP',
+        ttk.Button(footer,text='Complete ESM export ZIP (all evidence)',
                    command=self._bundle_esm_evidence).pack(side='left',padx=3)
-        ttk.Button(footer,text='Export organized module ZIPs',
+        ttk.Button(footer,text='Export categorized module ZIPs',
                    command=self._export_organized_evidence).pack(side='left',padx=3)
 
         for button in footer.winfo_children():button.pack_forget()
