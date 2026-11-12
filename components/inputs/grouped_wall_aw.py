@@ -160,6 +160,125 @@ def grouped_wall_aw(profile, height_m, groups):
                       "UBC 1997 and SEAOC are explanatory precedent, not Nepalese adoption"]}
 
 
+
+THESIS_WALL_POLICY = "THESIS_20261112_TWO_CONNECTED_12M_X_WALLS"
+
+
+def verify_thesis_two_12m_wall_geometry(profile, height_m):
+    """[REF docs/source/components/inputs/grouped_wall_aw.py.md]
+    Verify THIS thesis's two 12m perforated X-wall lines and three solid
+    6m Y-wall lines from generated OpenSees first-storey shell/node geometry.
+
+    No wall groups are inferred from a drawing or grid labels. Every actual
+    horizontal material slice is checked; failure is an explicit engineering
+    block rather than a fallback to 6m bays or a hard-coded 2.073m².
+    This validates EXPORT geometry, not original ETABS EDB coupling/rebar.
+    """
+    h = _number(height_m, "NBC building height H", positive=True)
+    rows = profile.get("rows") or []
+    if not rows:
+        raise ValueError("No exported first-storey wall material slices")
+    def near(a, b, tol=0.001):
+        return abs(a - b) <= tol
+    if not near(h, 95.):
+        raise ValueError("Thesis 12m-wall policy expected H=95m; source has " + str(h))
+    base = min(float(r["z_bottom_m"]) for r in rows)
+    top = max(float(r["z_top_m"]) for r in rows)
+    if not near(top - base, 3.8):
+        raise ValueError("First-storey extent differs from expected 3.8m")
+    axes = {}
+    for row in rows:
+        for seg in row.get("segments") or []:
+            key = (str(seg["axis"]).upper(), round(float(seg["plane_m"]), 6),
+                   round(float(seg["thickness_m"]), 6))
+            axes.setdefault(key, []).append((float(seg["start_m"]), float(seg["end_m"])))
+    xlines = sorted(k for k in axes if k[0] == "X")
+    ylines = sorted(k for k in axes if k[0] == "Y")
+    if len(xlines) != 2 or len(ylines) != 3:
+        raise ValueError("Expected 2 X wall planes and 3 Y wall planes, found "
+                         + str((len(xlines), len(ylines))))
+    if any(not near(k[2], .6) for k in axes):
+        raise ValueError("Source wall thickness differs from reviewed 0.6m")
+    groups = []
+    evidence = {"policy": THESIS_WALL_POLICY,
+                "source": "EXPORTED_OPENSEES_FIRST_STOREY_NODES_AND_SHELLS",
+                "first_storey_base_m": base,
+                "first_storey_top_m": top,
+                "x_wall_lines": [], "y_wall_lines": [],
+                "classification": "EXPORTED_GEOMETRY_VERIFIED_NOT_NATIVE_ETABS_CERTIFIED"}
+    for axis, lines in (("X", xlines), ("Y", ylines)):
+        expected_length = 12.0 if axis == "X" else 6.0
+        for k in lines:
+            spans = _union(axes[k])
+            left = min(a for a, b in spans)
+            right = max(b for a, b in spans)
+            if not near(right - left, expected_length):
+                raise ValueError(f"{axis} wall plane {k[1]} span is "
+                                 f"{right-left}m, expected {expected_length}m")
+            groups.append({"id": f"{axis}_{len(evidence[axis.lower()+'_wall_lines'])+1}",
+                           "axis": axis, "plane_m": k[1], "thickness_m": .6,
+                           "start_m": left, "end_m": right})
+            sections = []
+            for row in rows:
+                zlo, zhi = float(row["z_bottom_m"]), float(row["z_top_m"])
+                intervals = _union([
+                    (float(seg["start_m"]), float(seg["end_m"]))
+                    for seg in row.get("segments") or []
+                    if (str(seg["axis"]).upper(), round(float(seg["plane_m"]), 6),
+                        round(float(seg["thickness_m"]), 6)) == k])
+                intervals = [(max(left,a), min(right,b)) for a,b in intervals
+                             if min(right,b)-max(left,a) > 1e-7]
+                gaps = []
+                edge = left
+                for a,b in intervals:
+                    if a-edge > 1e-6:
+                        gaps.append((edge,a))
+                    edge = b
+                if right-edge > 1e-6:
+                    gaps.append((edge,right))
+                sections.append(dict(z_bottom_m=zlo,z_top_m=zhi,
+                                     solid_intervals_m=intervals,
+                                     gaps_m=gaps,
+                                     net_area_m2=.6*sum(b-a for a,b in intervals)))
+            if axis == "X":
+                low = [r for r in sections if r["z_bottom_m"] < base+2.3-1e-5]
+                high = [r for r in sections if r["z_top_m"] > base+2.3+1e-5]
+                if not low or not high:
+                    raise ValueError("Door head at 2.3m is not represented by source slices")
+                for row in low:
+                    if (not near(row["net_area_m2"], 4.8) or
+                        len(row["gaps_m"]) != 2 or
+                        any(not near(b-a,2.) for a,b in row["gaps_m"])):
+                        raise ValueError(f"X wall {k[1]} lacks two 2m floor-level doors "
+                                         "in a common horizontal section")
+                if any(not near(r["net_area_m2"], 7.2) or r["gaps_m"] for r in high):
+                    raise ValueError(f"X wall {k[1]} does not reconnect above 2.3m")
+                if any(not near(r["z_top_m"],base+2.3) for r in low):
+                    raise ValueError("Door-head elevation differs from expected 2.3m")
+                evidence["x_wall_lines"].append(dict(plane_m=k[1],
+                                                   gross_span_m=[left,right],
+                                                   first_storey_sections=sections))
+            else:
+                if any(not near(r["net_area_m2"],3.6) or r["gaps_m"] for r in sections):
+                    raise ValueError(f"Y wall {k[1]} contains an opening or missing segment")
+                evidence["y_wall_lines"].append(dict(plane_m=k[1],
+                                                   gross_span_m=[left,right],
+                                                   first_storey_sections=sections))
+    result = grouped_wall_aw(profile, h, groups)
+    result["status"] = "EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY"
+    result["policy"] = THESIS_WALL_POLICY
+    result["wall_geometry_verification"] = evidence
+    result["code_accepted"] = False
+    result["structural_grouping_decision"] = "USER_SELECTED_TWO_CONNECTED_12M_X_WALLS"
+    result["warnings"] = [
+        "Generated source-matched shell/node geometry confirmed; original ETABS "
+        "EDB and reinforcement connectivity are separate native checks.",
+        "Do not change the original Excel source file. Previous 6m grouping is a "
+        "historical comparison, not the selected 12m calculation.",
+    ]
+    return result
+
+
 def source_matched_grouping(export_dir, state, profile, height_m,
                             source_edb, assembled_model_sha256):
     """[REF docs/source/components/inputs/grouped_wall_aw.py.md]
