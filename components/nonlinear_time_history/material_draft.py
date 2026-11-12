@@ -4,7 +4,7 @@ import json, math, hashlib, shutil
 
 ROOT = Path(__file__).resolve().parents[2]
 
-def prepare(source, destination, basis='PUBLISHED_REFERENCE',
+def prepare(source, destination, basis='PEER_2015_12_SINGLE_SOURCE',
             steelmpf_transition='OPENSEES_DOCUMENTED'):
     source, destination = Path(source).resolve(), Path(destination).resolve()
     if destination == source:
@@ -29,22 +29,41 @@ def prepare(source, destination, basis='PUBLISHED_REFERENCE',
     if not properties: raise ValueError('No shear-wall properties found in this export')
     catalog = 'M30_Fe500_SFI_MVLEM_3D.json' if basis == 'M30_FE500_SENSITIVITY' else 'PEER_Web_ESFI_Patch.json'
     reference = read(ROOT / 'Material_Catalog' / catalog)
+    single = None
+    if basis == 'PEER_2015_12_SINGLE_SOURCE':
+        # [REF R01 PEER Report 2015/12 Appendix B.3; material_source_sets.py]
+        # Preserve SAME-paper ConcreteCM/SteelMPF values and the
+        # equation-adjusted SteelMPF cR1=a1/R0, never silently override them
+        # with an OpenSees example transition card.
+        from components.nonlinear_time_history.material_source_sets import peer_single_source
+        single = peer_single_source()
     tags = {name: 962000+i for i,name in enumerate(sorted(properties))}
     # Historical layout only: two curtains of 20 mm bars at 200 mm spacing.
     # This is not extracted reinforcement and is never represented as verified.
     ratios = {name: 2*math.pi*20**2/4/(200*thickness*1000) for name,thickness in properties.items()}
     from components.nonlinear_time_history.research_building_materials import _steelmpf_transition
     transition = _steelmpf_transition(steelmpf_transition)
-    s = dict(reference['wall_steel'])
-    s.update(R0=transition['R0'], cR1=transition['cR1'], cR2=transition['cR2'])
-    card = dict(basis=basis, source=reference['source'], citation=reference['citation'],
+    s = dict(single['wall_steel'] if single else reference['wall_steel'])
+    if not single:
+        s.update(R0=transition['R0'], cR1=transition['cR1'], cR2=transition['cR2'])
+    # The wall prototype includes FSAM transfer assumptions from the
+    # E-SFI author formulation; the 2015 specimen paper alone does not
+    # supply EVERY required 3D element constant or project bar schedule.
+    card = dict(basis=basis, source=(single['source'] if single else reference['source']),
+                citation=reference['citation'],
                 element_source='https://doi.org/10.1016/j.engstruct.2023.116700',
-                concrete=reference['wall_concrete'], steel=s, fsam=reference['fsam'],
-                steelmpf_transition_profile=steelmpf_transition,
-                steelmpf_transition_basis=transition['basis'],
+                concrete=(single['wall_concrete'] if single else reference['wall_concrete']),
+                steel=s, fsam=reference['fsam'],
+                single_source_parameter_table=(single['rows'] if single else None),
+                steelmpf_transition_profile=('PEER_APPENDIX_CONVERTED' if single else steelmpf_transition),
+                steelmpf_transition_basis=('PEER a1 / R0 transformation; same paper' if single else transition['basis']),
                 thickness_m=properties, fsam_tags=tags, assumed_rho=ratios,
                 reinforcement_assumption='Two curtains, 20 mm bars at 200 mm each way; confirm from project drawings.',
-                status='RESEARCH DRAFT; NOT PROJECT CALIBRATED OR APPROVED', units='MPa converted to kN/m2 by 1000')
+                status='RESEARCH DRAFT; NOT PROJECT CALIBRATED OR APPROVED',
+                provenance_limits=('PEER specimen inputs are not project data; FSAM geometry/reinforcement, '
+                                   '3D element parameters, SHS and FVD/BRB still require independent sources; '
+                                   'post-peak frame Concrete01 terms are modeling assumptions.'),
+                units='MPa converted to kN/m2 by 1000')
     destination.mkdir(parents=True)
     for name in names: shutil.copy2(source/name, destination/name)
     for name in ('OpenSees_Element_Overrides_V125.json','OpenSees_Complete_Story_Masters_V118.csv'):
