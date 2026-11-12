@@ -14,6 +14,45 @@ PROFILE='LITERATURE_FRAME_NL_ELASTIC_WALL_V138'
 TRANSIENT_SYSTEMS=('UmfPack','SparseGeneral')
 _RUN_CONTEXT={}
 
+def _initial_nonlinear_mode_audit(periods, props, *, model_sha256=None):
+    """Document initial-tangent eigenperiods and exact per-axis 90% mass mode.
+
+    [REF NBC 105:2025 §7.3; OpenSees modalProperties -return]
+    This is the gravity-preloaded NONLINEAR domain, not static Rayleigh T1,
+    an elastic modal response source, or an experimentally fitted period.
+    """
+    n=len(periods)
+    def cumulative(key):
+        raw=props.get(key,[]) if isinstance(props,dict) else []
+        try:
+            return [float(v) if v is not None and math.isfinite(float(v)) else None
+                    for v in list(raw)[:n]]
+        except (TypeError,ValueError):
+            return []
+    result=dict(status='INITIAL_NONLINEAR_MODAL_AUDIT',
+        model_sha256=model_sha256,
+        model_period_T1_s=float(periods[0]) if periods else None,
+        mode_count=n,periods_s=list(map(float,periods)),
+        note=('OpenSees eigen() on freshly gravity-preloaded nonlinear model. '
+              'T1 here is modal, not NBC §5.1.1 Rayleigh equivalent-static '
+              'period. The highest requested mode is NOT automatically Tn90.'))
+    for axis in ('X','Y'):
+        ratios=cumulative('partiMassRatiosCumuM'+axis)
+        found=next(((i+1,periods[i],v) for i,v in enumerate(ratios)
+                    if v is not None and v>=90.0),None)
+        result['cumulative_'+axis+'_percent']=ratios
+        result['Tn90_'+axis+'_s']=(float(found[1]) if found else None)
+        result['Tn90_'+axis+'_mode']=(int(found[0]) if found else None)
+        result['Tn90_'+axis+'_mass_percent']=(float(found[2]) if found else None)
+    result['ninety_percent_both_axes']=(
+        result['Tn90_X_s'] is not None and result['Tn90_Y_s'] is not None)
+    if not result['ninety_percent_both_axes']:
+        result['acceptance']='INCOMPLETE: 90% directional mass not established among inspected modes'
+    else:
+        result['acceptance']='NUMERICAL 90% MASS SCREEN ONLY: physical model qualification still required'
+    return result
+
+
 def configure_transient_system(ops,system):
     """Select a supported transient matrix solver without silent fallbacks."""
     if system not in TRANSIENT_SYSTEMS:
@@ -468,8 +507,35 @@ def _run(config):
         from components.shared.eigen_solver import solve_eigen
         eigenvalues=solve_eigen(ops,20);periods=[2*math.pi/math.sqrt(v) for v in eigenvalues if v>0]
         if len(periods)!=20:raise ValueError('Inspected nonlinear modes incomplete')
+        # [REF NBC 105:2025 §7.3; OpenSees modalProperties -return]
+        # Fresh nonlinear initial-tangent mass participation, not the
+        # saved elastic MRSM modal fingerprint and not the Rayleigh period.
+        try:
+            modal_props=ops.modalProperties('-return')
+            initial_modes=_initial_nonlinear_mode_audit(
+                periods,modal_props,
+                model_sha256=assumptions['source_model_sha256'])
+        except Exception as exc:
+            initial_modes=dict(status='NOT_VERIFIED',
+                model_sha256=assumptions['source_model_sha256'],
+                mode_count=len(periods),periods_s=periods,
+                model_period_T1_s=periods[0],
+                Tn90_X_s=None,Tn90_Y_s=None,ninety_percent_both_axes=False,
+                error=str(exc),acceptance='NO MASS-PARTICIPATION VERIFICATION')
+        (case/'Nonlinear_Initial_Modal_Audit.json').write_text(
+            json.dumps(initial_modes,indent=2,allow_nan=False),encoding='utf-8')
+        print('[NONLINEAR INITIAL MODAL]',
+              'T1='+str(initial_modes.get('model_period_T1_s')),
+              'Tn90_X='+str(initial_modes.get('Tn90_X_s')),
+              'Tn90_Y='+str(initial_modes.get('Tn90_Y_s')),
+              '90%-both='+str(initial_modes['ninety_percent_both_axes']),
+              flush=True)
+        if thesis_intent and not initial_modes['ninety_percent_both_axes']:
+            raise RuntimeError(
+                'THESIS_NLTHA 90% mass criterion not established on the initial '
+                'nonlinear domain. Increase modes with reviewed memory budget.')
         # The last of 20 eigenmodes is NOT Tn90; cumulative effective mass
-        # must be obtained from independent reviewed X and Y participation.
+        # is now independently saved from the initial nonlinear domain.
         bound=min(records[0][1],.01,periods[0]/100.)
         if dt>bound:
             raise ValueError(f'Chosen dt {dt} exceeds preliminary first-mode screen {bound:g}s; reduce dt')
