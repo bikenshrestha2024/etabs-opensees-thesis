@@ -54,6 +54,8 @@ class GravityLayoutTests(unittest.TestCase):
         self.assertIn('"RUNNING":("#155e75","#e0f2fe")',source)
         self.assertIn('"FINISHED":("#166534","#dcfce7")',source)
         self.assertIn('"BLOCKED":("#991b1b","#fee2e2")',source)
+        self.assertIn('"MISMATCH":("#991b1b","#fee2e2")',source)
+        self.assertIn('"CANCELLED":("#92400e","#fef3c7")',source)
         self.assertIn("PROCESS STATUS ONLY",source)
         self.assertIn("ETABS equivalence not inferred",source)
         self.assertIn("def _set_gravity_operation",self.funcs)
