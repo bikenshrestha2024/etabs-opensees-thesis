@@ -37,11 +37,15 @@ jobs:
           python -m unittest discover -s tests -p 'test_history_inspection_scopes.py' -v
           python -m unittest tests.verify_readiness_dashboard -v
           python -m unittest discover -s tests -p 'test_knowledge_map.py' -v
+          python -m unittest discover -s tests -p 'test_documentation_coverage.py' -v
           python tools/audit_knowledge_map.py
+          python tools/audit_documentation_coverage.py --output audit/documentation_coverage.json --fail-on-missing-component-guides
       - name: Archive static inventory (not engineering validation)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: static-repository-inventory
-          path: audit/active_inventory.json
+          path: |
+            audit/active_inventory.json
+            audit/documentation_coverage.json
           if-no-files-found: warn
