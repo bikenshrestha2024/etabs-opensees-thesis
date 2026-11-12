@@ -110,6 +110,14 @@ class ESMGuiSafetyTests(unittest.TestCase):
         self.assertIn("PROCESS ONLY",self.code)
         self.assertIn("self._esm_cancel_requested",self.code)
 
+    def test_shared_log_has_independent_scroll_actions(self):
+        source=(ROOT/"components/ui/plot_utilities.py").read_text(encoding="utf-8")
+        self.assertIn("Scroll to start",source)
+        self.assertIn("Scroll to latest",source)
+        self.assertIn("orient='vertical',command=text.yview",source)
+        self.assertIn("orient='horizontal',command=text.xview",source)
+        self.assertIn("current.winfo_class() in ('Text','Treeview','Listbox')",source)
+
     def test_wrong_json_type_explained(self):
         with self.assertRaisesRegex(ValueError,"not an ETABS case-and-story mapping"):
             validate_mapping([{"source_edb":"C:/source.EDB"}])
