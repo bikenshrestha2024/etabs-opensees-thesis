@@ -43,6 +43,14 @@ def available_evidence(model_script):
             path=Path(material);path=path if path.is_absolute() else folder/path
             add('wall_nonlinear_materials_and_reinforcement_cited_calibrated',[path],'material definitions found; calibration not inferred')
             add('frame_concrete_and_rebar_materials_reviewed',[path],'material definitions found; reinforcement calibration not inferred')
+    # The exploratory builder constructs these laws dynamically; its
+    # Research_Material_Assignment is NOT a model-bound production material
+    # file nor an experimentally calibrated project reinforcement schedule.
+    historical=list(out.glob('**/Research_Material_Assignment_V161.json'))
+    if historical:
+        result['research_material_transfer_reference_only']=(
+            'AVAILABLE FOR REVIEW ONLY: exploratory research-material assignment, '
+            'not a calibrated production mapping | '+str(historical[-1]))
     return result
 
 
@@ -55,7 +63,7 @@ def launch(parent,model_script,readiness_variable):
     ttk.Label(win,text='Selected nonlinear builder: '+str(model)+'\nChecklist: '+str(path)+'\nThis is a draft, not automatic approval. A source/material model must exist and checks require real evidence.',wraplength=1120).pack(anchor='w')
     cfg=model.with_name('OpenSees_Complete_Model_Config_V118.json')
     if cfg.exists():
-        config=json.loads(cfg.read_text(encoding='utf-8-sig'));ttk.Label(win,text='Current model configuration: nonlinear_parameters_reviewed='+str(config.get('nonlinear_parameters_reviewed'))+'; materials file='+str(config.get('nonlinear_materials_file') or 'MISSING')+'; wall FSAM mappings='+str(len(config.get('nonlinear_wall_fsam_tags',{}))),wraplength=1100,foreground='#9a3e1d').pack(anchor='w')
+        config=json.loads(cfg.read_text(encoding='utf-8-sig'));ttk.Label(win,text='PRODUCTION MODEL: nonlinear_parameters_reviewed='+str(config.get('nonlinear_parameters_reviewed'))+'; approved model-bound materials file='+str(config.get('nonlinear_materials_file') or 'NOT CONFIGURED')+'; wall FSAM property mappings='+str(len(config.get('nonlinear_wall_fsam_tags',{})))+'. Exploratory PEER materials are assigned dynamically in a separate model and cannot be treated as approved source reinforcement.',wraplength=1100,foreground='#9a3e1d').pack(anchor='w')
     from OpenSees_Research_UI_V123 import scrollable_form
     footer=ttk.Frame(win);footer.pack(side='bottom',fill='x',padx=8,pady=8)
     body=ttk.Frame(win);body.pack(fill='both',expand=True);form=scrollable_form(body,min_width=850);checks={};evidence={}
@@ -90,6 +98,34 @@ def launch(parent,model_script,readiness_variable):
             data.update(model_script=str(model),model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),approved_for_nltha=approved.get(),checks={k:v.get() for k,v in checks.items()},evidence={k:v.get().strip() for k,v in evidence.items()});path.write_text(json.dumps(data,indent=2),encoding='utf-8');readiness_variable.set(str(path));messagebox.showinfo('Readiness saved','Draft saved. Missing model/material prerequisites are not bypassed.',parent=win)
         except Exception as e:messagebox.showerror('Readiness input',str(e),parent=win)
     ttk.Button(footer,text='Save model-bound checklist',command=save).pack(anchor='w')
+    def prepare_peer_draft():
+        """[REF R01 PEER 2015/12; docs/source/components/nonlinear_time_history/material_draft.py.md]
+        Create research-only PEER wall material and FSAM mappings as a copy.
+        Does not promote the draft to a production NLTHA approval.
+        """
+        from datetime import datetime
+        from tkinter import messagebox
+        from components.nonlinear_time_history.material_draft import prepare as create_draft
+        folder=model.parent
+        destination=folder/'OpenSees_Analysis_Results'/(
+            'PEER_2015_12_RESEARCH_MATERIAL_DRAFT_'+datetime.now().strftime('%Y%m%d_%H%M%S'))
+        try:
+            card=create_draft(folder,destination,
+                basis='PEER_2015_12_SINGLE_SOURCE',
+                steelmpf_transition='PEER_APPENDIX_EXACT')
+            messagebox.showinfo('Research material draft created',
+                'CREATED UNAPPROVED COPY ONLY: '+str(destination)+
+                '\\n\\nIt contains Research_Wall_Materials.py, '
+                'Research_Wall_Parameters.json and source geometry/config copies. '
+                'Source EDB and production export remain unchanged. '
+                'This does NOT complete material calibration, reinforcement '
+                'schedules, P-Delta or thesis readiness.\\n\\n'
+                'Basis: '+str(card['basis']),parent=win)
+        except Exception as exc:
+            messagebox.showerror('Cannot create PEER research material draft',
+                                 str(exc),parent=win)
+    ttk.Button(footer,text='Create isolated PEER 2015/12 material/FSAM draft (not approval)',
+               command=prepare_peer_draft).pack(anchor='w')
     ttk.Button(footer,text='Open separate literature demo / material cards',command=lambda:__import__('OpenSees_Literature_Demo_GUI_V137').launch(win)).pack(anchor='w')
     win._readiness_checks=checks;win._readiness_evidence=evidence
     return win
