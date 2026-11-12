@@ -147,6 +147,33 @@ class TestGroupedWallArea(unittest.TestCase):
                 with self.assertRaises(FileExistsError):
                     export_wall_grouping_review_template(root, "ULS")
 
+    def test_common_aw_resolver_prefers_verified_12m_over_older_excel(self):
+        from unittest.mock import patch
+        from components.inputs.aw_sources import resolve_aw
+        reference={"values":{"awx":1.958293628808864,
+                             "awy":2.2030803324099724},
+                   "method":"ORIGINAL_EXCEL","source_identity":"SAME_EDB_SHA256"}
+        reported={"grouped_wall_aw_review":{
+                      "status":"EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY",
+                      "aw_candidate_m2":{"X":2.073174515235457,
+                                         "Y":2.2030803324099724},
+                      "source_edb_sha256":"a"*64},
+                  "assembled_model_sha256":"b"*64,
+                  "aw_evidence":{"X":{"code_accepted":False},
+                                 "Y":{"code_accepted":False}}}
+        with patch("components.inputs.aw_sources.latest_linked_reference",
+                   return_value=(reference,"historical reference")), patch(
+                   "components.inputs.opensees_nbc_sync._source_snapshot",
+                   return_value=reported):
+            chosen=resolve_aw("/nonexistent-export", "ULS")
+        self.assertAlmostEqual(chosen["X"],2.073174515235457)
+        self.assertEqual(chosen["method"],
+                         "EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY")
+        self.assertFalse(chosen["code_accepted"])
+        self.assertAlmostEqual(chosen["historical_workbook_aw_m2"]["X"],
+                               1.958293628808864)
+        self.assertEqual(chosen["reference"],reference)
+
     def test_zero_or_full_opening_rejected(self):
         with self.assertRaises(ValueError):
             wall_aw_example(opening_width_m=6)
