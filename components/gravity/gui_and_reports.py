@@ -310,8 +310,11 @@ class GravityAnalysisGUI:
             self._gravity_action_log('THREE_CASE_COMPARISON',str(out))
             messagebox.showinfo('Gravity support-case comparison',
                 'Saved comparison Excel, JSON, CSV, PNG and PDF:\\n'+str(out)+
-                '\\n\\nUnavailable cases:\\n'+
-                ('\\n'.join(report['missing_cases']) if report['missing_cases'] else 'None')+
+                '\\n\\nCompleted support configurations: '+
+                ', '.join(report['available_cases'])+
+                ('\\nMissing configurations: '+ '; '.join(report['missing_cases'])
+                 if report['missing_cases'] else
+                 '\\nAll requested 32/76/97 cases are present.')+
                 '\\n\\nThis does NOT verify ETABS support fixities or local reactions.',
                 parent=self.win)
         except Exception as exc:
