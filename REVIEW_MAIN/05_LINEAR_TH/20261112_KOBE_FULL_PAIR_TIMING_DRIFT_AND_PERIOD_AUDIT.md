@@ -1,3 +1,5 @@
+> **Load-purpose clarification (2026-11-12):** The different `GRAVITY_1.0D_1.0L` (~311,367 kN) and Kobe seismic `AS_CONFIGURED` (~286,420 kN) total loads are **intentionally different** because 100% live plus roof live is used for the gravity-only comparison, while NBC 105:2025 §5.2 Table 5-1 specifies seismic load participation D=1.0, storage live=0.6, other live=0.3, roof live=0.0. Do not flag the cross-purpose total difference as an error. Independent ETABS/OpenSees matching is required for **each corresponding load profile**. See [load-purpose guidance](../../07_REVIEW_MAIN/NBC105_2025_LOAD_CASE_PURPOSE_GUIDE.md).
+
 # 2026-11-12 — Kobe complete XY/YX pair and native transient performance review
 
 **Issue:** RV-LTH-003 (P0 performance bottleneck; P1 period provenance)  

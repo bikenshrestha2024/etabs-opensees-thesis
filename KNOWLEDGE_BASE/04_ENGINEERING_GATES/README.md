@@ -1,3 +1,7 @@
+## Gravity-only versus seismic-weight case purpose (2026-11-12)
+
+`GRAVITY_1.0D_1.0L` applies the source's 100% dead and 100% all live (including roof-live) for independent gravity comparison; NBC 105:2025 §5.2 Table 5-1 assigns seismic weight factors 1.0 dead, 0.6 storage, 0.3 other live, 0 roof live. Distinct totals are expected and must **never** be labelled a mismatch without matched input profiles. Source categories and exact factors now have a read-only [case-purpose audit](../../07_REVIEW_MAIN/NBC105_2025_LOAD_CASE_PURPOSE_GUIDE.md); separately validate P-Delta preload, seismic mass and ETABS reactions.
+
 # Engineering status and acceptance logic
 
 Every conclusion must explicitly distinguish:
