@@ -140,6 +140,16 @@ def audit(folder, model_script=None):
     root = Path(folder).expanduser().resolve()
     model = Path(model_script).expanduser().resolve() if model_script else None
     draft, draft_state = _load_draft(model)
+    # One SHA-256 read per distinct evidence path per audit. Repeated
+    # workstreams share source files; caching a digest within this immutable
+    # report avoids redundant disk IO without reusing hashes across refreshes.
+    hashes = {}
+    def evidence_sha(path):
+        resolved = Path(path).resolve()
+        if resolved not in hashes:
+            hashes[resolved] = _sha256(resolved)
+        return hashes[resolved]
+
     report = {
         "schema": "NLTHA_READINESS_EVIDENCE_V1",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -179,7 +189,7 @@ def audit(folder, model_script=None):
             for path in _candidates(root, filename):
                 found.append({
                     "path": str(path),
-                    "sha256": _sha256(path),
+                    "sha256": evidence_sha(path),
                     "bytes": path.stat().st_size,
                     "meaning": "AVAILABLE_FOR_REVIEW_ONLY"
                 })
