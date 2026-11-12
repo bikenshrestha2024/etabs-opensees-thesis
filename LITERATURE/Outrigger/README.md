@@ -17,6 +17,13 @@
 | L027 | Location/damping optimization | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 | L029 | Far-field FVD placement | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 
+## Newly verified code-cited works (2026-11-12)
+
+| ID | Thesis use | Metadata |
+|---|---|---|
+| L033 | Chen et al. 2010 mode-based damper design | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+| L034 | Xing et al. 2021 design optimization | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+
 ## Evidence and transfer policy
 
 - Prefer original paper and measured specimens over derived example parameters.
