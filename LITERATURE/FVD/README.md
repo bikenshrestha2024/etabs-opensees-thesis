@@ -14,6 +14,14 @@
 | L029 | Naseri et al. 2024 tall tubular PNVD placement | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 | L030 | Rouhani et al. 2024 tackle damper experiments | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 
+## Newly verified code-cited works (2026-11-12)
+
+| ID | Thesis use | Metadata |
+|---|---|---|
+| L033 | Chen et al. 2010 damped outrigger design curves | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+| L034 | Xing et al. 2021 FVD/BRB location and damping | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+| L035 | Chopra and McKenna 2015 nonlinear viscous damping artifacts | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+
 ## Evidence and transfer policy
 
 - Prefer original paper and measured specimens over derived example parameters.
