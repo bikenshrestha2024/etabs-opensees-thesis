@@ -42,3 +42,13 @@ The supplied XLSX files (Slab_Load_Path_Formulas_V141, OpenSees_Property_Element
 | ESM ULS design method and Vs30 | COMPARISON ONLY / OPEN |
 | Beam–column/wall joint accounting + local load path | OPEN |
 | Modal/MRSM/ESM model equivalence | OPEN |
+
+## Official manufacturer references for junction verification
+
+- CSI ETABS, **End (Length) Offset**: https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Frame/End_Length_Offset.htm — automatic member clear lengths, rigid zone factor, force stations, and distinction from joint-offset insertion geometry.
+- CSI ETABS, **Auto Edge Constraints**: https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Shell/Auto_Edge_Constraints.htm — a frame ending at a shell edge is not necessarily connected unless shared joint/edge constraints exist.
+- CSI ETABS, **Wall Auto Mesh Options**: https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Shell/Wall_Auto_Mesh_Options.htm — automatic restraint/constraint addition at analysis mesh edge joints.
+- CSI ETABS, **Floor Auto Mesh Options**: https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Shell/Floor_Auto_Mesh_Options.htm — slab meshing along beams and wall edges affects load transmission and support connectivity.
+- CSI ETABS, **Frame Auto Mesh Options**: https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Frame/Frame_Auto_Mesh_Options.htm — ETABS internally divides frames at intersections without changing model objects.
+
+These are current official user-help pages, not project-specific source files, and their contents do not prove the user's specific ETABS model has identical analysis connectivity to the exported OpenSees mesh.
