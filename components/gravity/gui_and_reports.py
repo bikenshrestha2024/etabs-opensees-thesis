@@ -109,7 +109,7 @@ class GravityAnalysisGUI:
         self.reaction_support_var = tk.StringVar(value=", ".join(map(str, sorted(PROJECT_PRIMARY_32))))
         self.position_support_var = tk.StringVar()
         self.reaction_support_verification_var = tk.StringVar(
-            value="32 project nodes predefined; original ETABS table not yet verified")
+            value="32 nonzero-reaction screening tags only; source has 76 restraints")
         self.load_var = tk.StringVar()
         self.solved_reaction_var = tk.StringVar(value="Not analyzed for this case")
         self.solved_reaction_status_var = tk.StringVar(value="No matching completed 32/76/97-node run")
@@ -985,7 +985,7 @@ class GravityAnalysisGUI:
                     selected,filter_audit=classify_supports(source_table,topology,model_data['supports'])
                     reaction_supports=sorted(map(int,selected))
                     self.reaction_support_var.set(", ".join(map(str,reaction_supports)))
-                    self.reaction_support_verification_var.set("PASS: 32 project nodes match original ETABS reactions and mapping")
+                    self.reaction_support_verification_var.set("SCREENING: 32 nonzero-reaction tags match selected ETABS output; 44 source restraints still exist")
                     self._gravity_action_log("ETABS_REACTION_FILTER",
                         f"Nonzero FZ support nodes={len(reaction_supports)}; excluded={filter_audit['released_support_count']}; original table={source_table}")
                 except Exception as filter_error:
@@ -995,7 +995,7 @@ class GravityAnalysisGUI:
             if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
                 self.support_var.set(", ".join(map(str,reaction_supports)))
                 if not source_table:
-                    self.status_var.set("Main 32 nodes displayed; select completed ETABS 1. DL + LL table before running")
+                    self.status_var.set("32-node diagnostic selection displayed. Original 76 source restraints must not be discarded for physical equivalence.")
             else:
                 self.support_var.set(", ".join(map(str,supports)))
             if total is not None: self.load_var.set(f"{float(total):.8f}")
