@@ -280,6 +280,22 @@ def launch(parent, folder):
         except Exception as exc:
             messagebox.showerror("Dependency inventory", str(exc), parent=win)
 
+    def open_knowledge_base():
+        """Open offline 5W1H reference, without changing model readiness.
+
+        [REF KNOWLEDGE_BASE/README.md]
+        """
+        knowledge = Path(__file__).resolve().parents[2] / "KNOWLEDGE_BASE" / "README.md"
+        if not knowledge.is_file():
+            messagebox.showerror(
+                "Knowledge base unavailable", "Missing: " + str(knowledge),
+                parent=win)
+            return
+        if os.name == "nt":
+            os.startfile(str(knowledge))
+        else:
+            webbrowser.open(knowledge.as_uri())
+
     def open_project():
         folder_path = Path(project_var.get()).expanduser().resolve()
         if not folder_path.is_dir():
@@ -356,7 +372,8 @@ def launch(parent, folder):
     for caption, callback in (
         ("Material validation", open_materials),
         ("Generate wall X/Y probes", generate_wall_probes),
-        ("Native FVD/BRB test", run_device_benchmark)
+        ("Native FVD/BRB test", run_device_benchmark),
+        ("Knowledge base — 5W1H", open_knowledge_base)
     ):
         ttk.Button(actions, text=caption, command=callback).pack(side="left", padx=3)
     ttk.Button(buttons, text="Close", command=win.destroy).pack(side="right", padx=3)
