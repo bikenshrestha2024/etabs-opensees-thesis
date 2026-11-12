@@ -1,7 +1,7 @@
 {
   "source": "LITERATURE/tools/audit_source_citations.py",
   "method": "git ls-files",
-  "files_scanned": 846,
+  "files_scanned": 848,
   "reference_occurrences_with_category_expansion": 2095,
   "distinct_reference_strings": 286,
   "unmatched_doi_count": 38,
