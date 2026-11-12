@@ -33,6 +33,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_project_output_layout_v171.py' -v
           python -m unittest discover -s tests -p 'test_gravity_organized_case_index_v172.py' -v
           python -m unittest discover -s tests -p 'test_linear_reaction_vectorization.py' -v
+          python -m unittest tests.verify_readiness_dashboard -v
       - name: Archive static inventory (not engineering validation)
         if: always()
         uses: actions/upload-artifact@v4
