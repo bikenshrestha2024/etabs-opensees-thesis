@@ -360,7 +360,30 @@ def _run_analysis(config):
                     peak['drift_screen_'+axis]='PASS' if peak['peak_story_drift_'+axis]<=drift_limit else 'REVIEW'
                 profiler.add('case_exports_and_drift',phase_clock)
                 peak['performance']=profiler.finish()
+                # Persist independently completed case evidence immediately.
+                # A later YX interruption must not hide the completed XY summary.
+                # Per-case results do NOT imply pair-level or suite acceptance.
+                case_summary_path = out / f"NBC105_LTH_{case}_Case_Summary.json"
+                case_summary_path.write_text(
+                    json.dumps(peak, indent=2), encoding="utf-8")
                 records.append(peak)
+                progress_path = out / "NBC105_LTH_Completed_Cases_Progress.json"
+                progress_tmp = progress_path.with_suffix(".json.tmp")
+                progress_tmp.write_text(json.dumps({
+                    "scope": "INCREMENTAL_CASE_EVIDENCE_ONLY_NOT_PAIRED_ACCEPTANCE",
+                    "requested_case_count": len(motions) * (
+                        1 if config.get("motion_mode") == "X_ONLY_SCREENING" else 2),
+                    "completed_case_count": len(records),
+                    "completed_cases": [
+                        {"case": r["case"], "orientation": r["orientation"],
+                         "is_truncated_trial": r["is_truncated_trial"],
+                         "summary": f"NBC105_LTH_{r['case']}_Case_Summary.json"}
+                        for r in records
+                    ],
+                    "note": "Only an additional complete XY/YX pair and all code gates qualify a paired-record result."
+                }, indent=2), encoding="utf-8")
+                progress_tmp.replace(progress_path)
+                print(f"[CASE SUMMARY] {case}: {case_summary_path}", flush=True)
                 print(f"[OK] {case}: steps={nsteps}, dt={dt:.6g}s, peak drifts X/Y={peak['peak_story_drift_X']:.6g}/{peak['peak_story_drift_Y']:.6g}", flush=True)
             finally:
                 if stream is not None:stream.close()
