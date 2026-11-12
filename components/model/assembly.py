@@ -1026,6 +1026,9 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
         'seismic_mass_factors': cfg.get('mass_factors',{}),
         'rule': purpose_audit.get('citation'),
     },default=str),flush=True)
+    if purpose_audit.get('issues'):
+        print('[LOAD CASE PURPOSE REVIEW] '+json.dumps(
+            purpose_audit['issues'],default=str),flush=True)
     requested_strategy=os.environ.get('OPENSEES_GRAVITY_WALL_SUPPORT_STRATEGY',
                                       'ETABS_SOURCE_SUPPORTS')
     # Only the gravity GUI opts in. Other modal/RSA/NLTHA runs retain the
