@@ -231,6 +231,41 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None)
     return result,out
 
 
+def find_verified_etabs_csv(source_folder, results_root):
+    """Auto-reuse only native ETABS API CSV with matching EDB SHA and approved map.
+
+    A generated OpenSees_Normalized.csv or unfilled ETABS template is NOT
+    evidence of native ETABS analysis; review ZIPs are not live API sources.
+    """
+    from components.inputs.project_workbooks import _source_edb_path
+    from components.validation.etabs_direct_api import fingerprint
+    edb=_source_edb_path(source_folder)
+    if not edb or not Path(edb).is_file():
+        return None,'Current original source EDB inaccessible'
+    root=Path(results_root)/'ETABS_Comparison_V148'
+    meta=root/'ETABS_API_Provenance.json'
+    mapfile=root/'ETABS_API_Mapping_SELECTED.json'
+    csv_path=root/'ETABS_API_Normalized.csv'
+    if not all(p.is_file() for p in (meta,mapfile,csv_path)):
+        return None,'No approved native ETABS CSV; run Direct ETABS API once'
+    try:
+        evidence=json.loads(meta.read_text(encoding='utf-8-sig'))
+        mapping=json.loads(mapfile.read_text(encoding='utf-8-sig'))
+        if (evidence.get('edb_sha256')!=fingerprint(edb) or
+            Path(evidence.get('edb_path','')).resolve()!=Path(edb).resolve() or
+            Path(mapping.get('source_edb','')).resolve()!=Path(edb).resolve()):
+            return None,'Previous ETABS source path or SHA differs'
+        if not mapping.get('assumptions_verified'):
+            return None,'Native mapping is not approved for physical comparison'
+        with csv_path.open(encoding='utf-8-sig',newline='') as f:
+            values=list(csv.DictReader(f))
+        if not values or any(not all(str(row.get(k,'')).strip() for k in FIELDS+['value']) for row in values):
+            return None,'Saved normalized native ETABS CSV is incomplete'
+        return csv_path,'Verified native ETABS CSV auto-selected'
+    except (OSError,ValueError,TypeError,KeyError) as exc:
+        return None,'ETABS source evidence failed verification: '+str(exc)
+
+
 def launch(parent,folder,results_root=None):
  import tkinter as tk
  from tkinter import ttk,filedialog,messagebox
@@ -238,7 +273,12 @@ def launch(parent,folder,results_root=None):
  def browse():
   p=filedialog.askopenfilename(parent=win,title='Normalized ETABS CSV',filetypes=[('CSV','*.csv')])
   if p:path.set(p)
- ttk.Button(bar,text='Select ETABS CSV',command=browse).pack(side='left')
+ ttk.Button(bar,text='Manual ETABS CSV (advanced)',command=browse).pack(side='left')
+ comparison_root=(Path(results_root).expanduser().resolve() if results_root is not None
+                  else Path(folder)/'OpenSees_Analysis_Results')
+ auto_file,auto_note=find_verified_etabs_csv(folder,comparison_root)
+ if auto_file:path.set(str(auto_file))
+ status.set('SOURCE: '+auto_note)
  def direct_api(auto=False):
   """Attach to the selected, already-open source .EDB in a COM STA thread."""
   import threading
@@ -355,6 +395,19 @@ def launch(parent,folder,results_root=None):
   ax.set(xlabel='Location / mode',ylabel=key[5]+' ('+key[6]+')',title=key[0]+' '+key[1]+' '+key[2]+' | '+key[7]);ax.set_xticks(x,[r['location'] for r in subset],rotation=60);ax.legend();ax.grid(alpha=.2);canvas=FigureCanvasTkAgg(fig,master=panel);canvas.get_tk_widget().pack(fill='both',expand=True);NavigationToolbar2Tk(canvas,panel);canvas.draw()
  ttk.Button(bar,text='Plot selected case / metric',command=plot).pack(side='left')
  ttk.Button(bar,text='Refresh / export CSV' ,command=refresh).pack(side='left')
+ def retry_auto():
+  candidate,note=find_verified_etabs_csv(folder,comparison_root)
+  if candidate:
+   path.set(str(candidate))
+   refresh()
+   status.set('VERIFIED ETABS SOURCE: '+str(candidate)+
+              ' | match still requires the same structural response basis')
+  else:
+   status.set('AUTO-SELECTION NOT AVAILABLE: '+note)
+ ttk.Button(bar,text='Auto-select verified ETABS CSV',command=retry_auto).pack(side='left')
  refresh()
+ if not auto_file:
+  status.set('SOURCE: '+auto_note+
+             ' | Do not select OpenSees normalized CSV as native ETABS evidence')
  win.after(400,lambda:direct_api(auto=True))
  return win
