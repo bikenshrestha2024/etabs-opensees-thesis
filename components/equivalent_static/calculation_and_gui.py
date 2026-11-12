@@ -533,7 +533,7 @@ class ESMGui:
     def _set_esm_operation(self,state,detail=""):
         """Main Tk thread only; independent of verbose console status."""
         self.esm_operation_state.set(str(state)+" | "+str(detail))
-        if state=="RUNNING":
+        if state in ("RUNNING","EXPORTING"):
             self.esm_busy_bar.start(12)
         else:
             self.esm_busy_bar.stop()
@@ -550,6 +550,7 @@ class ESMGui:
                 "\\nESM review archive already being built; existing run remains available.")
             return
         self._review_bundle_running=True
+        self._set_esm_operation("EXPORTING","Complete ESM evidence ZIP in progress")
         source=Path(self.export_dir)
         output=Path(self.outdir.get())
         def worker():
@@ -558,6 +559,7 @@ class ESMGui:
                 result=bundle_seismic_review(source,output,method="ESM")
                 def finished():
                     self._review_bundle_running=False
+                    self._set_esm_operation("EXPORTED","Complete ESM ZIP: "+result["zip"])
                     self.status.set(self.status.get()+
                         "\\n[ESM_AUTO_REVIEW_ZIP] "+result["zip"])
                 self.root.after(0,finished)
@@ -565,6 +567,7 @@ class ESMGui:
                 reason=str(exc)
                 def failed():
                     self._review_bundle_running=False
+                    self._set_esm_operation("FAILED","ESM review ZIP: "+reason)
                     self.status.set(self.status.get()+
                         "\\n[ESM_AUTO_REVIEW_FAILED] "+reason)
                 self.root.after(0,failed)
@@ -590,6 +593,7 @@ class ESMGui:
             self.status.set('Categorized ZIP export is already running.')
             return
         self._organized_export_busy=True
+        self._set_esm_operation("EXPORTING","Categorized module ZIPs in progress")
         self.status.set('Creating categorized Gravity / ESM / Modal / MRSM evidence copies…')
         def task():
             try:
@@ -598,6 +602,7 @@ class ESMGui:
                 result=publish_organized_results(output)
                 def done():
                     self._organized_export_busy=False
+                    self._set_esm_operation("EXPORTED","Organized ZIP: "+result['zip_files']['ALL_MODULES'])
                     self.status.set('ORGANIZED ZIP: '+result['zip_files']['ALL_MODULES']+
                                     ' | manifest '+result['manifest'])
                     messagebox.showinfo(
@@ -611,6 +616,7 @@ class ESMGui:
                 error=str(exc)
                 def failed():
                     self._organized_export_busy=False
+                    self._set_esm_operation("FAILED","Organized ZIP export: "+error)
                     self.status.set('ORGANIZED EXPORT FAILED: '+error)
                     messagebox.showerror('Organized results export',error,parent=self.root)
                 self.root.after(0,failed)
