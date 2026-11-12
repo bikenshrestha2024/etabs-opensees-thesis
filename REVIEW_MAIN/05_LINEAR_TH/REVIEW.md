@@ -1,3 +1,5 @@
+> **Latest full-pair evidence:** [2026-11-12 Kobe XY/YX completed 8,188 steps in 4 h 32 m 44 s](20261112_KOBE_FULL_PAIR_TIMING_DRIFT_AND_PERIOD_AUDIT.md). ULS drift screen is preliminary; directional T1 needs modal provenance review; solver time dominates. Prior half-finished screenshots do not describe the finalized batch.
+
 # Linear time-history review
 **RV-LTH-001:** P0 OPEN_HIGH — short diagnostics versus full records
 **RV-LTH-002:** P1 OPEN_HIGH — damping and periods, source states
