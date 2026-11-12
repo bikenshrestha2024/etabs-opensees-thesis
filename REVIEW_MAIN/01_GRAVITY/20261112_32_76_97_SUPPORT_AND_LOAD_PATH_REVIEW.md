@@ -77,6 +77,14 @@ The three uploaded review ZIPs contain repeated SOURCE DATA from the same 32/76/
 
 The current ESM GUI already contains `_run_rayleigh` / `Preliminary Rayleigh run (X/Y)` with source-state and both-axis preflight checks. It is a **directional period** method, not Rayleigh damping. The action was hidden near the bottom on smaller screens; a second button adjacent to X/Y Rayleigh period entries has now been added. Selected Aw=2.073174515 m² X, 2.203080332 m² Y is validated from exported wall geometry; this does not create `T_{Rayleigh}`. Both ULS/SLS must use matching source stiffness and state; do not substitute ETABS eigenperiod as a Rayleigh period without explicitly documenting a different basis.
 
+## Confirmed solved-displacement CSV software defect and correction
+
+Inspection of uploaded `Common_Node_Displacements_32_76_97.csv` found that **every `ux_m_*`, `uy_m_*`, and `uz_m_*` field was empty**, despite three completed solve files and a known 11,097 common nodes. Inspection of `components/gravity/three_case_comparison.py` showed the defect: `CASES` stores `(solver_strategy, case_number)`, but the displacement export used `for label,_ in CASES` and then looked up source dictionaries keyed by case number **32 / 76 / 97**, resulting in no matches.
+
+**Resolved in code:** change to `for _strategy,label in CASES` and add a deterministic test asserting actual numeric displacement values for populated cases and an empty value only for a genuinely absent case. Previous CSVs on disk are historical defective DERIVED exports and will not repair themselves. Re-run **Compare solved 32 / 76 / 97 + Excel** after updating the application; the function reads existing solved gravity JSON through its verified case registry and rewrites the derived comparison CSV/XLSX/PNG/PDF **without rerunning gravity**. Preserve old outputs if reproducibility requires exact frozen historical versions.
+
+**GUI text corrected:** Previous popup saying `Unavailable cases: None` was not a folder name. It meant all three cases were present. The popup now identifies completed cases explicitly and lists missing cases only when they exist.
+
 ## Disposition and remaining gates
 
 **CLOSED AS SOURCE-EVIDENCE FACT:** 32 vs 76 vs 97 support counts and differences, first-order load ledger, gross-vs-clear beam offset policy already applied, data routing location and missing on-screen Rayleigh control.
