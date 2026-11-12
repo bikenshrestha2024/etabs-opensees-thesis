@@ -4,7 +4,7 @@
   "files_scanned": 844,
   "reference_occurrences_with_category_expansion": 2092,
   "distinct_reference_strings": 285,
-  "unmatched_doi_count": 44,
+  "unmatched_doi_count": 38,
   "errors": [],
   "limitations": "DOI and URL regex only; author-year references without DOI require human review. Archived/generated files excluded."
 }
