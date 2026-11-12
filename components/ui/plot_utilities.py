@@ -186,7 +186,12 @@ def copyable_log(parent, variable, height=8):
         if value:text.insert('end',value+'\n');text.see('end')
     variable.trace_add('write',update);update()
     def copy():text.clipboard_clear();text.clipboard_append(text.get('1.0','end-1c'))
-    ttk.Button(box,text='Copy entire log',command=copy).pack(side='left')
+    tools=ttk.Frame(box);tools.pack(fill='x')
+    ttk.Button(tools,text='Copy entire log',command=copy).pack(side='left',padx=3)
+    ttk.Button(tools,text='Scroll to start',
+               command=lambda:text.yview_moveto(0)).pack(side='left',padx=3)
+    ttk.Button(tools,text='Scroll to latest',
+               command=lambda:text.yview_moveto(1)).pack(side='left',padx=3)
     return text
 
 
@@ -210,6 +215,10 @@ def scrollable_form(window, padding=12, min_width=940):
     canvas.bind('<Configure>',lambda e:canvas.itemconfigure(item,width=max(min_width,e.width)))
     def wheel(event):
         current=window.winfo_containing(event.x_root,event.y_root)
+        # Respect inner independent scroll surfaces (Run Log, Treeview).
+        # Otherwise the outer form also scrolls when a user reads a long log.
+        if current is not None and current.winfo_class() in ('Text','Treeview','Listbox'):
+            return
         if current is not None and str(current).startswith(str(host)):
             canvas.yview_scroll(-int(event.delta/120),'units')
     window.bind('<MouseWheel>',wheel,add='+')
