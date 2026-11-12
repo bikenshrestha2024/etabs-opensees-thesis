@@ -18,6 +18,7 @@ import csv
 import json
 import math
 import os
+import queue
 import re
 import subprocess
 import sys
@@ -510,6 +511,7 @@ class LinearTimeHistoryGUI:
         self.linear_factor_once=tk.BooleanVar(value=False)
         self.elastic_constant_tangent_verified=tk.BooleanVar(value=False)
         self._output_is_automatic=True
+        self._log_queue = queue.SimpleQueue()
         self.torsion = tk.BooleanVar(value=True); self.running = False
         self.motion_mode = tk.StringVar(value=LTH_DEFAULT_MODE)
         self.x_scale = tk.StringVar(value="1.0")
@@ -518,6 +520,7 @@ class LinearTimeHistoryGUI:
         self.y_record_paths = list(LTH_DEFAULT_Y_RECORDS)
         self.execute = tk.BooleanVar(value=RUN_LINEAR_TIME_HISTORY)
         self._build()
+        self.win.after(100, self._drain_log_queue)
         from OpenSees_Linear_Autofill_V124 import populate_available
         ttk.Button(self.win,text='Refresh available project inputs',command=lambda:populate_available(self,role='linear_model_script')).pack(anchor='w')
         self.win.after_idle(lambda:populate_available(self,role='linear_model_script'))
@@ -731,20 +734,39 @@ class LinearTimeHistoryGUI:
                 for line in proc.stdout:
                     logfile.write(line); logfile.flush()
                     current_case=update_history_case(ledger,line,current_case)
-                    self.win.after(0, self._append_log, line)
+                    self._log_queue.put(line)
                 code = proc.wait()
                 if ledger:ledger.finish_pending(
                     'Runner exited with code '+str(code)+' without a confirmed [OK] record-completion line.')
                 end_line = f"\n{'[SUCCESS]' if code == 0 else '[FAILED]'} Process exit code {code}. Persistent log: {log_path}\n"
                 logfile.write(end_line); logfile.flush()
-            self.win.after(0, self._append_log, end_line)
+            self._log_queue.put(end_line)
             if code==0:self.win.after(0,lambda:__import__("OpenSees_History_Results_V134").launch(self.win,log_path.parent))
         except Exception as exc:
             if ledger:ledger.finish_pending('Runner/logging failure: '+str(exc))
-            self.win.after(0, self._append_log, f"[FAILED] {exc}\n")
+            self._log_queue.put(f"[FAILED] {exc}\n")
         finally: self.running = False
 
+    def _drain_log_queue(self):
+        """Batch worker output on Tk's GUI thread; full output remains on disk."""
+        try:
+            lines = []
+            for _ in range(250):
+                try: lines.append(self._log_queue.get_nowait())
+                except queue.Empty: break
+            if lines:
+                self.log.insert("end", "".join(lines))
+                # Bounded widget history prevents large, long-running experiments
+                # from turning Tk's text widget into a memory/performance bottleneck.
+                if int(self.log.index("end-1c").split(".")[0]) > 12000:
+                    self.log.delete("1.0", "2001.0")
+                self.log.see("end")
+            self.win.after(100, self._drain_log_queue)
+        except tk.TclError:
+            pass
+
     def _append_log(self, line):
+        """Compatibility path for callers already on Tk's main thread."""
         try: self.log.insert("end", line); self.log.see("end")
         except tk.TclError: pass
 
