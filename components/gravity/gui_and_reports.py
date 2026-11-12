@@ -117,16 +117,19 @@ class GravityAnalysisGUI:
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
         self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
-        self.wall_support_strategy_var=tk.StringVar(value="76 source-restraint nodes (reference)")
+        self.wall_support_strategy_var=tk.StringVar(value="32 nonzero-reaction nodes (diagnostic)")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self.gravity_operation_state=tk.StringVar(value="IDLE | No gravity solver or exporter running")
         self._gravity_busy=False
         self._build()
-        # Use source-export restraints as the default reference case. Earlier
-        # 32-node results remain load-redistribution diagnostics; changing
-        # report selection never modifies an existing solver output.
-        self.wall_support_strategy_var.set("76 source-restraint nodes (reference)")
+        # User's requested 32-point object-level comparison is the default
+        # ONLY in this gravity diagnostic GUI. It releases 44 source-export
+        # restraints and is NOT the native ETABS analysis-mesh equivalent.
+        # All modal/MRSM/TH production runs independently retain the exact
+        # 76-source-restraint baseline until native constraint equivalence is
+        # established. Preserve old case-registry and run identifiers.
+        self.wall_support_strategy_var.set("32 nonzero-reaction nodes (diagnostic)")
         self.wall_support_strategy_var.trace_add(
             "write", lambda *_: self._read_code_inputs(show_error=False)
             if self.model_var.get() else self._refresh_case_reaction())
@@ -1049,7 +1052,7 @@ class GravityAnalysisGUI:
         ttk.Combobox(wall_row,textvariable=self.wall_support_strategy_var,
             state="readonly",width=38,
             values=("32 nonzero-reaction nodes (diagnostic)","76 source-restraint nodes (reference)","97 wall-base idealization (sensitivity)")).pack(side="left")
-        ttk.Label(wall_row,text="76 exported source restraints are the default ETABS-equivalence candidate; 32 releases 44 formerly restrained wall nodes, and 97 fixes 21 extra mesh nodes. Both are diagnostics, NOT equivalent models.",
+        ttk.Label(wall_row,text="32 nonzero-reaction nodes is a user-selected SCREENING default ONLY (releases 44 source restraints). 76 is the exported-restraint reference for modal/seismic production; 97 adds 21 idealized base fixities. NO case is yet native ETABS-equivalence certified.",
                   wraplength=485).pack(side="left",padx=8)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
