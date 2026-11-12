@@ -618,6 +618,7 @@ class ESMGui:
                             json.loads(Path(audit).read_text(encoding='utf-8')),audit,
                             state=self.state.get(),current_edb=_source_edb_path(self.export_dir))
                         self._confirm_and_apply_excel_reference(reference,confirm=False)
+                        self._apply_reviewed_wall_policy()
                     except Exception as exc:
                         self.status.set('ETABS-linked Aw/T not applied to the form: '+str(exc))
                         messagebox.showwarning('ETABS-linked values not applied',str(exc),parent=self.root)
@@ -852,6 +853,33 @@ class ESMGui:
             self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get())))
         self._load_project_inputs()
 
+    def _apply_reviewed_wall_policy(self):
+        """[REF docs/source/components/inputs/grouped_wall_aw.py.md]
+        Apply user-selected two-12m wall interpretation only when the current
+        exported node and shell source geometry verifies all model dimensions.
+        """
+        from components.inputs.aw_sources import resolve_aw
+        state=str(self.state.get()).strip().upper()
+        if state not in ('ULS','SLS'):
+            return False
+        result=resolve_aw(self.export_dir,state)
+        if result.get('method')!='EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY':
+            return False
+        if not all(result.get(axis) is not None for axis in ('X','Y')):
+            raise ValueError("Reviewed grouped-wall source has a missing Aw axis")
+        self.awx.set(f"{result['X']:.12g}")
+        self.awy.set(f"{result['Y']:.12g}")
+        self.excel_direct_reference=None
+        self._aw_sync_evidence=result.get('evidence')
+        self._aw_sync_model_hash=result.get('assembled_model_sha256')
+        self._reviewed_aw_policy=result
+        self._show_empirical()
+        self.status.set(
+            f"REVIEWED 2x12m X WALLS: Aw-X={result['X']:.9g}, "
+            f"Aw-Y={result['Y']:.9g} m². Node/shell geometry verified; "
+            "previous 6m Excel comparison retained. NBC acceptance open.")
+        return True
+
     def _load_project_inputs(self):
         self.excel_direct_reference=None
         try:
@@ -904,6 +932,9 @@ class ESMGui:
                     missing=[k for k in missing if k not in ('awx','awy')]
                     data['notes'].append('Aw loaded from ETABS-linked original Excel method: '
                                          +linked['provenance_json'])
+                if self._apply_reviewed_wall_policy():
+                    missing=[k for k in missing if k not in ('awx','awy')]
+                    data['notes'].append('User-selected 2x12m grouping verified from source shell/node positions; historical Excel retained read-only.')
             if missing:
                 source_notes=[str(note) for note in data['notes']
                               if ('SCALING SUMMARY' in str(note) or
