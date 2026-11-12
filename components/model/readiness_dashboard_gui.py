@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import os
+import queue
+import threading
 from pathlib import Path
 import subprocess
 import sys
@@ -121,45 +123,82 @@ def launch(parent, folder):
             model_selection_status.set("Model manually selected; model review is still required.")
             refresh()
 
+    # Hashing large project evidence may take noticeable time. Do it outside
+    # Tk's event loop, and apply only the newest requested result on Tk's thread.
+    # No worker is allowed to touch widgets or approve an engineering model.
+    result_queue = queue.SimpleQueue()
+    state["request_id"] = 0
+    state["busy"] = False
+
     def refresh():
+        folder_name = project_var.get().strip()
+        model_name = model_var.get().strip()
+        state["request_id"] += 1
+        request_id = state["request_id"]
+        state["report"] = None
+        state["busy"] = True
+        overview.set("Checking model and evidence in background — controls remain responsive.")
+        def worker():
+            try:
+                if not folder_name:
+                    raise ValueError("Select a project export folder")
+                folder_path = Path(folder_name).expanduser().resolve()
+                if not folder_path.is_dir():
+                    raise FileNotFoundError(folder_path)
+                if model_name and not Path(model_name).is_file():
+                    raise FileNotFoundError(model_name)
+                result_queue.put((request_id, audit(folder_path, model_name or None), None))
+            except Exception as exc:
+                result_queue.put((request_id, None, str(exc)))
+        threading.Thread(target=worker, daemon=True, name="readiness-evidence-audit").start()
+
+    def poll_results():
         try:
-            folder_name = project_var.get().strip()
-            if not folder_name:
-                raise ValueError("Select a project export folder")
-            folder_path = Path(folder_name).expanduser().resolve()
-            if not folder_path.is_dir():
-                raise FileNotFoundError(folder_path)
-            model_name = model_var.get().strip()
-            if model_name and not Path(model_name).is_file():
-                raise FileNotFoundError(model_name)
-            result = audit(folder_path, model_name or None)
-            state["report"] = result
-            for item in table.get_children():
-                table.delete(item)
-            for g in result["groups"]:
-                table.insert("", "end", iid=g["id"], text=g["title"],
-                             values=(g["status"], len(g["evidence"]),
-                                     "Yes*" if g["review_claim_present"] else "No"),
-                             tags=(g["status"],))
-            counts = result["counts"]
-            overview.set(
-                "READINESS: " + result["readiness_level"] +
-                " | Reviewed claims: " + str(counts["REVIEWED_SIGNOFF_CLAIM"]) +
-                " | Available for review: " + str(counts["EVIDENCE_FOUND_REVIEW_REQUIRED"]) +
-                " | Missing: " + str(counts["MISSING_EVIDENCE"]) +
-                " | Draft: " + result["draft_state"])
-            detail.configure(state="normal")
-            detail.delete("1.0", "end")
-            detail.insert("end",
-                "Project: " + result["project_folder"] + "\n" +
-                "Model: " + str(result["model_script"]) + "\n" +
-                "SHA256: " + str(result["model_sha256"]) + "\n\n" +
-                "A sign-off claim is not a verified physical model.\n\n" +
-                "Choose a workstream for file paths and next actions.")
-            detail.configure(state="disabled")
-        except Exception as exc:
-            overview.set("AUDIT ERROR: " + str(exc))
-            messagebox.showerror("Readiness evidence", str(exc), parent=win)
+            # Drain stale results without updating widgets; a recent project
+            # selection always wins even if an older disk scan finishes later.
+            latest = None
+            while True:
+                try:
+                    item = result_queue.get_nowait()
+                except queue.Empty:
+                    break
+                if item[0] == state["request_id"]:
+                    latest = item
+            if latest is not None:
+                _, result, error = latest
+                state["busy"] = False
+                if error is not None:
+                    overview.set("AUDIT ERROR: " + error)
+                    messagebox.showerror("Readiness evidence", error, parent=win)
+                else:
+                    state["report"] = result
+                    for item in table.get_children():
+                        table.delete(item)
+                    for g in result["groups"]:
+                        table.insert("", "end", iid=g["id"], text=g["title"],
+                                     values=(g["status"], len(g["evidence"]),
+                                             "Yes*" if g["review_claim_present"] else "No"),
+                                     tags=(g["status"],))
+                    counts = result["counts"]
+                    overview.set(
+                        "READINESS: " + result["readiness_level"] +
+                        " | Reviewed claims: " + str(counts["REVIEWED_SIGNOFF_CLAIM"]) +
+                        " | Available for review: " + str(counts["EVIDENCE_FOUND_REVIEW_REQUIRED"]) +
+                        " | Missing: " + str(counts["MISSING_EVIDENCE"]) +
+                        " | Draft: " + result["draft_state"])
+                    detail.configure(state="normal")
+                    detail.delete("1.0", "end")
+                    detail.insert("end",
+                        "Project: " + result["project_folder"] + "\\n" +
+                        "Model: " + str(result["model_script"]) + "\\n" +
+                        "SHA256: " + str(result["model_sha256"]) + "\\n\\n" +
+                        "A sign-off claim is not a verified physical model.\\n\\n" +
+                        "Choose a workstream for file paths and next actions.")
+                    detail.configure(state="disabled")
+            win.after(100, poll_results)
+        except tk.TclError:
+            # Window was closed: no worker attempts to operate on Tk.
+            return
 
     def show_selection(_event=None):
         selected = table.selection()
@@ -301,6 +340,7 @@ def launch(parent, folder):
         ttk.Button(actions, text=caption, command=callback).pack(side="left", padx=3)
     ttk.Button(buttons, text="Close", command=win.destroy).pack(side="right", padx=3)
 
+    win.after(100, poll_results)
     refresh()
     win._readiness_report = state
     return win
