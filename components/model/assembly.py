@@ -961,7 +961,16 @@ def apply_gravity_profile(data,cfg,profile,pattern_types=None):
     if not data.get('unfactored_patterns'):raise ValueError('Case-specific PDelta needs unfactored source patterns')
     dead,live=allowed[profile];factors={};gravity={};ledger={}
     for pattern,nodes in data['unfactored_patterns'].items():
-        kind=classify('area_load',pattern,(pattern_types or {}).get(pattern))[1]
+        # When a project-specific occupancy category was explicitly reviewed,
+        # apply it consistently to the full-gravity comparison. An unknown
+        # source pattern must still fail without a reviewed category.
+        if pattern in category_overrides:
+            from components.model.load_case_purpose import classify_load_pattern
+            source_category=classify_load_pattern(
+                pattern,explicit_category=category_overrides[pattern])
+            kind='DEAD' if source_category=='DEAD' else 'LIVE'
+        else:
+            kind=classify('area_load',pattern,(pattern_types or {}).get(pattern))[1]
         if kind=='UNCLASSIFIED':raise ValueError('Cannot assign DL/LL factor to unclassified pattern '+pattern)
         factor=dead if kind=='DEAD' else live;factors[pattern]=factor
         gravity[pattern]={node:[float(v)*factor for v in values] for node,values in nodes.items()}
