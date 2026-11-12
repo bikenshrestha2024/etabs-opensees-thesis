@@ -149,7 +149,17 @@ def _run_analysis(config):
                     append_base_shear, support_resultants,
                     write_base_shear_roof_curve, write_recorder_index,
                 )
-                base_reaction_reference = support_resultants(ops, support_nodes)
+                vectorized_reactions = config.get("linear_vectorized_reactions_experimental", False)
+                if not isinstance(vectorized_reactions, bool):
+                    raise ValueError("linear_vectorized_reactions_experimental must be a JSON boolean.")
+                base_reaction_reference = support_resultants(
+                    ops, support_nodes, vectorized=vectorized_reactions)
+                print(
+                    f"[RECORDER MODE] {case}: "
+                    + ("EXPERIMENTAL vector nodeReaction queries"
+                       if vectorized_reactions else "baseline scalar DOF queries"),
+                    flush=True,
+                )
                 periods = (float(config["damping_period_1_s"]), float(config["damping_period_2_s"]))
                 if min(periods) <= 0: raise ValueError("Both Rayleigh calibration periods must be positive.")
                 zeta = float(config["damping_ratio_percent"]) / 100.0
@@ -274,7 +284,8 @@ def _run_analysis(config):
                             below = row[f"{stories[i-1]['story_name']}_{col}_m"] if i else 0.0
                             row[f"{story['story_name']}_drift_{axis}"] = (current - below) / story["height"]
                     append_base_shear(
-                        row, ops, support_nodes, base_reaction_reference)
+                        row, ops, support_nodes, base_reaction_reference,
+                        vectorized=vectorized_reactions)
                     lines.append(row)
                     stream.append(row)
                     profiler.sample_seconds+=time.perf_counter()-sample_clock
@@ -286,6 +297,7 @@ def _run_analysis(config):
                 profiler.solver_diagnostics['constant_dt'] = constant_steps
                 profiler.solver_diagnostics['native_solve_seconds'] = profiler.stages.get('native_transient_solve', 0.0)
                 profiler.solver_diagnostics['recorder_seconds'] = profiler.sample_seconds
+                profiler.solver_diagnostics['vectorized_reactions_experimental'] = vectorized_reactions
                 phase_clock=time.perf_counter()
                 # SECTION 18.6 — Save case history and response/drift summary.
                 csv_path = out / f"NBC105_LTH_{case}_history.csv"
@@ -509,6 +521,7 @@ class LinearTimeHistoryGUI:
         self.nmodes = tk.StringVar(value="20"); self.ls = tk.StringVar(value="ULS")
         self.trial_duration=tk.StringVar(value="")
         self.linear_factor_once=tk.BooleanVar(value=False)
+        self.vectorized_reactions=tk.BooleanVar(value=False)
         self.elastic_constant_tangent_verified=tk.BooleanVar(value=False)
         self._output_is_automatic=True
         self._log_queue = queue.SimpleQueue()
@@ -610,6 +623,7 @@ class LinearTimeHistoryGUI:
         ttk.Label(params,text="Blank runs the full record. A shorter positive duration is only a numerical diagnostic and is NEVER NBC record acceptance.",wraplength=1050,foreground="#9a3412").pack(anchor="w",pady=3)
         ttk.Checkbutton(params,text="Experimental speed: reuse constant linear matrix factorization (opt-in)",variable=self.linear_factor_once).pack(anchor="w",pady=3)
         ttk.Checkbutton(params,text="I independently verified the assembled tangent remains constant, including damping and all elements",variable=self.elastic_constant_tangent_verified).pack(anchor="w",pady=3)
+        ttk.Checkbutton(params,text="Experimental recording speed: vector queries for six support reaction DOFs",variable=self.vectorized_reactions).pack(anchor="w",pady=3)
         ttk.Label(params,text="Speed experiment is OFF by default. Run identical XY/YX short trials with option OFF/ON, then compare histories, base reactions, drift and accelerations. Factor reuse is not appropriate for nonlinear material or time-varying matrices.",wraplength=1050,foreground="#9a3412").pack(anchor="w",pady=3)
         ttk.Label(params,text="The ULS/SLS context is passed to the selected builder (which may apply implemented state-specific stiffness modifiers) and labels outputs; it does not load a second ETABS model or derive service-load combinations. With only a ULS export, an SLS-labelled run is not independently validated. Verify service loads, effective stiffness, periods and motion/scaling basis before treating it as an SLS result.",wraplength=1060,foreground="#9a3412").pack(anchor="w",fill="x",pady=(4,2))
         ttk.Checkbutton(params, text="Torsionally sensitive 3D structure (requires at least 3 orthogonal motion pairs)", variable=self.torsion).pack(anchor="w", pady=(5, 0))
@@ -689,7 +703,8 @@ class LinearTimeHistoryGUI:
                 "execute_linear_time_history": True, "record_matching_metadata": LTH_MATCHING_METADATA,
                 "trial_duration_s": (float(self.trial_duration.get()) if self.trial_duration.get().strip() else None),
                 "linear_factor_once_experimental": bool(self.linear_factor_once.get()),
-                "elastic_constant_tangent_verified": bool(self.elastic_constant_tangent_verified.get())}
+                "elastic_constant_tangent_verified": bool(self.elastic_constant_tangent_verified.get()),
+                "linear_vectorized_reactions_experimental": bool(self.vectorized_reactions.get())}
             if not x_only:values.update(self.pair_selector.config())
             required = ["model_script", "python", "story_nodes_csv", "output_dir"]
             if not x_only and not use_preloaded_pairs: required.append("motion_manifest")
