@@ -10,6 +10,13 @@
 | L028 | OpenSees framework | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 | L029 | Tall tubular models in OpenSees | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 
+## Newly verified code-cited works (2026-11-12)
+
+| ID | Thesis use | Metadata |
+|---|---|---|
+| L035 | Chopra and McKenna: damping matrix and nonlinear response histories | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+| L036 | E-SFI macroelement validation | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+
 ## Evidence and transfer policy
 
 - Prefer original paper and measured specimens over derived example parameters.
