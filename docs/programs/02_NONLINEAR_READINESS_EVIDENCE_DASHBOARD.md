@@ -28,3 +28,13 @@ Open the existing GUI and select **OpenSees nonlinear readiness / calibration st
 The dashboard includes action buttons to launch the eight-material visual validation interface, generate separate ZERO/X/Y/XY wall diagnostic RunConfig files, and execute an isolated native FVD/BRB recorder test. Child-process console logs go to `OpenSees_Analysis_Results/Readiness_Diagnostics`; case outputs are written to distinct diagnostic directories. These buttons never run the building's full nonlinear time history automatically and never promote a case to thesis-qualified status.
 
 NBC 105:2025 screening now appears as a distinct dashboard workstream; the presence of a spectrum-screen JSON remains **available for review only**, never a code pass. See docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md.
+
+### 2026-11-12 usability and material-source clarification
+
+- When the chosen project folder contains the standard `OpenSees_Complete_Nonlinear_Model.py` in its root, the dashboard preselects that exact file **for inspection only** and computes its source SHA in the regular audit. If absent, the user must choose a model explicitly. A gravity-only builder is never substituted.
+- Changing project folders refreshes the model field so a selected model from an unrelated project is not silently retained.
+- The dependency preflight separately reports whether an **external project nonlinear material definition file** is configured and exists, versus whether `Material_Catalog/` research cards and `material_source_sets.py` exist. The research cards do **not** discharge material/reinforcement calibration requirements or set `approval=True`.
+- Readiness review claims remain model-bound and SHA-checked; automatic file discovery never checks reviewer boxes.
+- Regression tests: `python -m unittest tests.verify_readiness_dashboard -v`. This does not run native OpenSees/ETABS and does not resolve the first-step X wall failure.
+
+See [the 2026-11-12 thesis workboard](../review/20261112_THESIS_DELIVERY_WORKBOARD.md) for ordered structural verification and research completion gates.

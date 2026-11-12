@@ -93,6 +93,27 @@ def _candidates(root, name):
     return [p for p in base if p.is_file()]
 
 
+def discover_project_model(folder):
+    """Find a unique, conventional nonlinear builder inside the selected project.
+
+    Selection is for *inspection only*, never an approval. Do not recursively
+    search output folders or choose among multiple candidates automatically.
+    A caller must ask the user to select explicitly when more than one exists.
+    """
+    root = Path(folder).expanduser().resolve()
+    names = (
+        "OpenSees_Complete_Nonlinear_Model.py",
+        "OpenSees_Complete_Gravity_Model.py",
+    )
+    # Gravity-only model is not a nonlinear builder. It is intentionally not
+    # selected or returned as a substitute, even when it exists.
+    candidates = [root / names[0]]
+    found = [p for p in candidates if p.is_file() and p.parent == root]
+    if len(found) == 1:
+        return found[0], "UNIQUE_PROJECT_BUILDER_DETECTED_UNREVIEWED"
+    return None, "NO_PROJECT_NONLINEAR_BUILDER_FOUND"
+
+
 def _load_draft(model):
     if model is None or not model.is_file():
         return None, "NO_MODEL_SELECTED"
