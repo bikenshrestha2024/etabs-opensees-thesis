@@ -72,3 +72,20 @@ A cropped N2 bay cannot give building-level response unless equivalent interface
 - NBC 105:2025 official source: https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf
 
 No citation-count claim is made: current citation ranking, visits and downloads are not reliably available from the sources above.
+
+## Targeted literature expansion — selected verified references (2026-11-12)
+
+Relevance is prioritized over unverified citation rankings or webpage visit counts. These are hypotheses/benchmarks, NOT transplanted parameters or certified project calibrations.
+
+| Reference | Role in thesis | Scope warning |
+|---|---|---|
+| Smith & Willford, 2007, *The damped outrigger concept for tall buildings*, DOI [10.1002/tal.413](https://doi.org/10.1002/tal.413) | Foundational damped-outrigger mechanism and damping concept | Conceptual basis, not a numerical damper model for this building |
+| Wang, Nagarajaiah & Sun, 2021, *Optimal design of supplemental negative stiffness damped outrigger*, DOI [10.1016/j.jweia.2021.104761](https://doi.org/10.1016/j.jweia.2021.104761) | Multi-hazard tradeoffs; source page displays **Cited by 62** when checked | Different negative-stiffness device and model, not a direct FVD calibration |
+| *First mode damping ratio oriented optimal design procedure...*, 2021, DOI [10.1016/j.engstruct.2021.113229](https://doi.org/10.1016/j.engstruct.2021.113229) | How modal damping and outrigger arrangements interact | Linear viscous damper theory only; nonlinear project-specific α/C needs validation |
+| Xing et al., 2023, *Optimal models of outrigger locations and damping parameters...*, DOI [10.1016/j.jobe.2023.107209](https://doi.org/10.1016/j.jobe.2023.107209) | Systematic site-independent outrigger location/damping sensitivity; source page displays **Cited by 12** when checked | Simplified optimization is not 3D torsion proof |
+| Kolay et al., 2023, *Optimal parameters for tall buildings with a single viscously damped outrigger*, DOI [10.1002/tal.2003](https://doi.org/10.1002/tal.2003) | Parametric structure/damper sensitivity, multiple earthquake records | 60-storey example; do not import optimal location blindly |
+| Lin et al., August 2026, *Optimal design of damped-outrigger systems under wind and seismic loads in tall buildings*, DOI [10.1016/j.istruc.2026.112348](https://doi.org/10.1016/j.istruc.2026.112348) | Recent BRB-outrigger sensitivity and nonlinear history/OpenSees comparison | BRB and FVD mechanical behavior differ |
+| Jia & Ji, February 2026, *H2-norm-based tuning design for tuned viscous mass damper outriggers*, DOI [10.1016/j.jobe.2026.115439](https://doi.org/10.1016/j.jobe.2026.115439) | Alternative tuned viscous *mass* damper theory | TVMD is not the same as an ordinary FVD |
+| McKenna, 2011, *OpenSees: A Framework for Earthquake Engineering Simulation*, DOI [10.1109/MCSE.2011.66](https://doi.org/10.1109/MCSE.2011.66) | Analysis framework, reproducibility and scientific-software background | Not model-specific validation |
+
+Citation counts above reflect only individually displayed publisher metrics seen on 2026-11-12; they are not a complete comparative bibliometric analysis. “Most visited” cannot be established from available public usage statistics.
