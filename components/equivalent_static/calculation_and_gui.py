@@ -522,6 +522,7 @@ class ESMGui:
             self.status.set('SOURCE STATE REQUIRES REVIEW: '+detected_note+' | ULS shown as a UI default only; verify the actual .EDB before calculation.')
         self.state.trace_add('write',lambda *_:self._state_changed())
         self.direction.trace_add('write',lambda *_: self._direction_changed())
+        self.esm_module.trace_add('write',lambda *_:self._esm_module_changed())
         # ETABS is an optional comparison source; on-start ROT attachment can
         # fail with WinError -2147221021 even when workbook/geometry inputs are
         # valid. Do not automatically obscure input diagnostics with a COM error.
@@ -529,6 +530,19 @@ class ESMGui:
         self.awy.trace_add('write',lambda *_:self._show_empirical())
         self.rayleigh_tx.trace_add('write',lambda *_:self._show_empirical())
         self.rayleigh_ty.trace_add('write',lambda *_:self._show_empirical())
+
+    def _esm_module_changed(self):
+        """Avoid a stale OpenSees Run button when ETABS-linked mode is selected."""
+        if getattr(self,"_esm_running",False):
+            return
+        linked=self.esm_module.get()=="ETABS Linked Equivalent Static"
+        self.run_button.configure(
+            state="disabled" if linked or not self.last_runners or
+                  not Path(self.model_script.get()).is_file() else "normal")
+        if linked:
+            self.status.set("ETABS-linked workbook reference selected. "
+                "An original workbook run does not itself solve ETABS seismic response. "
+                "Use the mapping-gated ETABS comparison for native solved cases.")
 
     def _set_esm_operation(self,state,detail=""):
         """Process-only indication, independent from NBC design acceptance."""
@@ -608,7 +622,10 @@ class ESMGui:
                 result=bundle_seismic_review(source,output,method="ESM")
                 def finished():
                     self._review_bundle_running=False
-                    self._set_esm_operation("EXPORTED","Complete ESM ZIP: "+result["zip"])
+                    prior=getattr(self,"_esm_last_batch_state",None)
+                    self._set_esm_operation(
+                        prior if prior in ("CANCELLED","BLOCKED") else "EXPORTED",
+                        "Evidence ZIP created (batch acceptance unchanged): "+result["zip"])
                     self.status.set(self.status.get()+
                         "\\n[ESM_AUTO_REVIEW_ZIP] "+result["zip"])
                 self.root.after(0,finished)
@@ -1920,6 +1937,7 @@ class ESMGui:
             messagebox.showerror("Missing exported cases", "\n".join(missing))
             return
         self._esm_cancel_requested = False
+        self._esm_last_batch_state = None
         self._esm_running = True
         self._esm_active_proc = None
         self._esm_case_started = None
@@ -2014,6 +2032,17 @@ class ESMGui:
                     if status in ("CANCELLED", "TIMEOUT"):
                         break
             finally:
+                if len(outcomes)<len(scripts):
+                    missing_status=("SKIPPED_CANCELLED" if self._esm_cancel_requested
+                                    else "NOT_RUN")
+                    for script in scripts[len(outcomes):]:
+                        outcomes.append({
+                            "case":script.name,"status":missing_status,
+                            "return_code":None,"log":None,"elapsed_s":0.0,
+                            "error":"Not launched; batch incomplete. No solver result.",
+                        })
+                    state_file.write_text(
+                        json.dumps(outcomes,indent=2),encoding="utf-8")
                 def done():
                     self._esm_running = False
                     self._esm_active_proc = None
@@ -2023,9 +2052,13 @@ class ESMGui:
                     completed = len(outcomes) == len(scripts) and passed == len(scripts)
                     process_state=("FINISHED" if completed else
                                    "CANCELLED" if self._esm_cancel_requested else "BLOCKED")
+                    self._esm_last_batch_state=process_state
                     self._set_esm_operation(process_state,
                         f"{passed}/{len(scripts)} returned exit 0 | {state_file}")
-                    self.status.set("ESM batch complete. Status manifest: " + str(state_file))
+                    self.status.set(
+                        ("ESM batch cancelled; incomplete cases retained. " if
+                         process_state=="CANCELLED" else "ESM batch completed. ")
+                        +"Status manifest: "+str(state_file))
                     self._auto_bundle_seismic_review()
                     if completed:
                         messagebox.showinfo("ESM child processes finished",
