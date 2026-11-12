@@ -21,3 +21,5 @@ Units are not inferred from filenames. Reviewer claims and actual native solver/
 **Where:** `components/model/readiness_dashboard_gui.py`; state remains in this window. **Which:** source model hash, twelve review workstreams, evidence SHA and review status. **Who:** UI maintainer verifies responsiveness; structural engineer approves actual source evidence.
 
 **Limitations:** no cancellation of an already-started disk hash (stale results are discarded). No native Windows/Tk benchmark has been performed; solver performance is unchanged by this UI implementation. No model/material approval is automated.
+
+**Refresh backpressure:** A 100-ms Tk poll applies results. A single per-window daemon worker coalesces queued refreshes to the latest selection; obsolete completed results are discarded. The worker exits when the window is destroyed. No background thread touches Tk widgets.
