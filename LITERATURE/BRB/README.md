@@ -9,6 +9,12 @@
 | L018 | 2026 BRB-outrigger method | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 | L021 | Damped substructure outrigger concept | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 
+## Newly verified code-cited works (2026-11-12)
+
+| ID | Thesis use | Metadata |
+|---|---|---|
+| L034 | Comparison of BRB-outrigger and FVD-outrigger methods | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+
 ## Evidence and transfer policy
 
 - Prefer original paper and measured specimens over derived example parameters.
