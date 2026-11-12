@@ -20,6 +20,22 @@ class ReadinessTests(unittest.TestCase):
             self.assertEqual(result["readiness_level"], "DIAGNOSTIC_ONLY")
             self.assertEqual(len(result["model_sha256"]), 64)
 
+    def test_dependency_preflight_distinguishes_project_vs_reference_materials(self):
+        from components.model.nonlinear_preflight import inventory
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "OpenSees_Complete_Model_Config_V118.json").write_text(
+                json.dumps({"nonlinear_materials_file": None,
+                            "nonlinear_wall_fsam_tags": {},
+                            "nonlinear_parameters_reviewed": False}))
+            report = inventory(d)
+            self.assertEqual(report["production_material_status"],
+                             "NOT_CONFIGURED_EXTERNAL_FILE")
+            self.assertEqual(report["research_material_sources"]["assessment"],
+                             "REFERENCE_ONLY_NOT_PROJECT_CALIBRATION")
+            self.assertIn("Project nonlinear material definitions file",
+                          report["blockers"])
+            self.assertFalse(report["approval"])
+
     def test_gravity_builder_never_substitutes_for_nonlin_model(self):
         with tempfile.TemporaryDirectory() as d:
             Path(d, "OpenSees_Complete_Gravity_Model.py").write_text("pass\\n")
