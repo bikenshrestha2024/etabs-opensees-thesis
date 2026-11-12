@@ -234,6 +234,7 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None)
 def find_verified_etabs_csv(source_folder, results_root):
     """Auto-reuse only native ETABS API CSV with matching EDB SHA and approved map.
 
+    [REF docs/source/components/validation/etabs_comparison.py.md]
     A generated OpenSees_Normalized.csv or unfilled ETABS template is NOT
     evidence of native ETABS analysis; review ZIPs are not live API sources.
     """
