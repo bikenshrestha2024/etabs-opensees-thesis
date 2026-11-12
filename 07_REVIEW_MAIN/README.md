@@ -1,3 +1,5 @@
+> **New Kobe linear-history evidence:** [full XY/YX pair review, drift and modal provenance](../REVIEW_MAIN/05_LINEAR_TH/20261112_KOBE_FULL_PAIR_TIMING_DRIFT_AND_PERIOD_AUDIT.md). Both cases completed; performance and engineering acceptance remain distinct.
+
 # 07 — Thesis engineering review and discrepancy control
 
 **Canonical numbered navigation:** `07_REVIEW_MAIN/`.  

@@ -178,12 +178,45 @@ def playback(parent,history):
     win._playback_state=state;win._draw_frame=draw;return win
 
 
+def history_scope_name(root, file_path):
+    """Return a stable run/directory scope for a saved history item.
+
+    [REF docs/source/components/ui/history_inspection.py.md]
+    This is UI grouping only: it does not certify input/output model identity.
+    """
+    rel = Path(file_path).relative_to(Path(root))
+    return rel.parts[0] if len(rel.parts) > 1 else "(This directory)"
+
+
+def choose_default_history_scope(scopes, previously_selected=""):
+    """Favor a selected linear-history study instead of mixing analyses.
+
+    [REF docs/source/components/ui/history_inspection.py.md]
+    """
+    scopes = sorted(set(scopes))
+    if previously_selected in scopes:
+        return previously_selected
+    lth = [name for name in scopes if name.upper().startswith(("LTH_", "LINEAR_TIME_HISTORY"))]
+    if lth:
+        return lth[-1]
+    if "(This directory)" in scopes:
+        return "(This directory)"
+    if len(scopes) == 1:
+        return scopes[0]
+    return "All analyses (mixed)"
+
+
 def launch(parent,folder):
     import tkinter as tk
     from tkinter import ttk,messagebox,filedialog
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg,NavigationToolbar2Tk
     folder=Path(folder);win=tk.Toplevel(parent);win.title('Time histories — full data, spectra, playback and timing');win.geometry('1250x850')
+    scopebar=ttk.Frame(win);scopebar.pack(fill='x')
+    ttk.Label(scopebar,text='Analysis run scope (avoid mixing linear and nonlinear evidence):').pack(side='left')
+    scopevar=tk.StringVar(value='')
+    scopebox=ttk.Combobox(scopebar,textvariable=scopevar,state='readonly',width=65)
+    scopebox.pack(side='left',fill='x',expand=True)
     top=ttk.Frame(win);top.pack(fill='x');choice=tk.StringVar();series=tk.StringVar();groupvar=tk.StringVar(value='All');search=tk.StringVar();page=tk.IntVar(value=1);info=tk.StringVar()
     files=ttk.Combobox(top,textvariable=choice,state='readonly',width=72);files.pack(side='left',fill='x',expand=True)
     fields=ttk.Combobox(top,textvariable=series,state='readonly',width=30);fields.pack(side='left');groups=ttk.Combobox(top,textvariable=groupvar,state='readonly',width=15);groups.pack(side='left')
@@ -265,24 +298,54 @@ def launch(parent,folder):
             ax.clear();ax.plot(periods,sa,label='Applied component');ax.set(xlabel='Period (s)',ylabel='5% damped pseudo-acceleration Sa (g)',title='Input spectrum diagnostic; no automatic record matching');ax.grid(alpha=.25);ax.legend();chart.draw_idle();tabs.select(plot)
         except Exception as e:messagebox.showerror('Spectrum',str(e),parent=win)
     def refresh():
-        old=choice.get();paths={str(p.relative_to(folder)):p for p in sorted(folder.rglob('*.csv')) if p.name.endswith('history.csv') or p.name.startswith(('Drift_','Floor_Edge_Drift_'))}
-        for p in sorted(folder.rglob('*Input_Record_Audit*.csv')):
+        old=choice.get()
+        # One recursive pass per manual refresh. Scope result rows and logs to
+        # the selected run so that exploratory NL and accepted LTH files cannot
+        # be conflated in one result viewer by default.
+        inventory=[p for p in folder.rglob('*') if p.is_file() and p.suffix.lower() in ('.csv','.json','.log','.txt')]
+        evidence=[p for p in inventory if p.suffix.lower()=='.csv' and
+                  (p.name.endswith('history.csv') or p.name.startswith(('Drift_','Floor_Edge_Drift_','NBC105_Linear_Time_History_Input_Record_Audit')) or 'Input_Record_Audit' in p.name)]
+        scopes=sorted({history_scope_name(folder,p) for p in evidence})
+        if not scopes:
+            scopes=sorted({history_scope_name(folder,p) for p in inventory})
+        selected=choose_default_history_scope(scopes,scopevar.get())
+        options=['All analyses (mixed)']+scopes
+        scopebox['values']=options
+        scopevar.set(selected)
+        filtered=[p for p in inventory if selected=='All analyses (mixed)' or
+                  history_scope_name(folder,p)==selected]
+        paths={str(p.relative_to(folder)):p for p in sorted(filtered)
+               if p.suffix.lower()=='.csv' and
+               (p.name.endswith('history.csv') or p.name.startswith(('Drift_','Floor_Edge_Drift_')))}
+        for p in sorted(filtered):
+            if not (p.suffix.lower()=='.csv' and 'Input_Record_Audit' in p.name):
+                continue
             paths[str(p.relative_to(folder))]=p
             try:
                 with p.open(encoding='utf-8-sig',newline='') as f:
-                    for r in csv.DictReader(f):paths[str(p.parent.relative_to(folder))+' / INPUT '+r['record_or_pair_id']+' / '+r['component']]=r
-            except (OSError,KeyError):pass
+                    for record in csv.DictReader(f):
+                        paths[str(p.parent.relative_to(folder))+' / INPUT '+record['record_or_pair_id']+' / '+record['component']]=record
+            except (OSError,KeyError):
+                pass
         state['paths']=paths;files['values']=list(paths);notes.delete('1.0','end');perf.delete('1.0','end')
-        for p in sorted(folder.rglob('*Time_History*')):
-            if p.suffix.lower() in ('.json','.log','.txt'):notes.insert('end',str(p)+'\n'+p.read_text(encoding='utf-8-sig',errors='replace')+'\n\n')
-        for p in sorted(folder.rglob('*Performance_V133.json')):perf.insert('end',str(p)+'\n'+p.read_text(encoding='utf-8-sig')+'\n\n')
+        for p in sorted(filtered):
+            if 'Time_History' in p.name and p.suffix.lower() in ('.json','.log','.txt'):
+                notes.insert('end',str(p)+'\n'+p.read_text(encoding='utf-8-sig',errors='replace')+'\n\n')
+            if p.name.endswith('Performance_V133.json'):
+                perf.insert('end',str(p)+'\n'+p.read_text(encoding='utf-8-sig',errors='replace')+'\n\n')
+        perf.insert('end','Run-scope filter: '+selected+'. Do not compare incompatible studies without source and model checks.\n')
         perf.insert('end','No fixed nonlinear/linear runtime multiplier is assumed. Select one earthquake pair first; compare measured model, eigenanalysis, solve and recording stages. XY and YX remain separate rebuilt cases. Adaptive nonlinear substeps add work. No time-step limit is relaxed.\n')
-        if paths:choice.set(old if old in paths else next(iter(paths)));load()
-        else:info.set('No saved histories / input audits. Refresh after a case finishes.')
+        if paths:
+            choice.set(old if old in paths else next(iter(paths)))
+            load()
+        else:
+            choice.set('')
+            info.set('No history files in scope: '+selected+'. Choose another run or refresh after the case finishes.')
     for label,fn in [('Previous',lambda:(page.set(max(1,page.get()-1)),table())),('Next',lambda:(page.set(page.get()+1),table())),('Apply filter / page',draw),('Export filtered rows',export)]:ttk.Button(nav,text=label,command=fn).pack(side='left')
     actions=ttk.Frame(win);actions.pack(fill='x')
     for label,fn in [('Refresh',refresh),('Animate selected history',animate),('Input response spectrum',spectrum)]:ttk.Button(actions,text=label,command=fn).pack(side='left')
     from OpenSees_Results_UI_V127 import history_summary
     ttk.Button(actions,text='Run summary X / Y',command=lambda:history_summary(win,folder)).pack(side='left')
+    scopebox.bind('<<ComboboxSelected>>',lambda _event:refresh())
     files.bind('<<ComboboxSelected>>',load);fields.bind('<<ComboboxSelected>>',draw);groups.bind('<<ComboboxSelected>>',draw);refresh()
     win._history_state=state;return win
