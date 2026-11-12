@@ -235,6 +235,16 @@ class MaterialSensitivityTests(unittest.TestCase):
             summary = json.loads(
                 (root / "sweep" / "Material_Sensitivity_Summary.json").read_text())
             self.assertEqual(summary["status"], "COMPLETED")
+            self.assertEqual(summary["provenance_file"],
+                             "Sensitivity_Parameter_Provenance.json")
+            provenance=json.loads(
+                (root / "sweep" / summary["provenance_file"]).read_text())
+            self.assertEqual(provenance["parameter"],"brace.fy_mpa")
+            self.assertEqual(provenance["baseline"],345.)
+            self.assertEqual(provenance["source_value_status"],
+                             "MODEL_ASSUMPTION_OR_NOT_IN_PAPER")
+            self.assertEqual(provenance["candidate_status"],
+                             "ANALYST_SELECTED_PARAMETER_SWEEP_NOT_PAPER_UNCERTAINTY")
 
 
 if __name__ == "__main__":
