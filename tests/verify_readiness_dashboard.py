@@ -5,9 +5,28 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from components.model.readiness_dashboard import GROUPS, audit, export_report
+from components.model.readiness_dashboard import GROUPS, audit, export_report, discover_project_model
 
 class ReadinessTests(unittest.TestCase):
+    def test_discover_unique_nonlin_builder_for_inspection_only(self):
+        with tempfile.TemporaryDirectory() as d:
+            model = Path(d, "OpenSees_Complete_Nonlinear_Model.py")
+            model.write_text("pass\\n")
+            discovered, status = discover_project_model(d)
+            self.assertEqual(discovered, model.resolve())
+            self.assertIn("UNREVIEWED", status)
+            result = audit(d, discovered)
+            self.assertFalse(result["approved_for_nltha"])
+            self.assertEqual(result["readiness_level"], "DIAGNOSTIC_ONLY")
+            self.assertEqual(len(result["model_sha256"]), 64)
+
+    def test_gravity_builder_never_substitutes_for_nonlin_model(self):
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, "OpenSees_Complete_Gravity_Model.py").write_text("pass\\n")
+            discovered, status = discover_project_model(d)
+            self.assertIsNone(discovered)
+            self.assertEqual(status, "NO_PROJECT_NONLINEAR_BUILDER_FOUND")
+
     def test_missing_model_no_automatic_approval(self):
         with tempfile.TemporaryDirectory() as d:
             result = audit(d)
