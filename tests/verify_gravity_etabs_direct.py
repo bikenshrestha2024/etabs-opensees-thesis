@@ -307,7 +307,7 @@ class GravityDirectAPITests(unittest.TestCase):
         src=(Path(__file__).resolve().parents[1]/
              'components/gravity/gui_and_reports.py').read_text('utf-8')
         ast.parse(src)
-        self.assertIn('Extract ETABS + compare gravity',src)
+        self.assertIn('Extract ETABS and compare gravity',src)
         self.assertIn('connect_and_compare',src)
         self.assertIn('1. DL + LL',src)
 if __name__=='__main__':unittest.main()
