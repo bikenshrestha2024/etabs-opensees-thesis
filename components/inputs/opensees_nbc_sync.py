@@ -630,7 +630,7 @@ def write_local_aw_review(report, output_dir):
         "height_m":report.get("wall_aw_height_m"),
         "selected_aw_m2":selected.get("aw_candidate_m2") if reviewed else None,
         "former_four_6m_panel_aw_m2":{"X":previous.get("X"),"Y":previous.get("Y")},
-        "unweighted_pier_diagnostic_aw_m2":diagnostic,
+        "continuous_pier_weighted_diagnostic_aw_m2":diagnostic,
         "exported_wall_node_geometry":report.get(
             "source_node_wall_geometry_verification"),
         "wall_grouping_error":report.get("grouped_wall_aw_error"),
