@@ -161,6 +161,44 @@ def resolve_aw(export_dir, state):
     """
     state = 'ULS' if str(state).strip().upper() == 'BOTH' else str(state).strip().upper()
     out = dict(X=None, Y=None, method=None, labels={}, reference=None, notes=[], state=state)
+
+    # This thesis's 2x12m structural-wall decision takes precedence over the
+    # OLD 4x6m Excel value only when current first-storey exported shell/node
+    # geometry passes all source-linked dimensional checks. No EDB or XLSX
+    # bytes are altered, and native ETABS equivalence is not asserted.
+    try:
+        from components.inputs.opensees_nbc_sync import _source_snapshot
+        snapshot = _source_snapshot(export_dir, state)
+    except Exception as exc:
+        snapshot = None
+        out['notes'].append('12m wall grouping verification unavailable: ' + str(exc))
+    if snapshot is not None:
+        reviewed = snapshot.get('grouped_wall_aw_review') or {}
+        if reviewed.get('status') == 'EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY':
+            previous, why = latest_linked_reference(export_dir, state)
+            out.update(X=_positive(reviewed['aw_candidate_m2'].get('X')),
+                       Y=_positive(reviewed['aw_candidate_m2'].get('Y')),
+                       method='EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY',
+                       reference=previous, code_accepted=False,
+                       assembled_model_sha256=snapshot.get('assembled_model_sha256'),
+                       source_edb_sha256=reviewed.get('source_edb_sha256'),
+                       evidence=snapshot['aw_evidence'])
+            out['labels'] = {
+                'X': 'REVIEWED PROJECT GROUPING: 2 connected 12m X walls; export node geometry matched',
+                'Y': 'REVIEWED PROJECT GROUPING: 3 solid 6m Y walls; export node geometry matched'}
+            if previous:
+                prior = previous.get('values') or {}
+                out['historical_workbook_aw_m2'] = {
+                    'X': prior.get('awx'), 'Y': prior.get('awy')}
+                out['notes'].append(
+                    'Prior original Excel Aw retained as historical comparison. '
+                    'If calculated using 4x6m panels it is superseded for THIS '
+                    'project geometry; original workbook NOT modified.')
+            out['notes'].append(
+                'UBC 1997 and SEAOC support net minimum area with full '
+                'connected-wall length. Native ETABS validation and code '
+                'acceptance remain separate.')
+            return out
     ref, reason = latest_linked_reference(export_dir, state)
     if ref:
         out.update(X=ref['values']['awx'], Y=ref['values']['awy'],
