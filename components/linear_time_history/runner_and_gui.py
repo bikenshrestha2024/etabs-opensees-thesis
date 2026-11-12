@@ -507,6 +507,8 @@ class LinearTimeHistoryGUI:
         self.t1x = tk.StringVar(); self.t1y = tk.StringVar(); self.tnx = tk.StringVar(); self.tny = tk.StringVar()
         self.nmodes = tk.StringVar(value="20"); self.ls = tk.StringVar(value="ULS")
         self.trial_duration=tk.StringVar(value="")
+        self.linear_factor_once=tk.BooleanVar(value=False)
+        self.elastic_constant_tangent_verified=tk.BooleanVar(value=False)
         self._output_is_automatic=True
         self.torsion = tk.BooleanVar(value=True); self.running = False
         self.motion_mode = tk.StringVar(value=LTH_DEFAULT_MODE)
@@ -603,6 +605,9 @@ class LinearTimeHistoryGUI:
         for c in range(6): grid.columnconfigure(c, weight=1 if c % 2 else 0)
         self._entry(params,"Optional short trial duration (s)",self.trial_duration)
         ttk.Label(params,text="Blank runs the full record. A shorter positive duration is only a numerical diagnostic and is NEVER NBC record acceptance.",wraplength=1050,foreground="#9a3412").pack(anchor="w",pady=3)
+        ttk.Checkbutton(params,text="Experimental speed: reuse constant linear matrix factorization (opt-in)",variable=self.linear_factor_once).pack(anchor="w",pady=3)
+        ttk.Checkbutton(params,text="I independently verified the assembled tangent remains constant, including damping and all elements",variable=self.elastic_constant_tangent_verified).pack(anchor="w",pady=3)
+        ttk.Label(params,text="Speed experiment is OFF by default. Run identical XY/YX short trials with option OFF/ON, then compare histories, base reactions, drift and accelerations. Factor reuse is not appropriate for nonlinear material or time-varying matrices.",wraplength=1050,foreground="#9a3412").pack(anchor="w",pady=3)
         ttk.Label(params,text="The ULS/SLS context is passed to the selected builder (which may apply implemented state-specific stiffness modifiers) and labels outputs; it does not load a second ETABS model or derive service-load combinations. With only a ULS export, an SLS-labelled run is not independently validated. Verify service loads, effective stiffness, periods and motion/scaling basis before treating it as an SLS result.",wraplength=1060,foreground="#9a3412").pack(anchor="w",fill="x",pady=(4,2))
         ttk.Checkbutton(params, text="Torsionally sensitive 3D structure (requires at least 3 orthogonal motion pairs)", variable=self.torsion).pack(anchor="w", pady=(5, 0))
         ttk.Label(params, text="T1 is from NBC §5.1 (lesser adopted period); Tn is the highest mode needed for 90% mass participation in each axis. Obtain/verify these in the Modal Analysis GUI. The chosen Rayleigh calibration periods and checked modal damping must keep all inspected modes ≤5%.", wraplength=1060, foreground="#8a3412").pack(anchor="w", pady=(5, 0))
@@ -679,7 +684,9 @@ class LinearTimeHistoryGUI:
                 "x_scale_factor": float(self.x_scale.get()), "pair_scale_factor": float(self.pair_scale.get()),
                 "use_preloaded_peer_pairs": use_preloaded_pairs, "peer_pairs": LTH_DEFAULT_PEER_PAIRS,
                 "execute_linear_time_history": True, "record_matching_metadata": LTH_MATCHING_METADATA,
-                "trial_duration_s": (float(self.trial_duration.get()) if self.trial_duration.get().strip() else None)}
+                "trial_duration_s": (float(self.trial_duration.get()) if self.trial_duration.get().strip() else None),
+                "linear_factor_once_experimental": bool(self.linear_factor_once.get()),
+                "elastic_constant_tangent_verified": bool(self.elastic_constant_tangent_verified.get())}
             if not x_only:values.update(self.pair_selector.config())
             required = ["model_script", "python", "story_nodes_csv", "output_dir"]
             if not x_only and not use_preloaded_pairs: required.append("motion_manifest")
