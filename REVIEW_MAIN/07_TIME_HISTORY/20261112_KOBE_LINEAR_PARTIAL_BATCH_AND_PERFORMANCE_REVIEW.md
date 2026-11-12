@@ -1,3 +1,5 @@
+> **SUPERSEDED EVIDENCE STATUS (2026-11-12 20:30 +05:45):** This report represents an earlier partial log only. The complete XY/YX pair was subsequently supplied, verified and reviewed in [the full-pair audit](../05_LINEAR_TH/20261112_KOBE_FULL_PAIR_TIMING_DRIFT_AND_PERIOD_AUDIT.md). The incomplete-YX assertion below is historically accurate only for the earlier snapshot, NOT the final run.
+
 # 2026-11-12 — Legacy linear time history not finished, Kobe paired 3D
 
 **Run identity:** `LTH_ULS_Trial_20261112_155716_817601`
