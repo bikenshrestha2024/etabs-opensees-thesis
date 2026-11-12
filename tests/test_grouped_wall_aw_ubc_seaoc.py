@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 from components.inputs.project_workbooks import _wall_aw_profile, _continuous_wall_pier_diagnostic
 from components.inputs.grouped_wall_aw import (
-    wall_aw_example, grouped_wall_aw, source_matched_grouping, INPUT_NAME)
+    wall_aw_example, grouped_wall_aw, source_matched_grouping, INPUT_NAME,
+    verify_thesis_two_12m_wall_geometry, selected_two_12m_wall_reference)
 
 
 class TestGroupedWallArea(unittest.TestCase):
@@ -28,6 +29,44 @@ class TestGroupedWallArea(unittest.TestCase):
                                     thickness_m=.6, start_m=0, end_m=6))
             self.patches.append(("Y", plane, .6, 0, 6, 0, 3.8))
         self.profile = _wall_aw_profile(95, 0, 3.8, self.patches)
+
+
+    def test_two_12m_wall_lines_verified_from_actual_style_shell_slices(self):
+        patches=[]
+        for plane in (6.,12.):
+            patches.extend([
+                ("X",plane,.6,6.,8.,0.,2.3),
+                ("X",plane,.6,10.,14.,0.,2.3),
+                ("X",plane,.6,16.,18.,0.,2.3),
+                ("X",plane,.6,6.,18.,2.3,3.8)])
+        for plane in (6.,12.,18.):
+            patches.append(("Y",plane,.6,6.,12.,0.,3.8))
+        profile=_wall_aw_profile(95.,0.,3.8,patches)
+        result=verify_thesis_two_12m_wall_geometry(profile,95.)
+        desired=selected_two_12m_wall_reference()
+        self.assertEqual(result["status"],
+                         "EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY")
+        self.assertFalse(result["code_accepted"])
+        self.assertEqual(len(result["wall_geometry_verification"]["x_wall_lines"]),2)
+        self.assertEqual(len(result["wall_geometry_verification"]["y_wall_lines"]),3)
+        self.assertAlmostEqual(result["aw_candidate_m2"]["X"],desired["X"],places=9)
+        self.assertAlmostEqual(result["aw_candidate_m2"]["Y"],desired["Y"],places=9)
+        old=_continuous_wall_pier_diagnostic(95.,profile)
+        self.assertLess(old["aw_candidate_m2"]["X"],result["aw_candidate_m2"]["X"])
+        self.assertAlmostEqual(old["aw_candidate_m2"]["X"],1.9306371191,places=8)
+        # Physical first-storey connection above 2.3m is essential to 12m method.
+        no_head=[p for p in patches if not (p[0]=="X" and p[5]==2.3)]
+        with self.assertRaises(ValueError):
+            verify_thesis_two_12m_wall_geometry(
+                _wall_aw_profile(95.,0.,3.8,no_head),95.)
+        with self.assertRaises(ValueError):
+            verify_thesis_two_12m_wall_geometry(profile,94.)
+        with self.assertRaises(ValueError):
+            verify_thesis_two_12m_wall_geometry(
+                _wall_aw_profile(95.,0.,3.8,patches[:-1]),95.)
+        # Old method remains as sensitivity alternative, never selected by
+        # splitting identical 12m wall shells at architectural grid points.
+        self.assertAlmostEqual(wall_aw_example()["X"],1.9582936288,places=8)
 
     def test_user_original_excel_method_is_reproduced(self):
         result = grouped_wall_aw(self.profile, 95, self.groups)
