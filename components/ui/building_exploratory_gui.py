@@ -374,6 +374,60 @@ def launch(parent,model_folder,output_folder=None):
     sensitivity_button=ttk.Button(actions,text='Run material sensitivity sweep',command=lambda:messagebox.askyesno('Run sensitivity cases',f'Run {len([v for v in sensitivity_values.get().split(",") if v.strip()])} candidates serially for the selected state/orientations and duration? A duration of 0 means the full record; a full sweep may take a long time.',parent=win) and start(True));sensitivity_button.pack(side='left',padx=(6,0))
     ttk.Button(actions,text='Inspect saved histories / playback',command=inspect).pack(side='left');ttk.Button(actions,text='Open latest output folder',command=lambda:__import__('os').startfile(str(state['last'] or out.get()))).pack(side='left')
     secondary=ttk.Frame(win);secondary.pack(fill='x',padx=8,pady=4)
+    def one_storey_panel():
+        """[REF docs/source/components/nonlinear_time_history/one_storey_wall_probe.py.md]
+        Run one actual first-storey SHEAR-WALL MESH QUAD only. This is not
+        a full-storey building model and not a calibrated NLTHA.
+        """
+        if state['running']:
+            messagebox.showwarning('Existing run active',
+                'Stop/finish the current building analysis before opening an '
+                'independent first-storey wall-panel diagnostic.',parent=win)
+            return
+        if not messagebox.askyesno('Isolated ONE WALL QUAD (not entire floor)',
+            'Run a small-load monotonic first-storey wall-mesh-PANEL test '
+            'using PEER 2015/12 concrete/steel? This excludes columns, '
+            'spandrels, diaphragm, gravity/P-Delta and earthquake histories. '
+            'It only tests the E-SFI/FSAM element and will NOT approve NLTHA.',
+            parent=win):
+            return
+        source=Path(folder.get()).resolve()
+        destination=Path(out.get()).resolve()/(
+            'ONE_STOREY_WALL_QUAD_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        if not (source/'OpenSees_Complete_Model_Data_V118.json').is_file():
+            messagebox.showerror('Missing source geometry',
+                'Select the assembled OpenSees export containing the source '
+                'model-data JSON.',parent=win)
+            return
+        state['running']=True
+        status.set('ONE-STOREY PANEL RUNNING | source wall quad, not full building')
+        def task():
+            code=1
+            try:
+                root=Path(__file__).resolve().parents[2]
+                cmd=[sys.executable,'-u','-m',
+                     'components.nonlinear_time_history.one_storey_wall_probe',
+                     '--source',str(source),'--output',str(destination)]
+                proc=subprocess.Popen(cmd,cwd=str(root),stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,text=True,encoding='utf-8',
+                    errors='replace')
+                state['proc']=proc
+                for line in proc.stdout:messages.put(('line',line))
+                code=proc.wait()
+            except Exception as exc:
+                messages.put(('line','[ONE STOREY PANEL FAILED] '+str(exc)+'\\n'))
+            finally:
+                state['proc']=None
+                def finished():
+                    state['running']=False
+                    state['last']=destination
+                    status.set(('ONE-STOREY PANEL RESULT SAVED' if code==0
+                                else 'ONE-STOREY PANEL FAILED / REVIEW REQUIRED')+
+                               ' | '+str(destination))
+                top.after(0,finished)
+        threading.Thread(target=task,daemon=True).start()
+    ttk.Button(secondary,text='Run 1st-storey wall-QUAD diagnostic (NOT full floor)',
+               command=one_storey_panel).pack(side='left',padx=(0,6))
     ttk.Button(secondary,text='Stop owned process',command=stop).pack(side='left')
     ttk.Button(secondary,text='Building roof / force / section response plots',command=response_plots).pack(side='left')
     def recover():
