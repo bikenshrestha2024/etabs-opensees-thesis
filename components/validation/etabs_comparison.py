@@ -252,6 +252,8 @@ def find_verified_etabs_csv(source_folder, results_root):
     try:
         evidence=json.loads(meta.read_text(encoding='utf-8-sig'))
         mapping=json.loads(mapfile.read_text(encoding='utf-8-sig'))
+        if not isinstance(evidence,dict) or not isinstance(mapping,dict):
+            return None,'Saved ETABS provenance/mapping JSON must be objects, not lists'
         if (evidence.get('edb_sha256')!=fingerprint(edb) or
             Path(evidence.get('edb_path','')).resolve()!=Path(edb).resolve() or
             Path(mapping.get('source_edb','')).resolve()!=Path(edb).resolve()):
@@ -270,16 +272,55 @@ def find_verified_etabs_csv(source_folder, results_root):
 def launch(parent,folder,results_root=None):
  import tkinter as tk
  from tkinter import ttk,filedialog,messagebox
- win=tk.Toplevel(parent);win.title('ETABS comparison - modal / ESM / MRSM');win.geometry('1200x750');path=tk.StringVar();status=tk.StringVar();latest={'rows':None,'out':None,'etabs_rows':None,'policy':None};bar=ttk.Frame(win);bar.pack(fill='x');ttk.Entry(bar,textvariable=path,width=75).pack(side='left')
+ win=tk.Toplevel(parent);win.title('ETABS comparison — verified source / cases');win.geometry('1200x750')
+ path=tk.StringVar();status=tk.StringVar()
+ latest={'rows':None,'out':None,'etabs_rows':None,'policy':None}
+ bar=ttk.Frame(win,padding=5);bar.pack(fill='x')
+ file_row=ttk.Frame(bar);file_row.pack(fill='x',pady=(0,4))
+ ttk.Label(file_row,text='Native ETABS normalized CSV (optional):').pack(side='left',padx=(0,5))
+ ttk.Entry(file_row,textvariable=path,width=65).pack(side='left',fill='x',expand=True)
+ actions=ttk.Frame(bar);actions.pack(fill='x')
  def browse():
   p=filedialog.askopenfilename(parent=win,title='Normalized ETABS CSV',filetypes=[('CSV','*.csv')])
   if p:path.set(p)
- ttk.Button(bar,text='Manual ETABS CSV (advanced)',command=browse).pack(side='left')
+ ttk.Button(actions,text='Manual ETABS CSV (advanced)',command=browse).pack(side='left')
  comparison_root=(Path(results_root).expanduser().resolve() if results_root is not None
                   else Path(folder)/'OpenSees_Analysis_Results')
  auto_file,auto_note=find_verified_etabs_csv(folder,comparison_root)
  if auto_file:path.set(str(auto_file))
  status.set('SOURCE: '+auto_note)
+ def template_for_current_edb():
+  """Create discoverable INCOMPLETE source-bound mapping, never a verified file."""
+  from components.inputs.project_workbooks import _source_edb_path
+  from components.validation.etabs_direct_api import mapping_template
+  known=_source_edb_path(folder)
+  chosen=(str(Path(known).resolve()) if known and Path(known).is_file() else
+          filedialog.askopenfilename(parent=win,title='Select exact source ETABS EDB',
+                                     filetypes=[('ETABS model','*.edb')]))
+  if not chosen:return
+  destination=comparison_root/'ETABS_Comparison_V148'/'ETABS_API_Mapping_TEMPLATE.json'
+  destination.parent.mkdir(parents=True,exist_ok=True)
+  if not destination.exists():
+   destination.write_text(
+       json.dumps(mapping_template(chosen),indent=2),encoding='utf-8')
+  status.set('INCOMPLETE MAPPING TEMPLATE (NOT VERIFIED): '+str(destination))
+  messagebox.showinfo('ETABS case/story mapping template',
+      'Template location:\n'+str(destination)+
+      '\n\nFill real ETABS case names, exact story IDs and comparison basis. '
+      'Keep source_edb equal to the selected original EDB; verify matching SHA. '
+      'Never select OpenSees_Source_Model_Metadata_V118.json as a case mapping.',
+      parent=win)
+ ttk.Button(actions,text='Create / locate mapping TEMPLATE',
+            command=template_for_current_edb).pack(side='left',padx=3)
+ def _mapping_file_is_selected_source(path,chosen):
+  """Only JSON objects with exact source EDB are eligible for selection."""
+  try:
+   data=json.loads(Path(path).read_text(encoding='utf-8-sig'))
+   if not isinstance(data,dict):
+    return False
+   return Path(str(data.get('source_edb',''))).resolve()==Path(chosen).resolve()
+  except (OSError,ValueError,TypeError):
+   return False
  def direct_api(auto=False):
   """Attach to the selected, already-open source .EDB in a COM STA thread."""
   import threading
@@ -302,13 +343,13 @@ def launch(parent,folder,results_root=None):
              if provenance.is_file() else {})
    source_hash=fingerprint(chosen)
    if (not previous.is_file() or
-       json.loads(previous.read_text(encoding='utf-8-sig')).get('source_edb')!=str(chosen) or
+       not _mapping_file_is_selected_source(previous,chosen) or
        recorded.get('edb_sha256')!=source_hash):
     status.set('AUTO: no prior SHA-verified ETABS API mapping for this exact '
                'EDB; use Direct ETABS API once to review case mapping.')
     return
   config=(str(previous) if previous.is_file() and
-          json.loads(previous.read_text(encoding='utf-8-sig')).get('source_edb')==str(chosen)
+          _mapping_file_is_selected_source(previous,chosen)
           else filedialog.askopenfilename(
               parent=win,title='Select verified case-and-story mapping JSON',
               filetypes=[('Mapping JSON','*.json')]))
@@ -320,7 +361,7 @@ def launch(parent,folder,results_root=None):
    template.parent.mkdir(parents=True,exist_ok=True)
    from components.validation.etabs_direct_api import mapping_template
    template.write_text(json.dumps(mapping_template(chosen),indent=2),encoding='utf-8')
-   messagebox.showinfo('ETABS mapping needed','Template created at '+str(template)+'\nEnter the real ETABS cases, story mapping and matched results basis; then use Direct ETABS API again.',parent=win)
+   messagebox.showinfo('ETABS mapping needed','INCOMPLETE TEMPLATE created at '+str(template)+'\nEnter actual ETABS cases, story mapping and matched results basis before running Direct API; do not select generic model metadata JSON.',parent=win)
    return
   def worker():
    from components.validation.etabs_direct_api import connect_and_extract
@@ -329,8 +370,17 @@ def launch(parent,folder,results_root=None):
     comtypes.CoInitialize()
     try:
      mapping=json.loads(Path(config).read_text(encoding='utf-8-sig'))
-     if Path(mapping.get('source_edb','')).resolve()!=Path(chosen).resolve():
-      raise ValueError('Selected EDB and mapping JSON source_edb differ.')
+     from components.validation.etabs_direct_api import validate_mapping
+     validate_mapping(mapping)
+     if Path(mapping['source_edb']).resolve()!=Path(chosen).resolve():
+      raise ValueError('Selected EDB and mapping JSON source_edb differ. '
+                       'EDB: '+str(Path(chosen).resolve())+
+                       ' | mapping source: '+str(Path(mapping['source_edb']).resolve())+
+                       '. Do not disable source-identity verification.')
+     if not mapping.get('assumptions_verified'):
+      raise ValueError('This case/story mapping remains a TEMPLATE (not verified). '
+                       'Complete the true ETABS cases, matching story IDs, modal pairing '
+                       'and basis checks before using Direct ETABS API.')
      extracted=connect_and_extract(folder,mapping)
      compared,out=save(folder,etabs_rows=extracted,policy=mapping,
                       results_root=results_root)
