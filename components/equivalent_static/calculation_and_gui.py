@@ -668,7 +668,39 @@ class ESMGui:
                             json.loads(Path(audit).read_text(encoding='utf-8')),audit,
                             state=self.state.get(),current_edb=_source_edb_path(self.export_dir))
                         self._confirm_and_apply_excel_reference(reference,confirm=False)
-                        self._apply_reviewed_wall_policy()
+                        reviewed=self._apply_reviewed_wall_policy()
+                        if reviewed:
+                            # Preserve the original ETABS-linked Excel engine's
+                            # four-6m X result and its registered SHA. Write an
+                            # independent review workbook for the author's
+                            # geometry-verified two-12m X-wall interpretation.
+                            from openpyxl import Workbook
+                            from hashlib import sha256
+                            original=reference['values']
+                            policy=self._reviewed_aw_policy
+                            review_file=Path(target).with_name(
+                                Path(target).stem+'_GROUPED_WALL_REVIEW.xlsx')
+                            if review_file.exists():
+                                raise FileExistsError('Existing grouped Aw review cannot be overwritten: '+str(review_file))
+                            rev=Workbook();ws=rev.active;ws.title='Aw Method Comparison'
+                            for row in [
+                                ('Method','Aw-X (m2)','Aw-Y (m2)','Engineering status'),
+                                ('Original ETABS-linked workbook four 6m X panels',
+                                 float(original['awx']),float(original['awy']),'HISTORICAL SOURCE FORMULAS PRESERVED'),
+                                ('Export-verified two connected 12m X walls',
+                                 float(policy['X']),float(policy['Y']),'SELECTED RESEARCH Aw; NBC acceptance OPEN'),
+                                ('Selected minus original','=B3-B2','=C3-C2','Different wall grouping, not rounding'),
+                                ('Source EDB',str(source),'','Read-only'),
+                                ('Source model SHA256',str(policy.get('assembled_model_sha256','')),'','Grouped geometry'),
+                                ('Original generated Excel SHA256',sha256(Path(target).read_bytes()).hexdigest(),'','Original file unchanged'),
+                                ('Selected state',self.state.get(),'','ULS/SLS periods require independent Rayleigh runs'),
+                            ]:ws.append(row)
+                            for col,width in {'A':52,'B':50,'C':24,'D':56}.items():ws.column_dimensions[col].width=width
+                            rev.save(str(review_file))
+                            self.status.set(
+                                f"ETABS-linked legacy Aw-X={original['awx']:.9g}; "
+                                f"VERIFIED 12m grouped Aw-X={policy['X']:.9g}. "
+                                f"Separate review workbook: {review_file}")
                     except Exception as exc:
                         self.status.set('ETABS-linked Aw/T not applied to the form: '+str(exc))
                         messagebox.showwarning('ETABS-linked values not applied',str(exc),parent=self.root)
