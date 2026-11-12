@@ -797,10 +797,11 @@ class ESMGui:
             report,folder=export_reconciliation(self.export_dir,state,output)
             x=report['axes']['X'];y=report['axes']['Y']
             self.status.set(
-                f"Aw comparison (not code acceptance): X Excel={x['original_excel_aw_m2']:.8g}, "
-                f"continuous={x['continuous_pier_diagnostic_m2']}; "
-                f"Y Excel={y['original_excel_aw_m2']:.8g}, "
-                f"continuous={y['continuous_pier_diagnostic_m2']}; "+str(folder))
+                f"Aw review (not code acceptance): X selected 12m={x['selected_two_12m_aw_m2']}, "
+                f"historical Excel 6m={x['original_excel_aw_m2']:.8g}, "
+                f"continuous-pier={x['continuous_pier_diagnostic_m2']}; "
+                f"Y selected={y['selected_two_12m_aw_m2']}, "
+                f"original Excel={y['original_excel_aw_m2']:.8g}; "+str(folder))
             messagebox.showinfo('NBC 105 Aw reconciliation',
                 'Read-only original Excel / current-source wall diagnostic saved:\n'+
                 str(folder)+'\n\nA wall-by-wall match remains blocked unless '
