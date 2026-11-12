@@ -26,8 +26,8 @@ EXCLUDE = (
     "docs/source/", "Research_Components/results/", "Research_Components/study/",
     "excel/historical/", "Worked_Example_", "Verification_V",
 )
-URL_RE = re.compile(r'https?://[^\s"<>]+', re.I)
-DOI_RE = re.compile(r'10\.\d{4,9}/[^\s"<>]+', re.I)
+URL_RE = re.compile(r"https?://[^\s\"'<>\\\[\]]+", re.I)
+DOI_RE = re.compile(r"10\.\d{4,9}/[A-Za-z0-9._;()/:+%-]+", re.I)
 CATS = {
     "FVD": r"fvd|viscous.?damper|damper|damping",
     "BRB": r"brb|buckling.restrain|brace",
@@ -63,7 +63,12 @@ def tracked():
 
 
 def canonical(raw):
-    return re.sub(r"^https?://(?:dx\.)?doi\.org/", "", raw.strip(), flags=re.I).rstrip(".,;:)]}").lower()
+    value = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", raw.strip(), flags=re.I)
+    value = value.rstrip(".,;:]}")
+    # Drop only unmatched trailing parentheses; preserve actual ASCE DOI syntax.
+    while value.endswith(")") and value.count(")") > value.count("("):
+        value = value[:-1]
+    return value.lower()
 
 
 def csv_text(head, rows):
