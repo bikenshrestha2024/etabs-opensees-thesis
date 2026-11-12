@@ -655,7 +655,10 @@ class ESMGui:
         ttk.Button(footer,text='Excel sources…',command=self._choose_workbooks).pack(side='left',padx=3)
         ttk.Button(footer,text='Use original Excel Aw/T (research)',command=self._use_explicit_excel_calculation).pack(side='left',padx=3)
         ttk.Button(footer,text='Audit Excel vs continuous-pier Aw',command=self._audit_wall_aw).pack(side='left',padx=3)
-        ttk.Button(footer,text='Create doorway wall Aw grouping REVIEW template',
+        ttk.Button(footer,text='Verify 2×12m Aw from exported nodes',
+                   command=lambda:self._sync_opensees_inputs(etabs=False)
+                   ).pack(side='left',padx=3)
+        ttk.Button(footer,text='Manual wall grouping template (fallback)',
                    command=self._export_grouped_wall_aw_template).pack(side='left',padx=3)
         ttk.Button(footer,text='Why are Aw/period fields blank?',command=self._show_source_diagnostics).pack(side='left',padx=3)
         ttk.Button(footer,text='Sync from OpenSees model',command=self._sync_opensees_inputs).pack(side='left',padx=3)
