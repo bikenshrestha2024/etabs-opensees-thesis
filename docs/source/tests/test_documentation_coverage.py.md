@@ -1,0 +1,3 @@
+# Documentation coverage unit test
+
+**What/when:** solver-free regression for guide-path inventory and empty-file handling, run in CI. **Why:** avoid a false all-documented claim when guides are missing or zero bytes. **How:** temporary `components/` and `tests/` trees, assert path count and separate missing test guides. **Where:** `tests/test_documentation_coverage.py`, source `tools/audit_documentation_coverage.py`. **Which:** synthetic paths only. **Who:** software maintainer. **Run:** `python -m unittest discover -s tests -p 'test_documentation_coverage.py' -v`. **Limitations:** validates path reporting, not actual guide quality.
