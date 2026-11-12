@@ -12,6 +12,12 @@
 | L015 | Asymmetric openings | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 | L016 | U/H wall multidirectional benchmark | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 
+## Newly verified code-cited works (2026-11-12)
+
+| ID | Thesis use | Metadata |
+|---|---|---|
+| L036 | Lopez Massone Kolozvari 2022 E-SFI wall validation | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+
 ## Evidence and transfer policy
 
 - Prefer original paper and measured specimens over derived example parameters.
