@@ -600,6 +600,88 @@ def export_sync_report(report, output_dir, template=None):
     return json_path,excel_path
 
 
+
+def write_local_aw_review(report, output_dir):
+    """[REF docs/source/components/inputs/grouped_wall_aw.py.md]
+    Keep a versioned, machine-readable Aw decision beside the selected
+    analysis results, with a pointer to the exact source model SHA256.
+    It marks the geometry-review step complete without claiming physical
+    ETABS/structural equivalence or official NBC design acceptance.
+    """
+    from datetime import datetime, timezone
+    root=Path(output_dir).resolve()
+    root.mkdir(parents=True,exist_ok=True)
+    selected=report.get("grouped_wall_aw_review") or {}
+    reviewed=(selected.get("status")==
+              "EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY")
+    previous=report.get("historical_ubc_seaoc_user_example") or {}
+    diagnostic=(report.get("continuous_pier_diagnostic") or {}).get(
+        "aw_candidate_m2") or {}
+    record={
+        "decision":"THESIS_20261112_TWO_CONNECTED_12M_X_WALLS",
+        "geometry_review":"COMPLETE_FROM_EXPORTED_SOURCE_NODES" if reviewed
+                          else "BLOCKED_INCOMPLETE",
+        "code_acceptance":"NOT_CERTIFIED",
+        "native_etabs_equivalence":"NOT_CERTIFIED",
+        "source_edb":report.get("source_edb"),
+        "source_edb_sha256":selected.get("source_edb_sha256"),
+        "assembled_model_sha256":report.get("assembled_model_sha256"),
+        "limit_state":report.get("limit_state"),
+        "height_m":report.get("wall_aw_height_m"),
+        "selected_aw_m2":selected.get("aw_candidate_m2") if reviewed else None,
+        "former_four_6m_panel_aw_m2":{"X":previous.get("X"),"Y":previous.get("Y")},
+        "unweighted_pier_diagnostic_aw_m2":diagnostic,
+        "exported_wall_node_geometry":report.get(
+            "source_node_wall_geometry_verification"),
+        "wall_grouping_error":report.get("grouped_wall_aw_error"),
+        "source_references":[
+            "NBC 105:2025 section 5.1.2 - governing formula",
+            "UBC 1997 sections 1628 and 1630.2.2 - historical definitions",
+            "SEAOC 1997 UBC Design Manual Vol I Example 19 - perforated wall",
+            "SEAOC Blue Book 2019 Article 04.03.010 - RC wall applicability",
+            "Balkaya and Kalkan (2004) DOI:10.1016/j.engstruct.2004.07.005",
+            "Goel and Chopra (1998) DOI:10.1061/(ASCE)0733-9445(1998)124:4(426)",
+        ],
+        "generated_at_utc":datetime.now(timezone.utc).isoformat(),
+    }
+    path=root/"AwX_Node_Geometry_Decision_20261112.json"
+    if path.is_file():
+        raise FileExistsError("Existing Aw review evidence retained: "+str(path))
+    path.write_text(json.dumps(record,indent=2),encoding="utf-8")
+    lines=[
+        "# Aw Validation — 12m structural-wall grouping",
+        "",
+        "**Node geometry review: "+record["geometry_review"]+"**",
+        "",
+        "Source EDB: "+str(record["source_edb"]),
+        "Assembled model SHA256: "+str(record["assembled_model_sha256"]),
+        "Limit state: "+str(record["limit_state"]),
+        "Method: minimum net first-storey horizontal concrete area combined "
+        "with the overall length of each connected structural wall.",
+        "",
+        "| Calculation | X Aw (m²) | Y Aw (m²) |",
+        "|---|---:|---:|",
+        "| Selected 2×12m X walls | "+str((record["selected_aw_m2"] or {}).get("X"))+
+        " | "+str((record["selected_aw_m2"] or {}).get("Y"))+" |",
+        "| Historical 4×6m X panels | "+str(previous.get("X"))+" | "+
+        str(previous.get("Y"))+" |",
+        "| Continuous full-storey piers (diagnostic) | "+
+        str(diagnostic.get("X"))+" | "+str(diagnostic.get("Y"))+" |",
+        "",
+        "No source EDB, original workbook, wall stiffness or element connectivity "
+        "was modified by this calculation.",
+        "",
+        "**Outstanding:** Independent native ETABS source integrity, exact "
+        "wall/reinforcement connectivity and physical response equivalence "
+        "must still be checked before NBC design acceptance.",
+    ]
+    md=root/"AW_ENGINEERING_DECISION.md"
+    if md.is_file():
+        raise FileExistsError("Existing Aw decision retained: "+str(md))
+    md.write_text("\n".join(lines)+"\n",encoding="utf-8")
+    return path,md
+
+
 def synchronize(export_dir,state='ULS',template=None,output_dir=None,etabs_fallback=False):
     report=_source_snapshot(export_dir,state)
     if etabs_fallback:
@@ -625,6 +707,7 @@ def synchronize(export_dir,state='ULS',template=None,output_dir=None,etabs_fallb
     if output_dir is None:
         output_dir=analysis_output_folder(export_dir,state)/'NBC105_Input_Sync'
     paths=export_sync_report(report,output_dir,template=template)
+    write_local_aw_review(report,Path(output_dir)/"REVIEW_MAIN"/"02_ESM"/"Aw_Validation")
     return report,paths
 
 
