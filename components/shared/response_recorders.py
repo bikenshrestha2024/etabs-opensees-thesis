@@ -34,12 +34,31 @@ def frame_solver_tag_catalog(frames):
     ]
 
 
-def support_resultants(ops, support_nodes):
-    """Return signed summed support reactions; call after each converged state."""
+def support_resultants(ops, support_nodes, *, vectorized=False):
+    """Return signed support reactions in kN/kNm after calling reactions().
+
+    vectorized=False preserves the established six-DOF query path.
+    The opt-in vector path uses nodeReaction(nodeTag) to request all
+    reaction components in one call, rather than six scalar calls.
+    It requires six-DOF nodes; it will not silently omit moments.
+    Verify response equivalence before project production use.
+    """
     supports = [int(node) for node in support_nodes]
     if not supports:
         raise ValueError("At least one support node is required for reaction recording.")
     ops.reactions()
+    if vectorized:
+        result = [0.0] * len(REACTION_COMPONENTS)
+        for node in supports:
+            values = ops.nodeReaction(node)
+            if len(values) < len(result):
+                raise ValueError(
+                    f"Node {node} returned {len(values)} reaction DOFs; "
+                    "six required for six-component base-shear recording."
+                )
+            for i in range(len(result)):
+                result[i] += float(values[i])
+        return dict(zip(REACTION_COMPONENTS, result))
     values = [sum(float(ops.nodeReaction(node, dof)) for node in supports)
               for dof in range(1, 7)]
     return dict(zip(REACTION_COMPONENTS, values))
@@ -75,9 +94,9 @@ def write_recorder_index(output_dir, analysis, files, notes=(),
     return target
 
 
-def append_base_shear(row, ops, support_nodes, baseline=None):
+def append_base_shear(row, ops, support_nodes, baseline=None, *, vectorized=False):
     """Add signed incremental base shears and six support resultants to a sample."""
-    current = support_resultants(ops, support_nodes)
+    current = support_resultants(ops, support_nodes, vectorized=vectorized)
     reference = baseline or {}
     for key, value in current.items():
         row[key] = value - float(reference.get(key, 0.0))
