@@ -165,7 +165,10 @@ def _run_material_sensitivity(config):
     # baseline material was literature-derived. Distinguish source values,
     # transferred values, model assumptions and deliberately varied inputs.
     from components.nonlinear_time_history.material_source_sets import (
-        WALL_KEYS,FRAME_OVERRIDE_TARGETS,baseline_values,source_table,
+        WALL_KEYS,baseline_values,source_table,
+    )
+    from components.nonlinear_time_history.research_building_materials import (
+        FRAME_OVERRIDE_TARGETS,
     )
     material_basis=config.get('material_basis','PUBLISHED_REFERENCE')
     material_transition=config.get('steelmpf_transition','OPENSEES_DOCUMENTED')
