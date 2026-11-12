@@ -2,10 +2,10 @@ name: Repository compilation and navigation
 
 on:
   pull_request:
-    paths: ['*.py', 'components/**', 'tools/**', 'tests/**', 'docs/**', '00_READ_FIRST_RUN_ORDER.md', '.github/workflows/repository-integrity.yml']
+    paths: ['*.py', 'components/**', 'tools/**', 'tests/**', 'docs/**', 'KNOWLEDGE_BASE/**', '00_READ_FIRST_RUN_ORDER.md', '.github/workflows/repository-integrity.yml']
   push:
     branches: [main]
-    paths: ['*.py', 'components/**', 'tools/**', 'tests/**', 'docs/**', '00_READ_FIRST_RUN_ORDER.md', '.github/workflows/repository-integrity.yml']
+    paths: ['*.py', 'components/**', 'tools/**', 'tests/**', 'docs/**', 'KNOWLEDGE_BASE/**', '00_READ_FIRST_RUN_ORDER.md', '.github/workflows/repository-integrity.yml']
   workflow_dispatch:
 
 permissions:
@@ -34,6 +34,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_gravity_organized_case_index_v172.py' -v
           python -m unittest discover -s tests -p 'test_linear_reaction_vectorization.py' -v
           python -m unittest tests.verify_readiness_dashboard -v
+          python -m unittest discover -s tests -p 'test_knowledge_map.py' -v
+          python tools/audit_knowledge_map.py
       - name: Archive static inventory (not engineering validation)
         if: always()
         uses: actions/upload-artifact@v4
