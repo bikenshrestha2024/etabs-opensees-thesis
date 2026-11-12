@@ -359,7 +359,9 @@ class GravityAnalysisGUI:
         These colors describe the process only. Green is not an
         engineering validation, even if internal equilibrium passes.
         """
-        self.gravity_operation_state.set(state+" | "+str(detail))
+        self.gravity_operation_state.set(
+            state+" | "+str(detail)+
+            " | PROCESS STATUS ONLY — ETABS equivalence not inferred")
         colors={
             "RUNNING":("#155e75","#e0f2fe"),
             "FINISHED":("#166534","#dcfce7"),
@@ -1181,8 +1183,6 @@ class GravityAnalysisGUI:
                       self._compare_three_saved_cases,0,1)
         action_button(results_page,"Organize existing 32 / 76 / 97 outputs",
                       self._organize_existing_gravity_cases,1,0)
-        action_button(results_page,"Inspect reactions at selected nodes",
-                      self._select_reaction_nodes,1,1)
         action_button(verification_page,"Audit support DOFs and rigid zones",
                       self._audit_native_equivalence,0,0)
         action_button(verification_page,"Extract ETABS and compare gravity",
