@@ -5,8 +5,25 @@ from OpenSees_Timing_V130 import timed_outputs
 
 
 def saved_cases(folder):
-    folder=Path(folder);paths=[folder/'MRSM_Results_V132.json'] if (folder/'MRSM_Results_V132.json').is_file() else sorted(folder.rglob('MRSM_Results_V132.json'))
-    return [(path,key,case) for path in paths for key,case in json.loads(path.read_text(encoding='utf-8-sig')).items()]
+    """Read physical MRSM results once; exclude duplicated review/export copies."""
+    folder=Path(folder)
+    if (folder/'MRSM_Results_V132.json').is_file():
+        paths=[folder/'MRSM_Results_V132.json']
+    else:
+        paths=[folder/('MRSM_'+state)/'MRSM_Results_V132.json'
+               for state in ('ULS','SLS')]
+        paths=[p for p in paths if p.is_file()]
+        if not paths:
+            paths=[p for p in sorted(folder.rglob('MRSM_Results_V132.json'))
+                   if not any(part in ('Seismic_Review_Packages','Organized_Results',
+                                       'Gravity_Evidence_Upload','ETABS_Comparison_V148')
+                              for part in p.relative_to(folder).parts)]
+    unique={}
+    for path in paths:
+        for key,case in json.loads(path.read_text(encoding='utf-8-sig')).items():
+            identifier=(case.get('limit_state'),key,case.get('model_sha256'))
+            if identifier not in unique:unique[identifier]=(path,key,case)
+    return list(unique.values())
 
 
 def figures(cases):
@@ -19,7 +36,7 @@ def figures(cases):
         for key,r in rows:
             z=[v['height_m'] for v in r['stories']];label=r['axis']+' | '+('centered' if r.get('accidental_eccentricity_sign',0)==0 else 'e=+5% b' if r['accidental_eccentricity_sign']>0 else 'e=-5% b');style={0:'-',1:'--',-1:':'}[r.get('accidental_eccentricity_sign',0)]
             axes[0].plot([v['scaled_story_shear_kN'] for v in r['stories']],z,ls=style,label=label);axes[1].plot([v['design_drift_ratio'] for v in r['stories']],z,ls=style,label=label)
-        axes[0].set(xlabel='Scaled storey shear (kN)',ylabel='Height above base (m)',title=state+' MRSM actions');axes[1].set(xlabel='Design edge drift ratio',ylabel='Height above base (m)',title=state+' drift; force scale is not applied');axes[1].axvline(.006 if state=='SLS' else .025,color='black',ls='--',label='NBC drift limit')
+        axes[0].set(xlabel='Scaled storey shear (kN)',ylabel='Height above base (m)',title=state+' MRSM actions');axes[1].set(xlabel='Design edge drift ratio',ylabel='Height above base (m)',title=state+' NBC §5.5 design drift; force scale excluded');axes[1].axvline(.006 if state=='SLS' else .025,color='black',ls='--',label='NBC drift limit')
         for ax in axes:ax.grid(alpha=.25);ax.legend(fontsize=8)
         items.append((state+' MRSM: shear and drift',fig))
     comparison=Figure(figsize=(12,10),layout='constrained');grid=comparison.subplots(3,2,sharey='row',sharex='row')
@@ -58,11 +75,32 @@ def export_reports(folder):
     summary.append(headers);storey=wb.create_sheet('Storey response');storey.append(['State','Case','Storey','Height (m)','Scaled shear (kN)','Elastic master drift','Design edge drift','Design master drift','Drift limit','Drift status'])
     modal=wb.create_sheet('Modal response');modal.append(['State','Case','Mode','Period (s)','Frequency (Hz)','Signed modal base shear (kN)','UX mode (%)','UY mode (%)','RZ mode (%)','UX cumulative (%)','UY cumulative (%)'])
     nodes=wb.create_sheet('Nodal 6DOF');nodes.append(['State','Case','OpenSees node','X (m)','Y (m)','Z (m)','Ux (m)','Uy (m)','Uz (m)','Rx (rad)','Ry (rad)','Rz (rad)','Scope'])
+    derivation=wb.create_sheet('NBC 5.5 Deflections')
+    derivation.append(['NBC §5.5.1-5.5.3','Elastic MRSM displacement is unamplified',
+                       'ULS design displacement = Rmu × elastic; SLS design=elastic',
+                       'Effective stiffness §3.4 and native equivalence need review'])
+    derivation.append(['State','Case','Floor','Elevation m','Elastic master U m',
+                       'Design master U m','Observed design/elastic factor',
+                       'Elastic drift ratio','Design edge drift ratio','Limit',
+                       'Numerical drift status','Code acceptance status'])
     chart_index=0
     for path,key,r in cases:
         limit=.006 if r['limit_state']=='SLS' else .025;maxdrift=max(v['design_drift_ratio'] for v in r['stories']);summary.append([r['limit_state'],r['axis'],key,r.get('accidental_eccentricity_sign',0),r['unscaled_modal_base_shear_kN'],r['reference_ESM_base_shear_kN'],r['force_scale'],r['scaled_modal_base_shear_kN'],maxdrift,limit,r['mass_participation_percent'],r['status'],str(path)])
         first=storey.max_row+1
-        for v in r['stories']:storey.append([r['limit_state'],key,v['story_number'],v['height_m'],v['scaled_story_shear_kN'],v['elastic_drift_ratio'],v['design_drift_ratio'],v.get('master_design_drift_ratio'),limit,'PASS' if v['design_drift_ratio']<=limit else 'EXCEEDS'])
+        for v in r['stories']:
+            storey.append([r['limit_state'],key,v['story_number'],v['height_m'],
+                          v['scaled_story_shear_kN'],v['elastic_drift_ratio'],
+                          v['design_drift_ratio'],v.get('master_design_drift_ratio'),
+                          limit,'WITHIN NUMERICAL LIMIT' if v['design_drift_ratio']<=limit else 'EXCEEDS'])
+            elastic=v.get('elastic_displacement_m')
+            design=v.get('design_displacement_m')
+            factor=(float(design)/float(elastic)
+                    if elastic not in (None,0) and design is not None else None)
+            derivation.append([r['limit_state'],key,v['story_number'],v['height_m'],
+                               elastic,design,factor,v['elastic_drift_ratio'],
+                               v['design_drift_ratio'],limit,
+                               'WITHIN NUMERICAL LIMIT' if v['design_drift_ratio']<=limit else 'EXCEEDS',
+                               'OPEN: effective stiffness, source native equivalence and site proof'])
         if len(r['stories'])>1 and not r.get('accidental_eccentricity_sign',0):
             chart=ScatterChart();chart.title=r['limit_state']+' '+key+' storey shear';chart.x_axis.title='kN';chart.y_axis.title='Height (m)';chart.width=16;chart.height=10;chart.series.append(Series(Reference(storey,min_col=4,min_row=first,max_row=storey.max_row),Reference(storey,min_col=5,min_row=first,max_row=storey.max_row),title=key));summary.add_chart(chart,'O'+str(5+chart_index*20));chart_index+=1
         for i,v in enumerate(r['modal_rows']):modal.append([r['limit_state'],key,v['mode'],v['period_s'],v.get('frequency_Hz'),r['modal_base_shears_kN'][i],v.get('UX_participation_percent'),v.get('UY_participation_percent'),v.get('RZ_participation_percent'),v.get('UX_cumulative_percent'),v.get('UY_cumulative_percent')])
@@ -73,7 +111,7 @@ def export_reports(folder):
                 u=d['displacements'].get(tag,[]);nodes.append([r['limit_state'],key,int(tag),*xyz,*[u[i] if i<len(u) and i<len(mask) and mask[i] else None for i in range(6)],'Non-concurrent positive CQC design component envelopes; missing legacy rotations left blank'])
     sources=wb.create_sheet('Sources and units');sources.append(['Source','Meaning']);sources.append(['https://ebps.kathmandu.gov.np/UploadFiles/NBC_105_2025_Sesmic_Design.pdf','NBC sections 4, 5.5.3 and 7']);sources.append(['https://opensees.github.io/OpenSeesDocumentation/user/manual/analysis/responseSpectrumAnalysis.html','Native modal responses combined with CQC']);sources.append(['kN-m-s; rotations rad','Dimensionless Cd converted to m/s2 using standard gravity 9.80665; displayed node translation envelopes are in metres.']);sources.append(['Case summary / Source JSON','Per-case numerical provenance; full member action and support diagnostics remain in sibling CSV files.'])
     for ws in wb:
-        header=5 if ws==summary else 1;ws.freeze_panes='A'+str(header+1);ws.auto_filter.ref=f'A{header}:{ws.cell(ws.max_row,ws.max_column).coordinate}'
+        header=5 if ws==summary else 2 if ws==derivation else 1;ws.freeze_panes='A'+str(header+1);ws.auto_filter.ref=f'A{header}:{ws.cell(ws.max_row,ws.max_column).coordinate}'
         for c in ws[header]:c.font=Font(bold=True,color='FFFFFF');c.fill=PatternFill('solid',fgColor='16334C')
         for col in ws.columns:ws.column_dimensions[col[0].column_letter].width=22
         if ws==summary:ws.column_dimensions['M'].width=65
