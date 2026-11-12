@@ -23,7 +23,7 @@ class DocumentationCoverageTests(unittest.TestCase):
             self.assertEqual(result["status"], "COMPONENT_GUIDE_PATHS_COMPLETE")
             self.assertEqual(result["groups"]["components"]["guides_present_nonempty"], 1)
             self.assertEqual(result["groups"]["tests"]["guides_missing_or_empty"], 1)
-            self.assertIn("NOT", result["limitations"])
+            self.assertIn("require human", result["limitations"])
 
     def test_empty_and_missing_guides_are_not_complete(self):
         with tempfile.TemporaryDirectory() as name:
