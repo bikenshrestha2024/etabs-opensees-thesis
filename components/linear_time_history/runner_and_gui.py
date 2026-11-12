@@ -210,7 +210,36 @@ def _run_analysis(config):
                 nsteps = int(math.ceil(duration / dt))
                 # SECTION 18.4 — NBC-limited integration step and linear Newmark stack.
                 ops.wipeAnalysis(); ops.constraints("Transformation"); ops.numberer("RCM")
-                ops.system("UmfPack"); ops.algorithm("Linear")
+                ops.system("UmfPack")
+                # Opt-in constant-effective-matrix acceleration. Factor reuse is
+                # valid only when the assembled effective matrix remains unchanged;
+                # elastic constitutive behavior and fixed Newmark dt are necessary,
+                # but must also be confirmed on the project model. The default is
+                # deliberately the original, unfactored run for comparison.
+                factor_once_requested = config.get("linear_factor_once_experimental", False)
+                if not isinstance(factor_once_requested, bool):
+                    raise ValueError("linear_factor_once_experimental must be a JSON boolean.")
+                constant_steps = math.isclose(
+                    nsteps * dt, duration, rel_tol=1e-10, abs_tol=1e-8
+                )
+                if factor_once_requested and not constant_steps:
+                    raise ValueError(
+                        "Factor-once requires a constant dt for all steps; "
+                        "this record has a shortened final step. Use the baseline solver."
+                    )
+                if factor_once_requested and not config.get("elastic_constant_tangent_verified", False):
+                    raise ValueError(
+                        "Factor-once requires explicit elastic_constant_tangent_verified=true; "
+                        "no nonlinear elements, changing stiffness, or iteration-dependent "
+                        "damping terms may remain."
+                    )
+                if factor_once_requested:
+                    ops.algorithm("Linear", "-factorOnce")
+                    print(f"[SOLVER EXPERIMENTAL] {case}: UmfPack Linear -factorOnce; "
+                          "requires independent response equivalence verification", flush=True)
+                else:
+                    ops.algorithm("Linear")
+                    print(f"[SOLVER BASELINE] {case}: UmfPack Linear (no factor reuse)", flush=True)
                 ops.integrator("Newmark", 0.5, 0.25); ops.analysis("Transient")
                 # SECTION 18.5 — Record floor response at every accepted step.
                 gravity_offsets={s["node"]:list(ops.nodeDisp(s["node"])) for s in stories}
@@ -223,7 +252,9 @@ def _run_analysis(config):
                 for step in range(nsteps):
                     dt_this=min(dt,max(0.,duration-float(ops.getTime())))
                     if dt_this<=1e-12:break
+                    solve_step_started = time.perf_counter()
                     rc = ops.analyze(1, dt_this)
+                    profiler.stages["native_transient_solve"] = (profiler.stages.get("native_transient_solve", 0.0) + time.perf_counter() - solve_step_started)
                     profiler.internal_steps+=1
                     sample_clock=time.perf_counter()
                     if rc != 0: raise RuntimeError(f"Transient step {step + 1}/{nsteps} failed with OpenSees code {rc} at t={ops.getTime():.6f}s.")
@@ -250,6 +281,10 @@ def _run_analysis(config):
                         print(f"[PROGRESS] {case}: {step + 1}/{nsteps} steps, t={ops.getTime():.3f}s", flush=True)
                         profiler.progress(step+1,nsteps);stream.flush();next_progress_at=time.perf_counter()+10.
                 profiler.add('transient_with_recording',profiler.solve_clock)
+                profiler.solver_diagnostics['linear_factor_once_experimental'] = factor_once_requested
+                profiler.solver_diagnostics['constant_dt'] = constant_steps
+                profiler.solver_diagnostics['native_solve_seconds'] = profiler.stages.get('native_transient_solve', 0.0)
+                profiler.solver_diagnostics['recorder_seconds'] = profiler.sample_seconds
                 phase_clock=time.perf_counter()
                 # SECTION 18.6 — Save case history and response/drift summary.
                 csv_path = out / f"NBC105_LTH_{case}_history.csv"
