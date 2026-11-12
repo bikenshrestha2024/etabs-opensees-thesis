@@ -96,6 +96,9 @@ def _candidates(root, name):
 def discover_project_model(folder):
     """Find a unique, conventional nonlinear builder inside the selected project.
 
+    [REF docs/programs/02_NONLINEAR_READINESS_EVIDENCE_DASHBOARD.md]
+    Local builder discovery is a UI convenience and confers no approval.
+
     Selection is for *inspection only*, never an approval. Do not recursively
     search output folders or choose among multiple candidates automatically.
     A caller must ask the user to select explicitly when more than one exists.
