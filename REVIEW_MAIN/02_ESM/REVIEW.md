@@ -1,3 +1,5 @@
+> **12 November 2026 — ESM UI, combined categorized exports and ETABS mapping safety:** [Latest evidence and correction record](20261112_ESM_GUI_EXPORT_CASE_MAPPING_AND_JOINT_GATES.md). Applied-force charts are not recovered ETABS story shear; native source EDB identity and 6m/12m Aw grouping remain open. The ESM review snapshot is deliberately copy-only and non-certified.
+
 # ESM review — NBC 105:2025 Aw, periods and applicability
 **RV-ESM-001 Aw-X opening mismatch:** P0 OPEN_HIGH
 **RV-ESM-002 ESM case provenance / source identity:** P0 OPEN_HIGH

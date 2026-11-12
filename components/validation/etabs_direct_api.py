@@ -92,6 +92,12 @@ def _finite(value,label):
 
 def validate_mapping(mapping):
     """Explicit ETABS→OpenSees case/point identities, no fuzzy case guessing."""
+    if not isinstance(mapping, dict):
+        raise ValueError(
+            "Selected file is not an ETABS case-and-story mapping JSON object. "
+            "A list of nodes, results or metadata is not a verified case mapping. "
+            "Generate ETABS_API_Mapping_TEMPLATE.json in the comparison window, "
+            "fill its actual ETABS case/story identifiers, and reselect it.")
     cases=mapping.get("cases")
     if not isinstance(cases,list) or not cases:
         raise ValueError("Provide at least one explicit ETABS case mapping.")

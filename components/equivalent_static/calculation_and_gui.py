@@ -522,6 +522,7 @@ class ESMGui:
             self.status.set('SOURCE STATE REQUIRES REVIEW: '+detected_note+' | ULS shown as a UI default only; verify the actual .EDB before calculation.')
         self.state.trace_add('write',lambda *_:self._state_changed())
         self.direction.trace_add('write',lambda *_: self._direction_changed())
+        self.esm_module.trace_add('write',lambda *_:self._esm_module_changed())
         # ETABS is an optional comparison source; on-start ROT attachment can
         # fail with WinError -2147221021 even when workbook/geometry inputs are
         # valid. Do not automatically obscure input diagnostics with a COM error.
@@ -530,13 +531,75 @@ class ESMGui:
         self.rayleigh_tx.trace_add('write',lambda *_:self._show_empirical())
         self.rayleigh_ty.trace_add('write',lambda *_:self._show_empirical())
 
+    def _esm_module_changed(self):
+        """Avoid a stale OpenSees Run button when ETABS-linked mode is selected."""
+        if getattr(self,"_esm_running",False):
+            return
+        linked=self.esm_module.get()=="ETABS Linked Equivalent Static"
+        self.run_button.configure(
+            state="disabled" if linked or not self.last_runners or
+                  not Path(self.model_script.get()).is_file() else "normal")
+        if linked:
+            self.status.set("ETABS-linked workbook reference selected. "
+                "An original workbook run does not itself solve ETABS seismic response. "
+                "Use the mapping-gated ETABS comparison for native solved cases.")
+
     def _set_esm_operation(self,state,detail=""):
-        """Main Tk thread only; independent of verbose console status."""
-        self.esm_operation_state.set(str(state)+" | "+str(detail))
+        """Process-only indication, independent from NBC design acceptance."""
+        self.esm_operation_state.set(
+            str(state)+" | "+str(detail)+
+            " | PROCESS ONLY — NBC / ETABS validation separate")
+        palette={
+            "RUNNING":("#155e75","#e0f2fe"),
+            "EXPORTING":("#155e75","#e0f2fe"),
+            "FINISHED":("#166534","#dcfce7"),
+            "EXPORTED":("#166534","#dcfce7"),
+            "CANCELLED":("#92400e","#fef3c7"),
+            "BLOCKED":("#991b1b","#fee2e2"),
+            "FAILED":("#991b1b","#fee2e2"),
+            "IDLE":("#374151","#f3f4f6"),
+        }
+        if hasattr(self,"esm_operation_badge"):
+            fg,bg=palette.get(state,palette["IDLE"])
+            self.esm_operation_badge.configure(fg=fg,bg=bg)
         if state in ("RUNNING","EXPORTING"):
             self.esm_busy_bar.start(12)
         else:
             self.esm_busy_bar.stop()
+
+    def _export_combined_results(self):
+        """Snapshot, classify and consolidate both ESM module results without moving sources."""
+        if getattr(self,"_esm_combined_export_busy",False):
+            self.status.set("ESM combined export already running. Inspect ESM_Organized.")
+            return
+        self._esm_combined_export_busy=True
+        self._set_esm_operation("EXPORTING","Preparing categorized ESM Excel and ZIP")
+        root=Path(self.outdir.get())
+        def worker():
+            try:
+                from components.equivalent_static.organized_exports import build_combined_esm_export
+                report=build_combined_esm_export(root)
+                def done():
+                    self._esm_combined_export_busy=False
+                    self._set_esm_operation("EXPORTED","Combined result workbook and ZIP saved")
+                    self.status.set("ESM COMBINED EXPORTED | Excel: "+report["workbook"]+
+                                    " | ZIP: "+report["zip"]+" | manifest: "+report["manifest"])
+                    messagebox.showinfo("ESM combined results",
+                        "Combined Excel:\n"+report["workbook"]+
+                        "\n\nCategorized review ZIP:\n"+report["zip"]+
+                        "\n\nThis report does not imply source-matched ETABS or NBC acceptance.",
+                        parent=self.root)
+                self.root.after(0,done)
+            except Exception as exc:
+                reason=str(exc)
+                def fail():
+                    self._esm_combined_export_busy=False
+                    self._set_esm_operation("FAILED","Combined ESM export: "+reason)
+                    self.status.set("ESM combined export failed: "+reason)
+                    messagebox.showerror("ESM combined export",reason,parent=self.root)
+                self.root.after(0,fail)
+        threading.Thread(target=worker,daemon=True).start()
+
 
     def _auto_bundle_seismic_review(self):
         """Package current ETABS-linked and OpenSees ESM evidence automatically.
@@ -559,7 +622,10 @@ class ESMGui:
                 result=bundle_seismic_review(source,output,method="ESM")
                 def finished():
                     self._review_bundle_running=False
-                    self._set_esm_operation("EXPORTED","Complete ESM ZIP: "+result["zip"])
+                    prior=getattr(self,"_esm_last_batch_state",None)
+                    self._set_esm_operation(
+                        prior if prior in ("CANCELLED","BLOCKED") else "EXPORTED",
+                        "Evidence ZIP created (batch acceptance unchanged): "+result["zip"])
                     self.status.set(self.status.get()+
                         "\\n[ESM_AUTO_REVIEW_ZIP] "+result["zip"])
                 self.root.after(0,finished)
@@ -727,46 +793,80 @@ class ESMGui:
         ttk.Entry(parent,textvariable=var,width=width).grid(row=row,column=col+1,sticky="ew",padx=5,pady=4)
 
     def _build(self):
-        # Persistent actions remain visible; only the long input form scrolls.
-        footer=ttk.Frame(self.root,padding=8);footer.pack(side='bottom',fill='x')
-        ttk.Button(footer,text='1. Calculate + export',command=self._calculate).pack(side='left',padx=3)
-        ttk.Button(footer,text='ETABS Excel (historical calculation)',command=self._run_etabs_linked).pack(side='left',padx=3)
-        ttk.Button(footer,text='Auto compare ETABS / OpenSees (verified)',
-                   command=lambda:__import__(
-                       'components.validation.etabs_comparison',
-                       fromlist=['launch']).launch(
-                           self.root,self.export_dir,
-                           results_root=self.outdir.get())).pack(side='left',padx=3)
-        self.run_button=ttk.Button(footer,text='2. Run exported cases',command=self._run_generated,state='disabled');self.run_button.pack(side='left',padx=3)
-        self.esm_cancel_button=ttk.Button(footer,text='Cancel ESM batch',command=self._cancel_generated,state='disabled');self.esm_cancel_button.pack(side='left',padx=3)
-        ttk.Button(footer,text='Open output folder',command=self._open_export_folder).pack(side='left',padx=3)
-        ttk.Button(footer,text='Plots…',command=self._view_plots).pack(side='left',padx=3)
-        ttk.Button(footer,text='Excel sources…',command=self._choose_workbooks).pack(side='left',padx=3)
-        ttk.Button(footer,text='Historical Excel Aw/T (reference)',command=self._use_explicit_excel_calculation).pack(side='left',padx=3)
-        ttk.Button(footer,text='Audit Excel vs continuous-pier Aw',command=self._audit_wall_aw).pack(side='left',padx=3)
-        ttk.Button(footer,text='Verify 2×12m Aw from exported nodes',
-                   command=lambda:self._sync_opensees_inputs(etabs=False)
-                   ).pack(side='left',padx=3)
-        ttk.Button(footer,text='Manual wall grouping template (fallback)',
-                   command=self._export_grouped_wall_aw_template).pack(side='left',padx=3)
-        ttk.Button(footer,text='Why are Aw/period fields blank?',command=self._show_source_diagnostics).pack(side='left',padx=3)
-        ttk.Button(footer,text='Sync from OpenSees model',command=self._sync_opensees_inputs).pack(side='left',padx=3)
-        ttk.Button(footer,text='Check live ETABS geometry (read-only)',command=lambda:self._sync_opensees_inputs(etabs=True)).pack(side='left',padx=3)
-        ttk.Button(footer,text='Preliminary Rayleigh run (X/Y)',command=self._run_rayleigh).pack(side='left',padx=3)
-        ttk.Button(footer,text='Complete ESM export ZIP (all evidence)',
-                   command=self._bundle_esm_evidence).pack(side='left',padx=3)
-        ttk.Button(footer,text='Export categorized module ZIPs',
-                   command=self._export_organized_evidence).pack(side='left',padx=3)
-
-        for button in footer.winfo_children():button.pack_forget()
-        for index,button in enumerate(footer.winfo_children()):
-            button.grid(row=index//3,column=index%3,sticky='ew',padx=3,pady=3)
-        for column in range(3):footer.columnconfigure(column,weight=1)
-        self.esm_busy_bar=ttk.Progressbar(footer,mode='indeterminate')
-        self.esm_busy_bar.grid(row=5,column=0,columnspan=3,sticky='ew',padx=6,pady=2)
-        ttk.Label(footer,textvariable=self.esm_operation_state,
-                  wraplength=920).grid(row=5,column=0,columnspan=3,
-                                       sticky='w',padx=6,pady=2)
+        # Purpose-grouped actions, consistent with the Gravity module.
+        # Keep only the three primary execution actions visible at all times.
+        footer=ttk.Frame(self.root,padding=8)
+        footer.pack(side="bottom",fill="x")
+        quick=ttk.Frame(footer);quick.pack(fill="x",pady=(0,4))
+        for n in range(4):quick.columnconfigure(n,weight=1,uniform="esmprimary")
+        self.esm_calculate_button=ttk.Button(
+            quick,text="Calculate + export NBC forces",command=self._calculate)
+        self.esm_calculate_button.grid(row=0,column=0,sticky="ew",padx=3)
+        self.run_button=ttk.Button(
+            quick,text="Run exported OpenSees cases",command=self._run_generated,
+            state="disabled")
+        self.run_button.grid(row=0,column=1,sticky="ew",padx=3)
+        self.esm_cancel_button=ttk.Button(
+            quick,text="Stop running batch",command=self._cancel_generated,
+            state="disabled")
+        self.esm_cancel_button.grid(row=0,column=2,sticky="ew",padx=3)
+        self.esm_combined_export_button=ttk.Button(
+            quick,text="Export combined Excel + ZIP",
+            command=self._export_combined_results)
+        self.esm_combined_export_button.grid(row=0,column=3,sticky="ew",padx=3)
+        actions=ttk.Notebook(footer)
+        actions.pack(fill="x",padx=3,pady=(0,4))
+        linked=ttk.Frame(actions,padding=5)
+        sources=ttk.Frame(actions,padding=5)
+        evidence=ttk.Frame(actions,padding=5)
+        actions.add(linked,text="ETABS comparison")
+        actions.add(sources,text="Wall / period sources")
+        actions.add(evidence,text="Plots, reports and files")
+        def action(parent,text,callback,row,column):
+            return ttk.Button(parent,text=text,command=callback).grid(
+                row=row,column=column,sticky="ew",padx=4,pady=3)
+        for pane in (linked,sources,evidence):
+            pane.columnconfigure(0,weight=1,uniform="esmactions")
+            pane.columnconfigure(1,weight=1,uniform="esmactions")
+        action(linked,"Run linked ETABS Excel (reference)",self._run_etabs_linked,0,0)
+        action(linked,"Compare ETABS / OpenSees (source-verified)",
+               lambda:__import__(
+                   "components.validation.etabs_comparison",
+                   fromlist=["launch"]).launch(
+                       self.root,self.export_dir,results_root=self.outdir.get()),0,1)
+        action(linked,"Read-only ETABS wall geometry",
+               lambda:self._sync_opensees_inputs(etabs=True),1,0)
+        action(linked,"Historical Excel Aw / T comparison",
+               self._use_explicit_excel_calculation,1,1)
+        action(sources,"Run directional Rayleigh X / Y",
+               self._run_rayleigh,0,0)
+        action(sources,"Review grouped wall Aw from exported mesh",
+               lambda:self._sync_opensees_inputs(etabs=False),0,1)
+        action(sources,"Audit Excel vs continuous-pier Aw",
+               self._audit_wall_aw,1,0)
+        action(sources,"Manual wall grouping template",
+               self._export_grouped_wall_aw_template,1,1)
+        action(sources,"Select Excel/source workbooks",
+               self._choose_workbooks,2,0)
+        action(sources,"Source / missing-input diagnostics",
+               self._show_source_diagnostics,2,1)
+        action(sources,"Sync model inputs (read-only)",
+               self._sync_opensees_inputs,3,0)
+        action(evidence,"View ESM plots",
+               self._view_plots,0,0)
+        action(evidence,"Open results folder",
+               self._open_export_folder,0,1)
+        action(evidence,"Bundle all ESM evidence ZIP",
+               self._bundle_esm_evidence,1,0)
+        action(evidence,"Export all-module review ZIPs",
+               self._export_organized_evidence,1,1)
+        self.esm_busy_bar=ttk.Progressbar(footer,mode="indeterminate")
+        self.esm_busy_bar.pack(fill="x",padx=5,pady=(0,3))
+        self.esm_operation_badge=tk.Label(
+            footer,textvariable=self.esm_operation_state,
+            fg="#374151",bg="#f3f4f6",anchor="w",
+            font=("Segoe UI",10,"bold"),padx=8,pady=4,wraplength=1100)
+        self.esm_operation_badge.pack(fill="x",padx=5,pady=(0,2))
         from OpenSees_Research_UI_V123 import scrollable_form
         top=scrollable_form(self.root)
         ttk.Label(top,text="NBC 105:2025 EQUIVALENT STATIC ANALYSIS",font=("Segoe UI",16,"bold")).pack(anchor="w")
@@ -1791,7 +1891,7 @@ class ESMGui:
                     failures.append(f"{state}: {state_exc}")
             if not made: raise ValueError("No case was calculated. " + " | ".join(failures))
             elapsed=time.perf_counter()-started
-            files=", ".join(Path(p).name for p in made)
+            files=f"{len(made)} artifacts; saved under "+str(Path(self.outdir.get()))+"; use Export combined Excel + ZIP for a categorized index"
             note=("\nBlocked cases: " + " | ".join(failures)) if failures else ""
             self._set_esm_operation("FINISHED",
                 str(len(self.last_runners))+" ESM case scripts generated | "+
@@ -1813,6 +1913,8 @@ class ESMGui:
                 proc.terminate()
             except OSError:
                 pass
+        self._set_esm_operation("CANCELLED",
+            "Cancellation requested; active solver ending; saved evidence retained")
         self.status.set("Cancellation requested. Current case is stopping; earlier evidence is retained.")
 
     def _run_generated(self):
@@ -1835,6 +1937,7 @@ class ESMGui:
             messagebox.showerror("Missing exported cases", "\n".join(missing))
             return
         self._esm_cancel_requested = False
+        self._esm_last_batch_state = None
         self._esm_running = True
         self._esm_active_proc = None
         self._esm_case_started = None
@@ -1929,6 +2032,17 @@ class ESMGui:
                     if status in ("CANCELLED", "TIMEOUT"):
                         break
             finally:
+                if len(outcomes)<len(scripts):
+                    missing_status=("SKIPPED_CANCELLED" if self._esm_cancel_requested
+                                    else "NOT_RUN")
+                    for script in scripts[len(outcomes):]:
+                        outcomes.append({
+                            "case":script.name,"status":missing_status,
+                            "return_code":None,"log":None,"elapsed_s":0.0,
+                            "error":"Not launched; batch incomplete. No solver result.",
+                        })
+                    state_file.write_text(
+                        json.dumps(outcomes,indent=2),encoding="utf-8")
                 def done():
                     self._esm_running = False
                     self._esm_active_proc = None
@@ -1936,9 +2050,15 @@ class ESMGui:
                     self.esm_cancel_button.configure(state="disabled")
                     passed = sum(x["status"] == "SUCCESS" for x in outcomes)
                     completed = len(outcomes) == len(scripts) and passed == len(scripts)
-                    self._set_esm_operation("FINISHED" if completed else "BLOCKED",
+                    process_state=("FINISHED" if completed else
+                                   "CANCELLED" if self._esm_cancel_requested else "BLOCKED")
+                    self._esm_last_batch_state=process_state
+                    self._set_esm_operation(process_state,
                         f"{passed}/{len(scripts)} returned exit 0 | {state_file}")
-                    self.status.set("ESM batch complete. Status manifest: " + str(state_file))
+                    self.status.set(
+                        ("ESM batch cancelled; incomplete cases retained. " if
+                         process_state=="CANCELLED" else "ESM batch completed. ")
+                        +"Status manifest: "+str(state_file))
                     self._auto_bundle_seismic_review()
                     if completed:
                         messagebox.showinfo("ESM child processes finished",
