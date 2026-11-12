@@ -20,3 +20,7 @@ Source PDFs were supplied by the user for private review. Public repository cont
 - **Wall-pier coupling and spandrel design:** R03 and NBC 105 §§5.5–5.6, not an alternative empirical period formula.
 - **Period may depart from empirical prediction:** R04/R05.
 - **Two 12m X wall lines:** current ETABS user-supplied **screenshots only**, native first-storey EDB inspection outstanding.
+
+## Additional uploaded RC research — 12 November 2026
+
+See [20261112_ADDITIONAL_RC_SOURCES_REVIEW.md](20261112_ADDITIONAL_RC_SOURCES_REVIEW.md) for the detailed register of Lee, Chang & Chun (2000); Fares (2018); SEAOC Blue Book (1999); Hsiao (2014); Kim & Lee (2003); and Daniel, Shiu & Corley (1986), together with applicability limits and previously known duplicate editions. All source PDFs remain outside this public repository; the private manifest records full SHA256 and PDF pages. **No change to the selected two-12m X-wall Aw calculation.**
