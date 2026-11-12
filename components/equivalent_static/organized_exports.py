@@ -180,7 +180,9 @@ def _combined_workbook(target, cases, stories, manifest):
 
 
 def build_combined_esm_export(output_root):
-    """Return copy-only artifact paths. Never edit input EDB, XLSX, model or case."""
+    """[REF docs/source/components/equivalent_static/organized_exports.py.md]
+    Return copy-only artifact paths. Never edit input EDB, XLSX, model or case.
+    """
     root = Path(output_root).expanduser().resolve(strict=True)
     selected = list(_source_files(root))
     if not selected:
