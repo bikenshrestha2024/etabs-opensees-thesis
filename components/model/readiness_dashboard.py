@@ -140,6 +140,15 @@ def audit(folder, model_script=None):
     root = Path(folder).expanduser().resolve()
     model = Path(model_script).expanduser().resolve() if model_script else None
     draft, draft_state = _load_draft(model)
+    # A signed draft must belong to the current project's exact model.
+    # A manually selected file from another project can be inspected, but
+    # may not assert readiness using unrelated project evidence.
+    model_within_project = bool(
+        model is not None and model.is_file() and model.is_relative_to(root)
+    )
+    if model is not None and not model_within_project:
+        draft = None
+        draft_state = "MODEL_OUTSIDE_PROJECT_OR_MISSING"
     # One SHA-256 read per distinct evidence path per audit. Repeated
     # workstreams share source files; caching a digest within this immutable
     # report avoids redundant disk IO without reusing hashes across refreshes.
@@ -167,17 +176,25 @@ def audit(folder, model_script=None):
             "The X-only first-step instability remains unresolved until native solver evidence confirms a fix."
         ],
     }
+    required_keys = {
+        key for group_keys in REVIEW_KEYS.values() for key in group_keys
+    }
+    checks = draft.get("checks") if isinstance(draft, dict) else None
+    evidence = draft.get("evidence") if isinstance(draft, dict) else None
     all_signed = bool(
-        draft and draft.get("approved_for_nltha") is True
-        and isinstance(draft.get("checks"), dict)
-        and bool(draft["checks"])
-        and all(value is True for value in draft["checks"].values())
-        and isinstance(draft.get("evidence"), dict)
-        and all(isinstance(draft["evidence"].get(key), str)
-                and draft["evidence"][key].strip()
-                and not draft["evidence"][key].startswith(
+        model_within_project
+        and draft and draft.get("approved_for_nltha") is True
+        and isinstance(checks, dict)
+        and isinstance(evidence, dict)
+        and required_keys
+        and required_keys.issubset(checks)
+        and all(checks.get(key) is True for key in required_keys)
+        and all(isinstance(evidence.get(key), str)
+                and evidence[key].strip()
+                and not evidence[key].strip().startswith(
                     ("INPUT / REVIEW REQUIRED:", "AVAILABLE FOR REVIEW:"))
-                for key in draft["checks"])
+                for key in required_keys)
+        and all(value is True for value in checks.values())
     )
     # A human sign-off is reported as a claim, never as verified solver readiness.
     report["approved_for_nltha"] = all_signed
