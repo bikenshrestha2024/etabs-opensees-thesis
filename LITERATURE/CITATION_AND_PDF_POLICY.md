@@ -5,6 +5,7 @@ Updated 2026-11-12.
 ## Citation count snapshot
 - **L001 Smith & Willford (2007)**: **230**, Wiley publisher CrossRef display; observed 2026-11-12. https://onlinelibrary.wiley.com/doi/10.1002/tal.413
 - **L020 Dehghani & Tobber (2026)**: **1**, Elsevier publisher Cited-by display; observed 2026-11-12. https://doi.org/10.1016/j.istruc.2025.110897
+- **L003 Birrell et al. (2021), Structural Safety**: **28**, Elsevier publisher *Cited by* display; observed 2026-11-12. https://www.sciencedirect.com/science/article/pii/S0167473020301405
 - All other catalog rows: **unverified**. Earlier conversational numbers for 2021/2023 papers are not treated as independently verified bibliometric data. Citation-count sources can differ significantly.
 
 ## PDF status
