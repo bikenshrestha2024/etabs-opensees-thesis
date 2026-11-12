@@ -259,6 +259,14 @@ on:
       - 'tests/verify_exploratory_options.py'
       - 'components/nonlinear_time_history/material_source_sets.py'
       - 'tests/verify_material_source_sets.py'
+      - 'tests/verify_one_storey_wall_probe.py'
+      - 'tests/verify_peer_material_draft_isolation.py'
+      - 'components/nonlinear_time_history/one_storey_wall_probe.py'
+      - 'components/nonlinear_time_history/material_draft.py'
+      - 'components/nonlinear_time_history/material_source_sets.py'
+      - 'components/ui/building_exploratory_gui.py'
+      - 'components/model/readiness_gui.py'
+      - 'docs/source/components/nonlinear_time_history/one_storey_wall_probe.py.md'
   pull_request:
     paths:
       # Gravity evidence and cross-solver foundation reaction changes must
@@ -412,6 +420,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_grouped_wall_aw_ubc_seaoc.py' -v
           python tests/verify_exploratory_options.py
           python tests/verify_material_source_sets.py
+          python tests/verify_one_storey_wall_probe.py
+          python tests/verify_peer_material_draft_isolation.py
           python tests/verify_modal_cancel_status.py
           python tests/verify_v170_modern_reconciliation.py
           python tests/verify_nbc105_periods.py
