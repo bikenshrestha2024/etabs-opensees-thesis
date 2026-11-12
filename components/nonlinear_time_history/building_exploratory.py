@@ -160,6 +160,53 @@ def _run_material_sensitivity(config):
     if parameter.startswith(('frame.', 'wall.')) and not config.get('nonlinear_walls'):
         raise ValueError('Frame and wall sensitivity requires the nonlinear E-SFI-MVLEM-3D material profile.')
 
+    # [REF R01 PEER 2015/12 B.3; docs/source/components/nonlinear_time_history/material_source_sets.py.md]
+    # Candidate sweeps NEVER acquire a paper citation simply because the
+    # baseline material was literature-derived. Distinguish source values,
+    # transferred values, model assumptions and deliberately varied inputs.
+    from components.nonlinear_time_history.material_source_sets import (
+        WALL_KEYS,FRAME_OVERRIDE_TARGETS,baseline_values,source_table,
+    )
+    material_basis=config.get('material_basis','PUBLISHED_REFERENCE')
+    material_transition=config.get('steelmpf_transition','OPENSEES_DOCUMENTED')
+    baseline=baseline_values(material_basis,material_transition).get(parameter)
+    parsed=source_table(material_basis)
+    if parameter.startswith('wall.'):
+        shorthand=parameter.split('.',1)[1]
+        canonical=WALL_KEYS.get(shorthand)
+        paper_parameter=canonical[1] if canonical else None
+        family='Wall concrete (ConcreteCM)' if canonical and canonical[0]=='c' else (
+            'Reinforcing steel (SteelMPF)' if canonical and canonical[0]=='s'
+            else 'FSAM panel')
+    elif parameter.startswith('frame.'):
+        paper_parameter=FRAME_OVERRIDE_TARGETS.get(parameter)
+        family='Frame concrete (Concrete01)' if paper_parameter and (
+            'fc' in paper_parameter or 'eps' in paper_parameter) else 'Frame rebar (Steel02)'
+    else:
+        paper_parameter=parameter
+        family='Ordinary SHS brace (Steel01)'
+    matches=[row for row in parsed if row.get('parameter')==paper_parameter
+             and (row.get('family')==family or row.get('family')=='All')]
+    provenance=dict(parameter=parameter,material_basis=material_basis,
+        source_card='PEER Report 2015/12 Appendix B.3'
+                    if material_basis=='PEER_2015_12_SINGLE_SOURCE'
+                    else material_basis,
+        baseline=baseline,source_parameter=paper_parameter,
+        source_rows=matches,
+        source_value_status=('SOURCE_CARD_VALUE_OR_TRANSFER' if any(
+            row.get('status')=='FROM_SOURCE' for row in matches)
+            else 'MODEL_ASSUMPTION_OR_NOT_IN_PAPER'),
+        proposed_candidates=candidates,
+        candidate_status='ANALYST_SELECTED_PARAMETER_SWEEP_NOT_PAPER_UNCERTAINTY',
+        inference_limit=('The inspected source card pertains to a published specimen. '
+            'No candidate is an experimentally verified bound for the user high-rise. '
+            'Only the chosen parameter changes within this sweep; case/model '
+            'fingerprints, orientation, input dt and gravity must still be compared.'))
+    (output/'Sensitivity_Parameter_Provenance.json').write_text(
+        json.dumps(provenance,indent=2),encoding='utf-8')
+    print('[SENSITIVITY SOURCE]',parameter,provenance['source_value_status'],
+          '| source row(s)',len(matches),flush=True)
+
     rows = []
     completed = []
     for index, value in enumerate(candidates, 1):
@@ -228,6 +275,9 @@ def _run_material_sensitivity(config):
                 'candidate_values': candidates,
                 'completed_cases': completed,
                 'comparison_csv': 'Material_Sensitivity_Comparison.csv',
+                'provenance_file': 'Sensitivity_Parameter_Provenance.json',
+                'baseline': baseline,
+                'candidate_status': 'ANALYST_SELECTED_PARAMETER_SWEEP_NOT_PAPER_UNCERTAINTY',
                 'interpretation': 'One-factor exploratory comparison only; no candidate is selected as an optimum or design-approved.',
             }, indent=2), encoding='utf-8')
 
@@ -237,6 +287,7 @@ def _run_material_sensitivity(config):
         'candidate_values': candidates,
         'completed_cases': completed,
         'comparison_csv': str(output / 'Material_Sensitivity_Comparison.csv'),
+        'provenance_file': str(output / 'Sensitivity_Parameter_Provenance.json'),
     }
 
 def _run(config):
