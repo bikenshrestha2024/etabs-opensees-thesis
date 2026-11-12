@@ -80,6 +80,9 @@ on:
       - 'tests/test_gravity_three_case_comparison.py'
       - 'tests/test_gravity_support_ui_policy.py'
       - 'tests/test_shell_gravity_load_patch.py'
+      - 'tests/test_esm_section6_arithmetic.py'
+      - 'components/equivalent_static/calculation_and_gui.py'
+      - 'components/modal/rayleigh.py'
       - 'tools/audit_shell_gravity_transfer.py'
       - 'components/gravity/reaction_case_registry.py'
       - 'components/gravity/source_load_reconciliation.py'
@@ -370,6 +373,7 @@ jobs:
           python tests/verify_gravity_support_scenarios.py
           python -m unittest discover -s tests -p 'test_gravity_support_ui_policy.py' -v
           python -m unittest discover -s tests -p 'test_shell_gravity_load_patch.py' -v
+          python -m unittest discover -s tests -p 'test_esm_section6_arithmetic.py' -v
           python tests/verify_gravity_case_reaction_registry.py
           python tests/verify_gravity_source_load_reconciliation.py
           python tests/verify_etabs_assignment_gravity_audit.py
