@@ -34,10 +34,12 @@ OPTIONAL_SOURCE = (
 
 
 def digest(path):
+    """SHA256 source-file identity. [REF docs/source/components/gravity/mesh_cases.py.md]"""
     return sha256(Path(path).read_bytes()).hexdigest()
 
 
 def case_base(folder, subdivisions):
+    """Independent case directory. [REF docs/source/components/gravity/mesh_cases.py.md]"""
     n = int(subdivisions)
     if n not in MESH_SIZES:
         raise ValueError("Mesh comparison supports only 4, 8 and 16 subdivisions")
@@ -45,7 +47,9 @@ def case_base(folder, subdivisions):
 
 
 def prepared_configs(folder):
-    """Create three labeled *configurations*, not completed analysis cases."""
+    """Create three labeled *configurations*, not completed analysis cases.
+    [REF docs/source/components/gravity/mesh_cases.py.md]
+    """
     folder = Path(folder).resolve()
     config_path = folder / REQUIRED_SOURCE[3]
     if not config_path.is_file():
@@ -65,7 +69,9 @@ def prepared_configs(folder):
 
 
 def stage_case(folder, subdivisions):
-    """Copy source inputs into an isolated, unique case run; never mutate root."""
+    """Copy source inputs into an isolated, unique case run; never mutate root.
+    [REF docs/source/components/gravity/mesh_cases.py.md]
+    """
     folder = Path(folder).resolve()
     n = int(subdivisions)
     parent = case_base(folder, n) / "RUNS"
@@ -118,6 +124,7 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
     This is intentionally a potentially expensive operation and must run in a
     GUI worker thread. Other native solver stages, gravity and ETABS parity
     remain separate. On failure keep the case run + error JSON for diagnosis.
+    [REF docs/source/components/gravity/mesh_cases.py.md]
     """
     run_dir = stage_case(folder, subdivisions)
     n = int(subdivisions)
