@@ -143,7 +143,15 @@ def _run_analysis(config):
                 ]
                 if not support_nodes or not set(support_nodes).issubset(node_tags):
                     raise ValueError("The export support-node mapping is empty or does not match the assembled model.")
-                # Freeze the completed gravity state and reset transient time.
+                # NBC 105:2025 §8.1.1.2–3 / §9.3.1.2–3:
+                # Model builder MUST already have solved its §5.2 gravity
+                # preload. This freezes existing patterns; it does NOT apply
+                # gravity, certify convergence or transfer IS 16700 signed EL.
+                # OpenSees loadConst() preserves equilibrium and resets t=0.
+                # Keep the dependent linear/nonlinear case's static-EL
+                # carryover separate: avoid +1.5 EL and full ground motion
+                # being applied twice. See REVIEW_MAIN/00_MODEL/
+                # 20261113_NBC_IS_INITIAL_PDELTA_CODE_HIERARCHY.md.
                 ops.loadConst("-time", 0.0)
                 from components.shared.response_recorders import (
                     append_base_shear, support_resultants,
