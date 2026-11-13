@@ -25,6 +25,7 @@ jobs:
             python=3.12
             plotly
             openpyxl
+            numpy
           cache-environment: true
       - name: Compile active sources and verify workflow navigation
         shell: micromamba-shell {0}
