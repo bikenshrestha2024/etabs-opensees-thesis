@@ -21,3 +21,8 @@ References are indexed in [the research source register](../../../00_RESEARCH_RE
 Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.
 
 [Source module index](../../00_SOURCE_GUIDE_INDEX.md) · [G00–G10 acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md)
+
+
+## 2026-11-13 — Stage 02 model mesh / area-integration output update
+
+For the full rationale, mesh procedure, distinctions between **source quads** and **assembled meshed ShellMITC4 cells**, evidence requirements and safety warnings, read [the numbered Stage 02 review](../../../../REVIEW_MAIN/00_MODEL/20261113_STAGE02_AREA_INTEGRATION_AND_SLAB_MESH_STUDY.md). Mesh 04/08/16 files are separate case outputs and never a single rebadged baseline. Area inventory is source-only Excel + JSON; it does not instantiate OpenSees elements or validate gravity transfer.
