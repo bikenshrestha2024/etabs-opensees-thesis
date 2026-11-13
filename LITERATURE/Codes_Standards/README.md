@@ -7,6 +7,8 @@
 | L002 | Low/medium-rise seismic design context | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 | L028 | Computational engineering framework | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 
+- [IS 16700:2023 first revision and 2025 amendment tracker](IS16700_2023_AMENDMENT_TRACKER.md) — clause/page crosswalk, NBC-versus-IS precedence, private PDF watermark and pending amended-text reconciliation.
+
 ## Evidence and transfer policy
 
 - Prefer original paper and measured specimens over derived example parameters.
