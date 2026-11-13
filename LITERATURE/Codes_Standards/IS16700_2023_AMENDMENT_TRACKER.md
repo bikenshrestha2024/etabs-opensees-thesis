@@ -1,6 +1,8 @@
 # IS 16700:2023 first revision — project crosswalk, 2025 amendment gate
 
 **Reviewed:** 2026-11-13. **Authority:** Bureau of Indian Standards (BIS), CED 38. **Classification:** Indian supplementary tall-building standard, **not** Nepal's governing seismic design code.
+**Project-use restriction:** IS 16700 is adopted for **initial P-Delta cases (§7.2(d))** and **conventional slab flexural Ig (Table 5) only**. All other checks remain supplementary, subordinate to NBC 105:2025 and cannot change NBC seismic calculations. See [governing-code matrix](../../KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK/NBC105_GOVERNING_CODE_MATRIX.md).
+
 **Uploaded study copy:** *IS 16700:2023 Criteria for Structural Safety of Tall Concrete Buildings* (First Revision), September 2023, 38 PDF pages. The file was **not copied to public GitHub**: the supplied download copy contains an identifying access watermark. Keep original privately and record SHA256 only in the private literature ledger.
 
 ## Edition / amendment warning (do not omit)
