@@ -1,7 +1,17 @@
 """Numbered workflow and factual input inventory; no automatic calibration approval."""
 from pathlib import Path
 import json
-STEPS=[('1 Export','01_START_ETABS_TO_OPENSEES.py','Select EDB and export folder. Export with load sets; verify load totals and source units.'),('2 Inputs','02_MODEL_INPUTS_AND_READINESS.py','Review inventory, source identity and missing evidence.'),('3 Gravity','03_GRAVITY.py','Compare story dead/live components and support reactions with ETABS. Inspect slab mesh convergence.'),('4 Modal','04_MODAL_ULS_SLS.py','Run Both. Review X/Y/Rz modes, cumulative mass, initial stiffness and damping band.'),('5 Static','05_EQUIVALENT_STATIC.py','Review adopted periods, spectra, eligibility, drift and signed eccentricity cases.'),('6 MRSM','06_RESPONSE_SPECTRUM.py','Run ULS then SLS; inspect CQC envelopes and force-only scale.'),('7 Linear history','07_LINEAR_TIME_HISTORY.py','Select one earthquake pair first; confirm g conversion once, scale and time step.'),('8 Building trial','08_BUILDING_NONLINEAR_TRIAL.py','Exploratory nonlinear frames with elastic walls; use short trial then longer records. Inspect actual recorded response, not portal-demo results.'),('9 Reviewed nonlinear','09_NONLINEAR_REVIEWED_MODEL.py','Requires project materials, reinforcement, FSAM mapping and nonlinear benchmarks. Literature specimen values alone do not establish calibration.')]
+STEPS=[
+('1 Export','01_MAIN_GUI.py','Read source EDB; verify model hash, counts and physical units.'),
+('2 Inputs','02_INPUT_READINESS.py','Verify source identity and incomplete section, load and diaphragm evidence.'),
+('3 Gravity','10_GRAVITY.py','Compare exactly matched gravity cases and support reactions with ETABS.'),
+('4 Modal','11_MODAL_ULS_SLS.py','Run ULS/SLS; check X/Y/Rz mass and eigenperiods.'),
+('5 Static','12_EQUIVALENT_STATIC.py','Review NBC force profiles and ULS ESM eligibility.'),
+('6 MRSM','13_RESPONSE_SPECTRUM.py','Review source-matched CQC ULS/SLS response.'),
+('7 Linear history','14_LINEAR_TIME_HISTORY.py','Check paired records, conversion and full duration.'),
+('8 Building trial','15_BUILDING_NONLINEAR_TRIAL.py','Short exploratory trials are not complete nonlinear history.'),
+('9 Reviewed nonlinear','16_NONLINEAR_REVIEWED_MODEL.py','Requires actual project reinforcement and material calibration.')
+]
 GUIDE={
 'wall_nonlinear_materials_and_reinforcement_cited_calibrated':'Obtain wall thickness, web/boundary reinforcement ratios, bar grades, concrete strength, confinement and axial load from drawings/tests. Define ConcreteCM + SteelMPF + FSAM per wall region; benchmark cyclic force-drift and axial response against applicable experiments. Enter material file and property-to-FSAM tags in model config. Do not substitute specimen reinforcement for project data.',
 'frame_concrete_and_rebar_materials_reviewed':'Read ETABS section dimensions/materials and project reinforcement schedules (bar count, diameter, cover, ties). Replace illustrative M35/Fe550 templates; verify stress units, confinement and cyclic parameters with tests/literature. Run section moment-curvature and a member cyclic benchmark.',
@@ -27,15 +37,38 @@ def inventory(folder):
     return facts
 
 def workflow_status(folder):
-    """File-presence indicators only: no claim of matching model or valid result."""
-    root=Path(folder); out=root/'OpenSees_Analysis_Results'
-    def present(p): return p.is_file()
-    def candidates(pattern): return list(out.glob(pattern)) if out.is_dir() else []
-    modal=[state for state in ('ULS','SLS') if present(out/('Modal_'+state)/'NBC105_Modal_V111.json')]
-    mrsm=[state for state in ('ULS','SLS') if (out/('MRSM_'+state)).is_dir() and any((out/('MRSM_'+state)).glob('*.json'))]
-    checks=[present(root/'OpenSees_Complete_Export_Report_V118.json'),present(root/'OpenSees_Complete_Model_Config_V118.json'),present(root/'OpenSees_Complete_Gravity_Check_V118.json'),bool(modal),bool(candidates('NBC105_ESM_Calculation_*.json')),bool(mrsm),bool(candidates('LTH_*/*Summary*.json')),bool(candidates('EXPLORATORY_*/*Summary*.json')),bool(candidates('NLTH_*/*Summary*.json'))]
-    details={3:'saved modal states: '+(', '.join(modal) or 'none'),5:'saved MRSM state folders: '+(', '.join(mrsm) or 'none'),6:'summary file found does not guarantee completion',7:'summary file found does not guarantee completion; a short trial is not a complete history',8:'summary file found does not guarantee completion or approval'}
-    return [(('SAVED FILE FOUND - VERIFY CURRENT MODEL AND STATUS' if found else 'NO MATCHING RESULT FILE FOUND'),details.get(i,'')) for i,found in enumerate(checks)]
+    """[REF docs/source/OpenSees_Workflow_V144.py.md]
+    Candidate file presence only. Search legacy and model/state result trees.
+    """
+    root=Path(folder)
+    out=root/'OpenSees_Analysis_Results'
+    def find_candidate(*patterns):
+        for base in (out,root):
+            if not base.is_dir():continue
+            for pattern in patterns:
+                try:match=next(base.glob(pattern),None)
+                except (OSError,ValueError):match=None
+                if match is not None and match.is_file():return str(match)
+        return None
+    sources=[
+        find_candidate('OpenSees_Complete_Export_Report_V118.json','01_ETABS_EXPORT/**/OpenSees_Complete_Export_Report_V118.json'),
+        find_candidate('OpenSees_Complete_Model_Config_V118.json','01_ETABS_EXPORT/**/OpenSees_Complete_Model_Config_V118.json'),
+        find_candidate('OpenSees_Complete_Gravity_Check_V118.json','**/Gravity_*/**/*Gravity*Check*.json','**/Gravity_*/**/*Gravity*Result*.json'),
+        find_candidate('Modal_ULS/NBC105_Modal_V111.json','Modal_SLS/NBC105_Modal_V111.json','**/Modal_ULS/*.json','**/Modal_SLS/*.json'),
+        find_candidate('NBC105_ESM_Calculation_*.json','**/NBC105_ESM_Calculation_*.json'),
+        find_candidate('MRSM_ULS/*.json','MRSM_SLS/*.json','**/MRSM_ULS/*.json','**/MRSM_SLS/*.json'),
+        find_candidate('LTH_*/*Summary*.json','**/LTH_*/*Summary*.json','**/LTH_*/*Performance*.json'),
+        find_candidate('EXPLORATORY_*/*Summary*.json','**/EXPLORATORY_*/*Summary*.json'),
+        find_candidate('NLTH_*/*Summary*.json','**/NLTH_*/*Summary*.json')
+    ]
+    return [
+        ('CANDIDATE FILE FOUND - VALIDATION REQUIRED',
+         'Candidate: '+found+' | SHA, case status and completeness NOT checked.')
+        if found else
+        ('NO FILE DISCOVERED IN SEARCHED LOCATIONS',
+         'Another export/model/state folder may contain results; absence does not prove no run.')
+        for found in sources
+    ]
 def launch(parent=None,folder=None):
     import tkinter as tk
     from tkinter import ttk,filedialog,messagebox
