@@ -12,6 +12,7 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 | Analysis | Folder | Critical checks |
 |---|---|---|
 | Input/source identity | [00_INPUT_PROVENANCE](00_INPUT_PROVENANCE/REVIEW.md) | EDB / workbook SHA256, load-state and Git LFS identity |
+| **01 Import — export 02** | [2026-11-13 export 02](01_ETABS_IMPORT/20261113_EXPORT_02/01_IMPORT_AND_NONLINEAR_READINESS.md) | Source-identical re-export, topology, load/mass and actual nonlinear readiness |
 | Gravity | [01_GRAVITY](01_GRAVITY/REVIEW.md) | 32/76/97 nodes, native support reactions, source weight |
 | Equivalent static | [02_ESM](02_ESM/REVIEW.md) | opening-aware Aw, adopted T1, ESM eligibility |
 | Modal | [03_MODAL](03_MODAL/REVIEW.md) | X/Y eigenmodes, mass and effective stiffness |
