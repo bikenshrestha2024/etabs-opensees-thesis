@@ -143,7 +143,7 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
         'No second q*tributary-width beam load is added: that would double-count the same area pressure.',
         'Loaded node path lists the actual connected beam and wall solver tags. Interior shell nodes transfer through shell stiffness.',
         'A corner-only panel at column joints cannot resolve beam-span bending. V141 adds floor subdivisions (default 4 per source-panel direction) and splits connected beams at shared mesh nodes.',
-        'Refinement is a numerical choice, not an NBC-prescribed mesh. Compare 2/4/8 subdivisions and benchmark beam moments, slab deflection and reactions before design use.',
+        'Refinement is a numerical choice, not an NBC-prescribed mesh. Compare 4/8/16 subdivisions using separately assembled/solved models; check beam moments, slab deflection and reactions before design use.',
         'Gravity_Beam_End_Actions_ULS_V141.csv / SLS equivalent are written by complete-model preload. Gravity GUI action tabs also show local shears and bending moments. Beam end actions and shell forces are solver outputs; they cannot be replaced by q*A arithmetic or treated as a unique tributary UDL. Use gravity action reports for actual response.',
         'Surface load formulas: FULL GRAVITY 1.0D+1.0L; all included assigned floor live and roof live at 1.0. It is a separate diagnostic from the configured seismic gravity preload.',
         'Surface seismic preload: configured analysis gravity fractions, for example Live 0.3, while Mass factor remains an independent column in both worksheets.',
@@ -152,6 +152,16 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
         'https://openseespydoc.readthedocs.io/en/latest/src/ShellMITC4.html',
         'https://opensees.berkeley.edu/OpenSees/api/doxygen2/html/RigidDiaphragm_8cpp-source.html',
         'https://opensees.berkeley.edu/OpenSees/api/doxygen2/html/ShellMITC4_8cpp-source.html'] :notes.append([line])
+    # Display the actual assembled mesh identity, not merely a GUI selection.
+    mesh=wb.create_sheet('Mesh identity',0)
+    mesh.append(['Parameter','Value','Interpretation'])
+    mesh.append(['Subdivisions per source-panel direction',int(cfg.get('floor_subdivisions',4)),'Actual case must match model-data config SHA256'])
+    mesh.append(['Assembled shell cell count',len(data.get('shells',[])),'Includes floors and walls; see Source load detail for floor cells'])
+    mesh.append(['Assembly config SHA256',data.get('config_sha256',''),'Hash of config used when assembled model was generated'])
+    mesh.append(['Model evidence status','REQUIRES ETABS + SOLVER COMPARISON','Formulas and connectivity alone do not establish gravity load-path equivalence'])
+    mesh.append(['Study mode','ONE MESH PER WORKBOOK','4/8/16 require separate rebuilt assembled model runs'])
+    mesh.column_dimensions['A'].width=39;mesh.column_dimensions['B'].width=81;mesh.column_dimensions['C'].width=95
+    mesh.freeze_panes='A2'
     import csv
     for state in ('ULS','SLS'):
         path=folder/('Gravity_Beam_End_Actions_'+state+'_V141.csv')
@@ -212,7 +222,34 @@ def export(folder):
     from openpyxl import Workbook
     folder=Path(folder);wb=Workbook();wb.remove(wb.active);add_formula_audit(wb,folder)
     if not wb.worksheets:raise ValueError('Rebuild the assembled model first')
-    path=folder/'Slab_Load_Path_Formulas_V141.xlsx';wb.save(path);return path
+    # Filename and directory identify the actual assembled mesh. A saved GUI
+    # choice is insufficient: the assembled model records its config hash.
+    cfg_path=folder/'OpenSees_Complete_Model_Config_V118.json'
+    model_path=folder/'OpenSees_Complete_Model_Data_V118.json'
+    if not cfg_path.is_file() or not model_path.is_file():
+        raise ValueError('Rebuild complete OpenSees model before exporting mesh-specific formulas.')
+    import hashlib
+    cfg=json.loads(cfg_path.read_text(encoding='utf-8-sig'))
+    data=json.loads(model_path.read_text(encoding='utf-8-sig'))
+    n=int(cfg.get('floor_subdivisions',4))
+    if n not in (4,8,16):
+        raise ValueError('Mesh comparison requires subdivision 4, 8 or 16; received '+str(n))
+    actual=hashlib.sha256(cfg_path.read_bytes()).hexdigest()
+    if data.get('config_sha256')!=actual:
+        raise ValueError('Model is stale for this mesh configuration. Rebuild from this export, then regenerate the load-path workbook.')
+    root=folder/'02_MODEL'/'SLAB_LOAD_PATH'/f'MESH_{n:02d}'
+    excel_dir=root/'excel';json_dir=root/'json'
+    excel_dir.mkdir(parents=True,exist_ok=True);json_dir.mkdir(parents=True,exist_ok=True)
+    path=excel_dir/f'Slab_Load_Path_MESH_{n:02d}_V141.xlsx'
+    wb.save(path)
+    record=dict(mesh_subdivisions=n,config_sha256=actual,
+                assembled_model=str(model_path),workbook=str(path),
+                floor_shell_cells=sum(e.get('category')=='FLOOR' for e in data.get('shells',[])),
+                total_shell_cells=len(data.get('shells',[])),
+                validity='FORMULA_AUDIT_ONLY_NOT_SOLVER_VERIFICATION',
+                warning='Do not compare reaction, moments or deflections until gravity solves with matching mesh and load/support definitions exist')
+    (json_dir/f'Slab_Load_Path_MESH_{n:02d}_MANIFEST.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
+    return path
 
 
 def launch(parent,folder):
@@ -233,5 +270,20 @@ def launch(parent,folder):
         try:__import__('os').startfile(str(export(folder)))
         except Exception as exc:messagebox.showerror('Load path',str(exc),parent=win)
     ttk.Button(win,text='Save mesh choice (rebuild required)',command=save).pack(padx=12,pady=8,anchor='w')
-    ttk.Button(win,text='Export / open current load-path formulas',command=workbook).pack(padx=12,anchor='w')
+    ttk.Button(win,text='Export verified current mesh workbook (MESH_04 / 08 / 16)',command=workbook).pack(padx=12,anchor='w')
+    def prepare():
+        if not config.is_file():
+            messagebox.showerror('Mesh comparison','Export model first.',parent=win);return
+        src=json.loads(config.read_text(encoding='utf-8-sig'))
+        root=folder/'02_MODEL'/'SLAB_LOAD_PATH'/'PREPARED_CONFIGS'
+        root.mkdir(parents=True,exist_ok=True)
+        for n in (4,8,16):
+            modified=dict(src,floor_subdivisions=n)
+            target=root/f'Model_Config_MESH_{n:02d}.json'
+            target.write_text(json.dumps(modified,indent=2),encoding='utf-8')
+        messagebox.showinfo('Mesh cases prepared',
+            'Three independent mesh configs saved in '+str(root)+'\\n\\n'
+            'Each must be used to rebuild the assembled model and run gravity independently. '
+            'These configs are not completed analysis cases and no reactions are fabricated.',parent=win)
+    ttk.Button(win,text='Prepare MESH_04 / MESH_08 / MESH_16 configurations',command=prepare).pack(padx=12,pady=6,anchor='w')
     return win

@@ -248,7 +248,6 @@
   "components/sections/devices.py::summarize_fvd_history",
   "components/sections/mapping_audit.py::add_device",
   "components/sections/mapping_audit.py::collect",
-  "components/sections/mapping_audit.py::export_excel",
   "components/sections/mapping_audit.py::library",
   "components/sections/mapping_audit.py::parameter_sources",
   "components/sections/mapping_audit.py::read",
