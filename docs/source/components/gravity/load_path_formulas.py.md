@@ -93,3 +93,8 @@ comparison invariant**, not evidence that the user's entire original ETABS
 EDB contains no roof-live assignments. Test:
 `tests/verify_gravity_comparison_profile.py` (both empty-pattern and
 absent-pattern cases).
+
+
+## 2026-11-13 — Stage 02 model mesh / area-integration output update
+
+For the full rationale, mesh procedure, distinctions between **source quads** and **assembled meshed ShellMITC4 cells**, evidence requirements and safety warnings, read [the numbered Stage 02 review](../../../../REVIEW_MAIN/00_MODEL/20261113_STAGE02_AREA_INTEGRATION_AND_SLAB_MESH_STUDY.md). Mesh 04/08/16 files are separate case outputs and never a single rebadged baseline. Area inventory is source-only Excel + JSON; it does not instantiate OpenSees elements or validate gravity transfer.
