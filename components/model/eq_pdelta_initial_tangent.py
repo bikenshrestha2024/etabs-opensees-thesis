@@ -3,6 +3,7 @@
 NOT a replacement for existing ESM, modal, MRSM or NLTHA.
 Use on a newly verified corrected BEAM_CLEAR source model only.
 Runs both phases in one live OpenSees domain; no re-build between phases.
+NBC 105:2025 is the seismic parent standard. IS 16700:2023 §7.2(d) supplies the compulsory initial EQ P-Delta combination ONLY; conventional slab Table 5 is the other project-adopted IS input. This one-step static tangent test cannot be treated as accepted TH initialization, and a held static ±EL plus full dynamic support acceleration risks double-counting. [REF REVIEW_MAIN/00_MODEL/20261113_NBC_IS_INITIAL_PDELTA_CODE_HIERARCHY.md]
 """
 from __future__ import annotations
 import csv
