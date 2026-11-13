@@ -12,13 +12,49 @@ import math
 
 
 def _rows(wb, name):
-    stream=wb[name].iter_rows(values_only=True)
-    next(stream)  # table title
-    fields=[str(v).strip() if v is not None else "" for v in next(stream)]
-    next(stream)  # source unit row
-    return [{field:values[i] for i,field in enumerate(fields) if field}
-            for values in stream
-            if any(v is not None and v!="" for v in values)]
+    """Read contiguous native ETABS rows without traversing formatted Excel tail.
+
+    Some CSI-exported XLSX sheets advertise an entire worksheet of rows even
+    though only a few thousand populated data rows exist. openpyxl streaming
+    through that tail may attempt the invalid Excel row 1,048,577. ETABS
+    assignment tables are contiguous and have exactly three metadata rows.
+    Reject truncated/ambiguous data rather than treating padding as source.
+    [REF docs/source/components/validation/etabs_assignment_gravity_audit.py.md]
+    """
+    import itertools
+    sheet=wb[name]
+    # Ignore stale XLSX <dimension> metadata in streaming mode. Set an explicit
+    # conservative scan ceiling and stop after a substantial blank-only tail.
+    if hasattr(sheet,"reset_dimensions"):
+        sheet.reset_dimensions()
+    scan_limit=100_000
+    stream=sheet.iter_rows(min_row=1,max_row=scan_limit,values_only=True)
+    try:
+        next(stream)  # table title
+        fields=[str(v).strip() if v is not None else "" for v in next(stream)]
+        next(stream)  # ETABS units
+    except StopIteration as exc:
+        raise ValueError("Native ETABS worksheet has fewer than three header rows: "+name) from exc
+    if not any(fields) or len(fields)!=len(set(f for f in fields if f)):
+        raise ValueError("Missing or duplicated ETABS assignment column headers in "+name)
+    records=[];blank_run=0
+    for position,values in enumerate(stream,start=4):
+        if not any(v is not None and v!="" for v in values):
+            blank_run+=1
+            if blank_run>=128:
+                break  # ETABS tables are contiguous; avoids styled/blank tail
+            continue
+        if blank_run:
+            # Do not silently bridge missing source table rows.
+            raise ValueError(f"Unexpected empty row(s) within ETABS table {name} before row {position}")
+        blank_run=0
+        records.append({field:values[i] if i<len(values) else None
+                        for i,field in enumerate(fields) if field})
+        if position>=scan_limit:
+            raise ValueError(f"ETABS table {name} exceeds {scan_limit} rows; inspect native workbook instead of silently truncating")
+    if not records:
+        raise ValueError("Native ETABS worksheet has no assignment data: "+name)
+    return records
 
 
 def audit_native_assignment_workbook(workbook_path, output_folder,
