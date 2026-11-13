@@ -218,17 +218,20 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     wb.calculation=CalcProperties(calcId=191029,fullCalcOnLoad=True)
 
 
-def export(folder):
+def export(folder, *, output_root=None):
+    """Verified mesh-specific formula workbook from *matching* assembled model.
+
+    Validate the config SHA and mesh size BEFORE generating any workbook cells.
+    `output_root` lets isolated 4/8/16 run directories place their reports
+    beside one another rather than nesting another 02_MODEL path.
+    """
     from openpyxl import Workbook
-    folder=Path(folder);wb=Workbook();wb.remove(wb.active);add_formula_audit(wb,folder)
-    if not wb.worksheets:raise ValueError('Rebuild the assembled model first')
-    # Filename and directory identify the actual assembled mesh. A saved GUI
-    # choice is insufficient: the assembled model records its config hash.
+    import hashlib
+    folder=Path(folder)
     cfg_path=folder/'OpenSees_Complete_Model_Config_V118.json'
     model_path=folder/'OpenSees_Complete_Model_Data_V118.json'
     if not cfg_path.is_file() or not model_path.is_file():
-        raise ValueError('Rebuild complete OpenSees model before exporting mesh-specific formulas.')
-    import hashlib
+        raise ValueError('Source configuration and assembled model missing. Use "Build selected mesh + export workbook" to create an isolated current mesh run.')
     cfg=json.loads(cfg_path.read_text(encoding='utf-8-sig'))
     data=json.loads(model_path.read_text(encoding='utf-8-sig'))
     n=int(cfg.get('floor_subdivisions',4))
@@ -236,19 +239,26 @@ def export(folder):
         raise ValueError('Mesh comparison requires subdivision 4, 8 or 16; received '+str(n))
     actual=hashlib.sha256(cfg_path.read_bytes()).hexdigest()
     if data.get('config_sha256')!=actual:
-        raise ValueError('Model is stale for this mesh configuration. Rebuild from this export, then regenerate the load-path workbook.')
-    root=folder/'02_MODEL'/'SLAB_LOAD_PATH'/f'MESH_{n:02d}'
-    excel_dir=root/'excel';json_dir=root/'json'
+        raise ValueError('Model config changed after assembly. Do not label old slab cells with new mesh size; choose "Build selected mesh + export workbook" to assemble a matching model.')
+    if not any(e.get('category')=='FLOOR' for e in data.get('shells',[])):
+        raise ValueError('No assembled FLOOR shell cells found: a mesh-size-specific workbook would be misleading.')
+    wb=Workbook();wb.remove(wb.active)
+    add_formula_audit(wb,folder,data=data,cfg=cfg)
+    if not wb.worksheets:raise ValueError('Complete model does not contain enough source load-path data')
+    root=Path(output_root) if output_root is not None else folder/'02_MODEL'/'SLAB_LOAD_PATH'/f'MESH_{n:02d}'
+    excel_dir=root/'EXCEL';json_dir=root/'JSON'
     excel_dir.mkdir(parents=True,exist_ok=True);json_dir.mkdir(parents=True,exist_ok=True)
-    path=excel_dir/f'Slab_Load_Path_MESH_{n:02d}_V141.xlsx'
+    from datetime import datetime
+    stamp=datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    path=excel_dir/f'Slab_Load_Path_MESH_{n:02d}_{stamp}_V141.xlsx'
     wb.save(path)
     record=dict(mesh_subdivisions=n,config_sha256=actual,
                 assembled_model=str(model_path),workbook=str(path),
                 floor_shell_cells=sum(e.get('category')=='FLOOR' for e in data.get('shells',[])),
                 total_shell_cells=len(data.get('shells',[])),
                 validity='FORMULA_AUDIT_ONLY_NOT_SOLVER_VERIFICATION',
-                warning='Do not compare reaction, moments or deflections until gravity solves with matching mesh and load/support definitions exist')
-    (json_dir/f'Slab_Load_Path_MESH_{n:02d}_MANIFEST.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
+                warning='No reactions, beam forces or mesh-convergence results are inferred. Run separate matching gravity solves with ETABS response comparison')
+    (json_dir/f'Slab_Load_Path_MESH_{n:02d}_{stamp}_MANIFEST.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
     return path
 
 
