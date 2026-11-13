@@ -95,11 +95,12 @@ def audit_load_case_purpose(profile, gravity_factors, mass_factors,
             "issues": ["NO_LOAD_PATTERNS_TO_AUDIT"],
         })
     if present_patterns is not None and not present_patterns:
-        if not any("NO_LOAD_PATTERNS_TO_AUDIT" in e["issues"] for e in errors):
-            errors.append({
-                "pattern": "(empty source-pattern collection)",
-                "issues": ["EMPTY_SOURCE_PATTERN_SET"],
-            })
+        # An empty explicitly supplied source is a distinct missing-evidence
+        # condition, even when the combined factor audit also has no rows.
+        errors.append({
+            "pattern": "(empty source-pattern collection)",
+            "issues": ["EMPTY_SOURCE_PATTERN_SET"],
+        })
     for pattern in patterns:
         category = classify_load_pattern(
             pattern, explicit_category=overrides.get(pattern))
