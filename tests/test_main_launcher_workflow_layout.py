@@ -45,6 +45,11 @@ class LauncherWorkflowLayoutTests(unittest.TestCase):
         self.assertIn("command=original.invoke",self.code)
         self.assertNotIn('columns=ttk.Frame(shell); columns.pack(',self.code)
         self.assertIn('if not matches:',self.code)
+        self.assertIn('previous_workflow_stage',self.code)
+        self.assertIn('stage_tabs.select(previous_workflow_stage[0])',self.code)
+        for short_tab in ('1. Import','2. Model','3. Gravity / NBC',
+                          '4. Linear','5. Nonlinear','6. Materials','7. Results'):
+            self.assertIn(short_tab,self.code)
 
     def test_log_keeps_copy_and_two_axes_of_scrolling(self):
         for item in ('orient="vertical",command=self.logbox.yview',
