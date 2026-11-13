@@ -24,6 +24,7 @@ jobs:
             -c conda-forge
             python=3.12
             plotly
+            openpyxl
           cache-environment: true
       - name: Compile active sources and verify workflow navigation
         shell: micromamba-shell {0}
