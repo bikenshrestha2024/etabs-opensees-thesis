@@ -34,6 +34,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_gravity_organized_case_index_v172.py' -v
           python -m unittest discover -s tests -p 'test_gravity_gui_action_layout.py' -v
           python -m unittest discover -s tests -p 'test_main_launcher_workflow_layout.py' -v
+          python -m unittest discover -s tests -p 'test_main_launcher_short_alias.py' -v
           python -m unittest discover -s tests -p 'test_esm_organized_export_gui.py' -v
           python -m unittest discover -s tests -p 'test_linear_reaction_vectorization.py' -v
           python -m unittest discover -s tests -p 'test_nbc105_load_case_purpose.py' -v
