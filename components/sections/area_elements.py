@@ -373,6 +373,113 @@ def apply_etabs_area_uniform_loads(ops, *, load_assignment_csv: str | Path,
             "analysis_ready": False}
 
 
+def export_area_integration_inventory(*, topology_json, area_assignment_csv,
+                                      config_json, output_dir):
+    """Source-only Excel + JSON inventory; does not mutate an OpenSees model.
+
+    A four-node topology preview is not equivalent to instantiating a solver
+    element and cannot prove calibrated FSAM material tags, floor loading,
+    mass accounting, gravity load path or seismic verification.
+    """
+    import hashlib
+    from datetime import datetime, timezone
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+    paths={name:Path(value).expanduser().resolve() for name,value in
+           [('topology',topology_json),('area_assignments',area_assignment_csv),('config',config_json)]}
+    for name,path in paths.items():
+        if not path.is_file():
+            raise FileNotFoundError(f'{name} does not exist: {path}')
+    xyz,records=_load_topology(paths['topology'])
+    assignments=_area_assignments(paths['area_assignments'])
+    cfg=json.loads(paths['config'].read_text(encoding='utf-8-sig'))
+    checksums={name:hashlib.sha256(path.read_bytes()).hexdigest() for name,path in paths.items()}
+    case=checksums['topology'][:10]
+    base=Path(output_dir).expanduser().resolve()/'02_MODEL'/'AREA_INTEGRATION'
+    excel=base/'excel';json_dir=base/'json'
+    excel.mkdir(parents=True,exist_ok=True);json_dir.mkdir(parents=True,exist_ok=True)
+    wb=Workbook();summary=wb.active;summary.title='Summary'
+    summary.append(['Field','Value'])
+    for row in [
+        ('Run scope','SOURCE TOPOLOGY INVENTORY ONLY — no native solver was run'),
+        ('Analysis acceptance','NOT VERIFIED / NOT APPROVED'),
+        ('Topology SHA256',checksums['topology']),
+        ('Area assignment CSV SHA256',checksums['area_assignments']),
+        ('Area integration config SHA256',checksums['config']),
+        ('Source reviewed by user',str(bool(cfg.get('source_reviewed_by_user',False)))),
+        ('Node count in topology',len(xyz)),
+        ('Area polygon objects',sum(rec.get('dimension')=='area_polygon' for rec in records)),
+        ('Mesh semantics','These are exported ETABS source quads, NOT newly subdivided ShellMITC4 floor mesh'),
+        ('Required implementation','Nodes and materials first; call instantiate_area_elements only once'),
+        ('Floor formulation','ElasticMembranePlateSection + ShellMITC4; no automatic gravity loads or mass'),
+        ('Wall formulation','E-SFI-MVLEM-3D; reviewed FSAM and nonlinear material definitions required'),
+        ('Avoid duplicate elements','Do not add source floor/wall quads over an already assembled floor/wall mesh'),
+        ('Load path','Separate full-gravity 1D+1L, seismic preload, and mass; compare native ETABS reactions'),
+        ('Source topology',str(paths['topology'])),
+        ('Source area assignments',str(paths['area_assignments'])),
+        ('Area config',str(paths['config']))
+    ]:summary.append(row)
+    areas=wb.create_sheet('Area objects')
+    areas.append(['ETABS area object','Category','OpenSees preview tag','Section property','Node tags',
+                  'Area m2','Normal Z','Warp m','Validation','Note'])
+    errors=[];counts={'FLOOR':0,'SHEAR WALL':0,'OTHER':0}
+    for rec in records:
+        if rec.get('dimension')!='area_polygon':continue
+        obj=str(rec.get('etabs_object',''));cat=str(rec.get('category','')).upper()
+        counts[cat if cat in counts else 'OTHER']+=1
+        tags=[int(n) for n in rec.get('node_tags',[])]
+        val='GEOMETRY CHECK ONLY';area=None;nz=None;warp=None;note=''
+        try:
+            geom=_quad_geometry(tags,xyz,horizontal=(cat=='FLOOR'))
+            area=geom['area_m2'];nz=geom['normal_z'];warp=geom['warpage_m']
+        except (ValueError,TypeError,KeyError) as exc:
+            val='INVALID GEOMETRY';note=str(exc);errors.append(dict(object=obj,error=note))
+        prop=str(assignments.get(obj,{}).get('assigned_property',''))
+        if not prop:
+            val='MISSING SOURCE PROPERTY' if val!='INVALID GEOMETRY' else val
+            note=(note+'; ' if note else '')+'No area section assignment'
+        areas.append([obj,cat,rec.get('opensees_element_tag') or rec.get('element_tag'),
+                      prop,','.join(map(str,tags)),area,nz,warp,val,note])
+    warnings=wb.create_sheet('Engineering limitations')
+    for title in [
+        'This workbook documents source topology and property assignments only.',
+        'Area element integration adds finite elements to an existing OpenSees domain. It is NOT a model converter or complete NLTHA.',
+        'Floor ShellMITC4 is linear elastic under ElasticMembranePlateSection; nonlinear RC slab response is not supplied.',
+        'FSAM material tags must be previously defined and calibrated. A config name is not physical validation.',
+        'Opening gaps are intentionally preserved; coupling beams/junctions need independent modeling checks.',
+        'Calling this helper on a domain that already has the same floor/wall panels risks duplicate stiffness and mass.',
+        'Area loads and seismic mass are separate operations; neither is applied by instantiate_area_elements.',
+        'Check exact source joint IDs, element tags, units, element winding, section mapping and restraints.',
+        'For seismic cases, verify 100% dead + occupation-specific fractions of live and 0% roof live per NBC 105:2025 Table 5-1.',
+        'Separate gravity and mass ledgers and do not infer support reactions from nodal Q/4 loads.',
+        'Relevant source: https://opensees.github.io/OpenSeesDocumentation/user/manual/model/elements/ShellMITC4.html',
+        'Relevant wall research: https://doi.org/10.1016/j.engstruct.2023.116700'
+    ]:warnings.append([title])
+    for ws in (summary,areas,warnings):
+        ws.freeze_panes='A2';ws.sheet_view.showGridLines=False
+        if ws==areas:ws.auto_filter.ref=ws.dimensions
+        for c in ws[1]:
+            c.font=Font(color='FFFFFF',bold=True)
+            c.fill=PatternFill('solid',fgColor='183153')
+        for i in range(1,ws.max_column+1):
+            ws.column_dimensions[get_column_letter(i)].width=min(72,max(20,len(str(ws.cell(1,i).value or ''))+6))
+    summary.column_dimensions['A'].width=36;summary.column_dimensions['B'].width=100
+    warnings.column_dimensions['A'].width=145
+    out=excel/f'Area_Integration_Inventory_{case}.xlsx'
+    wb.save(out)
+    manifest={
+        'created_at_utc':datetime.now(timezone.utc).isoformat(),
+        'source_paths':{name:str(path) for name,path in paths.items()},
+        'sha256':checksums,'source_quad_counts':counts,'node_count':len(xyz),
+        'geometry_errors':errors,'excel_path':str(out),
+        'status':'SOURCE_ONLY_NOT_SOLVER_OR_DESIGN_VALIDATED',
+        'analysis_ready':False}
+    json_path=json_dir/f'Area_Integration_Inventory_{case}.json'
+    json_path.write_text(json.dumps(manifest,indent=2),encoding='utf-8')
+    return out,json_path
+
+
 def launch_area_integration_gui(parent=None, export_dir=None):
     """Write a reviewed area-stage call for insertion into the model builder."""
     import tkinter as tk
@@ -394,7 +501,7 @@ def launch_area_integration_gui(parent=None, export_dir=None):
     )
     root = ttk.Frame(win, padding=14); root.pack(fill="both", expand=True)
     ttk.Label(root, text="AREA ELEMENT INTEGRATION — V116", font=("Segoe UI", 15, "bold")).pack(anchor="w")
-    ttk.Label(root, text="The exported topology contains 350 floor quads and 375 wall quads. This writes a call to add elastic ShellMITC4 floor panels and nonlinear E-SFI-MVLEM_3D wall panels to your existing OpenSees model after nodes and materials are defined. The ETABS wall mesh is preserved; missing quads remain opening gaps.", wraplength=1000).pack(anchor="w", pady=(6, 12))
+    ttk.Label(root, text="Reads source area topology; preview counts reflect the selected export. This writes a call to add elastic ShellMITC4 floor panels and nonlinear E-SFI-MVLEM_3D wall panels to your existing OpenSees model after nodes and materials are defined. The ETABS wall mesh is preserved; missing quads remain opening gaps.", wraplength=1000).pack(anchor="w", pady=(6, 12))
     for label, key, title in rows:
         row = ttk.Frame(root); row.pack(fill="x", pady=4)
         ttk.Label(row, text=label, width=28).pack(side="left")
@@ -442,6 +549,19 @@ def launch_area_integration_gui(parent=None, export_dir=None):
         paths["output"].set(target)
         messagebox.showinfo("Integration call created", f"Review and insert this block into your model-builder after all ETABS nodes and FSAM materials are defined:\n\n{target}\n\nThis helper does not create gravity loads, total seismic mass, P-Delta preload, or an NLTHA-ready model.", parent=win)
     ttk.Button(root, text="Write reviewed area-stage call", command=write_call).pack(anchor="w", pady=8)
+    def export_inventory():
+        if not all(paths[k].get().strip() for k in ("topology","audit","config")):
+            messagebox.showerror('Source files required','Select topology, section audit and config.',parent=win);return
+        try:
+            destination=Path(export_dir).resolve() if export_dir else Path(paths['topology'].get()).resolve().parent
+            workbook,manifest=export_area_integration_inventory(
+                topology_json=paths['topology'].get(),
+                area_assignment_csv=paths['audit'].get(),
+                config_json=paths['config'].get(),output_dir=destination)
+            messagebox.showinfo('Source inventory saved',
+                f'Excel: {workbook}\\nJSON: {manifest}\\n\\nSOURCE REVIEW ONLY: no elements, loads or dynamic analysis executed.',parent=win)
+        except Exception as exc:messagebox.showerror('Area inventory',str(exc),parent=win)
+    ttk.Button(root,text="Export area-object inventory (Excel + JSON)",command=export_inventory).pack(anchor="w",pady=4)
     ttk.Label(root, text="References: Kolozvari, Lopez & Massone (2023), Engineering Structures 294, 116700, doi:10.1016/j.engstruct.2023.116700; E-SFI-MVLEM-3D user docs at github.com/kkolozvari/E-SFI-MVLEM-3D. NBC 105:2025 §7.3.12 governs wall segment/coupling beam representation. ShellMITC4 + elastic plate section is a linear floor panel, not nonlinear slab RC.", wraplength=1000).pack(anchor="w", pady=(8, 0))
     return win
 
