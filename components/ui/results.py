@@ -22,7 +22,7 @@ def library_window(parent,folder):
             status.set('FINISHED | Excel workbook created: '+path)
             try:os.startfile(path)
             except (AttributeError,OSError):
-                messagebox.showinfo('Material + section Excel workbook','Saved workbook:\\n'+path,parent=win)
+                messagebox.showinfo('Material + section Excel workbook','Saved workbook:\n'+path,parent=win)
         except Exception as exc:
             status.set('BLOCKED | Workbook not exported: '+str(exc))
             messagebox.showerror('Material + section Excel export',str(exc),parent=win)
