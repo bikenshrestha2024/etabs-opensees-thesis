@@ -20,6 +20,7 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 | Nonlinear time history | [06_NONLINEAR_TH](06_NONLINEAR_TH/REVIEW.md) | wall first-step failure, material validation |
 | Cross-model ETABS comparisons | [07_ETABS_OPENSEES](07_ETABS_OPENSEES/REVIEW.md) | apples-to-apples force/displacement comparisons |
 | Software and security | [08_SOFTWARE_SECURITY](08_SOFTWARE_SECURITY/REVIEW.md) | ZIP audit, GUI, credential safety |
+| **Engineering Q&A** | [09_ENGINEERING_QA](09_ENGINEERING_QA/README.md) | NBC / IS code hierarchy, signed initial EL, physical NLTHA gravity, ETABS and OpenSees interpretation |
 | Standard issue format | [90_TEMPLATES](90_TEMPLATES/ISSUE_TEMPLATE.md) | evidence and engineering judgment |
 
 ## Required nested folder structure for each local case
