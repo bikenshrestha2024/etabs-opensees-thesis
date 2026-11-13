@@ -53,7 +53,16 @@ A case may start as `NBC105_EQ_PDELTA` **only if**:
 5. NBC §8 / §9.3 requirements (paired motions, scaling, durations, time step, torsion/damping, response checks) are preserved; zero-initial branch stays `CONTROL_NOT_NBC_COMPLIANT` if P-Delta disabled.
 6. Any missing result, wrong sign, stale hash, failed convergence, nonfinite response, unsupported state restoration or “only initial case solved” status must **fail closed** with `PDELTA_INITIAL_STATE_UNVERIFIED`.
 
-## 4. OUTPUT and OWNER — do not scatter across module roots
+## 4. Existing implementation dependency audit — actual repository, not conjecture
+
+- `components/model/initial_pdelta.py` already creates four new-domain static X±/Y± initial checks. **Critical review:** it presently infers dead/live classification from `cfg['mass_factors']` (including the 0.3/0.6 seismic occupancy fractions), which is **not logically equivalent** to identifying the 1.2D versus 0.5IL classes. Before claims of a compulsory native initial-state PASS, read explicit ETABS load-pattern categories/assignments and check every source item; no silent D/IL classification through seismic mass percentages.
+- `components/validation/eq_pdelta_case_contract.py` explicitly recognizes an ETABS two-stage dependency: nonlinear static P-Delta initial case, followed by **linear lateral EQ using initial-case tangent stiffness while excluding initial-case load actions from the dependent response**. This is a *static load-case dependency*; it must not be represented as proof that a nonlinear dynamic solver has restored the same constitutive state. The no-P-Delta native static EQ comparison starts from zero lateral initialization as a **separate** diagnostic case.
+- `components/model/eq_pdelta_initial_tangent.py` is a same-domain **one-step static tangent** diagnostic and does not establish a validated ground-motion NLTHA initial state; it already documents that the second-stage EQ increment acts on the converged initial state. Distinguish *incremental static action* from *time-history ground acceleration* and keep transfer approval OPEN.
+- `docs/review/CONFIRMED_GRAVITY_TO_EQX_EQY_PDELTA_HANDOFF_20261109.md` is older and describes initial cases as diagnostics. For this adopted project workflow, the **compulsory prerequisite** supersedes that wording; actual case convergence and model equivalence are still unverified.
+
+**Actionability:** Future code changes must first fix explicit gravity load classification and validate the four native initial cases; then prove exactly what is transferred (stiffness only versus full state) into EQ P-Delta static and dynamic modules. Do not change member/earthquake load factors only to make a readiness flag pass.
+
+## 5. OUTPUT and OWNER — do not scatter across module roots
 
 Proposed evidence layout for a future code patch (not a claim that it already exists):
 ```text
@@ -72,7 +81,7 @@ RUN_OUTPUT/<source-model-hash>/<limit-state>/
 ```
 **Who:** structural researcher generates initial cases; independent structural reviewer checks combination/force derivation and state-transfer policy; computational reviewer tests numerical reproducibility. **When:** after gravity and modal/stiffness acceptance, before linear TH and nonlinear TH; rerun if mesh, load, material or state changes. **Why:** separate verified NBC compliance from diagnostic P-Delta sensitivity.
 
-## 5. Review findings and open decision
+## 6. Review findings and open decision
 
 | Finding | Status |
 |---|---|
@@ -84,7 +93,7 @@ RUN_OUTPUT/<source-model-hash>/<limit-state>/
 | 2025 IS amendment's exact effect on §7.2(d) / Table 5 | **UNKNOWN** pending authentic amendment text |
 | Native numerical cases, physical tests, transfer scripts and compliance | **NOT RUN / NOT VERIFIED** |
 
-## 6. Source citations
+## 7. Source citations
 
 - Government of Nepal / DUDBC, *NBC 105:2025 Seismic Design of Buildings in Nepal*, 2nd revision, sections 3.4, 5.2, 8.1.1.2–8.1.1.3, 9.3.1.2–9.3.1.3, pp. 42 and 45: https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf
 - BIS, *IS 16700:2023 Criteria for Structural Safety of Tall Concrete Buildings*, 1st rev., 2023, §7.2(d), Table 5; see [amendment watch](../../LITERATURE/Codes_Standards/IS16700_2023_AMENDMENT_TRACKER.md). Base text also available at https://www.rmcmaindia.org/adminpanel/admin/server/upload/1762423704_IS%2016700%20-%202023.pdf
