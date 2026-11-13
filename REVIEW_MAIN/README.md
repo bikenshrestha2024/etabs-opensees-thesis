@@ -43,7 +43,9 @@ REVIEW_MAIN/
 ```
 **Private evidence directories should be created outside the public repository or securely excluded from Git.** This repository contains the review register and issue templates, not raw private evidence. Preserve existing active output paths; copy only redacted review artifacts, never move solver results by assumption.
 
-**Mandatory source hierarchy:** [NBC 105 governing / IS 16700 exceptions matrix](../KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK/NBC105_GOVERNING_CODE_MATRIX.md). All seismic methods and design cases use NBC. IS 16700 provides only the separately labelled initial P-Delta gate and conventional-slab flexural modifier, plus clearly supplementary checks.
+**Mandatory source hierarchy:** [NBC 105 governing / IS 16700 exceptions matrix](../KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK/NBC105_GOVERNING_CODE_MATRIX.md). All seismic methods and design cases use NBC. IS 16700 provides the **COMPULSORY, source-documented signed initial EQ P-Delta cases** and **REQUIRED conventional-slab flexural modifier**, plus clearly supplementary checks.
+
+**P0 initial-state transfer:** [NBC §8.1.1.3/§9.3.1.3 + IS 16700 §7.2(d) source and analysis review](00_MODEL/20261113_NBC_IS_INITIAL_PDELTA_CODE_HIERARCHY.md). EQ with P-Delta must use verified initial P-Delta states without double-counted static EQ; EQ without P-Delta is a diagnostic control, not NBC compliant. All remaining IS checks are supplementary.
 
 ## Review methodology
 1. Freeze a reproducible source manifest: SHA256 of EDB, workbook, export, code revision, ETABS/OpenSees versions, ULS/SLS, load combination, mass and stiffness selection.
