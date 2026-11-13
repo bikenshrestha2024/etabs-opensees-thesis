@@ -1,6 +1,6 @@
 # 01 — Main ETABS-to-OpenSees GUI
 
-**Current launcher:** [`01.py`](../../01.py) (the old 01_WORKFLOW_START.py remains a compatibility alias)
+**Recommended short launcher:** [`01_MAIN_GUI.py`](../../01_MAIN_GUI.py) ([instructions](01_MAIN_GUI.md)). The canonical `01_WORKFLOW_START.py` and underlying `01.py` remain compatible.
 **Previous launcher:** [`01_START_ETABS_TO_OPENSEES.py`](../../01_START_ETABS_TO_OPENSEES.py) (compatibility alias)
 
 ## Goal
@@ -10,7 +10,7 @@ Main ETABS-to-OpenSees GUI. Run from the complete repository with a compatible W
 Confirm the current export folder, validated geometry and section mapping, gravity and mass data, analysis units, selected material cards, and output destination as applicable to this subprogram. Do not mix old saved V156 exports with source modules from the new checkout.
 
 ## Execution
-In Spyder open `01.py` and run. Alternatively from the repository root invoke `python 01.py`. If the script requires arguments (particularly the two diagnostic scripts), inspect the Python source usage and supply an appropriate export or failed-run folder.
+In Spyder open `01_MAIN_GUI.py` and run. Alternatively from the repository root invoke `python 01_MAIN_GUI.py`. If the script requires arguments (particularly the two diagnostic scripts), inspect the Python source usage and supply an appropriate export or failed-run folder.
 
 ## Validation and results
 Review the program's actual run logs, input assumptions, generated files and solver status before interpreting engineering output. Material examples and smoke tests are not experimental calibration, and an incomplete nonlinear earthquake history must not be ranked. The building transient first-step failure remains unresolved.
