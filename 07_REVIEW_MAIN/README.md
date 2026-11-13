@@ -2,6 +2,8 @@
 
 > **New Kobe linear-history evidence:** [full XY/YX pair review, drift and modal provenance](../REVIEW_MAIN/05_LINEAR_TH/20261112_KOBE_FULL_PAIR_TIMING_DRIFT_AND_PERIOD_AUDIT.md). Both cases completed; performance and engineering acceptance remain distinct.
 
+> **Engineering Q&A (new):** [Categorized code, P-Delta initialization, gravity/mass, ETABS/OpenSees and time-history answers](../REVIEW_MAIN/09_ENGINEERING_QA/README.md). Signed ±1.5EL static initial cases do not automatically constitute persistent lateral forcing for each NLTHA record; see the [nine-question explanation](../REVIEW_MAIN/09_ENGINEERING_QA/02_PDELTA_INITIAL_STATES/01_SIGNED_EL_VS_GRAVITY_START.md).
+
 # 07 — Thesis engineering review and discrepancy control
 
 **Canonical numbered navigation:** `07_REVIEW_MAIN/`.  
