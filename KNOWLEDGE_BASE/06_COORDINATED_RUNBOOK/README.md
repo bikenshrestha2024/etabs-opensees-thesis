@@ -1,9 +1,13 @@
 # 06 — Coordinated thesis operations: source → verified analysis → reported evidence
 
 **Updated:** 2026-11-13. **Status:** procedural guidance; not a structural design certificate.
-**Governing seismic code:** NBC 105:2025 (Nepal, second revision). IS 16700:2023 is a supplementary tall-concrete-building reference, subject to its **2025 Amendment No. 1** and deliberate project applicability review; see [amendment tracker](../../LITERATURE/Codes_Standards/IS16700_2023_AMENDMENT_TRACKER.md).
+**Governing seismic code:** **NBC 105:2025 for the complete thesis seismic workflow**. **Two deliberately adopted IS 16700:2023 exceptions only:** initial P-Delta prerequisite §7.2(d) and conventional RC slab flexural stiffness (Table 5: strength 0.25 Ig; serviceability 0.35 Ig). All remaining IS references are labelled *supplementary verification, never NBC replacement*; 2025 BIS amendment text pending. Read the **[mandatory governing-code and exceptions matrix](NBC105_GOVERNING_CODE_MATRIX.md)** and [amendment tracker](../../LITERATURE/Codes_Standards/IS16700_2023_AMENDMENT_TRACKER.md).
 
 This guide **extends** existing [run order](../../00_READ_FIRST_RUN_ORDER.md), [workflow cards](../01_WORKFLOWS/WORKFLOW_CARDS.csv), [launcher index](../../docs/programs/00_PROGRAM_INDEX.md), [engineering gates](../../docs/00_THESIS_ACCEPTANCE_GATES.md), [canonical review register](../../REVIEW_MAIN/README.md), and [AGENTS.md](../../AGENTS.md). It does not rename entry points, relocate historical outputs, change solver physics or duplicate their implementation.
+
+## Code precedence and exceptions
+
+The explicit case-by-case selection and load-case firewall are in [NBC 105 governing-code matrix](NBC105_GOVERNING_CODE_MATRIX.md). No IS 16700 seismic combination, spectrum, ESM, MRSM, elastic TH or nonlinear TH procedure may replace NBC 105:2025. Treat the IS initial P-Delta cases as additional independently run prerequisites, not the NBC design cases or TH preload.
 
 ## Exactly one accountable flow
 
