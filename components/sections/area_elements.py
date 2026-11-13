@@ -377,6 +377,7 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
                                       config_json, output_dir):
     """Source-only Excel + JSON inventory; does not mutate an OpenSees model.
 
+    [REF REVIEW_MAIN/00_MODEL/20261113_STAGE02_AREA_INTEGRATION_AND_SLAB_MESH_STUDY.md]
     A four-node topology preview is not equivalent to instantiating a solver
     element and cannot prove calibrated FSAM material tags, floor loading,
     mass accounting, gravity load path or seismic verification.
