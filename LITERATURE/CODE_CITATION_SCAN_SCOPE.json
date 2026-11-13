@@ -1,8 +1,8 @@
 {
   "source": "LITERATURE/tools/audit_source_citations.py",
   "method": "git ls-files",
-  "files_scanned": 905,
-  "reference_occurrences_with_category_expansion": 2167,
+  "files_scanned": 908,
+  "reference_occurrences_with_category_expansion": 2169,
   "distinct_reference_strings": 298,
   "unmatched_doi_count": 38,
   "errors": [],
