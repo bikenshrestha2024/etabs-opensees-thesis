@@ -4,7 +4,7 @@ Updated: 2026-11-13. **This is a navigable engineering reference and evidence re
 
 ## Governing-code decision (2026-11-13)
 
-**All seismic loading, load combinations, ESM, MRSM, linear and nonlinear time-history analysis, response limits and spectra follow NBC 105:2025.** The project's **only adopted IS 16700 values** are the additional initial P-Delta checks (§7.2(d)) and conventional beam-supported slab flexural stiffness (Table 5: 0.25 Ig strength / 0.35 Ig serviceability); other IS items are **supplementary independent checks** only. See the [authoritative code-purpose matrix](../KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK/NBC105_GOVERNING_CODE_MATRIX.md). Distinguish the IS initial-check combinations from NBC §3.6 and the §5.2 seismic weight / time-history preload. The 2025 BIS amendment must be reconciled before confirming the latest IS text.
+**All seismic loading, load combinations, ESM, MRSM, linear and nonlinear time-history analysis, response limits and spectra follow NBC 105:2025.** The project's **only adopted IS 16700 values** are the **COMPULSORY initial EQ P-Delta cases** (§7.2(d)) and **REQUIRED** conventional beam-supported slab flexural stiffness (Table 5: 0.25 Ig strength / 0.35 Ig serviceability); other IS items are **supplementary independent checks** only. See the [authoritative code-purpose matrix](../KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK/NBC105_GOVERNING_CODE_MATRIX.md). Distinguish the IS initial-check combinations from NBC §3.6 and the §5.2 seismic weight / time-history preload. The 2025 BIS amendment must be reconciled before confirming the latest IS text.
 
 ## Reference source register
 
@@ -43,7 +43,7 @@ Open the actual assembled model data, stiffness configuration and generated comm
 
 ### IS 16700:2023 §7.2(d) — project initial P-Delta gate
 
-The project's prerequisite is four signed X/Y `1.2 DL + 0.5 IL ± 1.5 EL` cases (and wind variants where applicable). They remain labelled as IS-based initial cases, not NBC load combinations. Actual successful solver convergence, gravity state, full model/source identity, selected sign/axis, stiffness and reactions must be recorded for **each** case before the gate is marked reviewed. The initial static P-Delta case is different from sustained NLTHA gravity preload.
+The project's **compulsory prerequisite** is four signed X/Y `1.2 DL + 0.5 IL ± 1.5 EL` cases (and wind variants where applicable). They remain labelled as IS-based initial cases, not NBC load combinations. Actual successful solver convergence, gravity state, full model/source identity, selected sign/axis, stiffness and reactions must be recorded for **each** case before the gate is marked reviewed. Initial EQ EL must be from the NBC seismic coefficient. For `EQ_PDELTA`, the signed initial cases are solved first and a reviewed, physically consistent initial state enters the history; the `EQ_NO_PDELTA` zero-perturbation branch is **diagnostic/non-NBC-compliant** because NBC §§8.1.1.3 and 9.3.1.3 mandate P-Delta. NBC §5.2 gravity must be applied in either branch before seismic analysis. Do **not** retain ±1.5EL as a static earthquake force and superimpose a complete acceleration record without proving the intended lateral-bias semantics and avoiding seismic double counting. See [engineering state-transfer review](../REVIEW_MAIN/00_MODEL/20261113_NBC_IS_INITIAL_PDELTA_CODE_HIERARCHY.md).
 
 ### NBC §§5.5.3, 6.5, 7.5, 8.1.1
 
