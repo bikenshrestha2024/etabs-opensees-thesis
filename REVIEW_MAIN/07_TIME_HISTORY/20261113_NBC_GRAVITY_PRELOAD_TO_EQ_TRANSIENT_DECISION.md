@@ -2,6 +2,8 @@
 
 **Governing:** NBC 105:2025 §§5.2, 8.1.1.2–8.1.1.3 and 9.3.1.2–9.3.1.3. **Supplementary mandatory initial-case rule:** IS 16700:2023 §7.2(d) for signed EQ P-Delta initialization (2025 BIS amendment text pending). **Status:** method selection; building's native equivalent analysis and full NLTHA still not validated.
 
+> **Engineering questions answered:** [Nine questions on compulsory signed IS P-Delta initial cases, NBC §5.2 gravity and nonlinear state transfer](../09_ENGINEERING_QA/02_PDELTA_INITIAL_STATES/01_SIGNED_EL_VS_GRAVITY_START.md). Here we retain the canonical adopted decision and open validation gates.
+
 ## Decision
 
 The nonlinear time-history analysis starts from a *converged NBC §5.2 gravity equilibrium*, retaining actual gravity-induced axial forces, strains and displacements and geometric nonlinearity. Freeze already-applied gravity patterns with `ops.loadConst('-time',0.0)` and remove **only** existing analysis objects with `ops.wipeAnalysis()` before defining the transient solver. New `UniformExcitation` patterns are added **after** the freeze. `ops.wipe()` is forbidden because it destroys the domain/state.
