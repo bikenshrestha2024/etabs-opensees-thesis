@@ -2,6 +2,10 @@
 
 Updated: 2026-11-13. **This is a navigable engineering reference and evidence register, NOT a certification of the current ETABS/OpenSees model.** Each claim below must be traced to the indicated code/source and current assembled inputs. Source code may contain a reference while the numerical model implements a different effective value. Obtain approval of the governing project design basis.
 
+## Governing-code decision (2026-11-13)
+
+**All seismic loading, load combinations, ESM, MRSM, linear and nonlinear time-history analysis, response limits and spectra follow NBC 105:2025.** The project's **only adopted IS 16700 values** are the additional initial P-Delta checks (§7.2(d)) and conventional beam-supported slab flexural stiffness (Table 5: 0.25 Ig strength / 0.35 Ig serviceability); other IS items are **supplementary independent checks** only. See the [authoritative code-purpose matrix](../KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK/NBC105_GOVERNING_CODE_MATRIX.md). Distinguish the IS initial-check combinations from NBC §3.6 and the §5.2 seismic weight / time-history preload. The 2025 BIS amendment must be reconciled before confirming the latest IS text.
+
 ## Reference source register
 
 | Source | URL | Relevant use | Evidence status |
