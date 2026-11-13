@@ -5,6 +5,7 @@ The native ETABS workflow explicitly separates:
   linear lateral EQ (=1.0) using stiffness from that initial case,
   initial loads NOT included in the dependent response.
 The unamplified response and code design-amplified response are different.
+The initial checks are COMPULSORY for this adopted thesis workflow, not optional diagnostics; native ETABS case evidence is still required. This contract compares dependent linear-static EQ response with initial-case tangent stiffness and initial actions excluded; it is NOT evidence of a full nonlinear transient initial-state transfer. NBC §§8.1.1.2–8.1.1.3/9.3.1.2–9.3.1.3 govern TH gravity/P-Delta. [REF REVIEW_MAIN/00_MODEL/20261113_NBC_IS_INITIAL_PDELTA_CODE_HIERARCHY.md]
 """
 from __future__ import annotations
 import math
