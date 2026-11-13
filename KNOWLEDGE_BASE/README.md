@@ -11,6 +11,7 @@
 - [Folder architecture](02_REPOSITORY_STRUCTURE/README.md) — where files belong, canonical location, how to add new files safely and what must not move.
 - [UI speed and accuracy](03_UI_PERFORMANCE/README.md) — background evidence hashing, stale results, feedback and native solver speed gates.
 - [Physical engineering checks](04_ENGINEERING_GATES/README.md) — separation of numerical, source, material and code status.
+- [Coordinated operations and code-amendment gate](06_COORDINATED_RUNBOOK/README.md) — source-to-solver workflow, owner roles, review statuses and 2025 IS 16700 amendment check.
 - [Knowledge ownership and update policy](05_PROVENANCE_OWNERSHIP/README.md) — source, reviewer responsibilities and explicit gaps.
 - [Knowledge map audit](../tools/audit_knowledge_map.py) — offline machine-readable paths and completeness checks, without importing OpenSees or disclosing private inputs.
 

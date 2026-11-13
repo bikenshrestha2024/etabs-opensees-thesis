@@ -1,6 +1,7 @@
 """Actual signed elastic stability checks; diagnostic EL profile, kN-m-s.
 
 The reference EL is explicitly not an eligible high-rise ULS ESM design case.
+Source hierarchy: NBC 105:2025 supplies the seismic coefficient/EL actions; IS 16700:2023 §7.2(d) supplies the compulsory project initial combination. NBC §§8.1.1.3/9.3.1.3 require P-Delta in time histories. This module solves initial checks only; it does not certify state transfer into a time-history solver. WARNING: current D/IL factor classification uses seismic mass_factors as a proxy: review explicit ETABS load categories before accepting results. [REF REVIEW_MAIN/00_MODEL/20261113_NBC_IS_INITIAL_PDELTA_CODE_HIERARCHY.md]
 Every sign/direction builds a fresh domain; the caller rebuilds its final state.
 """
 
