@@ -380,6 +380,9 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
     A four-node topology preview is not equivalent to instantiating a solver
     element and cannot prove calibrated FSAM material tags, floor loading,
     mass accounting, gravity load path or seismic verification.
+
+    [REF components/sections/area_elements.py _load_topology/_quad_geometry]
+    [REF docs/REF_TAG_CONVENTION.md] Source-only audit, not design approval.
     """
     import hashlib
     from datetime import datetime, timezone
