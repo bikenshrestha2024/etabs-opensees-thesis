@@ -65,12 +65,16 @@ def registered_project_source(export_dir, role, *, missing_lfs='error'):
                         return None
                     if missing_lfs != 'error':
                         raise ValueError("Unsupported missing_lfs policy")
-                    raise ValueError(
-                        "Registered workbook is a Git LFS pointer; git lfs pull "
-                        "requires an actual clone and matching SHA256: " +
-                        str(path) + " (" + str(reason) + "). "
-                        "Select the original workbook only in the explicit "
-                        "gravity-native validation workflow.")
+                    # Explicit downstream resolver may run after GUI
+                    # conversion preflight. Reuse the EDB/SHA-bound picker,
+                    # never substitute a guessed or mismatched Excel source.
+                    from components.inputs.lfs_workbook_recovery import (
+                        select_original_workbook_for_registered_pointer)
+                    selected=select_original_workbook_for_registered_pointer(
+                        pointer=path,expected_sha256=entry["sha256"],
+                        export_dir=export_dir,edb_hash=data["source_edb_sha256"],
+                        role=role,status=reason)
+                    return str(selected.resolve())
         if not path.is_file() or digest(path) != entry.get('sha256'):
             raise ValueError('Registered source changed or missing: '+role)
         return str(path.resolve())
