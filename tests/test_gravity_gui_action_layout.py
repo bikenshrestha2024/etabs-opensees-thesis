@@ -58,7 +58,7 @@ class GravityLayoutTests(unittest.TestCase):
         self.assertIn('"CANCELLED":("#92400e","#fef3c7")',source)
         self.assertIn("PROCESS STATUS ONLY",source)
         self.assertIn("ETABS equivalence not inferred",source)
-        self.assertIn("def _set_gravity_operation",self.funcs)
+        self.assertIn("_set_gravity_operation",self.funcs)
 
     def test_physics_callbacks_and_analysis_routines_remain_named(self):
         for callback in ("run", "run_both_wall_supports", "_inputs",
