@@ -5,6 +5,8 @@
 
 This guide **extends** existing [run order](../../00_READ_FIRST_RUN_ORDER.md), [workflow cards](../01_WORKFLOWS/WORKFLOW_CARDS.csv), [launcher index](../../docs/programs/00_PROGRAM_INDEX.md), [engineering gates](../../docs/00_THESIS_ACCEPTANCE_GATES.md), [canonical review register](../../REVIEW_MAIN/README.md), and [AGENTS.md](../../AGENTS.md). It does not rename entry points, relocate historical outputs, change solver physics or duplicate their implementation.
 
+**Searchable engineering explanations and recorded questions:** [REVIEW_MAIN/09_ENGINEERING_QA](../../REVIEW_MAIN/09_ENGINEERING_QA/README.md) (governing code, gravity/mass, initial P-Delta, ETABS/OpenSees tangent stiffness and dynamic handoff). See also [the detailed static-EL versus NLTHA-start explanation](../../REVIEW_MAIN/09_ENGINEERING_QA/02_PDELTA_INITIAL_STATES/01_SIGNED_EL_VS_GRAVITY_START.md).
+
 ## Code precedence and exceptions
 
 The explicit case-by-case selection and load-case firewall are in [NBC 105 governing-code matrix](NBC105_GOVERNING_CODE_MATRIX.md). No IS 16700 seismic combination, spectrum, ESM, MRSM, elastic TH or nonlinear TH procedure may replace NBC 105:2025. Treat the **compulsory** IS initial P-Delta combinations as independently converged X±/Y± cases using NBC seismic-coefficient EL before P-Delta enabled linear/nonlinear TH; no-P-Delta / zero-initial branch is a **control only** and cannot be accepted as NBC-compliant. Verify initial-state transfer without static EL + dynamic acceleration double counting; keep §5.2 gravity in the analysis. See [P0 transfer review](../../REVIEW_MAIN/00_MODEL/20261113_NBC_IS_INITIAL_PDELTA_CODE_HIERARCHY.md).
