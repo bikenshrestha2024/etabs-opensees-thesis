@@ -2213,7 +2213,7 @@ def convert_model(edb, outdir, log, include_live=True):
 # ============================================================================
 class App:
     def __init__(self,root):
-        self.root=root; root.title("ETABS → OpenSeesPy | NBC 105 Workflow — 2026-11-11 source and gravity routing fixes")
+        self.root=root; root.title("ETABS → OpenSeesPy | NBC 105:2025 Research Workflow")
         root.geometry("1320x880"); root.minsize(1000,700); root.configure(bg="#eef2f7")
         source_folder=Path(__file__).resolve().parent/'components'
         if not source_folder.is_dir():source_folder=Path(__file__).resolve().parent/'OpenSees_Runtime_V118/components'
@@ -2281,7 +2281,7 @@ class App:
             self._launcher_actions.append((group_stages[str(parent)],str(text),button))
             return button
         stage_0=ttk.Frame(stage_tabs,padding=8)
-        stage_tabs.add(stage_0,text="1. Import & audit")
+        stage_tabs.add(stage_0,text="1. Import")
         stage_0.columnconfigure(0,weight=1,uniform="stagecols")
         stage_0.columnconfigure(1,weight=1,uniform="stagecols")
         ttk.Label(stage_0,text="Read the original ETABS EDB, inspect connectivity and source loads. Keep the EDB unchanged.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
@@ -2289,7 +2289,7 @@ class App:
         group_0_1=make_group(stage_0,"Source audits","Import & audit",1)
         stage_frames.append(stage_0)
         stage_1=ttk.Frame(stage_tabs,padding=8)
-        stage_tabs.add(stage_1,text="2. Build the model")
+        stage_tabs.add(stage_1,text="2. Model")
         stage_1.columnconfigure(0,weight=1,uniform="stagecols")
         stage_1.columnconfigure(1,weight=1,uniform="stagecols")
         ttk.Label(stage_1,text="Reconcile ETABS geometry, connectivity, sections, walls and device assignments.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
@@ -2297,7 +2297,7 @@ class App:
         group_1_1=make_group(stage_1,"Load path and devices","Build the model",1)
         stage_frames.append(stage_1)
         stage_2=ttk.Frame(stage_tabs,padding=8)
-        stage_tabs.add(stage_2,text="3. Gravity & NBC setup")
+        stage_tabs.add(stage_2,text="3. Gravity / NBC")
         stage_2.columnconfigure(0,weight=1,uniform="stagecols")
         stage_2.columnconfigure(1,weight=1,uniform="stagecols")
         ttk.Label(stage_2,text="Validate gravity loads, mass, combinations and initial P-Delta before seismic response.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
@@ -2305,7 +2305,7 @@ class App:
         group_2_1=make_group(stage_2,"NBC prerequisites","Gravity & NBC setup",1)
         stage_frames.append(stage_2)
         stage_3=ttk.Frame(stage_tabs,padding=8)
-        stage_tabs.add(stage_3,text="4. Linear analysis")
+        stage_tabs.add(stage_3,text="4. Linear")
         stage_3.columnconfigure(0,weight=1,uniform="stagecols")
         stage_3.columnconfigure(1,weight=1,uniform="stagecols")
         ttk.Label(stage_3,text="Reference ESM, modal/RSA and linear time-history analyses on the reviewed model.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
@@ -2313,7 +2313,7 @@ class App:
         group_3_1=make_group(stage_3,"Dynamic linear","Linear analysis",1)
         stage_frames.append(stage_3)
         stage_4=ttk.Frame(stage_tabs,padding=8)
-        stage_tabs.add(stage_4,text="5. Nonlinear analysis")
+        stage_tabs.add(stage_4,text="5. Nonlinear")
         stage_4.columnconfigure(0,weight=1,uniform="stagecols")
         stage_4.columnconfigure(1,weight=1,uniform="stagecols")
         ttk.Label(stage_4,text="Review readiness, then run controlled nonlinear models and paired records.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
@@ -2321,7 +2321,7 @@ class App:
         group_4_1=make_group(stage_4,"Research and progression","Nonlinear analysis",1)
         stage_frames.append(stage_4)
         stage_5=ttk.Frame(stage_tabs,padding=8)
-        stage_tabs.add(stage_5,text="6. Material laboratory")
+        stage_tabs.add(stage_5,text="6. Materials")
         stage_5.columnconfigure(0,weight=1,uniform="stagecols")
         stage_5.columnconfigure(1,weight=1,uniform="stagecols")
         ttk.Label(stage_5,text="Inspect literature parameters and experiment-based component calibration.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
@@ -2329,7 +2329,7 @@ class App:
         group_5_1=make_group(stage_5,"Component benchmarks","Material laboratory",1)
         stage_frames.append(stage_5)
         stage_6=ttk.Frame(stage_tabs,padding=8)
-        stage_tabs.add(stage_6,text="7. Review & results")
+        stage_tabs.add(stage_6,text="7. Results")
         stage_6.columnconfigure(0,weight=1,uniform="stagecols")
         stage_6.columnconfigure(1,weight=1,uniform="stagecols")
         ttk.Label(stage_6,text="Compare like-for-like source-verified responses, interpret drift and export evidence.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
@@ -2384,7 +2384,8 @@ class App:
         ttk.Label(group_2_1,text="Research force profiles and modal/ESM summaries are not accepted native responses. Confirm source mass, P-Delta and source identities.",wraplength=410,justify="left",foreground="#8a3412").pack(anchor="w",pady=8)
         ttk.Label(group_4_0,text="Full NLTHA requires source-verified materials, gravity and P-Delta, matched earthquake pairs, stable integration and complete convergence.",wraplength=410,justify="left",foreground="#8a3412").pack(anchor="w",pady=8)
         search_tab=ttk.Frame(stage_tabs,padding=10)
-        stage_tabs.add(search_tab,text="Search results")
+        stage_tabs.add(search_tab,text="Search")
+        previous_workflow_stage=[str(stage_0)]
         search_note=ttk.Label(search_tab,text="Type a tool name above to search all workflows.")
         search_note.pack(anchor="w",pady=(0,8))
         search_results=ttk.Frame(search_tab);search_results.pack(fill="both",expand=True)
@@ -2393,6 +2394,8 @@ class App:
             needle=workflow_search.get().strip().casefold()
             if not needle:
                 search_note.configure(text="Type a tool name above to search all workflows.")
+                if stage_tabs.select()==str(search_tab):
+                    stage_tabs.select(previous_workflow_stage[0])
                 return
             matches=[(stage,label,original) for stage,label,original in self._launcher_actions if needle in (stage+" "+label).casefold()]
             search_note.configure(text=f"{len(matches)} matching tool(s) — select an action to open its original module.")
@@ -2400,6 +2403,8 @@ class App:
                 ttk.Label(search_results,text="No matching tools. Try a shorter keyword (e.g. wall, modal, gravity).").pack(anchor="w",pady=5)
             for stage,label,original in matches:
                 ttk.Button(search_results,text=stage+"  ·  "+label,command=original.invoke).pack(fill="x",pady=2)
+            if stage_tabs.select()!=str(search_tab):
+                previous_workflow_stage[0]=stage_tabs.select()
             stage_tabs.select(search_tab)
         workflow_search.trace_add("write",update_search)
         logcard=ttk.Frame(shell,style="Card.TFrame",padding=10); logcard.pack(fill="both",expand=True)
