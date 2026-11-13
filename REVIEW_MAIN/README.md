@@ -6,6 +6,8 @@
 
 This is a non-destructive, public-safe REVIEW directory. Do not upload the original EDB, drawings, XLSX, ground motions, access tokens, or unredacted result ZIPs to GitHub. Preserve source hashes and exact project states. A passing Python test, internal force equilibrium, or converged transient is not proof of ETABS–OpenSees equivalence or code compliance.
 
+**Cross-stage operating procedure:** [KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK](../KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK/README.md) — canonical numbered launchers, source/mass/mesh/stiffness gates, repeatable evidence and ownership; [IS 16700 amendment tracker](../LITERATURE/Codes_Standards/IS16700_2023_AMENDMENT_TRACKER.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|
