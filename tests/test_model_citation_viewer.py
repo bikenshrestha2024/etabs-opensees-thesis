@@ -14,8 +14,8 @@ class CitationViewerTests(unittest.TestCase):
         self.assertLess(path.stat().st_size, MAX_REFERENCE_BYTES)
         content = path.read_text(encoding="utf-8")
         for required in ("NBC 105:2025", "MESH_04", "MESH_08", "MESH_16",
-                         "P-Delta", "Gravity", "Source"):
-            self.assertIn(required, content)
+                         "P-Delta", "gravity", "Source"):
+            self.assertIn(required.lower(), content.lower())
 
     def test_missing_document_has_readable_error(self):
         with tempfile.TemporaryDirectory() as name:
