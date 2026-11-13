@@ -199,7 +199,7 @@ def validate_device(selection):
 
 @timed_outputs('Mapping and load audit workbook','folder')
 def export_excel(folder,path=None):
-    """Application export, using its existing installed Python Excel backend."""
+    """[REF docs/source/components/sections/mapping_audit.py.md] Copy-safe audit; use timestamped sibling when original is locked."""
     from openpyxl import Workbook
     from openpyxl.styles import Font,PatternFill,Alignment
     data=collect(folder);path=Path(path or Path(folder)/'OpenSees_Property_Element_Load_Audit_V125.xlsx')
@@ -224,6 +224,22 @@ def export_excel(folder,path=None):
     sheet('Library parameters',data['parameters'])
     sheet('Device selections',[dict(key=k,**v) for k,v in data['selections'].get('assignments',{}).items()])
     sheet('Scope',[dict(item='Source EDB',value=data['source_edb']),dict(item='Device activation',value=data['selections'].get('active',False)),dict(item='Material assumptions',value='RC template values are not calibrated project values. See Library parameters.'),dict(item='Assembly warnings',value=data['assembly'].get('warnings',[]))])
-    wb.save(path)
+    # A user may have the prior Excel audit open. Do not fail the review or
+    # overwrite that workbook: preserve it and create a timestamped sibling.
+    try:
+        wb.save(path)
+    except PermissionError as exc:
+        from datetime import datetime
+        suffix=datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        alternate=path.with_name(path.stem+'_OPEN_WORKBOOK_'+suffix+path.suffix)
+        try:
+            wb.save(alternate)
+        except OSError as second:
+            raise PermissionError(
+                f"Audit workbook is locked or unwritable: {path}. "
+                f"Fallback {alternate} also failed: {second}. "
+                "Close Excel or choose a writable output directory."
+            ) from second
+        path=alternate
     Path(folder,'OpenSees_Device_and_Parameter_Library_V125.json').write_text(json.dumps(dict(library=library(),parameter_sources=parameter_sources()),indent=2),encoding='utf-8')
     return path
