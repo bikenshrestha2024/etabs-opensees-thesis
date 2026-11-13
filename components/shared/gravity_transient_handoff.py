@@ -37,7 +37,7 @@ def freeze_verified_gravity(ops: Any, *, case: str, builder_gravity_converged: b
     -------
     dict
         Minimal handoff state. This is not a numerical equivalence certificate.
-    """
+     [REF docs/source/components/shared/gravity_transient_handoff.py.md]"""
     if builder_gravity_converged is not True:
         raise RuntimeError(
             f"{case}: gravity not independently confirmed converged; "

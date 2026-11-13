@@ -24,7 +24,9 @@ SHEETS = (
 )
 
 def library_tables(folder):
-    """Single source of truth used by both GUI and Excel; never infer approval."""
+    """Single source of truth used by both GUI and Excel; never infer approval.
+    [REF docs/source/components/sections/library_excel.py.md]
+    """
     from OpenSees_Mapping_Audit_V125 import (
         library, parameter_sources, source_parameter_inventory, validation_inventory
     )
@@ -61,6 +63,7 @@ def export_material_section_library(folder, path=None, *, tables=None):
     The workbook stores read-only source records, not an OpenSees input file.
     It will never silently overwrite a previous snapshot or alter the .EDB.
     Explicit `tables` permits deterministic tests, with no native ETABS access.
+    [REF docs/source/components/sections/library_excel.py.md]
     """
     try:
         from openpyxl import Workbook

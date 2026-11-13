@@ -218,17 +218,20 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     wb.calculation=CalcProperties(calcId=191029,fullCalcOnLoad=True)
 
 
-def export(folder):
+def export(folder, *, output_root=None):
+    """Verified mesh-specific formula workbook from *matching* assembled model.
+
+    Validate the config SHA and mesh size BEFORE generating any workbook cells.
+    `output_root` lets isolated 4/8/16 run directories place their reports
+    beside one another rather than nesting another 02_MODEL path.
+    """
     from openpyxl import Workbook
-    folder=Path(folder);wb=Workbook();wb.remove(wb.active);add_formula_audit(wb,folder)
-    if not wb.worksheets:raise ValueError('Rebuild the assembled model first')
-    # Filename and directory identify the actual assembled mesh. A saved GUI
-    # choice is insufficient: the assembled model records its config hash.
+    import hashlib
+    folder=Path(folder)
     cfg_path=folder/'OpenSees_Complete_Model_Config_V118.json'
     model_path=folder/'OpenSees_Complete_Model_Data_V118.json'
     if not cfg_path.is_file() or not model_path.is_file():
-        raise ValueError('Rebuild complete OpenSees model before exporting mesh-specific formulas.')
-    import hashlib
+        raise ValueError('Source configuration and assembled model missing. Use "Build selected mesh + export workbook" to create an isolated current mesh run.')
     cfg=json.loads(cfg_path.read_text(encoding='utf-8-sig'))
     data=json.loads(model_path.read_text(encoding='utf-8-sig'))
     n=int(cfg.get('floor_subdivisions',4))
@@ -236,54 +239,165 @@ def export(folder):
         raise ValueError('Mesh comparison requires subdivision 4, 8 or 16; received '+str(n))
     actual=hashlib.sha256(cfg_path.read_bytes()).hexdigest()
     if data.get('config_sha256')!=actual:
-        raise ValueError('Model is stale for this mesh configuration. Rebuild from this export, then regenerate the load-path workbook.')
-    root=folder/'02_MODEL'/'SLAB_LOAD_PATH'/f'MESH_{n:02d}'
-    excel_dir=root/'excel';json_dir=root/'json'
+        raise ValueError('Model config changed after assembly. Do not label old slab cells with new mesh size; choose "Build selected mesh + export workbook" to assemble a matching model.')
+    if not any(e.get('category')=='FLOOR' for e in data.get('shells',[])):
+        raise ValueError('No assembled FLOOR shell cells found: a mesh-size-specific workbook would be misleading.')
+    wb=Workbook();wb.remove(wb.active)
+    add_formula_audit(wb,folder,data=data,cfg=cfg)
+    if not wb.worksheets:raise ValueError('Complete model does not contain enough source load-path data')
+    root=Path(output_root) if output_root is not None else folder/'02_MODEL'/'SLAB_LOAD_PATH'/f'MESH_{n:02d}'
+    excel_dir=root/'EXCEL';json_dir=root/'JSON'
     excel_dir.mkdir(parents=True,exist_ok=True);json_dir.mkdir(parents=True,exist_ok=True)
-    path=excel_dir/f'Slab_Load_Path_MESH_{n:02d}_V141.xlsx'
+    from datetime import datetime
+    stamp=datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    path=excel_dir/f'Slab_Load_Path_MESH_{n:02d}_{stamp}_V141.xlsx'
     wb.save(path)
     record=dict(mesh_subdivisions=n,config_sha256=actual,
                 assembled_model=str(model_path),workbook=str(path),
                 floor_shell_cells=sum(e.get('category')=='FLOOR' for e in data.get('shells',[])),
                 total_shell_cells=len(data.get('shells',[])),
                 validity='FORMULA_AUDIT_ONLY_NOT_SOLVER_VERIFICATION',
-                warning='Do not compare reaction, moments or deflections until gravity solves with matching mesh and load/support definitions exist')
-    (json_dir/f'Slab_Load_Path_MESH_{n:02d}_MANIFEST.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
+                warning='No reactions, beam forces or mesh-convergence results are inferred. Run separate matching gravity solves with ETABS response comparison')
+    (json_dir/f'Slab_Load_Path_MESH_{n:02d}_{stamp}_MANIFEST.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
     return path
 
 
 def launch(parent,folder):
+    """2 Model: nonblocking, isolated three-mesh load-path review interface."""
+    import os
+    import threading
     import tkinter as tk
-    from tkinter import ttk,messagebox
-    folder=Path(folder);config=folder/'OpenSees_Complete_Model_Config_V118.json'
+    from tkinter import ttk, messagebox
+    from components.gravity.mesh_cases import prepared_configs, build_case, case_base
+
+    folder=Path(folder)
+    config=folder/'OpenSees_Complete_Model_Config_V118.json'
     cfg=json.loads(config.read_text(encoding='utf-8-sig')) if config.is_file() else {}
-    win=tk.Toplevel(parent);win.title('Slab vertical load path / mesh and formula audit');win.geometry('850x360')
-    ttk.Label(win,text='Vertical loads act on ShellMITC4 mesh nodes. Rigid diaphragm UX/UY/RZ constraints do not carry gravity. Shared mesh nodes connect slab bending to beam spans and walls. Beam force distributions come from the solver, not an extra tributary UDL.',wraplength=800).pack(padx=12,pady=10)
-    choice=tk.StringVar(value=str(cfg.get('floor_subdivisions',4)))
-    ttk.Label(win,text='Subdivisions in each source slab-panel direction (4 starting mesh; compare 8 and 16 for convergence)').pack(anchor='w',padx=12)
-    ttk.Combobox(win,textvariable=choice,values=['2','4','8','16'],state='readonly').pack(anchor='w',padx=12)
-    def save():
-        if not config.is_file():messagebox.showerror('Mesh','Export the model first.',parent=win);return
-        cfg['floor_subdivisions']=int(choice.get());config.write_text(json.dumps(cfg,indent=2),encoding='utf-8')
-        messagebox.showinfo('Mesh setting saved','Rebuild the assembled export, then rerun gravity and other analyses. Old results are not updated by this setting.',parent=win)
-    def workbook():
-        try:__import__('os').startfile(str(export(folder)))
-        except Exception as exc:messagebox.showerror('Load path',str(exc),parent=win)
-    ttk.Button(win,text='Save mesh choice (rebuild required)',command=save).pack(padx=12,pady=8,anchor='w')
-    ttk.Button(win,text='Export verified current mesh workbook (MESH_04 / 08 / 16)',command=workbook).pack(padx=12,anchor='w')
+    win=tk.Toplevel(parent)
+    win.title('02 Model | Slab mesh and load-path study')
+    win.geometry('920x570')
+    win.minsize(680,440)
+    outer=ttk.Frame(win,padding=14)
+    outer.pack(fill='both',expand=True)
+    ttk.Label(outer,text='SLAB MESH & LOAD-PATH STUDY',
+              font=('Segoe UI',14,'bold')).pack(anchor='w',pady=(0,6))
+    ttk.Label(outer,wraplength=870,
+              text='Four, eight and sixteen subdivisions are independent models. '
+              'Saved mesh configurations are NOT assembled ShellMITC4 cells. '
+              'Rebuild each size from the same ETABS source audit before exporting '
+              'its formula workbook; later run independent gravity analysis for '
+              'load transfer and ETABS equivalence.').pack(anchor='w',pady=(0,10))
+    header=ttk.Frame(outer)
+    header.pack(fill='x',pady=(0,9))
+    ttk.Label(header,text='Selected mesh subdivisions:').pack(side='left')
+    choice=tk.StringVar(value=str(cfg.get('floor_subdivisions',4)) if
+                        cfg.get('floor_subdivisions',4) in (4,8,16) else '4')
+    ttk.Combobox(header,textvariable=choice,values=['4','8','16'],state='readonly',
+                 width=8).pack(side='left',padx=9)
+    current=ttk.Label(header,text='Current root config: '+str(cfg.get('floor_subdivisions','unknown')))
+    current.pack(side='left',padx=10)
+
+    status=tk.StringVar(value='READY | Select mesh and build a fresh independent model.')
+    ttk.Label(outer,textvariable=status,wraplength=875).pack(fill='x',pady=(0,7))
+    controls=ttk.Frame(outer)
+    controls.pack(fill='x',pady=(0,8))
+    ttk.Label(controls,text='1  PREPARE',font=('Segoe UI',10,'bold')).grid(row=0,column=0,sticky='w')
+    ttk.Label(controls,text='2  ASSEMBLE + EXPORT',font=('Segoe UI',10,'bold')).grid(row=0,column=1,sticky='w',padx=12)
+    ttk.Label(controls,text='3  INSPECT',font=('Segoe UI',10,'bold')).grid(row=0,column=2,sticky='w')
+    buttons=[]
+
+    def log(message):
+        text.configure(state='normal')
+        text.insert('end',message+'\\n')
+        text.see('end')
+        text.configure(state='disabled')
+
     def prepare():
-        if not config.is_file():
-            messagebox.showerror('Mesh comparison','Export model first.',parent=win);return
-        src=json.loads(config.read_text(encoding='utf-8-sig'))
-        root=folder/'02_MODEL'/'SLAB_LOAD_PATH'/'PREPARED_CONFIGS'
-        root.mkdir(parents=True,exist_ok=True)
-        for n in (4,8,16):
-            modified=dict(src,floor_subdivisions=n)
-            target=root/f'Model_Config_MESH_{n:02d}.json'
-            target.write_text(json.dumps(modified,indent=2),encoding='utf-8')
-        messagebox.showinfo('Mesh cases prepared',
-            'Three independent mesh configs saved in '+str(root)+'\\n\\n'
-            'Each must be used to rebuild the assembled model and run gravity independently. '
-            'These configs are not completed analysis cases and no reactions are fabricated.',parent=win)
-    ttk.Button(win,text='Prepare MESH_04 / MESH_08 / MESH_16 configurations',command=prepare).pack(padx=12,pady=6,anchor='w')
+        try:
+            paths=prepared_configs(folder)
+            status.set('PREPARED ONLY | MESH_04, MESH_08, MESH_16 settings saved; no analysis was run.')
+            log('PREPARED CONFIGS: '+', '.join(str(p) for p in paths))
+        except Exception as exc:
+            status.set('BLOCKED | '+str(exc))
+            messagebox.showerror('Prepare mesh configurations',str(exc),parent=win)
+
+    def start_build():
+        size=int(choice.get())
+        # Separate run snapshots preserve all three models and permit
+        # comparison later; no root config, EDB or existing gravity results are
+        # changed. Model generation can take time, so never block Tk's loop.
+        def report_failure(exc):
+            for b in buttons:b.configure(state='normal')
+            status.set('FAILED | '+str(exc))
+            log('FAILED MESH_'+str(size).zfill(2)+': '+str(exc))
+            messagebox.showerror('Mesh build failed',str(exc),parent=win)
+        def report_success(result):
+            for b in buttons:b.configure(state='normal')
+            status.set('FORMULA EXPORTED | MESH_'+str(size).zfill(2)+' (gravity/ETABS verification still required)')
+            log('MESH_'+str(size).zfill(2)+' ASSEMBLED: '+result['assembled_model'])
+            log('WORKBOOK: '+result['workbook'])
+            log('REVIEW: no independent gravity solver run / reaction match performed')
+            messagebox.showinfo('Mesh formula workbook created',
+                'Saved a new assembled model and formula workbook.\\n\\n'
+                +result['workbook']+
+                '\\n\\nThis is NOT an independently solved gravity or NBC acceptance case.',
+                parent=win)
+        for b in buttons:b.configure(state='disabled')
+        status.set('RUNNING | Fresh MESH_'+str(size).zfill(2)+' assembly from saved source audit ...')
+        log('START | MESH_'+str(size).zfill(2)+' | new independent model run, not just a renamed spreadsheet')
+        def work():
+            try:
+                result=build_case(folder,size)
+            except Exception as exc:
+                try:win.after(0,lambda e=exc:report_failure(e))
+                except tk.TclError:pass
+            else:
+                try:win.after(0,lambda r=result:report_success(r))
+                except tk.TclError:pass
+        threading.Thread(target=work,name='slab_mesh_'+str(size),daemon=True).start()
+
+    def current_workbook():
+        try:
+            workbook=export(folder)
+            status.set('FORMULA EXPORTED | Original assembled root model; gravity not verified.')
+            log('CURRENT MODEL WORKBOOK: '+str(workbook))
+            if hasattr(os,'startfile'):os.startfile(str(workbook))
+            else:messagebox.showinfo('Workbook exported','Saved: '+str(workbook),parent=win)
+        except Exception as exc:
+            status.set('BLOCKED | '+str(exc))
+            messagebox.showwarning('Stale or incomplete model',
+                str(exc)+'\\n\\nUse "Build selected mesh + Excel" to create a fresh independent case.',
+                parent=win)
+    def open_cases():
+        root=folder/'02_MODEL'/'SLAB_LOAD_PATH'
+        if not root.is_dir():
+            messagebox.showinfo('Mesh cases','Prepare or build the cases first.',parent=win)
+        elif hasattr(os,'startfile'):os.startfile(str(root))
+        else:messagebox.showinfo('Mesh case folder',str(root),parent=win)
+    prep_button=ttk.Button(controls,text='Prepare 4 / 8 / 16 configs',command=prepare)
+    build_button=ttk.Button(controls,text='Build selected mesh + Excel',command=start_build)
+    open_button=ttk.Button(controls,text='Open case output folders',command=open_cases)
+    prep_button.grid(row=1,column=0,sticky='ew',pady=5)
+    build_button.grid(row=1,column=1,sticky='ew',padx=12,pady=5)
+    open_button.grid(row=1,column=2,sticky='ew',pady=5)
+    controls.columnconfigure(0,weight=1);controls.columnconfigure(1,weight=1);controls.columnconfigure(2,weight=1)
+    buttons.extend((prep_button,build_button))
+    advanced=ttk.LabelFrame(outer,text='Existing root export — only if it is already rebuilt',padding=9)
+    advanced.pack(fill='x',pady=(2,7))
+    ttk.Button(advanced,text='Export root assembled mesh workbook (hash-checked)',
+               command=current_workbook).pack(side='left')
+    ttk.Label(advanced,text='A changed mesh setting intentionally invalidates this older assembled model.',
+              wraplength=440).pack(side='left',padx=10)
+    ttk.Label(outer,text='Run log (copyable)',font=('Segoe UI',10,'bold')).pack(anchor='w')
+    panel=ttk.Frame(outer)
+    panel.pack(fill='both',expand=True)
+    text=tk.Text(panel,height=8,wrap='none',state='disabled')
+    vert=ttk.Scrollbar(panel,orient='vertical',command=text.yview)
+    horiz=ttk.Scrollbar(outer,orient='horizontal',command=text.xview)
+    text.configure(yscrollcommand=vert.set,xscrollcommand=horiz.set)
+    text.pack(side='left',fill='both',expand=True)
+    vert.pack(side='right',fill='y')
+    horiz.pack(fill='x')
+    log('Each mesh run has its own source snapshot, model config hash, build status, and Excel/JSON evidence.')
+    log('Gravity reactions and recovered shell/frame forces must be calculated separately, per mesh.')
     return win
