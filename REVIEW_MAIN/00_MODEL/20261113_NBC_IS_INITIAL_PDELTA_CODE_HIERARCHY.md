@@ -2,6 +2,8 @@
 
 Date: **2026-11-13** | Review type: **mandatory project modeling basis / not a successful structural check** | Evidence: original official NBC 105:2025 and IS 16700:2023 §7.2(d) base text. **No native ETABS/OpenSees solves performed in this review.**
 
+> **Detailed follow-up Q&A:** [Why signed static ±1.5EL is not automatically retained during nonlinear ground-motion records](../09_ENGINEERING_QA/02_PDELTA_INITIAL_STATES/01_SIGNED_EL_VS_GRAVITY_START.md). This page remains the canonical P0 engineering issue; the Q&A explains physics, software semantics and evidence required.
+
 ## 1. Source hierarchy (WHEN, WHY, WHICH)
 
 - **NBC 105:2025 §§8.1.1.2–8.1.1.3** (printed p. 42): for *elastic time-history*, apply gravity loads calculated under NBC §5.2 and **include P-Delta effects**; associated torsion/damping/record requirements stay NBC, not IS.
