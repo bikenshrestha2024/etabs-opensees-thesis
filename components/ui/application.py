@@ -2465,7 +2465,11 @@ class App:
         )
         txt.insert("1.0",summary); txt.configure(state="disabled")
         bar=ttk.Frame(outer); bar.pack(fill="x",pady=(8,0))
-        ttk.Button(bar,text="Open full formula/citation document",command=lambda: os.startfile(str(Path(__file__).resolve().with_name("NBC105_FORMULA_REFERENCE_V116.md")))).pack(side="left")
+        # Open repository-tracked reference inside a scrollable Tk window;
+        # do not launch a nonexistent sibling file through os.startfile.
+        from components.ui.reference_documents import open_reference_viewer
+        ttk.Button(bar,text="Open full formula/citation document",
+                   command=lambda: open_reference_viewer(win)).pack(side="left")
         ttk.Button(bar,text="Close",command=win.destroy).pack(side="right")
 
     def _open_result_interpretation(self):
