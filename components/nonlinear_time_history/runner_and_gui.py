@@ -286,7 +286,15 @@ def _run_analysis(config):
                 node_tags = set(int(x) for x in ops.getNodeTags())
                 missing = [s["node"] for s in stories if s["node"] not in node_tags]
                 if missing: raise RuntimeError(f"Story master nodes missing from model: {missing}")
-                # Freeze the completed gravity state and reset transient time.
+                # NBC 105:2025 §8.1.1.2–3 / §9.3.1.2–3:
+                # Model builder MUST already have solved its §5.2 gravity
+                # preload. This freezes existing patterns; it does NOT apply
+                # gravity, certify convergence or transfer IS 16700 signed EL.
+                # OpenSees loadConst() preserves equilibrium and resets t=0.
+                # Keep the dependent linear/nonlinear case's static-EL
+                # carryover separate: avoid +1.5 EL and full ground motion
+                # being applied twice. See REVIEW_MAIN/00_MODEL/
+                # 20261113_NBC_IS_INITIAL_PDELTA_CODE_HIERARCHY.md.
                 ops.loadConst("-time", 0.0)
                 periods = (float(config["damping_period_1_s"]), float(config["damping_period_2_s"]))
                 if min(periods) <= 0: raise ValueError("Both Rayleigh calibration periods must be positive.")
