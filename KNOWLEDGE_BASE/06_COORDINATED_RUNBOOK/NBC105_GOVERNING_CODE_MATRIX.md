@@ -63,4 +63,4 @@ These are **different purposes**, even if a source pattern is reused. Apply each
 - [NBC 105:2025, DUDBC official source](https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf)
 - [IS 16700:2023 §7.2(d), Table 5, base standard (BIS)](https://www.services.bis.gov.in/tmp/CED20920094_14092023_1.pdf)
 - [IS 16700:2023 amendment listing (BIS)](https://standards.bis.gov.in/website/standard-details)
-- [IS 16700 amendment source verification and transfer rules](../../../LITERATURE/Codes_Standards/IS16700_2023_AMENDMENT_TRACKER.md)
+- [IS 16700 amendment source verification and transfer rules](../../LITERATURE/Codes_Standards/IS16700_2023_AMENDMENT_TRACKER.md)
