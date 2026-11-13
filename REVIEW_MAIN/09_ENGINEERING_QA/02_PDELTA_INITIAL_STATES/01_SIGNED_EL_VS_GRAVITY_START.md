@@ -4,7 +4,7 @@
 
 ## Q1. What exactly is the apparent contradiction?
 
-**Short answer:** There is no contradiction. The IS 16700 initial analysis is a **compulsory separate project prerequisite**, while the NBC 105 ground-motion analysis needs a **physically compatible initial state**. Both can be required without their load histories being identical.
+**Short answer:** There is no contradiction. The IS 16700 initial analysis is a **COMPULSORY separate project prerequisite**, while the NBC 105 ground-motion analysis needs a **physically compatible initial state**. Both can be required without their load histories being identical.
 
 - IS 16700:2023 §7.2(d) (base text; 2025 amendment pending) supplies `1.2DL + 0.5IL ±1.5EL/WL` for an *initial P-Delta analysis*. In this thesis, `EL` uses **NBC 105:2025 seismic-coefficient actions**, not IS 1893 spectra. Run separate signed X+, X−, Y+, Y− initial cases, retaining all convergence, sign, identity and equilibrium evidence. An EQ load defined for reference from NBC ESM does not itself make ULS ESM a code-eligible **design method** for a tall building.
 - NBC 105:2025 §§8.1.1.2–8.1.1.3 and 9.3.1.2–9.3.1.3 require seismic-weight-consistent gravity and P-Delta in elastic and nonlinear time histories. They do **not** state “hold ±1.5EL as a permanent lateral bias while superposing the complete earthquake record”.

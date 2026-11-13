@@ -6,10 +6,30 @@ import json,csv,tkinter as tk
 from tkinter import ttk,messagebox,filedialog
 
 def library_window(parent,folder):
-    from OpenSees_Mapping_Audit_V125 import library,parameter_sources,source_parameter_inventory,validation_inventory
+    """View and export identical, live model-scoped source/material tables."""
+    from components.sections.library_excel import (
+        library_tables, export_material_section_library,
+    )
+    tables = library_tables(folder)
     win=tk.Toplevel(parent);win.title('OpenSees material and section library');win.geometry('1200x720')
+    toolbar=ttk.Frame(win,padding=(6,5))
+    toolbar.pack(fill='x')
+    status=tk.StringVar(value='Source parameters and uncalibrated research templates — not approval for NLTHA.')
+    def excel_export():
+        try:
+            import os
+            path=export_material_section_library(folder,tables=library_tables(folder))
+            status.set('FINISHED | Excel workbook created: '+path)
+            try:os.startfile(path)
+            except (AttributeError,OSError):
+                messagebox.showinfo('Material + section Excel workbook','Saved workbook:\\n'+path,parent=win)
+        except Exception as exc:
+            status.set('BLOCKED | Workbook not exported: '+str(exc))
+            messagebox.showerror('Material + section Excel export',str(exc),parent=win)
+    ttk.Button(toolbar,text='Export / open complete Excel library',command=excel_export).pack(side='left',padx=3)
+    ttk.Label(toolbar,text='All four tabs • source units • citations • validation flags • timestamped snapshot').pack(side='left',padx=8)
     tabs=ttk.Notebook(win);tabs.pack(fill='both',expand=True)
-    for title,rows in [('Section formulations',library()),('Parameter values and citations',parameter_sources()),('Current source parameters',source_parameter_inventory(folder)),('Validation and limits',validation_inventory())]:
+    for title,rows in tables:
         frame=ttk.Frame(tabs);tabs.add(frame,text=title)
         keys=list(dict.fromkeys(k for r in rows for k in r))
         tree=ttk.Treeview(frame,columns=keys,show='headings')
@@ -23,18 +43,18 @@ def library_window(parent,folder):
             selected=tree.selection()
             if not selected:return
             detail.delete('1.0','end')
-            detail.insert('end','\n'.join(k+': '+str(v) for k,v in zip(keys,tree.item(selected[0],'values'))))
+            detail.insert('end','\\n'.join(k+': '+str(v) for k,v in zip(keys,tree.item(selected[0],'values'))))
         tree.bind('<<TreeviewSelect>>',show_detail)
         def open_source(tree=tree,keys=keys):
             import re,webbrowser
             selected=tree.selection()
             if not selected:return
             values=dict(zip(keys,tree.item(selected[0],'values')))
-            match=re.search(r'https?://[^\s|;]+',str(values.get('source','')))
+            match=re.search(r'https?://[^\\s|;]+',str(values.get('source','')))
             if match:webbrowser.open(match.group(0))
             elif Path(str(values.get('source',''))).is_file():__import__('os').startfile(str(values['source']))
         ttk.Button(frame,text='Open selected source',command=open_source).pack(anchor='w')
-    ttk.Label(win,text='Library values and calibration evidence. Assign source objects in the separate Section mapping window.').pack(anchor='w')
+    ttk.Label(win,textvariable=status).pack(anchor='w')
     return win
 
 def device_guide(parent,folder):
