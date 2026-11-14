@@ -253,6 +253,9 @@ on:
       - 'tests/test_linear_th_directional_autofill.py'
       - 'tests/test_organized_results.py'
       - 'components/inputs/output_layout.py'
+      - 'components/validation/case_review.py'
+      - 'components/model/analysis_basis.py'
+      - 'tests/test_20261114_review_missing_data_and_slab.py'
       - 'tests/test_output_layout.py'
       - 'tests/test_esm_organized_export_gui.py'
       - 'components/equivalent_static/organized_exports.py'
@@ -387,6 +390,7 @@ jobs:
           python tests/verify_gravity_evidence_workflow.py
           python tests/test_organized_results.py
           python -m unittest discover -s tests -p 'test_output_layout.py' -v
+          python -m unittest discover -s tests -p 'test_20261114_review_missing_data_and_slab.py' -v
           python -m unittest discover -s tests -p 'test_esm_organized_export_gui.py' -v
           python tests/verify_gravity_etabs_direct.py
           python tests/verify_gravity_node_comparison.py
