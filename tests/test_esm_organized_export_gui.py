@@ -83,6 +83,49 @@ class ESMCombinedExportTests(unittest.TestCase):
             metadata = json.loads(Path(result["manifest"]).read_text())
             self.assertEqual(metadata["snapshot_status"], "PARTIAL_OR_UNVERIFIED")
 
+    def test_exact_solver_identity_required_for_complete_batch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._make_case(root)
+            run_name = "OpenSees_NBC105_ESM_Load_And_Static_Analysis_ULS_X+_E0_V111.py"
+            status_dir = root / "ESM_Runner_Status" / "20261114_110851"
+            status_dir.mkdir(parents=True)
+            path = status_dir / "CASE_STATUS.json"
+            def export_with(rows):
+                path.write_text(json.dumps(rows), encoding="utf-8")
+                return build_combined_esm_export(root)
+            success = {"case": run_name, "status": "SUCCESS",
+                       "return_code": 0, "elapsed_s": 140.0}
+            result = export_with([success])
+            self.assertEqual(result["solver_batch_status"], "COMPLETE_SOLVER_ONLY")
+            result = export_with([success, success])
+            self.assertEqual(result["solver_batch_status"], "PARTIAL_OR_FAILED")
+            manifest = json.loads(Path(result["manifest"]).read_text())
+            self.assertEqual(manifest["solver_batch"]["duplicate_cases"], [run_name])
+            result = export_with([{"case": "OTHER_CASE.py", "status": "SUCCESS",
+                                   "return_code": 0}])
+            self.assertEqual(result["solver_batch_status"], "PARTIAL_OR_FAILED")
+            manifest = json.loads(Path(result["manifest"]).read_text())
+            self.assertEqual(manifest["solver_batch"]["missing_cases"], [run_name])
+            self.assertEqual(manifest["solver_batch"]["unexpected_cases"], ["OTHER_CASE.py"])
+
+    def test_stale_success_cannot_cover_missing_runner(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._make_case(root)
+            second = "OpenSees_NBC105_ESM_Load_And_Static_Analysis_ULS_Y+_E0_V111.py"
+            (root / second).write_text("# Synthetic", encoding="utf-8")
+            status_dir = root / "ESM_Runner_Status" / "20261114_110851"
+            status_dir.mkdir(parents=True)
+            first = "OpenSees_NBC105_ESM_Load_And_Static_Analysis_ULS_X+_E0_V111.py"
+            (status_dir / "CASE_STATUS.json").write_text(json.dumps([
+                {"case": first, "status": "SUCCESS", "return_code": 0}
+            ]), encoding="utf-8")
+            result = build_combined_esm_export(root)
+            self.assertEqual(result["solver_batch_status"], "PARTIAL_OR_FAILED")
+            overview = json.loads(Path(result["manifest"]).read_text())
+            self.assertEqual(overview["solver_batch"]["missing_cases"], [second])
+
     def test_no_input_case_does_not_invent_result(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
@@ -116,7 +159,11 @@ class ESMGuiSafetyTests(unittest.TestCase):
                      "Plots, reports and files","Export combined Excel + ZIP",
                      "Stop running batch","REVIEW_SNAPSHOTS"):
             if text == "REVIEW_SNAPSHOTS":
-                self.assertIn(text,(ROOT/"components/equivalent_static/organized_exports.py").read_text())
+                # Canonical path literal is in the single shared source of truth,
+                # not repeated in each stage exporter.
+                self.assertIn(text, (ROOT/"components/inputs/output_layout.py").read_text())
+                self.assertIn("review_snapshots_for",
+                              (ROOT/"components/equivalent_static/organized_exports.py").read_text())
             else:
                 self.assertIn(text,self.code)
         self.assertNotIn("for button in footer.winfo_children():button.pack_forget()",self.code)

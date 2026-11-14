@@ -252,6 +252,11 @@ on:
       - 'components/nonlinear_time_history/runner_and_gui.py'
       - 'tests/test_linear_th_directional_autofill.py'
       - 'tests/test_organized_results.py'
+      - 'components/inputs/output_layout.py'
+      - 'tests/test_output_layout.py'
+      - 'tests/test_esm_organized_export_gui.py'
+      - 'components/equivalent_static/organized_exports.py'
+      - '09_ORGANIZE_ETABS_EXPORT.py'
       - 'components/equivalent_static/etabs_linked_excel.py'
       - 'tests/verify_aw_sources_and_thickness.py'
       - 'components/ui/exploratory_options.py'
@@ -381,6 +386,8 @@ jobs:
           python tests/verify_safe_gravity_engineering_review.py
           python tests/verify_gravity_evidence_workflow.py
           python tests/test_organized_results.py
+          python -m unittest discover -s tests -p 'test_output_layout.py' -v
+          python -m unittest discover -s tests -p 'test_esm_organized_export_gui.py' -v
           python tests/verify_gravity_etabs_direct.py
           python tests/verify_gravity_node_comparison.py
           python tests/verify_3d_zoom_to_node.py

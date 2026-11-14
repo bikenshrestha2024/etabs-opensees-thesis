@@ -938,13 +938,8 @@ class GravityAnalysisGUI:
             # Gravity belongs to the selected ETABS export's 02_GRAVITY,
             # not a second all-module snapshot inside OpenSees_Analysis_Results.
             # Legacy solver roots remain untouched and are only READ/COPIED.
-            analysis_parent = next(
-                (p for p in (gravity, *gravity.parents)
-                 if p.name.casefold() == 'opensees_analysis_results'), None)
-            if analysis_parent is not None:
-                destination_parent = analysis_parent.parent / '02_GRAVITY' / 'REVIEW_SNAPSHOTS'
-            else:
-                destination_parent = gravity / 'REVIEW_SNAPSHOTS'
+            from components.inputs.output_layout import review_snapshots_for
+            destination_parent = review_snapshots_for(root, 'GRAVITY')
             report=publish_organized_results(
                 root, gravity_root=optional,
                 destination_parent=destination_parent,
