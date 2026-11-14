@@ -101,8 +101,10 @@ def build_analysis_settings_review(export_dir):
             try:
                 actual=float(config[key])
                 if not math.isfinite(actual):
-                    warnings.append(f"{state} slab bending factor is not finite; review model config")
-                elif abs(actual-expected)>1e-10:
+                    raise ValueError("Nonfinite stiffness coefficient")
+                if actual <= 0:
+                    raise ValueError("Nonpositive stiffness coefficient")
+                if abs(actual-expected)>1e-10:
                     warnings.append(
                         f"{state} conventional slab bending factor {actual:g} differs "
                         f"from adopted IS 16700 value {expected:g}; review generated section.")
@@ -260,6 +262,34 @@ def build_analysis_settings_review(export_dir):
                      json.dumps(config.get("gravity_factors","MISSING"),ensure_ascii=False),"",
                      "Selected export config",STATUS_UNVERIFIED,
                      "An AS_CONFIGURED 0.3 LL gravity factor is NOT automatically the NBC mass source nor the NBC §3.6 strength combination."))
+    configured_patterns=config.get("gravity_factors")
+    if isinstance(configured_patterns,dict):
+        all_referenced=set(name.casefold() for key in (
+            "dead_pattern_names","storage_pattern_names",
+            "other_live_pattern_names","roof_live_pattern_names"
+        ) for name in mass_spec[key])
+        unmatched=[name for name,factor in configured_patterns.items()
+                   if str(name).casefold() not in all_referenced and
+                   isinstance(factor,(int,float)) and not isinstance(factor,bool)
+                   and factor!=0]
+        if unmatched:
+            warnings.append(
+                "NONZERO source gravity patterns missing from illustrative mass aliases: "
+                +", ".join(map(str,unmatched))
+                +". Self Weight and Wall may be assembled independently of "
+                 "pattern aliases; verify source model mass assembler and "
+                 "all physical load groups before accepting seismic mass.")
+        mass.append(_row(
+            "Mass mapping crosswalk","Unmatched source gravity pattern names",
+            ", ".join(map(str,unmatched)) if unmatched else "NONE",
+            "NOT A MASS VALIDATION",
+            "Current export gravity_factors vs illustrative pattern defaults",
+            STATUS_UNVERIFIED,
+            "A missing alias is not proof that mass is missing: self-weight, "
+            "wall and other sources can enter by an independent mesh/section "
+            "ledger. Verify final per-storey assembled mass and matching ETABS mass source."))
+    else:
+        warnings.append("Cannot cross-check source gravity pattern names: gravity_factors missing or not a dictionary")
     mass.append(_row("Torsional mass","Asymmetric floor rotational inertia Jm",
                      "SOURCE MESH REQUIRED","",
                      "Element/node mass coordinates",STATUS_UNVERIFIED,
@@ -283,6 +313,10 @@ def build_analysis_settings_review(export_dir):
             else:
                 details="NO SAVED CASE RECORD"
                 status=STATUS_UNVERIFIED
+            if status==STATUS_UNVERIFIED:
+                warnings.append(
+                    name+" signed initial P-Delta evidence absent or incomplete "
+                    "in selected config; inspect independent case evidence.")
             project.append(_row("Mandatory signed P-Delta",name,details,"",
                                 "Project IS 16700:2023 §7.2(d)",status,
                                 "A saved convergence flag is not a substitute for native solver logs and state-transfer validation."))
