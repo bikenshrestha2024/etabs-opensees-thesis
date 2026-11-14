@@ -172,17 +172,24 @@ def run(folder,storage=False,nonparallel=False):
     output,legacy=design_check_locations(folder)
     # Prefer user-edited criteria in the original legacy directory until
     # migrated explicitly. Blank canonical templates must not replace them.
-    legacy_sources={}
-    for filename in ('Section_Criteria_V135.csv','Nonlinear_Performance_V135.csv',
-                     'Deflection_Criteria_V135.csv','Action_Basis_V135.csv'):
-        oldfile=legacy/filename
-        if oldfile.is_file() and oldfile.stat().st_size>0:
-            legacy_sources[filename]=str(oldfile.resolve())
     output=templates(output);cases=combinations(storage,nonparallel)
     drift,issues=discover_design_drift(folder)
+    input_sources={}
     def input_rows(filename):
-        selected=Path(legacy_sources[filename]) if filename in legacy_sources else output/filename
-        return read_rows(selected)
+        # Prefer actual edited canonical input; fall back to nonempty legacy
+        # input, never discard/edit it or treat a header-only file as evidence.
+        fresh=output/filename
+        old=legacy/filename
+        fresh_rows=read_rows(fresh) if fresh.is_file() else []
+        old_rows=read_rows(old) if old.is_file() else []
+        if fresh_rows:
+            input_sources[filename]=str(fresh.resolve())
+            return fresh_rows
+        if old_rows:
+            input_sources[filename]=str(old.resolve())
+            return old_rows
+        input_sources[filename]=None
+        return []
     criteria=evaluate_checks(input_rows('Section_Criteria_V135.csv'),digest,'section')
     nonlinear=evaluate_checks(input_rows('Nonlinear_Performance_V135.csv'),digest,'nonlinear')
     deflections=evaluate_checks(input_rows('Deflection_Criteria_V135.csv'),digest,'deflection')
@@ -216,7 +223,7 @@ def run(folder,storage=False,nonparallel=False):
     tables={'Combination coverage':coverage,'Seismic drift':drift,'Project deflection':deflections,'Section checks':criteria,'Nonlinear performance':nonlinear,'Section inventory':inventory,'Combined actions':combined,'Missing action basis':missing,'Open items':issues}
     for name,rows in tables.items():write_rows(output/(name.replace(' ','_')+'.csv'),rows)
     elapsed=time.perf_counter()-start
-    report=dict(input_criteria_sources=legacy_sources,report_directory=str(output),
+    report=dict(input_criteria_sources=input_sources,report_directory=str(output),
                 evidence_status='SOURCE_IDENTITIES_REQUIRE_REVIEW',
                 model_sha256=digest,started=started,finished=datetime.datetime.now().astimezone().isoformat(),elapsed_s=elapsed,overall='INCOMPLETE' if not any(r.get('status')=='FAIL' for rows in tables.values() for r in rows) else 'FAIL / INCOMPLETE',sources=[SOURCE],tables=tables,scope='No whole-section PASS is inferred. Existing analysis outputs are checked without rerunning the solver. MRSM force envelopes and nonlinear totals are never superposed as linear increments.')
     from components.inputs.output_contract import atomic_json
