@@ -263,6 +263,9 @@ on:
       - 'components/validation/case_review.py'
       - 'components/validation/design_checks.py'
       - 'tests/test_design_checks_canonical_v135.py'
+      - 'components/modal/gui_and_reports.py'
+      - 'components/ui/results.py'
+      - 'tests/test_modal_canonical_output_v2.py'
       - 'components/model/analysis_basis.py'
       - 'tests/test_20261114_review_missing_data_and_slab.py'
       - 'tests/test_output_layout.py'
@@ -408,6 +411,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_response_root_compatibility.py' -v
           python -m unittest discover -s tests -p 'test_case_review_canonical_output.py' -v
           python -m unittest discover -s tests -p 'test_design_checks_canonical_v135.py' -v
+          python -m unittest discover -s tests -p 'test_modal_canonical_output_v2.py' -v
           python -m unittest discover -s tests -p 'test_folder_audit.py' -v
           python -m unittest discover -s tests -p 'test_20261114_review_missing_data_and_slab.py' -v
           python -m unittest discover -s tests -p 'test_esm_organized_export_gui.py' -v
