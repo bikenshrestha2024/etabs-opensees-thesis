@@ -13,7 +13,7 @@
 - The current review log reports native assignment beam count 750 and source structural weights, but joint-overlap candidates 19358.527 kN and beam-offset candidates 8652.444 kN are **mutually exclusive unvalidated hypotheses**, not automatic adjustments.
 - Uploaded V03/V04/evidence ZIP archives require exact byte/hashes and deeper native file comparison; screenshots plus textual logs do not establish every archived entry's contents.
 
-## Proposed final canonical active writer layout (NOT fully migrated in this change)
+## Canonical new gravity write root (implemented at GUI input boundary; other stages still pending)
 ```text
 <export>/01_ETABS_EXPORT/{00_MANIFEST,01_SOURCE,02_MAPPING,03_LOADS,04_VISUALIZATION,05_AUDITS,06_CONFIG,07_LOGS,08_PROCESSING,09_REVIEW}/
 <export>/02_GRAVITY/
@@ -31,3 +31,9 @@ Need migrate **every gravity producer AND consumer** (GUI output_var initializat
 - Verify loaded local runtime path and newest commit. The launcher title `V116` may be legacy even when GitHub source updates.
 
 **No code/physical pass claimed:** This patch fixes source basis wording and V142 evidence discovery/empty-state, not individual reaction redistribution or a complete gravity-writer migration.
+
+
+## Current code behavior — 02_GRAVITY routing (new runs)
+`components.inputs.output_layout.canonical_gravity_run_root()` redirects **only** selected output paths beneath `<export>/OpenSees_Analysis_Results/<case>` to `<export>/02_GRAVITY/RUNS/<case>`. The gravity GUI's `_inputs` stores that canonical path back into its shared `output_var` before creating a new case/registry; its subsequent solver thread, diagnostic plots, direct comparison and evidence packager all reference this runtime variable. Legacy paths remain unchanged on disk. Custom external output paths and already canonical gravity stage roots are preserved; no copying/removal or rehash of existing results occurs.
+
+This is a **new-run writer-path change**, not a completed repository-wide consumer migration. Always smoke-test 32, 76 and 97 scenarios, direct ETABS comparison, subsequent OpenSees result selection and ZIP paths on Windows with a source-identical model; a verified native run has not been completed in this PR. The stage index is navigation-only. For old runs, manually choose the old folder in result browsers rather than running another analysis to create categorized copies.
