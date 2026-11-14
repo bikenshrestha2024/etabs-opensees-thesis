@@ -852,7 +852,7 @@ class NonlinearTimeHistoryGUI:
         ttk.Button(run_row, text="Run NBC Nonlinear Time-History Cases", command=self._run).pack(side="left")
         # [REF components/ui/output_folder.py] shared output-folder action.
         from components.ui.output_folder import add_open_output_button
-        add_open_output_button(run_row, lambda:getattr(self,"_last_run_output",None) or self.output.get(), window=self.win, padx=8)
+        add_open_output_button(run_row, lambda:getattr(self,"_last_case_folder",None) or self.output.get(), window=self.win, padx=8)
         from components.shared.case_status import panel
         self.case_board=panel(root)
         ttk.Button(root,text='Performance objectives / component acceptance',command=lambda:__import__('components.validation.nonlinear_performance',fromlist=['launch']).launch(self.win,getattr(self,"_last_run_output",None) or self.output.get())).pack(anchor='w',pady=4)
@@ -1021,7 +1021,8 @@ class NonlinearTimeHistoryGUI:
                         motion, trial_orientation, values["trial_duration_s"])
             _require_nonlinear_readiness(values)
             from components.inputs.output_contract import prepare_history_run, record_case_status
-            scope='Trial' if values.get('trial_duration_s') is not None else 'Suite'
+            scope='Trial' if (values.get('preliminary_selection')
+                              or values.get('trial_duration_s') is not None) else 'Suite'
             self._run_contract_root=None
             if self._output_is_automatic:
                 self._run_contract_root=prepare_history_run(
@@ -1036,7 +1037,8 @@ class NonlinearTimeHistoryGUI:
                 out=base/f"NLTH_{values['limit_state']}_{scope}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
                 out.mkdir(parents=True,exist_ok=True)
             values['output_dir']=str(out)
-            self._last_run_output=str(self._run_contract_root or out)
+            self._last_run_output=str(out)
+            self._last_case_folder=str(self._run_contract_root or out)
             from components.shared.case_status import CaseLedger
             orientations=('X_ONLY',) if x_only else ('XY','YX')
             self.case_board['ledger']=CaseLedger(
@@ -1078,6 +1080,11 @@ class NonlinearTimeHistoryGUI:
                 record_case_status(contract_root,"COMPLETED_SOLVER_ONLY" if code==0 else "FAILED",
                                    message="Native transient runner exited with code "+str(code)+
                                            "; full record duration and physics still require review")
+                # Downstream older history viewers expect the run log beside
+                # their native result files. Preserve this compatibility copy.
+                import shutil
+                if log_path.is_file() and log_path != result_folder/log_path.name:
+                    shutil.copy2(log_path,result_folder/log_path.name)
                 if code==0:
                     # Keep original solver outputs in 02_RESULTS. Small Excel
                     # and figure copies are optional presentation aids only.
