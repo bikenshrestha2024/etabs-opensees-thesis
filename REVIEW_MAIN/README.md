@@ -12,6 +12,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **Current cross-module review (2026-11-14):** [Full folder layout, result-reader, stiffness, gravity, drift and nonlinear readiness audit](08_SOFTWARE_SECURITY/20261114_1709_FULL_CROSS_MODULE_REVIEW.md). P0 issues remain open; a folder audit pass is not native structural verification.
 
+**V142 mixed-source response correction:** [Source model SHA screening and plot mismatch exclusions](08_SOFTWARE_SECURITY/20261114_V142_SOURCE_MODEL_FILTER_AND_PLOT_GATE.md).
+
 **ESM post-run numerical integrity V5:** [Required saved ESM story/reaction/source identity before solver SUCCESS](02_ESM/20261114_SAVED_ESM_RESPONSE_INTEGRITY_V5.md).
 
 **MRSM six-case batch correction V4:** [Canonical MRSM run writer, source-identity-safe result discovery and Windows verification gates](04_MRSM/20261114_CANONICAL_BATCH_OUTPUT_AND_SOURCE_GATES_V4.md).

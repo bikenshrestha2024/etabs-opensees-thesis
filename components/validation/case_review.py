@@ -60,6 +60,15 @@ def collect(folder):
              item.get('axis'),item.get('displacement_m'))
         distinct_deflections.setdefault(key,item)
     deflections=list(distinct_deflections.values())
+    from components.validation.saved_case_identity import (
+        current_export_model_sha,identity_screen)
+    selected_model_sha=current_export_model_sha(export_root)
+    rows,drift_source_issues=identity_screen(
+        rows,expected_model_sha=selected_model_sha)
+    deflections,deflection_source_issues=identity_screen(
+        deflections,expected_model_sha=selected_model_sha)
+    issues.extend(drift_source_issues)
+    issues.extend(deflection_source_issues)
     # Search results may reference different model configurations. A scan is
     # not authority to blend them into a validated ULS/SLS design envelope.
     issues.append(dict(status='SOURCE_IDENTITIES_REQUIRE_REVIEW',
@@ -75,6 +84,8 @@ def collect(folder):
                            reason='No recognized floor-edge displacement or deformation results found. Do not treat an empty chart as zero response.',
                            searched_paths=[str(p) for p in roots]))
     return dict(drift=rows,deflection=deflections,issues=issues,
+                selected_serialized_model_sha256=selected_model_sha,
+                source_mismatch_excluded_count=len(drift_source_issues)+len(deflection_source_issues),
                 searched_paths=[str(p) for p in roots],
                 preload_profiles=profiles,combination_coverage=coverage)
 

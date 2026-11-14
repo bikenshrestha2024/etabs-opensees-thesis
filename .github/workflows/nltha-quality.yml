@@ -259,6 +259,9 @@ on:
       - 'tests/test_mrsm_canonical_output_v4.py'
       - 'components/equivalent_static/calculation_and_gui.py'
       - 'tests/test_esm_saved_evidence_gate_v5.py'
+      - 'components/validation/saved_case_identity.py'
+      - 'tests/test_saved_case_identity_v142.py'
+      - 'docs/source/components/validation/saved_case_identity.py.md'
       - 'tests/test_history_run_output_contract.py'
       - 'components/inputs/project_output_layout.py'
       - 'components/validation/response_inventory.py'
@@ -418,6 +421,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_unified_output_contract.py' -v
           python -m unittest discover -s tests -p 'test_mrsm_canonical_output_v4.py' -v
           python -m unittest discover -s tests -p 'test_esm_saved_evidence_gate_v5.py' -v
+          python -m unittest discover -s tests -p 'test_saved_case_identity_v142.py' -v
           python -m unittest discover -s tests -p 'test_history_run_output_contract.py' -v
           python -m unittest discover -s tests -p 'test_response_root_compatibility.py' -v
           python -m unittest discover -s tests -p 'test_case_review_canonical_output.py' -v
