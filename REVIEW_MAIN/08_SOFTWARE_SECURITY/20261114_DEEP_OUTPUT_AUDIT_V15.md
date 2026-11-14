@@ -84,3 +84,8 @@ Inspect output manifest SHA, run identity, stage, state and source EDB before an
 ## Additional privacy control — V15 archive manifest
 
 The full local `EVIDENCE_MANIFEST.json` intentionally retains original paths and SHA256. Each `*_Review_UPLOAD.zip` now contains a path-redacted `EVIDENCE_MANIFEST.json` (local source paths replaced, file hashes and archive-relative names retained, subset-specific entries). This is **path metadata reduction only**; output payloads can still contain sensitive original ETABS data, paths, keys or patient/other private information. A deliberate manual ZIP inspection remains required.
+
+
+## Disk-audit destination correction (O15-13)
+
+`tools/audit_output_storage.py` previously defaulted its new report to a sibling `Disk_Audit_<timestamp>` outside the selected ETABS export. This violated the single-case output ownership policy and made it easy to overlook diagnostics. The default now writes `09_SOFTWARE_DIAGNOSTICS/DISK_AUDITS/RUNS/<UTC>/JSON/`, `CSV/` and `REPORT/`. An explicitly provided `--out` remains honored; historical sibling reports are **not moved**. The source-size inventory takes place before the new report is written. Added regression tests and CI execution.
