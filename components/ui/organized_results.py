@@ -114,8 +114,7 @@ def _walk(root, *, destination, excluded_roots=()):
                          (here / d).resolve() != destination and
                          destination not in (here / d).resolve().parents and
                          not any((here / d).resolve() == blocked or
-                                 blocked in (here / d).resolve().parents or
-                                 (here / d).resolve() in blocked.parents
+                                 blocked in (here / d).resolve().parents
                                  for blocked in excluded))
         for name in sorted(names):
             path = here / name
