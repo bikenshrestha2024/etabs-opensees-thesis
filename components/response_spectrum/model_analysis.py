@@ -56,8 +56,12 @@ def run_model_spectrum(folder,config,output_dir):
             output_dir=out/('Modal_'+axis),
             story_nodes=modal_response_nodes(data))
         modal.update(limit_state=state,model_sha256=model_signature,implementation_sha256=source_signature,modal_numeric_sha256=numeric_signature)
-        from components.inputs.project_workbooks import analysis_output_folder
-        cache=analysis_output_folder(folder,state)/('Modal_'+state+('' if __import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')=='AS_CONFIGURED' else '_'+__import__('os').environ['OPENSEES_GRAVITY_PROFILE']));cache.mkdir(parents=True,exist_ok=True)
+        # This modal reference belongs to this MRSM model/gravity state.
+        # Never populate legacy all-stage results with a hidden cache copy.
+        # Keep it with the originating MRSM solver outputs and case provenance.
+        gravity_label=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+        cache=out/'Modal_Reference'/state/gravity_label
+        cache.mkdir(parents=True,exist_ok=True)
         from OpenSees_Timing_V130 import StageTimer
         cache_timer=StageTimer(cache,'MRSM modal reference cache export')
         (cache/'NBC105_Modal_V111.json').write_text(json.dumps(modal,indent=2),encoding='utf-8')
