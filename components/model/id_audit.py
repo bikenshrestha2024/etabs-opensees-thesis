@@ -29,7 +29,7 @@ def export_id_audit(folder, payload=None, report=None):
     node_labels=build_labels(node_records)
     for n in nodes:
         n["display_label"]=node_labels.get(str(n["opensees_node_tag"]),"UNCLASSIFIED_LEVEL")
-    structural_categories={"BEAM","COLUMN","SHEAR WALL","FLOOR",
+    structural_categories={"BEAM","BRACE","COLUMN","SHEAR WALL","FLOOR",
         "CONVENTIONAL OUTRIGGER","BELT TRUSS","CAP TRUSS"}
     elements=[dict(e) for e in topology.get("elements",[])]
     classified=[]
