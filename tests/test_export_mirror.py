@@ -29,3 +29,18 @@ def test_mirror_fails_before_clobbering_existing_different_file(tmp_path):
     with pytest.raises(ValueError, match="differs"):
         export_mirror(tmp_path)
     assert (target/"OpenSees_Element_Connectivity.json").read_text()=="different"
+
+def test_mirror_refuses_symlinked_destination(tmp_path):
+    original=tmp_path/"OpenSees_Element_Connectivity.json"
+    original.write_text('{"real":true}')
+    outside=tmp_path/"external"
+    outside.mkdir()
+    target=tmp_path/"01_ETABS_EXPORT"
+    target.mkdir()
+    try:
+        (target/"02_MAPPING").symlink_to(outside,target_is_directory=True)
+    except (OSError,NotImplementedError):
+        pytest.skip("Creating symlinks is not permitted on this Windows runner")
+    with pytest.raises(ValueError,match="symlink"):
+        export_mirror(tmp_path)
+    assert not (outside/original.name).exists()
