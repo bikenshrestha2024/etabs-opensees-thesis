@@ -80,3 +80,7 @@ python 22_AUDIT_EXPORT_FOLDERS.py "D:\\Thesis Opensees\\ETABS 11-14-2026\\3"
 ```
 
 Inspect output manifest SHA, run identity, stage, state and source EDB before any automated packaging. Migrate live legacy writer/reader pairs one stage at a time, never bulk-move or rewrite historical evidence.
+
+## Additional privacy control — V15 archive manifest
+
+The full local `EVIDENCE_MANIFEST.json` intentionally retains original paths and SHA256. Each `*_Review_UPLOAD.zip` now contains a path-redacted `EVIDENCE_MANIFEST.json` (local source paths replaced, file hashes and archive-relative names retained, subset-specific entries). This is **path metadata reduction only**; output payloads can still contain sensitive original ETABS data, paths, keys or patient/other private information. A deliberate manual ZIP inspection remains required.
