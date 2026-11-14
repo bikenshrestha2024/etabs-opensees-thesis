@@ -141,6 +141,35 @@ def _export_plot_and_excel(result, output):
     return warnings
 
 
+def prepare_canonical_modal_run(export_dir, limit_state, model_script):
+    """[REF docs/source/components/modal/gui_and_reports.py.md]
+    Create a model-script-traceable, independent ULS/SLS modal case.
+
+    The SHA here identifies the source Python script, not ETABS EDB or the
+    assembled OpenSees numerical model.
+    """
+    import hashlib
+    from components.inputs.output_contract import create_case_run, atomic_json
+    from components.inputs.project_workbooks import analysis_output_folder
+    from components.inputs.output_layout import export_root_for
+    export=export_root_for(export_dir)
+    state=str(limit_state).strip().upper()
+    if state not in ("ULS","SLS"):
+        raise ValueError("Single ULS/SLS state required")
+    model=Path(model_script).expanduser().resolve(strict=True)
+    case_name=analysis_output_folder(export,state).name
+    run=create_case_run(export,"MODAL",case_name,state=state)
+    atomic_json(run/"00_INPUT_SOURCE"/"MODAL_INPUT_PROVENANCE.json",{
+        "source_model_script":str(model),
+        "model_script_sha256":hashlib.sha256(model.read_bytes()).hexdigest(),
+        "assembled_model_sha256":None,
+        "source_edb_sha256":None,
+        "limit_state":state,
+        "status":"MODEL_SCRIPT_IDENTIFIED_NOT_NATIVE_ETABS_EQUIVALENCE",
+    })
+    return run
+
+
 class ModalAuditGUI:
     def __init__(self, parent=None):
         self._owns_root = parent is None
@@ -352,8 +381,14 @@ class ModalAuditGUI:
             messagebox.showerror("Modal audit inputs", str(exc), parent=self.root); return
         states=('ULS','SLS') if self.limit_state.get()=='Both' else (self.limit_state.get(),)
         from components.inputs.project_workbooks import analysis_output_folder
+        from components.inputs.output_contract import record_case_status
+        from components.inputs.output_layout import export_root_for
         from components.shared.case_status import CaseLedger
-        ledger=CaseLedger(output/"Modal_Batch_Status_V151.json",states);self.case_board["ledger"]=ledger;self.case_board["cancelled"]=False
+        ledger_root=(export_root_for(model.parent)/"04_MODAL"/"00_BATCH_STATUS"
+                     if self._output_is_automatic else output)
+        ledger_root.mkdir(parents=True,exist_ok=True)
+        ledger=CaseLedger(ledger_root/"Modal_Batch_Status_V151.json",states)
+        self.case_board["ledger"]=ledger;self.case_board["cancelled"]=False
         base_output=output
         solver=self.solver.get()
         self.run_button.configure(state='disabled')
@@ -364,9 +399,17 @@ class ModalAuditGUI:
                 for state in states:
                     if self.case_board.get("cancelled"):break
                     ledger.set(state,"RUNNING","Stage 1/3: model and gravity preload")
-                    state_output=analysis_output_folder(model.parent,state) if self._output_is_automatic else base_output
-                    output=state_output/('Modal_'+state);output.mkdir(parents=True,exist_ok=True)
-                    self._last_result_folder=str(output)
+                    run_root=None
+                    if self._output_is_automatic:
+                        run_root=prepare_canonical_modal_run(model.parent,state,model)
+                        state_output=run_root/"02_RESULTS"
+                        output=state_output
+                        record_case_status(run_root,"RUNNING")
+                    else:
+                        state_output=base_output
+                        output=state_output/("Modal_"+state)
+                    output.mkdir(parents=True,exist_ok=True)
+                    self._last_result_folder=str(run_root or output)
                     # [REF NBC105-2025 §5.1.2] keep the Aw provenance beside the result.
                     (output/'Wall_Aw_Source.json').write_text(json.dumps(dict(
                         wall_aw_x_m2=(period_inputs or {}).get('wall_aw_x_m2'),
@@ -376,11 +419,11 @@ class ModalAuditGUI:
                         code_accepted=False),indent=2,default=str),encoding='utf-8')
                     self.root.after(0,lambda state=state,output=output:self.status.set(f'Running {state} stiffness case: stage 1/3: rebuild + gravity preload; stage 2/3: solve {n} modes with {solver}; stage 3/3: mass participation, period comparison and export. Results: {output}'))
                     source=_runner_source(model,output,n,solver,period_inputs,mode_x,mode_y,state)
-                    runner=output/'_run_nbc105_modal_v111.py'
+                    runner=(run_root/"00_INPUT_SOURCE" if run_root else output)/'_run_nbc105_modal_v111.py'
                     runner.write_text(source,encoding='utf-8')
                     proc = subprocess.Popen([str(python), '-u', str(runner)], cwd=str(model.parent), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
                     self.case_board["process"]=proc
-                    log = output / "NBC105_Modal_V111_run.log"
+                    log = (run_root/"01_LOGS" if run_root else output) / "NBC105_Modal_V111_run.log"
                     with log.open('w',encoding='utf-8') as stream:
                         for line in proc.stdout:
                             stream.write(line);stream.flush()
@@ -398,10 +441,12 @@ class ModalAuditGUI:
                         msg=(f"Operator cancelled {state}; solver process stopped. "
                              f"Partial files in {output} must NOT be treated as modal PASS.")
                         ledger.set(state,"CANCELLED",msg)
+                        if run_root:record_case_status(run_root,"INTERRUPTED",message=msg)
                         messages.append(msg)
                         break
                     if proc.returncode:
                         msg = f"Run failed (exit {proc.returncode}). See {log}"
+                        if run_root:record_case_status(run_root,"FAILED",message=msg)
                     else:
                         result = json.loads((output / "NBC105_Modal_V111.json").read_text(encoding="utf-8"))
                         result['limit_state']=state
@@ -409,8 +454,15 @@ class ModalAuditGUI:
                         export_warnings = _export_plot_and_excel(result, output)
                         import shutil
                         shutil.copy2(output/'NBC105_Modal_V111.json',state_output/f'NBC105_Modal_{state}_V127.json')
-                        # Keep legacy latest-result readers working, with explicit case metadata.
-                        shutil.copy2(output/'NBC105_Modal_V111.json',state_output/'NBC105_Modal_V111.json')
+                        if run_root:
+                            for ext,dest in ((".xlsx","03_EXCEL"),(".csv","03_EXCEL"),
+                                             (".png","04_FIGURES"),(".pdf","04_FIGURES")):
+                                for artifact in output.glob("*"+ext):
+                                    shutil.copy2(artifact,run_root/dest/artifact.name)
+                            record_case_status(run_root,"COMPLETED_SOLVER_ONLY",
+                                message="Eigenanalysis completed; physical equivalence unverified.")
+                        else:
+                            shutil.copy2(output/'NBC105_Modal_V111.json',state_output/'NBC105_Modal_V111.json')
                         msg = (f"Finished {state}: {len(result.get('rows',[]))} eigenmodes. UX cumulative={result['cumulative_UX_percent']:.3f}%; UY cumulative={result['cumulative_UY_percent']:.3f}%. Modal mass coverage is not a section design PASS. "
                                f"Review CSV/JSON/TXT outputs and log in {output}.")
                         if export_warnings:
@@ -425,6 +477,11 @@ class ModalAuditGUI:
                     folder,summary,parent=self.root,title='Modal audit batch finished'))
             except Exception as exc:
                 error_text=str(exc)
+                if 'run_root' in locals() and run_root:
+                    try:
+                        record_case_status(run_root,"FAILED",message=error_text)
+                    except (OSError,ValueError):
+                        pass
                 self.root.after(0,lambda error_text=error_text:self.status.set('Error: '+error_text))
             finally:
                 self.case_board["process"]=None
