@@ -38,6 +38,9 @@ LEGACY_STAGE_ALIASES = {
 }
 ALL_STAGE_FOLDERS = {**STAGE_FOLDERS, **AUXILIARY_FOLDERS}
 _LEGACY_ROOT = "opensees_analysis_results"
+# Project-level supporting folders are owned by the same export root.
+# Their descendants must never become new nested ETABS exports.
+PROJECT_ROOT_FOLDERS = frozenset({"00_SOURCE_MANIFEST", "REVIEW_MAIN"})
 
 
 def export_root_for(source_path):
@@ -54,7 +57,9 @@ def export_root_for(source_path):
             return location.parent
     for location in chain:
         if location.name.casefold() in {
-            value.casefold() for value in (*ALL_STAGE_FOLDERS.values(), *LEGACY_STAGE_ALIASES)
+            value.casefold() for value in (
+                *ALL_STAGE_FOLDERS.values(), *LEGACY_STAGE_ALIASES,
+                *PROJECT_ROOT_FOLDERS)
         }:
             return location.parent
     return source
