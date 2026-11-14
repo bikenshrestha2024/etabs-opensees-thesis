@@ -71,7 +71,8 @@ def build_analysis_settings_review(export_dir):
     """
     from components.inputs.output_layout import export_root_for
     from components.model.analysis_basis import (
-        NBC105_FLEXURAL_MODIFIERS, IS16700_INITIAL_PDELTA_FACTORS)
+        NBC105_FLEXURAL_MODIFIERS, IS16700_INITIAL_PDELTA_FACTORS,
+        IS16700_SLAB_MODIFIERS)
     from components.equivalent_static import legacy_code_basis as source
     root=export_root_for(export_dir)
     config_path=root/"OpenSees_Complete_Model_Config_V118.json"
@@ -90,6 +91,22 @@ def build_analysis_settings_review(export_dir):
         warnings.append("Selected export has no OpenSees_Complete_Model_Config_V118.json")
     if not model_path.is_file():
         warnings.append("Selected export has no OpenSees_Complete_Model_Data_V118.json")
+    slab_basis=IS16700_SLAB_MODIFIERS["inertia_Ig"]
+    slab_uls=float(slab_basis["strength"])
+    slab_sls=float(slab_basis["serviceability"])
+    for state,key,expected in (("ULS","slab_bending_factor",slab_uls),
+                               ("SLS","slab_bending_factor_sls",slab_sls)):
+        if key in config:
+            try:
+                actual=float(config[key])
+                if abs(actual-expected)>1e-10:
+                    warnings.append(
+                        f"{state} conventional slab bending factor {actual:g} differs "
+                        f"from adopted IS 16700 value {expected:g}; review generated section.")
+            except (TypeError,ValueError,OverflowError):
+                warnings.append(f"{state} slab bending factor is not a valid number")
+        else:
+            warnings.append(f"Missing {state} adopted slab factor {key} in selected config")
     diagnostic=design_check_output_diagnostic(root)
     if diagnostic["status"] in ("LEGACY_REPORT_ONLY","LEGACY_REPORT_NEWER_REVIEW_ACTIVE_LAUNCHER"):
         warnings.append("V135 outputs are still recorded under the legacy results path; inspect running launcher/version")
@@ -148,10 +165,14 @@ def build_analysis_settings_review(export_dir):
     ])
     project=[
         _row("REQUIRED project adoption","Conventional beam-supported RC slab EI",
-             "0.25 Ig","0.35 Ig","IS 16700:2023 Table 5 (PROJECT ADOPTION)",
+             f"{slab_uls:g} Ig",f"{slab_sls:g} Ig",
+             "IS 16700:2023 Table 5 (PROJECT ADOPTION)",
              STATUS_PROJECT,"Not NBC flat-slab 0.25/0.50. Keep membrane area, slab physical thickness, weight and mass separately. Verify generated OpenSees section AND ETABS modifiers."),
         _row("REQUIRED project gate","Signed initial P-Delta EL/WL",
-             "1.2 DL + 0.5 IL ± 1.5 EL/WL","X+/X−, Y+/Y−",
+             f'{IS16700_INITIAL_PDELTA_FACTORS["DL"]:g} DL + '
+             f'{IS16700_INITIAL_PDELTA_FACTORS["IL"]:g} IL ± '
+             f'{IS16700_INITIAL_PDELTA_FACTORS["EL_or_WL"]:g} EL/WL',
+             "X+/X−, Y+/Y−",
              "IS 16700:2023 §7.2(d) (PROJECT ADOPTION)",
              STATUS_PROJECT,"Must converge and retain audit evidence; distinct from sustained NLTHA preload and NBC §3.6 combinations."),
         _row("Supplementary stability screen","Initial P-Delta θ",
