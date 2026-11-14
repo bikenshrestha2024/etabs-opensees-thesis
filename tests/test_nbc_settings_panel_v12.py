@@ -33,6 +33,7 @@ class NBCSettingsPanelV12Tests(unittest.TestCase):
                              "CODE_REFERENCE_AND_PROJECT_ADOPTION_NOT_ENGINEERING_CERTIFICATE")
             self.assertEqual(set(data["tables"]),{
                 "Review & project","NBC code & combinations",
+                "Mass source & patterns","Current model audit",
                 "Mechanics & solver","Runtime & folders"})
             project=data["tables"]["Review & project"]
             slab=next(r for r in project if r["Item / equation"]=="Conventional beam-supported RC slab EI")
@@ -41,6 +42,15 @@ class NBCSettingsPanelV12Tests(unittest.TestCase):
             self.assertIn("PROJECT-ADOPTED",slab["Evidence status"])
             self.assertFalse(any("NBC Table 3-1" in r["Authority"] for r in
                                  project if r["Item / equation"]=="Conventional beam-supported RC slab EI"))
+            masses=data["tables"]["Mass source & patterns"]
+            self.assertTrue(any("roof live" in r["Item / equation"].lower()
+                                and r["ULS / strength"]=="0.0" for r in masses))
+            audit=data["tables"]["Current model audit"]
+            self.assertTrue(any(r["Item / equation"]=="Conventional slab bending factors"
+                                for r in audit))
+            project_names=[r["Item / equation"] for r in project]
+            self.assertIn("PD_INIT_EL_X_PLUS",project_names)
+            self.assertIn("PD_INIT_EL_Y_MINUS",project_names)
             code=data["tables"]["NBC code & combinations"]
             flat=next(r for r in code if r["Item / equation"]=="flat_slab")
             self.assertEqual((flat["ULS / strength"],flat["SLS / service"]),("0.25","0.5"))
