@@ -16,7 +16,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-MODULES = ("Gravity", "ESM", "Modal", "MRSM", "Comparisons", "Unclassified")
+MODULES = ("Gravity", "ESM", "Modal", "MRSM", "LinearTH", "NonlinearTH", "Comparisons", "Unclassified")
 SKIP_DIRS = {
     "Organized_Results", "REVIEW_SNAPSHOTS", "Seismic_Review_Packages", "Gravity_Evidence_Upload",
     "__pycache__", ".git", ".pytest_cache",
@@ -30,6 +30,8 @@ METHOD_MARKERS = {
             "input_sync", "aw_reconciliation", "etabs_linked"),
     "Modal": ("modal", "eigen", "mass_participation"),
     "MRSM": ("mrsm", "response_spectrum", "cqc", "spectrum"),
+    "LinearTH": ("linear_time_history", "linear_th", "ltha", "lth_"),
+    "NonlinearTH": ("nonlinear_time_history", "nonlinear_th", "nltha", "nth_"),
     "Comparisons": ("etabs_comparison", "etabs_opensees_equivalence",
                     "case_comparison", "equivalence", "comparison"),
 }
@@ -49,6 +51,12 @@ def classify(path, relative=None):
     p = Path(relative or path)
     parts = [part.casefold() for part in p.parts]
     name = p.name.casefold()
+    # First classify explicit full stage names, never guess an NLTHA result
+    # from the shorter "ltha" substring. Historical aliases remain readable.
+    if any(x in ("07_nonlinear_time_history", "07_nonlinear_th") for x in parts):
+        return "NonlinearTH"
+    if any(x in ("06_linear_time_history", "06_linear_th") for x in parts):
+        return "LinearTH"
     # Folder membership overrides filename where possible; this keeps an
     # ETABS comparison within its own Comparison folder, not the ESM bundle.
     if any(x.startswith(("etabs_comparison", "gravity_case_comparison",
@@ -67,7 +75,7 @@ def classify(path, relative=None):
     # Comparison needs priority for explicitly labelled evidence files.
     if any(x in name for x in METHOD_MARKERS["Comparisons"]):
         return "Comparisons"
-    for module in ("MRSM", "Modal", "Gravity", "ESM"):
+    for module in ("NonlinearTH", "LinearTH", "MRSM", "Modal", "Gravity", "ESM"):
         if any(x in name for x in METHOD_MARKERS[module]):
             return module
     return "Unclassified"
@@ -173,7 +181,7 @@ def publish_organized_results(results_root, *, gravity_root=None,
     readme = destination / "README_FIRST.txt"
     readme.write_text(
         "THESIS ANALYSIS OUTPUT SNAPSHOT\n"
-        "Folders: Gravity, ESM, Modal, MRSM, Comparisons, Unclassified.\n"
+        "Folders: Gravity, ESM, Modal, MRSM, LinearTH, NonlinearTH, Comparisons, Unclassified.\n"
         "Original solver output files are UNCHANGED. These are verified copies.\n"
         "Cases are grouped by original relative path; no cross-source equivalence is inferred.\n"
         "Missing SLS/native ETABS output stays missing, not zero.\n"
