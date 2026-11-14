@@ -158,11 +158,19 @@ def modal_results(parent,folder):
         ax.grid(alpha=.25)
         if ax.lines:ax.legend()
     compare_chart=FigureCanvasTkAgg(compare_fig,master=compare_frame);compare_chart.get_tk_widget().pack(fill='both',expand=True);NavigationToolbar2Tk(compare_chart,compare_frame)
-    ttk.Button(compare_frame,text='Export comparison PNG',command=lambda:compare_fig.savefig(folder/'Modal_Comparison_V146.png',dpi=180)).pack(anchor='w')
+    def export_comparison():
+        from components.inputs.output_layout import export_root_for
+        out=export_root_for(folder)/"04_MODAL"/"REVIEW_SNAPSHOTS"
+        out.mkdir(parents=True,exist_ok=True)
+        compare_fig.savefig(out/"Modal_Comparison_V146.png",dpi=180)
+        messagebox.showinfo("Modal comparison export",str(out/"Modal_Comparison_V146.png"),parent=win)
+    ttk.Button(compare_frame,text='Export comparison PNG',command=export_comparison).pack(anchor='w')
     for state in ('ULS','SLS'):
         frame=ttk.Frame(tabs);tabs.add(frame,text=state+' modal audit')
         path=modal_path(state)
-        if not path.is_file():ttk.Label(frame,text=f'No saved {state} modal result. Run this stiffness case to populate the tab.').pack();continue
+        if path is None or not path.is_file():
+            ttk.Label(frame,text=f'No saved {state} modal result — missing is NOT zero response. Run this stiffness case to populate the tab.').pack()
+            continue
         result=json.loads(path.read_text(encoding='utf-8-sig'));rows=result['rows']
         ttk.Label(frame,text=f'{state} | '+str(path)).pack(anchor='w')
         fig=Figure(figsize=(10,4),layout='constrained');axes=fig.subplots(1,2);x=[r['mode'] for r in rows]
