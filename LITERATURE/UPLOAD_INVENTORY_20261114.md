@@ -1,12 +1,12 @@
 # 2026-11-14 user-uploaded PDF intake — private evidence inventory
 
-**Purpose:** catalogue the actual 19 PDF filenames attached to the 2026-11-14 discussion, identify the original works, avoid duplicate bibliography records, and link them to the five unresolved ETABS/OpenSees engineering issues and current modal results.
+**Purpose:** catalogue the actual 20 PDF filenames attached to the 2026-11-14 discussion, identify the original works, avoid duplicate bibliography records, and link them to the five unresolved ETABS/OpenSees engineering issues and current modal results.
 
 **Data protection:** This is *metadata only*. The user's PDFs were supplied in a private chat; public GitHub redistributions are **NOT authorized**, even where a public copy can be found online. Store originals locally, privately, with a calculated SHA256 before referencing them as a specific byte-identical copy. Do not commit PDFs or confidential ETABS/Excel datasets to this public repository.
 
 **Verification labels:** `SOURCE_HEADER_READ` = metadata confirmed from the uploaded PDF's rendered or parsed opening pages; `PUBLISHER_CHECKED` = publication metadata additionally checked against publisher; `PROVISIONAL` = title/venue/DOI require confirmation; `BYTE_DEDUPE_PENDING` = likely same paper but original file hashes not available in the GitHub environment. None of these labels is a model validation claim.
 
-## Intake: 19 PDF attachments (one row per uploaded file)
+## Intake: 20 PDF attachments (one row per uploaded file)
 
 | No. | Uploaded file name | Canonical work | Primary class | Verification / duplicate relationship |
 |---:|---|---|---|---|
@@ -29,8 +29,14 @@
 | 17 | `The FAIR Guiding Principles for scientific data management and stewardship(1).pdf` | U01 Wilkinson et al. 2016 | FAIR/provenance | SOURCE_HEADER_READ; BYTE_DEDUPE_PENDING against #01 |
 | 18 | `1-s2.0-S2352710221008044-main.pdf` | U13 Kolozvari et al. 2021 | Nonplanar RC walls | SOURCE_HEADER_READ |
 | 19 | `1-s2.0-S014102962301115X-main (3).pdf` | U14 Kolozvari, López & Massone 2023 | E-SFI-MVLEM-3D | SOURCE_HEADER_READ |
+| 20 | `dvorkin1984(1).pdf` | U15 Dvorkin & Bathe 1984 | Four-node shell numerical verification | SOURCE_HEADER_READ (13-page uploaded publisher PDF); DOI printed on first page; SHA256 pending |
 
-**Count:** 19 uploaded files, **14 distinct works by bibliographic identity** (pending byte-hash checks). Never silently delete the duplicate uploads; retain raw originals and select one canonical local copy only after SHA256 calculation and page count/edition comparison.
+**Count:** 20 uploaded files, **15 distinct works by bibliographic identity** (pending byte-hash checks). Never silently delete the duplicate uploads; retain raw originals and select one canonical local copy only after SHA256 calculation and page count/edition comparison.
+
+## Additional 2026-11-14 source: U15
+
+- **U15 / L048.** Dvorkin, E. N. & Bathe, K.-J. (1984). *A continuum mechanics based four-node shell element for general non-linear analysis.* Engineering Computations 1(1), 77–88 (March 1984). DOI: https://doi.org/10.1108/eb023562. Original uploaded source: `dvorkin1984(1).pdf`, 13 pages in submitted file, publisher cover plus article pp.77–88. Author/year/journal/DOI are verified against the first page of **this uploaded PDF**, not inferred from a filename. Its first page reports “cited by 359 other documents” as a historical download-era publisher snapshot (download 2012-11-07): **do not treat 359 as a 2026 count**.
+- Detailed section, table and figure crosswalk: [DVORKIN_BATHE_1984_SHELL_BENCHMARKS.md](DVORKIN_BATHE_1984_SHELL_BENCHMARKS.md). Five candidate duplicate pairs among the *previous* 19 PDFs remain unverified by exact hashes. The newly supplied U15 has no identified duplicate in this intake.
 
 ## Canonical verified bibliography (one row per distinct work)
 
@@ -63,12 +69,12 @@
 
 ## Public/private storage decision
 Public: this index, verified DOI and publisher links, source-to-thesis crosswalk, scripts that hash/local-index private files, reviewed citation statements.
-Private: all 19 originally attached PDFs (even if a journal has an openly accessible copy, redistribution and public repo permissions must be checked independently), proprietary ETABS EDB and Excel tables, project-specific or unpublished specimen data.
+Private: all 20 attached PDFs (even if a journal has an openly accessible copy, redistribution and public repo permissions must be checked independently), proprietary ETABS EDB and Excel tables, project-specific or unpublished specimen data.
 
 
 ## Stable cross-reference to existing master bibliography
 
-The intake identifiers U01–U14 identify *this upload group*, while stable thesis bibliography IDs L001–L047 identify works across all conversations. The existing master was deduplicated by bibliographic identity before this intake was appended.
+The intake identifiers U01–U15 identify *this upload group*, while stable thesis bibliography IDs L001–L047 identify works across all conversations. The existing master was deduplicated by bibliographic identity before this intake was appended.
 
 | Upload work ID | Stable master ID | Handling |
 |---|---|---|
@@ -86,5 +92,6 @@ The intake identifiers U01–U14 identify *this upload group*, while stable thes
 | U12 | **L006** | Already catalogued; no new bibliography row |
 | U13 | L047 | Newly added |
 | U14 | **L007** | Already catalogued; no new bibliography row |
+| U15 | L048 | Newly added from `dvorkin1984(1).pdf`; historic citation count in original publisher footer is not a current metric |
 
-**Current master count:** 47 curated works; this intake contains 14 distinct works, of which 3 had prior stable records and 11 were added. Hash-based PDF deduplication remains a separate pending local-byte audit; it must not be confused with bibliographic deduplication.
+**Current master count:** 48 curated works; this intake now contains 15 distinct works, of which 3 had prior stable records and 12 were added. Hash-based PDF deduplication remains a separate pending local-byte audit; it must not be confused with bibliographic deduplication.

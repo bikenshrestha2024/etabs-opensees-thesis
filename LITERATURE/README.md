@@ -7,6 +7,10 @@
 - [MASTER_LITERATURE_INDEX.csv](MASTER_LITERATURE_INDEX.csv) — searchable bibliography; DOI, authors, journal, publication date, PDF availability, citation count and provenance.
 - [CITATION_AND_PDF_POLICY.md](CITATION_AND_PDF_POLICY.md) — how citation counts and PDF permissions are recorded.
 - [UPLOAD_INVENTORY.md](UPLOAD_INVENTORY.md) — the five papers uploaded in this conversation, exact metadata and SHA256 storage requirements.
+- [UPLOAD_INVENTORY_20261114.md](UPLOAD_INVENTORY_20261114.md) — 20 uploaded PDF filenames, 15 distinct works by publication identity (not by SHA), stable U01–U15 ↔ L-series crosswalk, rights and provenance.
+- [DVORKIN_BATHE_1984_SHELL_BENCHMARKS.md](DVORKIN_BATHE_1984_SHELL_BENCHMARKS.md) — verified original 1984 four-node-shell paper: figures, numerical benchmark values and reproducible ShellMITC4 tests.
+- [UPLOADED_PDF_TO_ENGINEERING_GATES_20261114.md](UPLOADED_PDF_TO_ENGINEERING_GATES_20261114.md) — paper-to-test map covering support reactions, shell transfer, outriggers, walls/NLTHA and software governance.
+- [../REVIEW_MAIN/04_MODAL/20261114_ULS_40_MODE_MODAL_LITERATURE_REVIEW.md](../REVIEW_MAIN/04_MODAL/20261114_ULS_40_MODE_MODAL_LITERATURE_REVIEW.md) — 40-mode mass participation findings and mode-shape validation limitations.
 - [TOPICAL_READING_GUIDE.md](TOPICAL_READING_GUIDE.md) — staged reading pathway for thesis modelling.
 - [FREE_PDF_LINKS.md](FREE_PDF_LINKS.md) — verified open publisher landing pages and institutional source routes.
 - **Private local PDF bundle:** user-supplied PDFs are kept out of the public GitHub repo pending explicit redistribution permission or confirmed public license. The included files remain available privately in the downloadable literature ZIP delivered in chat, not through GitHub.
@@ -25,7 +29,7 @@
 
 Add new works by unique DOI; preserve existing stable IDs. On each citation refresh store *source, UTC retrieval date, count, and methodology*. Keep the catalog useful offline: URLs are references; private PDFs must not be silently pushed. See [existing curated source registry](../docs/00_RESEARCH_REFERENCES.md) for R01–R13 linkage.
 
-The curated master catalog includes 47 works after the 2026-11-14 intake; 11 unique additional works were appended and 3 already-listed works (L006, L007, L034) were not duplicated. The automated source audit also detects additional DOIs and reports uncatalogued sources separately; a matched DOI alone does not mean full metadata has been verified. Incomplete bibliographic fields represent **outstanding verification**, not implied completeness.
+The curated master catalog includes **48 works** after the supplemental 2026-11-14 Dvorkin/Bathe 1984 intake; **12 unique works** were appended from the 20-file literature intake and 3 already-listed works (L006, L007, L034) were not duplicated. The automated source audit also detects additional DOIs and reports uncatalogued sources separately; a matched DOI alone does not mean full metadata has been verified. Incomplete bibliographic fields represent **outstanding verification**, not implied completeness.
 
 ## Classification folders
 
