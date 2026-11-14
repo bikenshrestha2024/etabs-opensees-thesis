@@ -25,6 +25,51 @@ class OrganizedReviewTests(unittest.TestCase):
         self.assertEqual(classify("OpenSees_NLTHA_XY_Results.json"),"NonlinearTH")
         self.assertEqual(classify("02_MODEL/SLAB_LOAD_PATH/MESH_04/EXCEL/sheet.xlsx"),"Model")
 
+    def test_stage_folder_owns_ambiguous_file_labels(self):
+        self.assertEqual(classify("03_ESM/RUNS/ULS/Gravity_Notes.csv"),"ESM")
+        self.assertEqual(classify("04_MODAL/RUNS/ULS/Nonlinear_notes.json"),"Modal")
+        self.assertEqual(classify("02_GRAVITY/RUNS/X/Mode_shape.json"),"Gravity")
+        self.assertEqual(classify("05_MRSM/RUNS/X/Gravity_load.json"),"MRSM")
+        self.assertEqual(classify("08_ETABS_COMPARISONS/RUNS/X/Modal_diff.csv"),
+                         "Comparisons")
+
+    def test_archive_excludes_private_source_and_old_sibling_snapshots(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"export"
+            root.mkdir()
+            (root/"03_ESM"/"RUNS").mkdir(parents=True)
+            (root/"03_ESM"/"RUNS"/"ESM_Result.json").write_text("{}")
+            (root/"ETABS_full_table_original.xlsx").write_bytes(b"CONFIDENTIAL")
+            (root/"project_sources.private.json").write_text('{"secret":true}')
+            (root/"00_SOURCE_MANIFEST").mkdir()
+            (root/"00_SOURCE_MANIFEST"/"PROJECT_CONTEXT.json").write_text('{"private":"path"}')
+            (root/"09_SOFTWARE_DIAGNOSTICS").mkdir()
+            (root/"09_SOFTWARE_DIAGNOSTICS"/"REPORT.json").write_text("{}")
+            parent=root/"EXTERNAL_RESULTS"
+            old=parent/"OLD_CASE"
+            old.mkdir(parents=True)
+            (old/"Gravity_Run.json").write_text('{"old":true}')
+            report=publish_organized_results(root,destination_parent=parent)
+            manifest=json.loads(Path(report["manifest"]).read_text())
+            contents=[x["source"] for x in manifest["entries"]]
+            self.assertEqual(len(contents),1)
+            self.assertTrue(contents[0].endswith("ESM_Result.json"))
+            with zipfile.ZipFile(report["zip_files"]["ALL_MODULES"]) as z:
+                archive=" ".join(z.namelist())
+                self.assertNotIn("ETABS_full_table_original",archive)
+                self.assertNotIn("project_sources.private",archive)
+                self.assertNotIn("PROJECT_CONTEXT",archive)
+                self.assertNotIn("OLD_CASE",archive)
+
+    def test_bundle_name_rejects_windows_reserved_names(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            (root/"Gravity_Result.json").write_text("{}")
+            for bad in ("COM4","LPT9","../bad","C:\\temp","A."):
+                with self.assertRaises(ValueError):
+                    publish_organized_results(root,bundle_name=bad)
+            self.assertFalse((root/"Organized_Results").exists())
+
     def test_time_history_files_get_dedicated_review_zip(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)/"case"
