@@ -153,8 +153,8 @@ def create_case_run(export_dir, stage, case_id, *,
     for digest in (model_sha256, source_edb_sha256):
         if digest is not None and not re.fullmatch("[a-fA-F0-9]{64}", digest):
             raise ValueError("Source/model SHA256 must contain exactly 64 hexadecimal characters")
-    if not isinstance(units, str) or units != "kN-m-s":
-        raise ValueError("Production run units must be the reviewed kN-m-s basis")
+    if not isinstance(units, str) or units not in ("kN-m-s", "kN-mm-s"):
+        raise ValueError("Declare explicitly reviewed source units: kN-m-s or kN-mm-s")
     parent = root / stage_folder / "RUNS" / state / case_id
     parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
@@ -173,6 +173,45 @@ def create_case_run(export_dir, stage, case_id, *,
         "subfolders": list(RUN_SUBFOLDERS),
     }
     atomic_json(run / "00_INPUT_SOURCE" / "CASE_MANIFEST.json", manifest)
+    return run
+
+
+
+def prepare_history_run(model_script, stage, state, scope, *, model_length_unit):
+    """[REF docs/source/components/inputs/output_contract.py.md]
+    Create one immutable analysis-run directory, preserving source units.
+
+    This does NOT certify source motions, model readiness or a full-duration
+    transient. Users' explicit external output paths are handled by callers.
+    """
+    import hashlib
+    model=Path(model_script).expanduser().resolve(strict=True)
+    if not model.is_file() or model.suffix.casefold()!=".py":
+        raise ValueError("A real OpenSees model-builder Python file is required")
+    method=str(stage).strip().upper()
+    if method not in ("LTHA","NLTHA"):
+        raise ValueError("History run must be LTHA or NLTHA")
+    if model_length_unit not in ("m","mm"):
+        raise ValueError("Model length unit must be explicitly m or mm")
+    state=safe_component(state)
+    scope=safe_component(scope)
+    # An explicit model file stem differentiates independent case scenarios;
+    # original file SHA is separately recorded as an unaltered source digest.
+    case_id=safe_component((method+"_"+scope+"_"+model.stem)[:120].rstrip("._"))
+    export=export_root_for(model.parent)
+    run=create_case_run(export,method,case_id,state=state,
+                        units="kN-m-s" if model_length_unit=="m" else "kN-mm-s")
+    atomic_json(run/"00_INPUT_SOURCE"/"HISTORY_INPUT_PROVENANCE.json",{
+        "model_script":str(model),
+        "model_script_sha256":hashlib.sha256(model.read_bytes()).hexdigest(),
+        "assembled_model_sha256":None,
+        "source_edb_sha256":None,
+        "state":state,
+        "method":method,
+        "scope":scope,
+        "model_length_unit":model_length_unit,
+        "status":"SOURCE_SCRIPT_FINGERPRINT_ONLY_NOT_NATIVE_VERIFIED",
+    })
     return run
 
 
