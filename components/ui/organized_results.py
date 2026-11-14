@@ -19,8 +19,15 @@ from pathlib import Path
 MODULES = ("Model", "Gravity", "ESM", "Modal", "MRSM", "LinearTH", "NonlinearTH", "Comparisons", "Unclassified")
 SKIP_DIRS = {
     "Organized_Results", "REVIEW_SNAPSHOTS", "Seismic_Review_Packages", "Gravity_Evidence_Upload",
-    "__pycache__", ".git", ".pytest_cache",
+    "00_SOURCE_MANIFEST", "01_ETABS_EXPORT", "09_SOFTWARE_DIAGNOSTICS",
+    "90_UPLOAD_PACKAGES", "REVIEW_MAIN", "__pycache__", ".git", ".pytest_cache",
 }
+# Review archives are not authoritative-source backups. Source workbooks and
+# private manifests must be supplied separately only with explicit approval.
+SKIP_PRIVATE_NAMES = {"project_sources.private.json", "gravity_evidence_manifest.json",
+                      "project_context.json"}
+PRIVATE_WORKBOOK_MARKERS = ("original", "etabs_full_table", "source_workbook",
+                            "full_export", "source_etabs")
 SKIP_EXT = {".edb", ".bak", ".lock", ".tmp", ".pyc"}
 SKIP_SUFFIXES = (".processing.json", ".processing.log", ".tmp")
 METHOD_MARKERS = {
@@ -54,6 +61,17 @@ def classify(path, relative=None):
     name = p.name.casefold()
     # First classify explicit full stage names, never guess an NLTHA result
     # from the shorter "ltha" substring. Historical aliases remain readable.
+    stage_owner = {
+        "02_model": "Model", "02_gravity": "Gravity",
+        "03_esm": "ESM", "04_modal": "Modal", "05_mrsm": "MRSM",
+        "06_linear_time_history": "LinearTH", "06_linear_th": "LinearTH",
+        "07_nonlinear_time_history": "NonlinearTH",
+        "07_nonlinear_th": "NonlinearTH",
+        "08_etabs_comparisons": "Comparisons",
+    }
+    for part in parts[:-1]:
+        if part in stage_owner:
+            return stage_owner[part]
     if "02_model" in parts:
         return "Model"
     if any(x in ("07_nonlinear_time_history", "07_nonlinear_th") for x in parts):
@@ -84,21 +102,32 @@ def classify(path, relative=None):
     return "Unclassified"
 
 
-def _walk(root, *, destination):
+def _walk(root, *, destination, excluded_roots=()):
     root = Path(root).resolve()
     destination = Path(destination).resolve()
+    excluded = tuple(Path(p).resolve() for p in excluded_roots)
     for parent, dirs, names in os.walk(root, followlinks=False):
         here = Path(parent)
         dirs[:] = sorted(d for d in dirs
                          if d not in SKIP_DIRS and
                          not (here / d).is_symlink() and
                          (here / d).resolve() != destination and
-                         destination not in (here / d).resolve().parents)
+                         destination not in (here / d).resolve().parents and
+                         not any((here / d).resolve() == blocked or
+                                 blocked in (here / d).resolve().parents or
+                                 (here / d).resolve() in blocked.parents
+                                 for blocked in excluded))
         for name in sorted(names):
             path = here / name
             if path.is_symlink() or not path.is_file():
                 continue
-            if path.suffix.casefold() in SKIP_EXT or name.casefold().endswith(SKIP_SUFFIXES):
+            lowered = name.casefold()
+            if path.suffix.casefold() in SKIP_EXT or lowered.endswith(SKIP_SUFFIXES):
+                continue
+            if lowered in SKIP_PRIVATE_NAMES or ".private." in lowered:
+                continue
+            if path.suffix.casefold() in (".xlsx", ".xls", ".xlsm") and any(
+                    token in lowered for token in PRIVATE_WORKBOOK_MARKERS):
                 continue
             # Avoid recursively packaging ZIPs and old generated archives.
             if path.suffix.casefold() == ".zip":
@@ -126,12 +155,16 @@ def publish_organized_results(results_root, *, gravity_root=None,
         grav = Path(gravity_root).expanduser().resolve()
         if not grav.is_dir():
             raise FileNotFoundError("Selected gravity output root missing: " + str(grav))
-        if grav != root:
+        if grav != root and grav not in root.parents and root not in grav.parents:
             roots.append(("GravityGUI", grav))
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     parent = Path(destination_parent).expanduser().resolve() if destination_parent else root / "Organized_Results"
     if parent == root:
         raise ValueError("Destination parent may not be the source results root")
+    if parent in root.parents:
+        raise ValueError("Destination parent cannot be an ancestor of the source results root")
+    from components.inputs.output_contract import safe_component
+    bundle_name = safe_component(bundle_name)
     destination = parent / stamp
     destination.mkdir(parents=True, exist_ok=False)
     manifest = {
@@ -146,7 +179,8 @@ def publish_organized_results(results_root, *, gravity_root=None,
     # use fuzzy model-state matching or edit active result files.
     listed = []
     for source_label, source_root in roots:
-        for path, rel in _walk(source_root, destination=destination):
+        for path, rel in _walk(source_root, destination=destination,
+                               excluded_roots=(parent,) if parent != root else ()):
             module = classify(path, rel)
             if source_label == "GravityGUI" and module == "Unclassified":
                 module = "Gravity"
@@ -208,8 +242,6 @@ def publish_organized_results(results_root, *, gravity_root=None,
         subset = [e for e in manifest["entries"] if e["module"] == module]
         if subset:
             archive(module, subset)
-    if not bundle_name or "/" in bundle_name or "\\" in bundle_name:
-        raise ValueError("Invalid archive bundle name")
     archive(bundle_name, manifest["entries"])
     latest = parent / "LATEST_ORGANIZED_RESULT.txt"
     latest.write_text(
