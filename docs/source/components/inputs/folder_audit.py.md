@@ -18,7 +18,7 @@ Create a repeatable, non-destructive inventory of source export files and the re
 - Source flat files may still be required by old import/readers. The audit lists them even when their mirror copies exist, **intentionally**.
 - `*.processing.json`, `*.processing.log`, `*.partial` and `*.tmp` are ephemeral run sidecars and excluded from the export mirror.
 - Classification follows the existing `export_mirror.classification` heuristic. A module called `Gravity_*.json` in an export root is copied under source-load classification for backward compatibility; no analysis results are moved into `02_GRAVITY` based solely on file names.
-- Stage folder presence, immediate child directory and loose file counts are reported; there is no recursive payload inspection, native solver validation, mass verification, or assertion of a valid NBC model.
+- All canonical analysis and auxiliary stage folder names, immediate child directories and loose file names are reported. `02_MODEL`, `08_ETABS_COMPARISONS`, `09_SOFTWARE_DIAGNOSTICS`, `90_UPLOAD_PACKAGES`, `REVIEW_MAIN`, and `00_SOURCE_MANIFEST` are registered, not unexpected. Unexpected top-level directories and loose stage files receive separate findings. There is no recursive payload inspection, native solver validation, mass verification, or assertion of a valid NBC model.
 - Unsupported extensions, confidential source EDB, private manifest names and historical ZIPs aren't copied into Git by these tools.
 - Existing copy with different SHA is a **conflict**, not repaired automatically.
 
