@@ -16,6 +16,20 @@
 | Input source | ULS; project X Aw grouping 2 connected 12-m walls, Y 3 solid 6-m walls; source geometry vs original workbook provenance flagged in GUI |
 | Fundamental X/Y modal modes | Explicit optional mode IDs blank in screenshot |
 
+## Independent formulation/experiment context from newly uploaded U15
+
+The newest upload `dvorkin1984(1).pdf` (U15/L048; Dvorkin & Bathe 1984, original *Engineering Computations* article, DOI 10.1108/eb023562) illustrates why a numerically successful eigen solve is a limited screen:
+
+- Original article pp. 79–81 describes six rigid-body shell element modes and no spurious zero-energy modes for their own proposed formulation; the source also provides membrane/bending/shear/twist patch tests. It does not establish that the particular OpenSees `ShellMITC4` + wall/beam + rigid diaphragm assembled model has no artificial mechanism.
+- Original p. 83 Table 4 gives simply-supported *single plate* non-dimensional frequency ratios `f_FEM/f_thin-plate`: **1.02**, **1.18**, **1.17** for the authors' specified (1,1), (1,3), (3,3) shapes. These are *not* targets for the user's 25-storey, asymmetric and reentrant high-rise.
+- Compare OpenSees/ETABS modal shapes by **mass-weighted modal assurance criterion**:
+  `MAC_M(phi_i,psi_j)=|phi_i^T M psi_j|^2/((phi_i^T M phi_i)(psi_j^T M psi_j))`, after mapping physically equivalent DOFs, reference geometry, masses and orientation. High MAC does not independently prove stiffness/load-path equivalence; coupled bending/torsion may legitimately mix modes.
+- Compute first modal frequencies `f_i=sqrt(lambda_i)/(2*pi)`, periods `T_i=1/f_i`; preserve unit-consistent mass matrix and positive eigenvalue checks. Rayleigh static reference periods and NBC adopted code-action periods are **different data products** and should never occupy one ambiguous `T1` column.
+- Current GUI screenshot shows `Rayleigh TX=3.89851390s`, `TY=5.59044098s` as **input/reference fields**, 40 solved modes and UX/UY mass sums **91.245/90.775%**. Without the actual 40-row eigenfile, it is impossible to know which modes are fundamental X/Y/torsion or whether their periods match ETABS.
+- For 40-mode acceptance, examine *all* solver eigenvalues and full effective-mass distribution, plus first lateral and torsional shapes at each story. Do not only require percentage ≥90; review missing-mass correction, 33Hz cutoff and nearby modes under §7.3/7.4 in the project's verified NBC text.
+
+**New reference:** [Dvorkin/Bathe figure–table crosswalk](../../LITERATURE/DVORKIN_BATHE_1984_SHELL_BENCHMARKS.md). Source-to-physical model applicability remains `REFERENCE_ONLY`. Neither the original paper nor the modal screenshot verifies the assembled frame/wall interface or native ETABS response.
+
 ## Correct reading of these results
 - The modal audit reports numerical 90%-plus translational cumulative participation in X and Y, consistent with the GUI's cited NBC 105:2025 §7.3 screening. **This does not prove the correct number of modes for every response, nor lateral mode identification or model accuracy.** Obtain full eigenfrequency, mode shape and DOF participation workbook.
 - The 3.8985-s and 5.5904-s numbers shown are labelled **Rayleigh T X/Y**, so they MUST NOT automatically be reported as the first two modal eigenperiods. Rayleigh reference periods also may differ from code-adopted design-action periods, modal periods, and original ETABS eigenperiods.
