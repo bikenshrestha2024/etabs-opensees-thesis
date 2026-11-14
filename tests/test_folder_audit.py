@@ -84,6 +84,25 @@ class FolderAuditTests(unittest.TestCase):
                 {"LOOSE_STAGE_OUTPUTS", "UNREGISTERED_ROOT_DIRECTORIES"})
             self.assertTrue((root / "02_GRAVITY" / "Gravity_Response.json").exists())
 
+    def test_symlinked_stage_is_blocked_without_scanning_outside(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)/"selected"
+            outside=Path(tmp)/"outside"
+            root.mkdir()
+            outside.mkdir()
+            (outside/"PRIVATE.json").write_text('{"sensitive":true}')
+            try:
+                (root/"02_GRAVITY").symlink_to(outside,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Stage symlinks not available on this runner")
+            report=audit_export_structure(root)
+            self.assertIn("02_GRAVITY",report["symlinked_stage_directories"])
+            self.assertFalse(report["stages"]["GRAVITY"]["exists"])
+            self.assertTrue(report["stages"]["GRAVITY"]["symlink_refused"])
+            self.assertEqual(report["stages"]["GRAVITY"]["loose_files"],[])
+            self.assertIn("SYMLINKED_CANONICAL_STAGE_BLOCKED",
+                          {item["id"] for item in report["findings"]})
+
     def test_saved_audit_is_local_and_contains_no_compliance_claim(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
