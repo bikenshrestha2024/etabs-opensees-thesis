@@ -57,6 +57,9 @@ class OutputLayoutTests(unittest.TestCase):
             self.assertEqual(idx["schema"], "THESIS_STAGE_INDEX_V1")
             self.assertTrue(idx["legacy_analysis_results_present"])
             self.assertEqual({x["stage"] for x in idx["stages"]}, set(STAGE_FOLDERS))
+            self.assertEqual(
+                {x["stage"] for x in idx["auxiliary_stages"]},
+                {"MODEL", "ETABS_COMPARISONS", "SOFTWARE_DIAGNOSTICS", "UPLOAD_PACKAGES"})
             stages = {x["stage"]: x for x in idx["stages"]}
             self.assertEqual(stages["GRAVITY"]["review_snapshot_count"], 1)
             self.assertEqual(stages["ESM"]["latest_review_folder"],
