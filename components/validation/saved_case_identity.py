@@ -31,26 +31,26 @@ def current_export_model_sha(export_dir):
         return hashlib.file_digest(stream,"sha256").hexdigest()
 
 
-def recorded_result_model_sha(result_path, case=None):
+def source_model_hash_evidence(result_path, case=None):
     """[REF docs/source/components/validation/saved_case_identity.py.md]
-    Look up an explicitly recorded source-model hash, never infer from names.
+    Independently inspect run manifest AND recorded numeric payload SHA256.
 
-    Result source is trusted only when a valid hexadecimal SHA256 was emitted
-    by the analysis producer. Historical source labels stay NOT_VERIFIED.
+    If both are valid but disagree, report an explicit source conflict.
+    Neither the run directory nor an old saved report is modified.
     """
     path=Path(result_path).expanduser().resolve()
     folder=path.parent
-    # Canonical case outputs place the immutable input manifest alongside
-    # numeric results. No filesystem modifications are made.
+    manifest_digest=None
+    payload_digest=None
     for parent in (folder,*folder.parents):
         candidate=parent/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
         if candidate.is_file():
             try:
                 item=json.loads(candidate.read_text(encoding="utf-8-sig"))
-                digest=item.get("model_sha256")
-                if _valid_sha256(digest):
-                    return digest.lower()
-            except (OSError,ValueError,TypeError):
+                value=item.get("model_sha256") if isinstance(item,dict) else None
+                if _valid_sha256(value):
+                    manifest_digest=value.lower()
+            except (OSError,ValueError,TypeError,AttributeError):
                 pass
             break
         if parent.name.casefold() in {
@@ -58,25 +58,37 @@ def recorded_result_model_sha(result_path, case=None):
                 "07_nonlinear_time_history","opensees_analysis_results"}:
             break
     try:
+        value=None
         if path.name=="MRSM_Results_V132.json" and case:
             content=json.loads(path.read_text(encoding="utf-8-sig"))
-            value=content.get(str(case),{}).get("model_sha256")
-            if _valid_sha256(value):
-                return value.lower()
-        if path.name.startswith("Deformation_") and path.suffix.lower()==".json":
-            value=json.loads(path.read_text(encoding="utf-8-sig")).get("model_sha256")
-            if _valid_sha256(value):
-                return value.lower()
-        if path.name.startswith("Drift_Check_"):
+            if isinstance(content,dict) and isinstance(content.get(str(case)),dict):
+                value=content[str(case)].get("model_sha256")
+        elif path.name.startswith("Deformation_") and path.suffix.lower()==".json":
+            content=json.loads(path.read_text(encoding="utf-8-sig"))
+            value=content.get("model_sha256") if isinstance(content,dict) else None
+        elif path.name.startswith("Drift_Check_"):
             suffix=path.stem.removeprefix("Drift_Check_")
             metadata=folder/("NBC105_ESM_OpenSees_Response_META_"+suffix+".json")
             if metadata.is_file():
-                value=json.loads(metadata.read_text(encoding="utf-8-sig")).get("model_sha256")
-                if _valid_sha256(value):
-                    return value.lower()
+                content=json.loads(metadata.read_text(encoding="utf-8-sig"))
+                value=content.get("model_sha256") if isinstance(content,dict) else None
+        if _valid_sha256(value):
+            payload_digest=value.lower()
     except (OSError,ValueError,TypeError,AttributeError):
         pass
-    return None
+    conflict=(manifest_digest is not None and payload_digest is not None
+              and manifest_digest!=payload_digest)
+    return {"manifest_model_sha256":manifest_digest,
+            "payload_model_sha256":payload_digest,
+            "conflict":conflict,
+            "model_sha256":None if conflict else payload_digest or manifest_digest}
+
+
+def recorded_result_model_sha(result_path, case=None):
+    """[REF docs/source/components/validation/saved_case_identity.py.md]
+    Return an unambiguous saved SHA, or None on a source-evidence conflict.
+    """
+    return source_model_hash_evidence(result_path,case)["model_sha256"]
 
 
 def identity_screen(rows, *, expected_model_sha):
@@ -99,8 +111,18 @@ def identity_screen(rows, *, expected_model_sha):
             continue
         key=(str(path),str(item.get("case","")))
         if key not in cache:
-            cache[key]=recorded_result_model_sha(path,item.get("case"))
-        found=cache[key]
+            cache[key]=source_model_hash_evidence(path,item.get("case"))
+        evidence=cache[key]
+        if evidence["conflict"]:
+            issues.append({
+                "status":"SOURCE_MANIFEST_RESULT_SHA_CONFLICT_EXCLUDED",
+                "file":str(path),"case":item.get("case"),
+                "manifest_model_sha256":evidence["manifest_model_sha256"],
+                "payload_model_sha256":evidence["payload_model_sha256"],
+                "reason":"Run manifest disagrees with numeric result source; file excluded from plots until independently reconciled.",
+            })
+            continue
+        found=evidence["model_sha256"]
         if not expected_model_sha or not found:
             item["source_identity_status"]="NOT_VERIFIED"
             selected.append(item)
