@@ -27,3 +27,16 @@ Screenshot alone cannot distinguish a **historical** legacy report from a **curr
 6. Exercise Tk window search, scrolling, detail, buttons and JSON/XLSX output on the user's Windows machine. Review files locally; do not publish private project paths.
 
 **This is a presentation, source-data and report-path fix, not a numerical code equivalence certificate.**
+
+
+## Follow-up source discrepancy audit — 2026-11-14 (V13)
+
+New source-level findings, separate from native structural acceptance:
+
+- **Contradictory IS Table 5 project-adoption comment:** `components/model/analysis_basis.py` previously described adopted `0.25/0.35 Ig` as merely comparison values "not applicable" to the project's conventional slab. The comment has been corrected to reflect the explicitly adopted compulsory project basis. This correction **does not itself implement OpenSees section EI**.
+- **Nonfinite factors passed the settings warning gate:** `abs(float('nan')-expected)>tolerance` is false, permitting a corrupted slab modifier to appear unremarkable. The viewer now rejects nonfinite and nonpositive factor inputs and calls out mismatches.
+- **Illustrative NBC mass-source aliases miss source patterns:** Source references list `DL, Dead, Floor Finish, Partition` but not the exact `Self Weight` or `Wall` names from the exported gravity configuration. The updated panel now emits a crosswalk warning when nonzero source gravity patterns are not explicitly listed. **This does NOT establish a missing seismic mass**: physical material self-weight and wall mesh mass may be assembled independently of named load-pattern aliases. Follow actual assembly and compare per-story ETABS mass.
+- **P-Delta readiness displayed as incomplete but warning count did not reflect it:** Each absent signed `PD_INIT_EL_X/Y_PLUS/MINUS` record in the selected config now creates a visible warning. Records stored in separate runner output still require separate provenance review; absence from config is not proof that a native case did not run.
+- **Null source field in selected config could crash independent settings_audit:** `None + str` replaced with a safe explanatory fallback, with explicit JSON-object validation.
+
+Regression coverage: `tests/test_nbc_settings_panel_v12.py` now includes nonfinite factors, mismatched mass aliases, all four P-Delta messages and null provenance. CI pull-request paths include `analysis_basis.py` and `settings_audit.py`. Original ETABS, Excel and historical solver outputs remain read-only.

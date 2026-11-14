@@ -24,8 +24,13 @@ NBC105_FLEXURAL_MODIFIERS = {
     "steel": {"ULS": 1.00, "SLS": 1.00},
 }
 
-# IS 16700 Table 5 comparison values. Not applicable to this project's
-# conventional slab unless the user explicitly adopts that basis.
+# IS 16700:2023 Table 5 values are REQUIRED by the project's documented
+# adoption for the beam-supported conventional RC slab: ULS 0.25 Ig and
+# SLS 0.35 Ig. NBC 105 Table 3-1 flat-slab values are NOT substituted.
+# The analysis-section builder must still be independently audited to prove
+# these effective bending stiffnesses were applied; preserve physical thickness,
+# gross membrane area and gravity/seismic mass. Do not double-scale nonlinear
+# material response.
 IS16700_SLAB_MODIFIERS = {
     "area_Ag": {"serviceability": 1.00, "strength": 1.00},
     "inertia_Ig": {"serviceability": 0.35, "strength": 0.25},
