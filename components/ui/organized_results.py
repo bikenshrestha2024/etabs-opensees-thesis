@@ -227,11 +227,37 @@ def publish_organized_results(results_root, *, gravity_root=None,
     zipdir = destination / "ZIP_Exports"
     zipdir.mkdir()
     archives = {}
+
+    # The full, absolute-path evidence manifest stays LOCAL. Every upload ZIP
+    # receives a path-redacted variant with the same SHA and relative snapshot
+    # identities. This does not scan payloads for embedded secrets.
+    upload_manifest = dict(manifest)
+    upload_manifest["original_results_root"] = "<REDACTED_LOCAL_PATH>"
+    upload_manifest["gravity_output_root"] = (
+        "<REDACTED_LOCAL_PATH>" if manifest["gravity_output_root"] else None)
+    upload_manifest["source_sha256"] = {}
+    upload_manifest["source_path_policy"] = "LOCAL_PATHS_REDACTED_FOR_UPLOAD_ZIP"
+    upload_manifest["entries"] = [
+        dict(entry, source="<REDACTED_LOCAL_PATH>",
+             source_root="<REDACTED_LOCAL_PATH>")
+        for entry in manifest["entries"]
+    ]
+    upload_manifest["skipped"] = [
+        dict(item, source="<REDACTED_LOCAL_PATH>" if "source" in item
+             else item.get("source"))
+        for item in manifest["skipped"]
+    ]
     def archive(name, entries):
         target = zipdir / (name + "_Review_UPLOAD.zip")
+        visible = {item["snapshot"] for item in entries}
+        limited = dict(upload_manifest, entries=[
+            item for item in upload_manifest["entries"]
+            if item["snapshot"] in visible
+        ], file_count=len(entries))
         with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED,
                              compresslevel=6, allowZip64=True) as z:
-            z.write(manifest_file, "EVIDENCE_MANIFEST.json")
+            z.writestr("EVIDENCE_MANIFEST.json",
+                       json.dumps(limited, indent=2, ensure_ascii=False))
             z.write(readme, "README_FIRST.txt")
             for entry in entries:
                 path = destination / entry["snapshot"]
