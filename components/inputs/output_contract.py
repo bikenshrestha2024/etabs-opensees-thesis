@@ -194,6 +194,8 @@ def prepare_history_run(model_script, stage, state, scope, *, model_length_unit)
     if model_length_unit not in ("m","mm"):
         raise ValueError("Model length unit must be explicitly m or mm")
     state=safe_component(state)
+    if state.upper() not in ("ULS","SLS"):
+        raise ValueError("One ULS or SLS stiffness source is required per history case")
     scope=safe_component(scope)
     # An explicit model file stem differentiates independent case scenarios;
     # original file SHA is separately recorded as an unaltered source digest.
