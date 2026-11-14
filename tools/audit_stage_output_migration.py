@@ -41,7 +41,10 @@ def audit_stage_migration(export_dir):
         manifests=[]
         statuses={}
         unmanifested=[]
-        if runs.is_dir():
+        if runs.is_symlink():
+            unmanifested.append({"manifest":runs.relative_to(root).as_posix(),
+                                 "problem":"SYMLINKED_RUN_ROOT_REFUSED"})
+        elif runs.is_dir():
             for p in sorted(runs.rglob("CASE_MANIFEST.json")):
                 if p.is_symlink() or any(q.is_symlink() for q in p.parents if q!=root):
                     continue
@@ -50,6 +53,10 @@ def audit_stage_migration(export_dir):
                 except (ValueError,OSError):
                     unmanifested.append({"manifest":p.relative_to(root).as_posix(),
                                          "problem":"UNREADABLE_OR_INVALID_JSON"})
+                    continue
+                if not isinstance(item, dict):
+                    unmanifested.append({"manifest":p.relative_to(root).as_posix(),
+                                         "problem":"NONOBJECT_CASE_MANIFEST"})
                     continue
                 if item.get("schema")!=SCHEMA:
                     unmanifested.append({"manifest":p.relative_to(root).as_posix(),
@@ -65,7 +72,7 @@ def audit_stage_migration(export_dir):
                         "issues":details["issues"],
                     })
         stages.append({
-            "stage":key,"directory":dirname,"exists":stage.is_dir(),
+            "stage":key,"directory":dirname,"exists":stage.is_dir() and not stage.is_symlink(),
             "run_manifest_count":len(manifests),
             "solver_status_counts":statuses,
             "unreadable_or_invalid_manifests":unmanifested,
@@ -184,9 +191,10 @@ def main(argv=None):
         root=export_root_for(args.export_root)
         out=root/"09_SOFTWARE_DIAGNOSTICS"/"MIGRATION_AUDITS"
         stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
-        target=atomic_json(out/("Live_Stage_Output_Audit_"+stamp+".json"),report)
+        run=out/"RUNS"/stamp
+        target=atomic_json(run/"JSON"/"Live_Stage_Output_Audit.json",report)
         workbook=export_uniform_inventory_excel(
-            report,out/("Live_Stage_Output_Audit_"+stamp+".xlsx"))
+            report,run/"EXCEL"/"Live_Stage_Output_Audit.xlsx")
         print("Local audit JSON:",target)
         print("Uniform stage and case Excel:",workbook)
     return report
