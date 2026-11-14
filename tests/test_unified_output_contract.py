@@ -100,6 +100,22 @@ class UnifiedOutputContractTests(unittest.TestCase):
         self.assertEqual(ws.freeze_panes,"A2")
         self.assertTrue(ws.auto_filter.ref)
 
+    def test_large_excel_style_preserves_data_and_bounded_column_width(self):
+        from openpyxl import Workbook
+        book=Workbook()
+        sheet=book.active
+        sheet.append(("ETABS object","Reaction (kN)","Formula"))
+        for i in range(1,1201):
+            sheet.append((f"FRAME_{i}",float(i),f"=B{i+1}*2"))
+        original=sheet["C1201"].value
+        style_workbook(book)
+        self.assertEqual(sheet["C1201"].value,original)
+        self.assertEqual(sheet["B1201"].value,1200.0)
+        self.assertEqual(sheet["C2"].fill.fgColor.rgb,"00F2F5F9")
+        self.assertEqual(sheet["B3"].alignment.vertical,"top")
+        self.assertLessEqual(sheet.column_dimensions["A"].width,58)
+        self.assertTrue(sheet.auto_filter.ref)
+
     def test_project_layout_canonicalizes_old_callers(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
