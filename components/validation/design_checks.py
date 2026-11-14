@@ -176,6 +176,34 @@ def run(folder,storage=False,nonparallel=False):
     # migrated explicitly. Blank canonical templates must not replace them.
     output=templates(output);cases=combinations(storage,nonparallel)
     drift,issues=discover_design_drift(folder)
+    # A numerically low drift does not establish that the selected ETABS
+    # export produced it. Reuse the V142 source fingerprint gate and ensure
+    # legacy records without trusted identity cannot silently be marked PASS.
+    from components.validation.saved_case_identity import identity_screen
+    drift,source_issues=identity_screen(drift,expected_model_sha=digest)
+    issues.extend(dict(check="Seismic drift source identity",
+                       status=item["status"],
+                       reason=item.get("reason",""),
+                       file=item.get("file",""),
+                       case=item.get("case",""),
+                       manifest_model_sha256=item.get("manifest_model_sha256",""),
+                       payload_model_sha256=item.get("payload_model_sha256",""),
+                       result_model_sha256=item.get("result_model_sha256",""))
+                  for item in source_issues)
+    unknown_drift=0
+    for row in drift:
+        if row.get("source_identity_status")=="NOT_VERIFIED":
+            unknown_drift+=1
+            row["raw_limit_status"]=row.get("status")
+            if row.get("status")=="PASS":
+                row["status"]="NOT EVALUATED"
+            row["scope"]=str(row.get("scope","")) + (
+                " SOURCE MODEL IDENTITY MISSING: numeric limit check only;"
+                " not a verified drift PASS.")
+    if unknown_drift:
+        issues.append(dict(check="Unverified saved drift source",
+                           status="NOT EVALUATED",
+                           reason=f"{unknown_drift} drift rows lack matching source-model SHA256; numerical limit PASS withheld."))
     input_sources={}
     def input_rows(filename):
         # Prefer actual edited canonical input; fall back to nonempty legacy
@@ -226,6 +254,8 @@ def run(folder,storage=False,nonparallel=False):
     for name,rows in tables.items():write_rows(output/(name.replace(' ','_')+'.csv'),rows)
     elapsed=time.perf_counter()-start
     report=dict(input_criteria_sources=input_sources,report_directory=str(output),
+                drift_source_mismatch_excluded_count=len(source_issues),
+                drift_source_unverified_row_count=unknown_drift,
                 evidence_status='SOURCE_IDENTITIES_REQUIRE_REVIEW',
                 model_sha256=digest,started=started,finished=datetime.datetime.now().astimezone().isoformat(),elapsed_s=elapsed,overall='INCOMPLETE' if not any(r.get('status')=='FAIL' for rows in tables.values() for r in rows) else 'FAIL / INCOMPLETE',sources=[SOURCE],tables=tables,scope='No whole-section PASS is inferred. Existing analysis outputs are checked without rerunning the solver. MRSM force envelopes and nonlinear totals are never superposed as linear increments.')
     from components.inputs.output_contract import atomic_json
