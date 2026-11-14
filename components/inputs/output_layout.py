@@ -54,6 +54,28 @@ def review_snapshots_for(source_path, stage):
     return export_root_for(source_path) / STAGE_FOLDERS[key] / "REVIEW_SNAPSHOTS"
 
 
+def canonical_gravity_run_root(selected_output):
+    """[REF docs/source/components/inputs/output_layout.py.md]
+    Redirect a *new* gravity write away from legacy all-stage results.
+
+    Only paths under a named `OpenSees_Analysis_Results` are remapped.
+    Already canonical or explicitly user-selected external paths are preserved.
+    This does NOT relocate existing results or edit their embedded links.
+    """
+    selected = Path(selected_output).expanduser().resolve()
+    chain = (selected, *selected.parents)
+    legacy = next((p for p in chain
+                   if p.name.casefold() == _LEGACY_ROOT), None)
+    if legacy is None:
+        return selected
+    relative = selected.relative_to(legacy)
+    case_name = relative.parts[0] if relative.parts else "GENERAL"
+    # Preserve model/state scope without nesting arbitrary legacy subfolders.
+    if case_name in (".", "..") or not case_name:
+        raise ValueError("Invalid gravity case folder")
+    return legacy.parent / STAGE_FOLDERS["GRAVITY"] / "RUNS" / case_name
+
+
 def write_stage_index(export_dir):
     """[REF docs/source/components/inputs/output_layout.py.md]\n    Atomically publish a navigation index; never infer engineering pass.
 
