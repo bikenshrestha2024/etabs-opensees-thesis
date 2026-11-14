@@ -17,6 +17,15 @@ EXTS = {".json", ".csv", ".xlsx", ".xlsm", ".html", ".py", ".txt"}
 PRIVATE_NAMES = {"project_sources.private.json", "gravity_evidence_manifest.json"}
 
 
+def _digest(path):
+    """Stream SHA256 without loading large model JSON into RAM."""
+    h = sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def classification(name):
     """Classification for generated ETABS export artifacts only.
 
@@ -63,9 +72,9 @@ def export_mirror(export_dir):
         relative = Path(classification(original.name)) / original.name
         dest = target / relative
         dest.parent.mkdir(parents=True, exist_ok=True)
-        original_hash = sha256(original.read_bytes()).hexdigest()
+        original_hash = _digest(original)
         if dest.is_file():
-            if sha256(dest.read_bytes()).hexdigest() != original_hash:
+            if _digest(dest) != original_hash:
                 raise ValueError("Existing categorized copy differs; review manually: "+str(dest))
         else:
             with tempfile.NamedTemporaryFile(dir=dest.parent,suffix=".partial",
@@ -73,7 +82,7 @@ def export_mirror(export_dir):
                 part = Path(temp.name)
             try:
                 shutil.copy2(original, part)
-                if sha256(part.read_bytes()).hexdigest() != original_hash:
+                if _digest(part) != original_hash:
                     raise IOError("Copy did not preserve source bytes: "+original.name)
                 os.replace(part, dest)
             finally:
