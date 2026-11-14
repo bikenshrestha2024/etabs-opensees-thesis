@@ -2652,57 +2652,16 @@ class App:
             messagebox.showerror("Could not open area integration GUI",str(exc),parent=self.root)
 
     def _open_nbc105_settings(self):
-        """Display the code-based analysis factors and user-specified mass source."""
-        win=tk.Toplevel(self.root); win.title("NBC 105:2025 — Load Combinations, Stiffness Modifiers, Mass Source")
-        win.geometry("1250x780"); win.minsize(950,600); win.transient(self.root)
-        outer=ttk.Frame(win,padding=14); outer.pack(fill="both",expand=True)
-        ttk.Label(outer,text="NBC 105:2025 ANALYSIS SETTINGS",font=("Segoe UI",15,"bold")).pack(anchor="w")
-        ttk.Label(outer,text="Design basis: NBC 105:2025 Limit State Method only. Sources: §3.4 Table 3-1 (ultimate/serviceability effective stiffness); §3.6.1 (parallel combinations and λ); §3.6.2 (non-parallel directional combinations). WSM §3.7 combinations are excluded. Mass-source factors follow your stated requirement.",wraplength=1200).pack(anchor="w",pady=(5,10))
-        columns=("category","item","ultimate","serviceability","notes")
-        tv=ttk.Treeview(outer,columns=columns,show="headings",height=24)
-        for col,title,width in [("category","Category",165),("item","Setting / combination",360),("ultimate","ULS combination / factor",180),("serviceability","SLS combination / factor",180),("notes","Interpretation",340)]:
-            tv.heading(col,text=title); tv.column(col,width=width,anchor="w",stretch=(col=="notes"))
-        tv.pack(fill="both",expand=True)
-        settings_path=Path(__file__).resolve().with_name("NBC105_Analysis_Settings_V108.py")
+        """[REF docs/source/components/ui/nbc105_settings_panel.py.md]
+        Launch the source-aware NBC/project/solver reference, not a giant table.
+        """
         try:
-            spec=importlib.util.spec_from_file_location("nbc105_analysis_settings",settings_path)
-            mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-            tv.insert("","end",values=("Design method",mod.DESIGN_METHOD,"NBC §§3.4, 3.6","SLS checks retained","NBC §3.7 WSM combinations are not included in this project workflow."))
-            stack=mod.OPENSEES_ANALYSIS_STACK
-            tv.insert("","end",values=("Analysis stack","Constraints / numberer / system",stack["constraints"],stack["numberer"],stack["system"]))
-            tv.insert("","end",values=("Analysis mode",stack["primary_mode"],", ".join(stack["mode_choices"]),"NLTHA focus","Mode selects the solver setup; it does not replace nonlinear materials with elastic materials."))
-            tv.insert("","end",values=("Nonlinear algorithms",", ".join(stack["nonlinear_algorithm_choices"]),"Newton default","NLTHA","Use alternatives only after checking the convergence cause."))
-            for name,description in stack["optional_systems"].items():
-                tv.insert("","end",values=("Optional system",name,"—","—",description))
-            for stage_key,stage_name in [("nonlinear_static","Nonlinear gravity/static"),("nonlinear_transient","Nonlinear NLTHA")]:
-                stage=stack[stage_key]
-                tv.insert("","end",values=("Analysis stack",stage_name,f'{stage["algorithm"]} + {stage["integrator"]}',stage["analysis"],f'{stage["test"]} tol={stage["tolerance"]:g}, maxIter={stage["max_iterations"]}'))
-            tv.insert("","end",values=("Analysis stack","Elastic check only",stack["elastic_check_only"]["algorithm"],"Static","Never use the Linear algorithm for nonlinear fiber response."))
-            for label,values in mod.CRACKED_STIFFNESS_MODIFIERS.items():
-                if isinstance(values,dict):
-                    tv.insert("","end",values=("NBC stiffness reference",label,values.get("ultimate"),values.get("serviceability"),"NBC 105:2025 Table 3-1; elastic reference only, not applied to nonlinear fiber/FSAM materials."))
-                else:
-                    tv.insert("","end",values=("NBC stiffness reference",label,values,"—","Beam torsion only for compatibility torsion; otherwise retain gross J"))
-            tv.insert("","end",values=("NBC stiffness reference","Flat slab only",0.25,0.50,"NBC 105:2025 Table 3-1 ULS / SLS; not applicable to this conventional slab."))
-            tv.insert("","end",values=("Project slab stiffness","Conventional RC slab",0.25,0.35,"Project-adopted IS 16700:2023 Table 5; strength / serviceability flexural Ig. Axial/membrane area remains gross; NBC flat-slab row is not used."))
-            tv.insert("","end",values=("REQUIRED project initial P-Delta","EL/WL positive", "1.2 DL + 0.5 IL + 1.5 EL/WL","—","IS 16700:2023 §7.2(d); must converge before the NBC ESM runner."))
-            tv.insert("","end",values=("REQUIRED project initial P-Delta","EL/WL negative", "1.2 DL + 0.5 IL − 1.5 EL/WL","—","Run applicable X/Y and wind directions/signs; log completed results."))
-            for title,items in [("NBC LSM / strength + seismic",mod.PARALLEL_SYSTEM_COMBINATIONS),("NBC LSM / non-parallel",mod.NONPARALLEL_SYSTEM_COMBINATIONS)]:
-                for item in items: tv.insert("","end",values=(title,item["name"],item["expression"],item["expression"],"Same NBC §3.6 combination form for ULS and SLS; use the state-specific seismic action/coefficient. λ depends on occupancy."))
-            tv.insert("","end",values=("NBC gravity factors","LSM-01 gravity","1.2 DL + 1.5 LL","1.2 DL + 1.5 LL","NBC 105:2025 §3.6.1; same displayed combination form; apply factors to combinations, not source loads."))
-            tv.insert("","end",values=("Load handling","Source patterns","Unfactored","—","Preserve separate ETABS DL/LL patterns; avoid duplicated self-weight."))
-            for key,value in mod.LOAD_ACCOUNTING_COVERAGE.items():
-                tv.insert("","end",values=("Load coverage",key,value,"—","Current exporter coverage / required review"))
-            tv.insert("","end",values=("Combination factors","λ for storage facilities",mod.LIVE_LOAD_FACTORS["storage_facilities"],"—","Use with live load in seismic combinations"))
-            tv.insert("","end",values=("Combination factors","λ for other occupancy",mod.LIVE_LOAD_FACTORS["other_occupancy"],"—","Use with live load in seismic combinations"))
-            for key,value in [("Dead load factor",mod.EARTHQUAKE_MASS_SOURCE["dead_load_factor"]),("Storage live factor",mod.EARTHQUAKE_MASS_SOURCE["storage_live_factor"]),("Other live factor",mod.EARTHQUAKE_MASS_SOURCE["other_live_factor"]),("Roof live factor",mod.EARTHQUAKE_MASS_SOURCE["roof_live_factor"])]:
-                tv.insert("","end",values=("Earthquake mass source",key,value,"—","Roof live excluded" if key=="Roof live factor" else "User-specified seismic mass coefficient"))
-            for key in ("dead_pattern_names","storage_pattern_names","other_live_pattern_names","roof_live_pattern_names"):
-                tv.insert("","end",values=("ETABS pattern matching",key,", ".join(mod.EARTHQUAKE_MASS_SOURCE[key]),"—","Edit names in NBC105_Analysis_Settings_V108.py to match the ETABS model"))
+            from components.ui.nbc105_settings_panel import launch
+            return launch(self.root,self.out.get())
         except Exception as exc:
-            tv.insert("","end",values=("ERROR",str(exc),"—","—",str(settings_path)))
-        ttk.Label(outer,text="LSM only: NBC §3.7 WSM combinations are excluded. NBC §3.6 combinations govern seismic design. NBC Table 3-1 flat-slab values apply only to flat slabs; your conventional slab needs documented rational cracked stiffness or verified ETABS stiffness. IS 16700:2023 §7.2(d) plus/minus initial P-Delta cases are a REQUIRED project precondition before NBC ESM (the runner validates four X/Y case records and audit paths). §7.3.10 is a separate stability screen. The initial static P-Delta check is distinct from the sustained gravity preload retained for time history. This viewer does not solve the initial cases or alter ETABS shell properties.",wraplength=1200,foreground="#8a3412").pack(anchor="w",pady=(8,8))
-        ttk.Button(outer,text="Close",command=win.destroy).pack(anchor="e")
+            messagebox.showerror("Could not open NBC analysis settings",
+                                 str(exc),parent=self.root)
+
 
     def _row(self,parent,label,var,cmd):
         row=ttk.Frame(parent,style="Card.TFrame"); row.pack(fill="x",pady=5)
