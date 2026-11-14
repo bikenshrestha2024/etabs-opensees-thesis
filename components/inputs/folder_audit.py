@@ -26,7 +26,7 @@ STAGE_HINTS = {
 
 
 def audit_export_structure(export_dir, *, verify_copies=True):
-    """Check stage ownership, uncategorized export files and stale mirror copies.
+    """[REF docs/source/components/inputs/folder_audit.py.md]\n    Check stage ownership, uncategorized export files and stale mirror copies.
 
     Reads directory metadata and hashes only *existing categorized mirror copies*
     if verify_copies is true. Source paths are recorded as local diagnostic data:
@@ -120,7 +120,7 @@ def audit_export_structure(export_dir, *, verify_copies=True):
 
 
 def write_folder_audit(export_dir, *, verify_copies=True):
-    """Write one local immutable-ish dated audit under 01_ETABS_EXPORT/00_MANIFEST.
+    """[REF docs/source/components/inputs/folder_audit.py.md]\n    Write one local immutable-ish dated audit under 01_ETABS_EXPORT/00_MANIFEST.
 
     Only an audit output is created. Existing audit files aren't overwritten.
     """
