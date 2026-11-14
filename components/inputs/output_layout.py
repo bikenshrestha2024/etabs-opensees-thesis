@@ -27,7 +27,7 @@ _LEGACY_ROOT = "opensees_analysis_results"
 
 
 def export_root_for(source_path):
-    """Infer existing ETABS export root from a legacy model/results path.
+    """[REF docs/source/components/inputs/output_layout.py.md]\n    Infer existing ETABS export root from a legacy model/results path.
 
     Accepts a selected export root itself or a path nested beneath either
     OpenSees_Analysis_Results or a known stage folder. No directories are
@@ -47,7 +47,7 @@ def export_root_for(source_path):
 
 
 def review_snapshots_for(source_path, stage):
-    """Return the single canonical copy-only review parent for a known stage."""
+    """[REF docs/source/components/inputs/output_layout.py.md]\n    Return the single canonical copy-only review parent for a known stage."""
     key = str(stage).upper()
     if key not in STAGE_FOLDERS:
         raise ValueError("Unknown thesis analysis stage: " + str(stage))
@@ -55,7 +55,7 @@ def review_snapshots_for(source_path, stage):
 
 
 def write_stage_index(export_dir):
-    """Atomically publish a navigation index; never infer engineering pass.
+    """[REF docs/source/components/inputs/output_layout.py.md]\n    Atomically publish a navigation index; never infer engineering pass.
 
     Does not create stage folders, read large solver outputs, or publish the
     contents of private EDB/XLSX files. Explicitly separates folder presence
