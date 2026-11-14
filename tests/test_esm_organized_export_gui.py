@@ -49,6 +49,8 @@ class ESMCombinedExportTests(unittest.TestCase):
             result=build_combined_esm_export(root)
             self.assertEqual(source.read_bytes(),original)
             self.assertEqual(result["cases"],1)
+            self.assertTrue(Path(result["folder"]).is_relative_to(root / "03_ESM" / "REVIEW_SNAPSHOTS"))
+            self.assertEqual(result["solver_batch_status"], "NOT_RUN")
             index=json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
             self.assertEqual(index["acceptance"],
                              "COMPARISON_ONLY_NOT_NATIVE_ETABS_OR_NBC_CERTIFICATION")
@@ -63,8 +65,23 @@ class ESMCombinedExportTests(unittest.TestCase):
             self.assertIn("Case Summary",wb.sheetnames)
             self.assertIn("Storey Forces",wb.sheetnames)
             self.assertIn("Validation Gates",wb.sheetnames)
+            self.assertIn("Solver Batch Status",wb.sheetnames)
             self.assertIn("REQUIRES",str(tuple(wb["Validation Gates"].values)))
             self.assertTrue(Path(result["zip"]).is_file())
+
+    def test_running_batch_not_misreported_as_completed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._make_case(root)
+            status_dir = root / "ESM_Runner_Status" / "20261114_110851"
+            status_dir.mkdir(parents=True)
+            (status_dir / "CASE_STATUS.json").write_text(json.dumps([
+                {"case":"OpenSees_NBC105_ESM_Load_And_Static_Analysis_ULS_X+_E0_V111.py",
+                 "status":"RUNNING","return_code":None}]))
+            result = build_combined_esm_export(root)
+            self.assertEqual(result["solver_batch_status"], "PARTIAL_OR_FAILED")
+            metadata = json.loads(Path(result["manifest"]).read_text())
+            self.assertEqual(metadata["snapshot_status"], "PARTIAL_OR_UNVERIFIED")
 
     def test_no_input_case_does_not_invent_result(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -97,8 +114,8 @@ class ESMGuiSafetyTests(unittest.TestCase):
     def test_actions_grouped_and_export_visible(self):
         for text in ("ETABS comparison","Wall / period sources",
                      "Plots, reports and files","Export combined Excel + ZIP",
-                     "Stop running batch","ESM_Organized"):
-            if text == "ESM_Organized":
+                     "Stop running batch","REVIEW_SNAPSHOTS"):
+            if text == "REVIEW_SNAPSHOTS":
                 self.assertIn(text,(ROOT/"components/equivalent_static/organized_exports.py").read_text())
             else:
                 self.assertIn(text,self.code)

@@ -570,7 +570,7 @@ class ESMGui:
     def _export_combined_results(self):
         """Snapshot, classify and consolidate both ESM module results without moving sources."""
         if getattr(self,"_esm_combined_export_busy",False):
-            self.status.set("ESM combined export already running. Inspect ESM_Organized.")
+            self.status.set("ESM combined export already running. Inspect 03_ESM/REVIEW_SNAPSHOTS.")
             return
         self._esm_combined_export_busy=True
         self._set_esm_operation("EXPORTING","Preparing categorized ESM Excel and ZIP")
@@ -582,12 +582,13 @@ class ESMGui:
                 def done():
                     self._esm_combined_export_busy=False
                     self._set_esm_operation("EXPORTED","Combined result workbook and ZIP saved")
-                    self.status.set("ESM COMBINED EXPORTED | Excel: "+report["workbook"]+
+                    self.status.set("ESM SNAPSHOT "+report["solver_batch_status"]+" | Excel: "+report["workbook"]+
                                     " | ZIP: "+report["zip"]+" | manifest: "+report["manifest"])
                     messagebox.showinfo("ESM combined results",
                         "Combined Excel:\n"+report["workbook"]+
                         "\n\nCategorized review ZIP:\n"+report["zip"]+
-                        "\n\nThis report does not imply source-matched ETABS or NBC acceptance.",
+                        "\n\nSolver batch: "+report["solver_batch_status"]+"\nPartial exports may omit running cases."+
+                        "\nThis report does not imply source-matched ETABS or NBC acceptance.",
                         parent=self.root)
                 self.root.after(0,done)
             except Exception as exc:
