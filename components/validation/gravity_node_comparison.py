@@ -18,7 +18,10 @@ def _xyz(row):
 
     [REF components/validation/gravity_etabs_direct.py extract_from_sap]
     """
-    return (float(row["x_m"]),float(row["y_m"]),float(row["z_m"]))
+    xyz = (float(row["x_m"]), float(row["y_m"]), float(row["z_m"]))
+    if not all(math.isfinite(v) for v in xyz):
+        raise ValueError("Support coordinates must be finite in global metres")
+    return xyz
 
 
 def _distance(a,b):
@@ -45,15 +48,28 @@ def compare_support_nodes(etabs,opensees,*,tolerance_m=0.01):
     if not e_rows or not o_react or not o_coords:
         raise ValueError("ETABS reactions, OpenSees reactions and OpenSees nodes are required")
     ores=[]
+    reaction_tags=set()
     for row in o_react:
         tag=str(row.get("node_tag"))
+        if tag in reaction_tags:
+            raise ValueError("Duplicate OpenSees support reaction tag "+tag)
+        reaction_tags.add(tag)
         if tag not in o_coords:
             raise ValueError("OpenSees support "+tag+" missing geometry")
-        ores.append((tag,o_coords[tag],float(row["rz_kN"])))
+        value=float(row["rz_kN"])
+        if not math.isfinite(value):
+            raise ValueError("Nonfinite OpenSees support reaction at node "+tag)
+        ores.append((tag,o_coords[tag],value))
     eitems=[]
+    etabs_points=set()
     for row in e_rows:
         loc=_xyz(row)
-        point=str(row.get("point"))
+        if row.get("point") in (None,""):
+            raise ValueError("ETABS support reaction missing original point identity")
+        point=str(row["point"])
+        if point in etabs_points:
+            raise ValueError("Duplicate ETABS support point in selected result case: "+point)
+        etabs_points.add(point)
         if row.get("rz_global_kN") is None:
             usable=False
             rz=None
