@@ -260,6 +260,7 @@ on:
       - 'components/inputs/folder_audit.py'
       - 'components/inputs/export_mirror.py'
       - '22_AUDIT_EXPORT_FOLDERS.py'
+      - '09_ORGANIZE_ETABS_EXPORT.py'
       - 'tests/test_folder_audit.py'
       - 'tests/test_esm_organized_export_gui.py'
       - 'components/equivalent_static/organized_exports.py'
