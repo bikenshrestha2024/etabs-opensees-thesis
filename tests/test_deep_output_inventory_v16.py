@@ -28,6 +28,10 @@ class DeepOutputInventoryTests(unittest.TestCase):
             self.assertEqual(data["totals"]["files"], 1)
             self.assertGreaterEqual(data["totals"]["legacy_literal_occurrences"], 1)
             self.assertGreaterEqual(data["totals"]["possible_write_calls"], 1)
+            self.assertEqual(data["top_legacy_candidates"][0]["source"],
+                             "components/gravity/runner.py")
+            self.assertGreaterEqual(
+                data["top_legacy_candidates"][0]["potential_write_calls"],1)
             self.assertEqual(data["files"][0]["sha256"],
                              hashlib.sha256(old_bytes).hexdigest())
             self.assertEqual(src.read_bytes(), old_bytes)
