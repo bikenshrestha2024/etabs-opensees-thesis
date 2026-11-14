@@ -41,7 +41,10 @@ def audit_stage_migration(export_dir):
         manifests=[]
         statuses={}
         unmanifested=[]
-        if runs.is_symlink():
+        if stage.is_symlink():
+            unmanifested.append({"manifest":stage.relative_to(root).as_posix(),
+                                 "problem":"SYMLINKED_STAGE_ROOT_REFUSED"})
+        elif runs.is_symlink():
             unmanifested.append({"manifest":runs.relative_to(root).as_posix(),
                                  "problem":"SYMLINKED_RUN_ROOT_REFUSED"})
         elif runs.is_dir():
@@ -72,7 +75,9 @@ def audit_stage_migration(export_dir):
                         "issues":details["issues"],
                     })
         stages.append({
-            "stage":key,"directory":dirname,"exists":stage.is_dir() and not stage.is_symlink(),
+            "stage":key,"directory":dirname,
+            "exists":stage.is_dir() and not stage.is_symlink(),
+            "symlink_refused":stage.is_symlink() or runs.is_symlink(),
             "run_manifest_count":len(manifests),
             "solver_status_counts":statuses,
             "unreadable_or_invalid_manifests":unmanifested,
@@ -90,7 +95,9 @@ def audit_stage_migration(export_dir):
         "legacy_nonlinear_th_root_exists":(root/"07_NONLINEAR_TH").is_dir(),
         "stages":stages,
         "auxiliary_folders":[{
-            "name":key,"directory":folder,"exists":(root/folder).is_dir(),
+            "name":key,"directory":folder,
+            "exists":(root/folder).is_dir() and not (root/folder).is_symlink(),
+            "symlink_refused":(root/folder).is_symlink(),
             "assessment":"AUXILIARY_FOLDER_NOT_SOLVER_STATUS"
         } for key,folder in AUXILIARY_FOLDERS.items()],
         "summary":{
