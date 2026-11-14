@@ -37,7 +37,8 @@ This layout is **available as a shared API**, not automatically applied to all h
 
 ## API contract
 
-- `create_case_run(export_dir, stage, case_id, state='AS_CONFIGURED', model_sha256=None, source_edb_sha256=None, units='kN-m-s')` creates a **new** unique run only. Validates safe path components and the literal kN–m–s engineering unit basis. Hash fields are explicit, not inferred.
+- `create_case_run(export_dir, stage, case_id, state='AS_CONFIGURED', model_sha256=None, source_edb_sha256=None, units='kN-m-s')` creates a **new** unique run only. Validates safe path components and the explicitly supplied kN–m–s or kN–mm–s model basis. The history modules use the model's declared length basis; result output units (e.g., exported metres) must still be verified separately. Hash fields are explicit, not inferred.
+- `prepare_history_run(model_script, stage, state, scope, model_length_unit=...)` creates distinct source-script-fingerprinted LTHA/NLTHA runs in the matching stage and stores the units (`m` or `mm`) explicitly. The script SHA is **not** an assembled model SHA, and a truncated transient never becomes a full-record PASS.
 - `record_case_status(run_dir, 'RUNNING'|'COMPLETED_SOLVER_ONLY'|'FAILED'|'INTERRUPTED'|'INCOMPLETE')` updates the manifest without making any design-acceptance assertion. `VERIFIED_ETABS_EQUIVALENCE` cannot be set without a separate engineering-review field and is not self-certifying.
 - `style_workbook(workbook)` applies common navy headers, white bold text, alternating row shading, fixed 30-point header height, freeze/filter and bounded column widths to a new generated Excel workbook, without modifying cell values. Applied to V142 review Excel; other module workbooks require individually verified integration.
 - `atomic_json(path, data)` writes UTF-8, sorted keys, indentation 2, no NaN/Inf and an atomic replace. Use only for **new derived outputs** and explicit state updates, never original source datasets.

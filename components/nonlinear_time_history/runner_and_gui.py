@@ -760,8 +760,8 @@ class NonlinearTimeHistoryGUI:
         try:
             from OpenSees_Linear_Autofill_V124 import populate_linear
             if self._output_is_automatic:
-                from components.inputs.project_workbooks import analysis_output_folder
-                self.output.set(str(analysis_output_folder(path.resolve().parent,self.ls.get())))
+                from components.inputs.output_layout import export_root_for
+                self.output.set(str(export_root_for(path.resolve().parent)/"07_NONLINEAR_TIME_HISTORY"))
             result = populate_linear(self,path.resolve().parent)
             self.log.insert('end','[NLTHA PERIOD SOURCE] ' +
                             ' '.join(result.get('notes',[])) + '\n')
@@ -817,7 +817,7 @@ class NonlinearTimeHistoryGUI:
         ttk.Button(inputs,text="Prepare / inspect model-bound readiness checklist",command=lambda:__import__("OpenSees_Readiness_GUI_V134").launch(self.win,self.model.get(),self.readiness)).pack(anchor="w")
         ttk.Button(inputs,text="Run separate literature nonlinear demo (no building approval)",command=lambda:__import__("OpenSees_Literature_Demo_GUI_V137").launch(self.win)).pack(anchor="w")
         ttk.Button(inputs,text="Current building: exploratory nonlinear frames / elastic walls",command=lambda:__import__("OpenSees_Building_Exploratory_GUI_V138").launch(self.win,Path(self.model.get()).parent,self.output.get())).pack(anchor="w")
-        self._entry(inputs, "One-folder output directory", self.output, lambda: self._browse(self.output, "dir", "Select output folder"))
+        self._entry(inputs, "Auto stage output / custom override", self.output, lambda: self._browse(self.output, "dir", "Select output folder"))
         ttk.Button(inputs, text="Write CSV templates", command=self._templates).pack(anchor="e", pady=(5, 0))
         params = ttk.LabelFrame(root, text="2. NBC period, damping and time-step checks", padding=8); params.pack(fill="x", pady=8)
         trial_row=ttk.Frame(params);trial_row.pack(fill="x",pady=(0,4))
@@ -852,18 +852,18 @@ class NonlinearTimeHistoryGUI:
         ttk.Button(run_row, text="Run NBC Nonlinear Time-History Cases", command=self._run).pack(side="left")
         # [REF components/ui/output_folder.py] shared output-folder action.
         from components.ui.output_folder import add_open_output_button
-        add_open_output_button(run_row, self.output, window=self.win, padx=8)
+        add_open_output_button(run_row, lambda:getattr(self,"_last_case_folder",None) or self.output.get(), window=self.win, padx=8)
         from components.shared.case_status import panel
         self.case_board=panel(root)
-        ttk.Button(root,text='Performance objectives / component acceptance',command=lambda:__import__('components.validation.nonlinear_performance',fromlist=['launch']).launch(self.win,self.output.get())).pack(anchor='w',pady=4)
-        ttk.Button(root,text='Completed run graphs / Excel / unit audit',command=lambda:__import__('OpenSees_History_Results_V134').launch(self.win,self.output.get())).pack(anchor='w',pady=4)
+        ttk.Button(root,text='Performance objectives / component acceptance',command=lambda:__import__('components.validation.nonlinear_performance',fromlist=['launch']).launch(self.win,getattr(self,"_last_run_output",None) or self.output.get())).pack(anchor='w',pady=4)
+        ttk.Button(root,text='Completed run graphs / Excel / unit audit',command=lambda:__import__('OpenSees_History_Results_V134').launch(self.win,getattr(self,"_last_run_output",None) or self.output.get())).pack(anchor='w',pady=4)
         from components.ui.history_review_tools import export_review_zip_dialog
         review_actions = ttk.Frame(root); review_actions.pack(fill="x", pady=(0, 6))
         ttk.Button(review_actions, text="Copy complete run log",
                    command=lambda: (self.win.clipboard_clear(),
                                     self.win.clipboard_append(self.log.get("1.0", "end-1c")))).pack(side="left", padx=(0, 8))
         ttk.Button(review_actions, text="Export nonlinear results ZIP (local)",
-                   command=lambda: export_review_zip_dialog(self.win, self.output.get(), "nonlinear")).pack(side="left")
+                   command=lambda: export_review_zip_dialog(self.win, getattr(self,"_last_run_output",None) or self.output.get(), "nonlinear")).pack(side="left")
         tabs = ttk.Notebook(root); tabs.pack(fill="both", expand=True)
         from components.ui.history_review_tools import attach_text_scrollbar
         log_panel = ttk.Frame(tabs)
@@ -1020,19 +1020,32 @@ class NonlinearTimeHistoryGUI:
                     _analysis_duration_s(
                         motion, trial_orientation, values["trial_duration_s"])
             _require_nonlinear_readiness(values)
-            out = Path(values["output_dir"]); out.mkdir(parents=True, exist_ok=True)
-            from datetime import datetime
-            scope='Trial' if values.get('preliminary_selection') else 'Suite'
-            kind='NLTH' if 'Nonlinear' in type(self).__name__ else 'LTH'
-            out=out/f"{kind}_{values['limit_state']}_{scope}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
-            out.mkdir(parents=True,exist_ok=True);values['output_dir']=str(out)
+            from components.inputs.output_contract import prepare_history_run, record_case_status
+            scope='Trial' if (values.get('preliminary_selection')
+                              or values.get('trial_duration_s') is not None) else 'Suite'
+            self._run_contract_root=None
+            if self._output_is_automatic:
+                self._run_contract_root=prepare_history_run(
+                    values["model_script"],"NLTHA",values["limit_state"],
+                    scope,model_length_unit=values["model_length_unit"])
+                out=self._run_contract_root/"02_RESULTS"
+                record_case_status(self._run_contract_root,"RUNNING")
+            else:
+                from datetime import datetime
+                base=Path(values["output_dir"])
+                base.mkdir(parents=True,exist_ok=True)
+                out=base/f"NLTH_{values['limit_state']}_{scope}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+                out.mkdir(parents=True,exist_ok=True)
+            values['output_dir']=str(out)
+            self._last_run_output=str(out)
+            self._last_case_folder=str(self._run_contract_root or out)
             from components.shared.case_status import CaseLedger
             orientations=('X_ONLY',) if x_only else ('XY','YX')
             self.case_board['ledger']=CaseLedger(
                 out/'Time_History_Case_Status_V151.json',
                 [f"{motion['pair_id']}_{orientation}"
                  for motion in motions for orientation in orientations])
-            cfg = out / "NBC105_Nonlinear_Time_History_RunConfig_V116.json"
+            cfg = (self._run_contract_root/"00_INPUT_SOURCE" if self._run_contract_root else out) / "NBC105_Nonlinear_Time_History_RunConfig_V116.json"
             from OpenSees_Timing_V130 import StageTimer
             timer=StageTimer(cfg.parent,"Time-history configuration export")
             cfg.write_text(json.dumps(values, indent=2), encoding="utf-8");timer.finish("completed")
@@ -1048,7 +1061,9 @@ class NonlinearTimeHistoryGUI:
         try:
             proc = subprocess.Popen([python, str(Path(__file__).resolve()), "--run", str(cfg)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1, env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
             self.case_board['process']=proc
-            log_path = Path(json.loads(cfg.read_text(encoding="utf-8"))["output_dir"]) / "NBC105_Nonlinear_Time_History_Run_V116.log"
+            result_folder=Path(json.loads(cfg.read_text(encoding="utf-8"))["output_dir"])
+            contract_root=getattr(self,"_run_contract_root",None)
+            log_path = (contract_root/"01_LOGS" if contract_root else result_folder) / "NBC105_Nonlinear_Time_History_Run_V116.log"
             with log_path.open("w", encoding="utf-8") as logfile:
                 for line in proc.stdout:
                     logfile.write(line); logfile.flush()
@@ -1060,8 +1075,32 @@ class NonlinearTimeHistoryGUI:
                 end_line = f"\n{'[SUCCESS]' if code == 0 else '[FAILED]'} Process exit code {code}. Persistent log: {log_path}\n"
                 logfile.write(end_line); logfile.flush()
             self.win.after(0, self._append_log, end_line)
-            if code==0:self.win.after(0,lambda:__import__("OpenSees_History_Results_V134").launch(self.win,log_path.parent))
+            if contract_root:
+                from components.inputs.output_contract import record_case_status
+                record_case_status(contract_root,"COMPLETED_SOLVER_ONLY" if code==0 else "FAILED",
+                                   message="Native transient runner exited with code "+str(code)+
+                                           "; full record duration and physics still require review")
+                # Downstream older history viewers expect the run log beside
+                # their native result files. Preserve this compatibility copy.
+                import shutil
+                if log_path.is_file() and log_path != result_folder/log_path.name:
+                    shutil.copy2(log_path,result_folder/log_path.name)
+                if code==0:
+                    # Keep original solver outputs in 02_RESULTS. Small Excel
+                    # and figure copies are optional presentation aids only.
+                    import shutil
+                    for suffix,destination in ((".xlsx","03_EXCEL"),(".png","04_FIGURES"),
+                                               (".pdf","04_FIGURES")):
+                        for artifact in result_folder.glob("*"+suffix):
+                            if artifact.stat().st_size <= 25*1024*1024:
+                                shutil.copy2(artifact,contract_root/destination/artifact.name)
+            if code==0:self.win.after(0,lambda:__import__("OpenSees_History_Results_V134").launch(self.win,result_folder))
         except Exception as exc:
+            root=getattr(self,"_run_contract_root",None)
+            if root:
+                from components.inputs.output_contract import record_case_status
+                try:record_case_status(root,"FAILED",message=str(exc))
+                except (OSError,ValueError):pass
             if ledger:ledger.finish_pending('Runner/logging failure: '+str(exc))
             self.win.after(0, self._append_log, f"[FAILED] {exc}\n")
         finally: self.running = False
