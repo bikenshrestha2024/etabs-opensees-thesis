@@ -40,8 +40,13 @@ node response remain distinguishable. An archive is created only for a
 nonempty category. The combined archive contains all included categories.
 
 Files such as `.edb`, `.bak`, lock files, unfinished processing-sidecar
-files, old ZIPs and prior generated snapshots are excluded. Other saved logs,
-JSON, scripts, graphics, tables, CSV, PDF and Excel documents are included.
+files, old ZIPs and prior generated snapshots are excluded. As of V15,
+source-manifest/ETABS-export and software-diagnostic directories, known private
+manifests, and recognizable original-source workbooks are also excluded.
+Other saved logs, JSON, scripts, graphics, tables, CSV, PDF and generated Excel
+reports may be included, but **manual privacy review is still required**:
+unknown secret-bearing filenames or log payloads cannot be proven safe by a
+filename-only classifier. Never publish an archive without reviewing its manifest.
 The manifest identifies the original absolute source path, module assignment,
 original size and SHA256 for each included file. It also logs skipped
 unclassified evidence if that optional exclusion is requested.
@@ -78,3 +83,10 @@ The gravity GUI determines the ETABS export root from the selected results direc
 Users should receive a `GRAVITY_REVIEW_Review_UPLOAD.zip` under `02_GRAVITY/REVIEW_SNAPSHOTS/<timestamp>/ZIP_Exports/` and a pointer at `02_GRAVITY/REVIEW_SNAPSHOTS/LATEST_ORGANIZED_RESULT.txt`. Sources may still be in legacy output directories until all module readers are migrated with regression tests. Non-gravity ESM, MRSM and modal reports should be published from their own module actions, not bundled by a gravity button.
 
 **Acceptance:** Run `python -m unittest tests.test_organized_results` and current CI; then perform GUI smoke tests on Windows. Comparing total support reactions or packaging reports is not proof of native ETABS/OpenSees equivalence.
+
+
+## Deep output integrity V15
+
+The classifier now assigns ownership from canonical stage directory paths (`02_MODEL`, `02_GRAVITY`, `03_ESM`, `04_MODAL`, `05_MRSM`, `06_LINEAR_TIME_HISTORY`, `07_NONLINEAR_TIME_HISTORY`, `08_ETABS_COMPARISONS`) **before** reading ambiguous filenames. Source identity is still validated separately by native evidence code. A custom `destination_parent` inside the source tree is excluded from the scan, including older siblings: avoid feeding previously packaged results into new ZIPs. A separately supplied gravity directory already nested in the chosen source is not scanned again. The central `safe_component` validator rejects unsafe bundle names and Windows reserved devices before any new directory is made.
+
+This does **not** convert the historical all-module publisher into a canonical writer for every analysis stage. It remains a read-only forensic snapshot tool; each live solver writer/reader pair must migrate separately. Tests: `test_organized_results.py` and `test_unified_output_contract.py`.
