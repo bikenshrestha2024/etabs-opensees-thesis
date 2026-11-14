@@ -42,6 +42,15 @@ class UnifiedOutputContractTests(unittest.TestCase):
             })
             self.assertEqual(len(roots),3)
 
+    def test_review_and_source_manifest_nested_paths_map_to_export_root(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"export"
+            for name in ("REVIEW_MAIN","00_SOURCE_MANIFEST",
+                         "09_SOFTWARE_DIAGNOSTICS"):
+                nested=root/name/"RUNS"/"case"
+                self.assertEqual(export_root_for(nested),root)
+            self.assertFalse(root.exists())
+
     def test_uniform_case_folders_and_manifest_is_not_approval(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
@@ -62,7 +71,8 @@ class UnifiedOutputContractTests(unittest.TestCase):
             self.assertEqual(len(list(root.rglob("CASE_MANIFEST.json"))),len(STAGE_FOLDERS))
 
     def test_path_safety_and_format_writers(self):
-        for value in ("../hack","C:/temp","a\\b","CON","", "A." ):
+        for value in ("../hack","C:/temp","a\\b","CON","COM4","COM9",
+                      "LPT4","LPT9","", "A." ):
             with self.assertRaises(ValueError):
                 safe_component(value)
         with tempfile.TemporaryDirectory() as td:
