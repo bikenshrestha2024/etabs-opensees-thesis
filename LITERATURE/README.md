@@ -25,7 +25,7 @@
 
 Add new works by unique DOI; preserve existing stable IDs. On each citation refresh store *source, UTC retrieval date, count, and methodology*. Keep the catalog useful offline: URLs are references; private PDFs must not be silently pushed. See [existing curated source registry](../docs/00_RESEARCH_REFERENCES.md) for R01–R13 linkage.
 
-The curated master catalog includes 36 works. The automated source audit also detects additional DOIs and reports uncatalogued sources separately; a matched DOI alone does not mean full metadata has been verified. Incomplete bibliographic fields represent **outstanding verification**, not implied completeness.
+The curated master catalog includes 47 works after the 2026-11-14 intake; 11 unique additional works were appended and 3 already-listed works (L006, L007, L034) were not duplicated. The automated source audit also detects additional DOIs and reports uncatalogued sources separately; a matched DOI alone does not mean full metadata has been verified. Incomplete bibliographic fields represent **outstanding verification**, not implied completeness.
 
 ## Classification folders
 
