@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 import re
 
-_SHA256 = re.compile(r"[0-9a-fA-F]{64}\\Z")
+_SHA256 = re.compile(r"[0-9a-fA-F]{64}")
 
 
 def _valid_sha256(value):
