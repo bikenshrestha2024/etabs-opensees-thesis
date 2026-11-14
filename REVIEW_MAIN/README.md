@@ -24,6 +24,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **Uniform output contract implementation (2026-11-14):** [Shared canonical stage names, derived Excel/JSON/CSV style, reader compatibility and migration gates](08_SOFTWARE_SECURITY/20261114_UNIFIED_OUTPUT_CONTRACT_IMPLEMENTATION.md). Native Windows ETABS/OpenSees validation remains open.
 
+**All-module uniform output inventory V6:** [Common run-manifest checks, seven-stage and auxiliary inventory, shared diagnostic Excel/JSON format and remaining native evidence gates](08_SOFTWARE_SECURITY/20261114_ALL_MODULE_OUTPUT_INVENTORY_V6.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|
