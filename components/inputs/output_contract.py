@@ -40,8 +40,9 @@ def safe_component(value):
     part = str(value).strip()
     if (not CASE_COMPONENT.fullmatch(part) or part.endswith((".", " "))
             or part.upper().split(".")[0] in {
-                "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3",
-                "LPT1", "LPT2", "LPT3"}):
+                "CON", "PRN", "AUX", "NUL",
+                *(f"COM{i}" for i in range(1, 10)),
+                *(f"LPT{i}" for i in range(1, 10))}):
         raise ValueError("Unsafe run/case identifier: " + repr(value))
     return part
 
