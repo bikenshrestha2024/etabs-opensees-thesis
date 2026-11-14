@@ -147,18 +147,51 @@ class GravityAnalysisGUI:
         self.win.after_idle(populate_saved)
 
     def _populate_registered_sources(self):
+        """Source selection must never invoke a missing-Git-LFS modal dialog.
+
+        Only verified staged copies or available registered real XLSX files are
+        autofilled. Missing optional evidence does not block OpenSees gravity.
+        """
         from components.inputs.project_workbooks import registered_project_source
+        from components.inputs.gravity_evidence_stage import staged_gravity_workbooks
         if not self.model_var.get():
             return
+        folder = Path(self.model_var.get()).parent
         try:
+            staged = staged_gravity_workbooks(folder)
             for role, variable in (("etabs_full_table", self.etabs_full_table_var),
                                    ("etabs_assignment", self.etabs_native_assignment_var)):
                 if not variable.get():
-                    value = registered_project_source(Path(self.model_var.get()).parent, role)
+                    value = staged.get(role)
+                    if not value:
+                        value = registered_project_source(folder, role, missing_lfs='skip')
                     if value:
                         variable.set(value)
-        except (OSError, ValueError) as exc:
-            self.status_var.set('Source registration requires review: '+str(exc))
+        except (OSError, ValueError, KeyError) as exc:
+            self.status_var.set('Optional ETABS workbook evidence needs review: '+str(exc))
+
+    def _stage_selected_etabs_workbooks(self):
+        """Copy both user-chosen native Excel inputs into this selected export."""
+        from components.inputs.gravity_evidence_stage import stage_gravity_workbooks
+        try:
+            if not self.model_var.get():
+                raise ValueError('Select or auto-detect the current assembled model first')
+            assignment = self.etabs_native_assignment_var.get().strip()
+            full = self.etabs_full_table_var.get().strip()
+            if not assignment or not full:
+                raise ValueError('Select BOTH the assignment and compressed full-table XLSX files')
+            folder = Path(self.model_var.get()).resolve().parent
+            path = stage_gravity_workbooks(folder, assignment=assignment,
+                                          full_table=full,
+                                          source_edb=self.etabs_edb_path.get().strip() or None)
+            self._gravity_action_log('ETABS_WORKBOOKS_STAGED',
+                                     'Raw Excel bytes preserved; ETABS load/reaction equivalence still pending: '+str(path))
+            messagebox.showinfo('Local Excel evidence staged',
+                'Both native workbooks copied without modifying content or formatting.\n'
+                'SHA256 manifest:\n'+str(path)+
+                '\n\nThis does not certify ETABS/OpenSees equivalence.',parent=self.win)
+        except Exception as exc:
+            messagebox.showerror('ETABS workbook staging',str(exc),parent=self.win)
 
     def _view_saved_case(self):
         """Display only the selected fingerprint-checked saved 32/76/97 run."""
@@ -1113,6 +1146,9 @@ class GravityAnalysisGUI:
                  "Original workbook is READ ONLY; source hash and beam crosswalk are audited.",
             wraplength=1070,foreground="#9a3412",
             anchor="w",justify="left").pack(anchor="w",pady=(0,4))
+        ttk.Button(form,
+            text="Stage BOTH selected ETABS XLSX files locally (SHA256, no LFS)",
+            command=self._stage_selected_etabs_workbooks).pack(anchor="w",pady=(2,5))
         ttk.Button(form,text="Compare saved ETABS tables vs BOTH OpenSees gravity cases (no ETABS API)",
                    command=self._offline_etabs_table_compare).pack(anchor="w",pady=(3,5))
         self._path_row(form, "ETABS gravity results JSON (optional)", self.etabs_gravity_json_var,
