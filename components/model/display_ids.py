@@ -23,6 +23,8 @@ PREFIXES = {
 def display_label(prefix, storey, position):
     """Produce labels such as N1, N101, N202, B701, SW2501.
 
+    [REF docs/source/components/model/display_ids.py.md]
+
     Position is one-based within (category, storey), deterministic upstream.
     Reserve the first 99 slots in each storey for 100-based human labels.
     Additional objects use an unambiguous extended label rather than collide
@@ -41,6 +43,8 @@ def display_label(prefix, storey, position):
 
 def build_labels(objects):
     """Map stable native IDs to display names without modifying those IDs.
+
+    [REF docs/source/components/model/display_ids.py.md]
 
     Each input mapping needs native_id, storey, category. category must be
     externally classified; provenance of ETABS object/source is preserved.
