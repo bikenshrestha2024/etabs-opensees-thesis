@@ -1,5 +1,9 @@
 # AGENTS.md — Nonlinear ETABS-to-OpenSeesPy thesis coding contract
 
+## Export-case folder organization (2026-11-14)
+
+Always use the selected ETABS export case as the owning root; preserve `01_ETABS_EXPORT`, `02_GRAVITY`, `03_ESM`, `04_MODAL`, `05_MRSM`, `06_LINEAR_TIME_HISTORY` and `07_NONLINEAR_TIME_HISTORY`. Follow [the canonical folder/migration review](REVIEW_MAIN/08_SOFTWARE_SECURITY/20261114_CANONICAL_STAGE_FOLDER_AND_MIGRATION_AUDIT.md). Do not move source EDB/XLSX or live legacy files to make the directory look tidy: maintain a SHA-verified categorized mirror, audit consumer paths and migrate writer plus every reader atomically only after tests. Never commit real local case folder audits (contain absolute paths/project names) or confidential model evidence. Keep `.processing.json` sidecars out of categorized source mirrors. A folder index is a navigation artifact, not an engineering acceptance gate.
+
 ## Environment
 Windows; Spyder IDE; Python 3.12; conda-forge only. Keep source modules import-compatible and the 01–21 launchers usable. No external upload of sensitive ETABS exports or internal model datasets without permission.
 
