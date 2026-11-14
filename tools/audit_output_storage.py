@@ -116,14 +116,16 @@ def write_report(report, destination):
     if out.exists() and any(out.iterdir()):
         raise FileExistsError("Report destination already contains files: " + str(out))
     out.mkdir(parents=True, exist_ok=True)
-    (out / "DISK_AUDIT.json").write_text(json.dumps(report, indent=2),
-                                         encoding="utf-8")
-    with (out / "LARGEST_FILES.csv").open("w", newline="", encoding="utf-8-sig") as fp:
+    for name in ("JSON", "CSV", "REPORT"):
+        (out / name).mkdir(exist_ok=False)
+    (out / "JSON" / "DISK_AUDIT.json").write_text(
+        json.dumps(report, indent=2), encoding="utf-8")
+    with (out / "CSV" / "LARGEST_FILES.csv").open("w", newline="", encoding="utf-8-sig") as fp:
         writer = csv.DictWriter(fp, fieldnames=(
             "relative_path", "bytes", "extension", "module_folder"))
         writer.writeheader()
         writer.writerows(report["largest_files"])
-    with (out / "EXACT_DUPLICATES.csv").open("w", newline="", encoding="utf-8-sig") as fp:
+    with (out / "CSV" / "EXACT_DUPLICATES.csv").open("w", newline="", encoding="utf-8-sig") as fp:
         writer = csv.writer(fp)
         writer.writerow(("sha256", "bytes_per_file", "repeat_count",
                          "redundant_bytes", "relative_path"))
@@ -171,7 +173,7 @@ def write_report(report, destination):
         "potential archival actions manually. Native ETABS/OpenSees physics "
         "equivalence is not assessed by disk size.",
     ])
-    (out / "READ_FIRST.md").write_text("\n".join(lines) + "\n",
+    (out / "REPORT" / "READ_FIRST.md").write_text("\n".join(lines) + "\n",
                                        encoding="utf-8")
     return out
 
@@ -195,11 +197,14 @@ def main(argv=None):
     if not root:
         raise SystemExit("No output directory selected; nothing modified.")
     report = scan_output(root, hash_duplicates=not args.no_hash)
-    # A new sibling report directory avoids making the audit part of its
-    # own source tree, preserving a stable measured byte total.
+    # Save local diagnostics in the selected case's canonical output stage.
+    # The report describes the source snapshot BEFORE these new files are made;
+    # previous saved audits are counted on subsequent disk inventories.
+    from components.inputs.output_layout import export_root_for
     dest = Path(args.out) if args.out else (
-        Path(root).resolve().parent /
-        ("Disk_Audit_" + datetime.now().strftime("%Y%m%d_%H%M%S")))
+        export_root_for(root) / "09_SOFTWARE_DIAGNOSTICS" /
+        "DISK_AUDITS" / "RUNS" /
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ"))
     result = write_report(report, dest)
     print("DISK AUDIT (NO FILES REMOVED):", result)
     print("Total bytes:", report["total_bytes"],
