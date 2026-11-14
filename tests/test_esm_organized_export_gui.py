@@ -159,7 +159,11 @@ class ESMGuiSafetyTests(unittest.TestCase):
                      "Plots, reports and files","Export combined Excel + ZIP",
                      "Stop running batch","REVIEW_SNAPSHOTS"):
             if text == "REVIEW_SNAPSHOTS":
-                self.assertIn(text,(ROOT/"components/equivalent_static/organized_exports.py").read_text())
+                # Canonical path literal is in the single shared source of truth,
+                # not repeated in each stage exporter.
+                self.assertIn(text, (ROOT/"components/inputs/output_layout.py").read_text())
+                self.assertIn("review_snapshots_for",
+                              (ROOT/"components/equivalent_static/organized_exports.py").read_text())
             else:
                 self.assertIn(text,self.code)
         self.assertNotIn("for button in footer.winfo_children():button.pack_forget()",self.code)
