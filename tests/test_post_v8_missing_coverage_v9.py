@@ -46,6 +46,23 @@ class MissingStiffnessCoverageTests(unittest.TestCase):
             self.assertEqual(len([r for r in output["checks"] if
                                   r.get("status")=="NOT EVALUATED"]),3)
 
+    def test_invalid_sixtyfour_characters_not_accepted_as_sha256(self):
+        from components.validation.saved_case_identity import (
+            recorded_result_model_sha,identity_screen)
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td)
+            file=folder/"MRSM_Results_V132.json"
+            file.write_text(json.dumps({
+                "X_E0":{"model_sha256":"z"*64}
+            }))
+            self.assertIsNone(recorded_result_model_sha(file,"X_E0"))
+            selected,issues=identity_screen(
+                [{"file":str(file),"case":"X_E0"}],
+                expected_model_sha="a"*64)
+            self.assertEqual(len(selected),1)
+            self.assertEqual(selected[0]["source_identity_status"],"NOT_VERIFIED")
+            self.assertEqual(issues,[])
+
     def test_truncated_history_cannot_become_completed_via_late_ok(self):
         with tempfile.TemporaryDirectory() as td:
             ledger=CaseLedger(Path(td)/"ledger.json",["Kobe_XY"])
