@@ -38,6 +38,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **NBC 105 settings/V135 reference GUI V12:** [Six-tab source-aware code/project basis, local settings audit and legacy report path diagnostics](08_SOFTWARE_SECURITY/20261114_NBC_SETTINGS_REFERENCE_GUI_V12.md).
 
+**V135 source-safe drift classification V13:** [Numerical drift PASS requires a source-matched model and completed saved run](08_SOFTWARE_SECURITY/20261114_V135_DRIFT_EVIDENCE_RECHECK_V13.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|
