@@ -318,6 +318,8 @@ on:
       - 'docs/source/components/nonlinear_time_history/one_storey_wall_probe.py.md'
   pull_request:
     paths:
+      - 'components/model/analysis_basis.py'
+      - 'components/validation/settings_audit.py'
       - 'components/ui/nbc105_settings_panel.py'
       - 'components/validation/design_checks.py'
       - 'components/ui/application.py'
