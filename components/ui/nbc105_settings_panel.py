@@ -394,8 +394,9 @@ def export_analysis_settings_review(report):
         raise NotADirectoryError(str(root))
     parent=root/"09_SOFTWARE_DIAGNOSTICS"/"ANALYSIS_SETTINGS"
     stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
-    jsonfile=parent/("NBC105_Settings_Reference_"+stamp+".json")
-    xlsxfile=parent/("NBC105_Settings_Reference_"+stamp+".xlsx")
+    run=parent/"RUNS"/stamp
+    jsonfile=run/"JSON"/"NBC105_Settings_Reference.json"
+    xlsxfile=run/"EXCEL"/"NBC105_Settings_Reference.xlsx"
     local=dict(report,created_utc=datetime.now(timezone.utc).isoformat())
     atomic_json(jsonfile,local)
     wb=Workbook()
