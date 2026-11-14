@@ -177,6 +177,71 @@ def create_case_run(export_dir, stage, case_id, *,
 
 
 
+
+def inspect_case_manifest(run_dir, *, expected_stage=None):
+    """[REF docs/source/components/inputs/output_contract.py.md]
+    Read-only structural check shared by every producing module.
+
+    Reports missing/inconsistent evidence as issues. Never converts solver
+    status into engineering compliance, and never modifies archived outputs.
+    """
+    run=Path(run_dir).expanduser().resolve()
+    path=run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+    issues=[]
+    if not path.is_file():
+        return {"run":str(run),"valid":False,"issues":["MISSING_CASE_MANIFEST"],
+                "solver_status":"UNKNOWN","engineering_acceptance":"NOT_VERIFIED"}
+    try:
+        data=json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError,ValueError,TypeError):
+        return {"run":str(run),"valid":False,"issues":["UNREADABLE_CASE_MANIFEST"],
+                "solver_status":"UNKNOWN","engineering_acceptance":"NOT_VERIFIED"}
+    if not isinstance(data,dict) or data.get("schema")!=SCHEMA:
+        issues.append("UNKNOWN_SCHEMA")
+        data=data if isinstance(data,dict) else {}
+    if data.get("solver_status") not in STATUSES:
+        issues.append("INVALID_SOLVER_STATUS")
+    if data.get("units") not in ("kN-m-s","kN-mm-s"):
+        issues.append("UNDECLARED_MODEL_UNITS")
+    for name in ("case_id","state","run_id"):
+        try:
+            safe_component(data.get(name))
+        except ValueError:
+            issues.append("INVALID_"+name.upper())
+    # A manifest path must match the actual RUNS/state/case/run-id hierarchy.
+    if tuple(run.parts[-4:-1]) != ("RUNS",data.get("state"),data.get("case_id")):
+        issues.append("RUN_DIRECTORY_IDENTITY_MISMATCH")
+    if run.name!=data.get("run_id"):
+        issues.append("RUN_ID_MISMATCH")
+    if expected_stage is not None:
+        if data.get("stage")!=canonical_stage_folder(expected_stage):
+            issues.append("WRONG_STAGE")
+    for field in ("model_sha256","source_edb_sha256"):
+        value=data.get(field)
+        if value is not None and (not isinstance(value,str)
+                 or re.fullmatch("[a-fA-F0-9]{64}",value) is None):
+            issues.append("INVALID_"+field.upper())
+    for folder in RUN_SUBFOLDERS:
+        sub=run/folder
+        if not sub.is_dir() or sub.is_symlink():
+            issues.append("MISSING_"+folder)
+    acceptance=data.get("structural_acceptance","NOT_VERIFIED")
+    if acceptance not in ("NOT_VERIFIED","VERIFIED_BY_ENGINEERING_REVIEW"):
+        issues.append("UNKNOWN_ACCEPTANCE_STATUS")
+    if data.get("solver_status")=="VERIFIED_ETABS_EQUIVALENCE":
+        # No automated tool may certify a model from a manifest string alone.
+        issues.append("MANUAL_ENGINEERING_CERTIFICATION_REQUIRED")
+    return {"run":str(run),"valid":not issues,"issues":issues,
+            "stage":data.get("stage"),"state":data.get("state"),
+            "case_id":data.get("case_id"),"run_id":data.get("run_id"),
+            "solver_status":data.get("solver_status","UNKNOWN"),
+            "engineering_acceptance":acceptance,
+            "model_sha256_recorded":bool(data.get("model_sha256")),
+            "source_edb_sha256_recorded":bool(data.get("source_edb_sha256")),
+            "units":data.get("units")}
+
+
+
 def prepare_history_run(model_script, stage, state, scope, *, model_length_unit):
     """[REF docs/source/components/inputs/output_contract.py.md]
     Create one immutable analysis-run directory, preserving source units.
