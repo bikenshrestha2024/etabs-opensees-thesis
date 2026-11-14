@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -99,7 +100,9 @@ def build_analysis_settings_review(export_dir):
         if key in config:
             try:
                 actual=float(config[key])
-                if abs(actual-expected)>1e-10:
+                if not math.isfinite(actual):
+                    warnings.append(f"{state} slab bending factor is not finite; review model config")
+                elif abs(actual-expected)>1e-10:
                     warnings.append(
                         f"{state} conventional slab bending factor {actual:g} differs "
                         f"from adopted IS 16700 value {expected:g}; review generated section.")
