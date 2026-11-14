@@ -107,7 +107,7 @@ def write_stage_index(export_dir):
     ) as handle:
         temp = Path(handle.name)
         json.dump(manifest, handle, indent=2, ensure_ascii=False)
-        handle.write("\\n")
+        handle.write("\n")
     try:
         os.replace(temp, output)
     finally:
