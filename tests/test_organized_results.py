@@ -54,6 +54,37 @@ class OrganizedReviewTests(unittest.TestCase):
             self.assertEqual(again["file_count"], 6)
             self.assertNotEqual(result["folder"], again["folder"])
 
+    def test_gravity_review_under_export_02_gravity_isolated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            export = Path(tmp) / "Export_02"
+            root = export / "OpenSees_Analysis_Results" / "ULS_Model"
+            gravity = export / "02_GRAVITY" / "SOURCE_RUNS"
+            root.mkdir(parents=True)
+            gravity.mkdir(parents=True)
+            (root / "Gravity_Result_V110.json").write_text('{"ok":true}')
+            (root / "Modal_Results.json").write_text('{"modal":true}')
+            (root / "ETABS_Comparison.csv").write_text("source,open\\n1,1\\n")
+            (gravity / "Gravity_Run_V110.log").write_text("gravity log")
+            home = export / "02_GRAVITY" / "REVIEW_SNAPSHOTS"
+            first = publish_organized_results(
+                root, gravity_root=gravity, destination_parent=home,
+                selected_modules=("Gravity", "Comparisons"),
+                bundle_name="GRAVITY_REVIEW")
+            self.assertTrue(Path(first["folder"]).is_relative_to(home))
+            self.assertIn("GRAVITY_REVIEW", first["zip_files"])
+            with zipfile.ZipFile(first["zip_files"]["GRAVITY_REVIEW"]) as z:
+                entries = z.namelist()
+                self.assertTrue(any("Gravity_Result_V110.json" in n for n in entries))
+                self.assertTrue(any("ETABS_Comparison.csv" in n for n in entries))
+                self.assertFalse(any("Modal_Results.json" in n for n in entries))
+            self.assertTrue((root / "Gravity_Result_V110.json").exists())
+            # A second snapshot must not recursively copy the first review.
+            second = publish_organized_results(
+                root, gravity_root=gravity, destination_parent=home,
+                selected_modules=("Gravity", "Comparisons"),
+                bundle_name="GRAVITY_REVIEW")
+            self.assertEqual(first["file_count"], second["file_count"])
+
     def test_separate_gravity_output_can_be_packaged(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "analysis"
