@@ -28,6 +28,11 @@ class ProjectOutputLayoutTests(unittest.TestCase):
                 case_folder(result, "03_ESM", "../secret")
             with self.assertRaises(ValueError):
                 case_folder(result, "03_ESM", "C:\\absolute")
+            for unsafe in ("COM4", "LPT9", "NUL", "X.", "A/B"):
+                with self.assertRaises(ValueError):
+                    case_folder(result, "03_ESM", unsafe)
+            with self.assertRaises(ValueError):
+                case_folder(result, "03_ESM", "CASE", limit_state="COM6")
             source.write_bytes(b"different file")
             with self.assertRaises(ValueError):
                 create_project_layout(source, output)
