@@ -20,6 +20,7 @@ LFS_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 
 
 def file_sha256(path):
+    """SHA256 of the exact bytes. [REF docs/source/components/inputs/gravity_evidence_stage.py.md]"""
     h = sha256()
     with Path(path).open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -49,11 +50,14 @@ def _validate_excel(path):
 
 
 def manifest_path(export_dir):
+    """Private export-scoped manifest location. [REF docs/source/components/inputs/gravity_evidence_stage.py.md]"""
     return Path(export_dir) / "01_ETABS_EXPORT" / "10_PRIVATE_ETABS_WORKBOOKS" / "gravity_evidence_manifest.json"
 
 
 def stage_gravity_workbooks(export_dir, *, assignment, full_table, source_edb=None):
     """Stage read-only copies and atomic SHA manifest for an explicit ULS model.
+
+    [REF docs/source/components/inputs/gravity_evidence_stage.py.md]
 
     Workbook structure is checked, but full ETABS scientific equivalence is
     NOT implied. Caller must independently confirm model, load case, and
@@ -105,7 +109,10 @@ def stage_gravity_workbooks(export_dir, *, assignment, full_table, source_edb=No
 
 
 def staged_gravity_workbooks(export_dir):
-    """Return matching staged files or reject stale/altered evidence, never guess."""
+    """Return matching staged files or reject stale/altered evidence, never guess.
+
+    [REF docs/source/components/inputs/gravity_evidence_stage.py.md]
+    """
     path = manifest_path(export_dir)
     if not path.is_file():
         return {}
