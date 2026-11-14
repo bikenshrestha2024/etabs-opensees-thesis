@@ -46,6 +46,20 @@ class MissingStiffnessCoverageTests(unittest.TestCase):
             self.assertEqual(len([r for r in output["checks"] if
                                   r.get("status")=="NOT EVALUATED"]),3)
 
+    def test_missing_source_and_corrupt_saved_result_do_not_crash_review(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            folder=root/"05_MRSM"/"RUNS"/"ULS"/"case"/"run"/"02_RESULTS"
+            folder.mkdir(parents=True)
+            (folder/"Irregularity_X_E0_V132.json").write_text("{not json")
+            output=merge_saved_stiffness(root,{"checks":[]})
+            self.assertEqual(output["overall"],"INCOMPLETE")
+            self.assertEqual(len([r for r in output["checks"]
+                                  if r.get("status")=="NOT EVALUATED"]),4)
+            statuses={i["status"] for i in output["stiffness_evidence_issues"]}
+            self.assertIn("MISSING_SOURCE_MODEL",statuses)
+            self.assertIn("UNREADABLE_STIFFNESS_EVIDENCE",statuses)
+
     def test_invalid_sixtyfour_characters_not_accepted_as_sha256(self):
         from components.validation.saved_case_identity import (
             recorded_result_model_sha,identity_screen)
