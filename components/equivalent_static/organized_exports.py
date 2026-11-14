@@ -45,7 +45,7 @@ def _source_files(root):
     """Yield ESM files only; ignore gravity, other analysis and previous snapshots."""
     for source in sorted(root.iterdir()):
         if source.is_file() and source.name.startswith(_DIRECT_PREFIXES):
-            if source.suffix.lower() in _CATEGORIES:
+            if source.suffix.lower() in _CATEGORIES and not source.name.endswith(".processing.json"):
                 yield "opensees", source
     for subfolder, role in (("ETABS_Linked_ESM", "etabs"),
                             ("ESM_Runner_Status", "opensees")):
@@ -53,7 +53,7 @@ def _source_files(root):
         if folder.is_dir():
             for source in sorted(folder.rglob("*")):
                 if source.is_file() and not source.is_symlink():
-                    if source.suffix.lower() in _CATEGORIES:
+                    if source.suffix.lower() in _CATEGORIES and not source.name.endswith(".processing.json"):
                         yield role, source
 
 
@@ -179,6 +179,30 @@ def _combined_workbook(target, cases, stories, manifest):
     wb.save(target)
 
 
+def _latest_batch_status(root):
+    """Read one newest ESM solver batch. Never equate calculation files with solved cases."""
+    directory = root / "ESM_Runner_Status"
+    candidates = sorted(directory.glob("*/CASE_STATUS.json")) if directory.is_dir() else []
+    if not candidates:
+        return {"status": "NOT_RUN", "completed": 0, "records": [], "status_file": None}
+    path = max(candidates, key=lambda p: (p.stat().st_mtime_ns, str(p)))
+    try:
+        records = json.loads(path.read_text(encoding="utf-8-sig"))
+        if not isinstance(records, list):
+            raise ValueError("CASE_STATUS must be a list")
+        for item in records:
+            if not isinstance(item, dict) or not isinstance(item.get("case"), str):
+                raise ValueError("CASE_STATUS contains invalid case row")
+        success = sum(item.get("status") == "SUCCESS" and item.get("return_code") == 0 for item in records)
+        expected = len(list(root.glob("OpenSees_NBC105_ESM_Load_And_Static_Analysis_*.py")))
+        state = "COMPLETE_SOLVER_ONLY" if expected and len(records) >= expected and success == expected else "PARTIAL_OR_FAILED"
+        return {"status": state, "completed": success, "record_count": len(records),
+                "expected_scripts": expected, "records": records, "status_file": str(path)}
+    except (OSError, ValueError, TypeError) as exc:
+        return {"status": "INVALID_CASE_STATUS", "completed": 0, "records": [],
+                "status_file": str(path), "error": str(exc)}
+
+
 def build_combined_esm_export(output_root):
     """[REF docs/source/components/equivalent_static/organized_exports.py.md]
     Return copy-only artifact paths. Never edit input EDB, XLSX, model or case.
@@ -188,7 +212,12 @@ def build_combined_esm_export(output_root):
     if not selected:
         raise ValueError("No ESM source output files found. Calculate and export a case first.")
     datetime_token = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-    snapshot = root / "ESM_Organized" / datetime_token
+    # Keep the original per-case scripts/results readable; publish immutable review
+    # evidence under the selected ETABS export\u2019s 03_ESM subtree.
+    analysis_parent = next((p for p in (root, *root.parents)
+                            if p.name.casefold() == "opensees_analysis_results"), None)
+    export_root = analysis_parent.parent if analysis_parent is not None else root
+    snapshot = export_root / "03_ESM" / "REVIEW_SNAPSHOTS" / datetime_token
     snapshot.mkdir(parents=True, exist_ok=False)
     manifest = []
     for module, source in selected:
@@ -206,15 +235,30 @@ def build_combined_esm_export(output_root):
             "module": _MODULES[module], "state": state, "case": case,
         })
     cases, stories = _data_rows(root)
+    batch = _latest_batch_status(root)
     if not cases:
         raise ValueError("ESM artifacts were found, but no calculation JSON is available; "
                          "an engineering combined result cannot be generated.")
     workbook = snapshot / "ESM_Combined_Inspection.xlsx"
     _combined_workbook(workbook, cases, stories, manifest)
+    # Report state must be visible directly inside the workbook, not only JSON.
+    from openpyxl import load_workbook
+    wb = load_workbook(workbook)
+    status_sheet = wb.create_sheet("Solver Batch Status")
+    status_sheet.append(("Item", "Value"))
+    for key in ("status", "completed", "record_count", "expected_scripts", "status_file", "error"):
+        if key in batch:
+            status_sheet.append((key, str(batch[key])))
+    status_sheet.append(("Note", "This workbook can contain calculated ESM forces before all solver cases finish."))
+    status_sheet.append(("Engineering status", "NOT NATIVE ETABS VERIFIED; ULS high-rise ESM comparison only"))
+    wb.save(workbook)
     overview = {
         "schema": "ESM_ORGANIZED_V1", "source_root": str(root),
         "created_utc": datetime.now(timezone.utc).isoformat(), "files": manifest,
         "case_count": len(cases), "story_rows": len(stories),
+        "solver_batch": batch,
+        "snapshot_status": ("COMPLETE_SOLVER_ONLY" if batch["status"] == "COMPLETE_SOLVER_ONLY"
+                            else "PARTIAL_OR_UNVERIFIED"),
         "acceptance": "COMPARISON_ONLY_NOT_NATIVE_ETABS_OR_NBC_CERTIFICATION",
         "original_outputs_modified": False,
         "combined_workbook": workbook.name,
@@ -233,4 +277,5 @@ def build_combined_esm_export(output_root):
         "zip": str(archive), "workbook": str(workbook),
         "manifest": str(manifest_file), "folder": str(snapshot),
         "source_count": len(manifest), "cases": len(cases),
+        "solver_batch_status": batch["status"],
     }
