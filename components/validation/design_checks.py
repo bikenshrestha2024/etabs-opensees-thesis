@@ -126,22 +126,79 @@ def templates(folder):
             with path.open('w',encoding='utf-8-sig',newline='') as f:csv.writer(f).writerow(fields)
     return folder
 
+def design_check_locations(folder):
+    """[REF docs/source/components/validation/design_checks.py.md]
+    Return a canonical derived-report directory and the historical editable
+    criteria directory. Do not move/delete original project criteria.
+    """
+    from components.inputs.output_layout import export_root_for
+    root=export_root_for(folder)
+    return (root/'09_SOFTWARE_DIAGNOSTICS'/'DESIGN_CHECKS_V135',
+            root/'OpenSees_Analysis_Results'/'Design_Checks_V135')
+
+
+def discover_design_drift(folder):
+    """[REF docs/source/components/validation/design_checks.py.md]
+    Discover verified-on-disk report paths, not a structural PASS.
+
+    Archived review snapshots and diagnostic copies must not count as new
+    solver responses. Preserve status and path for individual case review.
+    """
+    from components.inputs.output_layout import result_roots
+    found=[];issues=[];seen=set()
+    for root in result_roots(folder,stages=('ESM','MRSM','LTHA','NLTHA')):
+        if not root.is_dir():continue
+        # scan_drift is a trusted input parser but scans deep directories;
+        # only actual production roots are eligible.
+        data,warnings=scan_drift(root)
+        for item in data:
+            p=Path(item['file']).resolve()
+            if any(x.casefold() in {'review_snapshots','organized_results','zip_exports',
+                    'seismic_review_packages','gravity_evidence_upload'} for x in p.parts):
+                continue
+            identity=(str(p),item['case'],item['limit_state'],
+                      str(item['storey']),item['axis'],str(item['demand']))
+            if identity not in seen:
+                seen.add(identity);found.append(item)
+        issues.extend(warnings)
+    return found,issues
+
+
 def run(folder,storage=False,nonparallel=False):
     start=time.perf_counter();started=datetime.datetime.now().astimezone().isoformat();folder=Path(folder)
     model=folder/'OpenSees_Complete_Model_Data_V118.json'
     if not model.is_file():raise ValueError('Select export folder containing OpenSees_Complete_Model_Data_V118.json')
     digest=hashlib.sha256(model.read_bytes()).hexdigest();data=json.loads(model.read_text(encoding='utf-8-sig'))
-    output=templates(folder/'OpenSees_Analysis_Results'/'Design_Checks_V135');cases=combinations(storage,nonparallel)
-    drift,issues=scan_drift(folder/'OpenSees_Analysis_Results')
-    criteria=evaluate_checks(read_rows(output/'Section_Criteria_V135.csv'),digest,'section')
-    nonlinear=evaluate_checks(read_rows(output/'Nonlinear_Performance_V135.csv'),digest,'nonlinear')
-    deflections=evaluate_checks(read_rows(output/'Deflection_Criteria_V135.csv'),digest,'deflection')
+    output,legacy=design_check_locations(folder)
+    # Prefer user-edited criteria in the original legacy directory until
+    # migrated explicitly. Blank canonical templates must not replace them.
+    output=templates(output);cases=combinations(storage,nonparallel)
+    drift,issues=discover_design_drift(folder)
+    input_sources={}
+    def input_rows(filename):
+        # Prefer actual edited canonical input; fall back to nonempty legacy
+        # input, never discard/edit it or treat a header-only file as evidence.
+        fresh=output/filename
+        old=legacy/filename
+        fresh_rows=read_rows(fresh) if fresh.is_file() else []
+        old_rows=read_rows(old) if old.is_file() else []
+        if fresh_rows:
+            input_sources[filename]=str(fresh.resolve())
+            return fresh_rows
+        if old_rows:
+            input_sources[filename]=str(old.resolve())
+            return old_rows
+        input_sources[filename]=None
+        return []
+    criteria=evaluate_checks(input_rows('Section_Criteria_V135.csv'),digest,'section')
+    nonlinear=evaluate_checks(input_rows('Nonlinear_Performance_V135.csv'),digest,'nonlinear')
+    deflections=evaluate_checks(input_rows('Deflection_Criteria_V135.csv'),digest,'deflection')
     from components.validation.response_inventory import available_response_rows
     recorded_deflections,recorded_actions=available_response_rows(folder)
     deflections.extend(recorded_deflections)
     if not criteria:
         criteria=recorded_actions or [dict(status='CAPACITY REQUIRED',reason='No section capacities or recorded member actions found. Run analysis and supply actual reinforcement/design criteria.')]
-    combined,missing=combine_actions(read_rows(output/'Action_Basis_V135.csv'),cases,digest)
+    combined,missing=combine_actions(input_rows('Action_Basis_V135.csv'),cases,digest)
     inventory=[]
     for kind,items in [('FRAME',data.get('frames',[])),('AREA',data.get('shells',[]))]:
         for item in items:
@@ -166,8 +223,11 @@ def run(folder,storage=False,nonparallel=False):
     tables={'Combination coverage':coverage,'Seismic drift':drift,'Project deflection':deflections,'Section checks':criteria,'Nonlinear performance':nonlinear,'Section inventory':inventory,'Combined actions':combined,'Missing action basis':missing,'Open items':issues}
     for name,rows in tables.items():write_rows(output/(name.replace(' ','_')+'.csv'),rows)
     elapsed=time.perf_counter()-start
-    report=dict(model_sha256=digest,started=started,finished=datetime.datetime.now().astimezone().isoformat(),elapsed_s=elapsed,overall='INCOMPLETE' if not any(r.get('status')=='FAIL' for rows in tables.values() for r in rows) else 'FAIL / INCOMPLETE',sources=[SOURCE],tables=tables,scope='No whole-section PASS is inferred. Existing analysis outputs are checked without rerunning the solver. MRSM force envelopes and nonlinear totals are never superposed as linear increments.')
-    (output/'Design_Check_Report_V135.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+    report=dict(input_criteria_sources=input_sources,report_directory=str(output),
+                evidence_status='SOURCE_IDENTITIES_REQUIRE_REVIEW',
+                model_sha256=digest,started=started,finished=datetime.datetime.now().astimezone().isoformat(),elapsed_s=elapsed,overall='INCOMPLETE' if not any(r.get('status')=='FAIL' for rows in tables.values() for r in rows) else 'FAIL / INCOMPLETE',sources=[SOURCE],tables=tables,scope='No whole-section PASS is inferred. Existing analysis outputs are checked without rerunning the solver. MRSM force envelopes and nonlinear totals are never superposed as linear increments.')
+    from components.inputs.output_contract import atomic_json
+    atomic_json(output/'Design_Check_Report_V135.json',report)
     from openpyxl import Workbook
     wb=Workbook();wb.remove(wb.active)
     for name,rows in tables.items():
@@ -179,10 +239,13 @@ def run(folder,storage=False,nonparallel=False):
             for col in ws.columns:ws.column_dimensions[col[0].column_letter].width=min(55,max(14,max(len(str(c.value or '')) for c in list(col)[:100])+2))
         else:ws.append(['NOT EVALUATED - no supplied/current results'])
     ws=wb.create_sheet('Basis and timing');ws.append(['Source',SOURCE]);ws.append(['Model SHA256',digest]);ws.append(['Started',started]);ws.append(['Elapsed before workbook (s)',elapsed]);ws.append(['Scope',report['scope']])
+    from components.inputs.output_contract import style_workbook
+    style_workbook(wb)
     wb.save(output/'Design_Check_Report_V135.xlsx')
     elapsed=time.perf_counter()-start;report['elapsed_s']=elapsed
     report['finished']=datetime.datetime.now().astimezone().isoformat()
-    (output/'Design_Check_Report_V135.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+    from components.inputs.output_contract import atomic_json
+    atomic_json(output/'Design_Check_Report_V135.json',report)
     (output/'Design_Check_V135.log').write_text(f"{started}\nModel SHA256: {digest}\n{report['overall']}\nElapsed including workbook: {elapsed:.3f} s\nFinished: {report['finished']}\n",encoding='utf-8')
     return report,output
 

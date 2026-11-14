@@ -88,6 +88,51 @@ def modal_classification(row):
     return ('Mixed ' if scores[order[1]]>=.5*scores[order[0]] else '')+label
 
 
+
+def saved_modal_result(folder, state):
+    """[REF docs/source/components/ui/results.py.md]
+    Locate a real saved modal JSON in canonical or historical directories.
+
+    The selected ETABS export owns all candidates. Case/state mismatches,
+    snapshot copies and unrecognised result structures are excluded.
+    This is a viewer locator, not model-source equivalence certification.
+    """
+    from components.inputs.output_layout import result_roots
+    state=str(state).strip().upper()
+    if state not in ("ULS","SLS"):
+        raise ValueError("Modal result requires explicit ULS or SLS")
+    candidates=[]
+    for root in result_roots(folder,stages=("MODAL",)):
+        for p in root.rglob("NBC105_Modal_V111.json"):
+            if any(x.casefold() in {"review_snapshots","organized_results",
+                    "zip_exports","seismic_review_packages"} for x in p.parts):
+                continue
+            inferred=next((x[-3:].upper() for x in p.parts if x.upper() in
+                           ("MODAL_ULS","MODAL_SLS")),None)
+            try:
+                d=json.loads(p.read_text(encoding="utf-8-sig"))
+            except (ValueError,OSError):
+                continue
+            actual=str(d.get("limit_state",inferred or "")).upper()
+            if actual!=state or not isinstance(d.get("rows"),list):
+                continue
+            candidates.append(p)
+        for p in root.rglob(f"NBC105_Modal_{state}_V127.json"):
+            if any(x.casefold() in {"review_snapshots","organized_results",
+                    "zip_exports","seismic_review_packages"} for x in p.parts):
+                continue
+            try:
+                d=json.loads(p.read_text(encoding="utf-8-sig"))
+            except (ValueError,OSError):
+                continue
+            if str(d.get("limit_state",state)).upper()==state and isinstance(d.get("rows"),list):
+                candidates.append(p)
+    if not candidates:
+        return None
+    candidates=sorted(set(candidates),key=lambda p:(p.stat().st_mtime_ns,str(p)),reverse=True)
+    return candidates[0]
+
+
 def modal_results(parent,folder):
     from matplotlib.figure import Figure
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg,NavigationToolbar2Tk
@@ -96,26 +141,7 @@ def modal_results(parent,folder):
     export_folder=next((path for path in (folder,*folder.parents)
                         if (path/'OpenSees_Element_Connectivity.json').is_file()),None)
     def modal_path(state):
-        candidates=[]
-        if export_folder is not None:
-            state_folder=analysis_output_folder(export_folder,state)
-            candidates.extend((state_folder/('Modal_'+state)/'NBC105_Modal_V111.json',
-                               state_folder/f'NBC105_Modal_{state}_V127.json',
-                               state_folder/'NBC105_Modal_V111.json'))
-        candidates.extend((folder/('Modal_'+state)/'NBC105_Modal_V111.json',
-                           folder/f'NBC105_Modal_{state}_V127.json',
-                           folder/'NBC105_Modal_V111.json'))
-        legacy_root=(export_folder or folder)/'OpenSees_Analysis_Results'
-        candidates.extend((legacy_root/('Modal_'+state)/'NBC105_Modal_V111.json',
-                           legacy_root/f'NBC105_Modal_{state}_V127.json',
-                           legacy_root/'NBC105_Modal_V111.json'))
-        for path in candidates:
-            if path.is_file():
-                if path.name=='NBC105_Modal_V111.json' and path.parent==legacy_root:
-                    if json.loads(path.read_text(encoding='utf-8-sig')).get('limit_state','ULS')!=state:
-                        continue
-                return path
-        return candidates[0]
+        return saved_modal_result(export_folder or folder,state)
     win=tk.Toplevel(parent);win.title('Modal audit results — ULS / SLS');win.geometry('1160x760')
     ttk.Button(win,text='Open ULS / SLS comparison chart',command=lambda:modal_comparison(win,folder)).pack(anchor='w')
     tabs=ttk.Notebook(win);tabs.pack(fill='both',expand=True)
@@ -123,7 +149,7 @@ def modal_results(parent,folder):
     compare_fig=Figure(figsize=(11,5),layout='constrained');compare_axes=compare_fig.subplots(1,2)
     for state,style in [('ULS','-'),('SLS','--')]:
         reference=modal_path(state)
-        if reference.is_file():
+        if reference is not None and reference.is_file():
             records=json.loads(reference.read_text(encoding='utf-8-sig')).get('rows',[]);modes=[r['mode'] for r in records]
             compare_axes[0].plot(modes,[r['period_s'] for r in records],ls=style,label=state)
             for key,label,color in [('UX_cumulative_percent','X','tab:blue'),('UY_cumulative_percent','Y','tab:orange'),('RZ_cumulative_percent','Rz','tab:green')]:compare_axes[1].plot(modes,[r.get(key,0) or 0 for r in records],ls=style,color=color,label=state+' '+label)
@@ -132,11 +158,19 @@ def modal_results(parent,folder):
         ax.grid(alpha=.25)
         if ax.lines:ax.legend()
     compare_chart=FigureCanvasTkAgg(compare_fig,master=compare_frame);compare_chart.get_tk_widget().pack(fill='both',expand=True);NavigationToolbar2Tk(compare_chart,compare_frame)
-    ttk.Button(compare_frame,text='Export comparison PNG',command=lambda:compare_fig.savefig(folder/'Modal_Comparison_V146.png',dpi=180)).pack(anchor='w')
+    def export_comparison():
+        from components.inputs.output_layout import export_root_for
+        out=export_root_for(folder)/"04_MODAL"/"REVIEW_SNAPSHOTS"
+        out.mkdir(parents=True,exist_ok=True)
+        compare_fig.savefig(out/"Modal_Comparison_V146.png",dpi=180)
+        messagebox.showinfo("Modal comparison export",str(out/"Modal_Comparison_V146.png"),parent=win)
+    ttk.Button(compare_frame,text='Export comparison PNG',command=export_comparison).pack(anchor='w')
     for state in ('ULS','SLS'):
         frame=ttk.Frame(tabs);tabs.add(frame,text=state+' modal audit')
         path=modal_path(state)
-        if not path.is_file():ttk.Label(frame,text=f'No saved {state} modal result. Run this stiffness case to populate the tab.').pack();continue
+        if path is None or not path.is_file():
+            ttk.Label(frame,text=f'No saved {state} modal result — missing is NOT zero response. Run this stiffness case to populate the tab.').pack()
+            continue
         result=json.loads(path.read_text(encoding='utf-8-sig'));rows=result['rows']
         ttk.Label(frame,text=f'{state} | '+str(path)).pack(anchor='w')
         fig=Figure(figsize=(10,4),layout='constrained');axes=fig.subplots(1,2);x=[r['mode'] for r in rows]
@@ -260,8 +294,11 @@ def modal_comparison(parent,folder):
     win=tk.Toplevel(parent);win.title('ULS then SLS modal comparison');win.geometry('1200x750')
     fig=Figure(figsize=(12,7),layout='constrained');axes=fig.subplots(2,2,sharex='row')
     for col,state in enumerate(('ULS','SLS')):
-        path=Path(folder)/('Modal_'+state)/'NBC105_Modal_V111.json'
-        if not path.is_file():axes[0,col].text(.1,.5,'No saved '+state+' modal result',transform=axes[0,col].transAxes);continue
+        path=saved_modal_result(folder,state)
+        if path is None:
+            axes[0,col].text(.1,.5,'No saved '+state+' modal result — NOT ZERO RESPONSE',
+                             transform=axes[0,col].transAxes)
+            continue
         rows=json.loads(path.read_text(encoding='utf-8-sig'))['rows'];x=[r['mode'] for r in rows]
         axes[0,col].plot(x,[r['period_s'] for r in rows],'o-');axes[0,col].set(title=state+' eigenperiods',ylabel='Period (s)')
         for key,label in [('UX_cumulative_percent','X'),('UY_cumulative_percent','Y'),('RZ_cumulative_percent','Rz')]:axes[1,col].plot(x,[r.get(key,0) or 0 for r in rows],label=label)
@@ -269,5 +306,8 @@ def modal_comparison(parent,folder):
     for row in axes:
         for ax in row:ax.grid(alpha=.25)
     embed_figures(win,[('ULS left / SLS right',fig)])
-    fig.savefig(Path(folder)/'Modal_ULS_SLS_Comparison_V143.png',dpi=180)
+    from components.inputs.output_layout import export_root_for
+    output=export_root_for(folder)/'04_MODAL'/'REVIEW_SNAPSHOTS'
+    output.mkdir(parents=True,exist_ok=True)
+    fig.savefig(output/'Modal_ULS_SLS_Comparison_V143.png',dpi=180)
     return win
