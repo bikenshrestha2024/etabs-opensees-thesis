@@ -2369,7 +2369,7 @@ class App:
         action(group_2_1,text="NBC 105: load combinations, stiffness + mass source",command=self._open_nbc105_settings)
         action(group_2_1,text="ULS / SLS design checks - combinations, drift, sections",command=lambda:__import__("OpenSees_Design_Checks_V135").launch(self.root,self.out.get()))
         action(group_2_1,text="NBC 105 formula reference — periods, ELF + drift",command=self._open_nbc105_formula_reference)
-        action(group_2_0,text="Step 13 — P-Delta, stiffness modifiers + damping",command=self._open_step13_basis)
+        action(group_2_0,text="P-Delta initial cases, stiffness + damping (legacy module 13)",command=self._open_step13_basis)
         action(group_3_0,text="OpenSees equivalent static analysis — ULS/SLS",command=self._open_nbc105_esm)
         action(group_3_0,text="OpenSees modal analysis + NBC checks",command=self._open_modal_audit)
         action(group_3_1,text="Site / record spectra and matching diagnostics",command=self._open_spectrum_diagnostics)
@@ -2442,7 +2442,7 @@ class App:
             from OpenSees_Step13_Analysis_Basis_V115 import open_step13_gui
             open_step13_gui(self.root)
         except Exception as exc:
-            messagebox.showerror("Step 13 reference", str(exc), parent=self.root)
+            messagebox.showerror("P-Delta and stiffness reference", str(exc), parent=self.root)
 
     def _open_nbc105_formula_reference(self):
         """Show the V116 formula map with NBC, mechanics and supplemental sources separated."""
