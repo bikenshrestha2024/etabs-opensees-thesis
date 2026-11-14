@@ -2,7 +2,7 @@ name: Repository compilation and navigation
 
 on:
   pull_request:
-    paths: ['*.py', 'components/**', 'tools/**', 'tests/**', 'docs/**', 'KNOWLEDGE_BASE/**', '00_READ_FIRST_RUN_ORDER.md', '.github/workflows/repository-integrity.yml']
+    paths: ['*.py', 'components/**', 'tools/**', 'tests/**', 'docs/**', 'KNOWLEDGE_BASE/**', '00_READ_FIRST_RUN_ORDER.md', 'LITERATURE/**', '.github/workflows/repository-integrity.yml']
   push:
     branches: [main]
     paths: ['*.py', 'components/**', 'tools/**', 'tests/**', 'docs/**', 'KNOWLEDGE_BASE/**', '00_READ_FIRST_RUN_ORDER.md', '.github/workflows/repository-integrity.yml']
@@ -48,6 +48,7 @@ jobs:
           python -m unittest tests.verify_readiness_dashboard -v
           python -m unittest discover -s tests -p 'test_knowledge_map.py' -v
           python -m unittest discover -s tests -p 'test_documentation_coverage.py' -v
+          python -m unittest discover -s tests -p 'test_literature_pdf_intake.py' -v
           python tools/audit_knowledge_map.py
           python tools/audit_documentation_coverage.py --output audit/documentation_coverage.json --fail-on-missing-component-guides
       - name: Archive static inventory (not engineering validation)
