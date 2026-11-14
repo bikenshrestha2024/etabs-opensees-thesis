@@ -61,9 +61,9 @@ class SettingsSourceTruthTests(unittest.TestCase):
             slab=next(r for r in report["rows"]
                       if r["item"]=="Conventional slab bending factors")
             self.assertEqual(slab["status"],"CONFIG VALUE MISSING / INVALID")
-            self.assertIn("NOT RECORDED",slab["basis"])
+            self.assertIn("No source recorded",slab["basis"])
             viewed=build_analysis_settings_review(root)
-            self.assertTrue(any("not finite" in w for w in viewed["warnings"]))
+            self.assertTrue(any("not a valid number" in w for w in viewed["warnings"]))
             self.assertTrue(any("not a valid number" in w
                                 for w in viewed["warnings"]))
             cfg.write_text("{broken")
