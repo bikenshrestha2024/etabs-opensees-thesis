@@ -8,6 +8,7 @@ def test_storey_examples():
     assert display_label("N", 1, 1) == "N101"
     assert display_label("N", 2, 2) == "N202"
     assert display_label("B", 7, 1) == "B701"
+    assert display_label("BR", 3, 1) == "BR301"
     assert display_label("C", 25, 1) == "C2501"
     assert display_label("SW", 25, 1) == "SW2501"
 
@@ -38,3 +39,9 @@ def test_fail_closed_unknown_classification_and_duplicates():
                       {"native_id": 1, "storey": 2, "category": "NODE"}])
     with pytest.raises(ValueError):
         display_label("N", -1, 1)
+
+
+def test_brace_display_is_not_automatically_outtrigger():
+    rows = [{"native_id": 1308, "storey": 25, "category": "BRACE"},
+            {"native_id": 1309, "storey": 25, "category": "BRACE"}]
+    assert build_labels(rows) == {"1308": "BR2501", "1309": "BR2502"}
