@@ -39,6 +39,7 @@ This layout is **available as a shared API**, not automatically applied to all h
 
 - `create_case_run(export_dir, stage, case_id, state='AS_CONFIGURED', model_sha256=None, source_edb_sha256=None, units='kN-m-s')` creates a **new** unique run only. Validates safe path components and the explicitly supplied kN–m–s or kN–mm–s model basis. The history modules use the model's declared length basis; result output units (e.g., exported metres) must still be verified separately. Hash fields are explicit, not inferred.
 - `prepare_history_run(model_script, stage, state, scope, model_length_unit=...)` creates distinct source-script-fingerprinted LTHA/NLTHA runs in the matching stage and stores the units (`m` or `mm`) explicitly. The script SHA is **not** an assembled model SHA, and a truncated transient never becomes a full-record PASS.
+- `inspect_case_manifest(run_dir, expected_stage=...)` reads a case without modification and verifies source/state identity, declared model units, standard subfolders, recorded SHA syntax and status vocabulary. Any discrepancy is listed as an issue, **not silently repaired**.
 - `record_case_status(run_dir, 'RUNNING'|'COMPLETED_SOLVER_ONLY'|'FAILED'|'INTERRUPTED'|'INCOMPLETE')` updates the manifest without making any design-acceptance assertion. `VERIFIED_ETABS_EQUIVALENCE` cannot be set without a separate engineering-review field and is not self-certifying.
 - `style_workbook(workbook)` applies common navy headers, white bold text, alternating row shading, fixed 30-point header height, freeze/filter and bounded column widths to a new generated Excel workbook, without modifying cell values. Applied to V142 review Excel; other module workbooks require individually verified integration.
 - `atomic_json(path, data)` writes UTF-8, sorted keys, indentation 2, no NaN/Inf and an atomic replace. Use only for **new derived outputs** and explicit state updates, never original source datasets.
@@ -56,6 +57,15 @@ Every future figure/report should share:
 - ZIPs grouped into `00_INPUT_SOURCE`, `01_LOGS`, `02_RESULTS`, `03_EXCEL`, `04_FIGURES`, `05_COMPARISONS`, `06_REVIEW`; a manifest of source SHA and files, with failed/missing evidence explicit. Exclude ETABS original EDB, source calculations and confidential project datasets unless user expressly approves.
 
 **Engineering safeguards:** the 32/76/97-node support cases are distinct; do not change physical restraints to repair a report path. The project-adopted IS 16700:2023 slab stiffness remains 0.25 Ig ULS / 0.35 Ig SLS, without forcing OpenSees shell parameter values; actual section commands must be audited. Do not label a zero-length/blank drift graph as a valid zero response. Native ETABS/OpenSees and NLTHA calibration remain separate validation gates.
+
+## Common local project-wide stage inventory
+
+`python tools/audit_stage_output_migration.py "<selected export case>" --write` now publishes two **new** time-stamped diagnostics under `09_SOFTWARE_DIAGNOSTICS/MIGRATION_AUDITS`:
+
+- `Live_Stage_Output_Audit_<UTC>.json` — uniform seven-stage and auxiliary directory inventory, case manifest statuses, source/units evidence, invalid folder contract counts and pending native checks.
+- `Live_Stage_Output_Audit_<UTC>.xlsx` — five consistently styled tabs: Stage summary, Case registry, Missing or inconsistent, Auxiliary folders and Read first. The workbook contains navigation metadata and review flags rather than confidential EDB contents or numerical design approval.
+
+Without `--write`, the audit is read-only and prints summary status. It does not rearrange or delete files. Existing original EDB/Excel outputs remain unchanged, and users should **not commit local audit files** with absolute project paths.
 
 ## Migration acceptance
 
