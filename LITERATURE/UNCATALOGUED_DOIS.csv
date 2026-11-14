@@ -16,8 +16,10 @@ DOI,Occurrences,Example_source_locations
 10.1016/j.finel.2015.01.006,7,Material_Validation_Results_V149/Validation_Report_V149.json:150; Material_Validation_Results_V149/Walls/wall_validation.json:15; VISUAL_VALIDATION_V149.md:35; WALL_VALIDATION_V147.md:31; Wall_Validation_Lu_Full/wall_validation.json:15; Wall_Validation_Results/wall_validation.json:15; components/validation/wall_validation.py:10
 10.1016/j.jcsr.2023.108415,2,components/validation/reference_library.py:193; docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:179
 10.1016/j.jobe.2021.102946,1,components/validation/reference_library.py:121
+10.1016/j.softx.2025.102126,1,REVIEW_MAIN/00_MODEL/20261114_DEEPSEEK_ARCHITECTURE_LITERATURE_REVIEW.md:33
 10.1016/j.soildyn.2018.06.021,1,Research_Components/02_MODELLING_BASIS.md:60
 10.1016/s0141-0296(03)00041-5,1,REVIEW_MAIN/02_ESM/Aw_Validation/20261112_ADDITIONAL_RC_SOURCES_REVIEW.md:15
+10.1038/s41598-025-94328-z,1,REVIEW_MAIN/00_MODEL/20261114_DEEPSEEK_ARCHITECTURE_LITERATURE_REVIEW.md:31
 10.1061/%28asce%290733-9445%281993%29119%3a7%282258%29,1,AXIAL_SHORTENING_LITERATURE_V124.md:80
 10.1061/(asce)0733-9445(1998)124:4(426),3,REVIEW_MAIN/02_ESM/Aw_Validation/20261112_EXPORT_NODE_GEOMETRY_REVIEW_COMPLETED.md:80; REVIEW_MAIN/02_ESM/Aw_Validation/SOURCE_REGISTER.md:10; components/inputs/opensees_nbc_sync.py:643
 10.1061/(asce)0733-9445(2008)134:4(581),3,components/nonlinear_time_history/damping_regions.py:4; components/nonlinear_time_history/energy_balance.py:5; tests/verify_damping_regions.py:3
