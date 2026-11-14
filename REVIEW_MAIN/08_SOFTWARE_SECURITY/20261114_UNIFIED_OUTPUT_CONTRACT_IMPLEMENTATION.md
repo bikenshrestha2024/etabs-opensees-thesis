@@ -9,7 +9,8 @@
 3. `components/inputs/output_contract.py`: common `RUNS/<STATE>/<CASE>/<RUN_ID>` case structure with `00_INPUT_SOURCE`, `01_LOGS`, `02_RESULTS`, `03_EXCEL`, `04_FIGURES`, `05_COMPARISONS`, `06_REVIEW`, `07_EXPORT_ZIP`; manifest with explicit model/EDB SHA, kN–m–s unit basis, solver-only completion vs engineering acceptance; deterministic UTF-8 JSON/CSV and shared Excel formatting.
 4. `components/validation/response_inventory.py`: searches canonical gravity/seismic and historical result paths for **read-only evidence**, without counting stored `REVIEW_SNAPSHOTS` or archive copies as independent numerical runs.
 5. `components/validation/case_review.py` (V142): discovers compatible seismic stage roots, eliminates identical drift/deflection entries, records missing-data and source-identity gates, writes report under `09_SOFTWARE_DIAGNOSTICS/CASE_REVIEW_V142` instead of creating an old-style nested `OpenSees_Analysis_Results`; uses common Excel style and atomic stable JSON.
-6. Tests: `tests/test_unified_output_contract.py`, `tests/test_response_root_compatibility.py`, `tests/test_case_review_canonical_output.py` plus existing `test_output_layout.py` and `test_project_output_layout_v171.py`.
+6. `components/ui/organized_results.py`: extends evidence grouping to **Model**, **LinearTH**, and **NonlinearTH** separately from Gravity/ESM/Modal/MRSM/Comparisons, preserving all existing legacy snapshot directories and hash-verified ZIP bundles. A mesh assembly workbook is not reclassified as a completed gravity analysis.
+7. Tests: `tests/test_unified_output_contract.py`, `tests/test_response_root_compatibility.py`, `tests/test_case_review_canonical_output.py` plus `tests/test_organized_results.py` and existing `test_output_layout.py` and `test_project_output_layout_v171.py`.
 
 ## Updated outputs and uniform formatting
 
