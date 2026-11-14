@@ -386,7 +386,8 @@ jobs:
           python tests/verify_safe_gravity_engineering_review.py
           python tests/verify_gravity_evidence_workflow.py
           python tests/test_organized_results.py
-          python -m unittest tests.test_output_layout tests.test_esm_organized_export_gui -v
+          python -m unittest discover -s tests -p 'test_output_layout.py' -v
+          python -m unittest discover -s tests -p 'test_esm_organized_export_gui.py' -v
           python tests/verify_gravity_etabs_direct.py
           python tests/verify_gravity_node_comparison.py
           python tests/verify_3d_zoom_to_node.py
