@@ -166,7 +166,11 @@ def write_folder_audit(export_dir, *, verify_copies=True):
     """
     root = export_root_for(export_dir)
     report = audit_export_structure(root, verify_copies=verify_copies)
-    folder = root / "01_ETABS_EXPORT" / "00_MANIFEST" / "FOLDER_AUDITS"
+    stage_root = root / "01_ETABS_EXPORT"
+    manifest_root = stage_root / "00_MANIFEST"
+    folder = manifest_root / "FOLDER_AUDITS"
+    if any(p.is_symlink() for p in (stage_root, manifest_root, folder)):
+        raise ValueError("Refusing folder audit write through linked output directories")
     folder.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     json_path = folder / ("Folder_Audit_" + stamp + ".json")
