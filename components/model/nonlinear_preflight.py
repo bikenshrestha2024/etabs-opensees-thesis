@@ -59,6 +59,9 @@ def launch(parent,folder):
     from tkinter.scrolledtext import ScrolledText
     box=ScrolledText(win,wrap='word');box.pack(fill='both',expand=True);box.insert('end',json.dumps(report,indent=2))
     def save():
-        out=Path(folder)/'OpenSees_Analysis_Results'/'Nonlinear_Dependency_Preflight_V160.json';out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(report,indent=2),encoding='utf8')
+        from components.inputs.output_layout import export_root_for
+        from components.inputs.output_contract import atomic_json
+        out=export_root_for(folder)/'09_SOFTWARE_DIAGNOSTICS'/'NONLINEAR_PREFLIGHT'/'Nonlinear_Dependency_Preflight_V160.json'
+        atomic_json(out,report)
     ttk.Button(win,text='Save dependency inventory (does not approve model)',command=save).pack(anchor='w')
     return win

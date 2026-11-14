@@ -30,3 +30,7 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 For a matching source, imported TnX/TnY come only from the first `NBC105_Modal_V111.json` modal row whose cumulative directional mass reaches ≥90%; the selected mode number and mass percentage are logged. They are explicitly labeled elastic-modal references. If 90% is not reached, keep that field empty and **never** substitute the last inspected eigenmode.
 
 Separately, workbook adopted empirical/Rayleigh T1 values remain NBC-design-period references and are **not** used as material-dependent nonlinear initial modal T1 nor assumed damping reference eigenperiods.
+
+## 2026-11-14 source-matched modal reference selection V8
+
+`matching_modal_reference(folder, state, model_sha)` scans both canonical `04_MODAL` and historical analysis-result directories, excluding review snapshots. It returns the newest **explicitly model-SHA + ULS/SLS matching** saved modal result with nonempty mode rows; it never selects the first mismatched file. `populate_linear` and `populate_site` display a source-missing warning rather than auto-filling Tn or damping periods from an unrelated export. A matching serialized JSON source hash is not ETABS physical equivalence and does not establish nonlinear initial tangent stiffness. Unit tests: `tests/test_legacy_reader_migration_v8.py`.

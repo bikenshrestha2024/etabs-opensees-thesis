@@ -7,6 +7,43 @@ import json
 import math
 
 
+
+def matching_modal_reference(folder, state, model_sha):
+    """[REF docs/source/components/inputs/analysis_autofill.py.md]
+    Read only a saved canonical/legacy modal result for the same model state.
+
+    Never select the first unrelated period source as a fallback. An eligible
+    result must explicitly record the same serialized model fingerprint.
+    """
+    from components.inputs.output_layout import result_roots
+    state=str(state).upper()
+    if state not in ("ULS","SLS") or not model_sha:
+        return None
+    candidates=set()
+    for root in result_roots(folder,stages=("MODAL",)):
+        candidates.update(root.rglob("NBC105_Modal_V111.json"))
+        candidates.update(root.rglob(f"NBC105_Modal_{state}_V127.json"))
+    excluded={"review_snapshots","organized_results","seismic_review_packages",
+              "07_export_zip","90_upload_packages"}
+    eligible=[]
+    for path in candidates:
+        if any(part.casefold() in excluded for part in path.parts):
+            continue
+        try:
+            data=json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError,ValueError,TypeError):
+            continue
+        if (not isinstance(data,dict)
+                or data.get("model_sha256")!=model_sha
+                or data.get("limit_state")!=state
+                or not isinstance(data.get("rows"),list)
+                or not data["rows"]):
+            continue
+        eligible.append(path)
+    return (max(eligible,key=lambda p:(p.stat().st_mtime_ns,str(p)))
+            if eligible else None)
+
+
 def populate_linear(gui, folder):
     from OpenSees_Project_Inputs_V123 import import_project_inputs
     folder=Path(folder)
@@ -25,17 +62,13 @@ def populate_linear(gui, folder):
             if 'aw'+axis in v and 'rayleigh_t'+axis in v:
                 period=min(v.get('period_factor',1.25)*.075*H**.75/math.sqrt(v['aw'+axis]),v['rayleigh_t'+axis])
                 getattr(gui,'t1'+axis).set(f'{period:.9g}')
-    from components.inputs.project_workbooks import analysis_output_folder
-    bases=[analysis_output_folder(folder,gui.ls.get()),folder/'OpenSees_Analysis_Results',Path(gui.output.get())]
-    candidates=[base/('Modal_'+gui.ls.get())/'NBC105_Modal_V111.json' for base in bases]+[base/f'NBC105_Modal_{gui.ls.get()}_V127.json' for base in bases]+[base/'NBC105_Modal_V111.json' for base in bases]
-    existing=[path for path in candidates if path.is_file()]
     model_sha=hashlib.sha256(datafile.read_bytes()).hexdigest() if datafile.is_file() else None
-    def matches(path):
-        try:
-            result=json.loads(path.read_text(encoding='utf-8-sig'));return result.get('model_sha256')==model_sha and result.get('limit_state','ULS')==gui.ls.get()
-        except Exception:return False
-    modal=next((path for path in existing if matches(path)),existing[0] if existing else candidates[0])
-    if modal.is_file() and datafile.is_file():
+    modal=matching_modal_reference(folder,gui.ls.get(),model_sha)
+    if modal is None:
+        inputs['notes'].append(
+            'NO MATCHING SAVED MODAL REFERENCE: source model SHA and limit state '
+            'must match; no unrelated elastic Tn/damping reference imported.')
+    if modal is not None and modal.is_file() and datafile.is_file():
         result=json.loads(modal.read_text(encoding='utf-8-sig'))
         inputs['notes'].append('Modal input reference: '+str(modal))
         from OpenSees_Model_Audit_V130 import implementation_digest
@@ -155,13 +188,17 @@ def populate_site(app,folder=None):
     for target,source in [('soil','soil'),('z','Z'),('imp','I'),('rmu','rmu'),('omega','omegau'),('t1x','workbook_adopted_tx'),('t1y','workbook_adopted_ty')]:
         if source in v:getattr(app,target).set(str(v[source]))
     state='ULS'
-    from components.inputs.project_workbooks import analysis_output_folder
-    modal=analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
-    if not modal.is_file():modal=folder/'OpenSees_Analysis_Results'/('Modal_'+state)/'NBC105_Modal_V111.json'
-    if modal.is_file():
+    datafile=folder/'OpenSees_Complete_Model_Data_V118.json'
+    model_sha=hashlib.sha256(datafile.read_bytes()).hexdigest() if datafile.is_file() else None
+    modal=matching_modal_reference(folder,state,model_sha)
+    if modal is not None:
         result=json.loads(modal.read_text(encoding='utf-8-sig'))
         for axis in ('X','Y'):
-            row=next((r for r in result['rows'] if (r.get('U'+axis+'_cumulative_percent') or 0)>=90),None)
+            row=next((r for r in result['rows'] if
+                      (r.get('U'+axis+'_cumulative_percent') or 0)>=90),None)
             if row:getattr(app,'tn'+axis.lower()).set(str(row['period_s']))
-        inputs['notes'].append('Tn shown from saved ULS modal file as a scaling reference; verify current model match before adoption.')
+        inputs['notes'].append('Tn from serialized-model-matching ULS modal file: '
+                               +str(modal)+'. Elastic reference only; nonlinear initial tangent requires independent audit.')
+    else:
+        inputs['notes'].append('Saved ULS modal reference unavailable or source SHA differs. No unrelated Tn imported.')
     app.status.set('Imported available project/source references: '+str(folder)+' | '+' '.join(inputs['notes']));return inputs

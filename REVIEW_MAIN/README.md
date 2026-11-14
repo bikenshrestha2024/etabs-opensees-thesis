@@ -28,6 +28,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **Post-V6 missed-items audit and V7 correction:** [History completion gate, unresolved numerical/physical validation and canonical output checks](08_SOFTWARE_SECURITY/20261114_POST_V6_MISSED_ITEMS_V7.md).
 
+**Legacy-only saved-model reader fixes V8:** [Irregularity stiffness screens, source-matched modal autofill and nonlinear preflight diagnostics](08_SOFTWARE_SECURITY/20261114_LEGACY_ONLY_READERS_AND_PREFLIGHT_V8.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|
