@@ -86,3 +86,20 @@ The conventional V04 **critical support examples** remain points
 each newly executed direct comparison, not hardcoded.
 
 Regression: `python tests/verify_gravity_node_comparison.py`.
+
+
+## V16 numerical-data integrity gate (2026-11-14)
+
+Before node matching or reaction discrepancy ranking, reject nonfinite global XYZ
+coordinates (NaN/Inf), nonfinite OpenSees vertical support reactions, missing
+ETABS point identities and duplicate ETABS or OpenSees reaction identifiers.
+Previously, NaN XYZ could appear as an unmatched coordinate and NaN Rz could
+contaminate the summed/ranked differences, producing a plausible-looking
+comparison with invalid numeric evidence. Duplicate reaction IDs could also
+contribute repeated support values. The new behavior **fails closed** with a
+specific `ValueError`; it does not fabricate missing loads or automatically
+consolidate physically distinct wall-mesh support reactions.
+
+Passing these screens still requires ETABS global-Z axis verification,
+source-model identity, equivalent gravity combination, restraints and load
+path. Refer to `tests/verify_gravity_node_comparison.py` for regression cases.
