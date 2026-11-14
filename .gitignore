@@ -32,3 +32,6 @@ Review_ZIPs/
 *_Review_UPLOAD.zip
 *security_history_private*
 security_history_private.json
+
+# Local, private ETABS XLSX evidence staging; never publish source workbook paths or hashes.
+**/10_PRIVATE_ETABS_WORKBOOKS/
