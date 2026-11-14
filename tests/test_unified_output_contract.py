@@ -9,7 +9,7 @@ from components.inputs.output_layout import (
 )
 from components.inputs.output_contract import (
     RUN_SUBFOLDERS, create_case_run, record_case_status, atomic_json,
-    write_table, safe_component,
+    write_table, safe_component, style_workbook,
 )
 from components.inputs.project_output_layout import create_project_layout, case_folder
 
@@ -76,6 +76,19 @@ class UnifiedOutputContractTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 atomic_json(root/"broken.json",{"nonfinite":float("nan")})
             self.assertFalse((root/"broken.json").exists())
+
+    def test_excel_style_preserves_values_and_adds_common_header(self):
+        from openpyxl import Workbook
+        wb=Workbook()
+        ws=wb.active
+        ws.append(["Source ID","Gravity reaction (kN)"])
+        ws.append(["ETABS:263",3041.266])
+        style_workbook(wb)
+        self.assertEqual(ws["B2"].value,3041.266)
+        self.assertEqual(ws["A1"].font.color.rgb,"00FFFFFF")
+        self.assertFalse(ws.sheet_view.showGridLines)
+        self.assertEqual(ws.freeze_panes,"A2")
+        self.assertTrue(ws.auto_filter.ref)
 
     def test_project_layout_canonicalizes_old_callers(self):
         with tempfile.TemporaryDirectory() as td:
