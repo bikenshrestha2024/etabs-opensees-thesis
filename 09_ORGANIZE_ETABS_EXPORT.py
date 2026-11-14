@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 from components.inputs.export_mirror import export_mirror
 from components.inputs.output_layout import write_stage_index
+from components.inputs.folder_audit import write_folder_audit
 
 def main(argv=None):
     """Export root CLI. [REF docs/source/components/inputs/export_mirror.py.md]"""
@@ -11,8 +12,11 @@ def main(argv=None):
     args=p.parse_args(argv)
     path=export_mirror(args.export_dir)
     index = write_stage_index(args.export_dir)
+    audit_json, audit_markdown = write_folder_audit(args.export_dir)
     print("ORGANIZED_MANIFEST="+str(path))
     print("STAGE_INDEX="+str(index))
+    print("FOLDER_AUDIT_JSON="+str(audit_json))
+    print("FOLDER_AUDIT_MARKDOWN="+str(audit_markdown))
     print("STATUS=MIRRORED_LEGACY_PATHS_PRESERVED")
     return path
 
