@@ -263,6 +263,8 @@ on:
       - 'tests/test_saved_case_identity_v142.py'
       - 'docs/source/components/validation/saved_case_identity.py.md'
       - 'tests/test_history_run_output_contract.py'
+      - 'components/shared/case_status.py'
+      - 'tests/test_history_batch_completion_gate_v7.py'
       - 'components/inputs/project_output_layout.py'
       - 'components/validation/response_inventory.py'
       - 'tests/test_unified_output_contract.py'
@@ -424,6 +426,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_esm_saved_evidence_gate_v5.py' -v
           python -m unittest discover -s tests -p 'test_saved_case_identity_v142.py' -v
           python -m unittest discover -s tests -p 'test_history_run_output_contract.py' -v
+          python -m unittest discover -s tests -p 'test_history_batch_completion_gate_v7.py' -v
           python -m unittest discover -s tests -p 'test_response_root_compatibility.py' -v
           python -m unittest discover -s tests -p 'test_case_review_canonical_output.py' -v
           python -m unittest discover -s tests -p 'test_design_checks_canonical_v135.py' -v
