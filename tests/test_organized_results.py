@@ -55,6 +55,15 @@ class OrganizedReviewTests(unittest.TestCase):
             self.assertEqual(len(contents),1)
             self.assertTrue(contents[0].endswith("ESM_Result.json"))
             with zipfile.ZipFile(report["zip_files"]["ALL_MODULES"]) as z:
+                public=json.loads(z.read("EVIDENCE_MANIFEST.json"))
+                self.assertEqual(public["source_path_policy"],
+                                 "LOCAL_PATHS_REDACTED_FOR_UPLOAD_ZIP")
+                self.assertEqual(public["entries"][0]["source"],
+                                 "<REDACTED_LOCAL_PATH>")
+                self.assertNotIn(str(root),z.read("EVIDENCE_MANIFEST.json").decode())
+                self.assertEqual(public["entries"][0]["sha256"],
+                                 manifest["entries"][0]["sha256"])
+            with zipfile.ZipFile(report["zip_files"]["ALL_MODULES"]) as z:
                 archive=" ".join(z.namelist())
                 self.assertNotIn("ETABS_full_table_original",archive)
                 self.assertNotIn("project_sources.private",archive)
