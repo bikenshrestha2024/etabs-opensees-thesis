@@ -590,8 +590,8 @@ class LinearTimeHistoryGUI:
         try:
             from OpenSees_Linear_Autofill_V124 import populate_linear
             if self._output_is_automatic:
-                from components.inputs.project_workbooks import analysis_output_folder
-                self.output.set(str(analysis_output_folder(Path(self.model.get()).parent,self.ls.get())))
+                from components.inputs.output_layout import export_root_for
+                self.output.set(str(export_root_for(Path(self.model.get()).parent)/"06_LINEAR_TIME_HISTORY"))
             data=populate_linear(self,Path(self.model.get()).parent)
             self.log.insert('end','Project inputs refreshed: '+' '.join(data['notes'])+'\n')
         except Exception as exc:self.log.insert('end','Project autofill needs review: '+str(exc)+'\n')
@@ -639,7 +639,7 @@ class LinearTimeHistoryGUI:
         self._entry(inputs, "Common X record scale factor", self.x_scale)
         ttk.Label(inputs, text="X-only screening remains available separately; those records are not substituted for missing Y components. Pair defaults preserve the user-supplied PEER/SeismoMatch time histories and parse each component's own time step and units.", wraplength=1040, foreground="#45556b").pack(anchor="w", pady=(2, 5))
         self._entry(inputs, "Story master-node CSV", self.stories, lambda: self._browse(self.stories, "file", "Select story master-node mapping"))
-        self._entry(inputs, "One-folder output directory", self.output, lambda: self._browse(self.output, "dir", "Select output folder"))
+        self._entry(inputs, "Auto stage output / custom override", self.output, lambda: self._browse(self.output, "dir", "Select output folder"))
         ttk.Button(inputs, text="Write CSV templates", command=self._templates).pack(anchor="e", pady=(5, 0))
         params = ttk.LabelFrame(root, text="2. NBC period, damping and time-step checks", padding=8); params.pack(fill="x", pady=8)
         grid = ttk.Frame(params); grid.pack(fill="x")
