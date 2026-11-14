@@ -64,3 +64,27 @@
 ## Public/private storage decision
 Public: this index, verified DOI and publisher links, source-to-thesis crosswalk, scripts that hash/local-index private files, reviewed citation statements.
 Private: all 19 originally attached PDFs (even if a journal has an openly accessible copy, redistribution and public repo permissions must be checked independently), proprietary ETABS EDB and Excel tables, project-specific or unpublished specimen data.
+
+
+## Stable cross-reference to existing master bibliography
+
+The intake identifiers U01–U14 identify *this upload group*, while stable thesis bibliography IDs L001–L047 identify works across all conversations. The existing master was deduplicated by bibliographic identity before this intake was appended.
+
+| Upload work ID | Stable master ID | Handling |
+|---|---|---|
+| U01 | L037 | Newly added |
+| U02 | L038 | Newly added |
+| U03 | L039 | Newly added |
+| U04 | L040 | Newly added |
+| U05 | L041 | Newly added |
+| U06 | **L034** | Already catalogued; no new bibliography row |
+| U07 | L042 | Newly added |
+| U08 | L043 | Newly added |
+| U09 | L044 | Newly added |
+| U10 | L045 | Newly added |
+| U11 | L046 | Newly added |
+| U12 | **L006** | Already catalogued; no new bibliography row |
+| U13 | L047 | Newly added |
+| U14 | **L007** | Already catalogued; no new bibliography row |
+
+**Current master count:** 47 curated works; this intake contains 14 distinct works, of which 3 had prior stable records and 11 were added. Hash-based PDF deduplication remains a separate pending local-byte audit; it must not be confused with bibliographic deduplication.
