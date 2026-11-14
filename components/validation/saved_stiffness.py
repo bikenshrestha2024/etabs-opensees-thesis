@@ -4,7 +4,16 @@ import json,hashlib
 
 def merge_saved_stiffness(folder,result):
  folder=Path(folder);source=folder/'OpenSees_Complete_Model_Data_V118.json';digest=hashlib.sha256(source.read_bytes()).hexdigest();imported=[];coverage=set()
- for p in sorted((folder/'OpenSees_Analysis_Results').rglob('Irregularity_*_E0_V132.json')):
+ from components.inputs.output_layout import result_roots
+ # New stage results and historical outputs are equally discoverable, but
+ # archived review bundles must not count as independent stiffness checks.
+ candidates=set()
+ for base in result_roots(folder,stages=('ESM','MRSM')):
+  candidates.update(base.rglob('Irregularity_*_E0_V132.json'))
+ excluded={'review_snapshots','organized_results','seismic_review_packages',
+           '07_export_zip','90_upload_packages'}
+ for p in sorted(candidates):
+  if any(part.casefold() in excluded for part in p.parts):continue
   d=json.loads(p.read_text(encoding='utf-8-sig'))
   if d.get('model_sha256')!=digest:continue
   state=d.get('limit_state');case=d.get('response_case',p.name);axis='X' if '_X' in case else 'Y' if '_Y' in case else None
