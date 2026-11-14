@@ -59,7 +59,9 @@ def run_model_spectrum(folder,config,output_dir):
         # This modal reference belongs to this MRSM model/gravity state.
         # Never populate legacy all-stage results with a hidden cache copy.
         # Keep it with the originating MRSM solver outputs and case provenance.
-        gravity_label=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+        from components.inputs.output_contract import safe_component
+        gravity_label=safe_component(
+            __import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
         cache=out/'Modal_Reference'/state/gravity_label
         cache.mkdir(parents=True,exist_ok=True)
         from OpenSees_Timing_V130 import StageTimer
@@ -455,8 +457,9 @@ def launch(parent,folder):
                                     record_case_status(run_root,'INCOMPLETE',message=str(exc))
                                     append('[MRSM_SAVED_CASE_GATE_FAILED] '+str(exc)+'\n')
                                     for key,row in ledger.rows.items():
-                                        if key.startswith(state+' ') and row['status']!='COMPLETED':
-                                            ledger.set(key,'FAILED','Saved case validation failed: '+str(exc))
+                                        if key.startswith(state+' '):
+                                            ledger.set(key,'FAILED',
+                                                'Saved case validation failed after child exit: '+str(exc))
                 except Exception as e:
                     current_run=latest_result.get('run')
                     if current_run is not None:
