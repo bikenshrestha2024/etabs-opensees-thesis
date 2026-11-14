@@ -36,6 +36,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **V11 numerical response/model manifest conflict:** [Exclude saved responses whose embedded source SHA disagrees with the run manifest](08_SOFTWARE_SECURITY/20261114_SOURCE_MANIFEST_VS_NUMERICAL_RESULT_V11.md).
 
+**NBC 105 settings/V135 reference GUI V12:** [Six-tab source-aware code/project basis, local settings audit and legacy report path diagnostics](08_SOFTWARE_SECURITY/20261114_NBC_SETTINGS_REFERENCE_GUI_V12.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|
