@@ -23,6 +23,7 @@ class OrganizedReviewTests(unittest.TestCase):
         self.assertEqual(classify("06_LINEAR_TH/ULS/Linear_Time_History.csv"),"LinearTH")
         self.assertEqual(classify("07_NONLINEAR_TH/NLTHA_XY_Result.json"),"NonlinearTH")
         self.assertEqual(classify("OpenSees_NLTHA_XY_Results.json"),"NonlinearTH")
+        self.assertEqual(classify("02_MODEL/SLAB_LOAD_PATH/MESH_04/EXCEL/sheet.xlsx"),"Model")
 
     def test_time_history_files_get_dedicated_review_zip(self):
         with tempfile.TemporaryDirectory() as td:
