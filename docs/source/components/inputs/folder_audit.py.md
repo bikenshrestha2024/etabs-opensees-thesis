@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Create a repeatable, non-destructive inventory of source export files and the seven numbered analysis stage folders. Distinguish **file organization** from structural acceptance. An empty drift folder, nominally successful gravity or modal log, and an output ZIP are not proof of ETABS–OpenSees equivalence.
+Create a repeatable, non-destructive inventory of source export files and the registered numbered analysis and auxiliary stage folders. The audit also identifies loose files directly under stage roots; it never moves active or historical outputs. Distinguish **file organization** from structural acceptance. An empty drift folder, nominally successful gravity or modal log, and an output ZIP are not proof of ETABS–OpenSees equivalence.
 
 ## Inputs, outputs and side effects
 
