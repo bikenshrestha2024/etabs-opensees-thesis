@@ -100,7 +100,9 @@ def export(folder):
     note=wb.create_sheet('Read first');note.append(['Missing combination results are not PASS. Profiles select gravity preloads for future fresh model runs, with original seismic mass retained.'])
     note.append(['AS_CONFIGURED = source configured preload; GRAVITY_1.0D_1.0L = 100% dead + 100% live comparison; GRAVITY_1.2D_1.5L; UPLIFT_0.9D. Snow/liquid/earth/wind/vertical earthquake applicability still requires project action data.'])
     note.append(['Linear time history is a linear transient model about a selected preloaded state. It is not a full nonlinear PDelta time-history solution. Positive CQC component envelopes are not concurrent deformed shapes.'])
-    wb.save(out/'All_Case_Review_V142.xlsx');(out/'All_Case_Review_V142.json').write_text(json.dumps(result,indent=2),encoding='utf-8');return result,out
+    from components.inputs.output_contract import style_workbook, atomic_json
+    style_workbook(wb)
+    wb.save(out/'All_Case_Review_V142.xlsx');atomic_json(out/'All_Case_Review_V142.json',result);return result,out
 
 
 def launch(parent,folder):
