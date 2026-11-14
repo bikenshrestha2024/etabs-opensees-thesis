@@ -28,7 +28,7 @@ class MappingGUI:
         pane=ttk.Frame(outer);pane.pack(fill='both',expand=True)
         self.tree=ttk.Treeview(pane,columns=('category','etabs','topology','solver','nodes','target'),height=18,selectmode='extended')
         self.tree.heading('#0',text='Property / source object / solver segment');self.tree.column('#0',width=310)
-        for key,title,width in [('category','Type',90),('etabs','ETABS ID',85),('topology','Topology tag',95),('solver','Solver tag(s)',130),('nodes','Node tags',140),('target','Selected target',210)]:
+        for key,title,width in [('category','Type',90),('etabs','ETABS ID',85),('topology','Display / topology tag',165),('solver','Solver tag(s)',130),('nodes','Node tags',140),('target','Selected target',210)]:
             self.tree.heading(key,text=title);self.tree.column(key,width=width)
         sy=ttk.Scrollbar(pane,orient='vertical',command=self.tree.yview);sx=ttk.Scrollbar(pane,orient='horizontal',command=self.tree.xview)
         self.tree.configure(yscrollcommand=sy.set,xscrollcommand=sx.set)
@@ -45,7 +45,8 @@ class MappingGUI:
         viewtools=ttk.Frame(preview);viewtools.pack(fill='x')
         for label,callback in [('Zoom +',lambda:self.zoom_view(.8)),('Zoom -',lambda:self.zoom_view(1.25)),('Fit model',self.fit_model),('Fit selection',self.fit_selection),('Isometric',lambda:self.set_camera(27.5,45))]:
             ttk.Button(viewtools,text=label,command=callback).pack(side='left',padx=2)
-        ttk.Label(preview,text='Wheel: zoom | Left drag: rotate | Fit selection: focus highlight').pack(anchor='w')
+        ttk.Button(viewtools,text='Export 3D figure…',command=self.export_figure).pack(side='left',padx=2)
+        ttk.Label(preview,text='Wheel: zoom | Left drag: rotate | Fit selection: focus highlight | Export PNG/SVG/PDF').pack(anchor='w')
         self.chart.mpl_connect('scroll_event',self.scroll_zoom)
         self.chart.get_tk_widget().bind('<MouseWheel>',lambda event:'break',add='+')
         self.selected_points=[]
@@ -94,12 +95,13 @@ class MappingGUI:
                 title=f"{group} ({prop['count']} objects) | {prop['material'] or 'material pending'}"
                 groups[group]=self.tree.insert('','end',text=title,open=True);self.item_keys[groups[group]]=[]
             parent=groups[group];self.item_keys[parent].append(r['key'])
-            iid=self.tree.insert(parent,'end',text=f"{r['key']} / Storey {r['storey']}",values=(r['category'],r['etabs_object'],r['topology_tag'],','.join(map(str,r['solver_tags'])),','.join(map(str,r['node_tags'])),r['target']))
+            label=r.get('display_label') or 'UNCLASSIFIED_MEMBER'
+            iid=self.tree.insert(parent,'end',text=f"{label} / {r['key']} / Storey {r['storey']}",values=(r['category'],r['etabs_object'],f"{label} ({r['topology_tag']})",','.join(map(str,r['solver_tags'])),','.join(map(str,r['node_tags'])),r['target']))
             self.item_keys[iid]=[r['key']];self.record_items[iid]=r
             for tag in r['solver_tags']:
                 sr=next((s for s in self.data['solver_elements'] if s['solver_tag']==tag),None)
                 target=self.data['selections'].get('assignments',{}).get(f'SOLVER:{tag}',{}).get('target',r['target'])
-                child=self.tree.insert(iid,'end',text=f'Solver element {tag}',values=(r['category'],r['etabs_object'],r['topology_tag'],tag,','.join(map(str,sr['node_tags'])) if sr else '',target))
+                child=self.tree.insert(iid,'end', text=f"{label} / solver element {tag}",values=(r['category'],r['etabs_object'],f"{label} ({r['topology_tag']})",tag,','.join(map(str,sr['node_tags'])) if sr else '',target))
                 self.item_keys[child]=[f'SOLVER:{tag}'];self.record_items[child]=r
 
     def parameter_template(self):
@@ -197,8 +199,45 @@ class MappingGUI:
         self.selection_line.set_segments(paths)
         for text in self.annotations:text.remove()
         self.annotations=[]
-        if paths and keys:self.annotations.append(self.axis.text2D(.02,.98,f'{len(keys)} selected: '+', '.join(keys[:2]),transform=self.axis.transAxes,va='top',fontsize=8,color='#9b0058',clip_on=True))
+        if paths and keys:
+            labels=[]
+            for key in keys[:2]:
+                owner=next((entry.get('key') for entry in self.data['solver_elements']
+                            if key==f"SOLVER:{entry['solver_tag']}"),key)
+                record=self.bykey.get(owner,{})
+                labels.append(record.get('display_label') or key)
+            self.annotations.append(self.axis.text2D(.02,.98,
+                f'{len(keys)} selected: '+', '.join(labels),
+                transform=self.axis.transAxes,va='top',fontsize=8,color='#9b0058',clip_on=True))
         self.chart.draw_idle()
+
+    def export_figure(self):
+        """Export current plotted orientation and highlighting without modifying analysis files."""
+        from tkinter import filedialog
+        try:
+            label='model'
+            keys=self.selected_keys()
+            if keys:
+                key=keys[0]
+                owner=next((e['key'] for e in self.data.get('solver_elements',[])
+                            if key==f"SOLVER:{e['solver_tag']}"),key)
+                label=self.bykey.get(owner,{}).get('display_label') or 'selection'
+            safe=''.join(c if c.isalnum() or c in '-_' else '_' for c in label)
+            output=filedialog.asksaveasfilename(
+                parent=self.win,title='Export 3D geometry and highlighted selection',
+                initialdir=str(self.folder),initialfile=f'OpenSees_Mapping_3D_{safe}.png',
+                defaultextension='.png',
+                filetypes=[('PNG image','*.png'),('SVG vector figure','*.svg'),
+                           ('PDF figure','*.pdf')])
+            if not output:return
+            suffix=Path(output).suffix.lower()
+            if suffix not in ('.png','.svg','.pdf'):
+                raise ValueError('Select PNG, SVG or PDF output format.')
+            self.figure.savefig(output,dpi=240,bbox_inches='tight',
+                                facecolor='white')
+            self.status.set(f'3D figure exported to {output} (display only; no model changed)')
+        except Exception as exc:
+            messagebox.showerror('Export 3D figure',str(exc),parent=self.win)
 
     def zoom_view(self,factor):
         for get,setter in [(self.axis.get_xlim3d,self.axis.set_xlim3d),(self.axis.get_ylim3d,self.axis.set_ylim3d),(self.axis.get_zlim3d,self.axis.set_zlim3d)]:
