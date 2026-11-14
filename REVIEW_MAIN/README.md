@@ -40,6 +40,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **V135 source-safe drift classification V13:** [Numerical drift PASS requires a source-matched model and completed saved run](08_SOFTWARE_SECURITY/20261114_V135_DRIFT_EVIDENCE_RECHECK_V13.md).
 
+**Selected settings evidence source truth V14:** [Remove unconditional wall stiffness claim, validate recorded conventional slab factors, report missing/invalid settings](08_SOFTWARE_SECURITY/20261114_SETTINGS_AUDIT_SOURCE_TRUTH_V14.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|
