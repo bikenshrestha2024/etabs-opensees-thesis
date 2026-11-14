@@ -135,10 +135,11 @@ def launch(parent,folder):
                     if valid:axes[1,col].plot([abs(r['displacement_m'])*1000 for r in valid],[float(r['storey']) for r in valid],label=case)
                 axes[1,col].set(title=state+' saved deflection (case envelope)',xlabel='Absolute displacement (mm)',ylabel='Storey / elevation (see source workbook)')
             for ax in axes.flat:ax.grid(alpha=.25)
-            embed_figures(body,[('ULS / SLS saved responses',fig)]);fig.savefig(out/'Drift_Deflection_Comparison_V142.png',dpi=150)
+            embed_figures(body,[('ULS / SLS saved responses',fig)])
             if not result['drift'] and not result['deflection']:
                 fig.suptitle('NO SAVED SEISMIC RESPONSE — NOT ZERO DRIFT; CHECK CASE RESULTS AND IDENTITY',
                              color='#a13c23',fontsize=11)
+            fig.savefig(out/'Drift_Deflection_Comparison_V142.png',dpi=150)
             text.set(str(len(result['drift']))+' saved drift rows; '+str(len(result['deflection']))+
                      ' saved deflection rows. '+('NO VERIFIED RESPONSE: open Read errors worksheet and check analysis source paths. ' if not result['drift'] and not result['deflection'] else '')+
                      'Full combination coverage remains subject to explicit case/identity verification. Workbook: '+str(out/'All_Case_Review_V142.xlsx'))
