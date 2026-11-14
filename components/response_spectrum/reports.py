@@ -5,26 +5,54 @@ from OpenSees_Timing_V130 import timed_outputs
 
 
 def saved_cases(folder):
-    """Read physical MRSM results once; exclude duplicated review/export copies."""
-    folder=Path(folder)
-    if (folder/'MRSM_Results_V132.json').is_file():
-        paths=[folder/'MRSM_Results_V132.json']
-    else:
-        paths=[folder/('MRSM_'+state)/'MRSM_Results_V132.json'
-               for state in ('ULS','SLS')]
-        paths=[p for p in paths if p.is_file()]
-        if not paths:
-            paths=[p for p in sorted(folder.rglob('MRSM_Results_V132.json'))
-                   if not any(part in ('Seismic_Review_Packages','Organized_Results',
-                                       'Gravity_Evidence_Upload','ETABS_Comparison_V148')
-                              for part in p.relative_to(folder).parts)]
-    unique={}
-    for path in paths:
-        for key,case in json.loads(path.read_text(encoding='utf-8-sig')).items():
-            identifier=(case.get('limit_state'),key,case.get('model_sha256'))
-            if identifier not in unique:unique[identifier]=(path,key,case)
-    return list(unique.values())
+    """[REF docs/source/components/response_spectrum/reports.py.md]
+    Discover real MRSM case files in both canonical and legacy directories.
 
+    A state/case identity MUST NOT silently blend different model digests.
+    A repeated result from the same model selects the latest original solver
+    file, not a report ZIP copy. This is file-scoped selection, not acceptance.
+    """
+    folder=Path(folder).expanduser().resolve()
+    from components.inputs.output_layout import result_roots,export_root_for
+    if (folder/'MRSM_Results_V132.json').is_file():
+        candidates=[folder/'MRSM_Results_V132.json']
+    else:
+        candidates=[]
+        for root in result_roots(folder,stages=('MRSM',)):
+            candidates.extend(root.rglob('MRSM_Results_V132.json'))
+        if folder.is_dir() and export_root_for(folder)==folder:
+            candidates.extend(folder.glob('MRSM_Results_V132.json'))
+    excluded={'review_snapshots','organized_results','seismic_review_packages',
+              'gravity_evidence_upload','etabs_comparison_v148','07_export_zip',
+              '09_software_diagnostics','90_upload_packages'}
+    paths=sorted({p.resolve() for p in candidates if p.is_file() and not
+                  any(part.casefold() in excluded for part in p.parts)},
+                 key=lambda p:(p.stat().st_mtime_ns,str(p)),reverse=True)
+    unique={}
+    conflicts=[]
+    for path in paths:
+        try:
+            document=json.loads(path.read_text(encoding='utf-8-sig'))
+        except (OSError,ValueError) as exc:
+            raise ValueError('Unreadable MRSM saved result '+str(path)+': '+str(exc)) from exc
+        if not isinstance(document,dict):
+            raise ValueError('MRSM saved result is not a case dictionary: '+str(path))
+        for key,case in document.items():
+            state=case.get('limit_state')
+            digest=case.get('model_sha256')
+            if state not in ('ULS','SLS') or not isinstance(digest,str) or len(digest)!=64:
+                raise ValueError('MRSM saved case lacks explicit state/model SHA: '+str(path)+' '+key)
+            identity=(state,key)
+            if identity in unique:
+                previous=unique[identity]
+                if previous[2].get('model_sha256')!=digest:
+                    conflicts.append((state,key,str(previous[0]),str(path)))
+                continue
+            unique[identity]=(path,key,case)
+    if conflicts:
+        raise ValueError('Multiple incompatible MRSM models for the same limit-state/case; '
+                         'select a specific RUNS/.../02_RESULTS folder: '+repr(conflicts[:5]))
+    return list(unique.values())
 
 def figures(cases):
     from matplotlib.figure import Figure
