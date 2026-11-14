@@ -375,7 +375,7 @@ def launch(parent,export_dir):
     def filter_rows(*unused):
         selected=book.select()
         for name,tree,items in report_holder["tables"]:
-            if str(tree.master)!=str(book.nametowidget(selected)) if selected else False:
+            if selected and str(tree.master)!=str(book.nametowidget(selected)):
                 continue
             tree.delete(*tree.get_children())
             needle=query.get().strip().casefold()
