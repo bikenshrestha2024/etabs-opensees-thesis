@@ -14,6 +14,8 @@
 
 **I-01 (P1): nonhexadecimal SHA labels were treated as real hashes.** `components/validation/saved_case_identity.py` accepted any 64-character value for saved MRSM/ESM/Deformation sources (although canonical manifest validation already enforced hexadecimal SHA256). This could wrongly exclude a historical response as a proven model mismatch. Now all saved-source digest inputs use the same exact 64-character hexadecimal validator; invalid labels remain `NOT_VERIFIED`.
 
+**S-03 (P1): missing/corrupted stiffness evidence could crash the viewer.** The prior reader unconditionally read the serialized source model file and parsed every candidate irregularity JSON. A missing source model or a partially written historical JSON raised an exception rather than retaining an incomplete, explainable review. The reader now skips unreadable files, records exact `stiffness_evidence_issues`, and marks all missing ULS/SLS directional cases `NOT EVALUATED`.
+
 ## New regression checks
 
 `tests/test_post_v8_missing_coverage_v9.py`: 4 missing source cases, repeated refresh without duplicated warning rows, partial one-axis source import, a truncated record followed by a misleading late `[OK]`, and malformed 64-character source hash labels.
