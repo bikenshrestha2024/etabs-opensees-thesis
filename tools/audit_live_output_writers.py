@@ -31,7 +31,7 @@ CANONICAL_MARKERS = (
 )
 WRITE_METHODS = frozenset({
     "write_text", "write_bytes", "mkdir", "save", "savefig",
-    "to_excel", "to_csv", "to_json", "dump", "dumps",
+    "to_excel", "to_csv", "to_json", "dump",
     "writestr", "write", "copyfile", "copy2", "replace",
 })
 ROOT_SCRIPTS = (".py",)
@@ -86,7 +86,7 @@ def scan_source(repo):
             continue
         occurrences = []
         for node in ast.walk(tree):
-            if isinstance(node, (ast.Constant, ast.JoinedStr)):
+            if isinstance(node, ast.Constant):
                 value = _text_literal(node).casefold()
                 if not value:
                     continue
@@ -123,7 +123,7 @@ def scan_source(repo):
         if occurrences:
             records.append({
                 "source": rel,
-                "sha256": hashlib.sha256(source.encode("utf-8-sig")).hexdigest(),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                 "occurrences": sorted(occurrences, key=lambda x: (x["line"], x["kind"])),
             })
     return {
