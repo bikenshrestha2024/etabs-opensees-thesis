@@ -93,6 +93,49 @@ def write_table(path, rows, *, columns):
     return target
 
 
+
+def style_workbook(workbook):
+    """[REF docs/source/components/inputs/output_contract.py.md]
+    Common, legible Excel style; metadata/content are never fabricated.
+
+    Works on already constructed openpyxl workbooks. Does not save or alter
+    any authoritative original source Excel calculation workbook.
+    """
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    header = PatternFill("solid", fgColor="182941")
+    alternate = PatternFill("solid", fgColor="F2F5F9")
+    for sheet in workbook.worksheets:
+        sheet.sheet_view.showGridLines = False
+        sheet.freeze_panes = sheet.freeze_panes or "A2"
+        if sheet.max_row < 1:
+            continue
+        for cell in sheet[1]:
+            cell.fill = header
+            cell.font = Font(name="Aptos", size=10, bold=True, color="FFFFFF")
+            cell.alignment = Alignment(wrap_text=True, vertical="center")
+        sheet.row_dimensions[1].height = 30
+        for col in sheet.columns:
+            cells = list(col)
+            if not cells:
+                continue
+            width = max((len(str(c.value)) for c in cells[:300]
+                         if c.value is not None), default=8)
+            sheet.column_dimensions[get_column_letter(cells[0].column)].width = (
+                min(58, max(12, width + 2))
+            )
+        for i in range(2, sheet.max_row + 1):
+            if i % 2 == 0:
+                for cell in sheet[i]:
+                    cell.fill = alternate
+            for cell in sheet[i]:
+                cell.alignment = Alignment(vertical="top")
+        if sheet.max_row > 1 and sheet.max_column > 1 and not sheet.auto_filter.ref:
+            sheet.auto_filter.ref = sheet.dimensions
+    return workbook
+
+
 def create_case_run(export_dir, stage, case_id, *,
                     state="AS_CONFIGURED", model_sha256=None,
                     source_edb_sha256=None, units="kN-m-s"):
