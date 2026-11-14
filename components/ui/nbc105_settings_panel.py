@@ -235,6 +235,76 @@ def build_analysis_settings_review(export_dir):
              "OpenSees implementation reference",STATUS_UNVERIFIED,
              "Alternative algorithms are diagnostics, not repairs for unstable materials or constraints."),
     ]
+    mass=[]
+    mass_spec=source.EARTHQUAKE_MASS_SOURCE
+    for key,description in (
+        ("dead_load_factor","Dead weight"),
+        ("storage_live_factor","Storage occupancy live weight"),
+        ("other_live_factor","Other occupancy live weight"),
+        ("roof_live_factor","Roof live weight"),
+    ):
+        mass.append(_row("NBC seismic mass",description,
+                         mass_spec[key],"",
+                         "NBC 105:2025 §5.2, Table 5-1",STATUS_REFERENCE,
+                         "Mass factor; NOT a gravity DL/LL combination. Confirm assigned physical story weight and m=W/g."))
+    for key in ("dead_pattern_names","storage_pattern_names",
+                "other_live_pattern_names","roof_live_pattern_names"):
+        mass.append(_row("ETABS pattern configuration",key,
+                         ", ".join(mass_spec[key]),"",
+                         "Configurable pattern-name defaults",STATUS_UNVERIFIED,
+                         "Verify these pattern aliases against the selected EDB export; a missing assignment must not silently become zero mass."))
+    mass.append(_row("Gravity vs mass","Configured gravity preload factors",
+                     json.dumps(config.get("gravity_factors","MISSING"),ensure_ascii=False),"",
+                     "Selected export config",STATUS_UNVERIFIED,
+                     "An AS_CONFIGURED 0.3 LL gravity factor is NOT automatically the NBC mass source nor the NBC §3.6 strength combination."))
+    mass.append(_row("Torsional mass","Asymmetric floor rotational inertia Jm",
+                     "SOURCE MESH REQUIRED","",
+                     "Element/node mass coordinates",STATUS_UNVERIFIED,
+                     "Compute from actual floor masses and coordinates; do not assume a uniformly filled rectangular diaphragm."))
+
+    pdelta_results=(config.get("IS16700_INITIAL_PDELTA_RESULTS")
+                    or config.get("is16700_initial_pdelta_results") or {})
+    if not isinstance(pdelta_results,dict):
+        pdelta_results={}
+        warnings.append("P-Delta initial case evidence mapping is not a valid dictionary")
+    for direction in ("X","Y"):
+        for sign in ("PLUS","MINUS"):
+            name="PD_INIT_EL_"+direction+"_"+sign
+            observed=pdelta_results.get(name)
+            if isinstance(observed,dict):
+                details=json.dumps(observed,ensure_ascii=False)
+                status=("EVIDENCE RECORDED; NATIVE CHECK REQUIRED" if
+                        observed.get("converged") is True and
+                        (observed.get("result_file") or observed.get("result_note"))
+                        else STATUS_UNVERIFIED)
+            else:
+                details="NO SAVED CASE RECORD"
+                status=STATUS_UNVERIFIED
+            project.append(_row("Mandatory signed P-Delta",name,details,"",
+                                "Project IS 16700:2023 §7.2(d)",status,
+                                "A saved convergence flag is not a substitute for native solver logs and state-transfer validation."))
+
+    audit_rows=[]
+    if config_path.is_file():
+        try:
+            from components.validation.settings_audit import audit
+            saved_audit=audit(root)
+            for entry in saved_audit.get("rows",[]):
+                val=entry.get("value")
+                audit_rows.append(_row("Selected-export audit",
+                    entry.get("item","unnamed"),
+                    json.dumps(val,ensure_ascii=False) if isinstance(val,(dict,list)) else str(val),
+                    "", "components/validation/settings_audit.py",
+                    entry.get("status",STATUS_UNVERIFIED),
+                    entry.get("basis","")))
+        except (OSError,ValueError,TypeError,KeyError) as exc:
+            warnings.append("Current exported settings audit unavailable: "+str(exc))
+    if not audit_rows:
+        audit_rows.append(_row("Selected-export audit","NO CURRENT SETTINGS AUDIT",
+                               "NOT EVALUATED","", "Selected model config",
+                               STATUS_UNVERIFIED,
+                               "Provide valid OpenSees_Complete_Model_Config_V118.json before reviewing actual project assignments."))
+
     source_rows=[
         _row("Runtime","Viewer module source path",__file__,"",
              "Loaded Python source","RUNTIME PATH ONLY",
@@ -259,6 +329,8 @@ def build_analysis_settings_review(export_dir):
     tabs={
         "Review & project":project,
         "NBC code & combinations":code,
+        "Mass source & patterns":mass,
+        "Current model audit":audit_rows,
         "Mechanics & solver":general,
         "Runtime & folders":source_rows,
     }
