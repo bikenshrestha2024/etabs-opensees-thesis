@@ -67,7 +67,14 @@ def export_mirror(export_dir):
     for original in sorted(root.iterdir()):
         if not original.is_file() or original.is_symlink():
             continue
-        if original.suffix.lower() not in EXTS or original.name in PRIVATE_NAMES:
+        # Export-side .processing.json files are transient sidecar status,
+        # not model source. Do not fill the canonical folders with these.
+        # Casefold private names for reliable Windows classification.
+        lowered = original.name.casefold()
+        if (original.suffix.lower() not in EXTS
+                or lowered in PRIVATE_NAMES
+                or lowered.endswith((".processing.json", ".processing.log",
+                                     ".partial", ".tmp"))):
             continue
         relative = Path(classification(original.name)) / original.name
         dest = target / relative
