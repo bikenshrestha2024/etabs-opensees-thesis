@@ -23,10 +23,21 @@ def merge_saved_stiffness(folder,result):
   if not rows:continue
   coverage.add((state,axis))
   for r in rows:r.update(check=state+' '+axis+' '+r['check'],note=str(r.get('note',''))+' | Model-matching centered static result: '+str(p));imported.append(r)
+ # The absence of matching stiffness cases must NEVER produce a
+ # reassuring 'NO TRIGGER FOUND'. Even a geometry-only preview is incomplete.
+ # Remove only our previous synthetic coverage notices for idempotence.
+ result['checks']=[r for r in result.get('checks',[]) if not (
+     r.get('clause')=='5.4.1.2' and
+     str(r.get('check','')).endswith(' soft-storey coverage'))]
  if imported:
+  # A matching native saved case supersedes old static stiffness placeholders.
   result['checks']=[r for r in result['checks'] if r.get('clause')!='5.4.1.2']+list({(r['check'],str(r.get('storey'))):r for r in imported}.values())
-  for state in ('ULS','SLS'):
-   for axis in ('X','Y'):
-    if (state,axis) not in coverage:result['checks'].append(dict(clause='5.4.1.2',check=state+' '+axis+' soft-storey coverage',storey='ALL',value=None,threshold=None,status='NOT EVALUATED',note='No matching centered static stiffness result. Calculate selected state(s).'))
+ for state in ('ULS','SLS'):
+  for axis in ('X','Y'):
+   if (state,axis) not in coverage:
+    result['checks'].append(dict(
+        clause='5.4.1.2',check=state+' '+axis+' soft-storey coverage',
+        storey='ALL',value=None,threshold=None,status='NOT EVALUATED',
+        note='No source-model-matching centered static stiffness response. Missing response is not evidence of regularity.'))
  result['overall']='IRREGULAR' if any(r.get('status')=='IRREGULAR' for r in result['checks']) else 'INCOMPLETE' if any(r.get('status')=='NOT EVALUATED' for r in result['checks']) else 'NO TRIGGER FOUND'
  result['stiffness_import_coverage']=sorted([list(x) for x in coverage]);return result
