@@ -318,6 +318,19 @@ on:
       - 'docs/source/components/nonlinear_time_history/one_storey_wall_probe.py.md'
   pull_request:
     paths:
+      - 'components/inputs/output_contract.py'
+      - 'components/inputs/output_layout.py'
+      - 'components/inputs/project_output_layout.py'
+      - 'components/inputs/export_mirror.py'
+      - 'components/inputs/folder_audit.py'
+      - 'components/ui/organized_results.py'
+      - 'tools/audit_stage_output_migration.py'
+      - 'tests/test_export_mirror.py'
+      - 'tests/test_organized_results.py'
+      - 'tests/test_unified_output_contract.py'
+      - 'tests/test_project_output_layout_v171.py'
+      - 'tests/test_folder_audit.py'
+      - 'tests/test_stage_output_migration_audit.py'
       - 'components/model/analysis_basis.py'
       - 'components/validation/settings_audit.py'
       - 'components/ui/nbc105_settings_panel.py'
@@ -437,6 +450,7 @@ jobs:
           python tests/verify_safe_gravity_engineering_review.py
           python tests/verify_gravity_evidence_workflow.py
           python tests/test_organized_results.py
+          python -m pytest tests/test_export_mirror.py -q
           python -m unittest discover -s tests -p 'test_output_layout.py' -v
           python -m unittest discover -s tests -p 'test_unified_output_contract.py' -v
           python -m unittest discover -s tests -p 'test_mrsm_canonical_output_v4.py' -v
