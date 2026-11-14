@@ -155,6 +155,25 @@ class GravityNodeAuditTests(unittest.TestCase):
             self.assertEqual(summary['profile'],'GRAVITY_1.0D_1.0L')
             self.assertTrue((folder/'out'/'OpenSees_Applied_Nodal_Gravity_By_Pattern.csv').is_file())
 
+    def test_nonfinite_reactions_cannot_be_plotted_or_summed(self):
+        self.os["reactions"][0]["rz_kN"]=float("nan")
+        with self.assertRaisesRegex(ValueError,"Nonfinite OpenSees"):
+            compare_support_nodes(self.etabs,self.os)
+
+    def test_nan_global_coordinates_cannot_be_called_unmatched(self):
+        self.os["nodes"][0]["x_m"]=float("nan")
+        with self.assertRaisesRegex(ValueError,"coordinates must be finite"):
+            compare_support_nodes(self.etabs,self.os)
+
+    def test_duplicate_support_ids_are_not_silently_counted(self):
+        self.os["reactions"].append(dict(node_tag=1,rz_kN=100.))
+        with self.assertRaisesRegex(ValueError,"Duplicate OpenSees support reaction"):
+            compare_support_nodes(self.etabs,self.os)
+        self.os["reactions"].pop()
+        self.etabs["joint_reactions"].append(dict(self.etabs["joint_reactions"][0]))
+        with self.assertRaisesRegex(ValueError,"Duplicate ETABS support point"):
+            compare_support_nodes(self.etabs,self.os)
+
     def test_disallows_unsupported_matching_tolerance(self):
         with self.assertRaises(ValueError):
             compare_support_nodes(self.etabs,self.os,tolerance_m=2)

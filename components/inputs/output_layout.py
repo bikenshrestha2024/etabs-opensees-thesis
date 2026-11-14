@@ -167,9 +167,11 @@ def write_stage_index(export_dir):
     for name, folder in STAGE_FOLDERS.items():
         location = root / folder
         snapshot_root = location / "REVIEW_SNAPSHOTS"
+        snapshot_safe = (location.is_dir() and not location.is_symlink()
+                         and snapshot_root.is_dir() and not snapshot_root.is_symlink())
         snapshots = (sorted(p.name for p in snapshot_root.iterdir()
                             if p.is_dir() and not p.is_symlink())
-                     if snapshot_root.is_dir() else [])
+                     if snapshot_safe else [])
         latest = snapshot_root / "LATEST_ORGANIZED_RESULT.txt"
         if name == "ESM":
             latest_esm = snapshot_root / "LATEST_ESM_COMBINED_EXPORT.txt"
@@ -177,7 +179,8 @@ def write_stage_index(export_dir):
                 latest = latest_esm
         stages.append({
             "stage": name, "folder": folder,
-            "present": location.is_dir(),
+            "present": location.is_dir() and not location.is_symlink(),
+            "symlink_refused": location.is_symlink() or snapshot_root.is_symlink(),
             "review_snapshot_count": len(snapshots),
             "latest_review_folder": (
                 (Path(folder) / "REVIEW_SNAPSHOTS" / snapshots[-1]).as_posix()
@@ -185,7 +188,8 @@ def write_stage_index(export_dir):
             ),
             "latest_pointer": (
                 (Path(folder) / "REVIEW_SNAPSHOTS" / latest.name).as_posix()
-                if latest.is_file() else None
+                if snapshot_safe and latest.is_file() and not latest.is_symlink()
+                else None
             ),
             "engineering_status": "NOT_ASSESSED_BY_FILE_INDEX",
         })
@@ -193,7 +197,8 @@ def write_stage_index(export_dir):
         {
             "stage": name,
             "folder": folder,
-            "present": (root / folder).is_dir(),
+            "present": (root / folder).is_dir() and not (root / folder).is_symlink(),
+            "symlink_refused": (root / folder).is_symlink(),
             "engineering_status": "NOT_ASSESSED_BY_FILE_INDEX",
         }
         for name, folder in AUXILIARY_FOLDERS.items()
@@ -207,7 +212,10 @@ def write_stage_index(export_dir):
         "stages": stages,
         "auxiliary_stages": auxiliary_stages,
     }
-    destination = root / "01_ETABS_EXPORT" / "00_MANIFEST"
+    stage_destination = root / "01_ETABS_EXPORT"
+    destination = stage_destination / "00_MANIFEST"
+    if stage_destination.is_symlink() or destination.is_symlink():
+        raise ValueError("Refusing stage index write through linked export directories")
     destination.mkdir(parents=True, exist_ok=True)
     output = destination / "analysis_stage_index.json"
     with tempfile.NamedTemporaryFile(

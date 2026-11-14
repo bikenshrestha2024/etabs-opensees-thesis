@@ -1,0 +1,49 @@
+name: Deep output integrity and writer inventory
+
+on:
+  pull_request:
+    paths:
+      - 'components/inputs/output_layout.py'
+      - 'components/inputs/folder_audit.py'
+      - 'components/inputs/output_contract.py'
+      - 'tools/audit_stage_output_migration.py'
+      - 'tools/audit_live_output_writers.py'
+      - 'tests/test_deep_output_inventory_v16.py'
+      - '.github/workflows/deep-output-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'components/inputs/output_layout.py'
+      - 'components/inputs/folder_audit.py'
+      - 'components/inputs/output_contract.py'
+      - 'tools/audit_stage_output_migration.py'
+      - 'tools/audit_live_output_writers.py'
+      - 'tests/test_deep_output_inventory_v16.py'
+      - '.github/workflows/deep-output-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  filesystem-static-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install workbook test dependency
+        run: python -m pip install openpyxl
+      - name: Check AST inventory and safety regressions
+        run: |
+          mkdir -p "$RUNNER_TEMP/etabs-output-audit"
+          python tools/audit_live_output_writers.py --repo . --export "$RUNNER_TEMP/etabs-output-audit" --write
+          python -m unittest tests.test_deep_output_inventory_v16 tests.test_folder_audit tests.test_output_layout tests.test_stage_output_migration_audit -v
+      - name: Retain structured source-only writer inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: etabs-opensees-static-writer-audit
+          path: ${{ runner.temp }}/etabs-output-audit/09_SOFTWARE_DIAGNOSTICS/WRITER_AUDITS/RUNS/
+          retention-days: 14
+      - name: Preserve engineering boundary
+        run: |
+          echo "Static writer audit is not proof of native ETABS/OpenSees equivalence."

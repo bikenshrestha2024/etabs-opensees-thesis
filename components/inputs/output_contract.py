@@ -117,20 +117,23 @@ def style_workbook(workbook):
             cell.font = Font(name="Aptos", size=10, bold=True, color="FFFFFF")
             cell.alignment = Alignment(wrap_text=True, vertical="center")
         sheet.row_dimensions[1].height = 30
-        for col in sheet.columns:
-            cells = list(col)
-            if not cells:
-                continue
-            width = max((len(str(c.value)) for c in cells[:300]
-                         if c.value is not None), default=8)
-            sheet.column_dimensions[get_column_letter(cells[0].column)].width = (
+        # Sampling widths must not instantiate every column as a full list.
+        # Large ETABS Excel reports can contain tens of thousands of rows.
+        sample_widths = [8] * sheet.max_column
+        for row in sheet.iter_rows(min_row=1, max_row=min(300, sheet.max_row)):
+            for cell in row:
+                if cell.value is not None:
+                    idx = cell.column - 1
+                    sample_widths[idx] = max(sample_widths[idx],
+                                             len(str(cell.value)))
+        for idx, width in enumerate(sample_widths, start=1):
+            sheet.column_dimensions[get_column_letter(idx)].width = (
                 min(58, max(12, width + 2))
             )
-        for i in range(2, sheet.max_row + 1):
-            if i % 2 == 0:
-                for cell in sheet[i]:
+        for i, cells in enumerate(sheet.iter_rows(min_row=2), start=2):
+            for cell in cells:
+                if i % 2 == 0:
                     cell.fill = alternate
-            for cell in sheet[i]:
                 cell.alignment = Alignment(vertical="top")
         if sheet.max_row > 1 and sheet.max_column > 1 and not sheet.auto_filter.ref:
             sheet.auto_filter.ref = sheet.dimensions
