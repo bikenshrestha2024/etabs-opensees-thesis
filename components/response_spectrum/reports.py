@@ -17,7 +17,8 @@ def saved_cases(folder):
     if (folder/'MRSM_Results_V132.json').is_file():
         candidates=[folder/'MRSM_Results_V132.json']
     else:
-        candidates=[]
+        candidates=[folder/('MRSM_'+state)/'MRSM_Results_V132.json'
+                    for state in ('ULS','SLS')]
         for root in result_roots(folder,stages=('MRSM',)):
             candidates.extend(root.rglob('MRSM_Results_V132.json'))
         if folder.is_dir() and export_root_for(folder)==folder:
@@ -40,8 +41,11 @@ def saved_cases(folder):
         for key,case in document.items():
             state=case.get('limit_state')
             digest=case.get('model_sha256')
-            if state not in ('ULS','SLS') or not isinstance(digest,str) or len(digest)!=64:
-                raise ValueError('MRSM saved case lacks explicit state/model SHA: '+str(path)+' '+key)
+            if state not in ('ULS','SLS') or not isinstance(digest,str) or not digest.strip():
+                raise ValueError('MRSM saved case lacks explicit state/model identifier: '+str(path)+' '+key)
+            # Old saved MRSM reference files sometimes contain a non-SHA
+            # source label. Keep them READABLE, but do not promote that label
+            # to the production six-case/source-hash acceptance gate.
             identity=(state,key)
             if identity in unique:
                 previous=unique[identity]
