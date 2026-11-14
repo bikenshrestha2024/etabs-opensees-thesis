@@ -214,10 +214,8 @@ def build_combined_esm_export(output_root):
     datetime_token = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     # Keep the original per-case scripts/results readable; publish immutable review
     # evidence under the selected ETABS export\u2019s 03_ESM subtree.
-    analysis_parent = next((p for p in (root, *root.parents)
-                            if p.name.casefold() == "opensees_analysis_results"), None)
-    export_root = analysis_parent.parent if analysis_parent is not None else root
-    snapshot = export_root / "03_ESM" / "REVIEW_SNAPSHOTS" / datetime_token
+    from components.inputs.output_layout import review_snapshots_for
+    snapshot = review_snapshots_for(root, "ESM") / datetime_token
     snapshot.mkdir(parents=True, exist_ok=False)
     manifest = []
     for module, source in selected:
