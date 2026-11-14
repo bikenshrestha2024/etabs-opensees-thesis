@@ -20,8 +20,8 @@ _ROOT=Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0,str(_ROOT))
 
-from components.inputs.output_contract import SCHEMA, atomic_json
-from components.inputs.output_layout import STAGE_FOLDERS, export_root_for
+from components.inputs.output_contract import SCHEMA, atomic_json, inspect_case_manifest, style_workbook
+from components.inputs.output_layout import STAGE_FOLDERS, AUXILIARY_FOLDERS, export_root_for
 
 
 def audit_stage_migration(export_dir):
@@ -55,17 +55,15 @@ def audit_stage_migration(export_dir):
                     unmanifested.append({"manifest":p.relative_to(root).as_posix(),
                                          "problem":"UNKNOWN_MANIFEST_SCHEMA"})
                     continue
-                statuses[item.get("solver_status","MISSING_STATUS")]=(
-                    statuses.get(item.get("solver_status","MISSING_STATUS"),0)+1)
-                manifests.append({
-                    "run":p.parent.parent.relative_to(root).as_posix(),
-                    "state":item.get("state"),
-                    "case_id":item.get("case_id"),
-                    "solver_status":item.get("solver_status"),
-                    "engineering_acceptance":item.get("structural_acceptance"),
-                    "model_sha256_recorded":bool(item.get("model_sha256")),
-                    "source_edb_sha256_recorded":bool(item.get("source_edb_sha256")),
-                })
+                details=inspect_case_manifest(p.parent.parent,expected_stage=key)
+                statuses[details["solver_status"]]=statuses.get(details["solver_status"],0)+1
+                manifests.append(details)
+                if not details["valid"]:
+                    unmanifested.append({
+                        "manifest":p.relative_to(root).as_posix(),
+                        "problem":"INVALID_CASE_CONTRACT",
+                        "issues":details["issues"],
+                    })
         stages.append({
             "stage":key,"directory":dirname,"exists":stage.is_dir(),
             "run_manifest_count":len(manifests),
@@ -84,6 +82,18 @@ def audit_stage_migration(export_dir):
         "legacy_linear_th_root_exists":(root/"06_LINEAR_TH").is_dir(),
         "legacy_nonlinear_th_root_exists":(root/"07_NONLINEAR_TH").is_dir(),
         "stages":stages,
+        "auxiliary_folders":[{
+            "name":key,"directory":folder,"exists":(root/folder).is_dir(),
+            "assessment":"AUXILIARY_FOLDER_NOT_SOLVER_STATUS"
+        } for key,folder in AUXILIARY_FOLDERS.items()],
+        "summary":{
+            "stage_count":len(stages),
+            "present_stage_count":sum(x["exists"] for x in stages),
+            "run_manifest_count":sum(x["run_manifest_count"] for x in stages),
+            "invalid_case_contract_count":sum(
+                len(x["unreadable_or_invalid_manifests"]) for x in stages),
+            "engineering_acceptance":"NOT_ESTABLISHED_BY_FILESYSTEM_AUDIT",
+        },
         "native_checks_required":[
             "Windows Tkinter GUI opening and close/stop for all stage modules",
             "ETABS source identity and original assignment/Excel SHA unchanged",
@@ -93,6 +103,69 @@ def audit_stage_migration(export_dir):
             "Nonlinear RC wall/brace/device calibration and NLTHA full readiness",
         ],
     }
+
+
+
+def export_uniform_inventory_excel(report, target):
+    """[REF docs/source/components/inputs/output_contract.py.md]
+    Publish the SAME formatted navigation workbook for every stage.
+
+    Never reproduces private EDB/Excel contents or promotes solver completion
+    to ETABS engineering equivalence.
+    """
+    from openpyxl import Workbook
+    book=Workbook()
+    overview=book.active
+    overview.title="Stage summary"
+    overview.append(("Stage","Folder","Present","Case manifests",
+                     "Invalid cases","File audit status"))
+    for stage in report["stages"]:
+        overview.append((stage["stage"],stage["directory"],stage["exists"],
+                         stage["run_manifest_count"],
+                         len(stage["unreadable_or_invalid_manifests"]),
+                         stage["assessment"]))
+    cases=book.create_sheet("Case registry")
+    cases.append(("Stage","Limit state","Case ID","Run ID","Solver status",
+                  "Model SHA recorded","EDB SHA recorded","Units",
+                  "Manifest valid","Issues","Engineering acceptance"))
+    for stage in report["stages"]:
+        for case in stage["cases"]:
+            cases.append((stage["stage"],case.get("state"),case.get("case_id"),
+                          case.get("run_id"),case.get("solver_status"),
+                          case.get("model_sha256_recorded"),
+                          case.get("source_edb_sha256_recorded"),
+                          case.get("units"),case.get("valid"),
+                          "; ".join(case.get("issues",[])),
+                          "NOT_CERTIFIED_BY_AUDIT"))
+    issues=book.create_sheet("Missing or inconsistent")
+    issues.append(("Stage","Manifest","Problem","Details"))
+    for stage in report["stages"]:
+        for item in stage["unreadable_or_invalid_manifests"]:
+            issues.append((stage["stage"],item["manifest"],item["problem"],
+                           "; ".join(item.get("issues",[]))))
+    auxiliary=book.create_sheet("Auxiliary folders")
+    auxiliary.append(("Name","Directory","Present","Meaning"))
+    for item in report["auxiliary_folders"]:
+        auxiliary.append((item["name"],item["directory"],item["exists"],
+                          item["assessment"]))
+    readme=book.create_sheet("Read first")
+    readme.append(("Field","Meaning"))
+    readme.append(("Scope","Filesystem output consistency; not a structural analysis"))
+    readme.append(("Source","Selected ETABS export folder; absolute local paths omitted"))
+    readme.append(("Engineering acceptance","NOT ESTABLISHED BY FILE AUDIT"))
+    readme.append(("Missing results","Not zero response; a separate native run is needed"))
+    readme.append(("Solver completion","Does not establish full record duration, force equilibrium or code compliance"))
+    for name in report["native_checks_required"]:
+        readme.append(("Required native check",name))
+    style_workbook(book)
+    dest=Path(target)
+    dest.parent.mkdir(parents=True,exist_ok=True)
+    # New timestamped diagnostic files only; never replace original workbook.
+    if dest.exists():
+        raise FileExistsError(str(dest))
+    book.save(dest)
+    return dest
+
 
 
 def main(argv=None):
@@ -112,7 +185,10 @@ def main(argv=None):
         out=root/"09_SOFTWARE_DIAGNOSTICS"/"MIGRATION_AUDITS"
         stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
         target=atomic_json(out/("Live_Stage_Output_Audit_"+stamp+".json"),report)
-        print("Local audit:",target)
+        workbook=export_uniform_inventory_excel(
+            report,out/("Live_Stage_Output_Audit_"+stamp+".xlsx"))
+        print("Local audit JSON:",target)
+        print("Uniform stage and case Excel:",workbook)
     return report
 
 
