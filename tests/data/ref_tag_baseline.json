@@ -406,7 +406,6 @@
   "components/validation/result_interpretation.py::write_element_force_snapshot",
   "components/validation/result_interpretation.py::write_modal_shape_snapshot",
   "components/validation/saved_stiffness.py::merge_saved_stiffness",
-  "components/validation/settings_audit.py::audit",
   "components/validation/settings_audit.py::launch",
   "components/validation/steel_calibration_gui.py::launch",
   "components/validation/thesis_evidence_dashboard.py::audit",
