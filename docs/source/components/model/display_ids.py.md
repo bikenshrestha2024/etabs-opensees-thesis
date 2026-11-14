@@ -16,4 +16,4 @@
 
 **Test:** `python -m pytest tests/test_display_ids_storey.py -q`. This test command is a prescribed validation, not a claim that tests have executed in the Windows solver environment.
 
-**Engineering review:** [2026-11-14 export review](../../../REVIEW_MAIN/00_MODEL/20261114_EXPORT_ID_HINGE_MESH_REVIEW.md).
+**Engineering review:** [2026-11-14 export review](../../../../REVIEW_MAIN/00_MODEL/20261114_EXPORT_ID_HINGE_MESH_REVIEW.md).
