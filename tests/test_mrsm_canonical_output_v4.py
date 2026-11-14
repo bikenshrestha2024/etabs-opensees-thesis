@@ -63,6 +63,25 @@ class MRSMOutputTests(unittest.TestCase):
                 saved_cases(root)
             self.assertEqual(len(saved_cases(first)),6)
 
+    def test_nan_and_nonhex_model_sha_rejected_even_with_six_case_files(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            file=root/"MRSM_Results_V132.json"
+            broken=make_cases()
+            broken["X_E0"]["stories"][0]["design_drift_ratio"]=float("nan")
+            file.write_text(json.dumps(broken))
+            with self.assertRaisesRegex(ValueError,"nonfinite/negative drift"):
+                validate_mrsm_case_output(root,state="ULS")
+            broken=make_cases("z"*64)
+            file.write_text(json.dumps(broken))
+            with self.assertRaisesRegex(ValueError,"fingerprint missing/invalid"):
+                validate_mrsm_case_output(root,state="ULS")
+            broken=make_cases()
+            broken["Y_Eminus"]["stories"][0].pop("design_drift_ratio")
+            file.write_text(json.dumps(broken))
+            with self.assertRaisesRegex(ValueError,"missing design drift"):
+                validate_mrsm_case_output(root,state="ULS")
+
     def test_snapshots_and_zip_do_not_contribute(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)

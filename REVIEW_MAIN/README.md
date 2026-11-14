@@ -32,6 +32,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **Additional V9 audit — missing stiffness coverage and truncated histories:** [Source-level fixes and remaining native validation](08_SOFTWARE_SECURITY/20261114_POST_V8_FAIL_CLOSED_STIFFNESS_AND_HISTORY_V9.md).
 
+**MRSM nonfinite-response evidence correction V10:** [Reject NaN/missing design drift or nonhexadecimal model identity before six-case solver completion](04_MRSM/20261114_NONFINITE_SAVED_RESULT_GATE_V10.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|

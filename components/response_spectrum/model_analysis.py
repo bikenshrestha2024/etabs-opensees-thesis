@@ -204,7 +204,10 @@ def validate_mrsm_case_output(output, *, state, expected_model_sha256=None):
     file=root/"MRSM_Results_V132.json"
     if not file.is_file():
         raise ValueError("MRSM solver returned without MRSM_Results_V132.json")
+    import re
     data=json.loads(file.read_text(encoding="utf-8-sig"))
+    if not isinstance(data,dict):
+        raise ValueError("MRSM saved result must be a case-keyed JSON object")
     expected={axis+suffix for axis in ("X","Y")
               for suffix in ("_E0","_Eplus","_Eminus")}
     if set(data)!=expected:
@@ -214,15 +217,38 @@ def validate_mrsm_case_output(output, *, state, expected_model_sha256=None):
     hashes=set()
     for key in sorted(expected):
         result=data[key]
+        if not isinstance(result,dict):
+            raise ValueError("MRSM case result is not a JSON object: "+key)
         if result.get("limit_state")!=state:
             raise ValueError("MRSM state mismatch: "+key)
         if result.get("axis")!=key[0]:
             raise ValueError("MRSM response direction mismatch: "+key)
         if not isinstance(result.get("stories"),list) or not result["stories"]:
             raise ValueError("MRSM case has no storey results: "+key)
+        for position,row in enumerate(result["stories"],start=1):
+            if not isinstance(row,dict):
+                raise ValueError(f"MRSM {key} story {position} is not a response object")
+            if "design_drift_ratio" not in row:
+                raise ValueError(f"MRSM {key} story {position} missing design drift")
+            try:
+                drift=float(row["design_drift_ratio"])
+            except (ValueError,TypeError,OverflowError) as exc:
+                raise ValueError(f"MRSM {key} story {position} has invalid drift") from exc
+            if not math.isfinite(drift) or drift<0:
+                raise ValueError(f"MRSM {key} story {position} has nonfinite/negative drift")
+            for numeric_key in ("height_m","scaled_story_shear_kN",
+                                "elastic_displacement_m","design_displacement_m",
+                                "elastic_drift_ratio"):
+                if numeric_key in row and row[numeric_key] is not None:
+                    try:
+                        number=float(row[numeric_key])
+                    except (ValueError,TypeError,OverflowError) as exc:
+                        raise ValueError(f"MRSM {key} story {position} invalid {numeric_key}") from exc
+                    if not math.isfinite(number):
+                        raise ValueError(f"MRSM {key} story {position} nonfinite {numeric_key}")
         digest=result.get("model_sha256")
-        if not isinstance(digest,str) or len(digest)!=64:
-            raise ValueError("MRSM model fingerprint missing: "+key)
+        if not isinstance(digest,str) or re.fullmatch("[a-fA-F0-9]{64}",digest) is None:
+            raise ValueError("MRSM model fingerprint missing/invalid: "+key)
         hashes.add(digest)
     if len(hashes)!=1:
         raise ValueError("MRSM response cases refer to different assembled models")
