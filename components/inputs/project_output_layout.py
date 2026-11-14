@@ -10,11 +10,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-MODULES = (
-    "01_ETABS_EXPORT", "02_GRAVITY", "03_ESM", "04_MODAL", "05_MRSM",
-    "06_LINEAR_TH", "07_NONLINEAR_TH", "08_ETABS_COMPARISONS",
-    "09_SOFTWARE_DIAGNOSTICS", "90_UPLOAD_PACKAGES",
-)
+from components.inputs.output_layout import ALL_STAGE_FOLDERS, LEGACY_STAGE_ALIASES, canonical_stage_folder
+
+# Single registry. Historical 06_LINEAR_TH / 07_NONLINEAR_TH are readable
+# aliases but must not be created as competing new stage directories.
+MODULES = tuple(ALL_STAGE_FOLDERS.values())
 
 
 def sha256_file(path):
@@ -84,14 +84,18 @@ def case_folder(layout, module, case_id, *, limit_state=None):
     Resolve a case folder under its canonical module without traversal."""
     from re import fullmatch
     name = str(module).strip()
-    if name not in MODULES:
-        raise ValueError("Unknown output module: " + name)
+    # Existing callers that supply legacy names now write to the canonical
+    # stage rather than creating a second, differently named directory.
+    try:
+        canonical = canonical_stage_folder(name)
+    except ValueError as exc:
+        raise ValueError("Unknown output module: " + name) from exc
     parts = [str(limit_state)] if limit_state else []
     parts.append(str(case_id))
     if not all(fullmatch(r"[A-Za-z0-9_.-]+", p or "") and
                p not in (".", "..") for p in parts):
         raise ValueError("Case names must not contain separators or '..'.")
-    base = Path(layout["modules"][name]).resolve()
+    base = Path(layout["modules"][canonical]).resolve()
     destination = base.joinpath(*parts).resolve()
     if base not in destination.parents:
         raise ValueError("Case output escaped selected project folder.")
