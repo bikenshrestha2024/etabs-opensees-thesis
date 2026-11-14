@@ -213,7 +213,6 @@
   "components/response_spectrum/reports.py::export_reports",
   "components/response_spectrum/reports.py::figures",
   "components/response_spectrum/reports.py::launch",
-  "components/response_spectrum/reports.py::saved_cases",
   "components/response_spectrum/site_spectrum_and_scaling.py::SpectrumScalingGUI",
   "components/response_spectrum/site_spectrum_and_scaling.py::candidate_scale_factor",
   "components/response_spectrum/site_spectrum_and_scaling.py::elastic_site_spectrum_g",
