@@ -62,6 +62,8 @@ def export_mirror(export_dir):
     if not root.is_dir():
         raise FileNotFoundError(root)
     target = root / "01_ETABS_EXPORT"
+    if target.is_symlink():
+        raise ValueError("Categorized export destination must not be a symlink")
     target.mkdir(exist_ok=True)
     entries = []
     for original in sorted(root.iterdir()):
@@ -78,6 +80,8 @@ def export_mirror(export_dir):
             continue
         relative = Path(classification(original.name)) / original.name
         dest = target / relative
+        if dest.parent.is_symlink() or dest.is_symlink():
+            raise ValueError("Refusing categorized destination symlink: " + str(dest))
         dest.parent.mkdir(parents=True, exist_ok=True)
         original_hash = _digest(original)
         if dest.is_file():
@@ -101,6 +105,8 @@ def export_mirror(export_dir):
                 "created_utc": datetime.now(timezone.utc).isoformat(),
                 "selected_export": str(root), "files": entries}
     folder = target / "00_MANIFEST"
+    if folder.is_symlink():
+        raise ValueError("Refusing mirror manifest destination symlink: " + str(folder))
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / "export_mirror_manifest.json"
     with tempfile.NamedTemporaryFile(mode="w",encoding="utf-8",dir=folder,
