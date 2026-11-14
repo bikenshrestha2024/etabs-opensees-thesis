@@ -935,12 +935,26 @@ class GravityAnalysisGUI:
                 optional=None
             else:
                 optional=gravity if gravity.is_dir() and gravity!=root else None
-            report=publish_organized_results(root,gravity_root=optional)
-            self._gravity_action_log('ORGANIZED_ALL_MODULE_ZIP',
-                                     report['zip_files']['ALL_MODULES'])
-            self.status_var.set('Categorized review ZIP: '+report['zip_files']['ALL_MODULES'])
-            messagebox.showinfo('Organized analysis evidence',
-                'All-module upload ZIP: '+report['zip_files']['ALL_MODULES']+
+            # Gravity belongs to the selected ETABS export's 02_GRAVITY,
+            # not a second all-module snapshot inside OpenSees_Analysis_Results.
+            # Legacy solver roots remain untouched and are only READ/COPIED.
+            analysis_parent = next(
+                (p for p in (gravity, *gravity.parents)
+                 if p.name.casefold() == 'opensees_analysis_results'), None)
+            if analysis_parent is not None:
+                destination_parent = analysis_parent.parent / '02_GRAVITY' / 'REVIEW_SNAPSHOTS'
+            else:
+                destination_parent = gravity / 'REVIEW_SNAPSHOTS'
+            report=publish_organized_results(
+                root, gravity_root=optional,
+                destination_parent=destination_parent,
+                selected_modules=('Gravity', 'Comparisons'),
+                bundle_name='GRAVITY_REVIEW')
+            self._gravity_action_log('ORGANIZED_GRAVITY_ZIP',
+                                     report['zip_files']['GRAVITY_REVIEW'])
+            self.status_var.set('Gravity review ZIP: '+report['zip_files']['GRAVITY_REVIEW'])
+            messagebox.showinfo('Organized gravity evidence',
+                'Gravity review ZIP: '+report['zip_files']['GRAVITY_REVIEW']+
                 ' | Manifest: '+report['manifest']+
                 ' | Original solver outputs remain unchanged.',
                 parent=self.win)

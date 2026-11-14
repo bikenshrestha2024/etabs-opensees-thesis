@@ -18,7 +18,7 @@ from pathlib import Path
 
 MODULES = ("Gravity", "ESM", "Modal", "MRSM", "Comparisons", "Unclassified")
 SKIP_DIRS = {
-    "Organized_Results", "Seismic_Review_Packages", "Gravity_Evidence_Upload",
+    "Organized_Results", "REVIEW_SNAPSHOTS", "Seismic_Review_Packages", "Gravity_Evidence_Upload",
     "__pycache__", ".git", ".pytest_cache",
 }
 SKIP_EXT = {".edb", ".bak", ".lock", ".tmp", ".pyc"}
@@ -96,7 +96,8 @@ def _walk(root, *, destination):
 
 
 def publish_organized_results(results_root, *, gravity_root=None,
-                              include_unclassified=True):
+                              include_unclassified=True, destination_parent=None,
+                              selected_modules=None, bundle_name="ALL_MODULES"):
     """[REF docs/source/components/ui/organized_results.py.md] Create dated folder and ZIPs.
 
     results_root is the existing source/model/state output folder (e.g. ULS...).
@@ -106,6 +107,9 @@ def publish_organized_results(results_root, *, gravity_root=None,
     root = Path(results_root).expanduser().resolve()
     if not root.is_dir():
         raise FileNotFoundError("Selected analysis result directory does not exist: " + str(root))
+    allowed = frozenset(selected_modules) if selected_modules is not None else None
+    if allowed is not None and (not allowed or not allowed.issubset(MODULES)):
+        raise ValueError("Unknown or empty selected modules")
     roots = [("Analysis", root)]
     if gravity_root:
         grav = Path(gravity_root).expanduser().resolve()
@@ -114,7 +118,10 @@ def publish_organized_results(results_root, *, gravity_root=None,
         if grav != root:
             roots.append(("GravityGUI", grav))
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    destination = root / "Organized_Results" / stamp
+    parent = Path(destination_parent).expanduser().resolve() if destination_parent else root / "Organized_Results"
+    if parent == root:
+        raise ValueError("Destination parent may not be the source results root")
+    destination = parent / stamp
     destination.mkdir(parents=True, exist_ok=False)
     manifest = {
         "schema": "thesis-module-evidence-v1",
@@ -132,6 +139,9 @@ def publish_organized_results(results_root, *, gravity_root=None,
             module = classify(path, rel)
             if source_label == "GravityGUI" and module == "Unclassified":
                 module = "Gravity"
+            if allowed is not None and module not in allowed:
+                manifest["skipped"].append({"source": str(path), "reason": "MODULE_NOT_SELECTED", "module": module})
+                continue
             if module == "Unclassified" and not include_unclassified:
                 manifest["skipped"].append({
                     "source": str(path), "reason": "UNCLASSIFIED_NOT_INCLUDED"})
@@ -187,8 +197,10 @@ def publish_organized_results(results_root, *, gravity_root=None,
         subset = [e for e in manifest["entries"] if e["module"] == module]
         if subset:
             archive(module, subset)
-    archive("ALL_MODULES", manifest["entries"])
-    latest = root / "Organized_Results" / "LATEST_ORGANIZED_RESULT.txt"
+    if not bundle_name or "/" in bundle_name or "\\" in bundle_name:
+        raise ValueError("Invalid archive bundle name")
+    archive(bundle_name, manifest["entries"])
+    latest = parent / "LATEST_ORGANIZED_RESULT.txt"
     latest.write_text(
         "FOLDER: " + str(destination) + "\n"
         "MANIFEST: " + str(manifest_file) + "\n" +

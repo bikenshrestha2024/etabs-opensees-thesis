@@ -65,3 +65,16 @@ exact ZIP and manifest paths. The new snapshot and archives require additional
 disk space. Preserve original files for reproducibility.
 
 Test: `tests/test_organized_results.py`.
+
+
+## 2026-11-14 gravity-only review mode
+The generic `publish_organized_results` still uses the legacy all-module snapshot directory and `ALL_MODULES` ZIP by default, preserving ESM/MRSM callers. New opt-in keyword arguments:
+- `destination_parent`: specific case-specific snapshot root, e.g. `<ETABS export>/02_GRAVITY/REVIEW_SNAPSHOTS`.
+- `selected_modules`: strict subset of `MODULES`; the gravity GUI requests only `Gravity` and `Comparisons`.
+- `bundle_name`: independent archive label, `GRAVITY_REVIEW` in gravity GUI. Existing calls default to `ALL_MODULES`.
+
+The gravity GUI determines the ETABS export root from the selected results directory's `OpenSees_Analysis_Results` ancestor, or falls back to a `REVIEW_SNAPSHOTS` child of its selected output root. Historical solvers and evidence remain in their original paths. SHA256-checked immutable copies are produced and prior `REVIEW_SNAPSHOTS` folders are excluded from rescanning. This is a **review snapshot output fix**, not yet the migration of all upstream gravity producer and downstream reader paths. 
+
+Users should receive a `GRAVITY_REVIEW_Review_UPLOAD.zip` under `02_GRAVITY/REVIEW_SNAPSHOTS/<timestamp>/ZIP_Exports/` and a pointer at `02_GRAVITY/REVIEW_SNAPSHOTS/LATEST_ORGANIZED_RESULT.txt`. Sources may still be in legacy output directories until all module readers are migrated with regression tests. Non-gravity ESM, MRSM and modal reports should be published from their own module actions, not bundled by a gravity button.
+
+**Acceptance:** Run `python -m unittest tests.test_organized_results` and current CI; then perform GUI smoke tests on Windows. Comparing total support reactions or packaging reports is not proof of native ETABS/OpenSees equivalence.
