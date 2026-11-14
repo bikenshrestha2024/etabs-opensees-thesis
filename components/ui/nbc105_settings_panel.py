@@ -264,7 +264,6 @@ def build_analysis_settings_review(export_dir):
                      "An AS_CONFIGURED 0.3 LL gravity factor is NOT automatically the NBC mass source nor the NBC §3.6 strength combination."))
     configured_patterns=config.get("gravity_factors")
     if isinstance(configured_patterns,dict):
-        known_dead=set(name.casefold() for name in mass_spec["dead_pattern_names"])
         all_referenced=set(name.casefold() for key in (
             "dead_pattern_names","storage_pattern_names",
             "other_live_pattern_names","roof_live_pattern_names"
