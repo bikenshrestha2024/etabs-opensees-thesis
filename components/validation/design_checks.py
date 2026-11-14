@@ -137,6 +137,33 @@ def design_check_locations(folder):
             root/'OpenSees_Analysis_Results'/'Design_Checks_V135')
 
 
+
+def saved_drift_solver_status(response_file):
+    """[REF docs/source/components/validation/design_checks.py.md]
+    Read saved run completion without inferring status from filename or drift.
+
+    An archived result with no run manifest is unverified, not zero response.
+    """
+    path=Path(response_file).resolve()
+    from components.inputs.output_contract import STATUSES
+    for parent in (path.parent,*path.parents):
+        manifest=parent/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+        if manifest.is_file():
+            try:
+                document=json.loads(manifest.read_text(encoding="utf-8-sig"))
+                if not isinstance(document,dict):
+                    return "INVALID_RUN_MANIFEST"
+                status=document.get("solver_status")
+                return status if status in STATUSES else "INVALID_RUN_STATUS"
+            except (OSError,ValueError,TypeError):
+                return "UNREADABLE_RUN_MANIFEST"
+        if parent.name.casefold() in ("03_esm","05_mrsm",
+                "06_linear_time_history","07_nonlinear_time_history",
+                "opensees_analysis_results"):
+            break
+    return "NO_RUN_COMPLETION_MANIFEST"
+
+
 def discover_design_drift(folder):
     """[REF docs/source/components/validation/design_checks.py.md]
     Discover verified-on-disk report paths, not a structural PASS.
@@ -191,19 +218,27 @@ def run(folder,storage=False,nonparallel=False):
                        result_model_sha256=item.get("result_model_sha256",""))
                   for item in source_issues)
     unknown_drift=0
+    incomplete_drift=0
     for row in drift:
-        if row.get("source_identity_status")=="NOT_VERIFIED":
-            unknown_drift+=1
+        row["run_completion_status"]=saved_drift_solver_status(row["file"])
+        source_unknown=(row.get("source_identity_status")=="NOT_VERIFIED")
+        run_incomplete=(row["run_completion_status"] not in (
+            "COMPLETED_SOLVER_ONLY","VERIFIED_ETABS_EQUIVALENCE"))
+        if source_unknown or run_incomplete:
             row["raw_limit_status"]=row.get("status")
             if row.get("status")=="PASS":
                 row["status"]="NOT EVALUATED"
             row["scope"]=str(row.get("scope","")) + (
-                " SOURCE MODEL IDENTITY MISSING: numeric limit check only;"
-                " not a verified drift PASS.")
-    if unknown_drift:
-        issues.append(dict(check="Unverified saved drift source",
+                " MISSING SOURCE IDENTITY OR RUN COMPLETION: this is a"
+                " numerical drift-limit comparison, not verified acceptance.")
+            unknown_drift+=int(source_unknown)
+            incomplete_drift+=int(run_incomplete)
+    if unknown_drift or incomplete_drift:
+        issues.append(dict(check="Unverified saved drift source or completion",
                            status="NOT EVALUATED",
-                           reason=f"{unknown_drift} drift rows lack matching source-model SHA256; numerical limit PASS withheld."))
+                           reason=(f"{unknown_drift} rows lack matching model SHA; "
+                                   f"{incomplete_drift} rows have no completed run manifest."
+                                   " Numeric drift-limit PASS withheld.")))
     input_sources={}
     def input_rows(filename):
         # Prefer actual edited canonical input; fall back to nonempty legacy
@@ -256,6 +291,7 @@ def run(folder,storage=False,nonparallel=False):
     report=dict(input_criteria_sources=input_sources,report_directory=str(output),
                 drift_source_mismatch_excluded_count=len(source_issues),
                 drift_source_unverified_row_count=unknown_drift,
+                drift_run_completion_unverified_row_count=incomplete_drift,
                 evidence_status='SOURCE_IDENTITIES_REQUIRE_REVIEW',
                 model_sha256=digest,started=started,finished=datetime.datetime.now().astimezone().isoformat(),elapsed_s=elapsed,overall='INCOMPLETE' if not any(r.get('status')=='FAIL' for rows in tables.values() for r in rows) else 'FAIL / INCOMPLETE',sources=[SOURCE],tables=tables,scope='No whole-section PASS is inferred. Existing analysis outputs are checked without rerunning the solver. MRSM force envelopes and nonlinear totals are never superposed as linear increments.')
     from components.inputs.output_contract import atomic_json
