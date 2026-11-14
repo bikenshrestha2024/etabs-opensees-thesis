@@ -82,7 +82,7 @@ def create_project_layout(source_edb, selected_output_root, *,
 def case_folder(layout, module, case_id, *, limit_state=None):
     """[REF docs/source/components/inputs/project_output_layout.py.md]
     Resolve a case folder under its canonical module without traversal."""
-    from re import fullmatch
+    from components.inputs.output_contract import safe_component
     name = str(module).strip()
     # Existing callers that supply legacy names now write to the canonical
     # stage rather than creating a second, differently named directory.
@@ -90,11 +90,8 @@ def case_folder(layout, module, case_id, *, limit_state=None):
         canonical = canonical_stage_folder(name)
     except ValueError as exc:
         raise ValueError("Unknown output module: " + name) from exc
-    parts = [str(limit_state)] if limit_state else []
-    parts.append(str(case_id))
-    if not all(fullmatch(r"[A-Za-z0-9_.-]+", p or "") and
-               p not in (".", "..") for p in parts):
-        raise ValueError("Case names must not contain separators or '..'.")
+    parts = [safe_component(limit_state)] if limit_state is not None else []
+    parts.append(safe_component(case_id))
     base = Path(layout["modules"][canonical]).resolve()
     destination = base.joinpath(*parts).resolve()
     if base not in destination.parents:
