@@ -42,6 +42,7 @@ def audit_export_structure(export_dir, *, verify_copies=True):
     root_files = []
     missing_mirrors = []
     conflicting_mirrors = []
+    unsafe_mirror_paths = []
     excluded_sidecars = []
     source_evidence = []
     legacy_analysis = root / "OpenSees_Analysis_Results"
@@ -59,6 +60,9 @@ def audit_export_structure(export_dir, *, verify_copies=True):
         expected = mirror / category / p.name
         source_evidence.append({"file": p.name, "category": category,
                                 "mirror": expected.relative_to(root).as_posix()})
+        if mirror.is_symlink() or expected.parent.is_symlink() or expected.is_symlink():
+            unsafe_mirror_paths.append(expected.relative_to(root).as_posix())
+            continue
         if not expected.is_file():
             missing_mirrors.append(p.name)
         elif verify_copies and _digest(p) != _digest(expected):
@@ -95,6 +99,11 @@ def audit_export_structure(export_dir, *, verify_copies=True):
                                 and p.name not in KNOWN_PROJECT_FOLDERS
                                 and p.name not in LEGACY_COMPAT_FOLDERS)
     findings = []
+    if unsafe_mirror_paths:
+        findings.append({"id":"UNSAFE_EXPORT_MIRROR_LINK",
+                         "severity":"BLOCKED",
+                         "count":len(unsafe_mirror_paths),
+                         "action":"Refuse to read SHA or compare files through linked mirror paths; inspect locally."})
     if symlinked_stages:
         findings.append({"id": "SYMLINKED_CANONICAL_STAGE_BLOCKED",
                          "severity": "BLOCKED",
@@ -140,6 +149,7 @@ def audit_export_structure(export_dir, *, verify_copies=True):
         "eligible_source_artifacts": source_evidence,
         "missing_categorized_copies": missing_mirrors,
         "conflicting_categorized_copies": conflicting_mirrors,
+        "unsafe_mirror_paths": unsafe_mirror_paths,
         "legacy_analysis_case_folders": legacy_cases,
         "unexpected_top_level_folders": unexpected_folders,
         "stages": stage_details,
@@ -171,6 +181,7 @@ def write_folder_audit(export_dir, *, verify_copies=True):
         f"- Flat root files: {len(report['files_in_export_root'])}",
         f"- Missing categorized copies: {len(report['missing_categorized_copies'])}",
         f"- Mirror hash conflicts: {len(report['conflicting_categorized_copies'])}",
+        f"- Unsafe mirror symlinks refused: {len(report['unsafe_mirror_paths'])}",
         f"- Processing sidecars excluded: {len(report['excluded_processing_sidecars'])}",
         f"- Legacy analysis case directories: {len(report['legacy_analysis_case_folders'])}",
         f"- Registered stage/auxiliary directories: {len(report['stages'])}",
