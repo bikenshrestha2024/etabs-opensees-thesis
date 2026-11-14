@@ -104,6 +104,42 @@ class NBCSettingsPanelV12Tests(unittest.TestCase):
             self.assertEqual(book["Review & project"].freeze_panes,"A2")
             self.assertEqual(original.read_bytes(),b"unchanged sensitive source")
 
+    def test_nonfinite_slab_factor_is_reported_not_accepted(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            (root/"OpenSees_Complete_Model_Data_V118.json").write_text("{}")
+            (root/"OpenSees_Complete_Model_Config_V118.json").write_text(
+                json.dumps({"slab_bending_factor":float("nan"),
+                            "slab_bending_factor_sls":float("inf"),
+                            "gravity_factors":{"Self Weight":1.0,
+                                               "Wall":1.0,
+                                               "Floor Finish":1.0}}))
+            report=build_analysis_settings_review(root)
+            self.assertTrue(any("ULS slab bending factor" in x and
+                                "not a valid number" in x for x in report["warnings"]))
+            self.assertTrue(any("SLS slab bending factor" in x and
+                                "not a valid number" in x for x in report["warnings"]))
+            self.assertTrue(any("Self Weight" in x and "Wall" in x and
+                                "missing from illustrative mass aliases" in x
+                                for x in report["warnings"]))
+            self.assertEqual(len([r for r in report["tables"]["Review & project"]
+                                  if r["Topic"]=="Mandatory signed P-Delta"]),4)
+            self.assertTrue(any("PD_INIT_EL_X_PLUS" in x
+                                for x in report["warnings"]))
+
+    def test_null_slab_source_does_not_crash_settings_audit(self):
+        from components.validation.settings_audit import audit
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            (root/"OpenSees_Complete_Model_Config_V118.json").write_text(
+                json.dumps({"slab_stiffness_source":None,
+                            "slab_bending_factor":0.25,
+                            "slab_bending_factor_sls":0.35}))
+            report=audit(root)
+            slab=next(x for x in report["rows"]
+                      if x["item"]=="Conventional slab bending factors")
+            self.assertIn("No source recorded",slab["basis"])
+
     def test_main_gui_delegates_to_new_panel(self):
         source=Path(__file__).resolve().parents[1]/"components"/"ui"/"application.py"
         content=source.read_text(encoding="utf-8")
