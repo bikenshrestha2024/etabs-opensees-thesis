@@ -17,6 +17,30 @@ class OrganizedReviewTests(unittest.TestCase):
         self.assertEqual(classify("Modal_ULS/mode_shapes.json"), "Modal")
         self.assertEqual(classify("ETABS_Comparison_V148/Comparison.csv"), "Comparisons")
 
+    def test_classify_time_histories_separately(self):
+        self.assertEqual(classify("06_LINEAR_TIME_HISTORY/RUNS/ULS/XY/Deformation.json"),"LinearTH")
+        self.assertEqual(classify("07_NONLINEAR_TIME_HISTORY/RUNS/M0/XY/Response.json"),"NonlinearTH")
+        self.assertEqual(classify("06_LINEAR_TH/ULS/Linear_Time_History.csv"),"LinearTH")
+        self.assertEqual(classify("07_NONLINEAR_TH/NLTHA_XY_Result.json"),"NonlinearTH")
+        self.assertEqual(classify("OpenSees_NLTHA_XY_Results.json"),"NonlinearTH")
+
+    def test_time_history_files_get_dedicated_review_zip(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"case"
+            root.mkdir()
+            linear=root/"06_LINEAR_TIME_HISTORY"/"RUNS"/"ULS"/"LTH_XY.json"
+            nonlinear=root/"07_NONLINEAR_TIME_HISTORY"/"RUNS"/"M0"/"NLTHA_XY.json"
+            for file in (linear,nonlinear):
+                file.parent.mkdir(parents=True,exist_ok=True)
+                file.write_text('{"solver_status":"INCOMPLETE"}')
+            pack=publish_organized_results(root)
+            self.assertIn("LinearTH",pack["zip_files"])
+            self.assertIn("NonlinearTH",pack["zip_files"])
+            self.assertEqual(pack["status"],"OUTPUT_INDEX_NOT_ENGINEERING_ACCEPTANCE")
+            for stage in ("LinearTH","NonlinearTH"):
+                with zipfile.ZipFile(pack["zip_files"][stage]) as archive:
+                    self.assertIn("EVIDENCE_MANIFEST.json",archive.namelist())
+
     def test_preserves_sources_exports_distinct_zip_and_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "ULS_MODEL_A"
