@@ -21,3 +21,7 @@ Relevant register IDs: R01 R02 R10 R12. Consult [research reference register](..
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+## 2026-11-14 nonlinear dependency output location V8
+
+The **Save dependency inventory** action now writes the derived JSON to `09_SOFTWARE_DIAGNOSTICS/NONLINEAR_PREFLIGHT/Nonlinear_Dependency_Preflight_V160.json`, using shared atomic JSON output. Previous legacy output files are not deleted or moved. Saving dependency state does **not** establish project material calibration, brace behavior or nonlinear wall readiness.
