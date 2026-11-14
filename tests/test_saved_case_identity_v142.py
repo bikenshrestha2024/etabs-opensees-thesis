@@ -43,6 +43,43 @@ class ReviewSourceIntegrityTests(unittest.TestCase):
             self.assertEqual(result2["drift"][0]["source_identity_status"],
                              "MATCHED_SERIALIZED_MODEL_SHA_NOT_ETABS_EQUIVALENCE")
 
+    def test_manifest_payload_source_conflict_excluded_even_when_manifest_matches(self):
+        from components.validation.saved_case_identity import (
+            recorded_result_model_sha,source_model_hash_evidence,identity_screen)
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            result=root/"05_MRSM"/"RUNS"/"ULS"/"case"/"r1"/"02_RESULTS"
+            result.mkdir(parents=True)
+            manifest=result.parent/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+            manifest.parent.mkdir()
+            manifest.write_text(json.dumps({"model_sha256":"a"*64}))
+            numeric=result/"MRSM_Results_V132.json"
+            numeric.write_text(json.dumps({"X_E0":{
+                "model_sha256":"b"*64,
+                "stories":[{"story_number":1,"design_drift_ratio":0.01}]
+            }}))
+            evidence=source_model_hash_evidence(numeric,"X_E0")
+            self.assertTrue(evidence["conflict"])
+            self.assertIsNone(recorded_result_model_sha(numeric,"X_E0"))
+            selected,issues=identity_screen(
+                [{"file":str(numeric),"case":"X_E0"}],
+                expected_model_sha="a"*64)
+            self.assertEqual(selected,[])
+            self.assertEqual(issues[0]["status"],
+                             "SOURCE_MANIFEST_RESULT_SHA_CONFLICT_EXCLUDED")
+            self.assertEqual(issues[0]["payload_model_sha256"],"b"*64)
+            numeric.write_text(json.dumps({"X_E0":{
+                "model_sha256":"a"*64,
+                "stories":[{"story_number":1,"design_drift_ratio":0.01}]
+            }}))
+            selected,issues=identity_screen(
+                [{"file":str(numeric),"case":"X_E0"}],
+                expected_model_sha="a"*64)
+            self.assertEqual(len(selected),1)
+            self.assertEqual(issues,[])
+            self.assertEqual(selected[0]["source_identity_status"],
+                             "MATCHED_SERIALIZED_MODEL_SHA_NOT_ETABS_EQUIVALENCE")
+
     def test_manifest_sha_and_missing_legacy_identity(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
