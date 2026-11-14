@@ -60,6 +60,10 @@ def update_history_case(ledger,line,current_case=None):
  if match:
   case=match.group(1).strip()
   if case in ledger.rows:
+   # A diagnostic truncation must not be overwritten by a later generic
+   # [OK] message. A separate rerun uses a fresh ledger and run identity.
+   if ledger.rows[case].get('status') in ('TRUNCATED','FAILED','NOT COMPLETED'):
+    return None
    ledger.set(case,'COMPLETED','Configured record/orientation completed; inspect summary for full-record coverage')
    return None
  return current_case

@@ -9,6 +9,13 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import re
+
+_SHA256 = re.compile(r"[0-9a-fA-F]{64}")
+
+
+def _valid_sha256(value):
+    return isinstance(value, str) and _SHA256.fullmatch(value) is not None
 
 
 def current_export_model_sha(export_dir):
@@ -41,8 +48,7 @@ def recorded_result_model_sha(result_path, case=None):
             try:
                 item=json.loads(candidate.read_text(encoding="utf-8-sig"))
                 digest=item.get("model_sha256")
-                if isinstance(digest,str) and len(digest)==64 and all(
-                        c in "0123456789abcdefABCDEF" for c in digest):
+                if _valid_sha256(digest):
                     return digest.lower()
             except (OSError,ValueError,TypeError):
                 pass
@@ -55,18 +61,18 @@ def recorded_result_model_sha(result_path, case=None):
         if path.name=="MRSM_Results_V132.json" and case:
             content=json.loads(path.read_text(encoding="utf-8-sig"))
             value=content.get(str(case),{}).get("model_sha256")
-            if isinstance(value,str) and len(value)==64:
+            if _valid_sha256(value):
                 return value.lower()
         if path.name.startswith("Deformation_") and path.suffix.lower()==".json":
             value=json.loads(path.read_text(encoding="utf-8-sig")).get("model_sha256")
-            if isinstance(value,str) and len(value)==64:
+            if _valid_sha256(value):
                 return value.lower()
         if path.name.startswith("Drift_Check_"):
             suffix=path.stem.removeprefix("Drift_Check_")
             metadata=folder/("NBC105_ESM_OpenSees_Response_META_"+suffix+".json")
             if metadata.is_file():
                 value=json.loads(metadata.read_text(encoding="utf-8-sig")).get("model_sha256")
-                if isinstance(value,str) and len(value)==64:
+                if _valid_sha256(value):
                     return value.lower()
     except (OSError,ValueError,TypeError,AttributeError):
         pass

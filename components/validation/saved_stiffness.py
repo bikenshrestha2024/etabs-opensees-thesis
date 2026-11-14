@@ -3,7 +3,11 @@ from pathlib import Path
 import json,hashlib
 
 def merge_saved_stiffness(folder,result):
- folder=Path(folder);source=folder/'OpenSees_Complete_Model_Data_V118.json';digest=hashlib.sha256(source.read_bytes()).hexdigest();imported=[];coverage=set()
+ from components.inputs.output_layout import export_root_for
+ folder=export_root_for(folder)
+ source=folder/'OpenSees_Complete_Model_Data_V118.json'
+ digest=hashlib.sha256(source.read_bytes()).hexdigest() if source.is_file() else None
+ imported=[];coverage=set();file_issues=[]
  from components.inputs.output_layout import result_roots
  # New stage results and historical outputs are equally discoverable, but
  # archived review bundles must not count as independent stiffness checks.
@@ -14,8 +18,15 @@ def merge_saved_stiffness(folder,result):
            '07_export_zip','90_upload_packages'}
  for p in sorted(candidates):
   if any(part.casefold() in excluded for part in p.parts):continue
-  d=json.loads(p.read_text(encoding='utf-8-sig'))
-  if d.get('model_sha256')!=digest:continue
+  try:
+   d=json.loads(p.read_text(encoding='utf-8-sig'))
+   if not isinstance(d,dict):
+    raise ValueError('Saved stiffness result is not an object')
+  except (OSError,ValueError,TypeError) as exc:
+   file_issues.append(dict(file=str(p),status='UNREADABLE_STIFFNESS_EVIDENCE',
+                           reason=str(exc)))
+   continue
+  if digest is None or d.get('model_sha256')!=digest:continue
   state=d.get('limit_state');case=d.get('response_case',p.name);axis=('X' if case.startswith('X_') or '_X' in case
         else 'Y' if case.startswith('Y_') or '_Y' in case else None)
   if state not in ('ULS','SLS') or axis is None:continue
@@ -23,10 +34,27 @@ def merge_saved_stiffness(folder,result):
   if not rows:continue
   coverage.add((state,axis))
   for r in rows:r.update(check=state+' '+axis+' '+r['check'],note=str(r.get('note',''))+' | Model-matching centered static result: '+str(p));imported.append(r)
+ # The absence of matching stiffness cases must NEVER produce a
+ # reassuring 'NO TRIGGER FOUND'. Even a geometry-only preview is incomplete.
+ # Remove only our previous synthetic coverage notices for idempotence.
+ result['checks']=[r for r in result.get('checks',[]) if not (
+     r.get('clause')=='5.4.1.2' and
+     str(r.get('check','')).endswith(' soft-storey coverage'))]
  if imported:
+  # A matching native saved case supersedes old static stiffness placeholders.
   result['checks']=[r for r in result['checks'] if r.get('clause')!='5.4.1.2']+list({(r['check'],str(r.get('storey'))):r for r in imported}.values())
-  for state in ('ULS','SLS'):
-   for axis in ('X','Y'):
-    if (state,axis) not in coverage:result['checks'].append(dict(clause='5.4.1.2',check=state+' '+axis+' soft-storey coverage',storey='ALL',value=None,threshold=None,status='NOT EVALUATED',note='No matching centered static stiffness result. Calculate selected state(s).'))
+ for state in ('ULS','SLS'):
+  for axis in ('X','Y'):
+   if (state,axis) not in coverage:
+    result['checks'].append(dict(
+        clause='5.4.1.2',check=state+' '+axis+' soft-storey coverage',
+        storey='ALL',value=None,threshold=None,status='NOT EVALUATED',
+        note='No source-model-matching centered static stiffness response. Missing response is not evidence of regularity.'))
  result['overall']='IRREGULAR' if any(r.get('status')=='IRREGULAR' for r in result['checks']) else 'INCOMPLETE' if any(r.get('status')=='NOT EVALUATED' for r in result['checks']) else 'NO TRIGGER FOUND'
- result['stiffness_import_coverage']=sorted([list(x) for x in coverage]);return result
+ result['stiffness_import_coverage']=sorted([list(x) for x in coverage])
+ if digest is None:
+  file_issues.append(dict(file=str(source),status='MISSING_SOURCE_MODEL',
+                          reason='Cannot verify stiffness results without the serialized current model'))
+ if file_issues:
+  result['stiffness_evidence_issues']=file_issues
+ return result

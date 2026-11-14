@@ -265,6 +265,7 @@ on:
       - 'components/inputs/analysis_autofill.py'
       - 'components/model/nonlinear_preflight.py'
       - 'tests/test_legacy_reader_migration_v8.py'
+      - 'tests/test_post_v8_missing_coverage_v9.py'
       - 'docs/source/components/validation/saved_case_identity.py.md'
       - 'tests/test_history_run_output_contract.py'
       - 'components/shared/case_status.py'
@@ -430,6 +431,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_esm_saved_evidence_gate_v5.py' -v
           python -m unittest discover -s tests -p 'test_saved_case_identity_v142.py' -v
           python -m unittest discover -s tests -p 'test_legacy_reader_migration_v8.py' -v
+          python -m unittest discover -s tests -p 'test_post_v8_missing_coverage_v9.py' -v
           python -m unittest discover -s tests -p 'test_history_run_output_contract.py' -v
           python -m unittest discover -s tests -p 'test_history_batch_completion_gate_v7.py' -v
           python -m unittest discover -s tests -p 'test_response_root_compatibility.py' -v

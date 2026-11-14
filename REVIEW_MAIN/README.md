@@ -30,6 +30,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **Legacy-only saved-model reader fixes V8:** [Irregularity stiffness screens, source-matched modal autofill and nonlinear preflight diagnostics](08_SOFTWARE_SECURITY/20261114_LEGACY_ONLY_READERS_AND_PREFLIGHT_V8.md).
 
+**Additional V9 audit — missing stiffness coverage and truncated histories:** [Source-level fixes and remaining native validation](08_SOFTWARE_SECURITY/20261114_POST_V8_FAIL_CLOSED_STIFFNESS_AND_HISTORY_V9.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|
