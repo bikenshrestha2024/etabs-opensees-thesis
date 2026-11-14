@@ -11,9 +11,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from components.inputs.export_mirror import EXTS, PRIVATE_NAMES, classification, _digest
-from components.inputs.output_layout import STAGE_FOLDERS, export_root_for
+from components.inputs.output_layout import STAGE_FOLDERS, AUXILIARY_FOLDERS, export_root_for
 
 STAGE_NAMES = set(STAGE_FOLDERS.values())
+KNOWN_PROJECT_FOLDERS = (STAGE_NAMES | set(AUXILIARY_FOLDERS.values())
+                         | {"00_SOURCE_MANIFEST", "REVIEW_MAIN"})
+LEGACY_COMPAT_FOLDERS = {"OpenSees_Analysis_Results", "06_LINEAR_TH", "07_NONLINEAR_TH"}
 IGNORED_SOURCE_SUFFIXES = (".processing.json", ".processing.log", ".tmp", ".partial")
 STAGE_HINTS = {
     "02_GRAVITY": ("gravity", "support", "reaction", "joint_overlap"),
@@ -62,15 +65,20 @@ def audit_export_structure(export_dir, *, verify_copies=True):
             conflicting_mirrors.append({"source": p.name,
                                         "copy": expected.relative_to(root).as_posix()})
     stage_details = {}
-    for key, stage_name in STAGE_FOLDERS.items():
+    loose_stage_files = []
+    for key, stage_name in {**STAGE_FOLDERS, **AUXILIARY_FOLDERS}.items():
         stage = root / stage_name
+        loose = sorted(p.name for p in stage.iterdir()
+                       if p.is_file() and not p.is_symlink()) if stage.is_dir() else []
+        if loose:
+            loose_stage_files.append({"stage": key, "directory": stage_name,
+                                      "files": loose, "count": len(loose)})
         stage_details[key] = {
             "path": stage_name,
             "exists": stage.is_dir(),
             "subfolders": sorted(p.name for p in stage.iterdir()
                                  if p.is_dir() and not p.is_symlink()) if stage.is_dir() else [],
-            "loose_files": sorted(p.name for p in stage.iterdir()
-                                  if p.is_file() and not p.is_symlink()) if stage.is_dir() else [],
+            "loose_files": loose,
             "engineering_status": "NOT_CHECKED_BY_FOLDER_AUDIT",
         }
     legacy_cases = []
@@ -79,8 +87,8 @@ def audit_export_structure(export_dir, *, verify_copies=True):
                               if p.is_dir() and not p.is_symlink())
     unexpected_folders = sorted(p.name for p in root.iterdir()
                                 if p.is_dir() and not p.is_symlink()
-                                and p.name not in STAGE_NAMES
-                                and p.name != "OpenSees_Analysis_Results")
+                                and p.name not in KNOWN_PROJECT_FOLDERS
+                                and p.name not in LEGACY_COMPAT_FOLDERS)
     findings = []
     if missing_mirrors:
         findings.append({"id": "EXPORT_MIRROR_INCOMPLETE",
@@ -97,6 +105,16 @@ def audit_export_structure(export_dir, *, verify_copies=True):
                          "severity": "COMPATIBILITY",
                          "count": len(legacy_cases),
                          "action": "Keep historical runs readable. Migrate each producer and reader together; do not bulk move results."})
+    if loose_stage_files:
+        findings.append({"id": "LOOSE_STAGE_OUTPUTS",
+                         "severity": "ORGANIZATION",
+                         "count": sum(item["count"] for item in loose_stage_files),
+                         "action": "New writers should use per-case RUNS/EXCEL/JSON/LOGS/PLOTS/ZIP subfolders. Existing files are inventoried only; do not relocate without updating consumers and provenance."})
+    if unexpected_folders:
+        findings.append({"id": "UNREGISTERED_ROOT_DIRECTORIES",
+                         "severity": "REVIEW",
+                         "count": len(unexpected_folders),
+                         "action": "Inspect unregistered root directories before categorization. Do not assume their contents can be safely moved."})
     if root_files:
         findings.append({"id": "FLAT_SOURCE_FILES_RETAINED",
                          "severity": "COMPATIBILITY",
@@ -115,6 +133,7 @@ def audit_export_structure(export_dir, *, verify_copies=True):
         "legacy_analysis_case_folders": legacy_cases,
         "unexpected_top_level_folders": unexpected_folders,
         "stages": stage_details,
+        "loose_stage_outputs": loose_stage_files,
         "findings": findings,
     }
 
@@ -143,6 +162,9 @@ def write_folder_audit(export_dir, *, verify_copies=True):
         f"- Mirror hash conflicts: {len(report['conflicting_categorized_copies'])}",
         f"- Processing sidecars excluded: {len(report['excluded_processing_sidecars'])}",
         f"- Legacy analysis case directories: {len(report['legacy_analysis_case_folders'])}",
+        f"- Registered stage/auxiliary directories: {len(report['stages'])}",
+        f"- Loose files at stage roots: {sum(item['count'] for item in report['loose_stage_outputs'])}",
+        f"- Unregistered top-level directories: {len(report['unexpected_top_level_folders'])}",
         "", "## Canonical stages", "",
         "| Stage | Directory present | Subfolders | Loose files |",
         "|---|---|---:|---:|",

@@ -184,6 +184,15 @@ def write_stage_index(export_dir):
             ),
             "engineering_status": "NOT_ASSESSED_BY_FILE_INDEX",
         })
+    auxiliary_stages = [
+        {
+            "stage": name,
+            "folder": folder,
+            "present": (root / folder).is_dir(),
+            "engineering_status": "NOT_ASSESSED_BY_FILE_INDEX",
+        }
+        for name, folder in AUXILIARY_FOLDERS.items()
+    ]
     manifest = {
         "schema": "THESIS_STAGE_INDEX_V1",
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -191,6 +200,7 @@ def write_stage_index(export_dir):
         "legacy_analysis_results_present": (
             root / "OpenSees_Analysis_Results").is_dir(),
         "stages": stages,
+        "auxiliary_stages": auxiliary_stages,
     }
     destination = root / "01_ETABS_EXPORT" / "00_MANIFEST"
     destination.mkdir(parents=True, exist_ok=True)
