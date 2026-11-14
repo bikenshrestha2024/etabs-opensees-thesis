@@ -254,6 +254,9 @@ on:
       - 'tests/test_organized_results.py'
       - 'components/inputs/output_layout.py'
       - 'components/inputs/output_contract.py'
+      - 'components/response_spectrum/model_analysis.py'
+      - 'components/response_spectrum/reports.py'
+      - 'tests/test_mrsm_canonical_output_v4.py'
       - 'tests/test_history_run_output_contract.py'
       - 'components/inputs/project_output_layout.py'
       - 'components/validation/response_inventory.py'
@@ -411,6 +414,7 @@ jobs:
           python tests/test_organized_results.py
           python -m unittest discover -s tests -p 'test_output_layout.py' -v
           python -m unittest discover -s tests -p 'test_unified_output_contract.py' -v
+          python -m unittest discover -s tests -p 'test_mrsm_canonical_output_v4.py' -v
           python -m unittest discover -s tests -p 'test_history_run_output_contract.py' -v
           python -m unittest discover -s tests -p 'test_response_root_compatibility.py' -v
           python -m unittest discover -s tests -p 'test_case_review_canonical_output.py' -v

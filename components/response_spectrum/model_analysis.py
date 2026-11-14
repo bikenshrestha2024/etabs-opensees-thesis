@@ -56,8 +56,14 @@ def run_model_spectrum(folder,config,output_dir):
             output_dir=out/('Modal_'+axis),
             story_nodes=modal_response_nodes(data))
         modal.update(limit_state=state,model_sha256=model_signature,implementation_sha256=source_signature,modal_numeric_sha256=numeric_signature)
-        from components.inputs.project_workbooks import analysis_output_folder
-        cache=analysis_output_folder(folder,state)/('Modal_'+state+('' if __import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')=='AS_CONFIGURED' else '_'+__import__('os').environ['OPENSEES_GRAVITY_PROFILE']));cache.mkdir(parents=True,exist_ok=True)
+        # This modal reference belongs to this MRSM model/gravity state.
+        # Never populate legacy all-stage results with a hidden cache copy.
+        # Keep it with the originating MRSM solver outputs and case provenance.
+        from components.inputs.output_contract import safe_component
+        gravity_label=safe_component(
+            __import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
+        cache=out/'Modal_Reference'/state/gravity_label
+        cache.mkdir(parents=True,exist_ok=True)
         from OpenSees_Timing_V130 import StageTimer
         cache_timer=StageTimer(cache,'MRSM modal reference cache export')
         (cache/'NBC105_Modal_V111.json').write_text(json.dumps(modal,indent=2),encoding='utf-8')
@@ -188,6 +194,47 @@ def run_model_spectrum(folder,config,output_dir):
     export_reports(out)
     return results
 
+
+def validate_mrsm_case_output(output, *, state, expected_model_sha256=None):
+    """[REF docs/source/components/response_spectrum/model_analysis.py.md]
+    Verify exact, independently saved six-case MRSM output before solver-only
+    completion status. This verifies *file completeness*, not physical validity.
+    """
+    root=Path(output)
+    file=root/"MRSM_Results_V132.json"
+    if not file.is_file():
+        raise ValueError("MRSM solver returned without MRSM_Results_V132.json")
+    data=json.loads(file.read_text(encoding="utf-8-sig"))
+    expected={axis+suffix for axis in ("X","Y")
+              for suffix in ("_E0","_Eplus","_Eminus")}
+    if set(data)!=expected:
+        raise ValueError("Incomplete or unexpected MRSM cases: "
+                         +repr(sorted(expected-set(data)))+" missing, "
+                         +repr(sorted(set(data)-expected))+" unexpected")
+    hashes=set()
+    for key in sorted(expected):
+        result=data[key]
+        if result.get("limit_state")!=state:
+            raise ValueError("MRSM state mismatch: "+key)
+        if result.get("axis")!=key[0]:
+            raise ValueError("MRSM response direction mismatch: "+key)
+        if not isinstance(result.get("stories"),list) or not result["stories"]:
+            raise ValueError("MRSM case has no storey results: "+key)
+        digest=result.get("model_sha256")
+        if not isinstance(digest,str) or len(digest)!=64:
+            raise ValueError("MRSM model fingerprint missing: "+key)
+        hashes.add(digest)
+    if len(hashes)!=1:
+        raise ValueError("MRSM response cases refer to different assembled models")
+    if expected_model_sha256 is not None and next(iter(hashes))!=expected_model_sha256:
+        raise ValueError("Saved MRSM response is not the requested model SHA")
+    return {"status":"COMPLETE_SAVED_CASES_ONLY",
+            "case_count":6,"limit_state":state,
+            "model_sha256":next(iter(hashes)),
+            "file":str(file)}
+
+
+
 def mrsm_period_defaults(folder, values, state='ULS'):
     """Return NBC §5.1.3 adopted periods only with current-model Rayleigh+Aw.
 
@@ -289,7 +336,13 @@ def launch(parent,folder):
     fields['limit_state'].trace_add('write',refresh)
     ttk.Label(form,text=period_note,wraplength=1000).pack(anchor='w',pady=3)
     ttk.Label(form,text='Each state runs X and Y, with E0 / Eplus / Eminus cases (6 cases/state). E0 is centered; Eplus/Eminus are signed 5% perpendicular-breadth eccentric inertia cases. Soil selection requires site evidence. Acceleration conversion is internal for the kN-m-s model. Workbook / PNG / PDF are exported automatically.',wraplength=1000).pack(anchor='w',pady=6)
-    actions=ttk.Frame(form);actions.pack(fill='x');output=analysis_output_folder(folder,initial_state)
+    from components.inputs.output_layout import export_root_for
+    from components.inputs.output_contract import create_case_run,record_case_status,atomic_json
+    import hashlib
+    actions=ttk.Frame(form);actions.pack(fill='x')
+    output=export_root_for(folder)/"05_MRSM"
+    output.mkdir(parents=True,exist_ok=True)
+    latest_result={"folder":None,"run":None}
     operation_status=tk.StringVar(value="READY | No MRSM batch running")
     operation_label=ttk.Label(form,textvariable=operation_status,wraplength=1030,
                               foreground='#165879')
@@ -348,9 +401,22 @@ def launch(parent,folder):
                         if board.get("cancelled"):break
                         append('[STATE START] '+state+' | gravity/preload, eigenanalysis, modal RSA, CQC, force scaling, drift and export.\n')
                         operation('RUNNING',state+' | gravity and modal CQC stages underway')
-                        current=dict(cfg,limit_state=state,gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'));out=analysis_output_folder(folder,state)/('MRSM_'+state+('' if current['gravity_profile']=='AS_CONFIGURED' else '_'+current['gravity_profile']));out.mkdir(parents=True,exist_ok=True);path=out/'MRSM_Config_V132.json';path.write_text(json.dumps(current,indent=2),encoding='utf-8')
+                        current=dict(cfg,limit_state=state,gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
+                        data_file=Path(folder)/'OpenSees_Complete_Model_Data_V118.json'
+                        if not data_file.is_file():
+                            raise FileNotFoundError('MRSM source model data not found: '+str(data_file))
+                        model_hash=hashlib.sha256(data_file.read_bytes()).hexdigest()
+                        run_root=create_case_run(folder,'MRSM','MRSM_'+current['gravity_profile'],
+                                                 state=state,model_sha256=model_hash)
+                        latest_result['run']=run_root
+                        out=run_root/'02_RESULTS'
+                        latest_result['folder']=out
+                        record_case_status(run_root,'RUNNING')
+                        path=run_root/'00_INPUT_SOURCE'/'MRSM_Config_V132.json'
+                        atomic_json(path,current)
                         script="import sys,json;sys.path.insert(0,"+repr(str(root))+");from OpenSees_Model_Response_Spectrum_V132 import run_model_spectrum;run_model_spectrum("+repr(str(Path(folder).resolve()))+",json.load(open("+repr(str(path.resolve()))+",encoding='utf-8')),"+repr(str(out.resolve()))+")"
-                        with (out/'MRSM_Run_V132.log').open('w',encoding='utf-8') as stream:
+                        log_path=run_root/'01_LOGS'/'MRSM_Run_V132.log'
+                        with log_path.open('w',encoding='utf-8') as stream:
                             proc=subprocess.Popen([sys.executable,'-u','-c',script],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
                             board["process"]=proc
                             for line in proc.stdout:
@@ -368,9 +434,38 @@ def launch(parent,folder):
                                     if key in ledger.rows:ledger.set(key,'COMPLETED',line.strip())
                             rc=proc.wait();append(state+' EXIT '+str(rc)+'\n')
                             if rc:
+                                record_case_status(run_root,'FAILED',
+                                    message='MRSM child process exit '+str(rc)+'; inspect '+str(log_path))
                                 for key,row in ledger.rows.items():
                                     if key.startswith(state+' ') and row['status']!='COMPLETED':ledger.set(key,'FAILED','State child exit '+str(rc)+'; inspect log. Next state will run independently.')
-                except Exception as e:append('[FAILED] '+str(e)+'\n')
+                            else:
+                                try:
+                                    gate=validate_mrsm_case_output(out,state=state,
+                                                                 expected_model_sha256=model_hash)
+                                    atomic_json(run_root/'06_REVIEW'/'SAVED_CASE_COMPLETENESS.json',gate)
+                                    record_case_status(run_root,'COMPLETED_SOLVER_ONLY',
+                                        message='Six saved MRSM cases found; physical equivalence unverified')
+                                    # Only copy small derived display exports; numerical
+                                    # native solver files stay exactly where they were written.
+                                    import shutil
+                                    for suffix,section in (('.xlsx','03_EXCEL'),('.png','04_FIGURES'),
+                                                           ('.pdf','04_FIGURES')):
+                                        for artifact in out.glob('*'+suffix):
+                                            if artifact.stat().st_size<=25*1024*1024:
+                                                shutil.copy2(artifact,run_root/section/artifact.name)
+                                except (OSError,ValueError,KeyError) as exc:
+                                    record_case_status(run_root,'INCOMPLETE',message=str(exc))
+                                    append('[MRSM_SAVED_CASE_GATE_FAILED] '+str(exc)+'\n')
+                                    for key,row in ledger.rows.items():
+                                        if key.startswith(state+' '):
+                                            ledger.set(key,'FAILED',
+                                                'Saved case validation failed after child exit: '+str(exc))
+                except Exception as e:
+                    current_run=latest_result.get('run')
+                    if current_run is not None:
+                        try:record_case_status(current_run,'FAILED',message=str(e))
+                        except (OSError,ValueError):pass
+                    append('[FAILED] '+str(e)+'\n')
                 finally:
                     ledger.finish_pending("Batch interrupted or case completion was not reported; inspect state log")
                     # Automatically consolidate real MRSM output in a single
@@ -379,7 +474,9 @@ def launch(parent,folder):
                     operation('EXPORTING','Case execution ended; collecting auditable MRSM evidence ZIP')
                     try:
                         from components.validation.seismic_review_bundle import bundle_seismic_review
-                        target=analysis_output_folder(folder,states[-1])
+                        target=latest_result.get('folder')
+                        if target is None:
+                            raise ValueError('No MRSM output created')
                         package=bundle_seismic_review(folder,target,method="MRSM")
                         append("[MRSM_AUTO_REVIEW_ZIP] "+package["zip"]+"\\n")
                     except Exception as pack_exc:
@@ -397,7 +494,8 @@ def launch(parent,folder):
         def worker():
             try:
                 from components.validation.seismic_review_bundle import bundle_seismic_review
-                package=bundle_seismic_review(folder,output,method='MRSM')
+                selected=latest_result.get('folder') or output
+                package=bundle_seismic_review(folder,selected,method='MRSM')
                 append('[MRSM_REVIEW_ZIP] '+package['zip']+'\n')
                 operation('EXPORTED','MRSM review ZIP: '+package['zip'])
             except Exception as exc:
@@ -410,7 +508,7 @@ def launch(parent,folder):
         def worker():
             try:
                 from components.ui.organized_results import publish_organized_results
-                selected=analysis_output_folder(folder,fields['limit_state'].get())
+                selected=latest_result.get('folder') or output
                 result=publish_organized_results(selected)
                 append('[ORGANIZED_ALL_MODULE_ZIP] '+
                        result['zip_files']['ALL_MODULES']+'\\n')
@@ -423,12 +521,11 @@ def launch(parent,folder):
 
     # [REF components/ui/output_folder.py] shared output-folder action.
     from components.ui.output_folder import add_open_output_button
-    add_open_output_button(actions,lambda:str(output),window=win)
-    ttk.Button(actions,text='Saved SLS / ULS charts + Excel',command=lambda:__import__('OpenSees_MRSM_Reports_V134').launch(win,output)).pack(side='left',padx=4)
-    ttk.Button(actions,text='Deformation / node DOFs',command=lambda:__import__('OpenSees_Response_Checks_V132').launch_response_viewer(win,output)).pack(side='left')
+    add_open_output_button(actions,lambda:str(latest_result.get('run') or output),window=win)
+    ttk.Button(actions,text='Saved SLS / ULS charts + Excel',command=lambda:__import__('OpenSees_MRSM_Reports_V134').launch(win,latest_result.get('folder') or output)).pack(side='left',padx=4)
+    ttk.Button(actions,text='Deformation / node DOFs',command=lambda:__import__('OpenSees_Response_Checks_V132').launch_response_viewer(win,latest_result.get('folder') or output)).pack(side='left')
     ttk.Button(actions,text='Compare true ETABS modal/MRSM results',
         command=lambda:__import__('components.validation.etabs_comparison',
             fromlist=['launch']).launch(
-            win,folder,results_root=analysis_output_folder(
-                folder,fields['limit_state'].get()))).pack(side='left',padx=4)
+            win,folder,results_root=latest_result.get('folder') or output)).pack(side='left',padx=4)
     win._mrsm_fields=fields;win._mrsm_log=log;return win
