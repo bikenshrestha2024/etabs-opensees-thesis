@@ -257,6 +257,10 @@ on:
       - 'components/model/analysis_basis.py'
       - 'tests/test_20261114_review_missing_data_and_slab.py'
       - 'tests/test_output_layout.py'
+      - 'components/inputs/folder_audit.py'
+      - 'components/inputs/export_mirror.py'
+      - '22_AUDIT_EXPORT_FOLDERS.py'
+      - 'tests/test_folder_audit.py'
       - 'tests/test_esm_organized_export_gui.py'
       - 'components/equivalent_static/organized_exports.py'
       - '09_ORGANIZE_ETABS_EXPORT.py'
@@ -390,6 +394,7 @@ jobs:
           python tests/verify_gravity_evidence_workflow.py
           python tests/test_organized_results.py
           python -m unittest discover -s tests -p 'test_output_layout.py' -v
+          python -m unittest discover -s tests -p 'test_folder_audit.py' -v
           python -m unittest discover -s tests -p 'test_20261114_review_missing_data_and_slab.py' -v
           python -m unittest discover -s tests -p 'test_esm_organized_export_gui.py' -v
           python tests/verify_gravity_etabs_direct.py
