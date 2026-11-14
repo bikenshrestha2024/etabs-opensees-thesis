@@ -472,6 +472,76 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
     return tuple([out_json,out_csv,out_py]+[p for p in (out_png,out_xlsx) if p.is_file()])
 
 
+def verify_generated_esm_result(script_path, export_dir):
+    """[REF docs/source/components/equivalent_static/calculation_and_gui.py.md]
+    Verify saved result identity, finite story responses and reaction evidence.
+
+    A passed saved-artifact gate is NOT seismic eligibility, source model
+    equivalence, complete design review or NBC acceptance.
+    """
+    import hashlib
+    import re
+    runner=Path(script_path).expanduser().resolve(strict=True)
+    match=re.fullmatch(
+        r"OpenSees_NBC105_ESM_Load_And_Static_Analysis_(.+)_V111",
+        runner.stem)
+    if not match:
+        raise ValueError("Unrecognized generated ESM runner: "+runner.name)
+    case=match.group(1)
+    output=runner.parent
+    def required(name):
+        file=output/name
+        if not file.is_file() or file.stat().st_size==0:
+            raise ValueError("ESM saved evidence is missing/empty: "+name)
+        return file
+    meta_path=required("NBC105_ESM_OpenSees_Response_META_"+case+".json")
+    response_path=required("NBC105_ESM_OpenSees_Response_"+case+".json")
+    calculation_path=required("NBC105_ESM_Calculation_"+case+"_V111.json")
+    recorder=required("Response_Recorder_Index_"+case+".json")
+    support=required("NBC105_ESM_Support_Reactions_"+case+".csv")
+    model=Path(export_dir).expanduser().resolve(strict=True)/"OpenSees_Complete_Model_Data_V118.json"
+    if not model.is_file():
+        raise ValueError("ESM source model data missing: "+str(model))
+    with model.open("rb") as stream:
+        digest=hashlib.file_digest(stream,"sha256").hexdigest()
+    metadata=json.loads(meta_path.read_text(encoding="utf-8-sig"))
+    responses=json.loads(response_path.read_text(encoding="utf-8-sig"))
+    calculation=json.loads(calculation_path.read_text(encoding="utf-8-sig"))
+    index=json.loads(recorder.read_text(encoding="utf-8-sig"))
+    parts=case.split("_",2)
+    if len(parts)<3 or parts[0] not in ("ULS","SLS") or parts[1][:1] not in ("X","Y"):
+        raise ValueError("ESM saved response has invalid state/direction identifier")
+    state,axis=parts[0],parts[1][0]
+    if any((metadata.get("model_sha256")!=digest,
+            metadata.get("limit_state")!=state,
+            metadata.get("axis")!=axis,
+            metadata.get("response_case")!=case)):
+        raise ValueError("ESM response metadata differs from selected model/case/state")
+    if calculation.get("direction_case")!=case or calculation.get("limit_state")!=state:
+        raise ValueError("ESM calculated floor-force case mismatch")
+    stories=calculation.get("stories")
+    if (not isinstance(responses,list) or not responses
+            or not isinstance(stories,list) or len(responses)!=len(stories)):
+        raise ValueError("ESM saved story-response rows do not match calculated story weights")
+    if index.get("analysis")!="equivalent_static" or not index.get("files"):
+        raise ValueError("ESM response recorder index missing expected analysis/files")
+    with support.open(encoding="utf-8-sig",newline="") as stream:
+        supports=list(csv.DictReader(stream))
+    if not supports:
+        raise ValueError("ESM support reactions missing/empty")
+    for row in responses:
+        if row.get("response_case")!=case:
+            raise ValueError("ESM response case mismatch within story rows")
+        if not all(math.isfinite(float(row[k])) for k in (
+                 "height_m","U_elastic_m","U_design_m","design_drift_ratio")):
+            raise ValueError("ESM result has nonfinite height/displacement/drift")
+    return {"status":"COMPLETE_SAVED_RESPONSE_ONLY",
+            "case":case,"state":state,"axis":axis,"model_sha256":digest,
+            "stories":len(responses),"support_count":len(supports),
+            "engineering_acceptance":"NOT_VERIFIED"}
+
+
+
 class ESMGui:
     def __init__(self,root):
         self.root=root; root.title("NBC 105:2025 — Earthquake Analysis — Equivalent Static Method")
@@ -2017,6 +2087,16 @@ class ESMGui:
                                   else "TIMEOUT" if timed_out else
                                   "SUCCESS" if rc == 0 else "FAILED")
                         message = str(log_path)
+                        if status=="SUCCESS":
+                            try:
+                                evidence=verify_generated_esm_result(script,self.export_dir)
+                                from components.inputs.output_contract import atomic_json
+                                atomic_json(batch_folder/("SAVED_RESULT_"+script.stem+".json"),evidence)
+                            except (ValueError,OSError,KeyError,TypeError) as integrity_error:
+                                status="INCOMPLETE"
+                                message="Child exit 0 but saved evidence incomplete: "+str(integrity_error)
+                                with log_path.open("a",encoding="utf-8") as sink:
+                                    sink.write("\n[ESM_SAVED_EVIDENCE_INCOMPLETE] "+message+"\n")
                     except Exception as exc:
                         rc, status, message = -999, "FAILED", str(exc)
                     finally:
@@ -2024,7 +2104,7 @@ class ESMGui:
                     entry = {"case": script.name, "status": status,
                              "return_code": rc, "log": str(log_path),
                              "elapsed_s": round(time.monotonic() - started, 3),
-                             "error": message if status == "FAILED" else ""}
+                             "error": message if status in ("FAILED","INCOMPLETE") else ""}
                     outcomes.append(entry)
                     state_file.write_text(json.dumps(outcomes, indent=2), encoding="utf-8")
                     self.root.after(0, lambda i=index, n=len(scripts), e=entry:
