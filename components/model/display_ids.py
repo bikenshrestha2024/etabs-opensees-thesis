@@ -9,6 +9,7 @@ from collections import defaultdict
 PREFIXES = {
     "NODE": "N",
     "BEAM": "B",
+    "BRACE": "BR",
     "COLUMN": "C",
     "CONVENTIONAL OUTRIGGER": "CO",
     "BELT TRUSS": "BT",
