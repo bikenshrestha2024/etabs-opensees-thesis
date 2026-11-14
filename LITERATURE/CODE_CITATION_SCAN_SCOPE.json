@@ -1,10 +1,10 @@
 {
   "source": "LITERATURE/tools/audit_source_citations.py",
   "method": "git ls-files",
-  "files_scanned": 926,
+  "files_scanned": 928,
   "reference_occurrences_with_category_expansion": 2187,
   "distinct_reference_strings": 305,
-  "unmatched_doi_count": 40,
+  "unmatched_doi_count": 37,
   "errors": [],
   "limitations": "DOI and URL regex only; author-year references without DOI require human review. Archived/generated files excluded."
 }
