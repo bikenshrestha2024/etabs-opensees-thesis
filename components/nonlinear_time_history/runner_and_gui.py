@@ -760,8 +760,8 @@ class NonlinearTimeHistoryGUI:
         try:
             from OpenSees_Linear_Autofill_V124 import populate_linear
             if self._output_is_automatic:
-                from components.inputs.project_workbooks import analysis_output_folder
-                self.output.set(str(analysis_output_folder(path.resolve().parent,self.ls.get())))
+                from components.inputs.output_layout import export_root_for
+                self.output.set(str(export_root_for(path.resolve().parent)/"07_NONLINEAR_TIME_HISTORY"))
             result = populate_linear(self,path.resolve().parent)
             self.log.insert('end','[NLTHA PERIOD SOURCE] ' +
                             ' '.join(result.get('notes',[])) + '\n')
@@ -817,7 +817,7 @@ class NonlinearTimeHistoryGUI:
         ttk.Button(inputs,text="Prepare / inspect model-bound readiness checklist",command=lambda:__import__("OpenSees_Readiness_GUI_V134").launch(self.win,self.model.get(),self.readiness)).pack(anchor="w")
         ttk.Button(inputs,text="Run separate literature nonlinear demo (no building approval)",command=lambda:__import__("OpenSees_Literature_Demo_GUI_V137").launch(self.win)).pack(anchor="w")
         ttk.Button(inputs,text="Current building: exploratory nonlinear frames / elastic walls",command=lambda:__import__("OpenSees_Building_Exploratory_GUI_V138").launch(self.win,Path(self.model.get()).parent,self.output.get())).pack(anchor="w")
-        self._entry(inputs, "One-folder output directory", self.output, lambda: self._browse(self.output, "dir", "Select output folder"))
+        self._entry(inputs, "Auto stage output / custom override", self.output, lambda: self._browse(self.output, "dir", "Select output folder"))
         ttk.Button(inputs, text="Write CSV templates", command=self._templates).pack(anchor="e", pady=(5, 0))
         params = ttk.LabelFrame(root, text="2. NBC period, damping and time-step checks", padding=8); params.pack(fill="x", pady=8)
         trial_row=ttk.Frame(params);trial_row.pack(fill="x",pady=(0,4))
