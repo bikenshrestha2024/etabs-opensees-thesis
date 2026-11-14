@@ -91,6 +91,41 @@ def panel(parent):
  tick();return holder
 
 
+
+def history_batch_exit_gate(ledger, exit_code, *, cancelled=False):
+ """[REF docs/source/components/shared/case_status.py.md]
+ Return conservative history-run status from actual per-record completion.
+
+ A zero child exit cannot turn TRUNCATED, missing, failed, or queued motion
+ into a completed solver batch. COMPLETED means structured [OK] was observed
+ for every requested record/orientation, not engineering/design acceptance.
+ """
+ if cancelled:
+  return {"status":"INTERRUPTED","complete":False,
+          "reason":"Operator interrupted the history batch"}
+ if exit_code!=0:
+  return {"status":"FAILED","complete":False,
+          "reason":"History runner exited nonzero: "+str(exit_code)}
+ if ledger is None:
+  return {"status":"INCOMPLETE","complete":False,
+          "reason":"No per-record completion ledger available"}
+ rows=ledger.snapshot()
+ if not rows:
+  return {"status":"INCOMPLETE","complete":False,
+          "reason":"No configured record/orientation cases"}
+ unfinished=[str(row["case"])+":"+str(row["status"]) for row in rows
+             if row.get("status")!="COMPLETED"]
+ if unfinished:
+  return {"status":"INCOMPLETE","complete":False,
+          "reason":"Unfinished or truncated record/orientation cases: "
+                   +", ".join(unfinished[:20]),
+          "total_cases":len(rows),
+          "completed_cases":len(rows)-len(unfinished)}
+ return {"status":"COMPLETED_SOLVER_ONLY","complete":True,
+         "reason":"All configured record/orientations have structured [OK]; full physical duration and acceptance still require native review",
+         "total_cases":len(rows),"completed_cases":len(rows)}
+
+
 def modal_exit_status(cancelled, exit_code):
  """Map subprocess outcome to an honest modal case status.
 
