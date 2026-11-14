@@ -10,6 +10,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **Cross-stage operating procedure:** [KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK](../KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK/README.md) — canonical numbered launchers, source/mass/mesh/stiffness gates, repeatable evidence and ownership; [IS 16700 amendment tracker](../LITERATURE/Codes_Standards/IS16700_2023_AMENDMENT_TRACKER.md).
 
+**Current cross-module review (2026-11-14):** [Full folder layout, result-reader, stiffness, gravity, drift and nonlinear readiness audit](08_SOFTWARE_SECURITY/20261114_1709_FULL_CROSS_MODULE_REVIEW.md). P0 issues remain open; a folder audit pass is not native structural verification.
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|
