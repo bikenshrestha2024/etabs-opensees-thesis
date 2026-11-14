@@ -322,6 +322,7 @@ on:
       - 'components/validation/design_checks.py'
       - 'components/ui/application.py'
       - 'tests/test_nbc_settings_panel_v12.py'
+      - 'tests/test_v135_drift_source_completion_v13.py'
       - 'components/validation/saved_case_identity.py'
       - 'components/validation/case_review.py'
       - 'tests/test_saved_case_identity_v142.py'
@@ -439,6 +440,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_saved_case_identity_v142.py' -v
           python -m unittest discover -s tests -p 'test_legacy_reader_migration_v8.py' -v
           python -m unittest discover -s tests -p 'test_nbc_settings_panel_v12.py' -v
+          python -m unittest discover -s tests -p 'test_v135_drift_source_completion_v13.py' -v
           python -m unittest discover -s tests -p 'test_post_v8_missing_coverage_v9.py' -v
           python -m unittest discover -s tests -p 'test_history_run_output_contract.py' -v
           python -m unittest discover -s tests -p 'test_history_batch_completion_gate_v7.py' -v
