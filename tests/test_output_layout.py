@@ -3,7 +3,7 @@ import tempfile
 import json
 import unittest
 from pathlib import Path
-from components.inputs.output_layout import export_root_for, review_snapshots_for, STAGE_FOLDERS, write_stage_index
+from components.inputs.output_layout import export_root_for, review_snapshots_for, STAGE_FOLDERS, write_stage_index, canonical_gravity_run_root
 
 
 class OutputLayoutTests(unittest.TestCase):
@@ -29,6 +29,19 @@ class OutputLayoutTests(unittest.TestCase):
             self.assertEqual(review_snapshots_for(root, "ESM"),
                              root / "03_ESM" / "REVIEW_SNAPSHOTS")
             self.assertFalse(root.exists())
+
+    def test_new_gravity_write_uses_one_canonical_case_root(self):
+        with tempfile.TemporaryDirectory() as td:
+            export = Path(td) / "case 3"
+            old = export / "OpenSees_Analysis_Results" / "ULS_Third_Floor"
+            new = export / "02_GRAVITY" / "RUNS" / "ULS_Third_Floor"
+            self.assertEqual(canonical_gravity_run_root(old), new)
+            self.assertEqual(canonical_gravity_run_root(old / "Gravity_Reaction_Diagnostic" / "prior"), new)
+            self.assertEqual(canonical_gravity_run_root(new), new)
+            external = export / "my_custom_gravity"
+            self.assertEqual(canonical_gravity_run_root(external), external)
+            self.assertFalse(new.exists())
+            self.assertFalse(old.exists())
 
     def test_stage_index_preserves_private_inputs_and_does_not_infer_pass(self):
         with tempfile.TemporaryDirectory() as td:
