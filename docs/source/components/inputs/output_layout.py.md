@@ -13,3 +13,7 @@
 **Validation:** `python -m unittest tests.test_output_layout tests.test_esm_organized_export_gui tests.test_organized_results -v`. CI is software evidence only. On Windows verify an existing live `OpenSees_Analysis_Results/ULS_Model` maps to the correct parent for ESM and gravity, that old result readers keep working, and no private EDB/XLSX moves into a public Git repository.
 
 **Acceptance:** canonical review folder consistency is a presentation/traceability screen, not NBC 105:2025, ETABS/OpenSees or nonlinear structural acceptance.
+
+
+## Cross-stage index from existing export organizer
+The optional `write_stage_index(export_dir)` writes atomically to `01_ETABS_EXPORT/00_MANIFEST/analysis_stage_index.json`, recording the seven canonical stage names, whether each folder exists, number and relative path of saved review snapshots, latest pointer (where present), and whether the historical `OpenSees_Analysis_Results` tree exists. This is invoked by existing `09_ORGANIZE_ETABS_EXPORT.py` after creating its non-destructive audit mirror. It does not create missing stage directories or look inside EDB, Excel or solver files; `engineering_status` is always `NOT_ASSESSED_BY_FILE_INDEX`. A missing stage is not proof no run ever happened in a legacy location. A stage with a folder is not proof a model was solved. Source review: 2026-11-14 UI/folder evidence.
