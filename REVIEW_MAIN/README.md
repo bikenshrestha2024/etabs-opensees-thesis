@@ -26,6 +26,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **All-module uniform output inventory V6:** [Common run-manifest checks, seven-stage and auxiliary inventory, shared diagnostic Excel/JSON format and remaining native evidence gates](08_SOFTWARE_SECURITY/20261114_ALL_MODULE_OUTPUT_INVENTORY_V6.md).
 
+**Post-V6 missed-items audit and V7 correction:** [History completion gate, unresolved numerical/physical validation and canonical output checks](08_SOFTWARE_SECURITY/20261114_POST_V6_MISSED_ITEMS_V7.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|

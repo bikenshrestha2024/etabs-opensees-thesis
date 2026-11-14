@@ -799,20 +799,24 @@ class LinearTimeHistoryGUI:
                 code = proc.wait()
                 if ledger:ledger.finish_pending(
                     'Runner exited with code '+str(code)+' without a confirmed [OK] record-completion line.')
-                end_line = f"\n{'[SUCCESS]' if code == 0 else '[FAILED]'} Process exit code {code}. Persistent log: {log_path}\n"
+                from components.shared.case_status import history_batch_exit_gate
+                gate=history_batch_exit_gate(
+                    ledger,code,cancelled=bool(self.case_board.get("cancelled",False)))
+                end_line=(f"\n[{'SUCCESS' if gate['complete'] else gate['status']}] "
+                          f"Process exit code {code}; {gate['reason']}. "
+                          f"Persistent log: {log_path}\n")
                 logfile.write(end_line); logfile.flush()
             self._log_queue.put(end_line)
             if contract_root:
                 from components.inputs.output_contract import record_case_status
-                record_case_status(contract_root,"COMPLETED_SOLVER_ONLY" if code==0 else "FAILED",
-                                   message="Native transient runner exited with code "+str(code)+
-                                           "; full record duration and physics still require review")
+                record_case_status(contract_root,gate["status"],
+                                   message=gate["reason"])
                 # Downstream older history viewers expect the run log beside
                 # their native result files. Preserve this compatibility copy.
                 import shutil
                 if log_path.is_file() and log_path != result_folder/log_path.name:
                     shutil.copy2(log_path,result_folder/log_path.name)
-                if code==0:
+                if gate["complete"]:
                     # Keep original solver outputs in 02_RESULTS. Small Excel
                     # and figure copies are optional presentation aids only.
                     import shutil
@@ -821,7 +825,8 @@ class LinearTimeHistoryGUI:
                         for artifact in result_folder.glob("*"+suffix):
                             if artifact.stat().st_size <= 25*1024*1024:
                                 shutil.copy2(artifact,contract_root/destination/artifact.name)
-            if code==0:self.win.after(0,lambda:__import__("OpenSees_History_Results_V134").launch(self.win,result_folder))
+            if gate["complete"]:
+                self.win.after(0,lambda:__import__("OpenSees_History_Results_V134").launch(self.win,result_folder))
         except Exception as exc:
             root=getattr(self,"_run_contract_root",None)
             if root:

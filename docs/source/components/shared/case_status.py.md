@@ -26,3 +26,16 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 ### Modal worker exit states
 
 `modal_exit_status(cancelled, exit_code)` returns `CANCELLED` if the GUI stop flag was set, even when process termination yields a nonzero operating-system exit code; otherwise `FAILED` for nonzero or `COMPLETED` for zero. `CaseLedger.finish_pending` marks queued work `NOT COMPLETED`. Test `tests/verify_modal_cancel_status.py` is solver-free.
+
+
+## 2026-11-14 V7 batch completion gate
+
+`history_batch_exit_gate(ledger, exit_code, cancelled=False)` is the shared fail-closed LTHA/NLTHA GUI completion policy:
+
+- **COMPLETED_SOLVER_ONLY** requires a zero child-process return code AND a structured `[OK] <case>:` entry for **every** requested record/orientation in `Time_History_Case_Status_V151.json`.
+- **INCOMPLETE** is returned for missing/queued/in-progress/failed/truncated individual records even if Python exits 0.
+- **FAILED** is returned for nonzero natural process exits; **INTERRUPTED** for deliberate operator cancellation.
+- This only verifies structured solver-run accounting, **not full physical record duration, convergence at every accepted state, ETABS equivalence or NBC compliance**. Detailed output/time vectors, force transfer and end-of-record checks remain native evidence gates.
+- Both linear and nonlinear GUI wrappers now use this gate for their summary log, `CASE_MANIFEST.json` solver status, and whether to auto-open/combine the saved results. Original solver source/motions and existing runs are unchanged.
+
+CI regression: `tests/test_history_batch_completion_gate_v7.py`.
