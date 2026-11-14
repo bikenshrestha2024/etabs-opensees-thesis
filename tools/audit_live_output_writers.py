@@ -15,8 +15,15 @@ import ast
 import csv
 import hashlib
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Direct `python tools/...py` execution must resolve the repository packages,
+# including when invoked from another working directory on Windows.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 LEGACY_MARKERS = (
     "opensees_analysis_results", "06_linear_th", "07_nonlinear_th",
