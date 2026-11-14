@@ -192,6 +192,47 @@ def run_model_spectrum(folder,config,output_dir):
     export_reports(out)
     return results
 
+
+def validate_mrsm_case_output(output, *, state, expected_model_sha256=None):
+    """[REF docs/source/components/response_spectrum/model_analysis.py.md]
+    Verify exact, independently saved six-case MRSM output before solver-only
+    completion status. This verifies *file completeness*, not physical validity.
+    """
+    root=Path(output)
+    file=root/"MRSM_Results_V132.json"
+    if not file.is_file():
+        raise ValueError("MRSM solver returned without MRSM_Results_V132.json")
+    data=json.loads(file.read_text(encoding="utf-8-sig"))
+    expected={axis+suffix for axis in ("X","Y")
+              for suffix in ("_E0","_Eplus","_Eminus")}
+    if set(data)!=expected:
+        raise ValueError("Incomplete or unexpected MRSM cases: "
+                         +repr(sorted(expected-set(data)))+" missing, "
+                         +repr(sorted(set(data)-expected))+" unexpected")
+    hashes=set()
+    for key in sorted(expected):
+        result=data[key]
+        if result.get("limit_state")!=state:
+            raise ValueError("MRSM state mismatch: "+key)
+        if result.get("axis")!=key[0]:
+            raise ValueError("MRSM response direction mismatch: "+key)
+        if not isinstance(result.get("stories"),list) or not result["stories"]:
+            raise ValueError("MRSM case has no storey results: "+key)
+        digest=result.get("model_sha256")
+        if not isinstance(digest,str) or len(digest)!=64:
+            raise ValueError("MRSM model fingerprint missing: "+key)
+        hashes.add(digest)
+    if len(hashes)!=1:
+        raise ValueError("MRSM response cases refer to different assembled models")
+    if expected_model_sha256 is not None and next(iter(hashes))!=expected_model_sha256:
+        raise ValueError("Saved MRSM response is not the requested model SHA")
+    return {"status":"COMPLETE_SAVED_CASES_ONLY",
+            "case_count":6,"limit_state":state,
+            "model_sha256":next(iter(hashes)),
+            "file":str(file)}
+
+
+
 def mrsm_period_defaults(folder, values, state='ULS'):
     """Return NBC §5.1.3 adopted periods only with current-model Rayleigh+Aw.
 
