@@ -33,6 +33,7 @@ class LegacyReaderMigrationTests(unittest.TestCase):
             values=[x.get("value") for x in found["checks"] if x.get("value") is not None]
             self.assertEqual(values,[0.73])
             self.assertEqual(found["overall"],"IRREGULAR")
+            self.assertIn(["ULS","X"],found["stiffness_import_coverage"])
 
     def test_modal_source_must_match_state_and_sha(self):
         with tempfile.TemporaryDirectory() as td:
