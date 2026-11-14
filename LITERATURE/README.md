@@ -62,3 +62,18 @@ The uploaded papers remain in a **private chat ZIP**, not the public repository.
 The GitHub Actions scanner completed an active-text scan of **844 tracked source files**, discovered **285 distinct DOI/URL strings** and generated **2,092 category-expanded source locations** without read errors. The original resulting list contained **44 unregistered DOI strings**; a subsequent six-source publisher-verification pass matched several of those, and later scan output is authoritative for remaining count. This is an **inventory**, not a complete bibliometric verification: plain author-year mentions are not captured unless accompanied by DOI/URL.
 
 [Open GitHub Actions execution evidence](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/workflows/literature-citation-audit.yml).
+
+## November 14, 2026 — 19 PDF intake and modal source audit
+
+- [Original uploaded PDF inventory](UPLOAD_INVENTORY_20261114.md) — **19 filenames / 14 bibliographic works**, verified opening pages, publisher/DOI links, duplicate candidates and license/access restrictions; exact SHA256 not yet computed in GitHub.
+- [PDF-to-engineering-gate crosswalk](UPLOADED_PDF_TO_ENGINEERING_GATES_20261114.md) — each new reference mapped to support reactions, ShellMITC4 load path, outrigger pinned joints, RC wall NLTHA, reproducibility and current 40-mode ULS audit.
+- [Private offline PDF SHA256 audit](tools/audit_private_pdf_uploads.py) — hash original files **locally** without moving, deleting or publishing them. This is independent of the existing 36-work bibliography; merge bibliographic identities with existing master index carefully, not by generating duplicate works with conflicting IDs.
+- [ULS modal screenshot-based review](../REVIEW_MAIN/04_MODAL/20261114_ULS_40_MODE_MODAL_LITERATURE_REVIEW.md) — 40 modes, UX 91.245%, UY 90.775%, Rayleigh X/Y period fields and verification still needed.
+
+**Private local audit command** (run from the repository root after copying original PDFs into a private directory):
+
+```powershell
+python LITERATURE/tools/audit_private_pdf_uploads.py "D:\\Thesis\\PRIVATE_LITERATURE_PDFS" --output "D:\\Thesis\\PRIVATE_LITERATURE_AUDIT\\pdf_sha256_manifest.json"
+```
+
+The private hash JSON must not be committed to public GitHub. File equality is established by identical SHA256 values; publication identity by title/DOI, potentially with different editions or bytes. The current intake's repeated titles are duplicate **candidates**, not proven byte-for-byte duplicates. For each public reference record, DOI and landing page can be committed; a PDF download or user-upload alone never implies public redistribution rights.
