@@ -400,7 +400,6 @@
   "components/validation/response_checks.py::launch_irregularity_legacy",
   "components/validation/response_checks.py::launch_response_viewer",
   "components/validation/response_checks.py::write_csv",
-  "components/validation/response_inventory.py::available_response_rows",
   "components/validation/response_inventory.py::read",
   "components/validation/result_interpretation.py::get_element_force_record",
   "components/validation/result_interpretation.py::normalized_mode_shape",

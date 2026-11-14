@@ -18,7 +18,10 @@ class TestCaseReviewAndSlabBasis(unittest.TestCase):
 
     def test_source_and_no_data_policy(self):
         s=(ROOT/'components/validation/case_review.py').read_text(encoding='utf-8')
-        for item in ('export_root_for','03_ESM','05_MRSM',
+        from components.inputs.output_layout import STAGE_FOLDERS
+        self.assertEqual(STAGE_FOLDERS['ESM'],'03_ESM')
+        self.assertEqual(STAGE_FOLDERS['MRSM'],'05_MRSM')
+        for item in ('export_root_for','result_roots',
                      'NO_SAVED_SEISMIC_DRIFT','NO_SAVED_LATERAL_DEFLECTION',
                      'Searched result paths','NOT ZERO DRIFT'):
             self.assertIn(item,s)

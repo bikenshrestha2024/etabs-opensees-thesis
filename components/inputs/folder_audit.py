@@ -137,7 +137,7 @@ def write_folder_audit(export_dir, *, verify_copies=True):
         "# ETABS → OpenSees export folder audit",
         "", "Status: **File structure only — not structural validation**",
         "", "## Source and compatibility",
-        f"- Export root: \`{root}\`",
+        f"- Export root: `{root}`",
         f"- Flat root files: {len(report['files_in_export_root'])}",
         f"- Missing categorized copies: {len(report['missing_categorized_copies'])}",
         f"- Mirror hash conflicts: {len(report['conflicting_categorized_copies'])}",

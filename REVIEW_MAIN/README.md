@@ -12,6 +12,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **Current cross-module review (2026-11-14):** [Full folder layout, result-reader, stiffness, gravity, drift and nonlinear readiness audit](08_SOFTWARE_SECURITY/20261114_1709_FULL_CROSS_MODULE_REVIEW.md). P0 issues remain open; a folder audit pass is not native structural verification.
 
+**Uniform output contract implementation (2026-11-14):** [Shared canonical stage names, derived Excel/JSON/CSV style, reader compatibility and migration gates](08_SOFTWARE_SECURITY/20261114_UNIFIED_OUTPUT_CONTRACT_IMPLEMENTATION.md). Native Windows ETABS/OpenSees validation remains open.
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|

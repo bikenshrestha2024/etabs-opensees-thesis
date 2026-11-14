@@ -253,6 +253,13 @@ on:
       - 'tests/test_linear_th_directional_autofill.py'
       - 'tests/test_organized_results.py'
       - 'components/inputs/output_layout.py'
+      - 'components/inputs/output_contract.py'
+      - 'components/inputs/project_output_layout.py'
+      - 'components/validation/response_inventory.py'
+      - 'tests/test_unified_output_contract.py'
+      - 'tests/test_response_root_compatibility.py'
+      - 'tests/test_case_review_canonical_output.py'
+      - 'docs/source/components/inputs/output_contract.py.md'
       - 'components/validation/case_review.py'
       - 'components/model/analysis_basis.py'
       - 'tests/test_20261114_review_missing_data_and_slab.py'
@@ -395,6 +402,9 @@ jobs:
           python tests/verify_gravity_evidence_workflow.py
           python tests/test_organized_results.py
           python -m unittest discover -s tests -p 'test_output_layout.py' -v
+          python -m unittest discover -s tests -p 'test_unified_output_contract.py' -v
+          python -m unittest discover -s tests -p 'test_response_root_compatibility.py' -v
+          python -m unittest discover -s tests -p 'test_case_review_canonical_output.py' -v
           python -m unittest discover -s tests -p 'test_folder_audit.py' -v
           python -m unittest discover -s tests -p 'test_20261114_review_missing_data_and_slab.py' -v
           python -m unittest discover -s tests -p 'test_esm_organized_export_gui.py' -v

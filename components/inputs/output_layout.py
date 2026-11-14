@@ -23,6 +23,20 @@ STAGE_FOLDERS = {
     "LTHA": "06_LINEAR_TIME_HISTORY",
     "NLTHA": "07_NONLINEAR_TIME_HISTORY",
 }
+# Auxiliary directories are first-class destinations, but they are not
+# analysis stages; keep their existing names without renaming archived runs.
+AUXILIARY_FOLDERS = {
+    "MODEL": "02_MODEL",
+    "ETABS_COMPARISONS": "08_ETABS_COMPARISONS",
+    "SOFTWARE_DIAGNOSTICS": "09_SOFTWARE_DIAGNOSTICS",
+    "UPLOAD_PACKAGES": "90_UPLOAD_PACKAGES",
+}
+# Legacy path names are readable aliases; never create them as new canonical stages.
+LEGACY_STAGE_ALIASES = {
+    "06_LINEAR_TH": "LTHA",
+    "07_NONLINEAR_TH": "NLTHA",
+}
+ALL_STAGE_FOLDERS = {**STAGE_FOLDERS, **AUXILIARY_FOLDERS}
 _LEGACY_ROOT = "opensees_analysis_results"
 
 
@@ -40,10 +54,68 @@ def export_root_for(source_path):
             return location.parent
     for location in chain:
         if location.name.casefold() in {
-            value.casefold() for value in STAGE_FOLDERS.values()
+            value.casefold() for value in (*ALL_STAGE_FOLDERS.values(), *LEGACY_STAGE_ALIASES)
         }:
             return location.parent
     return source
+
+
+
+def canonical_stage_folder(stage):
+    """[REF docs/source/components/inputs/output_layout.py.md]
+    Resolve canonical key/name or supported legacy alias without creating dirs.
+    """
+    key = str(stage).strip().upper()
+    if key in ALL_STAGE_FOLDERS:
+        return ALL_STAGE_FOLDERS[key]
+    if key in LEGACY_STAGE_ALIASES:
+        return STAGE_FOLDERS[LEGACY_STAGE_ALIASES[key]]
+    for value in ALL_STAGE_FOLDERS.values():
+        if value.casefold() == key.casefold():
+            return value
+    raise ValueError("Unknown canonical output stage: " + str(stage))
+
+
+def result_roots(source_path, *, stages=None, include_legacy=True):
+    """[REF docs/source/components/inputs/output_layout.py.md]
+    Read-only, de-duplicated roots for native result discovery.
+
+    Only actual directories are returned. Never synthesize a result or mix
+    case content with unrelated source EDBs; callers must validate identities.
+    """
+    source = Path(source_path).expanduser().resolve()
+    root = export_root_for(source)
+    keys = tuple(stages) if stages is not None else (
+        "GRAVITY", "ESM", "MODAL", "MRSM", "LTHA", "NLTHA")
+    candidates = []
+    if include_legacy:
+        candidates.append(root / "OpenSees_Analysis_Results")
+    for key in keys:
+        canonical = root / canonical_stage_folder(key)
+        candidates.append(canonical)
+        if str(key).upper() == "LTHA":
+            candidates.append(root / "06_LINEAR_TH")
+        elif str(key).upper() == "NLTHA":
+            candidates.append(root / "07_NONLINEAR_TH")
+    # A specific user-selected case that is outside the above trees is valid,
+    # but don't re-scan it when its parent is already in the roots.
+    if source != root and source.is_dir():
+        candidates.append(source)
+    found = []
+    seen = set()
+    for candidate in candidates:
+        if not candidate.is_dir() or candidate.is_symlink():
+            continue
+        resolved = candidate.resolve()
+        if any(parent in seen for parent in resolved.parents):
+            continue
+        # Discard an already selected child when a parent is added later.
+        found = [p for p in found if resolved not in p.parents]
+        seen = {p for p in seen if resolved not in p.parents}
+        if resolved not in seen:
+            found.append(resolved)
+            seen.add(resolved)
+    return tuple(found)
 
 
 def review_snapshots_for(source_path, stage):

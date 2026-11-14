@@ -4,21 +4,12 @@ import json,csv,os
 
 def collect(folder):
     from OpenSees_Design_Checks_V135 import scan_drift,combinations
+    from components.inputs.output_layout import export_root_for, result_roots
     folder=Path(folder)
-    # A case-local V142 launcher may be passed the export folder, the legacy
-    # OpenSees_Analysis_Results folder, or a single ULS/SLS case directory.
-    # Resolve actual sources; do not invent responses from force ledgers.
-    from components.inputs.output_layout import export_root_for
     export_root=export_root_for(folder)
-    legacy=export_root/'OpenSees_Analysis_Results'
-    roots=[legacy] if legacy.is_dir() else []
-    if folder.is_dir() and folder!=legacy and folder!=export_root:
-        roots.append(folder)
-    for stage in ('03_ESM','04_MODAL','05_MRSM','06_LINEAR_TIME_HISTORY',
-                  '07_NONLINEAR_TIME_HISTORY'):
-        stage_path=export_root/stage
-        if stage_path.is_dir() and stage_path not in roots:
-            roots.append(stage_path)
+    # Source-compatible reader: both canonical and archived result roots.
+    # The helper avoids scanning a selected case twice through its parent.
+    roots=result_roots(folder, stages=("ESM", "MRSM", "LTHA", "NLTHA"))
     rows=[];issues=[]
     for root in roots:
         new_rows,new_issues=scan_drift(root)
@@ -27,6 +18,16 @@ def collect(folder):
         issues.append(dict(status='MISSING_RESULTS_ROOT',
                            reason='Neither legacy nor canonical analysis stage outputs were found; run compatible seismic analysis first.',
                            file=str(export_root)))
+    # All compatible source files are read; duplicate path/row identities from
+    # overlapping aliases must never become extra plotted response values.
+    distinct=set()
+    unique=[]
+    for row in rows:
+        key=tuple((k,json.dumps(v,sort_keys=True,default=str)) for k,v in sorted(row.items()))
+        if key not in distinct:
+            unique.append(row)
+            distinct.add(key)
+    rows=unique
     profiles=[]
     for path in folder.rglob('Gravity_Profile_*_V142.json'):
         item=json.loads(path.read_text(encoding='utf-8-sig'));profiles.append(dict(file=str(path),limit_state=item.get('limit_state'),**item.get('gravity_context',{})))
@@ -53,6 +54,16 @@ def collect(folder):
     for case in combinations(nonparallel=True):
         for method in ('ESM','MRSM','LTH'):
             coverage.append(dict(case=case['case'],limit_state=case['limit_state'],method=method,factors=json.dumps(case['factors']),status='REQUIRES CASE-SPECIFIC RESULT / IDENTITY REVIEW',note='Existing similar state/direction files do not prove this full combination was solved; CQC envelopes cannot be treated as concurrent signed actions.'))
+    distinct_deflections={}
+    for item in deflections:
+        key=(item.get('file'),item.get('case'),item.get('storey'),
+             item.get('axis'),item.get('displacement_m'))
+        distinct_deflections.setdefault(key,item)
+    deflections=list(distinct_deflections.values())
+    # Search results may reference different model configurations. A scan is
+    # not authority to blend them into a validated ULS/SLS design envelope.
+    issues.append(dict(status='SOURCE_IDENTITIES_REQUIRE_REVIEW',
+                       reason='Result locations alone do not verify model SHA, loading, support case or ULS/SLS compatibility. Do not combine unlike source cases.'))
     # The V142 chart must never silently represent absent data as a zero drift.
     # A gravity-only run legitimately has no seismic interstorey drift.
     if not rows:
@@ -70,7 +81,13 @@ def collect(folder):
 
 def export(folder):
     from openpyxl import Workbook
-    folder=Path(folder);result=collect(folder);out=folder/'OpenSees_Analysis_Results/Case_Review_V142';out.mkdir(parents=True,exist_ok=True)
+    from components.inputs.output_layout import export_root_for
+    folder=Path(folder)
+    result=collect(folder)
+    # Derived review, not a source model or a seismic solver case. Publish in
+    # one diagnostics module regardless of whether launched from export or case.
+    out=export_root_for(folder)/'09_SOFTWARE_DIAGNOSTICS'/'CASE_REVIEW_V142'
+    out.mkdir(parents=True,exist_ok=True)
     wb=Workbook();wb.remove(wb.active)
     for key,title in [('drift','Saved drift'),('deflection','Saved deflection'),('preload_profiles','PDelta preload provenance'),('combination_coverage','Combination coverage'),('issues','Read errors')]:
         ws=wb.create_sheet(title);items=result[key]
@@ -83,7 +100,9 @@ def export(folder):
     note=wb.create_sheet('Read first');note.append(['Missing combination results are not PASS. Profiles select gravity preloads for future fresh model runs, with original seismic mass retained.'])
     note.append(['AS_CONFIGURED = source configured preload; GRAVITY_1.0D_1.0L = 100% dead + 100% live comparison; GRAVITY_1.2D_1.5L; UPLIFT_0.9D. Snow/liquid/earth/wind/vertical earthquake applicability still requires project action data.'])
     note.append(['Linear time history is a linear transient model about a selected preloaded state. It is not a full nonlinear PDelta time-history solution. Positive CQC component envelopes are not concurrent deformed shapes.'])
-    wb.save(out/'All_Case_Review_V142.xlsx');(out/'All_Case_Review_V142.json').write_text(json.dumps(result,indent=2),encoding='utf-8');return result,out
+    from components.inputs.output_contract import style_workbook, atomic_json
+    style_workbook(wb)
+    wb.save(out/'All_Case_Review_V142.xlsx');atomic_json(out/'All_Case_Review_V142.json',result);return result,out
 
 
 def launch(parent,folder):
@@ -116,10 +135,11 @@ def launch(parent,folder):
                     if valid:axes[1,col].plot([abs(r['displacement_m'])*1000 for r in valid],[float(r['storey']) for r in valid],label=case)
                 axes[1,col].set(title=state+' saved deflection (case envelope)',xlabel='Absolute displacement (mm)',ylabel='Storey / elevation (see source workbook)')
             for ax in axes.flat:ax.grid(alpha=.25)
-            embed_figures(body,[('ULS / SLS saved responses',fig)]);fig.savefig(out/'Drift_Deflection_Comparison_V142.png',dpi=150)
+            embed_figures(body,[('ULS / SLS saved responses',fig)])
             if not result['drift'] and not result['deflection']:
                 fig.suptitle('NO SAVED SEISMIC RESPONSE — NOT ZERO DRIFT; CHECK CASE RESULTS AND IDENTITY',
                              color='#a13c23',fontsize=11)
+            fig.savefig(out/'Drift_Deflection_Comparison_V142.png',dpi=150)
             text.set(str(len(result['drift']))+' saved drift rows; '+str(len(result['deflection']))+
                      ' saved deflection rows. '+('NO VERIFIED RESPONSE: open Read errors worksheet and check analysis source paths. ' if not result['drift'] and not result['deflection'] else '')+
                      'Full combination coverage remains subject to explicit case/identity verification. Workbook: '+str(out/'All_Case_Review_V142.xlsx'))
