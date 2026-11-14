@@ -69,7 +69,7 @@ def audit(folder):
              status=slab_state,
              basis=(f"Adopted IS 16700:2023 Table 5 conventional beam-supported slab EI ULS {uls:g} and SLS {sls:g}. "
                     f"ULS: {uls_state}; SLS: {sls_state}. "
-                    "Source: "+str(config.get("slab_stiffness_source") or "NOT RECORDED")
+                    "Source: "+str(config.get("slab_stiffness_source") or "No source recorded")
                     +". NBC Table 3-1 flat-slab 0.25/0.50 is a different type; actual native section and physical mass remain unverified.")),
         dict(item="RC frame effective EI",
              value="Beam 0.35/0.70; column 0.70/0.90 (ULS/SLS)",
