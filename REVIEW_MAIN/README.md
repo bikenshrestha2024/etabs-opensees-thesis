@@ -34,6 +34,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **MRSM nonfinite-response evidence correction V10:** [Reject NaN/missing design drift or nonhexadecimal model identity before six-case solver completion](04_MRSM/20261114_NONFINITE_SAVED_RESULT_GATE_V10.md).
 
+**V11 numerical response/model manifest conflict:** [Exclude saved responses whose embedded source SHA disagrees with the run manifest](08_SOFTWARE_SECURITY/20261114_SOURCE_MANIFEST_VS_NUMERICAL_RESULT_V11.md).
+
 ## Case index
 | Analysis | Folder | Critical checks |
 |---|---|---|

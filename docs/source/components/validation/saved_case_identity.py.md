@@ -19,3 +19,10 @@
 - Native Windows GUI and source-only acceptance tests remain necessary. Source code tests use synthetic JSON, not physical ETABS evidence.
 
 **No original ETABS `.EDB`, source Excel, or saved solver result file is altered by this reader.**
+
+
+## 2026-11-14 independent result-payload / manifest conflict gate V11
+
+`source_model_hash_evidence(path, case)` separately extracts the run's `00_INPUT_SOURCE/CASE_MANIFEST.json` SHA256 and the recorded MRSM/Deformation result SHA256 (or ESM drift META SHA256). If two valid hashes disagree, the saved response is **excluded** from V142 plots and reported as `SOURCE_MANIFEST_RESULT_SHA_CONFLICT_EXCLUDED`, even when the manifest alone matches the currently selected model. `recorded_result_model_sha` returns `None` for such conflicting evidence. When only one valid source exists, it remains an identifiable but **not structurally certified** source; source identity does not establish ETABS equivalence.
+
+Regression: `tests/test_saved_case_identity_v142.py` includes mismatched manifest/payload hashes and a subsequent matching response case. No original EDB, serialized model or response is edited.

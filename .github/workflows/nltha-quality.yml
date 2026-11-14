@@ -318,6 +318,9 @@ on:
       - 'docs/source/components/nonlinear_time_history/one_storey_wall_probe.py.md'
   pull_request:
     paths:
+      - 'components/validation/saved_case_identity.py'
+      - 'components/validation/case_review.py'
+      - 'tests/test_saved_case_identity_v142.py'
       # Gravity evidence and cross-solver foundation reaction changes must
       # pass the same broad Python quality checks BEFORE merging, not just
       # after landing on main.
