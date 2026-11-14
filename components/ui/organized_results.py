@@ -16,7 +16,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-MODULES = ("Gravity", "ESM", "Modal", "MRSM", "LinearTH", "NonlinearTH", "Comparisons", "Unclassified")
+MODULES = ("Model", "Gravity", "ESM", "Modal", "MRSM", "LinearTH", "NonlinearTH", "Comparisons", "Unclassified")
 SKIP_DIRS = {
     "Organized_Results", "REVIEW_SNAPSHOTS", "Seismic_Review_Packages", "Gravity_Evidence_Upload",
     "__pycache__", ".git", ".pytest_cache",
@@ -24,6 +24,7 @@ SKIP_DIRS = {
 SKIP_EXT = {".edb", ".bak", ".lock", ".tmp", ".pyc"}
 SKIP_SUFFIXES = (".processing.json", ".processing.log", ".tmp")
 METHOD_MARKERS = {
+    "Model": ("mesh_04", "mesh_08", "mesh_16", "element_connectivity", "model_config"),
     "Gravity": ("gravity", "joint_weight", "load_path", "support_reaction",
                 "slab_self_weight", "clear_beam", "foundation_reaction"),
     "ESM": ("esm", "equivalent_static", "nbc105", "rayleigh_preliminary",
@@ -53,6 +54,8 @@ def classify(path, relative=None):
     name = p.name.casefold()
     # First classify explicit full stage names, never guess an NLTHA result
     # from the shorter "ltha" substring. Historical aliases remain readable.
+    if "02_model" in parts:
+        return "Model"
     if any(x in ("07_nonlinear_time_history", "07_nonlinear_th") for x in parts):
         return "NonlinearTH"
     if any(x in ("06_linear_time_history", "06_linear_th") for x in parts):
@@ -75,7 +78,7 @@ def classify(path, relative=None):
     # Comparison needs priority for explicitly labelled evidence files.
     if any(x in name for x in METHOD_MARKERS["Comparisons"]):
         return "Comparisons"
-    for module in ("NonlinearTH", "LinearTH", "MRSM", "Modal", "Gravity", "ESM"):
+    for module in ("NonlinearTH", "LinearTH", "MRSM", "Modal", "Gravity", "ESM", "Model"):
         if any(x in name for x in METHOD_MARKERS[module]):
             return module
     return "Unclassified"
@@ -181,7 +184,7 @@ def publish_organized_results(results_root, *, gravity_root=None,
     readme = destination / "README_FIRST.txt"
     readme.write_text(
         "THESIS ANALYSIS OUTPUT SNAPSHOT\n"
-        "Folders: Gravity, ESM, Modal, MRSM, LinearTH, NonlinearTH, Comparisons, Unclassified.\n"
+        "Folders: Model, Gravity, ESM, Modal, MRSM, LinearTH, NonlinearTH, Comparisons, Unclassified.\n"
         "Original solver output files are UNCHANGED. These are verified copies.\n"
         "Cases are grouped by original relative path; no cross-source equivalence is inferred.\n"
         "Missing SLS/native ETABS output stays missing, not zero.\n"
