@@ -165,7 +165,9 @@ def discover_design_drift(folder):
 
 
 def run(folder,storage=False,nonparallel=False):
-    start=time.perf_counter();started=datetime.datetime.now().astimezone().isoformat();folder=Path(folder)
+    from components.inputs.output_layout import export_root_for
+    start=time.perf_counter();started=datetime.datetime.now().astimezone().isoformat()
+    folder=export_root_for(folder)
     model=folder/'OpenSees_Complete_Model_Data_V118.json'
     if not model.is_file():raise ValueError('Select export folder containing OpenSees_Complete_Model_Data_V118.json')
     digest=hashlib.sha256(model.read_bytes()).hexdigest();data=json.loads(model.read_text(encoding='utf-8-sig'))
@@ -257,7 +259,9 @@ def launch(parent,folder):
     path=tk.StringVar(value=str(folder));storage=tk.BooleanVar();np=tk.BooleanVar();summary=tk.StringVar(value='A section passes only after its governing strength, stability and detailing checks are completed. Drift PASS is separate.')
     ttk.Entry(win,textvariable=path).pack(fill='x',padx=8,pady=5)
     bar=ttk.Frame(win);bar.pack(fill='x');ttk.Checkbutton(bar,text='Storage occupancy (lambda 0.6; otherwise 0.3)',variable=storage).pack(side='left');ttk.Checkbutton(bar,text='Nonparallel lateral systems (100% + 30%)',variable=np).pack(side='left')
-    ttk.Label(win,textvariable=summary,wraplength=1200).pack(fill='x',padx=8,pady=8)
+    ttk.Label(win,textvariable=summary,wraplength=1200).pack(fill='x',padx=8,pady=4)
+    active_path=tk.StringVar(value='Runtime: '+str(Path(__file__).resolve()))
+    ttk.Label(win,textvariable=active_path,wraplength=1150,foreground='#82501c').pack(fill='x',padx=8)
     book=ttk.Notebook(win);book.pack(fill='both',expand=True);state={'output':None}
     def refresh():
         try:
@@ -270,9 +274,22 @@ def launch(parent,folder):
                 tree.grid(row=0,column=0,sticky='nsew');ys.grid(row=0,column=1,sticky='ns');xs.grid(row=1,column=0,sticky='ew');frame.rowconfigure(0,weight=1);frame.columnconfigure(0,weight=1)
                 for f in fields:tree.heading(f,text=f);tree.column(f,width=180,stretch=False)
                 for r in rows:tree.insert('', 'end',values=[r.get(f,'') for f in fields])
-            summary.set(f"{report['overall']} | {len(report['tables']['Seismic drift'])} saved drift checks | {len(report['tables']['Section checks'])} section/action review rows | elapsed {report['elapsed_s']:.2f} s | Model SHA: {report['model_sha256'][:16]}")
+            from components.ui.nbc105_settings_panel import design_check_output_diagnostic
+            location=design_check_output_diagnostic(path.get())
+            active_path.set("Running module: "+str(Path(__file__).resolve())
+                            +" | NEW output: "+str(output)
+                            +" | legacy audit: "+location["status"])
+            summary.set(f"{report['overall']} | {len(report['tables']['Seismic drift'])} saved drift checks | {len(report['tables']['Section checks'])} section/action review rows | elapsed {report['elapsed_s']:.2f} s | Model SHA: {report['model_sha256'][:16]}. New reports are in 09_SOFTWARE_DIAGNOSTICS, NOT the legacy results folder.")
         except Exception as e:messagebox.showerror('Check inputs',str(e),parent=win)
     def open_output():
-        if state['output']:os.startfile(str(state['output']))
+        from components.inputs.output_layout import export_root_for
+        target=state['output'] or design_check_locations(export_root_for(path.get()))[0]
+        if not Path(target).is_dir():
+            messagebox.showwarning('No new V135 report','Run Refresh checks first to generate a current V135 report in 09_SOFTWARE_DIAGNOSTICS.',parent=win)
+            return
+        try:
+            os.startfile(str(target))
+        except (OSError,AttributeError) as exc:
+            messagebox.showerror('Cannot open V135 output',str(exc)+'\nFolder: '+str(target),parent=win)
     ttk.Button(bar,text='Refresh checks + export Excel',command=refresh).pack(side='left',padx=8);ttk.Button(bar,text='Open report / input templates',command=open_output).pack(side='left')
     win.after(100,refresh);return win
