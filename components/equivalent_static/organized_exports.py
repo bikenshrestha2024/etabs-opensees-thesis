@@ -193,11 +193,31 @@ def _latest_batch_status(root):
         for item in records:
             if not isinstance(item, dict) or not isinstance(item.get("case"), str):
                 raise ValueError("CASE_STATUS contains invalid case row")
-        success = sum(item.get("status") == "SUCCESS" and item.get("return_code") == 0 for item in records)
-        expected = len(list(root.glob("OpenSees_NBC105_ESM_Load_And_Static_Analysis_*.py")))
-        state = "COMPLETE_SOLVER_ONLY" if expected and len(records) >= expected and success == expected else "PARTIAL_OR_FAILED"
-        return {"status": state, "completed": success, "record_count": len(records),
-                "expected_scripts": expected, "records": records, "status_file": str(path)}
+        expected = {file.name for file in root.glob(
+            "OpenSees_NBC105_ESM_Load_And_Static_Analysis_*.py")}
+        recorded = [item["case"] for item in records]
+        unique_recorded = set(recorded)
+        # Do not certify completion on count alone: duplicates or an unrelated
+        # older run can otherwise hide a missing X/Y eccentricity case.
+        successes = {
+            item["case"] for item in records
+            if item["case"] in expected
+            and item.get("status") == "SUCCESS"
+            and item.get("return_code") == 0
+        }
+        duplicates = sorted({name for name in recorded if recorded.count(name) > 1})
+        missing = sorted(expected - successes)
+        unexpected = sorted(unique_recorded - expected)
+        complete = (
+            bool(expected) and not duplicates and not missing
+            and not unexpected and len(records) == len(expected)
+        )
+        state = "COMPLETE_SOLVER_ONLY" if complete else "PARTIAL_OR_FAILED"
+        return {"status": state, "completed": len(successes),
+                "record_count": len(records), "expected_scripts": len(expected),
+                "missing_cases": missing, "duplicate_cases": duplicates,
+                "unexpected_cases": unexpected, "records": records,
+                "status_file": str(path), "status_sha256": _sha256(path)}
     except (OSError, ValueError, TypeError) as exc:
         return {"status": "INVALID_CASE_STATUS", "completed": 0, "records": [],
                 "status_file": str(path), "error": str(exc)}
@@ -247,6 +267,14 @@ def build_combined_esm_export(output_root):
     for key in ("status", "completed", "record_count", "expected_scripts", "status_file", "error"):
         if key in batch:
             status_sheet.append((key, str(batch[key])))
+    for key in ("missing_cases", "duplicate_cases", "unexpected_cases", "status_sha256"):
+        if key in batch:
+            status_sheet.append((key, ", ".join(batch[key]) if isinstance(batch[key], list) else str(batch[key])))
+    status_sheet.append(())
+    status_sheet.append(("Case", "Execution status", "Exit code", "Elapsed (s)"))
+    for item in batch.get("records", []):
+        status_sheet.append((item.get("case"), item.get("status"),
+                             item.get("return_code"), item.get("elapsed_s")))
     status_sheet.append(("Note", "This workbook can contain calculated ESM forces before all solver cases finish."))
     status_sheet.append(("Engineering status", "NOT NATIVE ETABS VERIFIED; ULS high-rise ESM comparison only"))
     wb.save(workbook)
