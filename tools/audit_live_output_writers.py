@@ -133,6 +133,21 @@ def scan_source(repo):
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                 "occurrences": sorted(occurrences, key=lambda x: (x["line"], x["kind"])),
             })
+    candidates = []
+    for item in records:
+        legacy_lines = [ref["line"] for ref in item["occurrences"]
+                        if ref["kind"] == "LITERAL_PATH_MARKER"
+                        and ref.get("legacy")]
+        if legacy_lines:
+            candidates.append({
+                "source": item["source"], "legacy_markers": len(legacy_lines),
+                "first_lines": legacy_lines[:8],
+                "potential_write_calls": sum(
+                    ref["kind"] == "POTENTIAL_WRITE_CALL"
+                    for ref in item["occurrences"]),
+                "classification": "REVIEW_ONLY_CALLER_READER_TRACE_REQUIRED",
+            })
+    candidates.sort(key=lambda item: (-item["legacy_markers"], item["source"]))
     return {
         "schema": "THESIS_STATIC_OUTPUT_WRITER_AUDIT_V1",
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -140,6 +155,7 @@ def scan_source(repo):
         "repository": str(root),
         "totals": totals,
         "files": records,
+        "top_legacy_candidates": candidates[:25],
         "parse_errors": problems,
         "next_action": "Trace every relevant writer and its result readers; migrate and test one stage/case at a time.",
     }
@@ -197,6 +213,7 @@ def main(argv=None):
     result = scan_source(args.repo)
     print(json.dumps({"assessment": result["assessment"],
                       "totals": result["totals"],
+                      "top_legacy_candidates": result["top_legacy_candidates"][:12],
                       "parse_errors": len(result["parse_errors"])}, indent=2))
     if args.write:
         print("Local report:", save_local_report(result, args.export))
