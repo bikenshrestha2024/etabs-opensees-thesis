@@ -66,18 +66,23 @@ def audit_export_structure(export_dir, *, verify_copies=True):
                                         "copy": expected.relative_to(root).as_posix()})
     stage_details = {}
     loose_stage_files = []
+    symlinked_stages = []
     for key, stage_name in {**STAGE_FOLDERS, **AUXILIARY_FOLDERS}.items():
         stage = root / stage_name
+        if stage.is_symlink():
+            symlinked_stages.append(stage_name)
+        usable = stage.is_dir() and not stage.is_symlink()
         loose = sorted(p.name for p in stage.iterdir()
-                       if p.is_file() and not p.is_symlink()) if stage.is_dir() else []
+                       if p.is_file() and not p.is_symlink()) if usable else []
         if loose:
             loose_stage_files.append({"stage": key, "directory": stage_name,
                                       "files": loose, "count": len(loose)})
         stage_details[key] = {
             "path": stage_name,
-            "exists": stage.is_dir(),
+            "exists": usable,
+            "symlink_refused": stage.is_symlink(),
             "subfolders": sorted(p.name for p in stage.iterdir()
-                                 if p.is_dir() and not p.is_symlink()) if stage.is_dir() else [],
+                                 if p.is_dir() and not p.is_symlink()) if usable else [],
             "loose_files": loose,
             "engineering_status": "NOT_CHECKED_BY_FOLDER_AUDIT",
         }
@@ -90,6 +95,11 @@ def audit_export_structure(export_dir, *, verify_copies=True):
                                 and p.name not in KNOWN_PROJECT_FOLDERS
                                 and p.name not in LEGACY_COMPAT_FOLDERS)
     findings = []
+    if symlinked_stages:
+        findings.append({"id": "SYMLINKED_CANONICAL_STAGE_BLOCKED",
+                         "severity": "BLOCKED",
+                         "count": len(symlinked_stages),
+                         "action": "Canonical stages must be real local directories. Do not traverse or write through stage symlinks."})
     if missing_mirrors:
         findings.append({"id": "EXPORT_MIRROR_INCOMPLETE",
                          "severity": "ORGANIZATION",
@@ -134,6 +144,7 @@ def audit_export_structure(export_dir, *, verify_copies=True):
         "unexpected_top_level_folders": unexpected_folders,
         "stages": stage_details,
         "loose_stage_outputs": loose_stage_files,
+        "symlinked_stage_directories": symlinked_stages,
         "findings": findings,
     }
 
@@ -165,6 +176,7 @@ def write_folder_audit(export_dir, *, verify_copies=True):
         f"- Registered stage/auxiliary directories: {len(report['stages'])}",
         f"- Loose files at stage roots: {sum(item['count'] for item in report['loose_stage_outputs'])}",
         f"- Unregistered top-level directories: {len(report['unexpected_top_level_folders'])}",
+        f"- Refused symlinked stage directories: {len(report['symlinked_stage_directories'])}",
         "", "## Canonical stages", "",
         "| Stage | Directory present | Subfolders | Loose files |",
         "|---|---|---:|---:|",
