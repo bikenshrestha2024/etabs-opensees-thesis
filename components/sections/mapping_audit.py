@@ -117,6 +117,23 @@ def collect(folder):
         if str(tag) not in known:nodes.append(dict(etabs_point_name=None,opensees_node_tag=int(tag),etabs_storey_number=None,coordinates_m=xyz,origin='Generated mesh node'))
     for g in payload.get('diaphragms',[]):
         nodes.append(dict(etabs_point_name=None,opensees_node_tag=g['master_tag'],etabs_storey_number=g['storey_number'],coordinates_m=g['master_xyz'],origin='Generated diaphragm master'))
+    # Reuse exactly the same display-only labels as the independent ID lookup.
+    # Native ETABS names, topology tags and OpenSees integer solver tags never change.
+    from components.model.display_ids import build_labels
+    structural_categories={'BEAM','BRACE','COLUMN','SHEAR WALL','FLOOR',
+                           'CONVENTIONAL OUTRIGGER','BELT TRUSS','CAP TRUSS'}
+    label_inputs=[]
+    for e in topology.get('elements',[]):
+        try:
+            storey=int(e.get('storey_number'))
+            if isinstance(e.get('storey_number'),bool) or storey<0:continue
+        except (TypeError,ValueError):
+            continue
+        category=str(e.get('category','')).upper().strip()
+        if category in structural_categories:
+            label_inputs.append(dict(native_id=str(e.get('dimension'))+':'+str(e.get('etabs_object')),
+                                     category=category,storey=storey))
+    display_labels=build_labels(label_inputs)
     rows=[];properties={}
     for e in topology.get('elements',[]):
         is_frame=e.get('dimension')=='line_2_node'
@@ -128,6 +145,7 @@ def collect(folder):
         category=e.get('category','UNKNOWN');group=category+' / '+section
         target=selections.get('assignments',{}).get(key,{}).get('target','KEEP_SOURCE_ELASTIC')
         record=dict(key=key,property=section,category=category,dimension=e['dimension'],etabs_object=obj,
+                    display_label=display_labels.get(str(e['dimension'])+':'+obj,'UNCLASSIFIED_MEMBER'),
                     topology_tag=e.get('element_tag'),solver_tags=element_map.get(key,[]),node_tags=e.get('node_tags',[]),
                     etabs_points=e.get('node_names',[]),storey=e.get('storey_number'),target=target)
         rows.append(record)
