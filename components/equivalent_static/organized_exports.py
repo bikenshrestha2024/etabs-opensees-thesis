@@ -277,6 +277,18 @@ def build_combined_esm_export(output_root):
                              item.get("return_code"), item.get("elapsed_s")))
     status_sheet.append(("Note", "This workbook can contain calculated ESM forces before all solver cases finish."))
     status_sheet.append(("Engineering status", "NOT NATIVE ETABS VERIFIED; ULS high-rise ESM comparison only"))
+    from openpyxl.styles import Alignment, Font, PatternFill
+    status_sheet.freeze_panes = "B2"
+    status_sheet.column_dimensions["A"].width = 70
+    status_sheet.column_dimensions["B"].width = 36
+    status_sheet.column_dimensions["C"].width = 18
+    status_sheet.column_dimensions["D"].width = 22
+    for column in status_sheet[1]:
+        column.font = Font(bold=True, color="FFFFFF")
+        column.fill = PatternFill("solid", fgColor="203A5F")
+    for row in status_sheet.iter_rows():
+        for cell in row:
+            cell.alignment = Alignment(vertical="top", wrap_text=False)
     wb.save(workbook)
     overview = {
         "schema": "ESM_ORGANIZED_V1", "source_root": str(root),
