@@ -16,7 +16,8 @@ def merge_saved_stiffness(folder,result):
   if any(part.casefold() in excluded for part in p.parts):continue
   d=json.loads(p.read_text(encoding='utf-8-sig'))
   if d.get('model_sha256')!=digest:continue
-  state=d.get('limit_state');case=d.get('response_case',p.name);axis='X' if '_X' in case else 'Y' if '_Y' in case else None
+  state=d.get('limit_state');case=d.get('response_case',p.name);axis=('X' if case.startswith('X_') or '_X' in case
+        else 'Y' if case.startswith('Y_') or '_Y' in case else None)
   if state not in ('ULS','SLS') or axis is None:continue
   rows=[dict(r) for r in d.get('checks',[]) if r.get('check','').startswith('Soft story') and r.get('value') is not None]
   if not rows:continue
