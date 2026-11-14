@@ -12,6 +12,8 @@ This is a non-destructive, public-safe REVIEW directory. Do not upload the origi
 
 **Current cross-module review (2026-11-14):** [Full folder layout, result-reader, stiffness, gravity, drift and nonlinear readiness audit](08_SOFTWARE_SECURITY/20261114_1709_FULL_CROSS_MODULE_REVIEW.md). P0 issues remain open; a folder audit pass is not native structural verification.
 
+**MRSM six-case batch correction V4:** [Canonical MRSM run writer, source-identity-safe result discovery and Windows verification gates](04_MRSM/20261114_CANONICAL_BATCH_OUTPUT_AND_SOURCE_GATES_V4.md).
+
 **LTHA/NLTHA automatic stage migration V3:** [Canonical time-history outputs, unchanged numerical runners and required Windows native acceptance](08_SOFTWARE_SECURITY/20261114_LINEAR_NONLINEAR_HISTORY_OUTPUT_MIGRATION_V3.md).
 
 **Live module migration V2:** [V135 diagnostic reports, canonical modal production + viewer and Windows verification sequence](08_SOFTWARE_SECURITY/20261114_LIVE_OUTPUT_STAGE_MIGRATION_V2.md). This is code- and CI-level verification; native structural acceptance remains open.
