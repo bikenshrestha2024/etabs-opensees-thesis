@@ -1374,7 +1374,13 @@ class GravityAnalysisGUI:
         if model.name.startswith('OpenSees_Complete_') and report_path.is_file():
             errors = json.loads(report_path.read_text(encoding='utf-8-sig')).get('assembly_errors', [])
             if errors: raise ValueError('Model assembly blocked: ' + '; '.join(errors) + '. Rebuild with the latest exporter. Manual support inputs cannot repair assembly.')
-        out = Path(self.output_var.get()).expanduser().resolve()
+        selected_output = Path(self.output_var.get()).expanduser().resolve()
+        from components.inputs.output_layout import canonical_gravity_run_root
+        out = canonical_gravity_run_root(selected_output)
+        if out != selected_output:
+            # Each stage owns newly written files. Old runs stay in place and
+            # can be inspected from the historical result browser.
+            self.output_var.set(str(out))
         py = Path(self.python_var.get()).expanduser().resolve()
         if not model.is_file(): raise ValueError("Select an existing generated OpenSees model script.")
         if not py.is_file(): raise ValueError("Select a valid Python executable with OpenSeesPy installed.")
