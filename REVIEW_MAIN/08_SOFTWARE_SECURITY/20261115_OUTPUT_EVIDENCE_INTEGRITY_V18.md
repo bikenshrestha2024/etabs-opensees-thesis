@@ -9,11 +9,11 @@
 
 The shared `write_table()` claimed it used finite values but did not check them. `csv.DictWriter` would write `nan`, `inf`, or `-inf` for floating nonfinite inputs. These cannot be treated as valid gravity reactions, modal periods, base shears, drifts or time-history results.
 
-**Correction:** Reject nonfinite Python floats and Decimal values before `writer.writerow()`. Existing write uses a temporary file and atomic replacement, so exceptions remove its temporary output and leave the previous output untouched. Also reject empty/whitespace/non-string CSV headers. All finite values and standard CSV formatting remain unchanged.
+**Correction:** Reject nonfinite real floating scalars (including NumPy float32/float64 when available) and Decimal values before `writer.writerow()`. Existing write uses a temporary file and atomic replacement, so exceptions remove its temporary output and leave the previous output untouched. Also reject empty/whitespace/non-string CSV headers. All finite values and standard CSV formatting remain unchanged.
 
-**Regression added:** `test_csv_rejects_nonfinite_numeric_values_without_publishing`; `test_csv_rejects_empty_and_nonstring_headers` in `tests/test_unified_output_contract.py`.
+**Regression added:** `test_csv_rejects_nonfinite_numeric_values_without_publishing`, `test_csv_rejects_numpy_nonfinite_scalars_when_available` and `test_csv_rejects_empty_and_nonstring_headers` in `tests/test_unified_output_contract.py`.
 
-**Explicit limitation:** String `"NaN"` values and arbitrary third-party numerical wrappers require validation upstream; this is a central output guard, not complete engineering validation of every source. Other CSV/Excel writer functions not using `write_table()` remain outside this patch.
+**Explicit limitation:** String `"NaN"` values and third-party non-Real numerical wrappers require validation upstream; this is a central output guard, not complete engineering validation of every source. Other CSV/Excel writer functions not using `write_table()` remain outside this patch.
 
 ### V18-02 — a valid-looking case manifest could be recorded under the wrong stage
 
@@ -70,3 +70,7 @@ python tools/audit_stage_output_migration.py "<PRIVATE_SELECTED_EXPORT_CASE>" --
 Keep the generated report under the selected export case's `09_SOFTWARE_DIAGNOSTICS`, not the public GitHub tree. On Windows, verify a finite gravity/ESM/MRSM history CSV still writes normally; a NaN does not publish; and manifest stage mismatch appears as invalid. Additional validation must include ETABS vs OpenSees numerical comparisons using the user's private source model and original Excel calculations.
 
 **No native solver testing was executed in this review. No original EDB/XLSX was changed. No claim of entire-repository line-by-line audit is made.**
+
+## CI feedback and repair
+
+At commit `1e22c4a77047333d10263fc1590d69a7cbe68590`, GitHub Actions [NLTHA Python quality checks](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43664867271) failed at `test_csv_rejects_nonfinite_numeric_values_without_publishing`: an incorrect test literal compared a CSV with actual newlines against a Python string containing escaped backslash-n characters. The test assertion was corrected in commit `f43c19520b936771f47fe52ad20ebab7a59f21d5`. Syntax and other focused tests in the log were passing up to that test. This was **a test expectation defect**, not evidence of a solver discrepancy. Later CI conclusions should be recorded separately after completion; no native ETABS, Windows or OpenSees run is established by this GitHub check.
