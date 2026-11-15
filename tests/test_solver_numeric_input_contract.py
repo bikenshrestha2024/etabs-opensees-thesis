@@ -102,7 +102,7 @@ class NumericalInputGateTests(unittest.TestCase):
                     [(2,0.01)]
                 )
         self.assertEqual(
-            [name for name,_,_ in ops.calls if name == "analysis"],
+            [args[0] for name,args,_ in ops.calls if name == "analysis"],
             ["Transient"]
         )
 
