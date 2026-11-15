@@ -136,6 +136,33 @@ class MeshCasesTests(unittest.TestCase):
                 self.assertEqual(shells,[])
                 self.assertEqual(objects,{})
 
+    def test_mesh_diagnostic_zip_is_separate_and_hash_verified(self):
+        import zipfile
+        for n in (4,8,16):
+            folder=mesh.case_base(self.root,n)
+            run=folder/"RUNS"/"RUN_TEST"
+            run.mkdir(parents=True)
+            (run/"MESH_BUILD_STATUS.json").write_text(
+                json.dumps({"status":"STAGED_NOT_ASSEMBLED"}))
+            (folder/"EXCEL").mkdir()
+            (folder/"EXCEL"/"sample.xlsx").write_bytes(b"synthetic-only")
+            zip_path=mesh.package_mesh_case(self.root,n)
+            self.assertEqual(zip_path.name,f"MESH_{n:02d}.zip")
+            self.assertEqual(zip_path.parent.name,"UPLOAD_PACKAGES")
+            with zipfile.ZipFile(zip_path) as z:
+                self.assertIsNone(z.testzip())
+                names=z.namelist()
+                self.assertIn(f"MESH_{n:02d}/RUNS/RUN_TEST/MESH_BUILD_STATUS.json",names)
+                self.assertIn(f"MESH_{n:02d}/EXCEL/sample.xlsx",names)
+                manifest=json.loads(z.read(f"MESH_{n:02d}/ZIP_SHA256_MANIFEST.json"))
+                self.assertEqual(manifest["mesh_subdivisions"],n)
+                self.assertEqual(manifest["status"],
+                                 "DIAGNOSTIC_PACKAGE_NOT_SOLVER_ACCEPTANCE")
+                self.assertEqual(
+                    manifest["files"]["RUNS/RUN_TEST/MESH_BUILD_STATUS.json"],
+                    mesh.digest(run/"MESH_BUILD_STATUS.json"))
+            self.assertTrue((folder/"EXCEL"/"sample.xlsx").is_file())
+
     def test_reject_missing_audit_and_invalid_mesh(self):
         with self.assertRaises(ValueError):
             mesh.case_base(self.root,2)
