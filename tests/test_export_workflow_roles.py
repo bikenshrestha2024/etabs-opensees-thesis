@@ -13,12 +13,14 @@ class OutputAndIdentityTests(unittest.TestCase):
         self.assertEqual(member_identity("BRACE"),
                          {"prefix":"BR","family":"BRACE","brace_role":"BR"})
         self.assertEqual(member_identity("BRACE","CO")["prefix"],"CO")
+        self.assertEqual(member_identity("BEAM","BT")["brace_role"],"BT")
+        self.assertEqual(member_identity("BEAM")["family"],"BEAM")
         self.assertEqual(member_identity("BELT TRUSS")["brace_role"],"BT")
         self.assertEqual(member_identity("CAP TRUSS")["brace_role"],"CT")
         self.assertEqual(display_label("CT",25,1),"CT2501")
 
     def test_no_geometry_only_fvd_or_outrigger_guessing(self):
-        for category, role in (("COLUMN","CT"),("BEAM","CO"),
+        for category, role in (("COLUMN","CT"),("FLOOR","CO"),
                                ("BRACE","FVD"),("CAP TRUSS","CO")):
             with self.subTest(category=category,role=role):
                 with self.assertRaises(ValueError):
