@@ -71,3 +71,8 @@ Inspected `components/inputs/export_mirror.py`: existing conflict handling was p
 ## Output-manifest ancestry correction (2026-11-15)
 
 `components/inputs/output_contract.py::inspect_case_manifest` previously resolved the run directory before inspecting symlinks, checking only the supplied run itself and the post-resolution manifest. A linked **parent** such as `02_GRAVITY` could evade the check. The reader now refuses any symlink in the original run path chain, returning `LINKED_CASE_MANIFEST_PATH`, and the existing status-update precondition inherits the protection. Synthetic regression coverage checks that the external manifest remains untouched. Native solver evidence still pending.
+
+
+## Fourth pass: release and design-check documentation (2026-11-15)
+
+Three more historical documents (`CHANGES_V136.md`, `CAPABILITIES_AND_LIMITS_V134.md` and `DESIGN_CHECKS_V135.md`) moved byte-for-byte to categorized `HISTORICAL_NOTES/` archives, protected by extended Git blob SHA regression. Root file count: **176 → 173** for this pass; cumulative reduction from 186 to **173**, with all 129 root Python files retained. Original V134–V167 historic manifests keep their old-package paths. Also repaired literal escaped newline text accidentally inserted into the root README during an earlier navigation edit. This does not deliver native numerical analysis validation.

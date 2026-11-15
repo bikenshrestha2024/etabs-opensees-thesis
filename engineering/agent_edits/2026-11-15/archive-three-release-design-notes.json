@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 via GitHub connector",
+  "baseline_sha": "23f28201f03dd0d6f01fcfba2de50bdd983a8f85",
+  "task": "Archive three unconsumed historical release/engineering notes, fix README newline formatting",
+  "files_moved": [
+    {
+      "from": "CHANGES_V136.md",
+      "to": "archive/previous_versions/HISTORICAL_NOTES/RELEASE_CHANGELOGS/CHANGES_V136.md",
+      "git_blob": "32d0d43caad07f733c893d178b5a026d5e21f9f7"
+    },
+    {
+      "from": "CAPABILITIES_AND_LIMITS_V134.md",
+      "to": "archive/previous_versions/HISTORICAL_NOTES/RELEASE_CHANGELOGS/CAPABILITIES_AND_LIMITS_V134.md",
+      "git_blob": "b913cfdf0e6a10c0e5d123043b6d0fe39d7cf3c6"
+    },
+    {
+      "from": "DESIGN_CHECKS_V135.md",
+      "to": "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/DESIGN_CHECKS_V135.md",
+      "git_blob": "a328c08916b5574e8ad6fc68cca7012175e9f8ba"
+    }
+  ],
+  "read_only_dependency_checks": "GitHub exact-name searches found historical release/manifest references but zero active .py/tests references; original files had no relative Markdown links",
+  "tests": "test_historical_note_archive.py in repository-integrity CI; CI pending",
+  "pending": "Native Windows GUI/ETABS/OpenSees and exhaustive semantic review",
+  "sourceModelsChanged": false
+}

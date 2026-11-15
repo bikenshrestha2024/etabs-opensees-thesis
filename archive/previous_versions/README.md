@@ -1,6 +1,6 @@
 # Historical versions archived from repository root
 
-The newest tracked revision of each `_V###` file family remains at repository root. Superseded versions are preserved byte-for-byte using the same Git blob SHA under `archive/previous_versions/<family>/`. This change does not rewrite existing historical evidence or the functional module implementations.
+For the initial 83 historical-version relocations, the newest tracked revision of each `_V###` family remained at the root. Later, individually reviewed documentation-only notes (including some newest release-note revisions) moved to `HISTORICAL_NOTES/`; active Python modules were not moved. Superseded versions are preserved byte-for-byte using the same Git blob SHA under `archive/previous_versions/<family>/`. This change does not rewrite existing historical evidence or the functional module implementations.
 
 **Moved files:** 83  
 **Version families:** 21  
@@ -157,3 +157,14 @@ These seven immutable historical Markdown artifacts are now organized by researc
 | `VISUAL_VALIDATION_V149.md` | [HISTORICAL_NOTES/MATERIAL_RESEARCH/VISUAL_VALIDATION_V149.md](HISTORICAL_NOTES/MATERIAL_RESEARCH/VISUAL_VALIDATION_V149.md) | `da1807066784aece769b06a2a4b251c0f9efc8af` |
 | `LITERATURE_REVIEW_AND_DECISION_V137.md` | [HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/LITERATURE_REVIEW_AND_DECISION_V137.md](HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/LITERATURE_REVIEW_AND_DECISION_V137.md) | `ebe43db247ecfafa6ecf634d523377f8ea4d1beb` |
 | `REVIEW_V151.md` | [HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/REVIEW_V151.md](HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/REVIEW_V151.md) | `855376641abc6352943db336f6324f47c60c3814` |
+
+
+## 2026-11-15 fourth pass — three release and diagnostic notes
+
+The following original report Git blobs were moved with no content changes and no Python import/launcher relocation. Exact-filename repository searches found no active .py or test references. Historical release manifests intentionally retain their original old-package filenames and are not rewritten as if they described the new repository tree. See [current archive index](HISTORICAL_NOTES/README.md).
+
+| Original root file | New path | Git blob SHA |
+|---|---|---|
+| `CHANGES_V136.md` | [HISTORICAL_NOTES/RELEASE_CHANGELOGS/CHANGES_V136.md](HISTORICAL_NOTES/RELEASE_CHANGELOGS/CHANGES_V136.md) | `32d0d43caad07f733c893d178b5a026d5e21f9f7` |
+| `CAPABILITIES_AND_LIMITS_V134.md` | [HISTORICAL_NOTES/RELEASE_CHANGELOGS/CAPABILITIES_AND_LIMITS_V134.md](HISTORICAL_NOTES/RELEASE_CHANGELOGS/CAPABILITIES_AND_LIMITS_V134.md) | `b913cfdf0e6a10c0e5d123043b6d0fe39d7cf3c6` |
+| `DESIGN_CHECKS_V135.md` | [HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/DESIGN_CHECKS_V135.md](HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/DESIGN_CHECKS_V135.md) | `a328c08916b5574e8ad6fc68cca7012175e9f8ba` |

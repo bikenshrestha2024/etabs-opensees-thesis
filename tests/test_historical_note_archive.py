@@ -1,4 +1,4 @@
-"""Confirm the three historical-note relocations are byte-identical Git objects.
+"""Confirm all historical-note relocations are byte-identical Git objects.
 
 This is a navigation/provenance test, NOT an engineering solver validation.
 """
@@ -47,6 +47,18 @@ MOVED = {
     "REVIEW_V151.md": (
         "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/REVIEW_V151.md",
         "855376641abc6352943db336f6324f47c60c3814",
+    ),
+    "CHANGES_V136.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/RELEASE_CHANGELOGS/CHANGES_V136.md",
+        "32d0d43caad07f733c893d178b5a026d5e21f9f7",
+    ),
+    "CAPABILITIES_AND_LIMITS_V134.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/RELEASE_CHANGELOGS/CAPABILITIES_AND_LIMITS_V134.md",
+        "b913cfdf0e6a10c0e5d123043b6d0fe39d7cf3c6",
+    ),
+    "DESIGN_CHECKS_V135.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/DESIGN_CHECKS_V135.md",
+        "a328c08916b5574e8ad6fc68cca7012175e9f8ba",
     ),
 }
 
