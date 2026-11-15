@@ -40,6 +40,10 @@ def safe_component(value):
     """[REF docs/source/components/inputs/output_contract.py.md]
     Validate one Windows-portable path segment; never clean away separators.
     """
+    # Missing/boolean values are not names. Reject rather than generating
+    # misleading literal "None"/"True" case folders in native evidence.
+    if value is None or isinstance(value, bool):
+        raise ValueError("Unsafe run/case identifier: " + repr(value))
     part = str(value).strip()
     if (not CASE_COMPONENT.fullmatch(part) or part.endswith((".", " "))
             or part.upper().split(".")[0] in {
@@ -230,7 +234,9 @@ def inspect_case_manifest(run_dir, *, expected_stage=None):
         issues.append("UNDECLARED_MODEL_UNITS")
     for name in ("case_id","state","run_id"):
         try:
-            safe_component(data.get(name))
+            value=data.get(name)
+            if not isinstance(value,str) or safe_component(value)!=value:
+                raise ValueError("Noncanonical or missing identifier")
         except ValueError:
             issues.append("INVALID_"+name.upper())
     # A manifest path must match the actual RUNS/state/case/run-id hierarchy.
