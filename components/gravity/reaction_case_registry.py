@@ -10,6 +10,8 @@ import math
 from datetime import datetime, timezone
 from pathlib import Path
 
+from components.inputs.output_layout import export_root_for
+
 SCENARIO_SUPPORTS = {
     "ETABS_NONZERO_REACTION_DIAGNOSTIC": 32,
     "ETABS_SOURCE_SUPPORTS": 76,
@@ -111,16 +113,12 @@ def publish_gravity_case_index(output_root, record):
     """
     from shutil import copy2
     root = Path(output_root).resolve()
-    # The configured analysis root is .../<selection>/OpenSees_Analysis_Results/
-    # <ULS-or-SLS_model>. Fall back to the selected output itself for standalone
-    # gravity workflows without that recognizable parent.
-    selection = None
-    for ancestor in (root, *root.parents):
-        if ancestor.name == "OpenSees_Analysis_Results":
-            selection = ancestor.parent
-            break
-    if selection is None:
-        selection = root
+    # Both historical OpenSees_Analysis_Results and already canonical
+    # 02_GRAVITY/RUNS/... inputs belong to the SAME selected export root.
+    # Do not create nested 02_GRAVITY/RUNS/.../02_GRAVITY directories.
+    # For standalone folders with no recognized ancestor, preserve the
+    # previous behavior of keeping the index below the selected folder.
+    selection = export_root_for(root)
     destination_root = selection / "02_GRAVITY"
     case_path = Path(record["result_path"]).resolve()
     scenario = record["scenario"]
