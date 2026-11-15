@@ -132,6 +132,37 @@ class UnifiedOutputContractTests(unittest.TestCase):
                     self.assertFalse(audit["valid"])
                     self.assertIn(issue, audit["issues"])
 
+    def test_no_missing_or_boolean_case_identifiers(self):
+        for invalid in (None,True,False):
+            with self.subTest(value=invalid):
+                with self.assertRaisesRegex(ValueError,"Unsafe run/case"):
+                    safe_component(invalid)
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            with self.assertRaisesRegex(ValueError,"Unsafe run/case"):
+                create_case_run(root,"GRAVITY",None,state="ULS")
+            self.assertFalse((root/"02_GRAVITY").exists())
+
+    def test_manifest_rejects_noncanonical_identifier_without_repair(self):
+        from components.inputs.output_contract import inspect_case_manifest
+        with tempfile.TemporaryDirectory() as td:
+            run=create_case_run(Path(td),"GRAVITY","X_E0",state="ULS")
+            manifest=run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+            original=json.loads(manifest.read_text())
+            for field,bad in (("case_id"," X_E0 "),
+                              ("case_id",None),
+                              ("state",True),
+                              ("run_id",run.name+" ")):
+                changed=dict(original)
+                changed[field]=bad
+                manifest.write_text(json.dumps(changed))
+                with self.subTest(field=field,bad=bad):
+                    checked=inspect_case_manifest(run)
+                    self.assertFalse(checked["valid"])
+                    self.assertIn("INVALID_"+field.upper(),checked["issues"])
+            self.assertEqual(
+                json.loads(manifest.read_text())["run_id"],run.name+" ")
+
     def test_csv_rejects_nonfinite_numeric_values_without_publishing(self):
         from decimal import Decimal
         with tempfile.TemporaryDirectory() as td:
