@@ -236,6 +236,18 @@ def inspect_case_manifest(run_dir, *, expected_stage=None):
         issues.append("RUN_DIRECTORY_IDENTITY_MISMATCH")
     if run.name!=data.get("run_id"):
         issues.append("RUN_ID_MISMATCH")
+    # A readable manifest is not sufficient: its recorded stage must match
+    # the directory physically containing the RUNS hierarchy even when the
+    # caller omitted expected_stage. Reject a forged/misfiled stage identity.
+    try:
+        recorded_stage = canonical_stage_folder(data.get("stage"))
+    except ValueError:
+        issues.append("UNKNOWN_RECORDED_STAGE")
+    else:
+        if recorded_stage != data.get("stage"):
+            issues.append("NONCANONICAL_RECORDED_STAGE")
+        if len(run.parents) < 4 or run.parents[3].name != recorded_stage:
+            issues.append("RUN_STAGE_DIRECTORY_MISMATCH")
     if expected_stage is not None:
         if data.get("stage")!=canonical_stage_folder(expected_stage):
             issues.append("WRONG_STAGE")
