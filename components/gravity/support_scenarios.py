@@ -74,6 +74,15 @@ def compare_wall_support_gravity(source_result, continuous_result):
                 raise ValueError(mode+" invalid support node coordinates: "+tag) from exc
             if not all(math.isfinite(v) for v in xyz):
                 raise ValueError(mode+" nonfinite support node coordinates: "+tag)
+    # A cached report may contain a reaction total from a different
+    # run. Do not accept a support-sensitivity comparison in which its
+    # native support rows cannot reproduce the published scalar total.
+    for mode,payload,react in ((SOURCE,source_result,source_by),
+                               (CONTINUOUS,continuous_result,continuous_by)):
+        actual=sum(scalar(row,"rz_kN") for row in react.values())
+        recorded=scalar(payload["report"],"support_vertical_reaction_kN")
+        if abs(actual-recorded)>max(0.01,abs(recorded)*1e-6):
+            raise ValueError(mode+" support reaction total differs from individual nodes")
     # Shared native node tags cannot be compared when the two independently
     # solved models do not agree on their actual global coordinates.
     for tag in source_by.keys() & continuous_by.keys():
