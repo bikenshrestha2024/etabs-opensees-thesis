@@ -1,4 +1,5 @@
 """Synthetic two-gravity-case support strategy audit tests."""
+import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,6 +31,10 @@ class DualWallGravityTests(unittest.TestCase):
         self.assertEqual(audit['max_Uz_difference_m'],0.004)
         self.assertEqual(
             [r for r in audit['per_node'] if r['status']=='CONTINUOUS_ONLY'][0]['node_tag'],'101')
+    @unittest.skipUnless(importlib.util.find_spec("openpyxl") is not None,
+                         "Workbook export requires optional openpyxl dependency")
+    def test_excel_export_when_openpyxl_is_installed(self):
+        audit=compare_wall_support_gravity(self.first,self.second)
         with tempfile.TemporaryDirectory() as d:
             dest=export_wall_support_comparison(audit,d)
             self.assertTrue((dest/'Gravity_Wall_Base_Strategy_Comparison.xlsx').exists())
