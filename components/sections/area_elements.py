@@ -512,6 +512,8 @@ def default_area_integration_script_path(export_dir):
 
     Always keep the generated, disabled-by-default Python call under the
     selected case's 02_MODEL/AREA_INTEGRATION/PYTHON directory.
+
+    [REF docs/source/components/sections/area_elements.py.md]
     """
     root=Path(export_dir).expanduser().resolve()
     target=root/"02_MODEL"/"AREA_INTEGRATION"/"PYTHON"/"OpenSees_Area_Integration_Call_V116.py"
