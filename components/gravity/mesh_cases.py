@@ -67,7 +67,10 @@ def _read_source_manifest(folder):
 
 
 def validated_mesh_size(subdivisions):
-    """Strict mesh identity; accept GUI decimal strings but never truncate floats."""
+    """Strict mesh identity; accept exact GUI integers, never truncate floats.
+
+    [REF docs/source/components/gravity/mesh_cases.py.md] Case provenance contract.
+    """
     if isinstance(subdivisions, bool):
         raise ValueError("Mesh subdivision must be an exact integer: 4, 8 or 16")
     if type(subdivisions) is int:
