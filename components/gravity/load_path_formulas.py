@@ -404,7 +404,8 @@ def launch(parent,folder):
             for b in buttons:b.configure(state='normal')
             status.set('FAILED | '+str(exc))
             log('FAILED MESH_'+str(size).zfill(2)+': '+str(exc))
-            messagebox.showerror('Mesh build failed',str(exc),parent=win)
+            messagebox.showerror('Mesh assembly / workbook export failed',
+                                 str(exc)+'\n\nIf a model assembled successfully, select "Retry Excel from assembled mesh (no rebuild)" to avoid reassembling it.',parent=win)
         def report_success(result):
             for b in buttons:b.configure(state='normal')
             status.set('FORMULA EXPORTED | MESH_'+str(size).zfill(2)+' (gravity/ETABS verification still required)')
