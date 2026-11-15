@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector and local Python AST inspection",
+  "base_sha": "950a221adc5b3438f9981ca3c0e96a00d6df88e7",
+  "scope": "Freeze reviewed mesh and gravity numerical gates and current full-tree source review counts",
+  "confirmed_ci": {
+    "integrated": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43698880921",
+    "compilation": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43698880934",
+    "integrated_result": "PASS",
+    "source_files": 534,
+    "tracked_paths": 3058,
+    "generated_semantic_units": 3959,
+    "completed_semantic_units": 0
+  },
+  "local_ast_triage": {
+    "named_definitions": 3425,
+    "integer_cast_candidates": 19,
+    "suppressed_handler_candidates": 133,
+    "interpretation": "static hints, not approved defects or completed function reviews"
+  },
+  "software_fixes": [
+    "strict exact mesh subdivisions across staging model assembly and workbook",
+    "finite gravity applied load, support reactions, displacements and tolerance before freeze",
+    "exact static/transient steps and finite transient dt"
+  ],
+  "source_changes_commit": "df62c79680d66a08605150a13c576b3fc7a786b4",
+  "test_fix_commit": "950a221adc5b3438f9981ca3c0e96a00d6df88e7",
+  "native_acceptance": "NOT_VERIFIED",
+  "full_semantic_review": "INCOMPLETE_0_OF_3959_SIGNED",
+  "confidential_source_files_uploaded": false
+}

@@ -30,3 +30,8 @@ A separate conservative AST triage performed on the same active snapshot indexed
 **Static source coverage:** inventory and parser gate. **Function-by-function semantics:** incomplete (3,939 generated units are not signed off). **Targeted mesh input contract:** source review completed and locally tested; native validation pending. **Gravity ETABS/OpenSees equivalence:** unverified. **NLTHA:** first-step X-wall and full records unresolved. **Governing NBC 105:2025 code compliance:** unverified, requires real accepted model evidence and code interpretation.
 
 No single CI green checkmark proves a full semantic engineering review. An archive of the active code and this triage evidence allows future reviews to work from the actual same source SHA without repeatedly rediscovering paths.
+
+
+## Verified current revision and source-wide triage
+
+The current verified integrated CI snapshot is `950a221adc5b3438f9981ca3c0e96a00d6df88e7` with **3,058 tracked files, 534 active Python files, and 3,959 module/function/class review units**. The independently generated AST review-priority scan over the **actual 534 active files at the same revision** identified **3,425 named definitions**, **19 candidate integer-cast sites** and **133 potential suppressed-exception handler sites**. These are *inspection candidates*, not 152 proven defects. Only the mesh discretization and finite-gravity/transient acceptance issues in the linked targeted review documents were independently confirmed and corrected during this pass. [Passing integrated workflow](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43698880921). The audit still reports **zero completed semantic review units**, so no complete-codebase approval is asserted.

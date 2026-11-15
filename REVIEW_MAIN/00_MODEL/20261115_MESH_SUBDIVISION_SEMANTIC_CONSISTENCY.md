@@ -32,3 +32,11 @@ The source code showed these exact conversions. This is not an inferred code req
 | 32/76/97 supports, X-wall first-step and full M0–M6 | NOT_VERIFIED |
 
 Preserve all legacy run paths, source EDB and original Excel source files. Never label a staged configuration or formula workbook as solved gravity analysis.
+
+## Verified software acceptance on commit `950a221adc5b3438f9981ca3c0e96a00d6df88e7`
+
+- [Integrated 534-active-Python, 3,058 tracked-file audit](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43698880921): **PASS**, including strict source/mesh staging and finite gravity/transient fake-solver regressions.
+- [Repository compilation/navigation](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43698880934): **PASS**.
+- Initial integrated run [43698732193](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43698732193) failed on a **test assertion mistake** comparing the mock method name `analysis` to its argument `Transient`. The actual solver corrections and all negative-input/failure-output tests passed; the assertion was corrected in `950a221` and the rerun passed. This failure is preserved as review evidence.
+- The integrated report contains **3,959 semantic review units, 0 completed**; software test acceptance does not imply the whole function-by-function codebase was semantically approved.
+- Native ETABS, OpenSees full-building gravity, 32/76/97 supports, nonlinear X-wall first-step, full-duration M0–M6 and NBC 105:2025 compliance remain **NOT_VERIFIED**.

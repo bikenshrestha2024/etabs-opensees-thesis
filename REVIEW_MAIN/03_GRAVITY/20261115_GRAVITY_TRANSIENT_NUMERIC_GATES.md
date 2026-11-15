@@ -31,3 +31,11 @@ A clean input validator only prevents clearly invalid data from entering a solve
 ## Critical reaction-output guard identified during follow-up
 
 The initial input-only correction is insufficient if the **solver itself** returns NaN after reporting an analysis success code. Source inspection confirmed `run_gravity_stage` computed `error_percent = 100*abs(reaction-applied)/applied` and then used `if error_percent > tolerance`: with NaN this condition is false, so gravity could be frozen. The coordinated fix now explicitly verifies finite summed support reaction, finite error percentage and finite requested nodal vertical displacements before any freeze. Regression tests make `analyze` return success but inject NaN `nodeReaction` or `nodeDisp`; both must raise `RuntimeError`, with no `loadConst` invocation. This does **not** validate the absolute numerical value or ETABS comparison of finite reactions.
+
+## Verified software acceptance on commit `950a221adc5b3438f9981ca3c0e96a00d6df88e7`
+
+- [Integrated 534-active-Python, 3,058 tracked-file audit](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43698880921): **PASS**, including strict source/mesh staging and finite gravity/transient fake-solver regressions.
+- [Repository compilation/navigation](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43698880934): **PASS**.
+- Initial integrated run [43698732193](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43698732193) failed on a **test assertion mistake** comparing the mock method name `analysis` to its argument `Transient`. The actual solver corrections and all negative-input/failure-output tests passed; the assertion was corrected in `950a221` and the rerun passed. This failure is preserved as review evidence.
+- The integrated report contains **3,959 semantic review units, 0 completed**; software test acceptance does not imply the whole function-by-function codebase was semantically approved.
+- Native ETABS, OpenSees full-building gravity, 32/76/97 supports, nonlinear X-wall first-step, full-duration M0–M6 and NBC 105:2025 compliance remain **NOT_VERIFIED**.
