@@ -60,6 +60,10 @@ class NativeStageMigrationAuditTests(unittest.TestCase):
             problems={row["problem"] for row in gravity["unreadable_or_invalid_manifests"]}
             self.assertIn("MISSING_CASE_MANIFEST",problems)
             self.assertIn("SYMLINKED_RUN_CASE_REFUSED",problems)
+            self.assertEqual(gravity["missing_run_manifest_count"],1)
+            self.assertEqual(gravity["linked_run_path_count"],1)
+            self.assertEqual(report["summary"]["missing_run_manifest_count"],1)
+            self.assertEqual(report["summary"]["linked_run_path_count"],1)
             self.assertEqual(gravity["run_manifest_count"],0)
             self.assertEqual(list(external.iterdir()),before)
             self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
