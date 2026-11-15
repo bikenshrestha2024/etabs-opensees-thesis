@@ -33,6 +33,11 @@ def select_first_storey_panel(data, *, property_name=None):
         if len(tags)!=4 or len(set(map(int,tags)))!=4:continue
         try:points=[tuple(map(float,xyz[str(n)])) for n in tags]
         except (KeyError,TypeError,ValueError):continue
+        # Reject malformed source coordinates before ranking first-storey
+        # candidates: NaN comparisons can otherwise select an invalid panel.
+        if any(len(point)!=3 or not all(math.isfinite(v) for v in point)
+               for point in points):
+            continue
         z_low=min(v[2] for v in points);z_high=max(v[2] for v in points)
         if z_high-z_low<=1.e-6:continue
         bottoms=[(int(n),p) for n,p in zip(tags,points) if abs(p[2]-z_low)<1.e-5]
