@@ -110,6 +110,10 @@ def audit_stage_migration(export_dir):
             "exists":stage.is_dir() and not stage.is_symlink(),
             "symlink_refused":stage.is_symlink() or runs.is_symlink(),
             "run_manifest_count":len(manifests),
+            "missing_run_manifest_count":sum(
+                x["problem"]=="MISSING_CASE_MANIFEST" for x in unmanifested),
+            "linked_run_path_count":sum(
+                x["problem"].startswith("SYMLINKED_") for x in unmanifested),
             "solver_status_counts":statuses,
             "unreadable_or_invalid_manifests":unmanifested,
             "cases":manifests,
@@ -135,6 +139,10 @@ def audit_stage_migration(export_dir):
             "stage_count":len(stages),
             "present_stage_count":sum(x["exists"] for x in stages),
             "run_manifest_count":sum(x["run_manifest_count"] for x in stages),
+            "missing_run_manifest_count":sum(x["missing_run_manifest_count"]
+                                             for x in stages),
+            "linked_run_path_count":sum(x["linked_run_path_count"]
+                                       for x in stages),
             "invalid_case_contract_count":sum(
                 len(x["unreadable_or_invalid_manifests"]) for x in stages),
             "engineering_acceptance":"NOT_ESTABLISHED_BY_FILESYSTEM_AUDIT",
@@ -163,10 +171,13 @@ def export_uniform_inventory_excel(report, target):
     overview=book.active
     overview.title="Stage summary"
     overview.append(("Stage","Folder","Present","Case manifests",
+                     "Missing manifests","Linked run paths",
                      "Invalid cases","File audit status"))
     for stage in report["stages"]:
         overview.append((stage["stage"],stage["directory"],stage["exists"],
                          stage["run_manifest_count"],
+                         stage["missing_run_manifest_count"],
+                         stage["linked_run_path_count"],
                          len(stage["unreadable_or_invalid_manifests"]),
                          stage["assessment"]))
     cases=book.create_sheet("Case registry")
