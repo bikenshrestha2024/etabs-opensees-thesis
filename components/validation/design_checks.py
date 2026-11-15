@@ -126,7 +126,12 @@ def scan_drift(folder):
     return out,issues
 
 def templates(folder):
-    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
+    from components.inputs.output_contract import _refuse_linked_output_target
+    folder=Path(folder)
+    # Criteria templates are written into the canonical diagnostics tree,
+    # never through a linked path into user-owned source workbooks.
+    _refuse_linked_output_target(folder)
+    folder.mkdir(parents=True,exist_ok=True)
     definitions={
       'Nonlinear_Performance_V135.csv':['performance_objective','control_type','suite_statistic','limit_state','case','member','check','demand','limit','unit','concurrent_action_id','model_sha256','reviewed','source','clause','result_file'],
       'Section_Criteria_V135.csv':['limit_state','case','member','check','demand','limit','unit','concurrent_action_id','model_sha256','reviewed','source','clause','result_file'],
@@ -134,8 +139,15 @@ def templates(folder):
       'Action_Basis_V135.csv':['limit_state','basis_case','member','station','axes','response_kind','model_sha256',*COMPONENTS]}
     for name,fields in definitions.items():
         path=folder/name
+        _refuse_linked_output_target(path)
         if not path.exists():
-            with path.open('w',encoding='utf-8-sig',newline='') as f:csv.writer(f).writerow(fields)
+            # Exclusive creation avoids truncating a concurrent criteria edit.
+            try:
+                with path.open('x',encoding='utf-8-sig',newline='') as f:
+                    csv.writer(f).writerow(fields)
+            except FileExistsError:
+                # Another writer created this input template: keep it intact.
+                pass
     return folder
 
 def design_check_locations(folder):
@@ -205,6 +217,8 @@ def run(folder,storage=False,nonparallel=False):
     start=time.perf_counter();started=datetime.datetime.now().astimezone().isoformat()
     folder=export_root_for(folder)
     model=folder/'OpenSees_Complete_Model_Data_V118.json'
+    if model.is_symlink():
+        raise ValueError('Refusing linked authoritative serialized model source')
     if not model.is_file():raise ValueError('Select export folder containing OpenSees_Complete_Model_Data_V118.json')
     digest=hashlib.sha256(model.read_bytes()).hexdigest();data=json.loads(model.read_text(encoding='utf-8-sig'))
     output,legacy=design_check_locations(folder)
