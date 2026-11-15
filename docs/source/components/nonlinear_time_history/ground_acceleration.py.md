@@ -6,9 +6,9 @@
 
 **Functions and parameters:**
 
-- `_sample_path(values,dt,time_s)`: linear time interpolation of a sampled Path, zero outside the recorded interval. Requires positive finite dt and at least two sample values.
+- `_sample_path(values,dt,time_s)`: linear time interpolation of a sampled Path, zero outside the recorded interval. Requires positive finite dt and at least two sample values. Nonfinite bracketing ordinates (NaN/Infinity) are refused before interpolation, in constant time per sample; malformed unused ordinates elsewhere in the record must still be screened at source-import time.
 - `applied_ground_acceleration(records,time_s,orientation,excitation,additional_spectral_scale)`: pairs original A/B source `g` or `m/s2` inputs and returns applied global X/Y support acceleration for XY or YX. `excitation` is either XY, X, Y or ZERO diagnostic mode; it never applies unsupported vertical Z.
-- `relative_to_absolute_floor_acceleration(node_relative_xyz,ground_xy)`: adds measured uniform-support X/Y input to nodal relative response. Rotational, Z and multisupport effects are excluded.
+- `relative_to_absolute_floor_acceleration(node_relative_xyz,ground_xy)`: adds measured uniform-support X/Y input to nodal relative response; refuses nonfinite relative/support acceleration. Rotational, Z and multisupport effects are excluded.
 
 **Runner output fields:** `ground_AccelX_m_s2`, `ground_AccelY_m_s2` (global support inputs), `Storey_N_UX_relative_accel_m_s2`, `Storey_N_UY_relative_accel_m_s2` and new `Storey_N_UX_absolute_accel_m_s2`, `Storey_N_UY_absolute_accel_m_s2`. A per-case `Ground_Acceleration_Recording_Method.json` records source units, conversion, orientation, scale and method restrictions.
 
