@@ -97,6 +97,30 @@ class FailureEvidenceTests(unittest.TestCase):
             self.assertEqual(selected["time_status"],"NONFINITE_NAN")
             self.assertTrue(committed.is_file())
 
+    def test_failed_step_evidence_survives_corrupt_mapping(self):
+        from components.nonlinear_time_history.failure_evidence import (
+            snapshot_failed_step)
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            mapping=root/"mapping.json"
+            output=root/"failure.json"
+            for content in ("{invalid-json", '{"AREA:1":[110280],"AREA:2":[110280]}',
+                            '["not a source map"]'):
+                with self.subTest(content=content):
+                    mapping.write_text(content,encoding="utf-8")
+                    report=snapshot_failed_step(
+                        FakeOps([],nonfinite=True),output,
+                        algorithm="Newton",dt=.005,return_code=-3,
+                        element_map_path=mapping,suspect_tags=[110280])
+                    self.assertEqual(report["element_map_status"],
+                                     "INVALID_SOURCE_MAPPING")
+                    self.assertTrue(report["element_map_error"])
+                    self.assertEqual(
+                        json.loads(output.read_text())["nonfinite_elements"][0]["tag"],
+                        110280)
+            # Physical cause is NOT inferred from unsupported source mapping.
+            self.assertIsNone(report["nonfinite_elements"][0]["source"])
+
     def test_invalid_capture_bounds_are_rejected_before_writing(self):
         from components.nonlinear_time_history.failure_evidence import (
             snapshot_failed_step, snapshot_selected_state)
