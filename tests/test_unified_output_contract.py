@@ -147,6 +147,21 @@ class UnifiedOutputContractTests(unittest.TestCase):
                              columns=("case", "reaction"))
             self.assertEqual(ok.read_text(), "case,reaction\nX,-127.5\n")
 
+    def test_csv_rejects_numpy_nonfinite_scalars_when_available(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("NumPy not installed in optional isolated test environment")
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for value in (np.float32("nan"), np.float32("inf"),
+                          np.float64("-inf")):
+                target = root / "nonfinite_numpy.csv"
+                with self.subTest(dtype=str(type(value))):
+                    with self.assertRaisesRegex(ValueError, "Nonfinite numeric CSV"):
+                        write_table(target, [{"result": value}], columns=("result",))
+                    self.assertFalse(target.exists())
+
     def test_csv_rejects_empty_and_nonstring_headers(self):
         with tempfile.TemporaryDirectory() as td:
             for columns in (("",), (" ",), ("case", None), ("case", 5)):
