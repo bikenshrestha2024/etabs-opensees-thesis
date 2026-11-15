@@ -129,7 +129,6 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     # Excel's hard row ceiling is 1,048,576 including the header. A 16x16
     # slab mesh can produce >1M per-node pressure paths; partition without
     # truncating the data or referring to nonexistent worksheet rows.
-    from openpyxl import Workbook as _Workbook
     from openpyxl.xml.constants import MAX_ROW
     node_headers=['Source area','Pattern','Cell row','Node','X m','Y m','Z m','Applied nodal Fz kN downward','Connected beam solver tags','Connected wall solver tags','Role']
     links=wb.create_sheet('Loaded node path')
@@ -240,7 +239,10 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
                 for row in csv.reader(stream):output.append(row)
             output.freeze_panes='A2';output.auto_filter.ref=output.dimensions
     notes.column_dimensions['A'].width=140
-    for sheet in (ws,links,weights):
+    node_sheets=[sheet for sheet in wb.worksheets if
+                 sheet.title=='Loaded node path' or
+                 sheet.title.startswith('Loaded node path ')]
+    for sheet in (ws,*node_sheets,weights):
         sheet.freeze_panes='A2';sheet.auto_filter.ref=sheet.dimensions
         for c in sheet[1]:c.font=Font(bold=True,color='FFFFFF');c.fill=PatternFill('solid',fgColor='1E3A5F')
         for col in sheet.columns:sheet.column_dimensions[col[0].column_letter].width=min(55,max(16,len(str(col[0].value))+2))
