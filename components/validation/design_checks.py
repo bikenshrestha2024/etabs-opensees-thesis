@@ -380,10 +380,10 @@ def run(folder,storage=False,nonparallel=False):
     fd,log_temp=tempfile.mkstemp(prefix='.design_check_log_',
                                  suffix='.partial',dir=output)
     try:
-        with os.fdopen(fd,'w',encoding='utf-8',newline='\\n') as writer:
-            writer.write(f"{started}\\nModel SHA256: {digest}\\n"
-                         f"{report['overall']}\\nElapsed including workbook: "
-                         f"{elapsed:.3f} s\\nFinished: {report['finished']}\\n")
+        with os.fdopen(fd,'w',encoding='utf-8',newline='\n') as writer:
+            writer.write(f"{started}\nModel SHA256: {digest}\n"
+                         f"{report['overall']}\nElapsed including workbook: "
+                         f"{elapsed:.3f} s\nFinished: {report['finished']}\n")
             writer.flush()
             os.fsync(writer.fileno())
         _refuse_linked_output_target(log_path)
