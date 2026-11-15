@@ -10,12 +10,19 @@ on:
       - "components/model/display_ids.py"
       - "components/model/id_audit.py"
       - "components/gravity/gui_and_reports.py"
+      - "components/gravity/load_path_formulas.py"
+      - "components/gravity/mesh_cases.py"
+      - "components/sections/area_elements.py"
       - "tests/test_gravity_evidence_stage.py"
       - "tests/test_export_mirror.py"
+      - "tests/test_model_mesh_case_workflow.py"
+      - "tests/test_slab_mesh_excel_paging.py"
       - "tests/test_display_ids_storey.py"
       - "tests/test_id_audit_display_labels.py"
       - "tests/test_id_audit_roles.py"
       - "tests/test_shared_3d_prefix_selector.py"
+      - "tests/test_model_mesh_case_workflow.py"
+      - "tests/test_slab_mesh_excel_paging.py"
       - ".github/workflows/export-staging-regressions.yml"
   pull_request:
     paths:
@@ -47,3 +54,5 @@ jobs:
           tests/test_shared_3d_prefix_selector.py
           tests/test_gravity_evidence_stage.py
           tests/test_export_mirror.py
+          tests/test_model_mesh_case_workflow.py
+          tests/test_slab_mesh_excel_paging.py
