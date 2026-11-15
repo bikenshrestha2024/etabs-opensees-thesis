@@ -483,12 +483,16 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
     return out,json_path
 
 
-def area_output_directory(export_dir=None, *, topology_json=None):
+def area_output_directory(export_dir=None, *, topology_json=None, generated_output=None):
     """Resolve the existing area-integration output folder for GUI browsing.
 
     [REF docs/source/components/sections/area_elements.py.md] This is purely
     navigational: never create folders, run analysis, or infer calibration.
     """
+    if generated_output:
+        generated=Path(generated_output).expanduser().resolve()
+        if generated.is_file():
+            return generated.parent
     if export_dir:
         export=Path(export_dir).expanduser().resolve()
     elif topology_json:
@@ -591,7 +595,8 @@ def launch_area_integration_gui(parent=None, export_dir=None):
             import subprocess
             import sys
             selected=area_output_directory(export_dir,
-                topology_json=paths["topology"].get().strip() or None)
+                topology_json=paths["topology"].get().strip() or None,
+                generated_output=paths["output"].get().strip() or None)
             if sys.platform=="win32":
                 os.startfile(str(selected))
             elif sys.platform=="darwin":
