@@ -145,7 +145,7 @@ class UnifiedOutputContractTests(unittest.TestCase):
             ok = write_table(root / "valid.csv",
                              [{"case": "X", "reaction": -127.5}],
                              columns=("case", "reaction"))
-            self.assertEqual(ok.read_text(), "case,reaction\\nX,-127.5\\n")
+            self.assertEqual(ok.read_text(), "case,reaction\nX,-127.5\n")
 
     def test_csv_rejects_empty_and_nonstring_headers(self):
         with tempfile.TemporaryDirectory() as td:
