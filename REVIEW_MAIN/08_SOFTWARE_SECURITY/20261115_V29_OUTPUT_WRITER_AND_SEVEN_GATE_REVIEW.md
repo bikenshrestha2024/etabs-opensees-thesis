@@ -40,3 +40,11 @@ Regressions: `tests/test_saved_case_identity_v142.py`, `tests/test_post_v8_missi
 - The V135 text log and some legacy producers are not yet using staged writes; multiple related output files are not one atomic transaction.
 - The result-identity gate does not independently verify raw payload content, structural response or physical numerical equivalence.
 - Symlink path checks are normal filesystem guards, not an OS-level TOCTOU race-proof security boundary.
+
+## Post-review V29 output-index amendment (current revision)
+
+The V135 output generator now writes `Design_Check_Output_Index_V135.json` in its existing `09_SOFTWARE_DIAGNOSTICS/DESIGN_CHECKS_V135` report directory. Every table receives a `current_row_count` and a precise `CURRENT_DERIVED_TABLE` or `NO_CURRENT_ROWS_PRIOR_CSV_NOT_REPLACED` status. This avoids silently presenting an old same-name CSV as a fresh result, without deleting historical data or breaking readers. The index carries the exact selected serialized model SHA and explicit `DERIVED_SOFTWARE_REPORT_NOT_ENGINEERING_ACCEPTANCE` scope; it is **not** a case completion certificate.
+
+The generated `Design_Check_V135.log` is also now published through same-directory staged atomic replacement, with temp cleanup. The first log implementation incorrectly used an escaped newline literal and failed CI; it was fixed with normal `\n` escapes and retested. The report remains a **multi-file nontransactional** collection; a successful index cannot by itself prove all related outputs were created in one atomic snapshot. Regressions: `tests/test_v135_drift_source_completion_v13.py`; no original source file was changed.
+
+Recommended user upload package: generated `Design_Check_Output_Index_V135.json`, `Design_Check_Report_V135.json`, `Design_Check_Report_V135.xlsx`, `Design_Check_V135.log` and only the CSV files whose index status is `CURRENT_DERIVED_TABLE`; do not include stale CSVs as current analysis evidence.
