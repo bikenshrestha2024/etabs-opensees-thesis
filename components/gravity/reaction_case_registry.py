@@ -174,10 +174,16 @@ def register_case(output_root, run_result_path, model_path, *,
     """
     output_root=Path(output_root).resolve()
     result_path=Path(run_result_path).resolve()
-    payload=json.loads(result_path.read_text(encoding="utf-8-sig"))
+    evidence_bytes=result_path.read_bytes()
+    payload=json.loads(evidence_bytes.decode("utf-8-sig"))
     record=checked_reaction_result(payload,model_path,scenario=scenario,
         profile=profile,expected_support_tags=expected_support_tags)
     record["result_path"]=str(result_path)
+    # Hash the EXACT bytes verified by the validator, and reject any source
+    # mutation observed before committing the public navigation index.
+    record["result_sha256"]=hashlib.sha256(evidence_bytes).hexdigest()
+    if _sha256(result_path)!=record["result_sha256"]:
+        raise RuntimeError("Gravity solver result changed during case registration")
     record["indexed_at_utc"]=datetime.now(timezone.utc).isoformat()
     # Keep output index under selected output root; no claims about stale results.
     dest=output_root/INDEX_NAME
@@ -240,7 +246,16 @@ def current_case(output_root, model_path, *, scenario, profile,
         result=Path(entry["result_path"])
         if not result.is_file():
             return None
-        payload=json.loads(result.read_text(encoding="utf-8-sig"))
+        # A legacy entry without a saved digest must be re-registered from
+        # verified source evidence. Never silently trust equal reaction totals.
+        digest=entry.get("result_sha256")
+        evidence_bytes=result.read_bytes()
+        if (not isinstance(digest,str) or len(digest)!=64
+                or hashlib.sha256(evidence_bytes).hexdigest()!=digest):
+            return None
+        payload=json.loads(evidence_bytes.decode("utf-8-sig"))
+        if _sha256(result)!=digest:
+            return None
         freshly=checked_reaction_result(payload,model_path,scenario=scenario,
            profile=profile,expected_support_tags=expected_support_tags)
         if abs(freshly["summed_reaction_kN"]-float(entry["summed_reaction_kN"]))>0.01:

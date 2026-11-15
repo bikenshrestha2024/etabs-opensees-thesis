@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "baseline_sha": "945e9aecc422cd400214652ff47b9456acc03526",
+  "scope": "Active repository function-level semantic review queue and gravity registry immutable saved-result identity",
+  "reviewed_current_sources": [
+    "components/gravity/reaction_case_registry.py",
+    "tests/verify_gravity_case_reaction_registry.py",
+    "tools/audit_repository_integrated.py",
+    "tests/test_repository_integrated_audit.py",
+    "tools/audit_active_repository.py",
+    "tools/audit_tracked_review_coverage.py",
+    "engineering/rules/ENGINEERING_GATES.md",
+    "AGENTS.md"
+  ],
+  "corrections": [
+    "Register SHA256 of exact validated gravity solver-result JSON bytes",
+    "Reject registered case after equal-total support reaction redistribution",
+    "Fail closed legacy entry lacking saved-result SHA until re-registration",
+    "Generate function/class/method/nested scope audit queue for every active Python module",
+    "Preserve indexed source SHA and exact line spans; report completed semantic reviews as zero until evidence"
+  ],
+  "test_plan": [
+    "tests.verify_gravity_case_reaction_registry",
+    "tests.test_repository_integrated_audit",
+    "All integrated CI source/output tests"
+  ],
+  "preservation": [
+    "ETABS EDB and original NBC workbook unchanged",
+    "Existing 32/76/97 support scenario numbers unchanged",
+    "No source model solver numerical algorithms changed",
+    "Original gravity output files remain untouched"
+  ],
+  "limits": [
+    "Function register is an exhaustive AST unit inventory, not complete human semantic review",
+    "Native 25-storey ETABS/OpenSees gravity and X-wall NLTHA unverified"
+  ],
+  "ci": "PENDING"
+}

@@ -51,3 +51,8 @@ case, all three indexed locations, stale inputs and profile isolation.
 * [Gravity reaction filter policy](../../../review/GRAVITY_REACTION_FILTER_DIAGNOSTIC.md)
 
 Changes authored by ChatGPT GPT-6; do not infer provenance for historical commits.
+
+
+## 2026-11-15 saved result byte identity
+
+`register_case()` validates the JSON it read and records `result_sha256` from those **same verified bytes**, checking the file again before writing the registry. `current_case()` requires that immutable result fingerprint and independently rechecks the stored source file when it loads each candidate. A redistribution between two support nodes that leaves the total support FZ and applied load unchanged now **invalidates** the previously registered case. Legacy entries without a result hash are not silently accepted and must be re-registered using the existing verified solver result; the original result is never mutated. This protects local evidence identity, not 32/76/97 support physics or ETABS equivalence. Tests: `tests/verify_gravity_case_reaction_registry.py`, including a compensating-reaction modification and a missing-SHA legacy record.

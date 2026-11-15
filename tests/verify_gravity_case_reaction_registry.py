@@ -95,6 +95,39 @@ class ReactionCaseRegistryTests(unittest.TestCase):
                 profile="GRAVITY_1.0D_1.0L")["result_path"],str(result.resolve()))
         self.assertIn("not ETABS validation",text)
 
+    def test_compensating_node_reaction_tamper_invalidates_registered_result(self):
+        mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
+        payload=self.payload(mode)
+        f=self.write(payload)
+        record=register_case(self.output,f,self.model,scenario=mode,
+                             profile="GRAVITY_1.0D_1.0L")
+        self.assertEqual(len(record["result_sha256"]),64)
+        self.assertIsNotNone(current_case(self.output,self.model,scenario=mode,
+                                          profile="GRAVITY_1.0D_1.0L"))
+        # Equal total and unchanged support count/report must NOT make a
+        # changed distribution look like the registered solver result.
+        payload["reactions"][0]["rz_kN"]+=400.0
+        payload["reactions"][1]["rz_kN"]-=400.0
+        f.write_text(json.dumps(payload),encoding="utf-8")
+        self.assertIsNone(current_case(self.output,self.model,scenario=mode,
+                                       profile="GRAVITY_1.0D_1.0L"))
+
+    def test_legacy_entry_without_result_sha_requires_reregistration(self):
+        mode="ETABS_SOURCE_SUPPORTS"
+        f=self.write(self.payload(mode))
+        register_case(self.output,f,self.model,scenario=mode,
+                      profile="GRAVITY_1.0D_1.0L")
+        index=self.output/"Gravity_Case_Reaction_Index.json"
+        records=json.loads(index.read_text(encoding="utf-8"))
+        records[mode+"|GRAVITY_1.0D_1.0L"].pop("result_sha256")
+        index.write_text(json.dumps(records),encoding="utf-8")
+        self.assertIsNone(current_case(self.output,self.model,scenario=mode,
+                                       profile="GRAVITY_1.0D_1.0L"))
+        register_case(self.output,f,self.model,scenario=mode,
+                      profile="GRAVITY_1.0D_1.0L")
+        self.assertIsNotNone(current_case(self.output,self.model,scenario=mode,
+                                          profile="GRAVITY_1.0D_1.0L"))
+
     def test_changed_model_code_invalidates_result(self):
         mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
         f=self.write(self.payload(mode))

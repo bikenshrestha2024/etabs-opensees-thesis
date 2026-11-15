@@ -9,3 +9,6 @@ Every claim carries independent flags: SOURCE_CHECKED, NUMERICALLY_CONVERGED, ET
 - Ground motions: preserve original SeismoMatch scaling, units, time-step, pair mapping and duration. Never double-scale matched accelerograms; confirm vertical-acceleration applicability independently.
 - Materials/FVD/BRB/walls: source actual laboratory data and verified OpenSees build; smoke tests do not validate full 3D material behavior.
 Retain detailed preexisting gates in `docs/00_THESIS_ACCEPTANCE_GATES.md`.
+
+- Stored gravity-result evidence: a saved per-node reaction vector is not identified by only total support FZ or a model-script SHA. Registry entries must pin the exact result JSON SHA256 to reject compensating nodal reaction edits. A matching saved-result digest proves identity since registration, not ETABS/OpenSees physical equivalence.
+- Static review coverage: full tracked-file and AST function inventories are audit queues, not complete semantic validation. `function_level_semantic_review` stays `INCOMPLETE_NOT_EXECUTED` until current-Git-blob, function-level engineering and caller evidence is documented.

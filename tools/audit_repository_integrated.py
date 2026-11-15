@@ -238,6 +238,86 @@ def import_graph(root: Path, source_entries: list[dict]) -> dict:
     }
 
 
+def inspect_semantic_review_units(root: Path, source_entries: list[dict],
+                                  indexed: dict[str, dict]) -> list[dict]:
+    """Generate *not-reviewed* module/function units with exact source spans.
+
+    This is a review queue, NOT an automatic semantic approval. Nested methods
+    and functions receive distinct qualified names; module-level side effects
+    are represented by an explicit <module> unit per file.
+    """
+    records = []
+    interesting = {
+        "call": ("eval", "exec", "compile", "system", "Popen", "run",
+                 "delete", "remove", "unlink", "rmtree", "write_text",
+                 "write_bytes", "open", "load", "loads", "analyze",
+                 "nodeReaction", "GetRestraint", "GetModelFilename"),
+    }
+    for entry in sorted(source_entries, key=lambda r: r["path"]):
+        rel = entry["path"]
+        identity = indexed.get(rel, {})
+        if entry["parse_status"] != "OK":
+            records.append({
+                "path": rel, "git_blob_sha": identity.get("git_blob_sha", ""),
+                "symbol": "<module>", "kind": "MODULE",
+                "start_line": 1, "end_line": entry.get("lines") or 0,
+                "risk_signals": "SOURCE_PARSE_OR_READ_FAILED",
+                "semantic_review_status": "BLOCKED_NOT_REVIEWED",
+                "reviewer": "", "evidence": "",
+            })
+            continue
+        parsed = ast.parse((root / rel).read_text(encoding="utf-8-sig"))
+        # Iterate the complete AST, including definitions within match/case,
+        # async blocks, nested try-star handlers and conditional branches.
+        parents={child:owner for owner in ast.walk(parsed)
+                 for child in ast.iter_child_nodes(owner)}
+        definitions=(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef)
+        for item in ast.walk(parsed):
+            if not isinstance(item,definitions):
+                continue
+            scope=[]
+            ancestor=parents.get(item)
+            while ancestor is not None:
+                if isinstance(ancestor,definitions):
+                    scope.insert(0,ancestor.name)
+                ancestor=parents.get(ancestor)
+            symbol=".".join([*scope,item.name])
+            signals=set()
+            if isinstance(item,(ast.FunctionDef,ast.AsyncFunctionDef)):
+                for sub in ast.walk(item):
+                    if isinstance(sub,ast.Call):
+                        name=(sub.func.id if isinstance(sub.func,ast.Name)
+                              else sub.func.attr if isinstance(
+                                  sub.func,ast.Attribute) else "")
+                        if name in interesting["call"]:
+                            signals.add("CALL_"+name.upper())
+                    elif isinstance(sub,ast.ExceptHandler) and sub.type is None:
+                        signals.add("BARE_EXCEPT")
+                kind=("ASYNC_FUNCTION" if isinstance(
+                    item,ast.AsyncFunctionDef) else "FUNCTION")
+            else:
+                kind="CLASS"
+            records.append({
+                "path":rel,"git_blob_sha":identity.get("git_blob_sha",""),
+                "symbol":symbol,"kind":kind,
+                "start_line":item.lineno,
+                "end_line":getattr(item,"end_lineno",item.lineno),
+                "risk_signals":";".join(sorted(signals)),
+                "semantic_review_status":"NOT_REVIEWED",
+                "reviewer":"","evidence":"",
+            })
+        records.append({
+            "path": rel, "git_blob_sha": identity.get("git_blob_sha", ""),
+            "symbol": "<module>", "kind": "MODULE",
+            "start_line": 1, "end_line": entry.get("lines") or 0,
+            "risk_signals": "MODULE_IMPORT_AND_SIDE_EFFECT_REVIEW",
+            "semantic_review_status": "NOT_REVIEWED", "reviewer": "",
+            "evidence": "",
+        })
+    return sorted(records, key=lambda r: (
+        r["path"], r["start_line"], r["symbol"]))
+
+
 def audit(root: Path) -> dict:
     root = Path(root).resolve(strict=True)
     paths = tracked_paths(root)
@@ -287,6 +367,7 @@ def audit(root: Path) -> dict:
         if len(members)>1
     ]
     graph = import_graph(root, source_entries)
+    semantic_units = inspect_semantic_review_units(root, source_entries, identities)
     findings = []
     if secret_candidates:
         findings.append({"id": "P0_PUBLIC_TREE_SECRET_CANDIDATES",
@@ -364,6 +445,9 @@ def audit(root: Path) -> dict:
         "exact_duplicate_git_blob_groups": duplicate_groups,
         "tracked_classification_counts": dict(sorted(by_kind.items())),
         "active_python_count": len(source_entries),
+        "semantic_review_units": semantic_units,
+        "semantic_review_unit_count": len(semantic_units),
+        "semantic_review_completed_count": 0,
         "active_source_parse_failures": source["syntax_errors"],
         "missing_src_source_guides": missing_src_guides,
         "canonical_missing": source["canonical_missing"],
@@ -379,6 +463,7 @@ def audit(root: Path) -> dict:
             "static_audit": "PASS" if not source["syntax_errors"]
                 and not source["canonical_missing"] and not writers["parse_errors"]
                 else "BLOCKED",
+            "function_level_semantic_review": "INCOMPLETE_NOT_EXECUTED",
             "import_semantics": "REVIEW_REQUIRED",
             "source_guide_semantics": "NOT_REVIEWED",
             "windows_spyder_gui": "NOT_VERIFIED",
@@ -387,6 +472,7 @@ def audit(root: Path) -> dict:
             "nbc_105_2025_compliance": "NOT_VERIFIED",
         },
         "limitations": [
+            "Every source symbol appears in a NOT_REVIEWED function register; AST signals are review hints, not completed semantic inspection.",
             "All tracked paths are inventoried but not all 3000+ files are semantically reviewed.",
             "Active code AST/compile/import scans do not execute models or catch every bug.",
             "Archived snapshots, documentation and binary assets are metadata-classified only.",
@@ -439,6 +525,15 @@ def save(report: dict, directory: Path) -> tuple[Path, Path]:
                         "git_mode", "git_blob_sha"))
         writer.writeheader()
         writer.writerows(report["file_register"])
+    semantic = directory / "08_SEMANTIC_REVIEW" / "function_review_register.csv"
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    with semantic.open("w", encoding="utf-8", newline="") as stream:
+        columns=("path", "git_blob_sha", "symbol", "kind", "start_line",
+                 "end_line", "risk_signals", "semantic_review_status",
+                 "reviewer", "evidence")
+        writer=csv.DictWriter(stream, fieldnames=columns)
+        writer.writeheader()
+        writer.writerows(report["semantic_review_units"])
     for target, data in pieces:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",

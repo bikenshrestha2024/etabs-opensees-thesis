@@ -91,8 +91,64 @@ class IntegratedAuditTests(unittest.TestCase):
                 (out/"07_ARCHIVE_PROVENANCE"/"exact_blob_duplicates.json").read_text())
             self.assertTrue(any(group["contains_historical_snapshot"]
                                 for group in provenance["duplicate_groups"]))
+            semantic=out/"08_SEMANTIC_REVIEW"/"function_review_register.csv"
+            with semantic.open(encoding="utf-8", newline="") as stream:
+                units=list(csv.DictReader(stream))
+            self.assertEqual(len(units),result["semantic_review_unit_count"])
+            self.assertGreater(len(units),result["active_python_count"])
+            self.assertTrue(all(unit["semantic_review_status"]=="NOT_REVIEWED"
+                                for unit in units))
+            self.assertEqual(result["semantic_review_completed_count"],0)
+            self.assertIn("src/thesis_core/neutral_model.py",
+                          {unit["path"] for unit in units})
             self.assertTrue((out/"README.md").is_file())
             self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
+
+    def test_function_review_register_exposes_methods_nested_functions_and_risk(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            source=root/"components"/"study.py"
+            source.parent.mkdir()
+            source.write_text(
+                "class Assembly:\n"
+                "    def run(self, p):\n"
+                "        def publish():\n"
+                "            p.write_text('review')\n"
+                "        return publish()\n",
+                encoding="utf-8")
+            from tools.audit_repository_integrated import inspect_semantic_review_units
+            items=inspect_semantic_review_units(
+                root,inventory(root)["active_python_modules"],
+                {"components/study.py":{"git_blob_sha":"f"*40}})
+            keys={(unit["symbol"],unit["kind"]) for unit in items}
+            self.assertIn(("<module>","MODULE"),keys)
+            self.assertIn(("Assembly","CLASS"),keys)
+            self.assertIn(("Assembly.run","FUNCTION"),keys)
+            self.assertIn(("Assembly.run.publish","FUNCTION"),keys)
+            self.assertTrue(any("CALL_WRITE_TEXT" in unit["risk_signals"]
+                                for unit in items))
+            self.assertTrue(all(unit["git_blob_sha"]=="f"*40 for unit in items))
+            self.assertTrue(all(unit["semantic_review_status"]=="NOT_REVIEWED"
+                                for unit in items))
+
+    def test_review_register_includes_defs_in_match_and_conditional_branches(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            mod=root/"components"/"nested.py"
+            mod.parent.mkdir()
+            mod.write_text(
+                "match 1:\n"
+                "    case 1:\n"
+                "        def matching(): return 1\n"
+                "if True:\n"
+                "    def conditional(): return 2\n",
+                encoding="utf-8")
+            from tools.audit_repository_integrated import inspect_semantic_review_units
+            items=inspect_semantic_review_units(
+                root,inventory(root)["active_python_modules"],
+                {"components/nested.py":{"git_blob_sha":"e"*40}})
+            self.assertIn("matching",{x["symbol"] for x in items})
+            self.assertIn("conditional",{x["symbol"] for x in items})
 
     def test_local_edges_relative_imports_cycles_and_dynamic_import_review(self):
         with tempfile.TemporaryDirectory() as td:
