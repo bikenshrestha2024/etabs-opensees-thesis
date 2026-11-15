@@ -50,9 +50,11 @@ class MeshCasesTests(unittest.TestCase):
 
     def test_source_and_derived_config_have_separate_digest_evidence(self):
         original_sha={p:mesh.digest(self.root/p) for p in mesh.REQUIRED_SOURCE}
+        optional_sha={"ETABS_Materials.csv":mesh.digest(self.root/"ETABS_Materials.csv")}
         path=mesh.stage_case(self.root,8)
         manifest=json.loads((path/"MESH_CASE_PROVENANCE.json").read_text())
-        self.assertEqual(manifest["original_source_file_sha256"],original_sha)
+        self.assertEqual(manifest["original_source_file_sha256"],
+                         {**original_sha, **optional_sha})
         name=mesh.REQUIRED_SOURCE[3]
         self.assertEqual(manifest["original_source_file_sha256"][name],
                          mesh.digest(self.root/name))
