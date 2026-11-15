@@ -37,6 +37,15 @@ class TestOneStoreyPanel(unittest.TestCase):
         self.assertEqual(panel['width_m'],1.0)
         self.assertEqual(panel['thickness_m'],0.6)
 
+    def test_nonfinite_source_panel_is_not_selected(self):
+        for value in (float("nan"),float("inf"),-float("inf")):
+            data=_fixture()
+            data['shells']=data['shells'][:1]
+            data['nodes']['3']=[value,0,3.5]
+            with self.subTest(value=str(value)):
+                with self.assertRaisesRegex(ValueError,"No eligible first-storey"):
+                    select_first_storey_panel(data)
+
     def test_nonrectangular_quad_fails_closed(self):
         source=_fixture()
         source['nodes']['3']=[0.8,0,3.5]
