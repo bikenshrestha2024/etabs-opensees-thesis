@@ -114,18 +114,38 @@ def scan_source(repo):
                           else func.id if isinstance(func, ast.Name) else "")
                 if method not in WRITE_METHODS and method != "open":
                     continue
+                mode_status = None
                 if method == "open":
-                    # Only statically known write/append/exclusive modes.
-                    modes = [_text_literal(x) for x in node.args[1:2]]
-                    modes.extend(_text_literal(k.value) for k in node.keywords
-                                 if k.arg == "mode")
-                    if not any(set(mode) & set("wax+") for mode in modes):
-                        continue
-                occurrences.append({
+                    # Builtin open(path, mode) and Path.open(mode) place their
+                    # positional mode arguments at different indices.
+                    positional_index = (0 if isinstance(func, ast.Attribute) else 1)
+                    mode_node = (node.args[positional_index]
+                                 if len(node.args) > positional_index else None)
+                    keyword_modes = [k.value for k in node.keywords if k.arg == "mode"]
+                    if keyword_modes:
+                        mode_node = keyword_modes[-1]
+                    if mode_node is None:
+                        mode = "r"  # Both open APIs default to a read-only mode.
+                        mode_status = "DEFAULT_READ_ONLY"
+                    elif isinstance(mode_node, ast.Constant) and isinstance(mode_node.value, str):
+                        mode = mode_node.value
+                        mode_status = "STATIC_MODE"
+                    else:
+                        # A dynamic mode must be examined, not silently
+                        # classified as read-only and omitted from the audit.
+                        mode = ""
+                        mode_status = "DYNAMIC_MODE_REVIEW_REQUIRED"
+                    if mode_status != "DYNAMIC_MODE_REVIEW_REQUIRED":
+                        if not any(flag in mode for flag in "wax+"):
+                            continue
+                occurrence = {
                     "line": getattr(node, "lineno", 0),
                     "kind": "POTENTIAL_WRITE_CALL",
                     "method": method,
-                })
+                }
+                if mode_status is not None:
+                    occurrence["mode_classification"] = mode_status
+                occurrences.append(occurrence)
                 totals["possible_write_calls"] += 1
         if occurrences:
             records.append({
