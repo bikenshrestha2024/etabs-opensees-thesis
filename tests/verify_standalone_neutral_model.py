@@ -34,6 +34,79 @@ class StandaloneBoundaryTests(unittest.TestCase):
         self.assertAlmostEqual(check["expected_uz_m"],-4e-5)
         self.assertAlmostEqual(check["actual_uz_m"],-4e-5)
 
+    def test_reject_disconnected_extra_node_before_solver_setup(self):
+        data=cantilever_example()
+        data["nodes"].append({"tag":3,"xyz":[1,0,1],"fixity":[0]*6})
+        with self.assertRaisesRegex(ValueError,"Exactly two connected"):
+            validate_model(data)
+        fake=FakeOps()
+        with self.assertRaisesRegex(ValueError,"Exactly two connected"):
+            run_standalone(data,ops=fake)
+        self.assertEqual(fake.calls,[])
+
+    def test_boolean_fixity_and_element_tag_are_invalid(self):
+        data=cantilever_example()
+        data["nodes"][0]["fixity"][0]=True
+        with self.assertRaisesRegex(ValueError,"integer binary fixity"):
+            validate_model(data)
+        data=cantilever_example()
+        data["elements"][0]["tag"]=True
+        with self.assertRaisesRegex(ValueError,"Invalid element tag"):
+            validate_model(data)
+
+    def test_nondict_element_is_explicitly_rejected(self):
+        data=cantilever_example()
+        data["elements"]=[None]
+        with self.assertRaisesRegex(ValueError,"Element must be a mapping"):
+            validate_model(data)
+
+    def test_unhashable_or_boolean_connectivity_does_not_crash_validator(self):
+        for bad in ([1], True, "1"):
+            data=cantilever_example()
+            data["elements"][0]["nodes"][0]=bad
+            with self.subTest(endpoint=repr(bad)):
+                with self.assertRaisesRegex(ValueError,"integer node tags"):
+                    validate_model(data)
+        for bad in ([2],True,{}):
+            data=cantilever_example()
+            data["loads"][0]["node"]=bad
+            with self.subTest(load_node=repr(bad)):
+                with self.assertRaisesRegex(ValueError,"unknown integer node tag"):
+                    validate_model(data)
+
+    def test_malformed_load_and_source_are_actionable_errors(self):
+        data=cantilever_example()
+        data["loads"]=[None]
+        with self.assertRaisesRegex(ValueError,"Nodal load must be a mapping"):
+            validate_model(data)
+        for description in (123,[], "  "):
+            data=cantilever_example()
+            data["source"]["description"]=description
+            with self.assertRaisesRegex(ValueError,"text model source"):
+                validate_model(data)
+
+    def test_force_balance_does_not_mask_unbalanced_global_moment(self):
+        data=cantilever_example()
+        data["loads"][0]["force"][0]=10.0
+        class MissingSupportMoment(FakeOps):
+            def __getattr__(self,name):
+                base=super().__getattr__(name)
+                if name!="nodeReaction":
+                    return base
+                def response(*args):
+                    if args==(1,1):return -10.0
+                    return base(*args)
+                return response
+        fake=MissingSupportMoment()
+        with self.assertRaisesRegex(RuntimeError,"moment equilibrium FAILED"):
+            run_standalone(data,ops=fake)
+
+    def test_moment_residual_reported_in_separate_3d_equilibrium_gate(self):
+        data=cantilever_example()
+        result=run_standalone(data,ops=FakeOps())
+        self.assertEqual(result["moment_residual_kNm"],[0.0,0.0,0.0])
+        self.assertEqual(result["force_residual_kN"],[0.0,0.0,0.0])
+
     def test_reject_unsupported_wall_without_fallback(self):
         data=cantilever_example();data["elements"][0]["type"]="SFI-MVLEM-3D"
         with self.assertRaisesRegex(ValueError,"Unsupported element"):

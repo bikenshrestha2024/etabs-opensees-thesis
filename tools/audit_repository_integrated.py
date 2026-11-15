@@ -35,6 +35,33 @@ HISTORICAL = ("archive/", "Saved_Project_", "Worked_Example_",
 SCHEMA = "THESIS_INTEGRATED_REPOSITORY_AUDIT_V1"
 
 
+def indexed_git_objects(root: Path) -> dict[str, dict]:
+    """Record immutable *index* blob identity, never read/follow tracked links.
+
+    A dirty checkout may differ from the Git index. The report explicitly
+    labels these as indexed object identities, not working-tree digests.
+    """
+    output=subprocess.check_output(
+        ["git","-C",str(root),"ls-files","--stage","-z"],
+        stderr=subprocess.DEVNULL)
+    entries={}
+    for item in output.split(b"\0"):
+        if not item:
+            continue
+        header, separator, raw_path=item.partition(b"\t")
+        if not separator:
+            raise ValueError("Malformed indexed Git stage entry")
+        fields=header.decode("ascii").split()
+        if len(fields)!=3 or fields[2]!="0":
+            raise ValueError("Unmerged/conflicted Git index entry blocks audit")
+        mode, blob_sha, _stage=fields
+        path=raw_path.decode("utf-8","surrogateescape")
+        if path in entries:
+            raise ValueError("Duplicate Git index path blocks audit")
+        entries[path]={"git_mode":mode,"git_blob_sha":blob_sha}
+    return entries
+
+
 def classify_file(path: str) -> str:
     """Classify every tracked entry without mistaking a snapshot for active code."""
     if "/" not in path and path.endswith(".py"):
@@ -214,6 +241,14 @@ def import_graph(root: Path, source_entries: list[dict]) -> dict:
 def audit(root: Path) -> dict:
     root = Path(root).resolve(strict=True)
     paths = tracked_paths(root)
+    identities=indexed_git_objects(root)
+    if set(paths)!=set(identities):
+        raise ValueError("Tracked-path and Git-index inventories disagree")
+    revision_result=subprocess.run(
+        ["git","-C",str(root),"rev-parse","--verify","HEAD"],
+        capture_output=True,text=True,check=False)
+    revision=(revision_result.stdout.strip()
+              if revision_result.returncode==0 else "UNBORN_HEAD")
     source = inventory(root)
     writers = scan_source(root)
     secret_candidates, secret_skipped = security_audit(root)
@@ -237,7 +272,20 @@ def audit(root: Path) -> dict:
         file_register.append({
             "path": rel, "classification": kind, "audit_state": state,
             "parse_status": entry["parse_status"] if entry else "NOT_APPLICABLE",
+            **identities[rel],
         })
+    # Indexed-object grouping only: do not move, delete, or follow copies.
+    by_blob=defaultdict(list)
+    for item in file_register:
+        by_blob[item["git_blob_sha"]].append(item["path"])
+    duplicate_groups=[
+        {"git_blob_sha":sha,"paths":sorted(members),
+         "contains_historical_snapshot":any(
+             classify_file(p)=="ARCHIVE_OR_RESEARCH_SNAPSHOT_METADATA_ONLY"
+             for p in members)}
+        for sha,members in sorted(by_blob.items())
+        if len(members)>1
+    ]
     graph = import_graph(root, source_entries)
     findings = []
     if secret_candidates:
@@ -311,6 +359,9 @@ def audit(root: Path) -> dict:
         "schema": SCHEMA, "created_utc": datetime.now(timezone.utc).isoformat(),
         "assessment": "TRACKED_FILE_AND_ACTIVE_SOURCE_STATIC_ONLY_NOT_FULL_CODE_REVIEW",
         "tracked_file_count": len(paths),
+        "git_revision": revision,
+        "git_identity_scope": "TRACKED_INDEX_OBJECTS_NOT_DIRTY_WORKTREE",
+        "exact_duplicate_git_blob_groups": duplicate_groups,
         "tracked_classification_counts": dict(sorted(by_kind.items())),
         "active_python_count": len(source_entries),
         "active_source_parse_failures": source["syntax_errors"],
@@ -366,6 +417,11 @@ def save(report: dict, directory: Path) -> tuple[Path, Path]:
         (directory / "05_OUTPUT_WRITERS" / "writer_summary.json",
          {"schema": report["schema"], "totals": report["writer_scan_totals"],
           "parse_failures": report["writer_parse_failures"]}),
+        (directory / "07_ARCHIVE_PROVENANCE" / "exact_blob_duplicates.json",
+         {"schema":report["schema"],"git_revision":report["git_revision"],
+          "git_identity_scope":report["git_identity_scope"],
+          "duplicate_groups":report["exact_duplicate_git_blob_groups"],
+          "warning":"Identical Git objects are not permission to move or remove active paths."}),
         (directory / "06_SECURITY" / "secret_scan_summary.json",
          {"schema": report["schema"],
           "current_tree_candidate_count": report["tracked_secret_candidate_count"],
@@ -379,7 +435,8 @@ def save(report: dict, directory: Path) -> tuple[Path, Path]:
                        encoding="utf-8")
     with register.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(
-            stream, fieldnames=("path", "classification", "audit_state", "parse_status"))
+            stream, fieldnames=("path", "classification", "audit_state", "parse_status",
+                        "git_mode", "git_blob_sha"))
         writer.writeheader()
         writer.writerows(report["file_register"])
     for target, data in pieces:

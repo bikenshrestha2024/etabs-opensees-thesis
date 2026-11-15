@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 through GitHub connector",
+  "base_sha": "88705b88760204fa77bd9a15272d03760b4d2b09",
+  "scope": "Coordinated active benchmark contract and full tracked Git-index archive provenance checks",
+  "verified_source_files": [
+    "src/thesis_core/neutral_model.py",
+    "src/opensees_engine/standalone.py",
+    "tools/run_standalone_benchmark.py",
+    "tests/verify_standalone_neutral_model.py",
+    "tools/audit_repository_integrated.py",
+    "tests/test_repository_integrated_audit.py",
+    "AGENTS.md",
+    "engineering/rules/CORE_RULES.md",
+    "engineering/rules/ENGINEERING_GATES.md"
+  ],
+  "fixed_candidates": [
+    "Disconnected third node allowed in one-element solver",
+    "Boolean fixity/tag values and unhashable connectivity could pass or crash",
+    "Malformed element/load/provenance errors not actionable",
+    "No global moment balance despite 3D six-component reactions",
+    "No indexed Git blob mode/SHA and duplicate snapshot inventory"
+  ],
+  "unchanged": [
+    "All ETABS EDB and research workbooks",
+    "Original working root launchers",
+    "Production full-building components/ numerical algorithms",
+    "Legacy analysis output readers and historical folder paths"
+  ],
+  "tests": [
+    "tests.verify_standalone_neutral_model",
+    "tests.test_repository_integrated_audit",
+    "Existing integrated audit regression workflow"
+  ],
+  "human_gates": {
+    "windows_spyder": "NOT_VERIFIED",
+    "native_etabs": "NOT_VERIFIED",
+    "full_opensees_nltha": "NOT_VERIFIED",
+    "original_32_supports": "NOT_VERIFIED",
+    "nbc_105_2025_acceptance": "NOT_VERIFIED"
+  },
+  "security": "No private model source files or candidate token values published",
+  "ci_status": "PENDING_CI"
+}

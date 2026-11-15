@@ -24,6 +24,7 @@ class IntegratedAuditTests(unittest.TestCase):
                 "components/gravity/solver.py": "from src.thesis_core.neutral_model import f\n",
                 "README.md": "# guide\n",
                 "archive/previous_versions/old.py": "broken code not runnable\n",
+                "archive/previous_versions/old_copy.py": "broken code not runnable\n",
                 "docs/overview.md": "Report\n",
                 "research_model.bin": "opaque archive",
             }
@@ -43,6 +44,18 @@ class IntegratedAuditTests(unittest.TestCase):
                              "METADATA_INVENTORIED_NOT_SEMANTICALLY_REVIEWED")
             self.assertEqual(records["src/thesis_core/neutral_model.py"]["parse_status"],
                              "OK")
+            self.assertEqual(result["git_identity_scope"],
+                             "TRACKED_INDEX_OBJECTS_NOT_DIRTY_WORKTREE")
+            self.assertEqual(result["git_revision"],"UNBORN_HEAD")
+            self.assertEqual(
+                records["archive/previous_versions/old.py"]["git_blob_sha"],
+                records["archive/previous_versions/old_copy.py"]["git_blob_sha"])
+            self.assertEqual(records["archive/previous_versions/old.py"]["git_mode"],
+                             "100644")
+            duplicates=[x for x in result["exact_duplicate_git_blob_groups"]
+                        if "archive/previous_versions/old.py" in x["paths"]]
+            self.assertEqual(len(duplicates),1)
+            self.assertTrue(duplicates[0]["contains_historical_snapshot"])
             self.assertEqual(result["acceptance"]["etabs_opensees_equivalence"],
                              "NOT_VERIFIED")
             self.assertNotIn("archive/previous_versions/old.py",
@@ -54,6 +67,7 @@ class IntegratedAuditTests(unittest.TestCase):
             with register.open(encoding="utf-8", newline="") as stream:
                 rows = list(csv.DictReader(stream))
             self.assertEqual(len(rows), len(files))
+            self.assertTrue(all(len(row["git_blob_sha"])==40 for row in rows))
             self.assertEqual(summary.relative_to(out).as_posix(),
                              "00_OVERVIEW/integrated_audit.json")
             self.assertEqual(register.relative_to(out).as_posix(),
@@ -64,6 +78,7 @@ class IntegratedAuditTests(unittest.TestCase):
                 "04_ACCEPTANCE/acceptance_gates.json",
                 "05_OUTPUT_WRITERS/writer_summary.json",
                 "06_SECURITY/secret_scan_summary.json",
+                "07_ARCHIVE_PROVENANCE/exact_blob_duplicates.json",
             )
             for rel in sections:
                 with self.subTest(section=rel):
@@ -72,6 +87,10 @@ class IntegratedAuditTests(unittest.TestCase):
             self.assertEqual(
                 json.loads((out/"04_ACCEPTANCE"/"acceptance_gates.json").read_text())
                 ["acceptance"]["etabs_opensees_equivalence"], "NOT_VERIFIED")
+            provenance=json.loads(
+                (out/"07_ARCHIVE_PROVENANCE"/"exact_blob_duplicates.json").read_text())
+            self.assertTrue(any(group["contains_historical_snapshot"]
+                                for group in provenance["duplicate_groups"]))
             self.assertTrue((out/"README.md").is_file())
             self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
 

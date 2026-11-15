@@ -38,8 +38,10 @@ def validate_model(data):
     if data.get("mode") not in ("standalone","benchmark"):
         raise ValueError("Only standalone or benchmark source mode allowed")
     nodes=data.get("nodes");elements=data.get("elements");loads=data.get("loads")
-    if not isinstance(nodes,list) or len(nodes)<2:
-        raise ValueError("At least two nodes required")
+    # The prototype creates exactly one two-node element. Extra nodes are
+    # disconnected (and may introduce singular free DOFs); do not accept them.
+    if not isinstance(nodes,list) or len(nodes)!=2:
+        raise ValueError("Exactly two connected nodes required for benchmark")
     if not isinstance(elements,list) or len(elements)!=1:
         raise ValueError("Only ONE 3D elastic beam-column element supported")
     if not isinstance(loads,list) or not loads:
@@ -52,18 +54,23 @@ def validate_model(data):
             raise ValueError("Duplicate or invalid node tag")
         ids.add(tag);coords[tag]=_numeric_vector(node.get("xyz"),3,"node.xyz")
         f=node.get("fixity")
-        if not isinstance(f,list) or len(f)!=6 or any(x not in (0,1) for x in f):
-            raise ValueError("Every node needs six explicit binary fixity values")
+        if (not isinstance(f,list) or len(f)!=6
+                or any(type(x) is not int or x not in (0,1) for x in f)):
+            raise ValueError("Every node needs six explicit integer binary fixity values")
         if all(f):fixed+=1
     if fixed<1:raise ValueError("At least one fully restrained 3D node required")
     element=elements[0]
+    if not isinstance(element,dict):
+        raise ValueError("Element must be a mapping")
     if element.get("type")!="elasticBeamColumn3D":
         raise ValueError("Unsupported element type; no shell/wall/device substitution")
     ends=element.get("nodes")
-    if not isinstance(ends,list) or len(ends)!=2 or ends[0]==ends[1] or any(t not in ids for t in ends):
-        raise ValueError("Element endpoints not mapped to two different nodes")
+    if (not isinstance(ends,list) or len(ends)!=2
+            or any(type(t) is not int or t not in ids for t in ends)
+            or ends[0]==ends[1]):
+        raise ValueError("Element endpoints not mapped to two different integer node tags")
     tag=element.get("tag")
-    if not isinstance(tag,int) or tag<=0:raise ValueError("Invalid element tag")
+    if type(tag) is not int or tag<=0:raise ValueError("Invalid element tag")
     if math.dist(coords[ends[0]],coords[ends[1]])<=1e-9:
         raise ValueError("Zero-length elastic beam")
     section=element.get("section")
@@ -80,13 +87,17 @@ def validate_model(data):
     if not any(not all(n["fixity"]) for n in nodes):
         raise ValueError("No unconstrained degrees of freedom")
     for load in loads:
-        if load.get("node") not in ids:
-            raise ValueError("Nodal load references unknown node")
+        if not isinstance(load,dict):
+            raise ValueError("Nodal load must be a mapping")
+        load_tag=load.get("node")
+        if type(load_tag) is not int or load_tag not in ids:
+            raise ValueError("Nodal load references unknown integer node tag")
         _numeric_vector(load.get("force"),6,"nodal load vector")
     if set(data)-{"schema_version","units","mode","nodes","elements","loads","source"}:
         raise ValueError("Unknown schema fields; no silent field discard")
-    if not isinstance(data.get("source"),dict) or not data["source"].get("description"):
-        raise ValueError("Model source description and provenance required")
+    description=(data.get("source") or {}).get("description") if isinstance(data.get("source"),dict) else None
+    if not isinstance(description,str) or not description.strip():
+        raise ValueError("Nonempty text model source description and provenance required")
     return data
 
 def model_sha256(data):

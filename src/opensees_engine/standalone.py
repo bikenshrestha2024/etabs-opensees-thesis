@@ -47,12 +47,36 @@ def run_standalone(data,ops=None):
     scale=max(1.0,max(abs(x) for x in external))
     if max(abs(x) for x in residual)>1e-6*scale:
         raise RuntimeError("Global axial/translational force equilibrium FAILED")
+
+    # The six-component OpenSees responses also need independent moment
+    # equilibrium about one global origin. Forces acting away from that origin
+    # produce r x F; nodal moment components must be included independently.
+    # A zero force residual does NOT establish a valid 3D reaction field.
+    positions={int(n["tag"]):n["xyz"] for n in nodes}
+    def global_moment(position, values):
+        x,y,z=position
+        fx,fy,fz,mx,my,mz=values
+        return (mx+y*fz-z*fy, my+z*fx-x*fz, mz+x*fy-y*fx)
+    contributions=[
+        global_moment(positions[int(row["node"])],row["force"])
+        for row in data["loads"]
+    ]
+    contributions.extend(
+        global_moment(positions[int(tag)],values)
+        for tag,values in reaction.items()
+    )
+    moment_residual=[sum(part[k] for part in contributions) for k in range(3)]
+    moment_scale=max(1.0,sum(max(abs(value) for value in part)
+                             for part in contributions))
+    if max(abs(value) for value in moment_residual)>1e-6*moment_scale:
+        raise RuntimeError("Global moment equilibrium FAILED")
     return {"schema":"standalone-ops-benchmark-v1","model_sha256":model_sha256(data),
             "status":"NUMERICALLY_CONVERGED_ONLY",
             "etabs_equivalence":"NOT_APPLICABLE",
             "full_building_validation":"NOT_PERFORMED",
             "displacement_m_and_rad":displacement,
-            "reaction_kN_and_kNm":reaction,"force_residual_kN":residual}
+            "reaction_kN_and_kNm":reaction,"force_residual_kN":residual,
+            "moment_residual_kNm":moment_residual}
 
 def axial_cantilever_check(data,results,relative_tolerance=0.002):
     """Independent analytical axial solution, only for synthetic cantilever."""
