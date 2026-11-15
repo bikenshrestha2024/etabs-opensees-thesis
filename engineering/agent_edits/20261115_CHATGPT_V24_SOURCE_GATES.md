@@ -10,3 +10,9 @@
 - Tools: connected GitHub repository API, GitHub Actions; native ETABS/Windows GUI/OpenSees solver not available in this environment.
 - Strictly preserved: original EDB, original Aw/T1 Excel, 32/76/97 independent physical restraints, material calibration gate and original ground-motion records.
 - Source modification does not count as native model acceptance. Existing uncommitted external local data were not accessed.
+
+## Supplementary V24 reader fix
+
+- `components/validation/case_review.py::collect` source and `tests/test_case_review_canonical_output.py`: recover safely from damaged or nonfinite saved profile, drift and deformation evidence; preserve legacy reader output paths and model SHA checks.
+- Per-file inspected line range recorded in `docs/review/ledger/REVIEW_LEDGER_V24_20261115_TARGETED.csv` with source blob ID.
+- Native Windows GUI remains unexecuted; no originally generated results were overwritten or moved.
