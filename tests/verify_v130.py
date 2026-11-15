@@ -48,12 +48,14 @@ class V130(unittest.TestCase):
             def write(out):Path(out,'data.csv').write_text('x,y\n1,2\n')
             write(td);p=Path(td)
             self.assertEqual((p/'data.csv').read_text(),'x,y\n1,2\n')
-            meta=json.loads((p/'data.csv.processing.json').read_text());self.assertEqual(meta['status'],'completed');self.assertGreaterEqual(meta['elapsed_seconds'],0);self.assertTrue(meta['started_at'].endswith('+05:45'))
+            self.assertFalse((p/'data.csv.processing.json').exists())
+            self.assertTrue((p/'00_PROCESSING_METADATA'/'OUTPUT_TIMING_INDEX_V130.json').exists())
+            meta=json.loads((p/'00_PROCESSING_METADATA'/'ARTIFACTS'/'data.csv.processing.json').read_text());self.assertEqual(meta['status'],'completed');self.assertGreaterEqual(meta['elapsed_seconds'],0);self.assertTrue(meta['started_at'].endswith('+05:45'))
     def test_timing_failure_is_recorded(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parent) as td:
             @timed_outputs('failure stage','out')
             def write(out):Path(out,'partial.txt').write_text('partial');raise RuntimeError('expected')
             with self.assertRaises(RuntimeError):write(td)
-            self.assertEqual(json.loads(Path(td,'partial.txt.processing.json').read_text())['status'],'failed')
+            self.assertEqual(json.loads(Path(td,'00_PROCESSING_METADATA','ARTIFACTS','partial.txt.processing.json').read_text())['status'],'failed')
 
 if __name__=='__main__':unittest.main()
