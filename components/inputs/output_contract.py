@@ -54,12 +54,28 @@ def safe_component(value):
     return part
 
 
+def _refuse_linked_output_target(target):
+    """Refuse pre-existing symbolic links in the destination path chain.
+
+    This guards normal checked paths; it cannot close OS-level TOCTOU races
+    when a different process concurrently changes directory entries.
+    """
+    target=Path(target)
+    for component in (target,*target.parents):
+        if component.is_symlink():
+            raise ValueError("Refusing linked derived-output destination: "+str(component))
+
+
 def atomic_json(path, data):
     """[REF docs/source/components/inputs/output_contract.py.md]
     Stable two-space UTF-8 JSON, replacing only the specified derived output.
     """
     target = Path(path)
+    _refuse_linked_output_target(target)
     target.parent.mkdir(parents=True, exist_ok=True)
+    # A concurrently substituted linked directory is not fully prevented
+    # without fd-relative openat controls; recheck before creating the file.
+    _refuse_linked_output_target(target)
     fd, name = tempfile.mkstemp(prefix=".writing_", suffix=".partial", dir=target.parent)
     tmp = Path(name)
     try:
@@ -69,6 +85,7 @@ def atomic_json(path, data):
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
+        _refuse_linked_output_target(target)
         os.replace(tmp, target)
     finally:
         tmp.unlink(missing_ok=True)
