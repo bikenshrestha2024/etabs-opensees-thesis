@@ -136,6 +136,65 @@ class MeshCasesTests(unittest.TestCase):
                 self.assertEqual(shells,[])
                 self.assertEqual(objects,{})
 
+    def test_mesh_diagnostic_zip_is_separate_and_hash_verified(self):
+        import zipfile
+        for n in (4,8,16):
+            folder=mesh.case_base(self.root,n)
+            run=folder/"RUNS"/"RUN_TEST"
+            run.mkdir(parents=True)
+            (run/"MESH_BUILD_STATUS.json").write_text(
+                json.dumps({"status":"STAGED_NOT_ASSEMBLED"}))
+            (folder/"EXCEL").mkdir()
+            (folder/"EXCEL"/"sample.xlsx").write_bytes(b"synthetic-only")
+            zip_path=mesh.package_mesh_case(self.root,n)
+            self.assertEqual(zip_path.name,f"MESH_{n:02d}.zip")
+            self.assertEqual(zip_path.parent.name,"UPLOAD_PACKAGES")
+            with zipfile.ZipFile(zip_path) as z:
+                self.assertIsNone(z.testzip())
+                names=z.namelist()
+                self.assertIn(f"MESH_{n:02d}/RUNS/RUN_TEST/MESH_BUILD_STATUS.json",names)
+                self.assertIn(f"MESH_{n:02d}/EXCEL/sample.xlsx",names)
+                manifest=json.loads(z.read(f"MESH_{n:02d}/ZIP_SHA256_MANIFEST.json"))
+                self.assertEqual(manifest["mesh_subdivisions"],n)
+                self.assertEqual(manifest["status"],
+                                 "DIAGNOSTIC_PACKAGE_NOT_SOLVER_ACCEPTANCE")
+                self.assertEqual(
+                    manifest["files"]["RUNS/RUN_TEST/MESH_BUILD_STATUS.json"],
+                    mesh.digest(run/"MESH_BUILD_STATUS.json"))
+            self.assertTrue((folder/"EXCEL"/"sample.xlsx").is_file())
+
+    def test_recover_excel_only_from_hash_verified_assembled_mesh(self):
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        import hashlib
+        run=mesh.stage_case(self.root,16)
+        cfg=run/mesh.REQUIRED_SOURCE[3]
+        (run/"OpenSees_Complete_Model_Data_V118.json").write_text(
+            json.dumps({"config_sha256":mesh.digest(cfg),
+                        "shells":[{"category":"FLOOR"}]}),encoding="utf-8")
+        seen=[]
+        def fake_export(folder,*,output_root):
+            seen.append((folder,output_root))
+            excel=output_root/"EXCEL"/"test.xlsx"
+            excel.parent.mkdir(parents=True,exist_ok=True)
+            excel.write_text("mock formula workbook")
+            return excel
+        with patch.dict("sys.modules",{"OpenSees_Load_Path_V141":
+                                      SimpleNamespace(export=fake_export)}):
+            evidence=mesh.recover_assembled_mesh_workbook(self.root,16)
+        self.assertEqual(evidence["status"],
+                         "FORMULA_WORKBOOK_REEXPORTED_NOT_GRAVITY_VERIFIED")
+        self.assertEqual(seen,[(run,mesh.case_base(self.root,16))])
+        self.assertTrue(Path(evidence["workbook"]).exists())
+        self.assertEqual(
+            json.loads((run/"MESH_BUILD_STATUS.json").read_text())["status"],
+            "FORMULA_WORKBOOK_REEXPORTED_NOT_GRAVITY_VERIFIED")
+        # Changing a source file must block reuse of the older run.
+        (self.root/"OpenSees_Element_Connectivity.json").write_text(
+            '{"changed":true}')
+        with self.assertRaisesRegex(ValueError,"source audit changed"):
+            mesh.recover_assembled_mesh_workbook(self.root,16)
+
     def test_reject_missing_audit_and_invalid_mesh(self):
         with self.assertRaises(ValueError):
             mesh.case_base(self.root,2)

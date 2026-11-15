@@ -507,6 +507,23 @@ def area_output_directory(export_dir=None, *, topology_json=None, generated_outp
     return target if target.is_dir() else export
 
 
+def default_area_integration_script_path(export_dir):
+    """Suggested working-call path (not an approval to execute FSAM walls).
+
+    Always keep the generated, disabled-by-default Python call under the
+    selected case's 02_MODEL/AREA_INTEGRATION/PYTHON directory.
+
+    [REF docs/source/components/sections/area_elements.py.md]
+    """
+    root=Path(export_dir).expanduser().resolve()
+    target=root/"02_MODEL"/"AREA_INTEGRATION"/"PYTHON"/"OpenSees_Area_Integration_Call_V116.py"
+    if any(p.is_symlink() for p in (root,root/"02_MODEL",
+                                   root/"02_MODEL"/"AREA_INTEGRATION",
+                                   target.parent,target)):
+        raise ValueError("Refusing linked area-integration Python output")
+    return target
+
+
 def launch_area_integration_gui(parent=None, export_dir=None):
     """Write a reviewed area-stage call for insertion into the model builder."""
     import tkinter as tk
@@ -543,8 +560,24 @@ def launch_area_integration_gui(parent=None, export_dir=None):
     def write_call():
         if not all(paths[k].get().strip() for k in ("topology", "audit", "config")):
             messagebox.showerror("Select inputs", "Choose the topology JSON, area section audit CSV and reviewed config JSON.", parent=win); return
-        target = filedialog.asksaveasfilename(title="Save area integration call", parent=win, defaultextension=".py", initialfile="OpenSees_Area_Integration_Call_V116.py", filetypes=[("Python files", "*.py")])
+        folder=Path(export_dir).resolve() if export_dir else Path(paths["topology"].get()).resolve().parent
+        suggested=default_area_integration_script_path(folder)
+        suggested.parent.mkdir(parents=True,exist_ok=True)
+        target = filedialog.asksaveasfilename(
+            title="Save area integration call (recommended 02_MODEL/AREA_INTEGRATION/PYTHON)",
+            parent=win, defaultextension=".py",
+            initialdir=str(suggested.parent),
+            initialfile=suggested.name,
+            filetypes=[("Python files", "*.py")])
         if not target: return
+        target=Path(target).expanduser().resolve()
+        if target.suffix.lower()!=".py":
+            messagebox.showerror("Invalid extension","Area integration call must end in .py",parent=win)
+            return
+        if target.exists() and target.is_symlink():
+            messagebox.showerror("Unsafe output","Refusing linked Python output file",parent=win)
+            return
+        target.parent.mkdir(parents=True,exist_ok=True)
         def q(value): return repr(str(Path(value).expanduser().resolve()))
         source = (
             "# Add this block after model nodes and required materials are defined.\n"
@@ -572,6 +605,8 @@ def launch_area_integration_gui(parent=None, export_dir=None):
             "# Merge AREA_MASS_NODAL with frame/wall self-weight and all other ETABS mass sources,\n"
             "# reconcile every floor to the ETABS seismic-weight report, then assign combined nodal mass once.\n"
         )
+        # Save only the disabled-by-default source template; do not execute
+        # it or alter the original ETABS source/assembled model.
         Path(target).write_text(source, encoding="utf-8")
         paths["output"].set(target)
         messagebox.showinfo("Integration call created", f"Review and insert this block into your model-builder after all ETABS nodes and FSAM materials are defined:\n\n{target}\n\nThis helper does not create gravity loads, total seismic mass, P-Delta preload, or an NLTHA-ready model.", parent=win)

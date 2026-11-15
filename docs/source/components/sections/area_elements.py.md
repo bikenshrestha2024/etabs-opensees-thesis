@@ -30,3 +30,8 @@ For the full rationale, mesh procedure, distinctions between **source quads** an
 
 ## 2026-11-15 — Open output folder UI
 The Area Element Integration V116 window now offers **Open output folder**. It uses `area_output_directory` to open the existing saved integration-call parent directory, else the existing `02_MODEL/AREA_INTEGRATION/` folder (where Excel/JSON source inventory belongs), else the existing export root. It creates no directories and never initiates OpenSees. On Windows it opens File Explorer using `os.startfile`; macOS/Linux use their system openers. It does not approve a wall config or modify the original EDB. A linked canonical output stage is refused. Source-only test: `tests/test_area_folder_and_hinged_brace_review.py`; engineering evidence `REVIEW_MAIN/00_MODEL/20261115_AREA_HINGED_BRACE_AND_MESH_EVIDENCE.md`.
+
+
+## 2026-11-15 — default Python integration-call export location
+
+The Area Integration GUI now opens its `Save area integration call` dialog in the selected ETABS export root's `02_MODEL/AREA_INTEGRATION/PYTHON/` directory (the default is `OpenSees_Area_Integration_Call_V116.py`). The directory is created if absent so Windows Save As does not silently fall back to the previous arbitrary folder. Selecting an alternate `.py` file still works; non-`.py` targets and symlink final file are rejected. This action creates an **inactive** review snippet (`AREA_STAGE_EXECUTION=False`), not an OpenSees assembled area model or permission to run nonlinear FSAM walls. Original ETABS source input files and folders remain unchanged. Pure helper `default_area_integration_script_path` may be tested independently of Tk/Windows.

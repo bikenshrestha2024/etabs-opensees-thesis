@@ -174,6 +174,122 @@ def stage_case(folder, subdivisions):
     return run_dir
 
 
+def package_mesh_case(folder, subdivisions):
+    """Package one independent mesh case without merging distinct run identities.
+
+    A ZIP is a diagnostic export, not evidence of a completed gravity solve.
+
+    [REF docs/source/components/gravity/mesh_cases.py.md]
+    Store it at 02_MODEL/SLAB_LOAD_PATH/UPLOAD_PACKAGES/MESH_nn.zip.
+    Existing case data are read-only; symlinks and recursive uploads refused.
+    """
+    import zipfile
+    root=_refuse_linked_chain(folder).resolve(strict=True)
+    n=validated_mesh_size(subdivisions)
+    case=_refuse_linked_chain(case_base(root,n))
+    if not case.is_dir():
+        raise FileNotFoundError(f"MESH_{n:02d} case has no outputs to package")
+    output=root/"02_MODEL"/"SLAB_LOAD_PATH"/"UPLOAD_PACKAGES"/f"MESH_{n:02d}.zip"
+    _refuse_linked_chain(output)
+    # Do not label an in-progress write as a complete debugging snapshot.
+    for status_path in case.glob("RUNS/RUN_*/MESH_BUILD_STATUS.json"):
+        _refuse_linked_chain(status_path)
+        state=json.loads(status_path.read_text(encoding="utf-8-sig")).get("status")
+        if state in {"ASSEMBLY_RUNNING","MODEL_ASSEMBLED_FORMULA_EXPORT_RUNNING"}:
+            raise RuntimeError("Mesh run is still writing: "+str(status_path.parent))
+    files=[]
+    for p in sorted(case.rglob("*")):
+        _refuse_linked_chain(p)
+        if p.is_file() and not p.name.endswith(".processing.json"):
+            files.append(p)
+    if not files:
+        raise ValueError(f"MESH_{n:02d} has no saved files")
+    output.parent.mkdir(parents=True,exist_ok=True)
+    # A unique same-directory staging name prevents a second ZIP click
+    # from corrupting an in-progress archive; replace only after validation.
+    temporary=output.with_name(output.name+".tmp-"+uuid4().hex)
+    _refuse_linked_chain(temporary)
+    manifest={"mesh_subdivisions":n,
+              "status":"DIAGNOSTIC_PACKAGE_NOT_SOLVER_ACCEPTANCE",
+              "files":{p.relative_to(case).as_posix():digest(p) for p in files}}
+    try:
+        with zipfile.ZipFile(temporary,"w",compression=zipfile.ZIP_DEFLATED,
+                             compresslevel=6,allowZip64=True) as z:
+            for p in files:
+                z.write(p,arcname=f"MESH_{n:02d}/"+p.relative_to(case).as_posix())
+            z.writestr(f"MESH_{n:02d}/ZIP_SHA256_MANIFEST.json",
+                       json.dumps(manifest,indent=2))
+        with zipfile.ZipFile(temporary) as check:
+            bad=check.testzip()
+            if bad:raise IOError("ZIP checksum failed: "+bad)
+            for name,expected in manifest["files"].items():
+                checksum=sha256()
+                with check.open(f"MESH_{n:02d}/"+name) as stream:
+                    for block in iter(lambda:stream.read(1024*1024),b""):
+                        checksum.update(block)
+                if checksum.hexdigest()!=expected:
+                    raise IOError("Source file changed during ZIP assembly: "+name)
+        temporary.replace(output)
+    finally:
+        if temporary.exists():temporary.unlink()
+    return output
+
+
+def recover_assembled_mesh_workbook(folder, subdivisions):
+    """Re-export a workbook without reassembling an already verified mesh.
+
+    Model and saved configuration SHA must match, and the original source
+    hashes must still match the staged run's source manifest. This is a
+    spreadsheet recovery only, NOT gravity convergence/ETABS acceptance.
+
+    [REF docs/source/components/gravity/mesh_cases.py.md]
+    """
+    root=_refuse_linked_chain(folder).resolve(strict=True)
+    n=validated_mesh_size(subdivisions)
+    case=case_base(root,n)
+    parent=_refuse_linked_chain(case/"RUNS")
+    if not parent.is_dir():
+        raise FileNotFoundError(f"No independent MESH_{n:02d} runs exist")
+    runs=sorted((p for p in parent.iterdir() if p.is_dir() and
+                 p.name.startswith("RUN_")),key=lambda p:p.name,reverse=True)
+    for run in runs:
+        _refuse_linked_chain(run)
+        model=run/"OpenSees_Complete_Model_Data_V118.json"
+        cfg_file=run/REQUIRED_SOURCE[3]
+        provenance=run/"MESH_CASE_PROVENANCE.json"
+        if not all(p.is_file() for p in (model,cfg_file,provenance)):
+            continue
+        meta=json.loads(provenance.read_text(encoding="utf-8-sig"))
+        if meta.get("mesh_subdivisions")!=n:
+            raise ValueError("Mesh run identity disagrees with selected mesh")
+        before=meta.get("original_source_file_sha256",{})
+        if not before or any(not (root/name).is_file() or
+                             digest(root/name)!=saved_sha
+                             for name,saved_sha in before.items()):
+            raise ValueError("Original ETABS source audit changed; do not re-export stale mesh run")
+        staged_cfg=json.loads(cfg_file.read_text(encoding="utf-8-sig"))
+        root_cfg=json.loads((root/REQUIRED_SOURCE[3]).read_text(encoding="utf-8-sig"))
+        if staged_cfg!=dict(root_cfg,floor_subdivisions=n):
+            raise ValueError("Staged mesh config no longer matches source settings")
+        assembled=json.loads(model.read_text(encoding="utf-8-sig"))
+        if assembled.get("config_sha256")!=digest(cfg_file):
+            raise ValueError("Assembled mesh SHA/config mismatch; do not reuse this model")
+        if not any(e.get("category")=="FLOOR" for e in assembled.get("shells",[])):
+            raise ValueError("Assembled model contains no FLOOR shell cells")
+        from OpenSees_Load_Path_V141 import export
+        workbook=export(run,output_root=case)
+        status=dict(status="FORMULA_WORKBOOK_REEXPORTED_NOT_GRAVITY_VERIFIED",
+                    mesh_subdivisions=n,workbook=str(workbook),
+                    assembled_model=str(model),config_sha256=digest(cfg_file),
+                    run_directory=str(run),
+                    note="Reused matching assembled mesh; NO native gravity or ETABS comparison")
+        (run/"MESH_BUILD_STATUS.json").write_text(
+            json.dumps(status,indent=2),encoding="utf-8")
+        return status
+    raise FileNotFoundError(
+        f"No completed SHA-matched assembled MESH_{n:02d} run found. Build the mesh first.")
+
+
 def build_case(folder, subdivisions, *, runtime_dir=None):
     """Stage, assemble fresh mesh and export formula workbook for that mesh only.
 
@@ -191,6 +307,7 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
         log.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
         return report
     record("ASSEMBLY_RUNNING")
+    assembly_complete=False
     try:
         from OpenSees_Complete_Export_V118 import prepare_complete_export
         if runtime_dir is None:
@@ -214,6 +331,9 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
             raise RuntimeError("Mesh size not preserved by model assembly.") from exc
         if assembled_n != n:
             raise RuntimeError("Mesh size was not preserved by model assembly.")
+        assembly_complete=True
+        record("MODEL_ASSEMBLED_FORMULA_EXPORT_RUNNING",
+               assembled_model=str(model_path),config_sha256=digest(cfgpath))
         from OpenSees_Load_Path_V141 import export
         workbook = export(run_dir, output_root=case_base(folder, n))
         result = record(
@@ -226,5 +346,6 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
         )
         return result
     except Exception as exc:
-        record("ASSEMBLY_FAILED", error=f"{type(exc).__name__}: {exc}")
+        record("WORKBOOK_EXPORT_FAILED_MODEL_ASSEMBLED" if assembly_complete
+               else "ASSEMBLY_FAILED", error=f"{type(exc).__name__}: {exc}")
         raise

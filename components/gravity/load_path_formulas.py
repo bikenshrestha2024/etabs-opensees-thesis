@@ -126,7 +126,21 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     for title in ('Surface load formulas','Loaded node path','Member weight formulas','Vertical load path'):
         if title in wb:del wb[title]
     ws=wb.create_sheet('Surface load formulas');ws.append(['Source area','Component','Pattern','Mesh cell','Area m2','Downward q kN per m2','Gravity factor','Mass factor','Q unfactored kN','Applied kN','Mass tonnes','Node share kN','Nodes','Origin','Physical thickness m','Unit weight kN per m3','Self-weight multiplier'])
-    links=wb.create_sheet('Loaded node path');links.append(['Source area','Pattern','Cell row','Node','X m','Y m','Z m','Applied nodal Fz kN downward','Connected beam solver tags','Connected wall solver tags','Role'])
+    # Excel's hard row ceiling is 1,048,576 including the header. A 16x16
+    # slab mesh can produce >1M per-node pressure paths; partition without
+    # truncating the data or referring to nonexistent worksheet rows.
+    from openpyxl.xml.constants import MAX_ROW
+    node_headers=['Source area','Pattern','Cell row','Node','X m','Y m','Z m','Applied nodal Fz kN downward','Connected beam solver tags','Connected wall solver tags','Role']
+    links=wb.create_sheet('Loaded node path')
+    links.append(node_headers)
+    node_sheet_number=1
+    def append_node_path(record):
+        nonlocal links,node_sheet_number
+        if links.max_row>=MAX_ROW:
+            node_sheet_number+=1
+            links=wb.create_sheet(f'Loaded node path {node_sheet_number:02d}')
+            links.append(node_headers)
+        links.append(record)
     adjacency={};walls={}
     for tag,e in enumerate(data.get('frames',[]),100001):
         if e['category']=='BEAM':
@@ -148,7 +162,16 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
             surface_row+=1;row=surface_row;own=component=='self_weight_floor';ws.append([cell['object'],component,pattern,index,cell['area'],f'=O{row}*P{row}*Q{row}' if own else q,1.0,cfg['mass_factors'].get(pattern,0),f'=E{row}*F{row}',f'=I{row}*G{row}',f'=I{row}*H{row}/9.80665',f'=J{row}/4',','.join(map(str,cell['nodes'])),origin,cell['properties']['thickness'] if own else None,cell['properties']['weight'] if own else None,multipliers.get(pattern) if own else None])
             for node in cell['nodes']:
                 xyz=data['nodes'].get(int(node),data['nodes'].get(str(node))); beams=adjacency.get(int(node),[]);wall=walls.get(int(node),[])
-                links.append([cell['object'],pattern,row,node,*xyz,f"='Surface load formulas'!L{row}",','.join(map(str,beams)),','.join(map(str,wall)),'beam joint' if beams else 'wall joint' if wall else 'slab interior / other joint'])
+                append_node_path([cell['object'],pattern,row,node,*xyz,f"='Surface load formulas'!L{row}",','.join(map(str,beams)),','.join(map(str,wall)),'beam joint' if beams else 'wall joint' if wall else 'slab interior / other joint'])
+    # Independent workbook ledger for full node-path coverage, including all
+    # overflow sheets. Never describe an incomplete mesh model as verified.
+    sheet_index=wb.create_sheet('Loaded node path index')
+    sheet_index.append(['Worksheet','Data rows','Meaning'])
+    for item in wb.worksheets:
+        if (item.title=='Loaded node path' or
+            (item.title.startswith('Loaded node path ') and
+             item.title.removeprefix('Loaded node path ').isdecimal())):
+            sheet_index.append([item.title,item.max_row-1,'Untruncated node-level slab pressure load path'])
     # The primary worksheet is the full-gravity validation load path (1.0D
     # + 1.0L). Preserve a separate configured seismic-preload view; mass
     # factors remain an independent column in BOTH sheets.
@@ -218,7 +241,11 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
                 for row in csv.reader(stream):output.append(row)
             output.freeze_panes='A2';output.auto_filter.ref=output.dimensions
     notes.column_dimensions['A'].width=140
-    for sheet in (ws,links,weights):
+    node_sheets=[sheet for sheet in wb.worksheets if
+                 sheet.title=='Loaded node path' or
+                 (sheet.title.startswith('Loaded node path ') and
+                  sheet.title.removeprefix('Loaded node path ').isdecimal())]
+    for sheet in (ws,*node_sheets,weights):
         sheet.freeze_panes='A2';sheet.auto_filter.ref=sheet.dimensions
         for c in sheet[1]:c.font=Font(bold=True,color='FFFFFF');c.fill=PatternFill('solid',fgColor='1E3A5F')
         for col in sheet.columns:sheet.column_dimensions[col[0].column_letter].width=min(55,max(16,len(str(col[0].value))+2))
@@ -312,7 +339,7 @@ def launch(parent,folder):
     import threading
     import tkinter as tk
     from tkinter import ttk, messagebox
-    from components.gravity.mesh_cases import prepared_configs, build_case, case_base
+    from components.gravity.mesh_cases import prepared_configs, build_case, case_base, package_mesh_case, recover_assembled_mesh_workbook
 
     folder=Path(folder)
     config=folder/'OpenSees_Complete_Model_Config_V118.json'
@@ -336,7 +363,7 @@ def launch(parent,folder):
     ttk.Label(header,text='Selected mesh subdivisions:').pack(side='left')
     choice=tk.StringVar(value=str(cfg.get('floor_subdivisions',4)) if
                         cfg.get('floor_subdivisions',4) in (4,8,16) else '4')
-    ttk.Combobox(header,textvariable=choice,values=['4','8','16'],state='readonly',
+    ttk.Combobox(header,textvariable=choice,values=['Current root (hash-checked)','4','8','16'],state='readonly',
                  width=8).pack(side='left',padx=9)
     current=ttk.Label(header,text='Current root config: '+str(cfg.get('floor_subdivisions','unknown')))
     current.pack(side='left',padx=10)
@@ -366,6 +393,9 @@ def launch(parent,folder):
             messagebox.showerror('Prepare mesh configurations',str(exc),parent=win)
 
     def start_build():
+        if choice.get()=='Current root (hash-checked)':
+            current_workbook()
+            return
         size=int(choice.get())
         # Separate run snapshots preserve all three models and permit
         # comparison later; no root config, EDB or existing gravity results are
@@ -374,7 +404,8 @@ def launch(parent,folder):
             for b in buttons:b.configure(state='normal')
             status.set('FAILED | '+str(exc))
             log('FAILED MESH_'+str(size).zfill(2)+': '+str(exc))
-            messagebox.showerror('Mesh build failed',str(exc),parent=win)
+            messagebox.showerror('Mesh assembly / workbook export failed',
+                                 str(exc)+'\n\nIf a model assembled successfully, select "Retry Excel from assembled mesh (no rebuild)" to avoid reassembling it.',parent=win)
         def report_success(result):
             for b in buttons:b.configure(state='normal')
             status.set('FORMULA EXPORTED | MESH_'+str(size).zfill(2)+' (gravity/ETABS verification still required)')
@@ -400,6 +431,26 @@ def launch(parent,folder):
                 except tk.TclError:pass
         threading.Thread(target=work,name='slab_mesh_'+str(size),daemon=True).start()
 
+    def recover_workbook():
+        if choice.get()=='Current root (hash-checked)':
+            current_workbook()
+            return
+        size=int(choice.get())
+        status.set(f'RECOVERING | MESH_{size:02d} already-assembled model...')
+        def work():
+            try:
+                result=recover_assembled_mesh_workbook(folder,size)
+            except Exception as exc:
+                win.after(0,lambda e=exc:(
+                    status.set('RECOVERY BLOCKED | '+str(e)),
+                    log('RECOVERY BLOCKED: '+str(e))))
+            else:
+                win.after(0,lambda r=result:(
+                    status.set('FORMULA RECOVERED | '+str(r['workbook'])),
+                    log('FORMULA WORKBOOK RECREATED: '+str(r['workbook']))))
+        threading.Thread(target=work,daemon=True,
+                         name=f'mesh_{size:02d}_workbook_recovery').start()
+
     def current_workbook():
         try:
             workbook=export(folder)
@@ -418,19 +469,36 @@ def launch(parent,folder):
             messagebox.showinfo('Mesh cases','Prepare or build the cases first.',parent=win)
         elif hasattr(os,'startfile'):os.startfile(str(root))
         else:messagebox.showinfo('Mesh case folder',str(root),parent=win)
+    def export_zip():
+        if choice.get()=='Current root (hash-checked)':
+            status.set('Select 4, 8, or 16 for an independent diagnostic ZIP.')
+            return
+        size=int(choice.get())
+        def run():
+            try:
+                result=package_mesh_case(folder,size)
+            except Exception as exc:
+                win.after(0,lambda e=exc:(status.set('ZIP FAILED | '+str(e)),log('ZIP FAILED: '+str(e))))
+            else:
+                win.after(0,lambda p=result:(status.set('ZIP CREATED | '+str(p)),log('ZIP: '+str(p))))
+        threading.Thread(target=run,daemon=True,name='mesh_diagnostic_zip').start()
+
+    ttk.Button(header,text='ZIP selected mesh',command=export_zip).pack(side='right',padx=8)
     prep_button=ttk.Button(controls,text='Prepare 4 / 8 / 16 configs',command=prepare)
-    build_button=ttk.Button(controls,text='Build selected mesh + Excel',command=start_build)
+    build_button=ttk.Button(controls,text='Build selected mesh / verified root + Excel',command=start_build)
     open_button=ttk.Button(controls,text='Open case output folders',command=open_cases)
     prep_button.grid(row=1,column=0,sticky='ew',pady=5)
     build_button.grid(row=1,column=1,sticky='ew',padx=12,pady=5)
     open_button.grid(row=1,column=2,sticky='ew',pady=5)
+    recover_button=ttk.Button(controls,text='Retry Excel from assembled mesh (no rebuild)',command=recover_workbook)
+    recover_button.grid(row=2,column=1,sticky='ew',padx=12,pady=2)
     controls.columnconfigure(0,weight=1);controls.columnconfigure(1,weight=1);controls.columnconfigure(2,weight=1)
-    buttons.extend((prep_button,build_button))
+    buttons.extend((prep_button,build_button,recover_button))
     advanced=ttk.LabelFrame(outer,text='Existing root export — only if it is already rebuilt',padding=9)
     advanced.pack(fill='x',pady=(2,7))
     ttk.Button(advanced,text='Export root assembled mesh workbook (hash-checked)',
                command=current_workbook).pack(side='left')
-    ttk.Label(advanced,text='A changed mesh setting intentionally invalidates this older assembled model.',
+    ttk.Label(advanced,text='Choose Current root in the mesh dropdown for a hash-checked root export. A changed mesh setting invalidates older assembly.',
               wraplength=440).pack(side='left',padx=10)
     ttk.Label(outer,text='Run log (copyable)',font=('Segoe UI',10,'bold')).pack(anchor='w')
     panel=ttk.Frame(outer)
