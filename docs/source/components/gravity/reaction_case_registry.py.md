@@ -29,7 +29,7 @@ The same applied gravity loads are used for all three modes, assuming identical 
 
 ## Common output location and consumers (2026-11-09)
 
-All three support strategies register under the output root selected in the GUI.
+All three support strategies register under the output root selected in the GUI. The optional lightweight case-preview publisher now resolves both legacy `OpenSees_Analysis_Results/...` and canonical `02_GRAVITY/RUNS/...` to the owning export case before choosing `02_GRAVITY`; it must not create `02_GRAVITY` beneath an already canonical run. Standalone output directories retain their previous fallback behavior. No historical result is moved.
 `Gravity_Case_Reaction_Index.json` is the machine index and
 `Gravity_Output_Index.txt` is its readable companion, listing the model, support
 count, actual result path and indexing time. Result files remain separate so a
@@ -41,7 +41,7 @@ the selected model/profile/support condition through `current_case`. They must n
 assume `Gravity_Result_V110.json` sits in the parent output directory, nor silently
 pick the most recently modified case. Unindexed older results require a new run.
 
-Regression: `tests.verify_gravity_case_reaction_registry` covers the nested 32-node
+Regression: `tests.test_gravity_organized_case_index_v172` covers both historical and canonical preview routing without nested stage folders; `tests.verify_gravity_case_reaction_registry` covers the nested 32-node
 case, all three indexed locations, stale inputs and profile isolation.
 
 ## Sources
