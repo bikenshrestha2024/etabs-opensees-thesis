@@ -85,3 +85,9 @@ The read-only stage audit now reports `MISSING_CASE_MANIFEST` when a canonical `
 `atomic_json()` and `write_table()` now check for pre-existing symlinks in the entire target path ancestor chain and at the final file name. The validation runs before creating any directories, after creating the parent, and before `os.replace`; the output remains atomic for ordinary local filesystem writes. As with ordinary `Path.is_symlink()` checks, OS-level concurrent directory swaps/junction semantics are not fully solved; do not treat this as a multi-user adversarial filesystem security boundary. The change preserves the source JSON/CSV content and filenames, and does not write to source EDB/Excel.
 
 Regression: `tests/test_unified_output_contract.py`. This is software validation only, not an ETABS/OpenSees physics acceptance gate.
+
+## V28 — status publication requires matching canonical identity (2026-11-15)
+
+`record_case_status()` now obtains a read-only `inspect_case_manifest(run_dir)` result and **refuses every invalid or misfiled manifest** before changing `solver_status`. A valid schema string alone is insufficient: stage/state/case/run path identity, declared units, SHA syntax, enumerated subfolders and status constraints are checked together. The inspector also reports `LINKED_CASE_MANIFEST_PATH` when the run root, `00_INPUT_SOURCE` directory or manifest file is a direct symlink; it does not rewrite old results. Existing valid new-run transitions remain compatible. This gate does **not** independently verify the ETABS EDB, physical load path, native solver completion or engineering certification.
+
+Regression: `tests/test_unified_output_contract.py` tests mismatched stage/case/run/units, linked source manifest and unchanged original JSON on refusal.
