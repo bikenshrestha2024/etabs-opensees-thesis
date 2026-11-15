@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector, local Python source analysis",
+  "branch": "main",
+  "base_sha": "c81a58facbf958b9ae43842e3fd0ae15f2f1b14a",
+  "source_only_CI_revision": "4e837643a11345c99e0bbec3f4e4eea674f7fbf2",
+  "reviewed_source_count": 533,
+  "integrated_semantic_review_units": 3939,
+  "ast_named_definitions": 3407,
+  "static_integer_cast_candidates": 19,
+  "static_suppressed_handler_candidates": 133,
+  "classification": "Candidate signals, not proven defects or completed semantic approval",
+  "confirmed_defect_groups": [
+    "Fractional floor_subdivisions silently truncated across mesh assembly, stage and workbook",
+    "NaN and Inf gravity applied load or limit not reliably rejected",
+    "NaN and Inf returned support reaction/settlement could falsely pass gravity equilibrium",
+    "NaN transient dt and fractional nsteps accepted in reusable gravity/transient helpers"
+  ],
+  "changed_source": [
+    "components/model/assembly.py",
+    "components/gravity/mesh_cases.py",
+    "components/gravity/load_path_formulas.py",
+    "components/gravity/solver_stack.py"
+  ],
+  "tests": [
+    "tests/test_model_mesh_case_workflow.py",
+    "tests/test_solver_numeric_input_contract.py",
+    "existing CLI/source/CI tests"
+  ],
+  "test_results_local": "12 targeted source-snapshot unittest cases passed for mesh and slab/source functions; new solver contract tests pending CI",
+  "unchanged": [
+    "ETABS EDB originals and original Excel workbooks",
+    "NBC 105:2025 adopted model and factors",
+    "Gravity support-count engineering decision",
+    "Nonlinear wall constitutive model",
+    "Historical results and source metadata"
+  ],
+  "acceptance": {
+    "static_review": "PENDING_CI",
+    "complete_line_by_line_semantic_review": "INCOMPLETE",
+    "native_etabs_opensees": "NOT_VERIFIED",
+    "X_wall_first_step": "UNRESOLVED",
+    "nbc105_compliance": "NOT_VERIFIED"
+  }
+}

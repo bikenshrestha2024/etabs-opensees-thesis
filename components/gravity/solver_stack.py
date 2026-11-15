@@ -24,6 +24,7 @@ __release__ = '134'
 # See README_V110.md for the limits and meaning of each analysis stage.
 import json
 import math
+import numbers
 import time
 from pathlib import Path
 
@@ -37,6 +38,37 @@ NONLINEAR_ALGORITHM_CHOICES = ("Newton", "KrylovNewton", "NewtonLineSearch")
 DEFAULT_SYSTEM = "SparseGeneral"
 DEFAULT_NUMBERER = "RCM"
 DEFAULT_CONSTRAINTS = "Transformation"
+
+
+def _positive_exact_steps(value, label="nsteps"):
+    """Do not silently truncate structural integration/load steps."""
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be a positive integer")
+    if isinstance(value, numbers.Integral):
+        steps = int(value)
+    elif isinstance(value, str) and value.isascii() and value.isdecimal():
+        steps = int(value)
+    elif isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        steps = int(value)
+    else:
+        raise ValueError(f"{label} must be a positive integer")
+    if steps < 1:
+        raise ValueError(f"{label} must be a positive integer")
+    return steps
+
+
+def _finite_load_quantity(value, label, *, positive=False):
+    """Reject invalid inputs before numerical work or equilibrium acceptance."""
+    if isinstance(value, bool):
+        raise ValueError(label + " must be a finite numerical value")
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(label + " must be a finite numerical value") from exc
+    if not math.isfinite(numeric) or (positive and numeric <= 0.0):
+        raise ValueError(label + (" must be finite and positive" if positive
+                                  else " must be finite"))
+    return numeric
 
 
 def _configure_common(ops, *, system=DEFAULT_SYSTEM, system_options=(),
@@ -140,13 +172,12 @@ def configure_nonlinear_static(ops, *, tolerance=1.0e-8, max_iterations=50,
                                numberer=DEFAULT_NUMBERER,
                                constraints=DEFAULT_CONSTRAINTS):
     """Configure nonlinear, load-controlled static analysis (e.g. gravity)."""
+    nsteps = _positive_exact_steps(nsteps)
     _configure_common(ops, system=system, system_options=system_options, numberer=numberer,
                      constraints=constraints)
     ops.test("NormDispIncr", float(tolerance), int(max_iterations), 0)
     ops.algorithm(str(algorithm))
-    if int(nsteps) < 1:
-        raise ValueError("nsteps must be a positive integer")
-    ops.integrator("LoadControl", 1.0 / int(nsteps))
+    ops.integrator("LoadControl", 1.0 / nsteps)
     ops.analysis("Static")
 
 
@@ -160,9 +191,7 @@ def run_static_analysis(ops, nsteps, *, tolerance=1.0e-8,
     For incremental gravity, set nsteps and the LoadControl increment to suit
     the actual pattern factors; review the generated loads before calling.
     """
-    nsteps = int(nsteps)
-    if nsteps < 1:
-        raise ValueError("nsteps must be a positive integer")
+    nsteps = _positive_exact_steps(nsteps)
     _configure_common(ops, system=system, system_options=system_options, numberer=numberer,
                      constraints=constraints)
     ops.test("NormDispIncr", float(tolerance), int(max_iterations), 0)
@@ -225,13 +254,15 @@ def run_gravity_stage(ops, support_nodes, total_applied_vertical_load_kN, *,
     tolerance. Gravity is frozen with loadConst('-time', 0.0) only after the
     equilibrium check succeeds.
     """
+    nsteps = _positive_exact_steps(nsteps)
     supports = [int(n) for n in support_nodes]
-    applied = float(total_applied_vertical_load_kN)
+    applied = _finite_load_quantity(total_applied_vertical_load_kN,
+                                    "total_applied_vertical_load_kN", positive=True)
     if not supports:
         raise ValueError("support_nodes must contain at least one node tag")
-    if applied <= 0.0:
-        raise ValueError("total_applied_vertical_load_kN must be positive")
-    if float(equilibrium_tolerance_percent) < 0.0:
+    limit = _finite_load_quantity(equilibrium_tolerance_percent,
+                                  "equilibrium_tolerance_percent")
+    if limit < 0.0:
         raise ValueError("equilibrium_tolerance_percent cannot be negative")
     started = time.perf_counter()
     diagnostics = None
@@ -310,13 +341,21 @@ def run_gravity_stage(ops, support_nodes, total_applied_vertical_load_kN, *,
             if response_output_dir is not None else None)
     ops.reactions()
     reaction = sum(float(ops.nodeReaction(n, 3)) for n in supports)
+    # NaN reactions make (error_percent > tolerance) false in Python. Such
+    # states must never be mistaken for converged gravity equilibrium.
+    if not math.isfinite(reaction):
+        raise RuntimeError("Non-finite gravity support reaction; gravity not frozen")
     error_percent = 100.0 * abs(reaction - applied) / applied
+    if not math.isfinite(error_percent):
+        raise RuntimeError("Non-finite gravity equilibrium error; gravity not frozen")
     elapsed = time.perf_counter() - started
     max_downward = None
     if model_nodes is not None:
         vertical_displacements = {
             int(n): float(ops.nodeDisp(int(n), 3)) for n in model_nodes
         }
+        if not all(math.isfinite(value) for value in vertical_displacements.values()):
+            raise RuntimeError("Non-finite gravity vertical displacement; gravity not frozen")
         max_downward = min(vertical_displacements.values(), default=0.0)
     result = {
         "steps": int(nsteps),
@@ -435,10 +474,8 @@ def run_transient_analysis(ops, nsteps, dt, *, tolerance=1.0e-7,
                            numberer=DEFAULT_NUMBERER,
                            constraints=DEFAULT_CONSTRAINTS):
     """Run transient steps and raise if OpenSees reports failure."""
-    nsteps = int(nsteps)
-    dt = float(dt)
-    if nsteps < 1 or dt <= 0.0:
-        raise ValueError("nsteps and dt must both be positive")
+    nsteps = _positive_exact_steps(nsteps)
+    dt = _finite_load_quantity(dt, "dt", positive=True)
     configure_nonlinear_transient(
         ops, tolerance=tolerance, max_iterations=max_iterations,
         algorithm=algorithm, gamma=gamma, beta=beta, system=system,

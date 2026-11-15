@@ -66,11 +66,24 @@ def _read_source_manifest(folder):
     return original
 
 
-def case_base(folder, subdivisions):
-    """Independent case directory. [REF docs/source/components/gravity/mesh_cases.py.md]"""
-    n = int(subdivisions)
+def validated_mesh_size(subdivisions):
+    """Strict mesh identity; accept GUI decimal strings but never truncate floats."""
+    if isinstance(subdivisions, bool):
+        raise ValueError("Mesh subdivision must be an exact integer: 4, 8 or 16")
+    if type(subdivisions) is int:
+        n = subdivisions
+    elif isinstance(subdivisions, str) and subdivisions in ("4", "8", "16"):
+        n = int(subdivisions)
+    else:
+        raise ValueError("Mesh subdivision must be an exact integer: 4, 8 or 16")
     if n not in MESH_SIZES:
         raise ValueError("Mesh comparison supports only 4, 8 and 16 subdivisions")
+    return n
+
+
+def case_base(folder, subdivisions):
+    """Independent case directory. [REF docs/source/components/gravity/mesh_cases.py.md]"""
+    n = validated_mesh_size(subdivisions)
     return Path(folder) / "02_MODEL" / "SLAB_LOAD_PATH" / f"MESH_{n:02d}"
 
 
@@ -106,7 +119,7 @@ def stage_case(folder, subdivisions):
     [REF docs/source/components/gravity/mesh_cases.py.md]
     """
     folder = _refuse_linked_chain(folder).resolve(strict=True)
-    n = int(subdivisions)
+    n = validated_mesh_size(subdivisions)
     parent = case_base(folder, n) / "RUNS"
     # Verify the entire path before any mkdir/copy. The config is source
     # evidence and the newly staged config is intentionally a derived variant.
@@ -167,7 +180,7 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
     [REF docs/source/components/gravity/mesh_cases.py.md]
     """
     run_dir = stage_case(folder, subdivisions)
-    n = int(subdivisions)
+    n = validated_mesh_size(subdivisions)
     log = run_dir / "MESH_BUILD_STATUS.json"
     def record(status, **extra):
         report = dict(mesh_subdivisions=n, status=status, run_directory=str(run_dir),
@@ -192,7 +205,11 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
         if data.get("config_sha256") != digest(cfgpath):
             raise RuntimeError("Mesh model/config SHA256 disagreement after assembly; no workbook exported.")
         cfg = json.loads(cfgpath.read_text(encoding="utf-8-sig"))
-        if int(cfg.get("floor_subdivisions", -1)) != n:
+        try:
+            assembled_n = validated_mesh_size(cfg.get("floor_subdivisions"))
+        except ValueError as exc:
+            raise RuntimeError("Mesh size not preserved by model assembly.") from exc
+        if assembled_n != n:
             raise RuntimeError("Mesh size was not preserved by model assembly.")
         from OpenSees_Load_Path_V141 import export
         workbook = export(run_dir, output_root=case_base(folder, n))

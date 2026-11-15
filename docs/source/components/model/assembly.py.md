@@ -23,3 +23,8 @@ referenced. No model assembly, stiffness or solver equations changed.
 Direct-import prepare_complete_export previously defaulted runtime_dir to components/model instead of actual project/runtime root; original root facade happened to work. Modal input populate(gui,Path(__file__).parent,folder) likewise depended on facade. Both now use _runtime_repo_root. Do not touch __file__ strings inside generated model/GUI scripts; those belong to generated-runtime context. No geometry or element physics changes.
 
 Scope of tests: synthetic direct-module import, exec-root facade, exported-runtime facade path consistency in `tests/test_facade_runtime_context.py`. No native ETABS/OpenSees, source workbook or full engineering model was executed in these path-only regressions.
+
+
+## 2026-11-15 exact integer mesh-grid contract
+
+`_mesh_areas(..., floor_subdivisions=...)` now rejects floats, booleans, missing or malformed values **before meshing**. The source/assembly contract preserves exact integral subdivisions 2–16 (including exact decimal strings such as `"8"`); it must never silently convert an input like `8.9` to `8`. Unlike the comparative 4/8/16 study, this general source mesher is intentionally not restricted to 4/8/16. Source ETABS geometry, model parameters, stiffness, gravity/mass factors and wall topology remain unmodified. Synthetic `tests/test_model_mesh_case_workflow.py` checks the early failure and accepted 2/4/8/16 cases; actual wall/shell gravity convergence and ETABS parity still require native model evidence.

@@ -121,6 +121,21 @@ class MeshCasesTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"stale"):
             mesh.stage_case(self.root,8)
 
+    def test_source_assembly_refuses_fractional_and_boolean_mesh_resolution(self):
+        from components.model.assembly import _mesh_areas
+        source_nodes={1:[0.0,0.0,0.0]}
+        for bad in (8.9,4.1,8.0,True,False,"8.0",None):
+            with self.subTest(value=repr(bad)):
+                with self.assertRaisesRegex(ValueError,"exact integer"):
+                    _mesh_areas(source_nodes,[],{},{},floor_subdivisions=bad)
+        for good in (2,4,8,16,"8"):
+            with self.subTest(good=repr(good)):
+                nodes,shells,objects=_mesh_areas(
+                    source_nodes,[],{},{},floor_subdivisions=good)
+                self.assertEqual(nodes,source_nodes)
+                self.assertEqual(shells,[])
+                self.assertEqual(objects,{})
+
     def test_reject_missing_audit_and_invalid_mesh(self):
         with self.assertRaises(ValueError):
             mesh.case_base(self.root,2)

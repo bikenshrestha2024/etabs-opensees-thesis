@@ -98,3 +98,8 @@ absent-pattern cases).
 ## 2026-11-13 — Stage 02 model mesh / area-integration output update
 
 For the full rationale, mesh procedure, distinctions between **source quads** and **assembled meshed ShellMITC4 cells**, evidence requirements and safety warnings, read [the numbered Stage 02 review](../../../../REVIEW_MAIN/00_MODEL/20261113_STAGE02_AREA_INTEGRATION_AND_SLAB_MESH_STUDY.md). Mesh 04/08/16 files are separate case outputs and never a single rebadged baseline. Area inventory is source-only Excel + JSON; it does not instantiate OpenSees elements or validate gravity transfer.
+
+
+## 2026-11-15 formula workbook and assembled-mesh identity
+
+The 4/8/16 comparative workbook uses the same strict `components.gravity.mesh_cases.validated_mesh_size` as the mesh-run staging helper. Both the `export` preflight and `Mesh identity` sheet refuse fractional or boolean sizes rather than silently truncating them with `int()`. Existing strict config SHA check remains unchanged. Workbook formula values, original ETABS load/mass factors and source geometry are not altered by this validation-only change. Excel generation and native 4/8/16 ShellMITC4 / gravity equivalence remain separate acceptance gates.

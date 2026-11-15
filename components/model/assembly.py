@@ -354,7 +354,16 @@ def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=
         raise ValueError("Cannot mesh ETABS area panels without source nodes")
     next_node=max(nodes)+1000; shells=[]; by_object={}
     original=list(source_nodes.values())
-    floor_subdivisions=int(floor_subdivisions)
+    # Discrete cell counts are exact integers, not truncated floating values.
+    # Keep source-model assembly's wider 2..16 valid range, separate from the
+    # GUI's explicit comparative mesh family (4/8/16).
+    if type(floor_subdivisions) is int:
+        pass
+    elif isinstance(floor_subdivisions, str) and floor_subdivisions in (
+            str(value) for value in range(2, 17)):
+        floor_subdivisions=int(floor_subdivisions)
+    else:
+        raise ValueError('floor_subdivisions must be an exact integer 2..16')
     if not 2<=floor_subdivisions<=16:raise ValueError('floor_subdivisions must be 2..16; one corner-only slab cell cannot resolve beam-span load transfer')
     # Seed the complete floor plane before meshing any panel. Adjacent slabs,
     # supporting walls and frame segments share these coordinates.

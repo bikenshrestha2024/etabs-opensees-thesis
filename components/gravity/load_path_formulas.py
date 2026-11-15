@@ -155,7 +155,8 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     # Display the actual assembled mesh identity, not merely a GUI selection.
     mesh=wb.create_sheet('Mesh identity',0)
     mesh.append(['Parameter','Value','Interpretation'])
-    mesh.append(['Subdivisions per source-panel direction',int(cfg.get('floor_subdivisions',4)),'Actual case must match model-data config SHA256'])
+    from components.gravity.mesh_cases import validated_mesh_size
+    mesh.append(['Subdivisions per source-panel direction',validated_mesh_size(cfg.get('floor_subdivisions',4)),'Actual case must match model-data config SHA256'])
     mesh.append(['Assembled shell cell count',len(data.get('shells',[])),'Includes floors and walls; see Source load detail for floor cells'])
     mesh.append(['Assembly config SHA256',data.get('config_sha256',''),'Hash of config used when assembled model was generated'])
     mesh.append(['Model evidence status','REQUIRES ETABS + SOLVER COMPARISON','Formulas and connectivity alone do not establish gravity load-path equivalence'])
@@ -234,9 +235,8 @@ def export(folder, *, output_root=None):
         raise ValueError('Source configuration and assembled model missing. Use "Build selected mesh + export workbook" to create an isolated current mesh run.')
     cfg=json.loads(cfg_path.read_text(encoding='utf-8-sig'))
     data=json.loads(model_path.read_text(encoding='utf-8-sig'))
-    n=int(cfg.get('floor_subdivisions',4))
-    if n not in (4,8,16):
-        raise ValueError('Mesh comparison requires subdivision 4, 8 or 16; received '+str(n))
+    from components.gravity.mesh_cases import validated_mesh_size
+    n=validated_mesh_size(cfg.get('floor_subdivisions',4))
     actual=hashlib.sha256(cfg_path.read_bytes()).hexdigest()
     if data.get('config_sha256')!=actual:
         raise ValueError('Model config changed after assembly. Do not label old slab cells with new mesh size; choose "Build selected mesh + export workbook" to assemble a matching model.')
