@@ -17,20 +17,35 @@ class TrackedCoverageTests(unittest.TestCase):
                                       check=True,capture_output=True,text=True).stdout
             git("init","-q")
             (repo/"components").mkdir()
+            (repo/"src").mkdir()
             (repo/"tests").mkdir()
             (repo/"docs").mkdir()
             (repo/"components"/"assembly.py").write_text("def x(): pass\n")
+            (repo/"src"/"neutral.py").write_text("def validate(x): return x\n")
+            for historical in ("Verification_V159", "Worked_Example_V132",
+                               "Research_Components"):
+                folder=repo/historical
+                folder.mkdir()
+                (folder/"old.py").write_text("historic snapshot\n")
             (repo/"tests"/"test_one.py").write_text("assert True\n")
             (repo/"docs"/"README.md").write_text("# docs\n")
             git("add",".")
             git("-c","user.name=Regression","-c","user.email=regression@example.invalid",
                 "commit","-qm","test files")
             report=inventory(repo)
-            self.assertEqual(report["tracked_count"],3)
-            self.assertEqual(report["review_not_completed_count"],3)
+            self.assertEqual(report["tracked_count"],7)
+            self.assertEqual(report["review_not_completed_count"],7)
             self.assertEqual(report["reviewed_current_head_count"],0)
             self.assertEqual(report["source_index_status"],"HEAD_CLEAN_TRACKED_FILES")
-            self.assertEqual(report["counts_by_category"]["ACTIVE_PYTHON_SOURCE"],1)
+            self.assertEqual(report["counts_by_category"]["ACTIVE_PYTHON_SOURCE"],2)
+            self.assertEqual(next(x["category"] for x in report["entries"]
+                                  if x["path"]=="src/neutral.py"),"ACTIVE_PYTHON_SOURCE")
+            self.assertEqual(report["counts_by_category"]["HISTORICAL_OR_ARCHIVE"],3)
+            self.assertTrue(all(x["category"]=="HISTORICAL_OR_ARCHIVE"
+                 for x in report["entries"]
+                 if x["path"].startswith(("Verification_V159/",
+                                          "Worked_Example_V132/",
+                                          "Research_Components/"))))
             self.assertTrue(all(x["review_status"]=="NOT_REVIEWED_CURRENT_HEAD"
                                 for x in report["entries"]))
             original=(repo/"components"/"assembly.py").read_bytes()

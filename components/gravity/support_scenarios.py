@@ -38,7 +38,7 @@ def compare_wall_support_gravity(source_result, continuous_result):
         return value
     a=source_result["report"];b=continuous_result["report"]
     wa=scalar(a,"applied_vertical_load_kN");wb=scalar(b,"applied_vertical_load_kN")
-    if abs(wa-wb)>max(0.01,wa*1e-7):
+    if abs(wa-wb)>max(0.01,abs(wa)*1e-7):
         raise ValueError("Two gravity cases have different applied vertical loads")
     summary=[]
     for mode,payload in results.items():
@@ -83,9 +83,16 @@ def compare_wall_support_gravity(source_result, continuous_result):
         recorded=scalar(payload["report"],"support_vertical_reaction_kN")
         if abs(actual-recorded)>max(0.01,abs(recorded)*1e-6):
             raise ValueError(mode+" support reaction total differs from individual nodes")
-    # Shared native node tags cannot be compared when the two independently
-    # solved models do not agree on their actual global coordinates.
-    for tag in source_by.keys() & continuous_by.keys():
+        applied=scalar(payload["report"],"applied_vertical_load_kN")
+        # Internal solver equilibrium is a prerequisite for comparing changes
+        # in support reactions. A cached report can have consistent reaction
+        # rows and yet be grossly out of balance against its applied gravity.
+        if abs(actual-applied)>max(0.01,abs(applied)*1e-6):
+            raise ValueError(mode+" gravity reaction and applied-load equilibrium failed")
+    # The two runs claim the same geometry. Check ALL shared geometry nodes,
+    # including nodes without vertical reactions, not only shared supports.
+    # Added wall-base mesh nodes may legitimately exist in only one case.
+    for tag in source_coords.keys() & coords.keys():
         p=source_coords[tag]; q=coords[tag]
         if any(abs(float(p[k])-float(q[k]))>1e-6 for k in ("x_m","y_m","z_m")):
             raise ValueError("Shared support tag has differing geometry: "+tag)
@@ -100,7 +107,7 @@ def compare_wall_support_gravity(source_result, continuous_result):
             continuous_Rz_kN=rb,
             delta_kN=rb-ra if ra is not None and rb is not None else None,
             status="COMMON_REACTION" if ra is not None and rb is not None else
-                ("CONTINUOUS_ONLY" if bb else "SOURCE_ONLY_ONLY")))
+                ("CONTINUOUS_ONLY" if bb else "SOURCE_ONLY")))
     return dict(
         schema="gravity-wall-base-strategy-v1",
         status="SENSITIVITY_NOT_ETABS_VALIDATION_OR_FOUNDATION_DESIGN",
@@ -110,7 +117,7 @@ def compare_wall_support_gravity(source_result, continuous_result):
         reaction_total_difference_kN=summary[1]["reaction_kN"]-summary[0]["reaction_kN"],
         max_Uz_difference_m=summary[1]["maximum_downward_Uz_m"]-summary[0]["maximum_downward_Uz_m"],
         explanation=[
-            "Only restraints differ; shell and frame loads and seismic mass are unchanged",
+            "Boundary restraint sensitivity intended; matching totals and shared XYZ do not independently prove identical elemental loads, stiffness or seismic mass",
             "The continuous-base run is a prescribed fixed-boundary sensitivity case, not a raft/soil spring model",
             "Individual reactions at newly fixed nodes have no one-to-one ETABS equivalent",
             "ETABS comparison requires native wall auto-mesh edge restraint/constraint verification"

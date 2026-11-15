@@ -16,3 +16,8 @@ Optional `--export "<LOCAL_SELECTED_ETABS_EXPORT>"` writes a **fresh private-loc
 It refuses a selected export destination inside the public source checkout and refuses linked intermediate diagnostics folders. Do not commit generated CSV/JSON with private case details; do not move historical files based solely on this inventory. This tool supplements `tools/audit_active_repository.py` and the frozen `docs/review/ledger/` snapshots rather than replacing them.
 
 Test with `python -m unittest tests.test_tracked_review_coverage_v23 -v`. Native ETABS, OpenSees, Tk GUI and solver equivalence are never invoked.
+
+
+## Coordinated source-tree coverage correction (2026-11-15)
+
+The tracked-index categorizer now includes active `src/**/*.py` alongside root, components and tools. It also labels `Verification_V*/`, `Worked_Example_V*/` and `Research_Components/` as historical/snapshot metadata rather than generic files, aligning the provenance basis with `tools/audit_repository_integrated.py`. The correction changes only classification, not the underlying Git index paths, file digests, semantics or the explicit all-files `NOT_REVIEWED_CURRENT_HEAD` status. Regression `tests/test_tracked_review_coverage_v23.py` covers the revised taxonomy and counts; the integrated workflow executes it.

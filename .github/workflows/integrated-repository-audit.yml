@@ -21,7 +21,7 @@ jobs:
           python-version: '3.12'
       - name: Execute focused audit regression tests
         run: |
-          python -m unittest -v tests.test_repository_integrated_audit tests.verify_active_repository_audit tests.test_deep_output_inventory_v16 tests.verify_standalone_neutral_model tests.verify_etabs_adapter_boundary
+          python -m unittest -v tests.test_repository_integrated_audit tests.verify_active_repository_audit tests.test_deep_output_inventory_v16 tests.verify_standalone_neutral_model tests.verify_etabs_adapter_boundary tests.test_tracked_review_coverage_v23
       - name: Inspect tracked tree and active Python, never execute solver/ETABS
         run: |
           python tools/audit_repository_integrated.py --repo . --output audit/integrated --fail-on-static-blockers

@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "base_sha": "a9c00c2b5d30e8ad4962b41dea0f094d865eb00b",
+  "scope": "Consolidated tracked-file classification and gravity 76/97 sensitivity comparison fail-closed evidence checks",
+  "classification": "EXTEND_EXISTING; no duplicated source module",
+  "inspected": [
+    "AGENTS.md",
+    "engineering/rules/CORE_RULES.md",
+    "engineering/migration/README.md",
+    "tools/audit_tracked_review_coverage.py",
+    "tools/audit_repository_integrated.py",
+    "components/gravity/support_scenarios.py",
+    "components/gravity/gui_and_reports.py",
+    "tests/verify_gravity_support_scenarios.py",
+    "tests/test_tracked_review_coverage_v23.py"
+  ],
+  "changes": [
+    "Classify active src and frozen research folders consistently",
+    "Require gravity applied load to agree with support node reaction sum",
+    "Check XYZ agreement at all shared nodes not just support reaction rows",
+    "Remove unsubstantiated engineering equivalence claim from sensitivity report",
+    "Fix SOURCE_ONLY_ONLY output label",
+    "Run added coverage regression in integrated audit and gravity scenario regression in conda-forge repository CI"
+  ],
+  "unchanged": [
+    "All original ETABS EDB and source Excel",
+    "Production OpenSees solver material/stiffness/mass formulas",
+    "32-primary support decision and 76/97 diagnostic selection",
+    "All historical folders and existing result files"
+  ],
+  "gates": {
+    "static_CI": "PENDING",
+    "native_gravity_32_76_97": "NOT_VERIFIED",
+    "nonlinear_X_wall": "NOT_VERIFIED",
+    "NBC105_code": "NOT_VERIFIED",
+    "windows_GUI": "NOT_VERIFIED",
+    "complete_semantic_audit": "NOT_COMPLETE"
+  },
+  "safety": "No user model data or private local paths uploaded"
+}

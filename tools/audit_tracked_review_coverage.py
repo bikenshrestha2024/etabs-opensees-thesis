@@ -38,11 +38,13 @@ def _category(name):
     if not parts:
         return "UNCLASSIFIED"
     if parts[0] in ("archive", "Archived", "Saved_Projects") or (
-            any(p.casefold().startswith(("archive", "saved_project_", "recovered_"))
+            any(p.casefold().startswith((
+                "archive", "saved_project_", "recovered_", "verification_",
+                "worked_example_", "regression_", "viewer_", "research_components"))
                 for p in parts)):
         return "HISTORICAL_OR_ARCHIVE"
     if name.endswith(".py") and (len(parts) == 1 or parts[0] in (
-            "components", "tools")):
+            "components", "src", "tools")):
         return "ACTIVE_PYTHON_SOURCE"
     if name.endswith(".py") and parts[0] == "tests":
         return "PYTHON_TEST"

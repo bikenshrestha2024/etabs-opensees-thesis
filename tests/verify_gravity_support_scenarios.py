@@ -69,6 +69,33 @@ class DualWallGravityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"total differs"):
             compare_wall_support_gravity(self.first,self.second)
 
+    def test_reject_cases_with_equal_reaction_rows_but_failed_applied_equilibrium(self):
+        # Previously this was accepted because report total == sum(reaction rows)
+        # even though neither balanced its 300 kN external gravity load.
+        self.second["reactions"][-1]["rz_kN"]=10.0
+        self.second["report"]["support_vertical_reaction_kN"]=280.0
+        with self.assertRaisesRegex(ValueError,"applied-load equilibrium failed"):
+            compare_wall_support_gravity(self.first,self.second)
+
+    def test_reject_shared_free_node_geometry_mismatch(self):
+        for item in (self.first,self.second):
+            item["nodes"].append(dict(tag=909,x_m=3.,y_m=4.,z_m=5.))
+        self.second["nodes"][-1]["x_m"]=3.05
+        with self.assertRaisesRegex(ValueError,"differing geometry"):
+            compare_wall_support_gravity(self.first,self.second)
+
+    def test_source_only_reaction_status_spelling(self):
+        self.second["reactions"]=[r for r in self.second["reactions"]
+                                  if r["node_tag"] != 2]
+        self.second["report"]["support_vertical_reaction_kN"]=120.
+        self.second["report"]["applied_vertical_load_kN"]=120.
+        self.first["report"]["applied_vertical_load_kN"]=120.
+        self.first["reactions"]=[dict(node_tag=1,rz_kN=120.)]
+        self.first["report"]["support_vertical_reaction_kN"]=120.
+        result=compare_wall_support_gravity(self.first,self.second)
+        self.assertEqual(next(row["status"] for row in result["per_node"]
+                              if row["node_tag"]=="2"),"SOURCE_ONLY")
+
     def test_reject_nonfinite_gravity_support_coordinates(self):
         self.first["nodes"][0]["x_m"]=float("nan")
         with self.assertRaisesRegex(ValueError,"nonfinite support node"):
