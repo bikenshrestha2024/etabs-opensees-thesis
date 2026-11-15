@@ -82,6 +82,19 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "SOURCE_MODEL_SHA_MISMATCH_EXCLUDED")
                 for r in report["tables"]["Open items"]))
 
+    def test_v135_workbook_publishes_without_temp_residue(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            model=root/"OpenSees_Complete_Model_Data_V118.json"
+            model.write_text('{"frames":[],"shells":[]}',encoding="utf-8")
+            with patch("components.validation.settings_audit.audit",
+                       return_value={"rows":[]}):
+                report,out=run(root)
+            self.assertEqual(report["overall"],"INCOMPLETE")
+            self.assertTrue((out/"Design_Check_Report_V135.xlsx").is_file())
+            self.assertEqual(list(out.glob(".design_checks_*.xlsx")),[])
+            self.assertEqual(list(out.glob(".writing_*.partial")),[])
+
     def test_derived_design_csv_publication_is_atomic(self):
         from components.validation.design_checks import write_rows
         with tempfile.TemporaryDirectory() as td:
