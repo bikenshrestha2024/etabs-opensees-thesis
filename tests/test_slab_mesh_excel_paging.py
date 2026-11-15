@@ -36,7 +36,8 @@ class MeshExcelPagingTests(unittest.TestCase):
             with patch("openpyxl.xml.constants.MAX_ROW",9):
                 add_formula_audit(wb,folder,data=data,cfg=cfg)
             pages=[s for s in wb.worksheets if
-                   s.title=="Loaded node path" or s.title.startswith("Loaded node path ")]
+                   s.title=="Loaded node path" or (s.title.startswith("Loaded node path ") and
+                   s.title.removeprefix("Loaded node path ").isdecimal())]
             self.assertEqual(len(pages),4)
             self.assertEqual([x.max_row for x in pages],[9,9,9,5])
             self.assertEqual(sum(x.max_row-1 for x in pages),28)
