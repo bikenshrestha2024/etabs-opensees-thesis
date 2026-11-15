@@ -48,6 +48,37 @@ def audit_stage_migration(export_dir):
             unmanifested.append({"manifest":runs.relative_to(root).as_posix(),
                                  "problem":"SYMLINKED_RUN_ROOT_REFUSED"})
         elif runs.is_dir():
+            # Existing run folders with no CASE_MANIFEST were invisible in
+            # the earlier rglob-only inventory. Inspect precisely the
+            # canonical RUNS/<state>/<case>/<run-id> depth, without following
+            # linked intermediate directories or claiming a solver ran.
+            for state_dir in sorted(runs.iterdir()):
+                if state_dir.is_symlink():
+                    unmanifested.append({
+                        "manifest":state_dir.relative_to(root).as_posix(),
+                        "problem":"SYMLINKED_RUN_STATE_REFUSED"})
+                    continue
+                if not state_dir.is_dir():
+                    continue
+                for case_dir in sorted(state_dir.iterdir()):
+                    if case_dir.is_symlink():
+                        unmanifested.append({
+                            "manifest":case_dir.relative_to(root).as_posix(),
+                            "problem":"SYMLINKED_RUN_CASE_REFUSED"})
+                        continue
+                    if not case_dir.is_dir():
+                        continue
+                    for run_dir in sorted(case_dir.iterdir()):
+                        if run_dir.is_symlink():
+                            unmanifested.append({
+                                "manifest":run_dir.relative_to(root).as_posix(),
+                                "problem":"SYMLINKED_RUN_FOLDER_REFUSED"})
+                        elif run_dir.is_dir() and not (
+                                run_dir/"00_INPUT_SOURCE"/"CASE_MANIFEST.json").is_file():
+                            unmanifested.append({
+                                "manifest":(run_dir/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+                                           ).relative_to(root).as_posix(),
+                                "problem":"MISSING_CASE_MANIFEST"})
             for p in sorted(runs.rglob("CASE_MANIFEST.json")):
                 if p.is_symlink() or any(q.is_symlink() for q in p.parents if q!=root):
                     continue
