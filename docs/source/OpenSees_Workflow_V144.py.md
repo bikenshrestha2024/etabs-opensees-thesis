@@ -1,1 +1,7 @@
 V144 numbered workflow navigation now uses canonical program names. It searches top-level and nested model/state result candidates but NEVER treats file existence as solver completion, model equivalence or NBC acceptance. This is read-only, manually refreshed directory discovery. See tests/test_import01_audit_and_workflow.py for synthetic regression. Full native Windows search and source hash validation remain pending.
+
+## 2026-11-15 canonical workflow candidate discovery
+
+`workflow_status` now searches **stage-owned** `02_GRAVITY`, `03_ESM`, `04_MODAL`, `05_MRSM`, `06_LINEAR_TIME_HISTORY`, `07_NONLINEAR_TIME_HISTORY` trees and the preserved legacy `OpenSees_Analysis_Results` in parallel; it does not falsely infer absence because only the older legacy tree was searched. Stage source/inputs are read at the selected export root and `01_ETABS_EXPORT` categorized mirrors. Processing sidecars are not analysis files, and a file named Summary remains **CANDIDATE_FILE_FOUND_VALIDATION_REQUIRED**, not completed or conforming. The GUI Export inventory action writes immutable unique run reports under `01_ETABS_EXPORT/00_MANIFEST/INPUT_READINESS`, not another root-level `Available_Inputs_And_Steps_V144.json`. Existing root reports are not moved or deleted.
+
+Unit regression: `tests/test_export_workflow_roles.py` and `tests/test_import01_audit_and_workflow.py`. This does not establish full motion duration, model SHA identity, source mass equivalence or native ETABS/OpenSees validation.
