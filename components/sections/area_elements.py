@@ -560,6 +560,7 @@ def launch_area_integration_gui(parent=None, export_dir=None):
             messagebox.showerror("Select inputs", "Choose the topology JSON, area section audit CSV and reviewed config JSON.", parent=win); return
         folder=Path(export_dir).resolve() if export_dir else Path(paths["topology"].get()).resolve().parent
         suggested=default_area_integration_script_path(folder)
+        suggested.parent.mkdir(parents=True,exist_ok=True)
         target = filedialog.asksaveasfilename(
             title="Save area integration call (recommended 02_MODEL/AREA_INTEGRATION/PYTHON)",
             parent=win, defaultextension=".py",
