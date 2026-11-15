@@ -1,0 +1,43 @@
+{
+  "record_type": "THESIS_MODELING_DECISION_DOCUMENTATION",
+  "date_local": "2026-11-15",
+  "observed_editor": "ChatGPT GPT-6 via connected GitHub",
+  "editor_confidence": "SELF_REPORTED_NOT_FORENSIC",
+  "base_main_sha": "3b310ca92f7498e45ebe5765dfe6437591947dc0",
+  "branch": "docs/20261115-provisional-hinged-outrigger-design-basis",
+  "decision": "Researcher provisionally retains ETABS pin-ended steel diagonal outrigger braces; chord and connection conditions separately reviewed; native NLTHA not approved",
+  "source_reviewed": [
+    "REVIEW_MAIN/00_MODEL/20261115_AREA_HINGED_BRACE_AND_MESH_EVIDENCE.md",
+    "AGENTS.md",
+    "components/model/assembly.py: GetReleases parsing and elastic/research/reviewed nonlinear branches",
+    "components/model/display_ids.py: source-ID-dependent BR/CO/BT/CT labels",
+    "docs/00_THESIS_ACCEPTANCE_GATES.md",
+    "CTBUH (Choi et al.) Outrigger Design for High-Rise Buildings sections 2.2, 2.8, 3.5, printed pp 27,35,60-61 (user-provided PDF, not committed)",
+    "Gunda and Anthugari (2022), Materials Today Proceedings 52:588-598 DOI 10.1016/j.matpr.2021.10.034, p589 (user-provided PDF, not committed)",
+    "Shrikhande, Finite Element Method and Computational Structural Dynamics ch2 (user-provided PDF, not committed)"
+  ],
+  "edited_paths": [
+    "REVIEW_MAIN/00_MODEL/20261115_PROVISIONAL_HINGED_OUTRIGGER_BRACE_DESIGN_BASIS.md",
+    "REVIEW_MAIN/README.md",
+    "docs/00_THESIS_ACCEPTANCE_GATES.md",
+    "docs/source/components/model/assembly.py.md",
+    "engineering/agent_edits/20261115_provisional_hinged_outrigger_assumption.json"
+  ],
+  "code_or_physics_changes": false,
+  "private_pdf_uploaded_to_repository": false,
+  "original_etabs_model_changed": false,
+  "required_gates": [
+    "SOURCE_RELEASE_ARRAY_VERIFICATION",
+    "ETABS_OPENSEES_MEMBER_EQUIVALENCE",
+    "CORE_TO_PERIMETER_OUTRIGGER_PANEL_ZONE_FORCE_PATH",
+    "ELASTIC_PIN_VS_SEMIRIGID_SENSITIVITY",
+    "NONLINEAR_CYCLIC_BUCKLING_FRACTURE_REBAR_FSAM_DEVICE_CALIBRATION",
+    "NATIVE_M0_M6_FULL_RECORD"
+  ],
+  "test_evidence": {
+    "synthetic_tests": "Not necessary for a documentation-only change",
+    "ci_status": "PENDING_PR_CI",
+    "native_solver": "NOT_RUN",
+    "etabs_oapi": "NOT_RUN"
+  }
+}

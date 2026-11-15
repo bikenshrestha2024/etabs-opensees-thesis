@@ -27,3 +27,15 @@ V168 diagnostics indicate a zero-motion first step succeeded but Kobe X-only fai
 ## Acceptance references
 
 Use R10 for NBC code interpretation, R01–R04/R12/R13 for wall/model experimental methods, R05–R06 for FVD hypotheses, and R07–R09 for brace investigations. See [source register](00_RESEARCH_REFERENCES.md).
+
+
+## 2026-11-15 conditional outrigger diagonal model decision (not a passed gate)
+
+**Researcher-adopted working assumption:** retain ETABS pin-ended steel *diagonal* members for the comparative steel outrigger truss configurations, as a **provisional two-force idealization**. This preserves the current model but does not physically establish the connections are pinned. Do not hinge all chords, RC frame members, shear-wall connections, belt/cap transfer components or FVD/BRB links by inference. Detailed basis and CTBUH guide/book-paper citations: [DB-OUT-2026-11-15-01](../REVIEW_MAIN/00_MODEL/20261115_PROVISIONAL_HINGED_OUTRIGGER_BRACE_DESIGN_BASIS.md).
+
+- **G01** still requires exact source `GetReleases`/member-role and truss geometry, real top/bottom chord path, and connection/drawing evidence.
+- **G03** still requires source-matched frequencies and elimination of mechanisms/rotational zero-energy modes under the released elastic beam idealization.
+- **G04/G06** still require cyclic buckling/fracture and BRB/FVD calibration and connection-stiffness sensitivity; an exploratory `corotTruss + Steel01` is NOT certified nonlinear behavior.
+- **G09/G10** still require comparable M0–M6 controlled variants and defined acceptance criteria. The reviewed nonlinear hinged-brace gate **must remain fail-closed** until a physically justified formulation is tested.
+
+**Status:** `PROVISIONAL_DESIGN_BASIS`, not `VERIFIED_MEMBER_CONNECTION`, `NLTHA_READY` or `CODE_ACCEPTED`. No legacy outputs have been retroactively promoted.
