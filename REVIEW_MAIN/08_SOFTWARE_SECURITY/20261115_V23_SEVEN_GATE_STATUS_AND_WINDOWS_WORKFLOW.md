@@ -57,3 +57,26 @@ Use `<STAGE>/RUNS/<STATE>/<CASE_ID>/<UTC_RUN_ID>/{00_INPUT_SOURCE,01_LOGS,02_RES
 6. Record sign-off with numerical acceptance tolerances and independent verification under `REVIEW_MAIN`.
 
 **Engineering prohibition:** no native result was executed by GitHub source access. This report records open gates, not a completed physical verification or NBC compliance certificate.
+
+## V23 follow-up: current-head tracked-file review register and actual Windows evidence
+
+A new independent inventory utility `tools/audit_tracked_review_coverage.py` uses Git-index blob identities to enumerate **all tracked files** and creates a **fresh**, private-local `09_SOFTWARE_DIAGNOSTICS/REVIEW_REGISTERS/RUNS/<UTC_RANDOM>/{JSON,CSV,REPORT}` report only when an explicit export directory is supplied. Its default is read-only. Every entry is labeled `NOT_REVIEWED_CURRENT_HEAD`; no historic reviewed status is silently carried across changed blobs. Per-file source inspections must subsequently be documented by a human with exact revision and lines. A new regression and GitHub Actions workflow `review-coverage-inventory.yml` verify its behavior.
+
+**Verified GitHub Actions coverage inventory on commit `ff4c0ad51145580bc6b068bf9bbd80354201510c`:** 2,982 tracked files in that revision, consisting of 325 active Python source, 193 Python tests, 814 historical/archives, 843 documentation/review, 20 GitHub/CI configuration and 787 other files. The inventory reports `reviewed_current_head_count=0` because none were independently attested *through this new register*—**not** because old project reviews have been erased or are necessarily invalid. <https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43671317181> passed. Count changes with future commits; never hardcode it as current forever.
+
+**Native Windows integration boundary:** the new `.github/workflows/windows-source-contract.yml` runs tests using Windows-latest and Python 3.12, confirms availability of a headless Tcl interpreter, and exercises actual Windows filesystem creation, source and audit contracts, gravity support consistency, and Soil-C completion screens. The first two Windows attempts exposed 8.3 short-path aliases (`RUNNER~1` versus `runneradmin`) in synthetic assertions and a direct-script Python import context failure. Test expectations now compare normalized physical paths, and verifier modules run through `python -m unittest discover`. The corrected workflow on commit `2efe7b0cd1e9aec11603f443f9d9f0265b65fe30` **passed**: <https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43671371305>.
+
+These are **Windows headless software checks**, not interactive GUI regression or ETABS OAPI. Native GUI must still be opened on the actual Windows computer with real ETABS/OpenSees executables, source file identities, ULS/SLS outputs and screenshots/logging. Do not promote this result to any of the seven engineering gates marked OPEN above.
+
+### Local commands for current working copy
+
+```powershell
+python tools/audit_tracked_review_coverage.py --repo .
+python tools/audit_tracked_review_coverage.py --repo . --export "<SELECTED_LOCAL_EXPORT_CASE>"
+python -m unittest discover -s tests -p test_tracked_review_coverage_v23.py -v
+python -m unittest discover -s tests -p test_project_output_layout_v171.py -v
+python -m unittest discover -s tests -p verify_gravity_support_scenarios.py -v
+python -m unittest discover -s tests -p verify_soil_c_case_completion.py -v
+```
+
+If native files cannot be supplied, the real-source engineering gate remains blocked. Do not make or publish artificial equivalence values or synthetic successful full-duration runs.
