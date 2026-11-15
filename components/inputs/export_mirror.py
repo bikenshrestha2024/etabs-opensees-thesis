@@ -52,26 +52,31 @@ def classification(name):
 
 
 def export_mirror(export_dir):
-    """Create safe categorized copies with content-addressed manifest.
+    """Create categorized copies after a fail-closed, whole-batch preflight.
 
     [REF docs/source/components/inputs/export_mirror.py.md]
-    Existing destination with different bytes fails closed. Does not follow
-    symlinks or recurse. Export model and source EDB are never modified.
+    The preflight detects source/destination conflicts before copying ANY new
+    files. Source files and existing mirror copies are never overwritten.
+    This is not a filesystem transaction: an unexpected I/O error during the
+    copy phase can still leave copies; a manifest is published only on success.
     """
-    root = Path(export_dir).resolve()
+    supplied = Path(export_dir).expanduser()
+    if supplied.is_symlink():
+        raise ValueError("Refusing symlinked selected export root")
+    root = supplied.resolve()
     if not root.is_dir():
         raise FileNotFoundError(root)
     target = root / "01_ETABS_EXPORT"
-    if target.is_symlink():
-        raise ValueError("Categorized export destination must not be a symlink")
-    target.mkdir(exist_ok=True)
-    entries = []
+    manifest_dir = target / "00_MANIFEST"
+    manifest_path = manifest_dir / "export_mirror_manifest.json"
+    if any(path.is_symlink() for path in (target, manifest_dir, manifest_path)):
+        raise ValueError("Refusing categorized export symlink")
+    # A complete source/destination plan is necessary: failing halfway through
+    # the copy phase creates a misleading partially refreshed mirror.
+    plan = []
     for original in sorted(root.iterdir()):
         if not original.is_file() or original.is_symlink():
             continue
-        # Export-side .processing.json files are transient sidecar status,
-        # not model source. Do not fill the canonical folders with these.
-        # Casefold private names for reliable Windows classification.
         lowered = original.name.casefold()
         if (original.suffix.lower() not in EXTS
                 or lowered in PRIVATE_NAMES
@@ -82,36 +87,62 @@ def export_mirror(export_dir):
         dest = target / relative
         if dest.parent.is_symlink() or dest.is_symlink():
             raise ValueError("Refusing categorized destination symlink: " + str(dest))
-        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.exists() and not dest.is_file():
+            raise ValueError("Categorized destination is not a regular file: " + str(dest))
         original_hash = _digest(original)
+        if dest.exists() and _digest(dest) != original_hash:
+            raise ValueError("Existing categorized copy differs; review manually: " + str(dest))
+        plan.append((original, dest, relative, original_hash, original.stat().st_size))
+
+    # No directory is created before preflight completes successfully.
+    entries = []
+    for original, dest, relative, original_hash, size in plan:
+        if dest.parent.is_symlink() or dest.is_symlink():
+            raise ValueError("Refusing categorized destination symlink: " + str(dest))
+        dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.is_file():
             if _digest(dest) != original_hash:
-                raise ValueError("Existing categorized copy differs; review manually: "+str(dest))
+                raise ValueError("Existing categorized copy changed during mirroring: " + str(dest))
         else:
-            with tempfile.NamedTemporaryFile(dir=dest.parent,suffix=".partial",
+            with tempfile.NamedTemporaryFile(dir=dest.parent, suffix=".partial",
                                              delete=False) as temp:
                 part = Path(temp.name)
             try:
                 shutil.copy2(original, part)
                 if _digest(part) != original_hash:
-                    raise IOError("Copy did not preserve source bytes: "+original.name)
+                    raise IOError("Source changed during copy; review manually: " + original.name)
+                # Do not silently replace a file created by another producer.
+                if dest.exists() or dest.is_symlink():
+                    raise ValueError("Destination created during copy: " + str(dest))
                 os.replace(part, dest)
             finally:
                 part.unlink(missing_ok=True)
         entries.append({"original": str(original), "categorized": str(dest),
                         "category": relative.parent.name, "sha256": original_hash,
-                        "size_bytes": original.stat().st_size})
+                        "size_bytes": size})
+
     manifest = {"schema": 1, "status": "MIRRORED_LEGACY_PATHS_PRESERVED",
                 "created_utc": datetime.now(timezone.utc).isoformat(),
                 "selected_export": str(root), "files": entries}
-    folder = target / "00_MANIFEST"
-    if folder.is_symlink():
-        raise ValueError("Refusing mirror manifest destination symlink: " + str(folder))
-    folder.mkdir(parents=True, exist_ok=True)
-    path = folder / "export_mirror_manifest.json"
-    with tempfile.NamedTemporaryFile(mode="w",encoding="utf-8",dir=folder,
-                                     suffix=".partial",delete=False) as out:
-        json.dump(manifest,out,indent=2)
+    if manifest_dir.is_symlink() or manifest_path.is_symlink():
+        raise ValueError("Refusing mirror manifest destination symlink")
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+                                     dir=manifest_dir, suffix=".partial",
+                                     delete=False) as out:
         part = Path(out.name)
-    os.replace(part, path)
-    return path
+        try:
+            json.dump(manifest, out, indent=2)
+            out.flush()
+            os.fsync(out.fileno())
+        except BaseException:
+            # Windows cannot remove a NamedTemporaryFile while open. The
+            # enclosing context closes it before the cleanup below.
+            raise
+    try:
+        if manifest_path.is_symlink():
+            raise ValueError("Refusing mirror manifest destination symlink")
+        os.replace(part, manifest_path)
+    finally:
+        part.unlink(missing_ok=True)
+    return manifest_path

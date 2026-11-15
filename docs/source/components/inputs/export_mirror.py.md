@@ -15,3 +15,8 @@
 **Test**: python -m pytest tests/test_export_mirror.py -q (not native solver validation).
 
 **Engineering decision**: downstream open/analysis scripts still use original paths. Only after all readers and writers use a model SHA-aware manifest resolver should the flat paths be deprecated. Source EDB remains read-only.
+
+
+## 2026-11-15 fail-closed batch preflight
+
+The mirroring tool now hashes and checks **all** candidate destination files before creating a categorized copy. This prevents a late pre-existing SHA conflict from leaving earlier files copied in a partially updated mirror. It also rejects a symlinked user-selected root and refuses an existing symlinked manifest. A source change during copying is caught by checking the temporary copy's digest before publishing. This prevents known preflight conflicts, but **does not provide cross-file transactional rollback on disk/permission failures or protect against arbitrary concurrent filesystem races**. Source EDB/Excel remains untouched; only generated mirrors are copied. Regression coverage includes a conflicting last file and a symlinked input root.

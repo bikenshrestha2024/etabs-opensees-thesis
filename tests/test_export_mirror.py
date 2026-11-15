@@ -44,3 +44,30 @@ def test_mirror_refuses_symlinked_destination(tmp_path):
     with pytest.raises(ValueError,match="symlink"):
         export_mirror(tmp_path)
     assert not (outside/original.name).exists()
+
+def test_late_conflict_preflights_before_copying_anything(tmp_path):
+    """A conflicting last file must not leave earlier new mirror copies."""
+    (tmp_path / "A_Export.json").write_text("source-a", encoding="utf-8")
+    (tmp_path / "Z_Export.json").write_text("source-z", encoding="utf-8")
+    target = tmp_path / "01_ETABS_EXPORT" / "01_SOURCE"
+    target.mkdir(parents=True)
+    (target / "Z_Export.json").write_text("older-z", encoding="utf-8")
+    with pytest.raises(ValueError, match="differs"):
+        export_mirror(tmp_path)
+    assert not (target / "A_Export.json").exists()
+    assert (target / "Z_Export.json").read_text() == "older-z"
+    assert not (tmp_path / "01_ETABS_EXPORT" / "00_MANIFEST").exists()
+
+
+def test_symlinked_export_root_rejected(tmp_path):
+    actual = tmp_path / "real"
+    actual.mkdir()
+    (actual / "OpenSees_Element_Connectivity.json").write_text("source")
+    alias = tmp_path / "alias"
+    try:
+        alias.symlink_to(actual, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("Symlinks unavailable")
+    with pytest.raises(ValueError, match="symlinked selected export root"):
+        export_mirror(alias)
+    assert not (actual / "01_ETABS_EXPORT").exists()

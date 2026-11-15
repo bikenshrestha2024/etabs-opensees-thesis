@@ -61,3 +61,8 @@ Seven additional V137–V164 documentation-only reports were moved into `archive
 - Production nonlinear first X-wall step fails; material/rebar/wall opening and FVD qualification remain engineering blockers.
 - The target folder-per-stage specification is not yet universal writer behavior; changing root notes does not modify run outputs.
 - Public repository visibility warrants an independent history/secret and sensitive evidence audit; these archive moves do not rewrite history.
+
+
+## Output mirror integrity correction (2026-11-15)
+
+Inspected `components/inputs/export_mirror.py`: existing conflict handling was per-file inside the copy loop, so a later SHA mismatch could leave earlier categorized source copies created without publishing a current manifest. Implemented a whole-batch SHA preflight and two explicit negative tests, keeping all original flat export files in place. This improves deterministic safety of the already established `01_ETABS_EXPORT` categorized mirror; it **does not** migrate analysis-stage writers/readers or claim global transaction/ETABS equivalence. All non-native output regressions must pass CI before relying on the new behavior.

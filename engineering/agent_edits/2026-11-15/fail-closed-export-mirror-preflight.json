@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 via GitHub connector",
+  "baseline_sha": "fc4fed51eb8ecb40b7341e1b38fb006dd06046b4",
+  "scope": "Existing ETABS categorized export mirror: fail-closed whole-batch preflight; selected-root symlink rejection; tests and source guide.",
+  "changed_modules": [
+    "components/inputs/export_mirror.py"
+  ],
+  "behavior_change": "Do not create any categorized copies when any pre-existing destination content conflicts at batch preflight; do not follow symlinked selected export root.",
+  "unchanged": [
+    "ETABS EDB/XLSX source files",
+    "OpenSees physics",
+    "solver configuration",
+    "analysis run folder readers and writers"
+  ],
+  "test_plan": "GitHub Actions export-staging-regressions pytest plus repository integrity; native ETABS/Windows/Spyder and full NLTHA NOT EXECUTED",
+  "status": "COMMITTED_PENDING_CI",
+  "limitations": [
+    "Not a true multi-file transaction",
+    "Concurrent file writers cannot be fully prevented without OS-level locking",
+    "No complete semantic review of all 3016 tracked files"
+  ]
+}
