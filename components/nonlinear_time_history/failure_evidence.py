@@ -5,6 +5,24 @@ import json
 import math
 from pathlib import Path
 
+from components.inputs.output_contract import atomic_json
+
+
+def _solver_time_evidence(value):
+    """Record a nonfinite solver clock without emitting illegal JSON numbers."""
+    clock=float(value)
+    if math.isfinite(clock):
+        return clock, "FINITE"
+    return None, "NONFINITE_" + ("NAN" if math.isnan(clock) else "INFINITY")
+
+
+def _validate_capture_limits(maximum_findings, max_values=None):
+    if type(maximum_findings) is not int or maximum_findings < 1 or maximum_findings > 100000:
+        raise ValueError("maximum_findings must be an integer from 1 to 100000")
+    if max_values is not None and (
+            type(max_values) is not int or max_values < 1 or max_values > 10000):
+        raise ValueError("max_values must be an integer from 1 to 10000")
+
 
 def _numbers(raw):
     if raw is None:
@@ -27,11 +45,15 @@ def snapshot_selected_state(ops, output_path, *, suspect_tags,
     the initiating cause. Use immediately after gravity and each accepted
     diagnostic step; the last committed snapshot survives a failed attempt.
     """
+    _validate_capture_limits(1,max_values)
+    if suspect_tags is None:
+        raise ValueError("suspect_tags must be a nonempty collection")
     tags=sorted({int(tag) for tag in suspect_tags})
-    if len(tags)>16 or any(t<=0 for t in tags):
+    if len(tags)<1 or len(tags)>16 or any(t<=0 for t in tags):
         raise ValueError("suspect_tags must have 1..16 positive solver tags")
     existing=set(map(int,ops.getEleTags()))
-    report={"status":stage,"time_s":float(ops.getTime()),
+    clock,time_status=_solver_time_evidence(ops.getTime())
+    report={"status":stage,"time_s":clock,"time_status":time_status,
             "tag_count":len(tags),"elements":[],"missing_tags":[],
             "warning":"Committed response evidence is not material qualification."}
     for tag in tags:
@@ -71,9 +93,7 @@ def snapshot_selected_state(ops, output_path, *, suspect_tags,
             except Exception as exc:
                 item["responses"][name]={"status":"UNSUPPORTED_OR_ERROR","error":str(exc)}
         report["elements"].append(item)
-    output=Path(output_path)
-    output.parent.mkdir(parents=True,exist_ok=True)
-    output.write_text(json.dumps(report,indent=2,allow_nan=False),encoding="utf-8")
+    atomic_json(output_path,report)
     return report
 
 
@@ -82,8 +102,8 @@ def snapshot_failed_step(
     element_map_path=None, maximum_findings=150, suspect_tags=None,
 ):
     """Write observed non-finite responses without treating missing responses as zero."""
+    _validate_capture_limits(maximum_findings)
     out = Path(output_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
     inverse = {}
     if element_map_path and Path(element_map_path).is_file():
         mapping = json.loads(
@@ -94,10 +114,15 @@ def snapshot_failed_step(
                 for tag in tags:
                     inverse[int(tag)] = source
 
+    clock,time_status=_solver_time_evidence(ops.getTime())
+    attempt=float(dt)
+    if not math.isfinite(attempt) or attempt<=0:
+        raise ValueError("Failed-step evidence requires a positive finite attempted time step")
     report = {
         "status": "FAILED_STEP_DIAGNOSTIC",
-        "analysis_time_s": float(ops.getTime()),
-        "attempt_dt_s": float(dt),
+        "analysis_time_s": clock,
+        "analysis_time_status":time_status,
+        "attempt_dt_s": attempt,
         "return_code": int(return_code),
         "algorithm": str(algorithm),
         "element_map": str(element_map_path) if element_map_path else None,
@@ -166,5 +191,5 @@ def snapshot_failed_step(
                         "error": str(exc),
                     })
 
-    out.write_text(json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")
+    atomic_json(out,report)
     return report
