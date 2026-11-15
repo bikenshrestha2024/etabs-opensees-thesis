@@ -11,9 +11,11 @@ def read_rows(path):
     with Path(path).open(encoding='utf-8-sig',newline='') as f:return list(csv.DictReader(f))
 
 def write_rows(path,rows):
+    """Publish derived V135 CSV without partial replacement of prior evidence."""
     if not rows:return
-    with Path(path).open('w',encoding='utf-8-sig',newline='') as f:
-        w=csv.DictWriter(f,fieldnames=list(dict.fromkeys(k for r in rows for k in r)));w.writeheader();w.writerows(rows)
+    from components.inputs.output_contract import write_table
+    columns=list(dict.fromkeys(k for r in rows for k in r))
+    return write_table(path,rows,columns=columns)
 
 def number(x):
     v=float(x)
