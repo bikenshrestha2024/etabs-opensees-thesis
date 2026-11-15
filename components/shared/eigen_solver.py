@@ -7,7 +7,33 @@ Reference: https://opensees.github.io/OpenSeesDocumentation/user/manual/analysis
 No mass/stiffness perturbation or dense fallback. Retains massless DOFs.
 """
 import time
+import math
+import numbers
 import numpy as np
+
+def validated_mode_count(value, *, name="modes"):
+    """Accept only a positive exact integer mode count; never truncate input.
+
+    [REF docs/source/components/shared/eigen_solver.py.md] This is an
+    input/provenance check before OpenSees or SciPy eigenanalysis, not a
+    substitute for the assembled mass/stiffness and modal-residual gates.
+    """
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a positive exact integer")
+    if isinstance(value, str):
+        if not value.strip().isdecimal():
+            raise ValueError(f"{name} must be a positive exact integer")
+        count = int(value.strip())
+    elif isinstance(value, numbers.Integral):
+        count = int(value)
+    elif isinstance(value, numbers.Real) and math.isfinite(value) and value == int(value):
+        count = int(value)
+    else:
+        raise ValueError(f"{name} must be a positive exact integer")
+    if count < 1:
+        raise ValueError(f"{name} must be a positive exact integer")
+    return count
+
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import eigsh, splu, LinearOperator
 
@@ -49,7 +75,7 @@ class SparseEigen:
         print(f'[EIGEN COMPLETE] sparse solve={time.perf_counter()-started:.3f}s max relative residual={max(residuals):.3g}',flush=True)
 
 def solve_eigen(ops, modes, solver='PythonSparse'):
-    modes=int(modes)
+    modes=validated_mode_count(modes)
     started=time.perf_counter()
     print(f'[EIGEN START] solver={solver} modes={modes} nodes={len(ops.getNodeTags())} elements={len(ops.getEleTags())}',flush=True)
     if solver=='PythonSparse':
