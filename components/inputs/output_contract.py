@@ -159,7 +159,15 @@ def create_case_run(export_dir, stage, case_id, *,
             raise ValueError("Source/model SHA256 must contain exactly 64 hexadecimal characters")
     if not isinstance(units, str) or units not in ("kN-m-s", "kN-mm-s"):
         raise ValueError("Declare explicitly reviewed source units: kN-m-s or kN-mm-s")
-    parent = root / stage_folder / "RUNS" / state / case_id
+    # Refuse existing linked ancestors rather than writing outside the
+    # selected export case through a redirected stage/state/case folder.
+    # Only inspect paths below the already resolved case root; older results
+    # remain untouched and readable through their existing consumers.
+    parent = root
+    for segment in (stage_folder, "RUNS", state, case_id):
+        parent = parent / segment
+        if parent.is_symlink():
+            raise ValueError("Refusing linked run-output directory: " + str(parent))
     parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
     run_id = now.strftime("%Y%m%dT%H%M%S_%fZ") + "_" + uuid4().hex[:8]
