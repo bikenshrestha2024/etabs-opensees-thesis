@@ -8,7 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from openpyxl import load_workbook
-from components.sections.area_elements import export_area_integration_inventory
+from components.sections.area_elements import export_area_integration_inventory, default_area_integration_script_path
 
 
 class AreaInventoryTests(unittest.TestCase):
@@ -55,6 +55,15 @@ class AreaInventoryTests(unittest.TestCase):
             _,manifest=export_area_integration_inventory(topology_json=root/'topo.json',
                 area_assignment_csv=root/'a.csv',config_json=root/'c.json',output_dir=root)
             self.assertEqual(len(json.loads(manifest.read_text())['geometry_errors']),1)
+
+    def test_area_python_default_is_inside_selected_export(self):
+        with TemporaryDirectory() as td:
+            root=Path(td).resolve()
+            target=default_area_integration_script_path(root)
+            self.assertEqual(target,root/"02_MODEL"/"AREA_INTEGRATION"/
+                             "PYTHON"/"OpenSees_Area_Integration_Call_V116.py")
+            self.assertFalse(target.exists())
+            self.assertFalse((root/"02_MODEL").exists())
 
     def test_04_08_16_names_and_hash_guard_present(self):
         src=(Path(__file__).parents[1]/'components/gravity/load_path_formulas.py').read_text()
