@@ -77,6 +77,40 @@ class FailureEvidenceTests(unittest.TestCase):
             self.assertEqual(report["nonfinite_elements"][0]["tag"], 110280)
             self.assertTrue(report["warning"].startswith("Post-failure responses"))
 
+    def test_nonfinite_failure_clock_preserves_evidence(self):
+        from components.nonlinear_time_history.failure_evidence import (
+            snapshot_failed_step, snapshot_selected_state)
+        with tempfile.TemporaryDirectory() as td:
+            ops=FakeOps([],nonfinite=True)
+            ops.time=float("nan")
+            path=Path(td)/"failure.json"
+            report=snapshot_failed_step(
+                ops,path,algorithm="Newton",dt=.005,return_code=-3,
+                suspect_tags=[110280])
+            self.assertIsNone(report["analysis_time_s"])
+            self.assertEqual(report["analysis_time_status"],"NONFINITE_NAN")
+            self.assertEqual(json.loads(path.read_text())["nonfinite_elements"][0]["tag"],110280)
+            committed=Path(td)/"last_committed.json"
+            selected=snapshot_selected_state(
+                ops,committed,suspect_tags=[110280])
+            self.assertIsNone(selected["time_s"])
+            self.assertEqual(selected["time_status"],"NONFINITE_NAN")
+            self.assertTrue(committed.is_file())
+
+    def test_invalid_capture_bounds_are_rejected_before_writing(self):
+        from components.nonlinear_time_history.failure_evidence import (
+            snapshot_failed_step, snapshot_selected_state)
+        with tempfile.TemporaryDirectory() as td:
+            path=Path(td)/"evidence.json"
+            for count in (0,-1,1.5,True):
+                with self.subTest(count=count),self.assertRaises(ValueError):
+                    snapshot_failed_step(FakeOps([]),path,algorithm="Newton",
+                        dt=.005,return_code=-3,maximum_findings=count)
+            with self.assertRaises(ValueError):
+                snapshot_selected_state(FakeOps([]),path,
+                                        suspect_tags=[110280],max_values=0)
+            self.assertFalse(path.exists())
+
     def test_recovered_fallback_removes_stale_failure_evidence(self):
         with tempfile.TemporaryDirectory() as folder:
             evidence_path = Path(folder) / "First_Step_Failure_Evidence.json"
