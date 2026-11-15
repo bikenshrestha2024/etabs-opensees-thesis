@@ -25,6 +25,9 @@ def current_export_model_sha(export_dir):
     from components.inputs.output_layout import export_root_for
     root=export_root_for(export_dir)
     path=root/"OpenSees_Complete_Model_Data_V118.json"
+    if path.is_symlink():
+        # Never fingerprint an external file through a linked source alias.
+        return None
     if not path.is_file():
         return None
     with path.open("rb") as stream:
@@ -38,11 +41,15 @@ def source_model_hash_evidence(result_path, case=None):
     If both are valid but disagree, report an explicit source conflict.
     Neither the run directory nor an old saved report is modified.
     """
-    path=Path(result_path).expanduser().resolve()
+    raw_path=Path(result_path).expanduser()
+    # Resolving first would erase evidence of a linked source payload.
+    linked_source=any(part.is_symlink() for part in (raw_path,*raw_path.parents))
+    path=raw_path.resolve()
     folder=path.parent
     manifest_digest=None
     payload_digest=None
     invalid_manifest=False
+    invalid_payload_sha=False
     manifest_path=None
     for parent in (folder,*folder.parents):
         candidate=parent/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
@@ -78,11 +85,16 @@ def source_model_hash_evidence(result_path, case=None):
         elif path.name.startswith("Drift_Check_"):
             suffix=path.stem.removeprefix("Drift_Check_")
             metadata=folder/("NBC105_ESM_OpenSees_Response_META_"+suffix+".json")
-            if metadata.is_file():
+            if metadata.is_symlink():
+                linked_source=True
+            elif metadata.is_file():
                 content=json.loads(metadata.read_text(encoding="utf-8-sig"))
                 value=content.get("model_sha256") if isinstance(content,dict) else None
-        if _valid_sha256(value):
-            payload_digest=value.lower()
+        if value is not None:
+            if _valid_sha256(value):
+                payload_digest=value.lower()
+            else:
+                invalid_payload_sha=True
     except (OSError,ValueError,TypeError,AttributeError):
         pass
     conflict=(manifest_digest is not None and payload_digest is not None
@@ -91,8 +103,11 @@ def source_model_hash_evidence(result_path, case=None):
             "payload_model_sha256":payload_digest,
             "manifest_path":manifest_path,
             "invalid_manifest":invalid_manifest,
+            "invalid_payload_sha":invalid_payload_sha,
+            "linked_source":linked_source,
             "conflict":conflict,
-            "model_sha256":None if conflict or invalid_manifest else
+            "model_sha256":None if conflict or invalid_manifest or
+                           invalid_payload_sha or linked_source else
                            payload_digest or manifest_digest}
 
 
@@ -125,6 +140,20 @@ def identity_screen(rows, *, expected_model_sha):
         if key not in cache:
             cache[key]=source_model_hash_evidence(path,item.get("case"))
         evidence=cache[key]
+        if evidence["linked_source"]:
+            issues.append({
+                "status":"LINKED_RESULT_EVIDENCE_EXCLUDED",
+                "file":str(path),"case":item.get("case"),
+                "reason":"Linked source result or ESM metadata cannot establish source-model identity.",
+            })
+            continue
+        if evidence["invalid_payload_sha"]:
+            issues.append({
+                "status":"INVALID_RESULT_MODEL_SHA_EXCLUDED",
+                "file":str(path),"case":item.get("case"),
+                "reason":"An explicitly recorded malformed model SHA cannot be ignored in favor of manifest-only identity.",
+            })
+            continue
         if evidence["invalid_manifest"]:
             issues.append({
                 "status":"INVALID_RUN_MANIFEST_EXCLUDED",
