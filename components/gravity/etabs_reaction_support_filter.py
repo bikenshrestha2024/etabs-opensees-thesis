@@ -139,15 +139,25 @@ def export_primary_32_comparison(gravity_result, audit_json, output_dir):
         reactions[tag]=value
     if set(reactions)!=set(PROJECT_PRIMARY_32):
         raise ValueError("Solver reaction output does not contain exactly the 32 expected supports")
-    etabs = {int(m["opensees_node"]):m for m in audit["mapping"] if m["selected"]}
+    etabs={}
+    for source in audit["mapping"]:
+        if source["selected"]:
+            tag=int(source["opensees_node"])
+            if tag in etabs:
+                raise ValueError("Duplicate selected ETABS source mapping at "+str(tag))
+            etabs[tag]=source
     if set(etabs)!=set(PROJECT_PRIMARY_32):
         raise ValueError("Source ETABS point mapping does not cover exactly 32 supports")
     rows=[]
     for tag in PROJECT_PRIMARY_32:
         m=etabs[tag]
         original=float(m["etabs_FZ_kN"])
+        if not math.isfinite(original):
+            raise ValueError("Nonfinite original ETABS reaction at "+str(tag))
         got=reactions[tag]
         delta=got-original
+        if not math.isfinite(delta):
+            raise ValueError("Nonfinite ETABS–OpenSees reaction difference at "+str(tag))
         rows.append(dict(opensees_node=tag,etabs_unique_name=m["etabs_unique"],
                          etabs_FZ_kN=original,opensees_FZ_kN=got,
                          delta_kN=delta,
@@ -157,6 +167,8 @@ def export_primary_32_comparison(gravity_result, audit_json, output_dir):
     etabs_total=sum(r["etabs_FZ_kN"] for r in rows)
     open_total=sum(r["opensees_FZ_kN"] for r in rows)
     solver_total=float(result["report"]["support_vertical_reaction_kN"])
+    if not all(math.isfinite(value) for value in (etabs_total,open_total,solver_total)):
+        raise ValueError("Nonfinite total ETABS/OpenSees support reaction")
     if abs(open_total-solver_total)>max(0.01,abs(solver_total)*1e-7):
         raise ValueError("Saved 32-node reactions do not sum to solver support total")
     global_diff=open_total-etabs_total
