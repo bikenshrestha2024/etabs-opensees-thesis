@@ -2227,6 +2227,7 @@ class App:
         ttk.Button(toolbar,text="Open implementation files",command=lambda:os.startfile(str(source_folder))).pack(side="left",padx=(0,8))
         self.edb=tk.StringVar(); self.out=tk.StringVar(value=os.environ.get("OPENSEES_PROJECT_FOLDER",r"D:\Thesis Opensees\Etabs Nodes Export"))
         self.include_live=tk.BooleanVar(value=True)
+        self.categorize_export=tk.BooleanVar(value=True)
         ttk.Label(toolbar,text='Active launcher: '+Path(__file__).name).pack(side="right",padx=8)
         def repair_runtime():
             from OpenSees_Release_Health_V142 import repair
@@ -2259,6 +2260,7 @@ class App:
         ttk.Button(source,text="Browse…",command=self._browse_dir).grid(row=1,column=2,padx=(8,0),pady=3)
         self.include_live.set(True)
         ttk.Checkbutton(source,text="Include live area load in ETABS load audit preview",variable=self.include_live).grid(row=2,column=0,columnspan=2,sticky="w",pady=(4,0))
+        ttk.Checkbutton(source,text="Create SHA-verified categorized export copies (keep original flat files)",variable=self.categorize_export).grid(row=3,column=0,columnspan=3,sticky="w",pady=(4,0))
         runbar=ttk.Frame(shell); runbar.pack(fill="x",pady=(0,8))
         self.runbtn=ttk.Button(runbar,text="RUN ETABS → OPENSEESPY EXPORT  |  Assemble model, loads, mass and analysis-file manifest",style="Primary.TButton",command=self._run)
         self.runbtn.pack(fill="x",ipady=5)
@@ -3028,17 +3030,51 @@ class App:
                      str(optional_audit.get("evidence_status")))
             result=convert_model(self.edb.get().strip(),self.out.get().strip(),self.log,self.include_live.get())
             self._last_exports=result
+            if self.categorize_export.get():
+                self._sync_export_mirror()
             report_path=Path(self.out.get())/'OpenSees_Complete_Export_Report_V118.json'
             assembly=json.loads(report_path.read_text(encoding='utf-8-sig'))
             if assembly['assembly_errors']:
                 messagebox.showwarning('Export created — model assembly needs inputs',
                     'Analysis files are linked automatically. The model entry reports these unresolved inputs:\n\n'+'\n'.join(assembly['assembly_errors'])+'\n\nReport: '+str(report_path),parent=self.root)
             else:
-                messagebox.showinfo('Connected OpenSees export created',
-                    f"Assembled {assembly['frame_segments']} frame segments and {assembly['shell_mesh_cells']} wall/slab shell cells.\nGravity loads, source self-weight, seismic mass and rigid floors are included.\n\nGravity, Modal, Linear TH and Nonlinear TH windows now select their matching entry automatically.\n\nElastic conversion model: compare reactions, mass and periods with ETABS. Nonlinear execution still requires calibrated materials.\n\nReport: {report_path}",parent=self.root)
+                analysis_ready=bool(assembly.get('analysis_ready',False))
+                nonlinear_ready=bool(assembly.get('nonlinear_ready',False))
+                readiness=('Engineering readiness: '+('REVIEW REQUIRED' if not analysis_ready else 'reported ready')
+                           +' | Nonlinear readiness: '+('REVIEW REQUIRED' if not nonlinear_ready else 'reported ready'))
+                messagebox.showinfo('Elastic assembly created — validation required',
+                    f"Assembled {assembly['frame_segments']} frame segments and {assembly['shell_mesh_cells']} wall/slab shell cells.\n\n"
+                    +readiness
+                    +"\n\nSaved loads/mass/diaphragms are evidence for comparison, not proof of ETABS parity. "
+                    +"Stage viewers can discover saved candidates but must validate the source model SHA, case identity, "
+                    +"status and completeness. Nonlinear analysis remains gated on real project material/rebar and benchmarks."
+                    +"\n\nReport: "+str(report_path),parent=self.root)
         except Exception as e:
             self.log("ERROR: "+repr(e)); self.log(traceback.format_exc()); messagebox.showerror("Conversion failed",str(e))
         finally:self.runbtn.configure(state="normal")
+
+    def _sync_export_mirror(self):
+        """Create hash-verified categorized copies, keeping flat legacy readers.
+
+        A categorized-mirror conflict is an organization warning; it must not
+        falsely convert a finished native source export into a failed export.
+        """
+        try:
+            from components.inputs.export_mirror import export_mirror
+            from components.inputs.output_layout import write_stage_index
+            selected=Path(self.out.get()).expanduser()
+            manifest=export_mirror(selected)
+            index=write_stage_index(selected)
+            self.log("[EXPORT_ORGANIZED] Flat source retained; SHA-verified "
+                     "categorized copies in 01_ETABS_EXPORT. Manifest: "
+                     +str(manifest)+" | Stage index: "+str(index))
+            return manifest
+        except Exception as exc:
+            self.log("[EXPORT_ORGANIZATION_NEEDS_REVIEW] "
+                     +type(exc).__name__+": "+str(exc)
+                     +" | Original source files preserved. Use 09_ORGANIZE_ETABS_EXPORT.py "
+                     "after checking pre-existing categorized copies.")
+            return None
 
     def _rebuild_complete_export(self):
         """Regenerate model entries after editing the V118 config; no ETABS run."""
@@ -3065,6 +3101,8 @@ class App:
                      +str(health['runtime_path']))
             manifest,report=prepare_complete_export(self.out.get(),frame_mapping=ETABS_TO_OPENSEES_SECTION)
             self.log('Rebuilt complete-model entries; report: '+str(Path(self.out.get())/manifest['report']))
+            if self.categorize_export.get():
+                self._sync_export_mirror()
             if report['assembly_errors']:
                 messagebox.showwarning('Assembly needs inputs','\n'.join(report['assembly_errors']),parent=self.root)
             else:

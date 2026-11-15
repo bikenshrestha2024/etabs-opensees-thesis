@@ -20,6 +20,49 @@ PREFIXES = {
 # A segment is not automatically an outrigger solely because it is diagonal.
 # Source classification is mandatory for CO, BT and CT.
 
+# Keep the main structural family separate from the thesis brace role.
+# Only an explicit ETABS-backed category or a user-reviewed per-object role
+# qualifies as CO/BT/CT; neither storey=25 nor diagonal geometry is evidence.
+BRACE_ROLES = {"BR", "CO", "BT", "CT"}
+_ROLE_BY_CATEGORY = {
+    "NODE": ("N", "NODE", ""),
+    "BEAM": ("B", "BEAM", ""),
+    "COLUMN": ("C", "COLUMN", ""),
+    "BRACE": ("BR", "BRACE", "BR"),
+    "CONVENTIONAL OUTRIGGER": ("CO", "BRACE", "CO"),
+    "BELT TRUSS": ("BT", "BRACE", "BT"),
+    "CAP TRUSS": ("CT", "BRACE", "CT"),
+    "SHEAR WALL": ("SW", "SHEAR WALL", ""),
+    "FLOOR": ("FL", "FLOOR", ""),
+}
+
+
+def member_identity(category, explicit_role=None):
+    """Return display prefix, main family, and thesis brace subcategory.
+
+    [REF docs/source/components/model/display_ids.py.md] Display-only source
+    role mapping; user-specified 2026-11-15 project member names.
+    A source BRACE remains BR unless explicit, reviewed source mapping says
+    CO/BT/CT. This helper never changes solver or topology element IDs.
+    """
+    key = str(category).strip().upper()
+    if key not in _ROLE_BY_CATEGORY:
+        raise ValueError("Unclassified ETABS member category: " + key)
+    prefix, family, role = _ROLE_BY_CATEGORY[key]
+    if explicit_role not in (None, ""):
+        role_input = str(explicit_role).strip().upper()
+        if (key not in {"BRACE", "BEAM", "CONVENTIONAL OUTRIGGER",
+                        "BELT TRUSS", "CAP TRUSS"}
+                or role_input not in BRACE_ROLES):
+            raise ValueError("Explicit BR/CO/BT/CT role requires a source frame member")
+        # An already source-tagged role may not be silently contradicted.
+        if key not in ("BRACE", "BEAM") and role_input != role:
+            raise ValueError("Explicit role contradicts source ETABS category: " + key)
+        prefix, family, role = role_input, "BRACE", role_input
+    return {"prefix": prefix, "family": family, "brace_role": role}
+
+
+
 
 def display_label(prefix, storey, position):
     """Produce labels such as N1, N101, N202, B701, SW2501.

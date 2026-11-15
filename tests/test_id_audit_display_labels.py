@@ -24,6 +24,7 @@ def test_labels_in_excel_and_html(tmp_path):
     assert nodes[2][-1]=="N101"
     assert elements[1][0]=="251"
     assert elements[1][5]==1001
-    assert elements[1][-1]=="B101"
+    assert elements[1][9]=="B101"
+    assert elements[1][10:13]==("BEAM",None,"B")
     html=(tmp_path/"OpenSees_ID_Lookup.html").read_text()
     assert "B101" in html and "251" in html
