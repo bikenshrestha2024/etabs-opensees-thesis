@@ -46,6 +46,29 @@ class DualWallGravityTests(unittest.TestCase):
         self.second['report']['applied_vertical_load_kN']=287.
         with self.assertRaisesRegex(ValueError,'different applied'):
             compare_wall_support_gravity(self.first,self.second)
+    def test_reject_duplicate_reaction_and_geometry_tags(self):
+        self.first["reactions"].append(dict(self.first["reactions"][0]))
+        with self.assertRaisesRegex(ValueError,"Duplicate.*reactions"):
+            compare_wall_support_gravity(self.first,self.second)
+        self.first["reactions"].pop()
+        self.second["nodes"].append(dict(self.second["nodes"][0]))
+        with self.assertRaisesRegex(ValueError,"Duplicate.*nodes"):
+            compare_wall_support_gravity(self.first,self.second)
+
+    def test_reject_missing_or_misaligned_shared_support_geometry(self):
+        self.second["nodes"][0]["x_m"]=6.
+        with self.assertRaisesRegex(ValueError,"differing geometry"):
+            compare_wall_support_gravity(self.first,self.second)
+        self.second["nodes"][0]["x_m"]=0.
+        self.second["nodes"].pop(0)
+        with self.assertRaisesRegex(ValueError,"lacks source coordinates"):
+            compare_wall_support_gravity(self.first,self.second)
+
+    def test_reject_nonfinite_gravity_support_coordinates(self):
+        self.first["nodes"][0]["x_m"]=float("nan")
+        with self.assertRaisesRegex(ValueError,"nonfinite support node"):
+            compare_wall_support_gravity(self.first,self.second)
+
     def test_gui_uses_isolated_output_directories(self):
         src=(Path(__file__).resolve().parents[1]/
              'components/gravity/gui_and_reports.py').read_text(encoding='utf8')
