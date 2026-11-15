@@ -13,7 +13,7 @@ class TimingMetadataLayoutTests(unittest.TestCase):
             @timed_outputs("elastic export","output")
             def export(output):
                 child=Path(output)/"nested"/"run.csv"
-                child.parent.mkdir()
+                child.parent.mkdir(exist_ok=True)
                 child.write_text("n,kN\\n1,2\\n",encoding="utf-8")
             export(root)
             self.assertFalse((root/"nested"/"run.csv.processing.json").exists())
