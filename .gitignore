@@ -35,3 +35,7 @@ security_history_private.json
 
 # Local, private ETABS XLSX evidence staging; never publish source workbook paths or hashes.
 **/10_PRIVATE_ETABS_WORKBOOKS/
+
+# Local source/path audits may contain confidential source names and machine paths.
+# Keep them out of public commits; CI can publish sanitized workflow artifacts.
+/audit/

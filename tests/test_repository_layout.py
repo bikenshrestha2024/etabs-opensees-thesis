@@ -7,6 +7,38 @@ from tools.audit_repository_layout import audit
 
 
 class LayoutAuditTests(unittest.TestCase):
+    def test_rejects_tracked_symlink_without_reading_external_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            external = Path(tmp) / "private.txt"
+            root.mkdir()
+            external.write_text("SECRET OUTSIDE CHECKOUT", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            link = root / "external.txt"
+            try:
+                link.symlink_to(external)
+            except (OSError, NotImplementedError):
+                self.skipTest("Symlink creation unavailable")
+            (root / "OLD_NOTE.md").write_text("history", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            report = audit(root)
+            self.assertIn("external.txt", report["skipped_text_files"])
+            note = next(x for x in report["root_files"] if x["path"] == "OLD_NOTE.md")
+            self.assertEqual(note["relocation_status"], "HOLD_REVIEW_REQUIRED")
+            self.assertEqual(external.read_text(), "SECRET OUTSIDE CHECKOUT")
+
+    def test_malformed_tracked_utf8_blocks_relocation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "BROKEN.md").write_bytes(b"\\xff\\xfe")
+            (root / "OLD_NOTE.md").write_text("history", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            report = audit(root)
+            self.assertIn("BROKEN.md", report["skipped_text_files"])
+            note = next(x for x in report["root_files"] if x["path"] == "OLD_NOTE.md")
+            self.assertEqual(note["relocation_status"], "HOLD_REVIEW_REQUIRED")
+
     def test_inventory_is_read_only_and_blocks_referenced_documents(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

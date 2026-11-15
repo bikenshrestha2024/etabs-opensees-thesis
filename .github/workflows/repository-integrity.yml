@@ -32,6 +32,8 @@ jobs:
         run: |
           python tools/audit_active_repository.py --output audit/active_inventory.json --fail-on-missing-canonical
           python -m unittest tests.verify_active_repository_audit tests.verify_gravity_reactions_3d -v
+          python -m unittest discover -s tests -p 'test_repository_layout.py' -v
+          python tools/audit_repository_layout.py --output audit/repository_layout.json
           python -m unittest discover -s tests -p 'test_project_output_layout_v171.py' -v
           python -m unittest discover -s tests -p 'test_gravity_organized_case_index_v172.py' -v
           python -m unittest discover -s tests -p 'test_gravity_gui_action_layout.py' -v
@@ -58,5 +60,6 @@ jobs:
           name: static-repository-inventory
           path: |
             audit/active_inventory.json
+            audit/repository_layout.json
             audit/documentation_coverage.json
           if-no-files-found: warn

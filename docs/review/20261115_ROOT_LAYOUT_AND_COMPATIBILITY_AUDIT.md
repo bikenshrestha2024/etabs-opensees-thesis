@@ -34,3 +34,11 @@ The X-wall first-step nonlinear failure, qualified RCC material/rebar mappings, 
 
 ## Scope and provenance
 Editor: ChatGPT (OpenAI GPT-6), GitHub connector. Static Git tree and repository policy inspected; the shared ChatGPT conversation URL was not retrievable. No local checkout, native ETABS, Windows/Spyder, OpenSees, or full semantic file-by-file review was available in this connector-only pass.
+
+## Second review: audit safety and CI checks (2026-11-15)
+- Refuse symlinked tracked text inputs; a malicious symbolic link may otherwise cause local files outside the repository to be read during navigation audits.
+- Skip malformed UTF-8 instead of replacing invalid bytes and reporting a misleadingly complete scan.
+- Report skipped text-file count and block all automatic relocation candidates when scanning is incomplete.
+- CI now executes the layout inventory regression tests and produces the layout JSON as a downloadable CI artifact (not a tracked source file).
+- `/audit/` is ignored in local working trees. Confirm separately that sensitive evidence is not already present in Git history; ignoring future writes does not rewrite history.
+- Static search findings are **not** a license to relocate root scripts: existing source/launcher references must be checked against actual Windows execution and test evidence.

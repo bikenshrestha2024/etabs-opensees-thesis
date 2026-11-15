@@ -59,11 +59,16 @@ def audit(root: Path) -> dict:
         if path.suffix.lower() not in READABLE:
             continue
         try:
+            # Never follow tracked symlinks, including links leaving the checkout.
+            # An audit must not read private local files outside its tracked tree.
+            if path.is_symlink() or not path.is_file():
+                skipped.append(rel)
+                continue
             if path.stat().st_size > SCANNABLE_LIMIT:
                 skipped.append(rel)
                 continue
-            data = path.read_text(encoding="utf-8-sig", errors="replace")
-        except OSError:
+            data = path.read_text(encoding="utf-8-sig", errors="strict")
+        except (OSError, UnicodeError):
             skipped.append(rel)
             continue
         for target in targets:
@@ -95,12 +100,14 @@ def audit(root: Path) -> dict:
         "duplicate_numbered_prefixes": {
             k: v for k, v in sorted(numbered.items()) if len(v) > 1},
         "skipped_text_files": skipped,
+        "skipped_text_file_count": len(skipped),
         "source_changes_performed": False,
         "file_moves_approved": False,
         "root_files": root_files,
         "limitations": [
             "Static exact-name scans cannot detect constructed paths, imports or GUI callbacks.",
             "Untracked local and ignored files are excluded.",
+            "Tracked symlinks and malformed or oversized text files are skipped; any skips block relocation approval.",
             "All relocation candidates require runtime consumer tests before a move.",
             "No native ETABS/OpenSees run, engineering check, or semantic code review.",
         ],
