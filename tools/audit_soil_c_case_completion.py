@@ -81,11 +81,12 @@ def inspect_case(output_dir, variant, state, earthquake, orientation):
         achieved=durations["achieved_time_s"]
         if abs(record-requested)>1e-7 or abs(achieved-requested)>1e-7:
             raise ValueError("Accepted duration does not reach full source record")
-        try:
-            accepted_states=int(b["accepted_states"])
-        except (KeyError,TypeError,ValueError,OverflowError) as exc:
-            raise ValueError("Missing/invalid accepted state count") from exc
-        if accepted_states<2 or isinstance(b["accepted_states"],bool):
+        # bool, 2.5, "2", or 2.9 must never be silently coerced into
+        # an actual count of accepted integration states.
+        accepted_states=b.get("accepted_states")
+        if type(accepted_states) is not int:
+            raise ValueError("Accepted state count must be an integer JSON number")
+        if accepted_states<2:
             raise ValueError("Accepted history requires at least two accepted states")
         if a.get("diagnostic_excitation")!="XY":
             raise ValueError("X-only/Y-only diagnostic cannot count as a full paired record")
