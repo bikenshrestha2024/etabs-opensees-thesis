@@ -334,7 +334,7 @@ def launch(parent,folder):
     import threading
     import tkinter as tk
     from tkinter import ttk, messagebox
-    from components.gravity.mesh_cases import prepared_configs, build_case, case_base
+    from components.gravity.mesh_cases import prepared_configs, build_case, case_base, package_mesh_case
 
     folder=Path(folder)
     config=folder/'OpenSees_Complete_Model_Config_V118.json'
@@ -358,7 +358,7 @@ def launch(parent,folder):
     ttk.Label(header,text='Selected mesh subdivisions:').pack(side='left')
     choice=tk.StringVar(value=str(cfg.get('floor_subdivisions',4)) if
                         cfg.get('floor_subdivisions',4) in (4,8,16) else '4')
-    ttk.Combobox(header,textvariable=choice,values=['4','8','16'],state='readonly',
+    ttk.Combobox(header,textvariable=choice,values=['Current root (hash-checked)','4','8','16'],state='readonly',
                  width=8).pack(side='left',padx=9)
     current=ttk.Label(header,text='Current root config: '+str(cfg.get('floor_subdivisions','unknown')))
     current.pack(side='left',padx=10)
@@ -388,6 +388,9 @@ def launch(parent,folder):
             messagebox.showerror('Prepare mesh configurations',str(exc),parent=win)
 
     def start_build():
+        if choice.get()=='Current root (hash-checked)':
+            current_workbook()
+            return
         size=int(choice.get())
         # Separate run snapshots preserve all three models and permit
         # comparison later; no root config, EDB or existing gravity results are
@@ -440,8 +443,23 @@ def launch(parent,folder):
             messagebox.showinfo('Mesh cases','Prepare or build the cases first.',parent=win)
         elif hasattr(os,'startfile'):os.startfile(str(root))
         else:messagebox.showinfo('Mesh case folder',str(root),parent=win)
+    def export_zip():
+        if choice.get()=='Current root (hash-checked)':
+            status.set('Select 4, 8, or 16 for an independent diagnostic ZIP.')
+            return
+        size=int(choice.get())
+        def run():
+            try:
+                result=package_mesh_case(folder,size)
+            except Exception as exc:
+                win.after(0,lambda e=exc:(status.set('ZIP FAILED | '+str(e)),log('ZIP FAILED: '+str(e))))
+            else:
+                win.after(0,lambda p=result:(status.set('ZIP CREATED | '+str(p)),log('ZIP: '+str(p))))
+        threading.Thread(target=run,daemon=True,name='mesh_diagnostic_zip').start()
+
+    ttk.Button(header,text='ZIP selected mesh',command=export_zip).pack(side='right',padx=8)
     prep_button=ttk.Button(controls,text='Prepare 4 / 8 / 16 configs',command=prepare)
-    build_button=ttk.Button(controls,text='Build selected mesh + Excel',command=start_build)
+    build_button=ttk.Button(controls,text='Build selected mesh / verified root + Excel',command=start_build)
     open_button=ttk.Button(controls,text='Open case output folders',command=open_cases)
     prep_button.grid(row=1,column=0,sticky='ew',pady=5)
     build_button.grid(row=1,column=1,sticky='ew',padx=12,pady=5)
@@ -452,7 +470,7 @@ def launch(parent,folder):
     advanced.pack(fill='x',pady=(2,7))
     ttk.Button(advanced,text='Export root assembled mesh workbook (hash-checked)',
                command=current_workbook).pack(side='left')
-    ttk.Label(advanced,text='A changed mesh setting intentionally invalidates this older assembled model.',
+    ttk.Label(advanced,text='Choose Current root in the mesh dropdown for a hash-checked root export. A changed mesh setting invalidates older assembly.',
               wraplength=440).pack(side='left',padx=10)
     ttk.Label(outer,text='Run log (copyable)',font=('Segoe UI',10,'bold')).pack(anchor='w')
     panel=ttk.Frame(outer)
