@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
 import re
 import tempfile
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
@@ -70,11 +72,12 @@ def atomic_json(path, data):
 
 def write_table(path, rows, *, columns):
     """[REF docs/source/components/inputs/output_contract.py.md]
-    Use consistent CSV headers/order, finite values supplied by the caller.
+    Use consistent CSV headers/order; reject nonfinite numeric evidence.
     """
     columns = tuple(columns)
-    if not columns or len(set(columns)) != len(columns):
-        raise ValueError("Unique nonempty columns required")
+    if (not columns or any(not isinstance(c, str) or not c.strip()
+                           for c in columns) or len(set(columns)) != len(columns)):
+        raise ValueError("Unique nonempty string columns required")
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix=".writing_", suffix=".partial", dir=target.parent)
@@ -85,6 +88,14 @@ def write_table(path, rows, *, columns):
                                     lineterminator="\n")
             writer.writeheader()
             for row in rows:
+                # CSVs are routinely opened as engineering evidence in Excel.
+                # A NaN/Infinity in forces, periods or drifts must fail closed,
+                # not be silently published as a result in an otherwise valid CSV.
+                for column in columns:
+                    value = row.get(column)
+                    if isinstance(value, (float, Decimal)) and not math.isfinite(value):
+                        raise ValueError(
+                            f"Nonfinite numeric CSV evidence in column {column!r}")
                 writer.writerow(row)
             stream.flush()
             os.fsync(stream.fileno())
