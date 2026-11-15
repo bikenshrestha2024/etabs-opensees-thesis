@@ -13,7 +13,16 @@ def export_id_audit(folder, payload=None, report=None):
     topology=read("OpenSees_Element_Connectivity.json")
     metadata=read("OpenSees_Source_Model_Metadata_V118.json")
     # Non-destructive labels are extra lookup metadata, never OpenSees tags.
-    from components.model.display_ids import build_labels
+    from components.model.display_ids import build_labels, member_identity
+    # User-reviewed role mapping uses ETABS UNIQUE object IDs only, never
+    # topology preview or numerical OpenSees solver tags.
+    cfg=read("OpenSees_Complete_Model_Config_V118.json")
+    role_overrides=cfg.get("display_member_roles", {}) or {}
+    if not isinstance(role_overrides, dict):
+        raise ValueError("display_member_roles must map ETABS object IDs to BR/CO/BT/CT")
+    if any(str(value).strip().upper() not in {"BR", "CO", "BT", "CT"}
+           for value in role_overrides.values()):
+        raise ValueError("Invalid display_member_roles value; expected BR/CO/BT/CT")
     nodes=[dict(n) for n in topology.get("node_map",[])]
     def valid_floor(value):
         try:
@@ -33,12 +42,36 @@ def export_id_audit(folder, payload=None, report=None):
         "CONVENTIONAL OUTRIGGER","BELT TRUSS","CAP TRUSS"}
     elements=[dict(e) for e in topology.get("elements",[])]
     classified=[]
+    source_ids={str(e.get("etabs_object")) for e in elements}
+    unrecognized=set(map(str,role_overrides))-source_ids
+    if unrecognized:
+        raise ValueError("display_member_roles references absent ETABS IDs: "
+                         + ", ".join(sorted(unrecognized)[:20]))
     for element in elements:
         category=str(element.get("category","")).upper().strip()
         storey=valid_floor(element.get("storey_number"))
-        if category in structural_categories and storey is not None:
-            classified.append(dict(native_id=str(element.get("dimension"))+":"+str(element.get("etabs_object")),
-                                   category=category,storey=storey))
+        override=role_overrides.get(str(element.get("etabs_object")))
+        if category in structural_categories:
+            identity=member_identity(category, override)
+            element["member_family"]=identity["family"]
+            element["brace_role"]=identity["brace_role"]
+            element["display_category"]=identity["prefix"]
+            if storey is not None:
+                # The grouping is based on the explicit role, preserving
+                # independent per-storey CO, BT, CT and ordinary BR counters.
+                classified.append(dict(
+                    native_id=str(element.get("dimension"))+":"+str(element.get("etabs_object")),
+                    category=("BRACE" if identity["prefix"]=="BR" else
+                              next((k for k,v in {"CONVENTIONAL OUTRIGGER":"CO","BELT TRUSS":"BT",
+                                                 "CAP TRUSS":"CT"}.items() if v==identity["prefix"]),category)),
+                    storey=storey))
+        else:
+            element["member_family"]="UNCLASSIFIED"
+            element["brace_role"]=""
+            element["display_category"]="UNCLASSIFIED"
+            if override is not None:
+                raise ValueError("Role override requires classified brace member: "
+                                 +str(element.get("etabs_object")))
     element_labels=build_labels(classified)
     for element in elements:
         key=str(element.get("dimension"))+":"+str(element.get("etabs_object"))
@@ -52,7 +85,7 @@ def export_id_audit(folder, payload=None, report=None):
     for index,element in enumerate((payload or {}).get('shells',[]),100001+len((payload or {}).get('frames',[]))):
         assembled_area.setdefault(str(element.get('object')),[]).append(index)
     for e in elements:
-        rows.append([str(e.get("etabs_object","")),e.get("dimension"),e.get("category"),e.get("storey_number"),e.get("assigned_section",e.get("assigned_property","")),e.get("element_tag"),json.dumps(e.get("node_names",[])),json.dumps(e.get("node_tags",[])),json.dumps(assembled.get(str(e.get("etabs_object")),[])) if payload else "NOT ASSEMBLED",e.get("display_label","UNCLASSIFIED_MEMBER")])
+        rows.append([str(e.get("etabs_object","")),e.get("dimension"),e.get("category"),e.get("storey_number"),e.get("assigned_section",e.get("assigned_property","")),e.get("element_tag"),json.dumps(e.get("node_names",[])),json.dumps(e.get("node_tags",[])),json.dumps(assembled.get(str(e.get("etabs_object")),[])) if payload else "NOT ASSEMBLED",e.get("display_label","UNCLASSIFIED_MEMBER"),e.get("member_family","UNCLASSIFIED"),e.get("brace_role",""),e.get("display_category","UNCLASSIFIED")])
     wb=Workbook();ws=wb.active;ws.title="Read me"
     for row in [["ETABS / OpenSees identifier audit"],["ETABS unique object name is not an OpenSees element tag."],["Preview tags describe exported topology; assembled tags describe solver elements."],["Gravity support input uses OpenSees node tags, never ETABS point names."],["Support rows are source restraints even if assembly fails; they do not prove a runnable model."],["Assembly errors",json.dumps((report or {}).get("assembly_errors",[]))]]:ws.append(row)
     def sheet(name,headers,data):
@@ -61,7 +94,7 @@ def export_id_audit(folder, payload=None, report=None):
         s.freeze_panes="A2";s.auto_filter.ref=s.dimensions
         for c in s[1]:c.font=Font(bold=True,color="FFFFFF");c.fill=PatternFill("solid",fgColor="17365D")
         for column in s.columns:s.column_dimensions[column[0].column_letter].width=min(65,max(18,max(len(str(c.value or "")) for c in column)+2))
-    headers=["ETABS unique object name","Dimension","Category","Storey number","ETABS section","OpenSees topology preview tag","ETABS end point names","OpenSees end node tags","Assembled frame element tags","Display label (not solver tag)"]
+    headers=["ETABS unique object name","Dimension","Category","Storey number","ETABS section","OpenSees topology preview tag","ETABS end point names","OpenSees end node tags","Assembled frame element tags","Display label (not solver tag)","Main family","Brace role","Display prefix"]
     sheet("Elements",headers,rows)
     sheet("Nodes",["ETABS point name","OpenSees node tag","Storey","X m","Y m","Z m","Display label (not solver tag)"],[[n["etabs_point_name"],n["opensees_node_tag"],n.get("etabs_storey_number"),*n["coordinates_m"],n.get("display_label","UNCLASSIFIED_LEVEL")] for n in nodes])
     sheet("Supports",["OpenSees node tag","ETABS point name","UX fixed","UY fixed","UZ fixed","RX fixed","RY fixed","RZ fixed"],[[int(tag),reverse.get(str(tag),"generated mesh node"),*flags] for tag,flags in metadata.get("supports",{}).items() if any(flags)])
