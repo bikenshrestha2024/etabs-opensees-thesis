@@ -351,7 +351,45 @@ def run(folder,storage=False,nonparallel=False):
     report['finished']=datetime.datetime.now().astimezone().isoformat()
     from components.inputs.output_contract import atomic_json
     atomic_json(output/'Design_Check_Report_V135.json',report)
-    (output/'Design_Check_V135.log').write_text(f"{started}\nModel SHA256: {digest}\n{report['overall']}\nElapsed including workbook: {elapsed:.3f} s\nFinished: {report['finished']}\n",encoding='utf-8')
+    # Declare exactly which derived CSVs belong to this refresh; empty
+    # tables retain historical CSVs but are explicitly NOT CURRENT outputs.
+    generated_index={}
+    for table_name,table_rows in tables.items():
+        filename=table_name.replace(' ','_')+'.csv'
+        generated_index[table_name]={
+            'csv':filename,
+            'current_row_count':len(table_rows),
+            'status':('CURRENT_DERIVED_TABLE' if table_rows else
+                      'NO_CURRENT_ROWS_PRIOR_CSV_NOT_REPLACED'),
+        }
+    atomic_json(output/'Design_Check_Output_Index_V135.json',{
+        'schema':'V135_DERIVED_REPORT_INDEX_V1',
+        'model_sha256':digest,
+        'created_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        'tables':generated_index,
+        'report_json':'Design_Check_Report_V135.json',
+        'report_excel':'Design_Check_Report_V135.xlsx',
+        'source_status':'DERIVED_SOFTWARE_REPORT_NOT_ENGINEERING_ACCEPTANCE',
+        'note':('Rows absent in current run must not be inferred from any '
+                'older same-name CSV retained for historical compatibility.'),
+    })
+    # Stage the display-only log before replacing it; do not truncate a
+    # previously complete log because of an interrupted write.
+    log_path=output/'Design_Check_V135.log'
+    _refuse_linked_output_target(log_path)
+    fd,log_temp=tempfile.mkstemp(prefix='.design_check_log_',
+                                 suffix='.partial',dir=output)
+    try:
+        with os.fdopen(fd,'w',encoding='utf-8',newline='\\n') as writer:
+            writer.write(f"{started}\\nModel SHA256: {digest}\\n"
+                         f"{report['overall']}\\nElapsed including workbook: "
+                         f"{elapsed:.3f} s\\nFinished: {report['finished']}\\n")
+            writer.flush()
+            os.fsync(writer.fileno())
+        _refuse_linked_output_target(log_path)
+        os.replace(log_temp,log_path)
+    finally:
+        Path(log_temp).unlink(missing_ok=True)
     return report,output
 
 def launch(parent,folder):
