@@ -218,6 +218,59 @@ def package_mesh_case(folder, subdivisions):
     return output
 
 
+def recover_assembled_mesh_workbook(folder, subdivisions):
+    """Re-export a workbook without reassembling an already verified mesh.
+
+    Model and saved configuration SHA must match, and the original source
+    hashes must still match the staged run's source manifest. This is a
+    spreadsheet recovery only, NOT gravity convergence/ETABS acceptance.
+    """
+    root=_refuse_linked_chain(folder).resolve(strict=True)
+    n=validated_mesh_size(subdivisions)
+    case=case_base(root,n)
+    parent=_refuse_linked_chain(case/"RUNS")
+    if not parent.is_dir():
+        raise FileNotFoundError(f"No independent MESH_{n:02d} runs exist")
+    runs=sorted((p for p in parent.iterdir() if p.is_dir() and
+                 p.name.startswith("RUN_")),key=lambda p:p.name,reverse=True)
+    for run in runs:
+        _refuse_linked_chain(run)
+        model=run/"OpenSees_Complete_Model_Data_V118.json"
+        cfg_file=run/REQUIRED_SOURCE[3]
+        provenance=run/"MESH_CASE_PROVENANCE.json"
+        if not all(p.is_file() for p in (model,cfg_file,provenance)):
+            continue
+        meta=json.loads(provenance.read_text(encoding="utf-8-sig"))
+        if meta.get("mesh_subdivisions")!=n:
+            raise ValueError("Mesh run identity disagrees with selected mesh")
+        before=meta.get("original_source_file_sha256",{})
+        if not before or any(not (root/name).is_file() or
+                             digest(root/name)!=saved_sha
+                             for name,saved_sha in before.items()):
+            raise ValueError("Original ETABS source audit changed; do not re-export stale mesh run")
+        staged_cfg=json.loads(cfg_file.read_text(encoding="utf-8-sig"))
+        root_cfg=json.loads((root/REQUIRED_SOURCE[3]).read_text(encoding="utf-8-sig"))
+        if staged_cfg!=dict(root_cfg,floor_subdivisions=n):
+            raise ValueError("Staged mesh config no longer matches source settings")
+        assembled=json.loads(model.read_text(encoding="utf-8-sig"))
+        if assembled.get("config_sha256")!=digest(cfg_file):
+            raise ValueError("Assembled mesh SHA/config mismatch; do not reuse this model")
+        if not any(e.get("category")=="FLOOR" for e in assembled.get("shells",[])):
+            raise ValueError("Assembled model contains no FLOOR shell cells")
+        from OpenSees_Load_Path_V141 import export
+        workbook=export(run,output_root=case)
+        status=dict(status="FORMULA_WORKBOOK_REEXPORTED_NOT_GRAVITY_VERIFIED",
+                    mesh_subdivisions=n,workbook=str(workbook),
+                    assembled_model=str(model),config_sha256=digest(cfg_file),
+                    run_directory=str(run),
+                    note="Reused matching assembled mesh; NO native gravity or ETABS comparison")
+        (run/"MESH_BUILD_STATUS.json").write_text(
+            json.dumps(status,indent=2),encoding="utf-8")
+        return status
+    raise FileNotFoundError(
+        f"No completed SHA-matched assembled MESH_{n:02d} run found. Build the mesh first.")
+
+
 def build_case(folder, subdivisions, *, runtime_dir=None):
     """Stage, assemble fresh mesh and export formula workbook for that mesh only.
 
