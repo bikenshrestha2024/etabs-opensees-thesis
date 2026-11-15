@@ -97,6 +97,26 @@ class FailureEvidenceTests(unittest.TestCase):
             self.assertEqual(selected["time_status"],"NONFINITE_NAN")
             self.assertTrue(committed.is_file())
 
+    def test_focus_tags_cannot_be_empty_or_fractionally_coerced(self):
+        from components.nonlinear_time_history.failure_evidence import (
+            snapshot_failed_step, snapshot_selected_state)
+        with tempfile.TemporaryDirectory() as td:
+            target=Path(td)/"focus.json"
+            for bad in ([],[110280.9],[True],[0],["110280.0"]):
+                with self.subTest(tags=bad):
+                    with self.assertRaises(ValueError):
+                        snapshot_failed_step(
+                            FakeOps([]),target,algorithm="Newton",
+                            dt=.005,return_code=-3,suspect_tags=bad)
+                    with self.assertRaises(ValueError):
+                        snapshot_selected_state(
+                            FakeOps([]),target,suspect_tags=bad)
+            self.assertFalse(target.exists())
+            valid=snapshot_failed_step(
+                FakeOps([],nonfinite=True),target,algorithm="Newton",
+                dt=.005,return_code=-3,suspect_tags=["110280"])
+            self.assertEqual(valid["focused_element_tags"],[110280])
+
     def test_failed_step_evidence_survives_corrupt_mapping(self):
         from components.nonlinear_time_history.failure_evidence import (
             snapshot_failed_step)
