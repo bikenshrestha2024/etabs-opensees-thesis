@@ -28,24 +28,48 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
     eccentricity and same response location are independently reviewed.
     """
     policy=policy or {}
+    if not isinstance(policy,dict):
+        raise ValueError("Comparison policy must be a dictionary")
+    if not isinstance(fields,(tuple,list)) or len(fields)!=8 or len(set(fields))!=8:
+        raise ValueError("Comparison requires eight distinct semantic key fields")
     approval=policy.get("assumptions_verified",False)
     if not isinstance(approval,bool):
         raise ValueError("assumptions_verified must be a real JSON boolean, not a truthy string")
     checked=(approval is True)
     limits=dict(DEFAULT_PERCENT_LIMITS)
-    limits.update(policy.get("percent_limits",{}))
     zero=dict(DEFAULT_ABS_ZERO)
-    zero.update(policy.get("absolute_zero_limits",{}))
-    for val in list(limits.values())+list(zero.values()):
-        if not math.isfinite(float(val)) or float(val)<0:
-            raise ValueError("Comparison tolerances must be finite and nonnegative.")
+    for key,base in (("percent_limits",limits),("absolute_zero_limits",zero)):
+        custom=policy.get(key,{})
+        if not isinstance(custom,dict):
+            raise ValueError(key+" must be a dictionary")
+        for metric,val in custom.items():
+            if metric not in base:
+                raise ValueError("Unknown comparison metric tolerance: "+str(metric))
+            if isinstance(val,bool):
+                raise ValueError("Boolean comparison tolerance is not numeric")
+            try:
+                threshold=float(val)
+            except (ValueError,TypeError,OverflowError) as exc:
+                raise ValueError("Comparison tolerances must be numeric") from exc
+            if not math.isfinite(threshold) or threshold<0:
+                raise ValueError("Comparison tolerances must be finite and nonnegative")
+            base[metric]=threshold
     idx={}
+    def numeric_value(row, label, key):
+        raw=row.get("value")
+        if isinstance(raw,bool):
+            raise ValueError("Boolean "+label+" result "+repr(key))
+        try:
+            number=float(raw)
+        except (ValueError,TypeError,OverflowError) as exc:
+            raise ValueError("Invalid "+label+" result "+repr(key)) from exc
+        if not math.isfinite(number):
+            raise ValueError("Nonfinite "+label+" result "+repr(key))
+        return number
     for r in ref_rows:
         key=tuple(str(r.get(k,"")) for k in fields)
         if key in idx:raise ValueError("Duplicate ETABS normalized key: "+repr(key))
-        v=float(r["value"])
-        if not math.isfinite(v):raise ValueError("Nonfinite reference "+repr(key))
-        idx[key]=v
+        idx[key]=numeric_value(r,"ETABS",key)
     appeared=set()
     referenced=set()
     result=[]
@@ -54,6 +78,9 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
         key=tuple(str(r.get(k,"")) for k in fields)
         if key in appeared:raise ValueError("Duplicate OpenSees normalized key: "+repr(key))
         appeared.add(key)
+        # Validate ALL OpenSees responses, even unmatched ones: a missing
+        # ETABS case must not hide NaN/Inf or an invalid numeric payload.
+        source_value=numeric_value(r,"OpenSees",key)
         v=idx.get(key)
         match_key="|".join(key)
         exact=v is not None
@@ -70,8 +97,12 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
             error=delta=None
         else:
             appeared.add(key)
-            delta=float(r["value"])-v
+            delta=source_value-v
+            if not math.isfinite(delta):
+                raise ValueError("Nonfinite OpenSees–ETABS difference "+repr(key))
             error=None if v==0 else 100*abs(delta)/abs(v)
+            if error is not None and not math.isfinite(error):
+                raise ValueError("Nonfinite OpenSees–ETABS percent difference "+repr(key))
             if not checked:
                 status="NOT_COMPARABLE"
                 note="Matching key only; independent model and spectrum basis not approved"
