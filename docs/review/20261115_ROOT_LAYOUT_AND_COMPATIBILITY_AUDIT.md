@@ -49,3 +49,15 @@ Editor: ChatGPT (OpenAI GPT-6), GitHub connector. Static Git tree and repository
 Three historical, documentation-only V141/V142/V165 notes were moved to `archive/previous_versions/HISTORICAL_NOTES/`. Original Git blob SHAs are preserved; their former root paths are removed from the current tree. Current tracked root-file count decreases from **186 to 183**. Original contents, numeric models, launchers and source runtime paths are unchanged. See `archive/previous_versions/README.md` and `tests/test_historical_note_archive.py`.
 
 **Reference caveat:** `MANIFEST_V167.json` and older release manifests retain historical filenames verbatim. Those archival manifests are provenance records, not runtime file-location instructions. Do not rewrite them to fabricate a new historical package layout. Any external links to the old root note URLs may require updating separately. No broad relocation is approved based on this narrowly scoped success.
+
+
+## Third pass: seven source-preserving research note relocations (2026-11-15)
+
+Seven additional V137–V164 documentation-only reports were moved into `archive/previous_versions/HISTORICAL_NOTES/{RESEARCH_DIAGNOSTICS,RELEASE_CHANGELOGS,MATERIAL_RESEARCH}/` without modifying any original Git blobs. Across both migrations: **10 root notes archived**, root tracked file count **186 → 176**, root Python scripts **129 unchanged**. This remains a partial root cleanup and does not certify full per-line semantics. The new archive index and regression test protect historical retrieval and byte identity. Exact-string GitHub search showed zero active `.py` references for these seven candidates; historical manifests, literature link text and curated source citations may still retain former root references. Archive records are not silently rewritten.
+
+### Current priority defects (not fixed by reorganizing notes)
+- Numbered launcher aliases collide (e.g. 01/17/20); sorting filenames cannot define the engineering run sequence.
+- Native 32/76/97 support and gravity reactions remain unresolved equivalence questions.
+- Production nonlinear first X-wall step fails; material/rebar/wall opening and FVD qualification remain engineering blockers.
+- The target folder-per-stage specification is not yet universal writer behavior; changing root notes does not modify run outputs.
+- Public repository visibility warrants an independent history/secret and sensitive evidence audit; these archive moves do not rewrite history.

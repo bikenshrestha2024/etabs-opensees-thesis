@@ -20,6 +20,34 @@ MOVED = {
         "archive/previous_versions/HISTORICAL_NOTES/PACKAGE_CONTENTS_V141.md",
         "d5943dd2fe781e77bedbcdb2e61f888da44ccab4",
     ),
+    "00_V163_NONLINEAR_DIAGNOSTIC.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/00_V163_NONLINEAR_DIAGNOSTIC.md",
+        "b1e40a3ddf98080f43d3a186dd424f4b6d75815d",
+    ),
+    "00_V164_LOAD_AND_NONLINEAR_REVIEW.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/00_V164_LOAD_AND_NONLINEAR_REVIEW.md",
+        "60ef574573750b982f7516fcb8b9ca8f8448bf4a",
+    ),
+    "CHANGES_AND_LIMITS_V138.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/RELEASE_CHANGELOGS/CHANGES_AND_LIMITS_V138.md",
+        "b0b115dbae34f392cd6a819f4ad741b56ce09b29",
+    ),
+    "MATERIAL_SETUP_V156.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/MATERIAL_RESEARCH/MATERIAL_SETUP_V156.md",
+        "2900b16301cd959d47d1c10f0bfed75db6cc59cc",
+    ),
+    "VISUAL_VALIDATION_V149.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/MATERIAL_RESEARCH/VISUAL_VALIDATION_V149.md",
+        "da1807066784aece769b06a2a4b251c0f9efc8af",
+    ),
+    "LITERATURE_REVIEW_AND_DECISION_V137.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/LITERATURE_REVIEW_AND_DECISION_V137.md",
+        "ebe43db247ecfafa6ecf634d523377f8ea4d1beb",
+    ),
+    "REVIEW_V151.md": (
+        "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/REVIEW_V151.md",
+        "855376641abc6352943db336f6324f47c60c3814",
+    ),
 }
 
 

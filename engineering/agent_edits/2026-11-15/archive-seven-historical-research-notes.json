@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 using GitHub connector",
+  "branch": "main",
+  "baseline_sha": "aedfaebc5756d13dd1919391176662e12d8aaac2",
+  "task": "Safe root file reduction; relocate seven historical research notes without modifying original blobs",
+  "changed_source_code": false,
+  "files_moved": [
+    {
+      "original": "00_V163_NONLINEAR_DIAGNOSTIC.md",
+      "destination": "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/00_V163_NONLINEAR_DIAGNOSTIC.md",
+      "git_blob_sha": "b1e40a3ddf98080f43d3a186dd424f4b6d75815d"
+    },
+    {
+      "original": "00_V164_LOAD_AND_NONLINEAR_REVIEW.md",
+      "destination": "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/00_V164_LOAD_AND_NONLINEAR_REVIEW.md",
+      "git_blob_sha": "60ef574573750b982f7516fcb8b9ca8f8448bf4a"
+    },
+    {
+      "original": "CHANGES_AND_LIMITS_V138.md",
+      "destination": "archive/previous_versions/HISTORICAL_NOTES/RELEASE_CHANGELOGS/CHANGES_AND_LIMITS_V138.md",
+      "git_blob_sha": "b0b115dbae34f392cd6a819f4ad741b56ce09b29"
+    },
+    {
+      "original": "MATERIAL_SETUP_V156.md",
+      "destination": "archive/previous_versions/HISTORICAL_NOTES/MATERIAL_RESEARCH/MATERIAL_SETUP_V156.md",
+      "git_blob_sha": "2900b16301cd959d47d1c10f0bfed75db6cc59cc"
+    },
+    {
+      "original": "VISUAL_VALIDATION_V149.md",
+      "destination": "archive/previous_versions/HISTORICAL_NOTES/MATERIAL_RESEARCH/VISUAL_VALIDATION_V149.md",
+      "git_blob_sha": "da1807066784aece769b06a2a4b251c0f9efc8af"
+    },
+    {
+      "original": "LITERATURE_REVIEW_AND_DECISION_V137.md",
+      "destination": "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/LITERATURE_REVIEW_AND_DECISION_V137.md",
+      "git_blob_sha": "ebe43db247ecfafa6ecf634d523377f8ea4d1beb"
+    },
+    {
+      "original": "REVIEW_V151.md",
+      "destination": "archive/previous_versions/HISTORICAL_NOTES/RESEARCH_DIAGNOSTICS/REVIEW_V151.md",
+      "git_blob_sha": "855376641abc6352943db336f6324f47c60c3814"
+    }
+  ],
+  "verification": {
+    "precommit": "Read AGENTS.md, CORE_RULES, canonical program index and migration rules; inspected full notes (head and link count) and GitHub exact-name reference searches",
+    "postcommit": "CI outcome must be checked; no locally executed Windows ETABS/OpenSees run",
+    "engineering": "NOT_VERIFIED"
+  },
+  "known_limits": [
+    "Historical manifest references intentionally remain unchanged",
+    "External direct URLs to original root note files may require redirect via Git history",
+    "Exact search cannot rule out dynamically constructed file paths",
+    "No solver source code changed"
+  ]
+}
