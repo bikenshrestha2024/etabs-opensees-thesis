@@ -31,6 +31,17 @@ class GroundAccelerationTests(unittest.TestCase):
  def test_relative_absolute_distinction(self):
     self.assertEqual(relative_to_absolute_floor_acceleration((2.,-1.,.1),(3.,4.)),(5.,3.))
 
+ def test_nonfinite_path_ordinates_and_floor_acceleration_rejected(self):
+    for invalid in (float("nan"), float("inf"), -float("inf")):
+       with self.subTest(value=str(invalid)):
+          bad=[([0.,invalid,.2],.01,"g"),self.records[1]]
+          with self.assertRaisesRegex(ValueError,"Nonfinite ground-motion"):
+             applied_ground_acceleration(bad,time_s=.015,orientation="XY")
+          with self.assertRaisesRegex(ValueError,"Nonfinite relative"):
+             relative_to_absolute_floor_acceleration((invalid,0.),(0.,0.))
+          with self.assertRaisesRegex(ValueError,"Nonfinite relative"):
+             relative_to_absolute_floor_acceleration((0.,0.),(invalid,0.))
+
  def test_unsupported_units_and_orientation(self):
     with self.assertRaises(ValueError):
        applied_ground_acceleration(self.records,time_s=.01,orientation="XZ")
