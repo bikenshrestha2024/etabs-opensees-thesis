@@ -129,3 +129,16 @@ The newest tracked revision of each `_V###` file family remains at repository ro
 - Nested saved-project snapshots remain unchanged and already have their own folder.
 - Old manifests and audit reports are historical evidence. They may name original root paths; those references describe their historical state.
 - JSON per-file field guides are regenerated from the full checkout after these moves. Re-run the offline documentation generator whenever paths change.
+
+
+## 2026-11-15 targeted archive — historical documentation notes
+
+The following three old informational notes have been **moved** out of the GitHub root with unchanged Git blob SHAs. This is a separate migration from the 83 superseded version files counted above. Historical release manifests intentionally remain immutable: a historic path in those manifests describes the old package layout, not an active import or a redirect.
+
+| Original root path | New archived path | Original Git blob SHA |
+|---|---|---|
+| `00_V165_LAUNCHER_FIX.md` | [`archive/previous_versions/HISTORICAL_NOTES/00_V165_LAUNCHER_FIX.md`](../../archive/previous_versions/HISTORICAL_NOTES/00_V165_LAUNCHER_FIX.md) | `193b11611fd2057ad21b8b858e8a12f5fe3dcf6f` |
+| `EXPORT_HOTFIX_V142.md` | [`archive/previous_versions/HISTORICAL_NOTES/EXPORT_HOTFIX_V142.md`](../../archive/previous_versions/HISTORICAL_NOTES/EXPORT_HOTFIX_V142.md) | `be5ea40470a054942434e6432b41821c7eff7ad0` |
+| `PACKAGE_CONTENTS_V141.md` | [`archive/previous_versions/HISTORICAL_NOTES/PACKAGE_CONTENTS_V141.md`](../../archive/previous_versions/HISTORICAL_NOTES/PACKAGE_CONTENTS_V141.md) | `d5943dd2fe781e77bedbcdb2e61f888da44ccab4` |
+
+Scope: exact-name GitHub code-search was checked before relocation. All identified references were in immutable historical manifests, not in current Python imports or launcher docs. This search does not prove every runtime-generated path is absent; a relocation regression test checks these three exact archive blobs. If a historical external URL is relied upon, Git history retains the original path at the parent commit `151ed7ec2548f66d30ed18b7813411e099354eea`.

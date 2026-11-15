@@ -42,3 +42,10 @@ Editor: ChatGPT (OpenAI GPT-6), GitHub connector. Static Git tree and repository
 - CI now executes the layout inventory regression tests and produces the layout JSON as a downloadable CI artifact (not a tracked source file).
 - `/audit/` is ignored in local working trees. Confirm separately that sensitive evidence is not already present in Git history; ignoring future writes does not rewrite history.
 - Static search findings are **not** a license to relocate root scripts: existing source/launcher references must be checked against actual Windows execution and test evidence.
+
+
+## Targeted root reduction — 2026-11-15
+
+Three historical, documentation-only V141/V142/V165 notes were moved to `archive/previous_versions/HISTORICAL_NOTES/`. Original Git blob SHAs are preserved; their former root paths are removed from the current tree. Current tracked root-file count decreases from **186 to 183**. Original contents, numeric models, launchers and source runtime paths are unchanged. See `archive/previous_versions/README.md` and `tests/test_historical_note_archive.py`.
+
+**Reference caveat:** `MANIFEST_V167.json` and older release manifests retain historical filenames verbatim. Those archival manifests are provenance records, not runtime file-location instructions. Do not rewrite them to fabricate a new historical package layout. Any external links to the old root note URLs may require updating separately. No broad relocation is approved based on this narrowly scoped success.
