@@ -94,10 +94,8 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "limit":1e-308
             }],"a"*64,"deflection")
             self.assertEqual(checks[0]["status"],"NOT EVALUATED")
-            self.assertIsNone(checks[0]["utilization"] if
-                              not isinstance(checks[0]["utilization"],float) else
-                              checks[0]["utilization"] if
-                              __import__("math").isfinite(checks[0]["utilization"]) else None)
+            self.assertIsNone(checks[0]["utilization"])
+            self.assertIn("overflow",checks[0]["reason"])
             case={"case":"ULS_EXTREME","limit_state":"ULS",
                   "factors":{"A":2.0}}
             row={"model_sha256":"a"*64,"response_kind":
