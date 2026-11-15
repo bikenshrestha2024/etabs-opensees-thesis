@@ -62,3 +62,14 @@ Synthetic regression: `tests/test_gravity_full_source_reactions.py` plus the exi
 - Dvorkin & Bathe (1984); Bathe & Dvorkin (1985): shell formulation framework, not an identity of ETABS and OpenSees shell/load paths.
 
 **Acceptance:** Source evidence supports **solved gravity equilibrium**. It **does not** support matching node reaction distribution or native ETABS/OpenSees physical equivalence. No original model was modified, and no native solver was run in this public-code correction.
+
+
+## 2026-11-15 — resumed source evidence and output-folder status
+
+The latest user-provided 1.0D+1.0L source FZ comparison was independently recomputed: exact ETABS source total `311367.3136 kN`, OpenSees 32/76/97 solved vertical total `311367.31387955 kN`, absolute pointwise differences 32=`37297.02723154 kN`, 76=`208926.02678841 kN`, and 97-at-source-nodes=`179939.35233032 kN`; 44 originally fixed ETABS zero-FZ points carry `104463.01353398 kN` in OS76. Full independently rebuilt source-linked 97-row comparison workbook is delivered as a user artifact, **not committed publicly**. Structural discrepancy remains open.
+
+Source output writer search identified `components/shared/timing.py` as the origin of proliferating `<filename>.processing.json` files. New sidecars are organized within `00_PROCESSING_METADATA/ARTIFACTS` in this PR. Other legacy flat main export CSV/JSON/XLSX remain for old readers, so this cannot be called full root migration.
+
+V135 user-provided design check has 56 combination definitions with zero evaluated signed actions, 11586 section action rows needing capacity, 2037 inventory rows, 153 deflection rows without adopted limits, 14 open checks, and zero verified seismic drift or nonlinear acceptance. Latest V135 run-owned derived table PR #82 is already merged. Do not confuse source model SHA `97def708661a10c165b6e0072b045ca7a0a82e13f021649bdb07c3a522a25f72` with original EDB SHA; they are different fingerprints.
+
+Primary engineering next step is native ETABS **point object versus analysis element** IDs and six-component reactions, actual restraints and wall mesh connections, then rigid-end-zone stiffness comparison and subassembly tests. Do not modify supports to force reaction equality.

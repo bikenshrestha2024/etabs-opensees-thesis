@@ -21,3 +21,10 @@ Relevant register IDs: See subject-specific source citations. Consult [research 
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+
+## 2026-11-15 — canonical processing metadata (new runs only)
+
+The old `timed_outputs` and `StageTimer` created `<artifact>.processing.json` beside every CSV/JSON/XLSX/PY result, proliferating hundreds of incidental root-level JSON files and cluttering user result folders. **New runs** retain original artifacts at their existing source paths for reader compatibility, but keep timing sidecars in `<selected-stage>/00_PROCESSING_METADATA/ARTIFACTS/<relative-subfolder>/<artifact>.processing.json`, with a single index and JSONL log inside `00_PROCESSING_METADATA/`. This is non-destructive: historical sidecars, original ETABS EDB/Excel, and solver outputs are never moved/deleted. Timing evidence cannot be mistaken for numerical analysis results. Nested metadata is filtered out on subsequent scans to prevent recursive sidecar generation.
+
+This is a **specific writer correction**, not full migration of all legacy export-root sources. Complete root cleanup needs source reader migration, verified SHA manifests, rollback and native regression evidence. Source-only independent tests: `tests/test_timing_metadata_structure.py`; native dependent legacy tests adjusted: `tests/verify_v130.py`.
