@@ -168,7 +168,9 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     sheet_index=wb.create_sheet('Loaded node path index')
     sheet_index.append(['Worksheet','Data rows','Meaning'])
     for item in wb.worksheets:
-        if item.title=='Loaded node path' or item.title.startswith('Loaded node path '):
+        if item.title=='Loaded node path' or
+           (item.title.startswith('Loaded node path ') and
+            item.title.removeprefix('Loaded node path ').isdecimal()):
             sheet_index.append([item.title,item.max_row-1,'Untruncated node-level slab pressure load path'])
     # The primary worksheet is the full-gravity validation load path (1.0D
     # + 1.0L). Preserve a separate configured seismic-preload view; mass
@@ -241,7 +243,8 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     notes.column_dimensions['A'].width=140
     node_sheets=[sheet for sheet in wb.worksheets if
                  sheet.title=='Loaded node path' or
-                 sheet.title.startswith('Loaded node path ')]
+                 (sheet.title.startswith('Loaded node path ') and
+                  sheet.title.removeprefix('Loaded node path ').isdecimal())]
     for sheet in (ws,*node_sheets,weights):
         sheet.freeze_panes='A2';sheet.auto_filter.ref=sheet.dimensions
         for c in sheet[1]:c.font=Font(bold=True,color='FFFFFF');c.fill=PatternFill('solid',fgColor='1E3A5F')
