@@ -52,6 +52,17 @@ class Primary32Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"Missing=.*41"):
                 classify_supports(self.path,self.topology,self.original)
 
+    def test_original_six_dof_restraints_must_be_explicit_binary(self):
+        for invalid in ([1,1,1], "111111", [1,1,"0",1,1,1],
+                        [1,1,2,1,1,1], [1,1,0.5,1,1,1], None):
+            with self.subTest(flags=invalid):
+                modified=dict(self.original)
+                modified["1"]=invalid
+                with self.assertRaisesRegex(ValueError,"six-DOF restraint"):
+                    classify_supports(self.path,self.topology,modified)
+        selected,_=classify_supports(self.path,self.topology,self.original)
+        self.assertEqual(len(selected),32)
+
     def test_export_exact_32_numeric_comparison(self):
         selected,audit=classify_supports(self.path,self.topology,self.original)
         reactions=[dict(node_tag=i,rz_kN=1000.0)
