@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 via GitHub connector",
+  "baseline_sha": "012af7f782fdc289a623a1dba38d083766ae464a",
+  "task": "Fix legacy-analysis output folder auditor following symlinked result tree",
+  "inspected": [
+    "components/inputs/folder_audit.py",
+    "tests/test_folder_audit.py",
+    "components/inputs/output_layout.py",
+    "docs/source/components/inputs/folder_audit.py.md",
+    "AGENTS.md",
+    "engineering/rules/CORE_RULES.md"
+  ],
+  "source_files_modified": [
+    "components/inputs/folder_audit.py"
+  ],
+  "tests_added": "test_symlinked_legacy_analysis_root_is_reported_without_scanning",
+  "existing_ci": ".github/workflows/deep-output-audit.yml runs tests.test_folder_audit",
+  "scope_limitations": [
+    "No native ETABS or OpenSees run",
+    "No source EDB or workbook touched",
+    "No assumption that software audit establishes structural equivalence",
+    "No mass relocation of active paths"
+  ],
+  "security": "No model data, private absolute local project paths or credentials uploaded",
+  "ci_status": "PENDING"
+}

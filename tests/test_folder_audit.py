@@ -103,6 +103,25 @@ class FolderAuditTests(unittest.TestCase):
             self.assertIn("SYMLINKED_CANONICAL_STAGE_BLOCKED",
                           {item["id"] for item in report["findings"]})
 
+    def test_symlinked_legacy_analysis_root_is_reported_without_scanning(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)/"selected"
+            outside=Path(tmp)/"private_elsewhere"
+            root.mkdir()
+            (outside/"CONFIDENTIAL_PROJECT").mkdir(parents=True)
+            link=root/"OpenSees_Analysis_Results"
+            try:
+                link.symlink_to(outside, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("Legacy symlinks not available on this runner")
+            result=audit_export_structure(root)
+            self.assertTrue(result["symlinked_legacy_analysis_root"])
+            self.assertEqual(result["legacy_analysis_case_folders"], [])
+            self.assertNotIn("CONFIDENTIAL_PROJECT", str(result))
+            self.assertIn("SYMLINKED_LEGACY_ANALYSIS_ROOT_BLOCKED",
+                          {item["id"] for item in result["findings"]})
+            self.assertFalse((root/"01_ETABS_EXPORT").exists())
+
     def test_saved_audit_is_local_and_contains_no_compliance_claim(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -98,3 +98,8 @@ Project engineering conventions: `AGENTS.md`, `KNOWLEDGE_BASE/06_COORDINATED_RUN
 ## 2026-11-15 manifest-link audit visibility
 
 Additional output-integrity defect: the stage migration auditor's exact-depth walk used `.is_file()` for case manifests, which follows symlinks, while its recursive manifest inventory skipped symlinked files/directories. Consequently linked `00_INPUT_SOURCE` or `CASE_MANIFEST.json` could be **silently absent** from the issue list. The amended inspector reports explicit `SYMLINKED_RUN_INPUT_SOURCE_REFUSED` / `SYMLINKED_RUN_MANIFEST_REFUSED` findings, counts linked paths and does not read outside the selected export. This is path/provenance correctness, not evidence of OpenSees solver validation.
+
+
+## 2026-11-15 linked legacy results root (software audit finding)
+
+The canonical folder auditor already refused linked analysis stages but still used `legacy_analysis.is_dir()` for `OpenSees_Analysis_Results`, following a linked legacy root into another folder and listing external case names. Corrected with an explicit symlink refusal, a blocked finding and synthetic test. Engineering acceptance remains independent of folder auditing. No user models, results or existing legacy directories are moved.

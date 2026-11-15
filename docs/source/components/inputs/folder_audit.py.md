@@ -29,3 +29,8 @@ Create a repeatable, non-destructive inventory of source export files and the re
 ## Risks
 
 A large source mirror incurs I/O cost; avoid running the `--mirror` step on an actively writing export directory. A source-mutating external process can change files between the inventory and copy; keep the input export frozen and review hashes. Result reports contain potentially sensitive absolute filenames, so **do not upload them automatically**. A physical model that passes gravity global equilibrium but differs at individual foundation reactions remains **NOT STRUCTURALLY VALIDATED**.
+
+
+## Legacy symlink audit hardening (2026-11-15)
+
+The read-only folder auditor now refuses to traverse `OpenSees_Analysis_Results` when this legacy directory is a symbolic link. It reports `symlinked_legacy_analysis_root=true` and a blocked `SYMLINKED_LEGACY_ANALYSIS_ROOT_BLOCKED` finding. Previously the legacy enumeration relied on `Path.is_dir()`, which follows directory symlinks and could expose names of projects outside the selected ETABS export. A synthetic temporary-folder test checks non-disclosure and absence of derived output writes. The directory itself remains untouched; no solver calculations or legacy result layouts are altered.

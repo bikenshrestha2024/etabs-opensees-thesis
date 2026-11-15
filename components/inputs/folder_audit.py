@@ -91,7 +91,11 @@ def audit_export_structure(export_dir, *, verify_copies=True):
             "engineering_status": "NOT_CHECKED_BY_FOLDER_AUDIT",
         }
     legacy_cases = []
-    if legacy_analysis.is_dir():
+    # A legacy result tree must not be traversed through a symbolic link.
+    # Unlike canonical stage roots this directory is not enumerated above,
+    # so report its redirected state as a separate filesystem finding.
+    linked_legacy_analysis = legacy_analysis.is_symlink()
+    if legacy_analysis.is_dir() and not linked_legacy_analysis:
         legacy_cases = sorted(p.name for p in legacy_analysis.iterdir()
                               if p.is_dir() and not p.is_symlink())
     unexpected_folders = sorted(p.name for p in root.iterdir()
@@ -119,6 +123,11 @@ def audit_export_structure(export_dir, *, verify_copies=True):
                          "severity": "BLOCKED",
                          "count": len(conflicting_mirrors),
                          "action": "Compare original and existing categorized files; do not silently overwrite."})
+    if linked_legacy_analysis:
+        findings.append({"id": "SYMLINKED_LEGACY_ANALYSIS_ROOT_BLOCKED",
+                         "severity": "BLOCKED",
+                         "count": 1,
+                         "action": "Refuse legacy result inventory through a linked root; inspect target only with explicit authorization."})
     if legacy_cases:
         findings.append({"id": "LEGACY_ANALYSIS_ROOT_PRESENT",
                          "severity": "COMPATIBILITY",
@@ -151,6 +160,7 @@ def audit_export_structure(export_dir, *, verify_copies=True):
         "conflicting_categorized_copies": conflicting_mirrors,
         "unsafe_mirror_paths": unsafe_mirror_paths,
         "legacy_analysis_case_folders": legacy_cases,
+        "symlinked_legacy_analysis_root": linked_legacy_analysis,
         "unexpected_top_level_folders": unexpected_folders,
         "stages": stage_details,
         "loose_stage_outputs": loose_stage_files,
