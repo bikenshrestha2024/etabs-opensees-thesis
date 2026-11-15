@@ -19,7 +19,7 @@ class ProjectOutputLayoutTests(unittest.TestCase):
             self.assertEqual(result["source_edb_sha256"], sha256_file(source))
             self.assertTrue((output / "00_SOURCE_MANIFEST" / "PROJECT_CONTEXT.json").is_file())
             folder = case_folder(result, "03_ESM", "X_E0", limit_state="ULS")
-            self.assertEqual(folder, output / "03_ESM" / "ULS" / "X_E0")
+            self.assertEqual(folder, (output / "03_ESM" / "ULS" / "X_E0").resolve())
             before = json.loads((output / "00_SOURCE_MANIFEST" / "PROJECT_CONTEXT.json").read_text())
             create_project_layout(source, output)
             after = json.loads((output / "00_SOURCE_MANIFEST" / "PROJECT_CONTEXT.json").read_text())
