@@ -151,6 +151,7 @@ on:
       - 'tests/verify_v169_wall_triage_evidence.py'
       - 'components/nonlinear_time_history/thesis_quality.py'
       - 'components/nonlinear_time_history/failure_evidence.py'
+      - 'tests/verify_failure_evidence.py'
       - 'docs/review/20261105_WALL_FIRST_STEP_DIAGNOSTIC_IMPLEMENTATION.md'
       - '.github/workflows/nltha-quality.yml'
       - 'components/sections/devices.py'
@@ -563,6 +564,7 @@ jobs:
           python tests/verify_project_wall_material_gate.py
           python tests/verify_device_recording.py
           python tests/verify_full_record_gate.py
+          python tests/verify_failure_evidence.py
           python tests/verify_variant_comparison.py
           python tests/verify_nbc105_2025_nltha.py
           python tests/verify_nbc105_horizontal_input.py
