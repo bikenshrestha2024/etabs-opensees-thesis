@@ -92,6 +92,7 @@ def evaluate_checks(rows,model_hash,kind):
             if kind in ('section','nonlinear') and not r.get('concurrent_action_id'):raise ValueError('Missing concurrent action/station/time or approved envelope-method reference')
             ratio=demand/limit
             if not math.isfinite(ratio):
+                ratio=None
                 raise ValueError('Nonfinite demand/limit utilization; computed ratio overflow')
             status='PASS' if ratio<=1 else 'FAIL'
         except (ValueError,KeyError,TypeError) as e:status='NOT EVALUATED';reason=str(e)
