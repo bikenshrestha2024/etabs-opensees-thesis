@@ -126,7 +126,22 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     for title in ('Surface load formulas','Loaded node path','Member weight formulas','Vertical load path'):
         if title in wb:del wb[title]
     ws=wb.create_sheet('Surface load formulas');ws.append(['Source area','Component','Pattern','Mesh cell','Area m2','Downward q kN per m2','Gravity factor','Mass factor','Q unfactored kN','Applied kN','Mass tonnes','Node share kN','Nodes','Origin','Physical thickness m','Unit weight kN per m3','Self-weight multiplier'])
-    links=wb.create_sheet('Loaded node path');links.append(['Source area','Pattern','Cell row','Node','X m','Y m','Z m','Applied nodal Fz kN downward','Connected beam solver tags','Connected wall solver tags','Role'])
+    # Excel's hard row ceiling is 1,048,576 including the header. A 16x16
+    # slab mesh can produce >1M per-node pressure paths; partition without
+    # truncating the data or referring to nonexistent worksheet rows.
+    from openpyxl import Workbook as _Workbook
+    from openpyxl.xml.constants import MAX_ROW
+    node_headers=['Source area','Pattern','Cell row','Node','X m','Y m','Z m','Applied nodal Fz kN downward','Connected beam solver tags','Connected wall solver tags','Role']
+    links=wb.create_sheet('Loaded node path')
+    links.append(node_headers)
+    node_sheet_number=1
+    def append_node_path(record):
+        nonlocal links,node_sheet_number
+        if links.max_row>=MAX_ROW:
+            node_sheet_number+=1
+            links=wb.create_sheet(f'Loaded node path {node_sheet_number:02d}')
+            links.append(node_headers)
+        links.append(record)
     adjacency={};walls={}
     for tag,e in enumerate(data.get('frames',[]),100001):
         if e['category']=='BEAM':
@@ -148,7 +163,14 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
             surface_row+=1;row=surface_row;own=component=='self_weight_floor';ws.append([cell['object'],component,pattern,index,cell['area'],f'=O{row}*P{row}*Q{row}' if own else q,1.0,cfg['mass_factors'].get(pattern,0),f'=E{row}*F{row}',f'=I{row}*G{row}',f'=I{row}*H{row}/9.80665',f'=J{row}/4',','.join(map(str,cell['nodes'])),origin,cell['properties']['thickness'] if own else None,cell['properties']['weight'] if own else None,multipliers.get(pattern) if own else None])
             for node in cell['nodes']:
                 xyz=data['nodes'].get(int(node),data['nodes'].get(str(node))); beams=adjacency.get(int(node),[]);wall=walls.get(int(node),[])
-                links.append([cell['object'],pattern,row,node,*xyz,f"='Surface load formulas'!L{row}",','.join(map(str,beams)),','.join(map(str,wall)),'beam joint' if beams else 'wall joint' if wall else 'slab interior / other joint'])
+                append_node_path([cell['object'],pattern,row,node,*xyz,f"='Surface load formulas'!L{row}",','.join(map(str,beams)),','.join(map(str,wall)),'beam joint' if beams else 'wall joint' if wall else 'slab interior / other joint'])
+    # Independent workbook ledger for full node-path coverage, including all
+    # overflow sheets. Never describe an incomplete mesh model as verified.
+    sheet_index=wb.create_sheet('Loaded node path index')
+    sheet_index.append(['Worksheet','Data rows','Meaning'])
+    for item in wb.worksheets:
+        if item.title=='Loaded node path' or item.title.startswith('Loaded node path '):
+            sheet_index.append([item.title,item.max_row-1,'Untruncated node-level slab pressure load path'])
     # The primary worksheet is the full-gravity validation load path (1.0D
     # + 1.0L). Preserve a separate configured seismic-preload view; mass
     # factors remain an independent column in BOTH sheets.
