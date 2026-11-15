@@ -17,6 +17,61 @@ def write_rows(path,rows):
     columns=list(dict.fromkeys(k for r in rows for k in r))
     return write_table(path,rows,columns=columns)
 
+CURRENT_V135_HEADERS = {
+    "Combination coverage": ("case","limit_state","expression","clause","action_rows","status","note"),
+    "Seismic drift": ("file","case","limit_state","storey","axis","edge",
+                      "demand","limit","utilization","status","clause","scope"),
+    "Project deflection": ("limit_state","case","member","check","demand","limit","unit","status","reason","result_file"),
+    "Section checks": ("limit_state","case","member","check","status","reason","result_file"),
+    "Nonlinear performance": ("performance_objective","control_type","suite_statistic",
+                              "limit_state","case","member","check","demand","limit",
+                              "unit","status","reason"),
+    "Section inventory": ("member","category","section","status","checks_supplied",
+                          "required_checks","reason"),
+    "Combined actions": ("case","limit_state","member","station","axes",*COMPONENTS,"scope"),
+    "Missing action basis": ("case","member","station","status","reason"),
+    "Open items": ("check","status","reason"),
+}
+
+
+def publish_current_v135_tables(output, tables, model_sha256):
+    """Publish all tables, including empty ones, as an immutable run bundle.
+
+    [REF docs/source/components/validation/design_checks.py.md]
+    Legacy historical flat CSVs are untouched. No complete/current status is
+    inferred until caller atomically publishes the output index.
+    """
+    from uuid import uuid4
+    from components.inputs.output_contract import write_table, atomic_json
+    root=Path(output)
+    run_id=(datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
+            +"_"+uuid4().hex[:8])
+    target=root/"RUNS"/run_id
+    created={}
+    for title, rows in tables.items():
+        if title not in CURRENT_V135_HEADERS:
+            raise ValueError("Unrecognized V135 derived table: "+title)
+        columns=list(dict.fromkeys(
+            [*CURRENT_V135_HEADERS[title],*(key for row in rows for key in row)]))
+        filename=title.replace(" ","_")+".csv"
+        path=target/"TABLES"/filename
+        write_table(path,rows,columns=columns)
+        created[title]={
+            "current_csv":str(path.relative_to(root)).replace("\\","/"),
+            "current_row_count":len(rows),
+            "current_status":"CURRENT_DERIVED_TABLE" if rows else "CURRENT_EMPTY_NO_DATA",
+        }
+    atomic_json(target/"RUN_MANIFEST.json", {
+        "schema":"V135_CURRENT_RUN_TABLES_V1",
+        "run_id":run_id,
+        "model_sha256":model_sha256,
+        "status":"DERIVED_TABLES_PUBLISHED_NOT_STRUCTURAL_ACCEPTANCE",
+        "tables":created,
+        "source_note":"Empty CSV headers are explicit current absence, not older stale rows",
+    })
+    return run_id,created
+
+
 def number(x):
     v=float(x)
     if not math.isfinite(v):raise ValueError('Non-finite numerical input')
@@ -378,8 +433,10 @@ def run(folder,storage=False,nonparallel=False):
     report['finished']=datetime.datetime.now().astimezone().isoformat()
     from components.inputs.output_contract import atomic_json
     atomic_json(output/'Design_Check_Report_V135.json',report)
-    # Declare exactly which derived CSVs belong to this refresh; empty
-    # tables retain historical CSVs but are explicitly NOT CURRENT outputs.
+    # Preserve the old flat CSV contract; publish a separate immutable
+    # run-owned current table set with explicit header-only empty CSVs.
+    # The output index is the single authority for which files are current.
+    current_run_id,current_run_tables=publish_current_v135_tables(output,tables,digest)
     generated_index={}
     for table_name,table_rows in tables.items():
         filename=table_name.replace(' ','_')+'.csv'
@@ -388,17 +445,22 @@ def run(folder,storage=False,nonparallel=False):
             'current_row_count':len(table_rows),
             'status':('CURRENT_DERIVED_TABLE' if table_rows else
                       'NO_CURRENT_ROWS_PRIOR_CSV_NOT_REPLACED'),
+            **current_run_tables[table_name],
         }
     atomic_json(output/'Design_Check_Output_Index_V135.json',{
         'schema':'V135_DERIVED_REPORT_INDEX_V1',
+        'current_run_id':current_run_id,
+        'current_run_manifest':'RUNS/'+current_run_id+'/RUN_MANIFEST.json',
         'model_sha256':digest,
         'created_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'tables':generated_index,
         'report_json':'Design_Check_Report_V135.json',
         'report_excel':'Design_Check_Report_V135.xlsx',
         'source_status':'DERIVED_SOFTWARE_REPORT_NOT_ENGINEERING_ACCEPTANCE',
-        'note':('Rows absent in current run must not be inferred from any '
-                'older same-name CSV retained for historical compatibility.'),
+        'note':('Flat CSVs remain legacy-compatible. Use each table current_csv '
+                'under RUNS/<run_id>/TABLES for this model-hash run; '
+                'zero-row tables have explicit header-only current CSV files. '
+                'Do not infer missing results from older same-name flat CSVs.'),
     })
     # Stage the display-only log before replacing it; do not truncate a
     # previously complete log because of an interrupted write.
