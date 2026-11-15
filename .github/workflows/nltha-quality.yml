@@ -70,6 +70,8 @@ on:
       - 'tests/verify_joint_volume_ownership.py'
       - 'components/gravity/support_scenarios.py'
       - 'tests/verify_gravity_support_scenarios.py'
+      - 'components/gravity/etabs_reaction_support_filter.py'
+      - 'tests/verify_primary_32_support_reactions.py'
       - 'components/validation/gravity_etabs_offline.py'
       - 'tests/verify_gravity_etabs_offline.py'
       - 'Offline_ETABS_OpenSees_Gravity_Standalone.py'
@@ -482,6 +484,7 @@ jobs:
           python tests/verify_joint_volume_ownership.py
           python tests/verify_beam_weight_convention.py
           python tests/verify_gravity_support_scenarios.py
+          python tests/verify_primary_32_support_reactions.py
           python -m unittest discover -s tests -p 'test_gravity_support_ui_policy.py' -v
           python -m unittest discover -s tests -p 'test_shell_gravity_load_patch.py' -v
           python -m unittest discover -s tests -p 'test_esm_section6_arithmetic.py' -v
