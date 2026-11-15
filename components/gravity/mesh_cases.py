@@ -189,6 +189,12 @@ def package_mesh_case(folder, subdivisions):
         raise FileNotFoundError(f"MESH_{n:02d} case has no outputs to package")
     output=root/"02_MODEL"/"SLAB_LOAD_PATH"/"UPLOAD_PACKAGES"/f"MESH_{n:02d}.zip"
     _refuse_linked_chain(output)
+    # Do not label an in-progress write as a complete debugging snapshot.
+    for status_path in case.glob("RUNS/RUN_*/MESH_BUILD_STATUS.json"):
+        _refuse_linked_chain(status_path)
+        state=json.loads(status_path.read_text(encoding="utf-8-sig")).get("status")
+        if state in {"ASSEMBLY_RUNNING","MODEL_ASSEMBLED_FORMULA_EXPORT_RUNNING"}:
+            raise RuntimeError("Mesh run is still writing: "+str(status_path.parent))
     files=[]
     for p in sorted(case.rglob("*")):
         _refuse_linked_chain(p)
@@ -197,7 +203,9 @@ def package_mesh_case(folder, subdivisions):
     if not files:
         raise ValueError(f"MESH_{n:02d} has no saved files")
     output.parent.mkdir(parents=True,exist_ok=True)
-    temporary=output.with_suffix(".zip.tmp")
+    # A unique same-directory staging name prevents a second ZIP click
+    # from corrupting an in-progress archive; replace only after validation.
+    temporary=output.with_name(output.name+".tmp-"+uuid4().hex)
     _refuse_linked_chain(temporary)
     manifest={"mesh_subdivisions":n,
               "status":"DIAGNOSTIC_PACKAGE_NOT_SOLVER_ACCEPTANCE",
@@ -212,6 +220,13 @@ def package_mesh_case(folder, subdivisions):
         with zipfile.ZipFile(temporary) as check:
             bad=check.testzip()
             if bad:raise IOError("ZIP checksum failed: "+bad)
+            for name,expected in manifest["files"].items():
+                checksum=sha256()
+                with check.open(f"MESH_{n:02d}/"+name) as stream:
+                    for block in iter(lambda:stream.read(1024*1024),b""):
+                        checksum.update(block)
+                if checksum.hexdigest()!=expected:
+                    raise IOError("Source file changed during ZIP assembly: "+name)
         temporary.replace(output)
     finally:
         if temporary.exists():temporary.unlink()
