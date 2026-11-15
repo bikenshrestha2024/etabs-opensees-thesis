@@ -21,3 +21,11 @@ Relevant register IDs: R01 R04 R05 R10 R12 R13. Consult [research reference regi
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+## V28 — completion and drift result evidence gates (2026-11-15)
+
+`saved_drift_solver_status()` no longer trusts an isolated `solver_status` string from arbitrary JSON. It resolves a saved response to the closest canonical run and calls `inspect_case_manifest` for full folder, stage, state, case, run-ID, units, subfolder and source-hash grammar checks. Invalid canonical metadata yields `INVALID_RUN_MANIFEST` and numerical drift-limit PASS remains `NOT EVALUATED`; a valid `COMPLETED_SOLVER_ONLY` is a *software completion assertion*, not ETABS equivalence or seismic compliance. Missing historical manifest remains `NO_RUN_COMPLETION_MANIFEST`.
+
+`scan_drift()` reads each CSV and MRSM JSON as a single all-or-nothing unit before appending saved result rows. A later NaN/Inf, missing state/field, malformed case or corrupted JSON rejects *all rows from that file* and records an issue; symlinked saved CSV/JSON source files are refused. Neither a partially parsed CSV nor an early case of a malformed MRSM result may silently contribute a PASS to the design-check table.
+
+Regressions: `tests/test_v135_drift_source_completion_v13.py` (full canonical vs malformed manifest, mixed valid/invalid CSV/MRSM, and case/stage/run mismatch). CI path filtering now includes this test file for push changes.
