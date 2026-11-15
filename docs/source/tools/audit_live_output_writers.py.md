@@ -71,3 +71,7 @@ remain separate engineering acceptance gates.
 
 Validation: `tests/test_deep_output_inventory_v16.py` and
 `.github/workflows/deep-output-audit.yml`.
+
+## V22 static-mode detection correction (2026-11-15)
+
+The writer inventory now distinguishes **built-in** `open(path, mode)` from **path-bound** `Path(path).open(mode)`. The former uses positional argument 2, while the latter uses positional argument 1. Earlier scans omitted `Path.open("w")` and `Path.open("a")`, understating writer candidates. Explicit `mode="w"` is also recognized. Default `open()` and known `"r"` modes remain read-only and are omitted. A variable/dynamic mode is now included with `mode_classification=DYNAMIC_MODE_REVIEW_REQUIRED`, not silently assumed safe or confirmed as an executed write. The AST inventory is conservative and not an executed caller/reader graph. Regression: `tests/test_deep_output_inventory_v16.py`.
