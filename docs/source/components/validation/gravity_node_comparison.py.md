@@ -103,3 +103,11 @@ consolidate physically distinct wall-mesh support reactions.
 Passing these screens still requires ETABS global-Z axis verification,
 source-model identity, equivalent gravity combination, restraints and load
 path. Refer to `tests/verify_gravity_node_comparison.py` for regression cases.
+
+## V21 axis-provenance propagation and duplicate-row rejection (2026-11-15)
+
+The native ETABS direct extractor supplies `global_z_basis=GLOBAL_Z_VERIFIED_DEFAULT_AXES` only when all three point local-axis angles are zero and advanced axes are disabled. A finite numeric `rz_global_kN` with another or missing basis is **not** proof of global-Z reaction. The `compare_support_nodes` matcher therefore labels such coordinates `MATCHED_AXES_UNVERIFIED` and excludes their difference from the valid one-to-one global-Z ranking. Nonfinite ETABS values are explicitly rejected.
+
+This same check now applies to `export_fixed_source_support_reactions` and the all-node crosswalk: the 76-support workbook cannot rank a numeric local-axis reaction as `MATCHED_GLOBAL_Z`; its ETABS global sum remains unavailable if any point lacks verified basis. All-model node exports exclude its unverified ETABS global Rz/delta fields. Duplicated ETABS point reaction and displacement rows cause an explicit error rather than replacing one row with another.
+
+These are metadata/axis and data-integrity checks. They are **not** actual ETABS restraint equivalence, don't convert rotated point-local axes, don't alter the user's 32/76/97 support scenarios and don't substitute for six-component force/moment checks. Tests: `python tests/verify_gravity_node_comparison.py`.
