@@ -40,6 +40,99 @@ def collect_cases(output_root, model_path, profile="GRAVITY_1.0D_1.0L"):
     return available, missing
 
 
+
+def join_source_etabs_reactions(available, reaction_rows):
+    """Join the exact 32-case source-restraint audit to all 32/76/97 tags.
+
+    [REF docs/source/components/gravity/three_case_comparison.py.md]
+    Missing native ETABS FZ evidence is marked unavailable; no guessed values.
+    """
+    if "32" not in available:
+        return [], {"status": "NO_CURRENT_PRIMARY32_CASE", "source_support_count": 0}
+    _entry, payload = available["32"]
+    path = Path(_entry["result_path"]).parent / "ETABS_Nonzero_Reaction_Support_Audit.json"
+    if not path.is_file() or path.is_symlink():
+        return [], {"status": "SOURCE_ETABS_SUPPORT_AUDIT_NOT_FOUND", "source_support_count": 0}
+    audit = json.loads(path.read_text(encoding="utf-8-sig"))
+    if (audit.get("mode") != "ETABS_NONZERO_REACTION_DIAGNOSTIC"
+            or audit.get("case") != "1. DL + LL"
+            or int(audit.get("original_support_count", -1)) != 76
+            or int(audit.get("kept_support_count", -1)) != 32):
+        raise ValueError("Exact 32-case ETABS source audit identity/support counts disagree")
+    mapping = {}
+    for source in audit.get("mapping", []):
+        tag = int(source["opensees_node"])
+        if tag in mapping:
+            raise ValueError("Duplicate ETABS source-support mapping at " + str(tag))
+        value = float(source["etabs_FZ_kN"])
+        if not math.isfinite(value):
+            raise ValueError("Nonfinite ETABS source support reaction: " + str(tag))
+        flags = source["source_restraints"]
+        if (not isinstance(flags, list) or len(flags) != 6 or
+                any(flag not in (0, 1, False, True) for flag in flags)):
+            raise ValueError("Malformed native six-DOF support at " + str(tag))
+        mapping[tag] = source
+    if len(mapping) != 76:
+        raise ValueError("Source ETABS audit is missing or duplicating restrained points")
+    actual = {int(row["node_tag"]) for row in reaction_rows}
+    if not set(mapping).issubset(actual):
+        raise ValueError("Missing source-restrained node tags in solved support comparison")
+    expected32 = {tag for tag, source in mapping.items() if source["selected"]}
+    saved32 = {int(row["node_tag"]) for row in payload["reactions"]}
+    if expected32 != saved32:
+        raise ValueError("Source ETABS primary32 support set disagrees with solved run")
+    audit_total = float(audit["etabs_total_FZ_kN"])
+    computed_total = sum(float(x["etabs_FZ_kN"]) for x in mapping.values())
+    if abs(audit_total - computed_total) > max(0.01, abs(audit_total)*1e-7):
+        raise ValueError("ETABS source 76-support reactions disagree with declared total")
+    rows = []
+    for row in reaction_rows:
+        tag = int(row["node_tag"])
+        source = mapping.get(tag)
+        original = float(source["etabs_FZ_kN"]) if source else None
+        values = [row["rz_"+label+"_kN"] for label in ("32", "76", "97")]
+        differences = [(v-original if v is not None and original is not None
+                        else None) for v in values]
+        rows.append(dict(
+            opensees_node=tag,
+            etabs_unique_name=(str(source["etabs_unique"]) if source else ""),
+            source_dof=("".join(str(int(x)) for x in source["source_restraints"])
+                        if source else ""),
+            source_primary32=(bool(source["selected"]) if source else False),
+            original_ETABS_FZ_kN=original,
+            opensees_32_Rz_kN=values[0],
+            opensees_76_Rz_kN=values[1],
+            opensees_97_Rz_kN=values[2],
+            delta_32_minus_ETABS_kN=differences[0],
+            delta_76_minus_ETABS_kN=differences[1],
+            delta_97_minus_ETABS_kN=differences[2],
+            status=("SOURCE_RESTRAINED_ZERO_ETABS_REACTION"
+                    if source and original == 0
+                    else "SOURCE_RESTRAINED" if source else
+                    "NON_SOURCE_97_POINT_NO_ETABS_NODE_REACTION")))
+    abs32 = sum(abs(x["delta_32_minus_ETABS_kN"]) for x in rows
+                if x["delta_32_minus_ETABS_kN"] is not None)
+    abs76 = sum(abs(x["delta_76_minus_ETABS_kN"]) for x in rows
+                if x["delta_76_minus_ETABS_kN"] is not None)
+    additional44 = [x for x in rows if x["status"] ==
+                    "SOURCE_RESTRAINED_ZERO_ETABS_REACTION"]
+    summary = {
+        "status": "SOURCE_NODE_MAPPED_REACTIONS_NOT_STRUCTURAL_EQUIVALENCE",
+        "source_support_count": len(mapping),
+        "source_fixed_released_in_32": sum(not x["selected"] for x in mapping.values()),
+        "etabs_total_FZ_kN": computed_total,
+        "sum_abs_delta_primary_32_kN": abs32,
+        "sum_abs_delta_source_76_kN": abs76,
+        "opensees_76_reaction_at_source_zero_ETABS_points_kN": sum(
+            x["opensees_76_Rz_kN"] or 0 for x in additional44),
+        "warning": "ETABS zero FZ at a fixed point is not proof of a free DOF; "
+                   "compare original 6 DOF, shell/rigid-zone load paths, and "
+                   "source-identical analysis before accepting any reaction match.",
+        "audit_file": str(path)
+    }
+    return rows, summary
+
+
 def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L"):
     """[REF docs/source/components/gravity/three_case_comparison.py.md]
 
@@ -99,7 +192,7 @@ def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L")
               "missing_cases": missing, "summary": summary,
               "common_node_count": len(common_nodes),
               "interpretation": "Boundary-condition sensitivity, not physical ETABS equivalence"}
-    (root / "Case_Comparison.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+
     def write_csv(filename, rows):
         if not rows:
             return
@@ -109,6 +202,12 @@ def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L")
             writer.writerows(rows)
     write_csv("Support_Reactions_32_76_97.csv", reaction_rows)
     write_csv("Common_Node_Displacements_32_76_97.csv", displacement_rows)
+    joined, native_summary = join_source_etabs_reactions(available, reaction_rows)
+    report["etabs_source_support_comparison"] = native_summary
+    if joined:
+        write_csv("ETABS_OpenSees_All_76_Source_Support_Reactions.csv", joined)
+    (root / "Case_Comparison.json").write_text(
+        json.dumps(report, indent=2, allow_nan=False), encoding="utf-8")
     from openpyxl import Workbook
     wb = Workbook()
     for sheet_name, rows in (
@@ -124,7 +223,17 @@ def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L")
                 ws.append(list(row.values()))
             ws.freeze_panes = "A2"
             ws.auto_filter.ref = ws.dimensions
+    if joined:
+        detail = wb.create_sheet("ETABS vs OpenSees all")
+        detail.append(list(joined[0]))
+        for row in joined:
+            detail.append(list(row.values()))
+        detail.freeze_panes = "A2"
+        detail.auto_filter.ref = detail.dimensions
     checks = wb.create_sheet("Evidence status")
+    for key, value in native_summary.items():
+        if key != "audit_file":
+            checks.append(["ETABS_SOURCE_"+key, value])
     checks.append(["Model", str(Path(model_path).resolve())])
     checks.append(["Profile", profile])
     checks.append(["Interpretation", report["interpretation"]])

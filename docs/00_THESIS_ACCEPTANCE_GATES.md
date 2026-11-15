@@ -39,3 +39,10 @@ Use R10 for NBC code interpretation, R01–R04/R12/R13 for wall/model experiment
 - **G09/G10** still require comparable M0–M6 controlled variants and defined acceptance criteria. The reviewed nonlinear hinged-brace gate **must remain fail-closed** until a physically justified formulation is tested.
 
 **Status:** `PROVISIONAL_DESIGN_BASIS`, not `VERIFIED_MEMBER_CONNECTION`, `NLTHA_READY` or `CODE_ACCEPTED`. No legacy outputs have been retroactively promoted.
+
+
+## 2026-11-15 full 76-point gravity reaction reconciliation blocker
+
+The 2026-11-15 1.0D+1.0L exported ETABS global `FZ=311367.313600 kN` matches OpenSees solved `Rz=311367.31387955 kN` only in **global arithmetic**. The native 76-source support ledger has **44 fully source-restrained points with ETABS FZ=0**. The primary32 diagnostic releases those restraints; the 76-support OpenSees solver carries approximately **104463.014 kN** at them. Aggregate absolute node mismatches are **37297.027 kN (32 model)** and **208926.027 kN (76 model)**. The native preflight flags 1367 rigid-end-zone metadata records. Therefore no case may be tagged ETABS support/reaction **physically equivalent** without source restraint/analysis-element mapping and stiffness/load-path tests. New full-76 source mapping output is implemented in `components/gravity/three_case_comparison.py`. See [full native discrepancy review](../REVIEW_MAIN/01_GRAVITY/20261115_FULL_76_SUPPORT_REACTIONS_AND_NATIVE_DISCREPANCY.md).
+
+**G02/G03 remain OPEN**. The 32-support case is a sensitivity case; don't remove 44 fixed DOFs from the original source model or rewrite reactions to force agreement.

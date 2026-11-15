@@ -1,0 +1,49 @@
+{
+  "record_type": "SOURCE_REACTION_COMPARISON_AND_PRIVATE_EVIDENCE_TRIAGE",
+  "date_local": "2026-11-15",
+  "observed_editor": "ChatGPT GPT-6 via GitHub connector",
+  "base_main": "54d70c6e24882180ee44f2d9516f61acce48d8eb",
+  "branch": "fix/20261115-full-76-reaction-comparison",
+  "actual_source_inspected": [
+    "components/gravity/three_case_comparison.py",
+    "components/gravity/etabs_reaction_support_filter.py",
+    "components/gravity/comparison_bundle.py",
+    "components/gravity/support_scenarios.py",
+    "components/inputs/export_mirror.py",
+    "components/inputs/output_layout.py",
+    "tests/test_gravity_three_case_comparison.py",
+    "AGENTS.md",
+    "docs/source/components/gravity/three_case_comparison.py.md"
+  ],
+  "user_private_evidence_inspected_locally": [
+    "Case_Comparison(1).json",
+    "Support_Reactions_32_76_97(1).csv",
+    "GRAVITY_NATIVE_EQUIVALENCE_UPLOAD(1).zip",
+    "Gravity_ETABS_OpenSees_Evidence_V04(10).zip",
+    "Gravity_Review_UPLOAD(9).zip",
+    "Comparisons_Review_UPLOAD(9).zip",
+    "GRAVITY_REVIEW_Review_UPLOAD(1).zip",
+    "Gravity_ETABS_OpenSees_Evidence_V02(5).zip",
+    "Gravity_ETABS_OpenSees_Evidence_V03(8).zip",
+    "Gravity_ETABS_OpenSees_Evidence(2).zip"
+  ],
+  "source_public_code_only": true,
+  "private_model_uploaded_to_github": false,
+  "physical_changes_to_model": false,
+  "original_restraints_changed": false,
+  "work_product": [
+    "components/gravity/three_case_comparison.py",
+    "tests/test_gravity_full_source_reactions.py",
+    "REVIEW_MAIN/01_GRAVITY/20261115_FULL_76_SUPPORT_REACTIONS_AND_NATIVE_DISCREPANCY.md",
+    "docs/source/components/gravity/three_case_comparison.py.md",
+    "docs/00_THESIS_ACCEPTANCE_GATES.md"
+  ],
+  "tests": [
+    "tests.test_gravity_full_source_reactions",
+    "tests.test_gravity_three_case_comparison",
+    "integrated repository CI"
+  ],
+  "native_gates": "NOT_RUN",
+  "structural_equivalence": "NOT_VALIDATED",
+  "folder_removal": "NOT_ATTEMPTED_EXISTING_FLAT_READERS_REQUIRE_ATOMIC_MIGRATION"
+}
