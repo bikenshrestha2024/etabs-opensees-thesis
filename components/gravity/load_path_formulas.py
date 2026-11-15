@@ -339,7 +339,7 @@ def launch(parent,folder):
     import threading
     import tkinter as tk
     from tkinter import ttk, messagebox
-    from components.gravity.mesh_cases import prepared_configs, build_case, case_base, package_mesh_case
+    from components.gravity.mesh_cases import prepared_configs, build_case, case_base, package_mesh_case, recover_assembled_mesh_workbook
 
     folder=Path(folder)
     config=folder/'OpenSees_Complete_Model_Config_V118.json'
@@ -430,6 +430,26 @@ def launch(parent,folder):
                 except tk.TclError:pass
         threading.Thread(target=work,name='slab_mesh_'+str(size),daemon=True).start()
 
+    def recover_workbook():
+        if choice.get()=='Current root (hash-checked)':
+            current_workbook()
+            return
+        size=int(choice.get())
+        status.set(f'RECOVERING | MESH_{size:02d} already-assembled model...')
+        def work():
+            try:
+                result=recover_assembled_mesh_workbook(folder,size)
+            except Exception as exc:
+                win.after(0,lambda e=exc:(
+                    status.set('RECOVERY BLOCKED | '+str(e)),
+                    log('RECOVERY BLOCKED: '+str(e))))
+            else:
+                win.after(0,lambda r=result:(
+                    status.set('FORMULA RECOVERED | '+str(r['workbook'])),
+                    log('FORMULA WORKBOOK RECREATED: '+str(r['workbook']))))
+        threading.Thread(target=work,daemon=True,
+                         name=f'mesh_{size:02d}_workbook_recovery').start()
+
     def current_workbook():
         try:
             workbook=export(folder)
@@ -469,8 +489,10 @@ def launch(parent,folder):
     prep_button.grid(row=1,column=0,sticky='ew',pady=5)
     build_button.grid(row=1,column=1,sticky='ew',padx=12,pady=5)
     open_button.grid(row=1,column=2,sticky='ew',pady=5)
+    recover_button=ttk.Button(controls,text='Retry Excel from assembled mesh (no rebuild)',command=recover_workbook)
+    recover_button.grid(row=2,column=1,sticky='ew',padx=12,pady=2)
     controls.columnconfigure(0,weight=1);controls.columnconfigure(1,weight=1);controls.columnconfigure(2,weight=1)
-    buttons.extend((prep_button,build_button))
+    buttons.extend((prep_button,build_button,recover_button))
     advanced=ttk.LabelFrame(outer,text='Existing root export — only if it is already rebuilt',padding=9)
     advanced.pack(fill='x',pady=(2,7))
     ttk.Button(advanced,text='Export root assembled mesh workbook (hash-checked)',
