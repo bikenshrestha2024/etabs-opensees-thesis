@@ -101,7 +101,9 @@ def write_table(path, rows, *, columns):
                            for c in columns) or len(set(columns)) != len(columns)):
         raise ValueError("Unique nonempty string columns required")
     target = Path(path)
+    _refuse_linked_output_target(target)
     target.parent.mkdir(parents=True, exist_ok=True)
+    _refuse_linked_output_target(target)
     fd, name = tempfile.mkstemp(prefix=".writing_", suffix=".partial", dir=target.parent)
     tmp = Path(name)
     try:
@@ -122,6 +124,7 @@ def write_table(path, rows, *, columns):
                 writer.writerow(row)
             stream.flush()
             os.fsync(stream.fileno())
+        _refuse_linked_output_target(target)
         os.replace(tmp, target)
     finally:
         tmp.unlink(missing_ok=True)
