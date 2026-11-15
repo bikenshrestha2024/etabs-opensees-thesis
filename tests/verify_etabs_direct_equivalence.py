@@ -143,6 +143,38 @@ class Tests(unittest.TestCase):
         self.assertIsNone(res[0]["percent_difference"])
         self.assertEqual(evaluate([],[dict(base,value=.001)],FIELDS)[0]["status"],"MISSING_OPENSEES")
 
+    def test_nonfinite_opensees_result_is_rejected_even_when_unmatched(self):
+        base=dict(method="MRSM",limit_state="ULS",case="X_E0",axis="X",
+                  location="BASE",metric="base_shear",unit="kN",
+                  basis="CQC_force_scaled")
+        for bad in (float("nan"),float("inf"),"-Infinity",None,True,"missing"):
+            with self.subTest(bad=str(bad)):
+                with self.assertRaisesRegex(ValueError,"OpenSees"):
+                    evaluate([dict(base,value=bad)],[],FIELDS,
+                             {"assumptions_verified":True})
+        with self.assertRaisesRegex(ValueError,"Nonfinite.*difference"):
+            evaluate([dict(base,value=1e308)],[dict(base,value=-1e308)],
+                     FIELDS,{"assumptions_verified":True})
+
+    def test_invalid_comparison_policy_and_thresholds_fail_closed(self):
+        base=dict(method="MRSM",limit_state="ULS",case="X_E0",axis="X",
+                  location="BASE",metric="base_shear",unit="kN",
+                  basis="CQC_force_scaled",value=100.)
+        for policy in (
+            {"assumptions_verified":"yes"},
+            {"percent_limits":{"base_shear":"NaN"}},
+            {"percent_limits":{"base_shear":True}},
+            {"percent_limits":{"base_shear":"not-a-number"}},
+            {"percent_limits":{"base_shear":-1}},
+            {"percent_limits":{"unknown_metric":5}},
+            {"absolute_zero_limits":[0.01]},
+        ):
+            with self.subTest(policy=policy):
+                with self.assertRaises(ValueError):
+                    evaluate([base],[base],FIELDS,policy)
+        with self.assertRaisesRegex(ValueError,"eight distinct"):
+            evaluate([base],[base],FIELDS[:7])
+
     def test_excel_report_synthetic(self):
         with tempfile.TemporaryDirectory() as tmp:
             base=dict(method="MRSM",limit_state="ULS",case="X_E0",axis="X",
