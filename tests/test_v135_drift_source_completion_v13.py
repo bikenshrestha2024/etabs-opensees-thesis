@@ -82,6 +82,23 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "SOURCE_MODEL_SHA_MISMATCH_EXCLUDED")
                 for r in report["tables"]["Open items"]))
 
+    def test_finite_drift_inputs_with_overflowed_ratios_are_excluded(self):
+        from components.validation.design_checks import scan_drift
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            csv_result=root/"Drift_Check_ULS_X.csv"
+            csv_result.write_text(
+                "limit_state,design_drift_ratio,story_number,axis\n"
+                "ULS,1e308,1,X\n",encoding="utf-8")
+            mrsm=root/"MRSM_Results_V132.json"
+            mrsm.write_text(json.dumps({"X_E0":{"limit_state":"ULS",
+                 "axis":"X","stories":[{"story_number":1,
+                                        "design_drift_ratio":1e308}]}}))
+            rows,issues=scan_drift(root)
+            self.assertEqual(rows,[])
+            self.assertEqual(len(issues),2)
+            self.assertTrue(all("Nonfinite" in x["reason"] for x in issues))
+
     def test_finite_source_values_cannot_publish_overflowed_utilization(self):
         from components.validation.design_checks import evaluate_checks,combine_actions,COMPONENTS
         with tempfile.TemporaryDirectory() as td:
