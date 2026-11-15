@@ -26,3 +26,7 @@ Unit/metadata tests, isolated material or wall benchmarks, complete solver log, 
 ## 2026-11-13 — Stage 02 model mesh / area-integration output update
 
 For the full rationale, mesh procedure, distinctions between **source quads** and **assembled meshed ShellMITC4 cells**, evidence requirements and safety warnings, read [the numbered Stage 02 review](../../../../REVIEW_MAIN/00_MODEL/20261113_STAGE02_AREA_INTEGRATION_AND_SLAB_MESH_STUDY.md). Mesh 04/08/16 files are separate case outputs and never a single rebadged baseline. Area inventory is source-only Excel + JSON; it does not instantiate OpenSees elements or validate gravity transfer.
+
+
+## 2026-11-15 — Open output folder UI
+The Area Element Integration V116 window now offers **Open output folder**. It uses `area_output_directory` to open the existing saved integration-call parent directory, else the existing `02_MODEL/AREA_INTEGRATION/` folder (where Excel/JSON source inventory belongs), else the existing export root. It creates no directories and never initiates OpenSees. On Windows it opens File Explorer using `os.startfile`; macOS/Linux use their system openers. It does not approve a wall config or modify the original EDB. A linked canonical output stage is refused. Source-only test: `tests/test_area_folder_and_hinged_brace_review.py`; engineering evidence `REVIEW_MAIN/00_MODEL/20261115_AREA_HINGED_BRACE_AND_MESH_EVIDENCE.md`.
