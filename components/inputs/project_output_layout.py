@@ -43,13 +43,22 @@ def create_project_layout(source_edb, selected_output_root, *,
     root = Path(selected_output_root).expanduser().resolve()
     if root == source or root in source.parents:
         raise ValueError("Output root must not be an ancestor of the source EDB.")
-    root.mkdir(parents=True, exist_ok=True)
     sha = sha256_file(source)
     manifest_dir = root / "00_SOURCE_MANIFEST"
-    manifest_dir.mkdir(exist_ok=True)
     manifest = manifest_dir / "PROJECT_CONTEXT.json"
+    # Validate existing output destinations before any directory or manifest
+    # is created. A linked manifest dir would otherwise write outside the
+    # user-selected export case, and a linked stage would scatter its results.
+    if manifest_dir.is_symlink() or manifest.is_symlink():
+        raise ValueError("Refusing linked project manifest destination")
+    previous = None
     if manifest.exists():
-        previous = json.loads(manifest.read_text(encoding="utf-8-sig"))
+        try:
+            previous = json.loads(manifest.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError, TypeError) as exc:
+            raise ValueError("Unreadable existing project source manifest") from exc
+        if not isinstance(previous, dict):
+            raise ValueError("Existing project source manifest must be a JSON object")
         if previous.get("source_edb_sha256") != sha:
             raise ValueError(
                 "Selected output root belongs to a DIFFERENT EDB SHA256. "
@@ -58,9 +67,15 @@ def create_project_layout(source_edb, selected_output_root, *,
     layout["REVIEW_MAIN"] = str(root / "REVIEW_MAIN")
     if create_analysis_directories:
         for folder in layout.values():
+            if Path(folder).is_symlink():
+                raise ValueError("Refusing linked project output stage: " + folder)
+    root.mkdir(parents=True, exist_ok=True)
+    manifest_dir.mkdir(exist_ok=True)
+    if create_analysis_directories:
+        for folder in layout.values():
             Path(folder).mkdir(parents=True, exist_ok=True)
     # Preserve first recorded start time on repeated runs of the same source.
-    created = (previous.get("created_utc") if manifest.exists() else None)
+    created = previous.get("created_utc") if previous is not None else None
     document = {
         "schema": "etabs-opensees-project-context-v1",
         "source_edb": str(source),
@@ -73,9 +88,10 @@ def create_project_layout(source_edb, selected_output_root, *,
         "legacy_output": str(root / "OpenSees_Analysis_Results"),
         "note": "Legacy outputs remain at existing locations until all readers are migrated."
     }
-    temp = manifest.with_suffix(".tmp")
-    temp.write_text(json.dumps(document, indent=2), encoding="utf-8")
-    temp.replace(manifest)
+    # Unique same-directory temporary file and atomic replacement. Reusing a
+    # fixed .tmp name risks clobbering an unrelated interrupted writer.
+    from components.inputs.output_contract import atomic_json
+    atomic_json(manifest, document)
     return document
 
 
@@ -92,8 +108,16 @@ def case_folder(layout, module, case_id, *, limit_state=None):
         raise ValueError("Unknown output module: " + name) from exc
     parts = [safe_component(limit_state)] if limit_state is not None else []
     parts.append(safe_component(case_id))
-    base = Path(layout["modules"][canonical]).resolve()
-    destination = base.joinpath(*parts).resolve()
+    stage_path = Path(layout["modules"][canonical])
+    if stage_path.is_symlink():
+        raise ValueError("Refusing linked case stage")
+    current = stage_path
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            raise ValueError("Refusing linked case output component")
+    base = stage_path.resolve()
+    destination = current.resolve()
     if base not in destination.parents:
         raise ValueError("Case output escaped selected project folder.")
     destination.mkdir(parents=True, exist_ok=False)
