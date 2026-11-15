@@ -3038,8 +3038,17 @@ class App:
                 messagebox.showwarning('Export created — model assembly needs inputs',
                     'Analysis files are linked automatically. The model entry reports these unresolved inputs:\n\n'+'\n'.join(assembly['assembly_errors'])+'\n\nReport: '+str(report_path),parent=self.root)
             else:
-                messagebox.showinfo('Connected OpenSees export created',
-                    f"Assembled {assembly['frame_segments']} frame segments and {assembly['shell_mesh_cells']} wall/slab shell cells.\nGravity loads, source self-weight, seismic mass and rigid floors are included.\n\nGravity, Modal, Linear TH and Nonlinear TH windows now select their matching entry automatically.\n\nElastic conversion model: compare reactions, mass and periods with ETABS. Nonlinear execution still requires calibrated materials.\n\nReport: {report_path}",parent=self.root)
+                analysis_ready=bool(assembly.get('analysis_ready',False))
+                nonlinear_ready=bool(assembly.get('nonlinear_ready',False))
+                readiness=('Engineering readiness: '+('REVIEW REQUIRED' if not analysis_ready else 'reported ready')
+                           +' | Nonlinear readiness: '+('REVIEW REQUIRED' if not nonlinear_ready else 'reported ready'))
+                messagebox.showinfo('Elastic assembly created — validation required',
+                    f"Assembled {assembly['frame_segments']} frame segments and {assembly['shell_mesh_cells']} wall/slab shell cells.\n\n"
+                    +readiness
+                    +"\n\nSaved loads/mass/diaphragms are evidence for comparison, not proof of ETABS parity. "
+                    +"Stage viewers can discover saved candidates but must validate the source model SHA, case identity, "
+                    +"status and completeness. Nonlinear analysis remains gated on real project material/rebar and benchmarks."
+                    +"\n\nReport: "+str(report_path),parent=self.root)
         except Exception as e:
             self.log("ERROR: "+repr(e)); self.log(traceback.format_exc()); messagebox.showerror("Conversion failed",str(e))
         finally:self.runbtn.configure(state="normal")
