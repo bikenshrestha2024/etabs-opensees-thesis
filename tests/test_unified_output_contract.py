@@ -73,6 +73,48 @@ class UnifiedOutputContractTests(unittest.TestCase):
                     record_case_status(run,"VERIFIED_ETABS_EQUIVALENCE")
             self.assertEqual(len(list(root.rglob("CASE_MANIFEST.json"))),len(STAGE_FOLDERS))
 
+    def test_record_status_refuses_wrong_run_identity_and_preserves_source(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            run=create_case_run(root,"MRSM","X_E0",state="ULS")
+            manifest=run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+            baseline=manifest.read_bytes()
+            original=json.loads(baseline)
+            for field,value in (("case_id","OTHER"),("stage","03_ESM"),
+                                ("run_id","wrong_run"),("units","not_a_unit")):
+                damaged=dict(original)
+                damaged[field]=value
+                manifest.write_text(json.dumps(damaged),encoding="utf-8")
+                unchanged=manifest.read_bytes()
+                with self.subTest(field=field):
+                    with self.assertRaisesRegex(ValueError,"invalid case manifest"):
+                        record_case_status(run,"RUNNING")
+                    self.assertEqual(manifest.read_bytes(),unchanged)
+            manifest.write_bytes(baseline)
+            record_case_status(run,"RUNNING")
+            self.assertEqual(json.loads(manifest.read_text())["solver_status"],"RUNNING")
+
+    def test_record_status_refuses_linked_case_manifest(self):
+        from components.inputs.output_contract import inspect_case_manifest
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            run=create_case_run(root,"MRSM","X_E0",state="ULS")
+            manifest=run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+            actual=root/"original.json"
+            actual.write_bytes(manifest.read_bytes())
+            manifest.unlink()
+            try:
+                manifest.symlink_to(actual)
+            except (OSError,NotImplementedError):
+                self.skipTest("File symlink unavailable")
+            result=inspect_case_manifest(run)
+            self.assertFalse(result["valid"])
+            self.assertIn("LINKED_CASE_MANIFEST_PATH",result["issues"])
+            before=actual.read_bytes()
+            with self.assertRaisesRegex(ValueError,"invalid case manifest"):
+                record_case_status(run,"RUNNING")
+            self.assertEqual(before,actual.read_bytes())
+
     def test_linked_stage_or_case_folder_is_refused_without_external_writes(self):
         for linked_at in ("stage", "runs", "state", "case"):
             with self.subTest(linked_at=linked_at):
