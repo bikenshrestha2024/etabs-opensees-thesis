@@ -24,6 +24,26 @@ def _validate_capture_limits(maximum_findings, max_values=None):
         raise ValueError("max_values must be an integer from 1 to 10000")
 
 
+def _focus_tags(raw):
+    """Do not coerce fractional/boolean element identities into other tags."""
+    if raw is None:
+        raise ValueError("Focused diagnostic requires explicitly selected element tags")
+    tags=set()
+    for value in raw:
+        if type(value) is int and value>0:
+            tag=value
+        elif isinstance(value,str) and value.isdecimal() and int(value)>0:
+            tag=int(value)
+        else:
+            raise ValueError("Focused element tag must be a positive integer")
+        tags.add(tag)
+        if len(tags)>16:
+            raise ValueError("At most 16 focused element tags")
+    if not tags:
+        raise ValueError("Focused diagnostic requires at least one element tag")
+    return sorted(tags)
+
+
 def _numbers(raw):
     if raw is None:
         return []
@@ -46,11 +66,7 @@ def snapshot_selected_state(ops, output_path, *, suspect_tags,
     diagnostic step; the last committed snapshot survives a failed attempt.
     """
     _validate_capture_limits(1,max_values)
-    if suspect_tags is None:
-        raise ValueError("suspect_tags must be a nonempty collection")
-    tags=sorted({int(tag) for tag in suspect_tags})
-    if len(tags)<1 or len(tags)>16 or any(t<=0 for t in tags):
-        raise ValueError("suspect_tags must have 1..16 positive solver tags")
+    tags=_focus_tags(suspect_tags)
     existing=set(map(int,ops.getEleTags()))
     clock,time_status=_solver_time_evidence(ops.getTime())
     report={"status":stage,"time_s":clock,"time_status":time_status,
@@ -157,9 +173,7 @@ def snapshot_failed_step(
         "query_errors": [],
     }
 
-    focus=set(map(int,suspect_tags)) if suspect_tags is not None else None
-    if focus is not None and (len(focus)>16 or any(t<=0 for t in focus)):
-        raise ValueError("suspect_tags must contain 1..16 positive element tags")
+    focus=set(_focus_tags(suspect_tags)) if suspect_tags is not None else None
     report["focused_element_tags"]=sorted(focus) if focus is not None else None
     for tag in ([] if focus is not None else ops.getNodeTags()):
         report["nodes_scanned"] += 1
