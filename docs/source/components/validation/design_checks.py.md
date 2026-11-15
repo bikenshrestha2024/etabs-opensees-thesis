@@ -37,3 +37,9 @@ The existing `write_rows(path, rows)` preserves its data columns and no-op for g
 `run()` stages the V135 generated XLSX in a uniquely named file in the same report directory, validates the output destination against preexisting symlinks and atomically replaces the prior workbook only after `openpyxl` successfully saves it. Source model `OpenSees_Complete_Model_Data_V118.json` is refused when its direct path is linked. `templates()` also refuses linked destinations, and uses exclusive file creation for otherwise missing criteria templates rather than potentially truncating a concurrently created user-edited input.
 
 The V135 multi-file CSV, XLSX, JSON and text-log set is **not one atomic transaction**. The workbook and derived CSV changes do not edit original Excel Aw/T1, ETABS EDB or historical imported source criteria. Tests: `tests/test_v135_drift_source_completion_v13.py`; verified non-native GitHub quality/compilation is **not** a model qualification or physical drift benchmark.
+
+## V29 update — V135 current-output index and atomic diagnostic log
+
+`run()` now writes `Design_Check_Output_Index_V135.json` with a model SHA, generation timestamp, each table's current row count, and `CURRENT_DERIVED_TABLE` versus `NO_CURRENT_ROWS_PRIOR_CSV_NOT_REPLACED` classifications. The previous legacy empty-row no-write behavior is preserved, but an old report must no longer be interpreted as belonging to the latest refresh when the index says no current rows. The output index is data provenance, **not** a real ETABS/OpenSees simulation result.
+
+`Design_Check_V135.log` now uses a unique same-directory staged text file and atomic final replacement. This prevents a partially written log from truncating the prior completed log. The current workbook, JSON, CSV and log remain separately published rather than an atomic multi-file transaction. Regression: `tests/test_v135_drift_source_completion_v13.py`.
