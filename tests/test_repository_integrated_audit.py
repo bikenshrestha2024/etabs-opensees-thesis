@@ -212,6 +212,51 @@ class IntegratedAuditTests(unittest.TestCase):
                      for item in report["direct_local_edges"]}
             self.assertIn(("components/audit_fixture/left.py",
                            "components/audit_fixture/right.py"), edges)
+            # An ImportFrom(module=None) must create an actual package-init
+            # dependency on its tracked child, not an ignored self-edge.
+            self.assertIn(("components/audit_fixture/__init__.py",
+                           "components/audit_fixture/left.py"), edges)
+
+    def test_from_package_import_tracked_submodule_and_exported_symbol(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            pkg=root/"components"/"package_case"
+            pkg.mkdir(parents=True)
+            (pkg/"__init__.py").write_text(
+                "EXPORTED_CONSTANT = 17\n", encoding="utf-8")
+            (pkg/"submodule.py").write_text("VALUE = 3\n", encoding="utf-8")
+            (pkg/"caller.py").write_text(
+                "from components.package_case import submodule, EXPORTED_CONSTANT\n"
+                "def use(): return submodule.VALUE + EXPORTED_CONSTANT\n",
+                encoding="utf-8")
+            graph=import_graph(root,inventory(root)["active_python_modules"])
+            edges={(edge["from"],edge["to"])
+                   for edge in graph["direct_local_edges"]}
+            self.assertIn(("components/package_case/caller.py",
+                           "components/package_case/submodule.py"),edges)
+            self.assertEqual(graph["unresolved_explicit_local_imports"],[])
+
+    def test_relative_from_import_exposes_real_eager_dependency_cycle(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            pkg=root/"components"/"relative_cycle"
+            pkg.mkdir(parents=True)
+            (pkg/"__init__.py").write_text(
+                "from . import child\n",encoding="utf-8")
+            (pkg/"child.py").write_text(
+                "from components.relative_cycle import main\n",encoding="utf-8")
+            # Referencing a package symbol called main is not necessarily an
+            # actual submodule, unless a tracked module at that path exists.
+            (pkg/"main.py").write_text(
+                "from components.relative_cycle import child\n",encoding="utf-8")
+            graph=import_graph(root,inventory(root)["active_python_modules"])
+            edges={(edge["from"],edge["to"])
+                   for edge in graph["direct_local_edges"]}
+            self.assertIn(("components/relative_cycle/__init__.py",
+                           "components/relative_cycle/child.py"),edges)
+            self.assertIn(("components/relative_cycle/main.py",
+                           "components/relative_cycle/child.py"),edges)
+            self.assertEqual(graph["unresolved_explicit_local_imports"],[])
 
     def test_function_scoped_mutual_import_is_not_eager_cycle(self):
         with tempfile.TemporaryDirectory() as td:
