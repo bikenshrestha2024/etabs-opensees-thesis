@@ -41,6 +41,12 @@ class DisplayRoleOutputTests(unittest.TestCase):
             html=(root/"OpenSees_ID_Lookup.html").read_text(encoding="utf-8")
             self.assertIn("Brace role",html)
             self.assertIn("CO2501",html)
+            import csv
+            with (root/"OpenSees_Brace_Role_Review.csv").open(encoding="utf-8-sig",newline="") as stream:
+                source_rows=list(csv.DictReader(stream))
+            self.assertEqual(len(source_rows),4)
+            self.assertEqual([r["Current role"] for r in source_rows],["CO","BT","CT","BR"])
+            self.assertIn("REVIEW",source_rows[-1]["Review status"])
 
     def test_invalid_role_and_unknown_source_id_fail_closed(self):
         with tempfile.TemporaryDirectory() as temp:
