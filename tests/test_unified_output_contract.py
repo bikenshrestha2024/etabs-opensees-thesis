@@ -111,6 +111,34 @@ class UnifiedOutputContractTests(unittest.TestCase):
                 atomic_json(root/"broken.json",{"nonfinite":float("nan")})
             self.assertFalse((root/"broken.json").exists())
 
+    def test_shared_writers_refuse_linked_parent_or_target(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            outside=root/"outside"
+            outside.mkdir()
+            link=root/"redirected"
+            try:
+                link.symlink_to(outside,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host lacks symbolic link support")
+            for writer in ("json","csv"):
+                dest=link/("report."+writer)
+                with self.subTest(writer=writer):
+                    with self.assertRaisesRegex(ValueError,"linked derived-output"):
+                        if writer=="json":
+                            atomic_json(dest,{"valid":True})
+                        else:
+                            write_table(dest,[{"value":1}],columns=("value",))
+                    self.assertFalse(dest.exists())
+            normal=root/"protected.json"
+            normal.write_text('{"unchanged":true}',encoding="utf-8")
+            linked_file=root/"alias.json"
+            linked_file.symlink_to(normal)
+            with self.assertRaisesRegex(ValueError,"linked derived-output"):
+                atomic_json(linked_file,{"valid":False})
+            self.assertEqual(normal.read_text(), '{"unchanged":true}')
+            self.assertTrue(linked_file.is_symlink())
+
     def test_manifest_stage_identity_validated_without_expected_stage(self):
         from components.inputs.output_contract import inspect_case_manifest
         with tempfile.TemporaryDirectory() as td:
