@@ -198,11 +198,17 @@ def run_nbc105_modal_audit(ops, *, nmodes=30, output_dir=".",
     Returns a JSON-serializable result dictionary. This is a modal audit only;
     no response-spectrum forces or design actions are generated here.
     """
-    nmodes = int(nmodes)
-    if nmodes < 1:
-        raise ValueError("nmodes must be a positive integer")
-    if not (0.0 < float(target_mass_percent) <= 100.0):
+    from components.shared.eigen_solver import validated_mode_count
+    nmodes = validated_mode_count(nmodes, name="nmodes")
+    if isinstance(target_mass_percent, bool) or not (
+        0.0 < float(target_mass_percent) <= 100.0):
         raise ValueError("target_mass_percent must be in (0, 100]")
+    if not math.isfinite(float(max_frequency_hz)) or float(max_frequency_hz) <= 0:
+        raise ValueError("max_frequency_hz must be finite and positive")
+    # Validate manually selected mode identities before launching the solver.
+    for axis, selected in (("X", fundamental_mode_x), ("Y", fundamental_mode_y)):
+        if selected is not None:
+            validated_mode_count(selected, name=f"fundamental_mode_{axis}")
     started = time.perf_counter()
     from components.shared.eigen_solver import solve_eigen
     eigvals = solve_eigen(ops, nmodes, solver)
@@ -280,7 +286,7 @@ def run_nbc105_modal_audit(ops, *, nmodes=30, output_dir=".",
                 period_check[f"candidate_modal_period_{axis}_s"] = periods[mode - 1]
                 period_check[f"modal_period_candidate_note_{axis}"] = "Mode with largest directional participation; inspect shape and confirm manually."
             else:
-                mode = int(mode)
+                mode = validated_mode_count(mode, name=f"fundamental_mode_{axis}")
                 if mode < 1 or mode > n:
                     raise ValueError(f"fundamental_mode_{axis} must be between 1 and {n}")
                 period_check[f"reviewed_modal_mode_{axis}"] = mode
