@@ -82,6 +82,28 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "SOURCE_MODEL_SHA_MISMATCH_EXCLUDED")
                 for r in report["tables"]["Open items"]))
 
+    def test_v135_output_index_marks_no_current_rows_explicitly(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            (root/"OpenSees_Complete_Model_Data_V118.json").write_text(
+                '{"frames":[],"shells":[]}',encoding="utf-8")
+            diagnostics=root/"09_SOFTWARE_DIAGNOSTICS"/"DESIGN_CHECKS_V135"
+            diagnostics.mkdir(parents=True)
+            prior=diagnostics/"Seismic_drift.csv"
+            prior.write_text("historical csv must not appear current\\n")
+            with patch("components.validation.settings_audit.audit",
+                       return_value={"rows":[]}):
+                report,out=run(root)
+            idx=json.loads((out/"Design_Check_Output_Index_V135.json").read_text())
+            self.assertEqual(idx["schema"],"V135_DERIVED_REPORT_INDEX_V1")
+            self.assertEqual(idx["tables"]["Seismic drift"]["current_row_count"],0)
+            self.assertEqual(idx["tables"]["Seismic drift"]["status"],
+                             "NO_CURRENT_ROWS_PRIOR_CSV_NOT_REPLACED")
+            self.assertEqual(prior.read_text(),"historical csv must not appear current\\n")
+            self.assertTrue((out/"Design_Check_V135.log").is_file())
+            self.assertEqual(list(out.glob(".design_check_log_*.partial")),[])
+            self.assertEqual(list(out.glob(".design_checks_*.xlsx")),[])
+
     def test_v135_refuses_linked_templates_or_model_source(self):
         from components.validation.design_checks import templates
         with tempfile.TemporaryDirectory() as td:
