@@ -59,3 +59,9 @@ without foundations, ETABS auto-mesh settings and structural evidence.
 
 Tests: `tests/verify_gravity_support_scenarios.py` and
 `tests/verify_wall_base_restraints.py`.
+
+## V23 source-based evidence checks — 2026-11-15
+
+The 76-versus-continuous-wall sensitivity comparator rejects duplicate node and reaction tags (no silent dictionary replacement), rejects missing/nonfinite coordinates for reaction nodes, and requires coincident **global XYZ for any shared native node tag** before comparing its Rz. A node that appears only in the source case retains the source-case coordinate instead of an invented coordinate or a blank continuous-case coordinate. Each saved `support_vertical_reaction_kN` summary must reproduce the actual sum of finite `rz_kN` records within `max(0.01 kN, 1e-6 × |reported support sum|)`. This is a consistency tolerance for data export, **not** acceptance of gravity load balance or structural equivalence. See `tests/verify_gravity_support_scenarios.py`.
+
+The comparator still compares only the two independently solved original-source (nominal 76 restraints) and continuous-wall (nominal 97 restraints) idealizations. The user's preferred 32 reaction-bearing physical support locations remain a separate, independently validated source selection. Matching tags/totals cannot prove that only boundary conditions differ; actual EDB/model SHA, mesh stiffness, load ledgers and six-component restraint geometry remain a separate native engineering review.
