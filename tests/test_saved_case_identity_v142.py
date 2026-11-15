@@ -117,6 +117,68 @@ class ReviewSourceIntegrityTests(unittest.TestCase):
             self.assertEqual(external.read_text(),
                              json.dumps({"model_sha256":"a"*64}))
 
+    def test_invalid_payload_sha_cannot_be_hidden_by_good_manifest(self):
+        from components.validation.saved_case_identity import source_model_hash_evidence
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            run=root/"05_MRSM"/"RUNS"/"ULS"/"case"/"r1"
+            result=run/"02_RESULTS"/"MRSM_Results_V132.json"
+            result.parent.mkdir(parents=True)
+            manifest=run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+            manifest.parent.mkdir()
+            manifest.write_text(json.dumps({"model_sha256":"a"*64}))
+            for value in ("invalid-sha",123,True):
+                with self.subTest(value=value):
+                    result.write_text(json.dumps({"X_E0":{"model_sha256":value}}))
+                    evidence=source_model_hash_evidence(result,"X_E0")
+                    self.assertTrue(evidence["invalid_payload_sha"])
+                    self.assertIsNone(evidence["model_sha256"])
+                    chosen,issues=identity_screen(
+                        [{"file":str(result),"case":"X_E0"}],
+                        expected_model_sha="a"*64)
+                    self.assertEqual(chosen,[])
+                    self.assertEqual(issues[0]["status"],"INVALID_RESULT_MODEL_SHA_EXCLUDED")
+            # A genuinely absent optional payload SHA is different from a
+            # present malformed field; preserved as the legacy identity policy.
+            result.write_text(json.dumps({"X_E0":{"stories":[]}}))
+            selected,issues=identity_screen(
+                [{"file":str(result),"case":"X_E0"}],expected_model_sha="a"*64)
+            self.assertEqual(len(selected),1)
+            self.assertEqual(issues,[])
+
+    def test_linked_result_and_metadata_cannot_claim_matching_source(self):
+        from components.validation.saved_case_identity import source_model_hash_evidence
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            external=root/"other_source.json"
+            external.write_text(json.dumps({"X_E0":{"model_sha256":"a"*64}}))
+            run=root/"05_MRSM"/"RUNS"/"ULS"/"case"/"r1"
+            result=run/"02_RESULTS"/"MRSM_Results_V132.json"
+            result.parent.mkdir(parents=True)
+            try:
+                result.symlink_to(external)
+            except (OSError,NotImplementedError):
+                self.skipTest("Symlinks unsupported")
+            evidence=source_model_hash_evidence(result,"X_E0")
+            self.assertTrue(evidence["linked_source"])
+            self.assertIsNone(evidence["model_sha256"])
+            selected,issues=identity_screen(
+                [{"file":str(result),"case":"X_E0"}],expected_model_sha="a"*64)
+            self.assertEqual(selected,[])
+            self.assertEqual(issues[0]["status"],"LINKED_RESULT_EVIDENCE_EXCLUDED")
+            linked_model=root/"OpenSees_Complete_Model_Data_V118.json"
+            linked_model.symlink_to(external)
+            self.assertIsNone(current_export_model_sha(root))
+            esm=root/"03_ESM"/"Drift_Check_ULS_X_E0.csv"
+            esm.parent.mkdir()
+            esm.write_text("story_number,design_drift_ratio\\n1,0.001\\n")
+            meta=esm.parent/"NBC105_ESM_OpenSees_Response_META_ULS_X_E0.json"
+            meta.symlink_to(external)
+            selected,issues=identity_screen(
+                [{"file":str(esm),"case":"X_E0"}],expected_model_sha="a"*64)
+            self.assertEqual(selected,[])
+            self.assertEqual(issues[0]["status"],"LINKED_RESULT_EVIDENCE_EXCLUDED")
+
     def test_manifest_sha_and_missing_legacy_identity(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
