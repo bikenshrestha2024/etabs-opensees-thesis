@@ -14,6 +14,7 @@ DOI,Occurrences,Example_source_locations
 10.1016/j.engstruct.2025.121846,1,docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md:77
 10.1016/j.finel.2015.01.006,6,Material_Validation_Results_V149/Validation_Report_V149.json:150; Material_Validation_Results_V149/Walls/wall_validation.json:15; WALL_VALIDATION_V147.md:31; Wall_Validation_Lu_Full/wall_validation.json:15; Wall_Validation_Results/wall_validation.json:15; components/validation/wall_validation.py:10
 10.1016/j.jcsr.2023.108415,2,components/validation/reference_library.py:193; docs/OUTRIGGER_MATERIAL_SENSITIVITY_AND_VALIDATION.md:179
+10.1016/j.matpr.2021.10.034,2,REVIEW_MAIN/00_MODEL/20261115_PROVISIONAL_HINGED_OUTRIGGER_BRACE_DESIGN_BASIS.md:43; engineering/agent_edits/20261115_provisional_hinged_outrigger_assumption.json:16
 10.1016/j.softx.2025.102126,1,REVIEW_MAIN/00_MODEL/20261114_DEEPSEEK_ARCHITECTURE_LITERATURE_REVIEW.md:33
 10.1016/j.soildyn.2018.06.021,1,Research_Components/02_MODELLING_BASIS.md:60
 10.1016/s0141-0296(03)00041-5,1,REVIEW_MAIN/02_ESM/Aw_Validation/20261112_ADDITIONAL_RC_SOURCES_REVIEW.md:15
