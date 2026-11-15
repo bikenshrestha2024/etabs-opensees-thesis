@@ -105,15 +105,30 @@ def snapshot_failed_step(
     _validate_capture_limits(maximum_findings)
     out = Path(output_path)
     inverse = {}
-    if element_map_path and Path(element_map_path).is_file():
-        mapping = json.loads(
-            Path(element_map_path).read_text(encoding="utf-8-sig")
-        )
-        for source, tags in mapping.items():
-            if isinstance(tags, list):
-                for tag in tags:
-                    inverse[int(tag)] = source
-
+    mapping_error = None
+    if element_map_path:
+        try:
+            candidate=Path(element_map_path)
+            if candidate.is_symlink():
+                raise ValueError("Linked element source mapping refused")
+            if not candidate.is_file():
+                raise FileNotFoundError("Source element mapping not found")
+            mapping=json.loads(candidate.read_text(encoding="utf-8-sig"))
+            if not isinstance(mapping,dict):
+                raise ValueError("Element source mapping must be a JSON object")
+            for source,tags in mapping.items():
+                if not isinstance(source,str) or not isinstance(tags,list):
+                    raise ValueError("Invalid element source mapping record")
+                for raw in tags:
+                    tag=int(raw)
+                    if tag<=0:
+                        raise ValueError("Nonpositive element tag in source mapping")
+                    if tag in inverse and inverse[tag]!=source:
+                        raise ValueError("Conflicting source mapping for element "+str(tag))
+                    inverse[tag]=source
+        except (OSError,ValueError,TypeError,OverflowError) as exc:
+            mapping_error=str(exc)
+            inverse={}
     clock,time_status=_solver_time_evidence(ops.getTime())
     attempt=float(dt)
     if not math.isfinite(attempt) or attempt<=0:
@@ -126,6 +141,10 @@ def snapshot_failed_step(
         "return_code": int(return_code),
         "algorithm": str(algorithm),
         "element_map": str(element_map_path) if element_map_path else None,
+        "element_map_status":("NOT_SUPPLIED" if not element_map_path else
+                               "INVALID_SOURCE_MAPPING" if mapping_error else
+                               "SOURCE_MAPPING_PARSED_NOT_PHYSICALLY_VERIFIED"),
+        "element_map_error":mapping_error,
         "warning": (
             "Post-failure responses may be rollback/contaminated states; "
             "the first observed non-finite element is not necessarily the cause."
