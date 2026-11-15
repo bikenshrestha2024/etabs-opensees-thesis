@@ -67,6 +67,11 @@ def combine_actions(rows,cases,model_hash):
             if missing:
                 issues.append(dict(case=c['case'],member=key[1],station=key[2],status='NOT EVALUATED',reason='Missing basis: '+', '.join(missing)));continue
             v=[sum(f*basis[key,b][i] for b,f in c['factors'].items()) for i in range(6)]
+            if not all(math.isfinite(component) for component in v):
+                issues.append(dict(case=c['case'],member=key[1],
+                                   station=key[2],status='NOT EVALUATED',
+                                   reason='Nonfinite combined action; finite input can overflow under superposition'))
+                continue
             out.append(dict(case=c['case'],limit_state=key[0],member=key[1],station=key[2],axes=key[3],**dict(zip(COMPONENTS,v)),scope='FIRST ORDER ACTION COMBINATION ONLY; second-order and capacity checks separate'))
     return out,issues
 
@@ -85,7 +90,10 @@ def evaluate_checks(rows,model_hash,kind):
             demand=abs(number(r['demand']));limit=number(r['limit'])
             if limit<=0:raise ValueError('Limit must be positive')
             if kind in ('section','nonlinear') and not r.get('concurrent_action_id'):raise ValueError('Missing concurrent action/station/time or approved envelope-method reference')
-            ratio=demand/limit;status='PASS' if ratio<=1 else 'FAIL'
+            ratio=demand/limit
+            if not math.isfinite(ratio):
+                raise ValueError('Nonfinite demand/limit utilization; computed ratio overflow')
+            status='PASS' if ratio<=1 else 'FAIL'
         except (ValueError,KeyError,TypeError) as e:status='NOT EVALUATED';reason=str(e)
         q.update(utilization=ratio,status=status,reason=reason,scope='Reviewed supplied criterion only; not whole-section certification' if kind=='section' else 'Reviewed nonlinear performance criterion; not whole-building acceptance' if kind=='nonlinear' else 'Reviewed project deflection criterion')
         out.append(q)
