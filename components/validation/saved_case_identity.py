@@ -42,16 +42,25 @@ def source_model_hash_evidence(result_path, case=None):
     folder=path.parent
     manifest_digest=None
     payload_digest=None
+    invalid_manifest=False
+    manifest_path=None
     for parent in (folder,*folder.parents):
         candidate=parent/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+        if candidate.is_symlink():
+            invalid_manifest=True
+            manifest_path=str(candidate)
+            break
         if candidate.is_file():
+            manifest_path=str(candidate)
             try:
                 item=json.loads(candidate.read_text(encoding="utf-8-sig"))
                 value=item.get("model_sha256") if isinstance(item,dict) else None
                 if _valid_sha256(value):
                     manifest_digest=value.lower()
+                else:
+                    invalid_manifest=True
             except (OSError,ValueError,TypeError,AttributeError):
-                pass
+                invalid_manifest=True
             break
         if parent.name.casefold() in {
                 "05_mrsm","03_esm","06_linear_time_history",
@@ -80,8 +89,11 @@ def source_model_hash_evidence(result_path, case=None):
               and manifest_digest!=payload_digest)
     return {"manifest_model_sha256":manifest_digest,
             "payload_model_sha256":payload_digest,
+            "manifest_path":manifest_path,
+            "invalid_manifest":invalid_manifest,
             "conflict":conflict,
-            "model_sha256":None if conflict else payload_digest or manifest_digest}
+            "model_sha256":None if conflict or invalid_manifest else
+                           payload_digest or manifest_digest}
 
 
 def recorded_result_model_sha(result_path, case=None):
@@ -113,6 +125,14 @@ def identity_screen(rows, *, expected_model_sha):
         if key not in cache:
             cache[key]=source_model_hash_evidence(path,item.get("case"))
         evidence=cache[key]
+        if evidence["invalid_manifest"]:
+            issues.append({
+                "status":"INVALID_RUN_MANIFEST_EXCLUDED",
+                "file":str(path),"case":item.get("case"),
+                "manifest":evidence["manifest_path"],
+                "reason":"Canonical run manifest is malformed, unreadable, or linked; do not promote a payload hash to verified model identity.",
+            })
+            continue
         if evidence["conflict"]:
             issues.append({
                 "status":"SOURCE_MANIFEST_RESULT_SHA_CONFLICT_EXCLUDED",
