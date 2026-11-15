@@ -73,6 +73,16 @@ class MissingStiffnessCoverageTests(unittest.TestCase):
             selected,issues=identity_screen(
                 [{"file":str(file),"case":"X_E0"}],
                 expected_model_sha="a"*64)
+            # An explicitly present but malformed digest is stronger negative
+            # evidence than an absent optional legacy digest: exclude it.
+            self.assertEqual(selected,[])
+            self.assertEqual(len(issues),1)
+            self.assertEqual(issues[0]["status"],
+                             "INVALID_RESULT_MODEL_SHA_EXCLUDED")
+            file.write_text(json.dumps({"X_E0":{"stories":[]}}))
+            selected,issues=identity_screen(
+                [{"file":str(file),"case":"X_E0"}],
+                expected_model_sha="a"*64)
             self.assertEqual(len(selected),1)
             self.assertEqual(selected[0]["source_identity_status"],"NOT_VERIFIED")
             self.assertEqual(issues,[])
