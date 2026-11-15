@@ -288,6 +288,7 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
         log.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
         return report
     record("ASSEMBLY_RUNNING")
+    assembly_complete=False
     try:
         from OpenSees_Complete_Export_V118 import prepare_complete_export
         if runtime_dir is None:
@@ -311,6 +312,9 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
             raise RuntimeError("Mesh size not preserved by model assembly.") from exc
         if assembled_n != n:
             raise RuntimeError("Mesh size was not preserved by model assembly.")
+        assembly_complete=True
+        record("MODEL_ASSEMBLED_FORMULA_EXPORT_RUNNING",
+               assembled_model=str(model_path),config_sha256=digest(cfgpath))
         from OpenSees_Load_Path_V141 import export
         workbook = export(run_dir, output_root=case_base(folder, n))
         result = record(
@@ -323,5 +327,6 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
         )
         return result
     except Exception as exc:
-        record("ASSEMBLY_FAILED", error=f"{type(exc).__name__}: {exc}")
+        record("WORKBOOK_EXPORT_FAILED_MODEL_ASSEMBLED" if assembly_complete
+               else "ASSEMBLY_FAILED", error=f"{type(exc).__name__}: {exc}")
         raise
