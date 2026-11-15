@@ -108,6 +108,31 @@ class UnifiedOutputContractTests(unittest.TestCase):
                 atomic_json(root/"broken.json",{"nonfinite":float("nan")})
             self.assertFalse((root/"broken.json").exists())
 
+    def test_csv_rejects_nonfinite_numeric_values_without_publishing(self):
+        from decimal import Decimal
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for value in (float("nan"), float("inf"), -float("inf"),
+                          Decimal("NaN"), Decimal("Infinity")):
+                with self.subTest(value=str(value)):
+                    target = root / "bad.csv"
+                    with self.assertRaisesRegex(ValueError, "Nonfinite numeric CSV"):
+                        write_table(target, [{"case": "X", "reaction": value}],
+                                    columns=("case", "reaction"))
+                    self.assertFalse(target.exists())
+                    self.assertEqual(list(root.glob(".writing_*.partial")), [])
+            ok = write_table(root / "valid.csv",
+                             [{"case": "X", "reaction": -127.5}],
+                             columns=("case", "reaction"))
+            self.assertEqual(ok.read_text(), "case,reaction\\nX,-127.5\\n")
+
+    def test_csv_rejects_empty_and_nonstring_headers(self):
+        with tempfile.TemporaryDirectory() as td:
+            for columns in (("",), (" ",), ("case", None), ("case", 5)):
+                with self.subTest(columns=columns):
+                    with self.assertRaisesRegex(ValueError, "nonempty string"):
+                        write_table(Path(td) / "invalid.csv", [], columns=columns)
+
     def test_excel_style_preserves_values_and_adds_common_header(self):
         from openpyxl import Workbook
         wb=Workbook()
