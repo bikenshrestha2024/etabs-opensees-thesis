@@ -82,6 +82,33 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "SOURCE_MODEL_SHA_MISMATCH_EXCLUDED")
                 for r in report["tables"]["Open items"]))
 
+    def test_mixed_valid_invalid_rows_do_not_leak_drift_passes(self):
+        from components.validation.design_checks import scan_drift
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            csvpath=root/"Drift_Check_ULS_X.csv"
+            csvpath.write_text(
+                "limit_state,design_drift_ratio,story_number,axis\\n"
+                "ULS,0.003,1,X\\nULS,NaN,2,X\\n",encoding="utf-8")
+            mrsm=root/"MRSM_Results_V132.json"
+            mrsm.write_text(json.dumps({
+                "X_E0":{"limit_state":"ULS","axis":"X",
+                        "stories":[{"story_number":1,"design_drift_ratio":0.003}]},
+                "Y_E0":{"limit_state":"ULS","axis":"Y",
+                        "stories":[{"story_number":2,"design_drift_ratio":"Infinity"}]}
+            }),encoding="utf-8")
+            rows,issues=scan_drift(root)
+            self.assertEqual(rows,[])
+            self.assertEqual(len(issues),2)
+            self.assertTrue(all(row["status"]=="NOT EVALUATED" for row in issues))
+            csvpath.write_text(
+                "limit_state,design_drift_ratio,story_number,axis\\n"
+                "ULS,0.003,1,X\\n",encoding="utf-8")
+            mrsm.unlink()
+            rows,issues=scan_drift(root)
+            self.assertEqual(len(rows),1)
+            self.assertEqual(issues,[])
+
     def test_manifest_misfiled_identity_blocks_completed_drift_status(self):
         from components.inputs.output_contract import create_case_run,record_case_status
         with tempfile.TemporaryDirectory() as td:
