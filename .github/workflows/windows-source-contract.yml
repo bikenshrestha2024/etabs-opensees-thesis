@@ -45,9 +45,9 @@ jobs:
           python -m unittest discover -s tests -p test_project_output_layout_v171.py -v
           python -m unittest discover -s tests -p test_unified_output_contract.py -v
           python -m unittest discover -s tests -p test_stage_output_migration_audit.py -v
-          python tests/verify_gravity_support_scenarios.py
-          python tests/verify_soil_c_case_completion.py
-          python tests/verify_full_record_gate.py
+          python -m unittest discover -s tests -p verify_gravity_support_scenarios.py -v
+          python -m unittest discover -s tests -p verify_soil_c_case_completion.py -v
+          python -m unittest discover -s tests -p verify_full_record_gate.py -v
       - name: State the native validation boundary
         run: |
           echo "PASS means headless Python source contracts only."
