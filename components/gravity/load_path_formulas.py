@@ -14,13 +14,41 @@ def recovered_vertical_transfers(payload, elevations_m):
     [REF docs/source/components/gravity/load_path_formulas.py.md]
     """
     import math
-    nodes={int(n['tag']):n for n in payload['nodes']}
-    edges={int(e['tag']):list(map(int,e['nodes'])) for e in payload['elements']}
-    forces={int(e['tag']):e for e in payload.get('global_end_forces',[])}
+    def index_unique(records, field, label):
+        indexed={}
+        for record in records:
+            tag=int(record[field])
+            if tag in indexed:
+                raise ValueError('Duplicate '+label+' tag: '+str(tag))
+            indexed[tag]=record
+        return indexed
+    nodes=index_unique(payload['nodes'],'tag','node')
+    edges=index_unique(payload['elements'],'tag','element')
+    forces=index_unique(payload.get('global_end_forces',[]),'tag','global force')
     if set(forces)!=set(edges) or payload.get('missing_global_forces'):
         raise ValueError('Complete frame and shell global end forces required; rerun gravity with current recorder')
+    # Validate every force vector even when no requested interface crosses it,
+    # and when called by vertical_joint_balance with an empty level list.
+    for tag, element in edges.items():
+        connected=list(map(int,element['nodes']))
+        if not connected or len(set(connected))!=len(connected):
+            raise ValueError('Duplicate or missing element endpoint tags: '+str(tag))
+        if any(node not in nodes for node in connected):
+            raise ValueError('Element references absent node: '+str(tag))
+        vector=forces[tag]
+        if list(map(int,vector['nodes']))!=connected or len(vector['forces'])!=6*len(connected):
+            raise ValueError('Global end-force node ordering/length mismatch: '+str(tag))
+        if not all(math.isfinite(float(v)) for v in vector['forces']):
+            raise ValueError('Nonfinite global end-force vector: '+str(tag))
+    edges={tag:list(map(int,element['nodes'])) for tag,element in edges.items()}
+    for node in nodes.values():
+        if not math.isfinite(float(node['z_m'])):
+            raise ValueError('Nonfinite node elevation')
     rows=[]
-    for level in sorted(set(map(float,elevations_m))):
+    levels=set(map(float,elevations_m))
+    if not all(math.isfinite(level) for level in levels):
+        raise ValueError('Nonfinite requested floor elevation')
+    for level in sorted(levels):
         total=0.;count=0
         for tag,tags in edges.items():
             z=[float(nodes[n]['z_m']) for n in tags]
@@ -53,8 +81,24 @@ def vertical_joint_balance(payload, applied_fz_kN):
             fz=float(values[6*i+2])
             if not math.isfinite(fz):raise ValueError('Nonfinite element force')
             totals[int(tag)]+=fz
-    reactions={int(r['node_tag']):float(r['rz_kN']) for r in payload['reactions']}
-    applied={int(k):float(v) for k,v in applied_fz_kN.items()}
+    reactions={}
+    for row in payload['reactions']:
+        tag=int(row['node_tag'])
+        if tag in reactions:
+            raise ValueError('Duplicate support reaction node tag: '+str(tag))
+        reaction=float(row['rz_kN'])
+        if tag not in totals or not math.isfinite(reaction):
+            raise ValueError('Invalid support reaction node/value: '+str(tag))
+        reactions[tag]=reaction
+    applied={}
+    for raw_tag, raw_value in applied_fz_kN.items():
+        tag=int(raw_tag)
+        if tag in applied:
+            raise ValueError('Duplicate applied-load node tag: '+str(tag))
+        force=float(raw_value)
+        if tag not in totals or not math.isfinite(force):
+            raise ValueError('Invalid applied-load node/value: '+str(tag))
+        applied[tag]=force
     rows=[]
     for node in payload['nodes']:
         tag=int(node['tag']);force=applied.get(tag,0.);reaction=reactions.get(tag,0.)

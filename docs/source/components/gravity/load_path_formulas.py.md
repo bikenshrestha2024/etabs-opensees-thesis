@@ -103,3 +103,8 @@ For the full rationale, mesh procedure, distinctions between **source quads** an
 ## 2026-11-15 formula workbook and assembled-mesh identity
 
 The 4/8/16 comparative workbook uses the same strict `components.gravity.mesh_cases.validated_mesh_size` as the mesh-run staging helper. Both the `export` preflight and `Mesh identity` sheet refuse fractional or boolean sizes rather than silently truncating them with `int()`. Existing strict config SHA check remains unchanged. Workbook formula values, original ETABS load/mass factors and source geometry are not altered by this validation-only change. Excel generation and native 4/8/16 ShellMITC4 / gravity equivalence remain separate acceptance gates.
+
+
+## 2026-11-15 — saved force-vector identity validation
+
+The active gravity load-path postprocessor now refuses duplicate/canonical-alias IDs in saved node/element/force tables; a duplicate entry is not silently overwritten by Python dict construction. It checks every complete six-DOF global vector, endpoint membership/order and nonfinite elevation even when no floor cut is selected (the zero-level completeness call used by joint balance). Joint-balance results reject duplicate or nonfinite reaction rows and missing/nonfinite applied loads. This does **not** alter OpenSees forces, ETABS source records or the signed Fz formula. Regression: `tests/test_gravity_loadpath_evidence_integrity.py`; evidence: `REVIEW_MAIN/01_GRAVITY/20261115_LOAD_PATH_EVIDENCE_TAG_COLLISION_AUDIT.md`. Native validation remains NOT_VERIFIED.
