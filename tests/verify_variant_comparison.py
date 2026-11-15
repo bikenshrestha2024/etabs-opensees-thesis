@@ -112,6 +112,12 @@ class CompareTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"invalid metric"):
             compare_completed_cases(manifest(),data)
 
+    def test_completion_boolean_must_be_real_true(self):
+        data=suite()
+        data["M3"][0]["completion_gate"]["full_record_completed"]="true"
+        with self.assertRaisesRegex(ValueError,"full-duration"):
+            compare_completed_cases(manifest(),data)
+
     def test_reject_trial(self):
         data=suite();data["M3"][0]["completion_gate"]["full_record_completed"]=False
         with self.assertRaisesRegex(ValueError,"full-duration"):
