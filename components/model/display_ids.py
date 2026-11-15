@@ -49,12 +49,14 @@ def member_identity(category, explicit_role=None):
     prefix, family, role = _ROLE_BY_CATEGORY[key]
     if explicit_role not in (None, ""):
         role_input = str(explicit_role).strip().upper()
-        if family != "BRACE" or role_input not in BRACE_ROLES:
-            raise ValueError("Explicit CO/BT/CT role requires source brace member")
+        if (key not in {"BRACE", "BEAM", "CONVENTIONAL OUTRIGGER",
+                        "BELT TRUSS", "CAP TRUSS"}
+                or role_input not in BRACE_ROLES):
+            raise ValueError("Explicit BR/CO/BT/CT role requires a source frame member")
         # An already source-tagged role may not be silently contradicted.
         if key != "BRACE" and role_input != role:
             raise ValueError("Explicit role contradicts source ETABS category: " + key)
-        prefix, role = role_input, role_input
+        prefix, family, role = role_input, "BRACE", role_input
     return {"prefix": prefix, "family": family, "brace_role": role}
 
 
