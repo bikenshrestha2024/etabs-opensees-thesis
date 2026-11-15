@@ -239,8 +239,15 @@ def main(argv=None):
     if args.write:
         root=export_root_for(args.export_root)
         out=root/"09_SOFTWARE_DIAGNOSTICS"/"MIGRATION_AUDITS"
+        # Match the writer-audit publisher: refuse linked destinations
+        # rather than writing private project paths outside this export case.
+        run_parent=out/"RUNS"
+        for directory in (out.parent,out,run_parent):
+            if directory.is_symlink():
+                raise ValueError("Refusing linked migration-audit output directory: "+str(directory))
         stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
-        run=out/"RUNS"/stamp
+        run=run_parent/stamp
+        run.mkdir(parents=True,exist_ok=False)
         target=atomic_json(run/"JSON"/"Live_Stage_Output_Audit.json",report)
         workbook=export_uniform_inventory_excel(
             report,run/"EXCEL"/"Live_Stage_Output_Audit.xlsx")
