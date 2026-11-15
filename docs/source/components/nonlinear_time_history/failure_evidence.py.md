@@ -21,3 +21,13 @@ Relevant register IDs: R01 R02 R03 R04 R05 R06. Consult [research reference regi
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+## V26 — preserve catastrophic first-step evidence (2026-11-15)
+
+`snapshot_selected_state()` and `snapshot_failed_step()` now record nonfinite solver clocks without putting non-JSON numeric `NaN` or `Infinity` into the report. The legacy `time_s`/`analysis_time_s` remains a finite numeric when available and is `null` when nonfinite; the new `time_status`/`analysis_time_status` explicitly says `NONFINITE_NAN` or `NONFINITE_INFINITY`. A failed step's nonfinite clock therefore does **not** erase the diagnostic. The source and failure report JSON is written using the existing atomic run-output writer, avoiding partial replacement of the saved failure state.
+
+A malformed, absent, symlinked, or duplicate-conflicting `element_map_path` now produces `element_map_status=INVALID_SOURCE_MAPPING` and a nonempty `element_map_error` while leaving the observed nonfinite element response captured. Such a report has no trusted source area mapping and **must not** infer the initiating wall/material failure. The accepted committed-state snapshot still must be captured **before** attempting a failed nonlinear step, preferably in a separate artifact; this code cannot reconstruct it afterward. `maximum_findings`/`max_values` bounds reject invalid or unreasonably large settings. Failed post-step data remain potentially contaminated.
+
+Tests: `tests/verify_failure_evidence.py`; added to NLTHA Python quality workflow invocation. The test uses synthetic FakeOps and is not a reproduced 25-storey E-SFI solver failure.
+
+**Native engineering reproduction remains open:** original affected element tag (historically 110280), exact source mesh SHA and wall/quad mapping, P-Delta/gravity preload state, ConcreteCM/SteelMPF/FSAM parameters, actual first accepted step/time and log traceback, isolated zero/X/Y/XY tests, connected-bay interface actions, and independent material calibration. Do not treat this recording fix as proof of root-cause resolution.
