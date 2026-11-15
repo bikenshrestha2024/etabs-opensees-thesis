@@ -88,8 +88,8 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
             root=Path(td)
             csvpath=root/"Drift_Check_ULS_X.csv"
             csvpath.write_text(
-                "limit_state,design_drift_ratio,story_number,axis\\n"
-                "ULS,0.003,1,X\\nULS,NaN,2,X\\n",encoding="utf-8")
+                "limit_state,design_drift_ratio,story_number,axis\n"
+                "ULS,0.003,1,X\nULS,NaN,2,X\n",encoding="utf-8")
             mrsm=root/"MRSM_Results_V132.json"
             mrsm.write_text(json.dumps({
                 "X_E0":{"limit_state":"ULS","axis":"X",
@@ -102,8 +102,8 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
             self.assertEqual(len(issues),2)
             self.assertTrue(all(row["status"]=="NOT EVALUATED" for row in issues))
             csvpath.write_text(
-                "limit_state,design_drift_ratio,story_number,axis\\n"
-                "ULS,0.003,1,X\\n",encoding="utf-8")
+                "limit_state,design_drift_ratio,story_number,axis\n"
+                "ULS,0.003,1,X\n",encoding="utf-8")
             mrsm.unlink()
             rows,issues=scan_drift(root)
             self.assertEqual(len(rows),1)
