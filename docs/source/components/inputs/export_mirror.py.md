@@ -20,3 +20,8 @@
 ## 2026-11-15 fail-closed batch preflight
 
 The mirroring tool now hashes and checks **all** candidate destination files before creating a categorized copy. This prevents a late pre-existing SHA conflict from leaving earlier files copied in a partially updated mirror. It also rejects a symlinked user-selected root and refuses an existing symlinked manifest. A source change during copying is caught by checking the temporary copy's digest before publishing. This prevents known preflight conflicts, but **does not provide cross-file transactional rollback on disk/permission failures or protect against arbitrary concurrent filesystem races**. Source EDB/Excel remains untouched; only generated mirrors are copied. Regression coverage includes a conflicting last file and a symlinked input root.
+
+
+## 2026-11-15 — automatically requested copy-only categorized files
+
+The export UI now calls this existing fail-closed copier (default-on option) after conversion/rebuild, instead of requiring the user to know to run `09_ORGANIZE_ETABS_EXPORT.py`. Flat path consumers remain unchanged: no generic root-file deletion or unsafe migration. Existing categorized SHA conflicts stop the mirror copy, report an explicit diagnostic, and preserve the original source and prior snapshot. Full stage-native outputs require coordinated writer+reader migrations, tracked separately.
