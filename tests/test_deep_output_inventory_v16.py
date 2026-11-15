@@ -37,6 +37,33 @@ class DeepOutputInventoryTests(unittest.TestCase):
             self.assertEqual(src.read_bytes(), old_bytes)
             self.assertFalse((repo / "09_SOFTWARE_DIAGNOSTICS").exists())
 
+    def test_builtin_and_path_open_modes_are_detected_by_position(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td)
+            (repo / "runner.py").write_text(
+                "from pathlib import Path\n"
+                "def run(file_path, mode):\n"
+                "    Path(file_path).open('w')\n"
+                "    Path(file_path).open('a')\n"
+                "    Path(file_path).open('r')\n"
+                "    Path(file_path).open()\n"
+                "    Path(file_path).open(mode=mode)\n"
+                "    open(file_path, 'wb')\n"
+                "    open(file_path, 'r')\n"
+                "    open(file_path, mode=mode)\n"
+                "    open(file_path)\n",
+                encoding="utf-8")
+            result = scan_source(repo)
+            self.assertFalse(result["parse_errors"])
+            records = [r for r in result["files"][0]["occurrences"]
+                       if r["kind"] == "POTENTIAL_WRITE_CALL"]
+            self.assertEqual([r["line"] for r in records], [3, 4, 7, 8, 10])
+            self.assertEqual(result["totals"]["possible_write_calls"], 5)
+            self.assertEqual(
+                sum(r.get("mode_classification") == "DYNAMIC_MODE_REVIEW_REQUIRED"
+                    for r in records), 2)
+            self.assertTrue(all(r["method"] == "open" for r in records))
+
     def test_optional_writer_report_is_canonical_and_complete(self):
         with tempfile.TemporaryDirectory() as td:
             base=Path(td)
