@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 via GitHub connector",
+  "baseline_sha": "cbf35a6508cbf050439feee2464032602451133c",
+  "parent_integrated_commit": "8e9c86115ab7c7778b020af67099c04c131b21b0",
+  "review": "Reviewed CI artifact integrated_audit.json and actual import statements of four cyclic groups. All four contain deferred import edges.",
+  "confirmed_bug": "src/opensees_engine/standalone.py axial_cantilever_check selected first/second node by list order, contrary to element tag connectivity.",
+  "corrected": [
+    "Static import graph differentiates eager and deferred import edges",
+    "Standalone analytical comparison selects endpoint nodes by tag",
+    "Seven real opt-in src source guides supplied",
+    "Full-tree consolidated findings ledger and actual CI report summary documented",
+    "Integrated CI now runs standalone/adapter boundary tests"
+  ],
+  "files_changed": [
+    "tools/audit_repository_integrated.py",
+    "tests/test_repository_integrated_audit.py",
+    "src/opensees_engine/standalone.py",
+    "tests/verify_standalone_neutral_model.py",
+    ".github/workflows/integrated-repository-audit.yml",
+    "REVIEW_MAIN/08_SOFTWARE_SECURITY/20261115_V31_INTEGRATED_REPOSITORY_AUDIT.md",
+    "docs/review/ledger/20261115_V31_INTEGRATED_FINDINGS.csv",
+    "docs/source/src/ (seven source guides)"
+  ],
+  "original_user_models_changed": false,
+  "engineering_claim": "Not verified: 32/76/97 gravity supports, first-step X-wall NLTHA, NBC 105 equivalence, complete M0-M6 paired ground motion records",
+  "validation": "GitHub CI pending",
+  "risk": "Opt-in standalone analytical checker only; no production solver modifications"
+}

@@ -78,3 +78,25 @@ For newly migrated producing stages, use `<STAGE>/RUNS/<STATE>/<CASE>/<RUN_ID>/0
 7. **Research/acceptance gate:** documented NBC 105:2025 code purpose and distinct source-checked, numerically converged, ETABS-matched, experimental and code accepted statuses; no gate is inferred from the preceding one.
 
 **Until the above checks are actually executed and the acceptance evidence is retained, the entire repository must not be described as fully semantically audited or the thesis numerically validated.** This change creates an auditable, repeatable foundation for reviewing it in breadth and depth without one-error-at-a-time guesswork.
+
+## First complete tracked-tree CI result and source follow-up (2026-11-15)
+
+**Verified CI run:** [Integrated tracked-tree audit](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43686569086), `success` for commit `8e9c86115ab7c7778b020af67099c04c131b21b0`; underlying generated ZIP was fetched and the JSON inspected, not inferred from workflow name.
+
+- **3,027** Git-tracked paths inventoried; **530** active Python sources/tests/root scripts AST-scanned/compiled.
+- Tracked classification: **129** root launcher/helpers; **401** active sources/tests; **1,145** archive/research snapshots (metadata only); **924** documentation/literature; **174** governance/workflow; **254** other files.
+- Writer audit: **334** active root/components/src/tools files visited; **1,017** possible write calls; **96** legacy path literal occurrences; **97** canonical path literal occurrences. A marker occurrence is not an independently proved writer or inconsistency; some markers occur inside the audit tool itself.
+- **0** invalid active parse/compile entries, **0** missing canonical entry points, **0** unresolved explicit local module imports. **83** dynamic import calls require manual caller/side-effect review. Static gate `PASS` only.
+- **4** cyclic relationships in the inclusive static import graph, listed in the structured artifact; inspecting their actual import statements found reciprocal edges inside functions/GUI callbacks in each group. Only one direction in the ETABS EQ PDelta ↔ gravity pair is at module scope. The follow-up code now separately reports **eager/top-level** import cycles versus any-cycle potential, so these four cannot be misrepresented as confirmed startup failures.
+- **7** `src/` source-guide paths missing in the initial run. Added source-grounded guides under `docs/source/src/`; follow-up CI must confirm the new source-guide finding is cleared.
+- Static pattern scanning reported no current tracked-tree secret candidates in this run; Git history and credential exposure via binary files remain unverified.
+
+### Focused standalone benchmark defect and coordinated correction
+
+`src/opensees_engine/standalone.py::axial_cantilever_check` previously retrieved the first/next nodes by **list position** even though the neutral data contract determines the element endpoints by stable node tags. Reordering two node records could therefore invalidate the analytical comparison of an otherwise identical cantilever. The new checker resolves node records from the element's `nodes` tags, preserving input-independent physics and unit definitions. Added a solver-free `FakeOps` test with deliberately reversed node ordering in `tests/verify_standalone_neutral_model.py`. No ETABS source, model conversion, full-building solver or engineering load is changed.
+
+Follow-up consolidated regression now includes the neutral schema/standalone test and the ETABS adapter import boundary test in the integrated CI workflow.
+
+### Precise remaining acceptance status
+
+The integrated scan is a **repeatable broad inventory**, not completion of per-function behavior review across 530 Python files. The remaining review work is tracked in [the findings ledger](../../docs/review/ledger/20261115_V31_INTEGRATED_FINDINGS.csv), the structured CI JSON, and `engineering/rules/ENGINEERING_GATES.md`. Do not label function-scoped reciprocal imports, legacy reference strings or untested output writers as confirmed bugs without a targeted reproduction and a native/regression test. Native ETABS, 32/76/97 physical reaction equivalence, X-wall element 110280, full ground-motion durations, NBC/ESM/MRSM scaling and M0–M6 sensitivity remain **NOT_VERIFIED**.

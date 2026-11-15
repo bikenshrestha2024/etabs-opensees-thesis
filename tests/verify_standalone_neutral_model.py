@@ -25,6 +25,15 @@ class StandaloneBoundaryTests(unittest.TestCase):
         self.assertEqual(result["model_sha256"],sha)
         self.assertEqual(result["status"],"NUMERICALLY_CONVERGED_ONLY")
         self.assertTrue(axial_cantilever_check(data,result)["pass"])
+    def test_axial_analytic_comparison_uses_endpoint_tags_not_list_order(self):
+        data=cantilever_example()
+        data["nodes"].reverse()
+        result=run_standalone(data,ops=FakeOps())
+        check=axial_cantilever_check(data,result)
+        self.assertTrue(check["pass"])
+        self.assertAlmostEqual(check["expected_uz_m"],-4e-5)
+        self.assertAlmostEqual(check["actual_uz_m"],-4e-5)
+
     def test_reject_unsupported_wall_without_fallback(self):
         data=cantilever_example();data["elements"][0]["type"]="SFI-MVLEM-3D"
         with self.assertRaisesRegex(ValueError,"Unsupported element"):

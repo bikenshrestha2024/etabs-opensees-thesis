@@ -1,0 +1,5 @@
+# src/opensees_engine/standalone.py — limited elastic OpenSees benchmark
+
+**Scope:** `run_standalone(data, ops=None)` validates the versioned `src.thesis_core.neutral_model` contract, creates an independent 3D six-DOF OpenSees domain with a single elastic beam-column, applies explicit nodal loads, computes six-component node responses, checks finite results and translational force equilibrium, and returns `NUMERICALLY_CONVERGED_ONLY`. `ops` may be injected for source-only fake-solver testing; otherwise OpenSeesPy is imported when the function runs. There is no ETABS source dependency.
+
+`axial_cantilever_check(data, results)` compares a **two-node vertical axial synthetic cantilever** against the elementary elastic axial solution. Its endpoint selection must use element tag references, not node-list order; regression `tests/verify_standalone_neutral_model.py` checks reversed input ordering. Units are kN-m-s, displacement m, reactions kN/kNm. This is not 3D RCC wall/shell/FVD/BRB/full NLTHA validation; `etabs_equivalence=NOT_APPLICABLE`.

@@ -78,6 +78,9 @@ class IntegratedAuditTests(unittest.TestCase):
             self.assertIn(["components/audit_fixture/left.py",
                            "components/audit_fixture/right.py"],
                           report["potential_import_cycles"])
+            self.assertIn(["components/audit_fixture/left.py",
+                           "components/audit_fixture/right.py"],
+                          report["eager_import_cycles"])
             self.assertEqual(report["unresolved_explicit_local_imports"][0]["import"],
                              "components.audit_fixture.does_not_exist")
             self.assertEqual(report["dynamic_import_review"][0]["kind"],
@@ -86,6 +89,23 @@ class IntegratedAuditTests(unittest.TestCase):
                      for item in report["direct_local_edges"]}
             self.assertIn(("components/audit_fixture/left.py",
                            "components/audit_fixture/right.py"), edges)
+
+    def test_function_scoped_mutual_import_is_not_eager_cycle(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            pkg=root/"components"/"deferred"
+            pkg.mkdir(parents=True)
+            (pkg/"left.py").write_text(
+                "def work():\n    from components.deferred.right import solve\n"
+                "    return solve()\n",encoding="utf-8")
+            (pkg/"right.py").write_text(
+                "def solve():\n    from components.deferred.left import work\n"
+                "    return work\n",encoding="utf-8")
+            graph=import_graph(root,inventory(root)["active_python_modules"])
+            self.assertEqual(len(graph["potential_import_cycles"]),1)
+            self.assertEqual(graph["eager_import_cycles"],[])
+            self.assertEqual(graph["eager_import_edges"],0)
+            self.assertEqual(graph["deferred_import_edges"],2)
 
     def test_missing_root_canonical_is_not_mislabeled_as_equivalence_failure(self):
         with tempfile.TemporaryDirectory() as td:

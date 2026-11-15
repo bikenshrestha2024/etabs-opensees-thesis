@@ -62,7 +62,10 @@ def axial_cantilever_check(data,results,relative_tolerance=0.002):
     p=data["loads"][0]
     if p["node"]!=ends[1] or any(abs(p["force"][i])>1e-12 for i in (0,1,3,4,5)):
         raise ValueError("Expected pure axial gravity tip load")
-    first,next_=data["nodes"]
+    # The neutral schema identifies connectivity by node tags, not list order.
+    # Reversing data["nodes"] must not change the independent comparison.
+    nodes_by_tag={node["tag"]:node for node in data["nodes"]}
+    first,next_=(nodes_by_tag[tag] for tag in ends)
     L=math.dist(first["xyz"],next_["xyz"])
     if abs(next_["xyz"][2]-first["xyz"][2])<L-1e-9:
         raise ValueError("Analytical comparison requires vertical member")

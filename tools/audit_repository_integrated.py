@@ -75,6 +75,8 @@ def import_graph(root: Path, source_entries: list[dict]) -> dict:
     }
     roots = {name for name in ACTIVE_TOP}
     edges: set[tuple[str, str]] = set()
+    eager_edges: set[tuple[str, str]] = set()
+    deferred_edges: set[tuple[str, str]] = set()
     unresolved = []
     dynamic = []
     parse_skipped = []
@@ -93,6 +95,18 @@ def import_graph(root: Path, source_entries: list[dict]) -> dict:
         package = (current.split(".")[:-1]
                    if current and Path(rel).name != "__init__.py"
                    else current.split(".") if current else [])
+        parent = {child: node for node in ast.walk(parsed)
+                  for child in ast.iter_child_nodes(node)}
+
+        def is_deferred(node):
+            ancestor = parent.get(node)
+            while ancestor is not None:
+                if isinstance(ancestor, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                         ast.Lambda)):
+                    return True
+                ancestor = parent.get(ancestor)
+            return False
+
         for node in ast.walk(parsed):
             if isinstance(node, ast.Import):
                 requests = [(alias.name, node.lineno) for alias in node.names]
@@ -136,46 +150,54 @@ def import_graph(root: Path, source_entries: list[dict]) -> dict:
                                            "import": name,
                                            "reason": "NO_TRACKED_LOCAL_MODULE"})
                 elif current and target != rel:
-                    edges.add((rel, target))
-    # Strongly connected components identify potential module import cycles.
-    # Cycle membership warrants review, not an automatic runtime failure.
-    adjacent = defaultdict(set)
-    for origin, target in edges:
-        adjacent[origin].add(target)
-    order = 0
-    index, low, stack, onstack, cycles = {}, {}, [], set(), []
+                    edge = (rel, target)
+                    edges.add(edge)
+                    (deferred_edges if is_deferred(node) else eager_edges).add(edge)
 
-    def visit(node):
-        nonlocal order
-        index[node] = order
-        low[node] = order
-        order += 1
-        stack.append(node)
-        onstack.add(node)
-        for child in sorted(adjacent[node]):
-            if child not in index:
-                visit(child)
-                low[node] = min(low[node], low[child])
-            elif child in onstack:
-                low[node] = min(low[node], index[child])
-        if low[node] == index[node]:
-            group = []
-            while True:
-                child = stack.pop()
-                onstack.remove(child)
-                group.append(child)
-                if child == node:
-                    break
-            if len(group) > 1:
-                cycles.append(sorted(group))
+    def cyclic_groups(selected_edges):
+        # Strongly connected components of the selected directed graph.
+        adjacent = defaultdict(set)
+        for origin, target in selected_edges:
+            adjacent[origin].add(target)
+        order = 0
+        index, low, stack, onstack, cycles = {}, {}, [], set(), []
 
-    for node in sorted({item for pair in edges for item in pair}):
-        if node not in index:
-            visit(node)
+        def visit(node):
+            nonlocal order
+            index[node] = order
+            low[node] = order
+            order += 1
+            stack.append(node)
+            onstack.add(node)
+            for child in sorted(adjacent[node]):
+                if child not in index:
+                    visit(child)
+                    low[node] = min(low[node], low[child])
+                elif child in onstack:
+                    low[node] = min(low[node], index[child])
+            if low[node] == index[node]:
+                group = []
+                while True:
+                    child = stack.pop()
+                    onstack.remove(child)
+                    group.append(child)
+                    if child == node:
+                        break
+                if len(group) > 1:
+                    cycles.append(sorted(group))
+
+        for node in sorted({part for edge in selected_edges for part in edge}):
+            if node not in index:
+                visit(node)
+        return sorted(cycles)
+
     return {
         "source_modules_with_imports_checked": len(source_entries) - len(parse_skipped),
         "direct_local_edges": [{"from": a, "to": b} for a, b in sorted(edges)],
-        "potential_import_cycles": sorted(cycles),
+        "potential_import_cycles": cyclic_groups(edges),
+        "eager_import_cycles": cyclic_groups(eager_edges),
+        "eager_import_edges": len(eager_edges),
+        "deferred_import_edges": len(deferred_edges),
         "unresolved_explicit_local_imports": sorted(
             unresolved, key=lambda x: (x["source"], x["line"], x["import"])),
         "dynamic_import_review": sorted(
@@ -260,8 +282,11 @@ def audit(root: Path) -> dict:
         findings.append({"id": "P1_STATIC_LOCAL_IMPORT_CYCLES",
                          "priority": "P1", "status": "REVIEW_REQUIRED",
                          "count": len(graph["potential_import_cycles"]),
-                         "evidence": graph["potential_import_cycles"][:25],
-                         "gate": "Check initialization side effects and circular dependency import order."})
+                         "evidence": {
+                             "all_potential": graph["potential_import_cycles"][:25],
+                             "eager_only": graph["eager_import_cycles"][:25],
+                         },
+                         "gate": "Distinguish top-level import initialization from deferred function/GUI imports. Verify native import order before refactoring."})
     if writers["parse_errors"]:
         findings.append({"id": "P0_OUTPUT_WRITER_SCAN_INCOMPLETE",
                          "priority": "P0", "status": "CONFIRMED",
