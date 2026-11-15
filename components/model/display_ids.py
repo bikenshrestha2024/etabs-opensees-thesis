@@ -54,7 +54,7 @@ def member_identity(category, explicit_role=None):
                 or role_input not in BRACE_ROLES):
             raise ValueError("Explicit BR/CO/BT/CT role requires a source frame member")
         # An already source-tagged role may not be silently contradicted.
-        if key != "BRACE" and role_input != role:
+        if key not in ("BRACE", "BEAM") and role_input != role:
             raise ValueError("Explicit role contradicts source ETABS category: " + key)
         prefix, family, role = role_input, "BRACE", role_input
     return {"prefix": prefix, "family": family, "brace_role": role}
