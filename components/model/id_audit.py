@@ -99,6 +99,30 @@ def export_id_audit(folder, payload=None, report=None):
     sheet("Nodes",["ETABS point name","OpenSees node tag","Storey","X m","Y m","Z m","Display label (not solver tag)"],[[n["etabs_point_name"],n["opensees_node_tag"],n.get("etabs_storey_number"),*n["coordinates_m"],n.get("display_label","UNCLASSIFIED_LEVEL")] for n in nodes])
     sheet("Supports",["OpenSees node tag","ETABS point name","UX fixed","UY fixed","UZ fixed","RX fixed","RY fixed","RZ fixed"],[[int(tag),reverse.get(str(tag),"generated mesh node"),*flags] for tag,flags in metadata.get("supports",{}).items() if any(flags)])
     wb.save(folder/"OpenSees_ID_and_Support_Audit.xlsx")
+    # An editable review *reference*, not an automatic mechanical classifier.
+    # A brace on storey 25 is not assumed to be a cap-truss member: project
+    # drawings/ETABS groups must establish CO, BT and CT role explicitly.
+    import csv
+    brace_review=folder/"OpenSees_Brace_Role_Review.csv"
+    with brace_review.open("w",newline="",encoding="utf-8-sig") as stream:
+        writer=csv.writer(stream)
+        writer.writerow(["ETABS unique object name","Storey","ETABS source category",
+                         "Main family","Current role","Display label",
+                         "Review status","Required evidence"])
+        for e in elements:
+            if e.get("member_family")!="BRACE":
+                continue
+            obj=str(e.get("etabs_object"))
+            category=str(e.get("category","")).upper().strip()
+            explicit=obj in role_overrides or category in (
+                "CONVENTIONAL OUTRIGGER","BELT TRUSS","CAP TRUSS")
+            writer.writerow([obj,e.get("storey_number"),category,"BRACE",
+                             e["brace_role"],e["display_label"],
+                             ("SOURCE_ROLE_RECORDED_REVIEW_GEOMETRY" if explicit else
+                              "ORDINARY_BRACE_UNLESS_PROJECT_REVIEW_OVERRIDES"),
+                             "ETABS object ID, source member group, wall-to-perimeter "
+                             "connection (CO), belt perimeter (BT), roof cap at "
+                             "storey 25 (CT); confirm drawings and source geometry"])
     body="""<!doctype html><meta charset=utf-8><title>ETABS / OpenSees ID lookup</title><style>body{font:15px Arial;margin:24px}input{padding:10px;width:280px}td,th{padding:8px;border:1px solid #ddd}table{border-collapse:collapse}th{background:#eef}tr.hide{display:none}</style><h2>ETABS / OpenSees exact ID lookup</h2><p>ETABS object unique names and OpenSees tags are independent. Preview tags are not assembled solver tags.</p><label>ETABS unique object name <input id=e placeholder='e.g. 251'></label> <label>OpenSees preview element tag <input id=o></label><button onclick="e.value='';o.value='';filter()">Clear</button><p id=count></p><table><thead><tr>"""+"".join("<th>"+html.escape(h)+"</th>" for h in headers)+"</tr></thead><tbody>"+"".join("<tr>"+"".join("<td>"+html.escape(str(v or ""))+"</td>" for v in r)+"</tr>" for r in rows)+"""</tbody></table><script>const e=document.getElementById('e'),o=document.getElementById('o');function filter(){let n=0;document.querySelectorAll('tbody tr').forEach(r=>{let ok=(!e.value.trim()||r.cells[0].textContent===e.value.trim())&&(!o.value.trim()||r.cells[5].textContent===o.value.trim());r.classList.toggle('hide',!ok);if(ok)n++});document.getElementById('count').textContent=n+' matching objects'}e.oninput=o.oninput=filter;filter()</script>"""
     (folder/"OpenSees_ID_Lookup.html").write_text(body,encoding="utf-8")
 
