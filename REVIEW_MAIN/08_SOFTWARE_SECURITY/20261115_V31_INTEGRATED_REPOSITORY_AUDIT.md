@@ -20,8 +20,8 @@ python tools/audit_repository_integrated.py --repo . --output audit/integrated -
 
 The integrated tool calls the existing source, static writer and conservative security audits, and uses `git ls-files` to inventory **every tracked path**. It publishes two untracked local/CI artifacts:
 
-- `audit/integrated/integrated_audit.json` — counts, all tracked file records, source parse/compile errors, missing canonical launchers, import edges, dynamic import candidates, potential cycles, unresolved imports, legacy output path references, categorized findings and gate status.
-- `audit/integrated/tracked_file_register.csv` — one row per tracked file, classification and precise review state; `METADATA_INVENTORIED_NOT_SEMANTICALLY_REVIEWED` is never a passing engineering review.
+- `audit/integrated/00_OVERVIEW/integrated_audit.json` — counts, all tracked file records, source parse/compile errors, missing canonical launchers, import edges, dynamic import candidates, potential cycles, unresolved imports, legacy output path references, categorized findings and gate status.
+- `audit/integrated/01_TRACKED_FILES/tracked_file_register.csv` — one row per tracked file, classification and precise review state; `METADATA_INVENTORIED_NOT_SEMANTICALLY_REVIEWED` is never a passing engineering review.
 
 CI: [`.github/workflows/integrated-repository-audit.yml`](../../.github/workflows/integrated-repository-audit.yml) runs on pushes to main, pull requests and manual dispatch. Uploads the report as an Actions artifact; does not upload EDB/XLSX contents or credentials. The secret detector records only the candidate file, line and category, never credential values, and cannot assess prior Git history.
 
@@ -111,3 +111,8 @@ The integrated scan is a **repeatable broad inventory**, not completion of per-f
 - The standalone axial tag-order regression and ETABS adapter boundary tests passed within the same integrated CI. [Repository compilation/navigation](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43687116807), [NLTHA Python quality](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43687116800), and [literature provenance](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43687116812) also passed.
 
 **Explicitly not accepted:** complete semantic line-by-line review of all 530 active source files; historic-snapshot semantics; performance profiling of actual 25-storey model; complete writer/reader migration; Windows native GUI and ETABS; 32/76/97 reaction equivalence; first-step wall element 110280; full-duration NLTHA; NBC 105:2025 engineering acceptance. Those gates require actual model records and engineering checks, not CI green checkmarks.
+
+
+## Review-output subfolder contract
+
+The integrated report publisher now writes a structured, local/read-only audit evidence package rather than two loose files. Its stable folders are `00_OVERVIEW` (full JSON), `01_TRACKED_FILES` (CSV register), `02_DEPENDENCIES` (import graph), `03_FINDINGS` (consolidated open issues), `04_ACCEPTANCE` (separated static and native gates), `05_OUTPUT_WRITERS` (candidate writer counts), and `06_SECURITY` (current-tree redacted summary). A root README explains limitations. The new synthetic test checks each folder and retains the explicit `NOT_VERIFIED` native engineering gate. This audit layout is separate from, and must not displace, the canonical per-case stage output folders under the selected ETABS export.

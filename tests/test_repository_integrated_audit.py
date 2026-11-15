@@ -54,6 +54,25 @@ class IntegratedAuditTests(unittest.TestCase):
             with register.open(encoding="utf-8", newline="") as stream:
                 rows = list(csv.DictReader(stream))
             self.assertEqual(len(rows), len(files))
+            self.assertEqual(summary.relative_to(out).as_posix(),
+                             "00_OVERVIEW/integrated_audit.json")
+            self.assertEqual(register.relative_to(out).as_posix(),
+                             "01_TRACKED_FILES/tracked_file_register.csv")
+            sections = (
+                "02_DEPENDENCIES/import_graph.json",
+                "03_FINDINGS/consolidated_findings.json",
+                "04_ACCEPTANCE/acceptance_gates.json",
+                "05_OUTPUT_WRITERS/writer_summary.json",
+                "06_SECURITY/secret_scan_summary.json",
+            )
+            for rel in sections:
+                with self.subTest(section=rel):
+                    data = json.loads((out/rel).read_text(encoding="utf-8"))
+                    self.assertIsInstance(data,dict)
+            self.assertEqual(
+                json.loads((out/"04_ACCEPTANCE"/"acceptance_gates.json").read_text())
+                ["acceptance"]["etabs_opensees_equivalence"], "NOT_VERIFIED")
+            self.assertTrue((out/"README.md").is_file())
             self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
 
     def test_local_edges_relative_imports_cycles_and_dynamic_import_review(self):

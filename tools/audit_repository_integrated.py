@@ -347,10 +347,34 @@ def audit(root: Path) -> dict:
 
 
 def save(report: dict, directory: Path) -> tuple[Path, Path]:
-    """Publish separate per-file and findings artifacts without changing sources."""
+    """Create a stable review package with per-subject outputs, no source mutation.
+
+    Files contain tracked relative paths and summary observations only; user
+    EDB/XLSX contents, actual secret values and native solver inputs stay out.
+    """
     directory.mkdir(parents=True, exist_ok=True)
-    summary = directory / "integrated_audit.json"
-    register = directory / "tracked_file_register.csv"
+    summary = directory / "00_OVERVIEW" / "integrated_audit.json"
+    register = directory / "01_TRACKED_FILES" / "tracked_file_register.csv"
+    pieces = (
+        (directory / "02_DEPENDENCIES" / "import_graph.json",
+         report["dependency_graph"]),
+        (directory / "03_FINDINGS" / "consolidated_findings.json",
+         {"schema": report["schema"], "findings": report["findings"]}),
+        (directory / "04_ACCEPTANCE" / "acceptance_gates.json",
+         {"schema": report["schema"], "acceptance": report["acceptance"],
+          "limitations": report["limitations"]}),
+        (directory / "05_OUTPUT_WRITERS" / "writer_summary.json",
+         {"schema": report["schema"], "totals": report["writer_scan_totals"],
+          "parse_failures": report["writer_parse_failures"]}),
+        (directory / "06_SECURITY" / "secret_scan_summary.json",
+         {"schema": report["schema"],
+          "current_tree_candidate_count": report["tracked_secret_candidate_count"],
+          "skipped_binary_or_oversized_count":
+              report["secret_scan_skipped_binary_or_oversized_count"],
+          "status": "CURRENT_TRACKED_TREE_PATTERN_SCAN_ONLY"}),
+    )
+    summary.parent.mkdir(parents=True, exist_ok=True)
+    register.parent.mkdir(parents=True, exist_ok=True)
     summary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n",
                        encoding="utf-8")
     with register.open("w", newline="", encoding="utf-8") as stream:
@@ -358,6 +382,22 @@ def save(report: dict, directory: Path) -> tuple[Path, Path]:
             stream, fieldnames=("path", "classification", "audit_state", "parse_status"))
         writer.writeheader()
         writer.writerows(report["file_register"])
+    for target, data in pieces:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                          encoding="utf-8")
+    (directory / "README.md").write_text(
+        "# Static repository audit evidence (not native engineering approval)\n\n"
+        "00_OVERVIEW/ — complete integrated JSON, including tracked file register\n"
+        "01_TRACKED_FILES/ — one-row-per-tracked-file CSV\n"
+        "02_DEPENDENCIES/ — active local import graph and unresolved candidates\n"
+        "03_FINDINGS/ — prioritized issues and review obligations\n"
+        "04_ACCEPTANCE/ — distinct static and native engineering gates\n"
+        "05_OUTPUT_WRITERS/ — potential write calls and legacy reference counts\n"
+        "06_SECURITY/ — redacted current-tree pattern-scan summary\n\n"
+        "A passing static gate is NOT ETABS/OpenSees equivalence, NBC code "
+        "acceptance or a full line-by-line semantic review.\n",
+        encoding="utf-8")
     return summary, register
 
 

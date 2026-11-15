@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "baseline_sha": "be1f2954b67ed25c28cc84e6f114a7fab766d3d9",
+  "workflow": "Integrated audit local/CI output organization",
+  "changes": [
+    "tools/audit_repository_integrated.py save() publishes report in seven named subject folders plus README",
+    "tests/test_repository_integrated_audit.py verifies seven-folder structured outputs and no false native gate",
+    "REVIEW_MAIN/08_SOFTWARE_SECURITY/20261115_V31_INTEGRATED_REPOSITORY_AUDIT.md documents output locations"
+  ],
+  "compatibility": "Preserves public save(report,directory)->(summary_path, register_path) API and workflow artifact root; output paths intentionally updated for newly introduced report generation",
+  "source_inputs_changed": false,
+  "solver_outputs_changed": false,
+  "native_etabs_opensees_verified": false,
+  "ci": "pending"
+}
