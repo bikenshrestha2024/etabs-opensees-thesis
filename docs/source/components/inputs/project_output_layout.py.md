@@ -17,3 +17,7 @@ Creates `00_SOURCE_MANIFEST/PROJECT_CONTEXT.json` and numbered subdirectories *i
 
 ## References
 `AGENTS.md`, `engineering/rules/PROVENANCE.md`, `REVIEW_MAIN/07_ETABS_OPENSEES/ISSUE_20261111_CANONICAL_SOURCE_OUTPUT_ROUTING.md`.
+
+## V22 safe destination handling (2026-11-15)
+
+Project initialization checks existing `00_SOURCE_MANIFEST`, `PROJECT_CONTEXT.json` and canonical stage destinations for directory/file symlinks **before** writing project files. Invalid pre-existing project-context JSON is rejected with a descriptive error without updating it. The project context is written using a unique same-directory temporary file and atomic replacement rather than a shared fixed `.tmp` filename. `case_folder()` rejects linked stage/state/case intermediate components. This is a best-effort application-level path guard (not a guarantee against concurrent filesystem races or all NTFS junction/reparse-point types). It does not change source EDB bytes or original workbook content. Regression: `tests/test_project_output_layout_v171.py`.
