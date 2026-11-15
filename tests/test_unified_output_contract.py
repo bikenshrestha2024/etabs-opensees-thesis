@@ -108,6 +108,27 @@ class UnifiedOutputContractTests(unittest.TestCase):
                 atomic_json(root/"broken.json",{"nonfinite":float("nan")})
             self.assertFalse((root/"broken.json").exists())
 
+    def test_manifest_stage_identity_validated_without_expected_stage(self):
+        from components.inputs.output_contract import inspect_case_manifest
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            run = create_case_run(root, "GRAVITY", "X", state="ULS")
+            original = run / "00_INPUT_SOURCE" / "CASE_MANIFEST.json"
+            result = inspect_case_manifest(run)
+            self.assertTrue(result["valid"], result["issues"])
+            for false_stage, issue in (
+                ("05_MRSM", "RUN_STAGE_DIRECTORY_MISMATCH"),
+                ("NOT_A_STAGE", "UNKNOWN_RECORDED_STAGE"),
+                ("GRAVITY", "NONCANONICAL_RECORDED_STAGE"),
+            ):
+                data = json.loads(original.read_text(encoding="utf-8"))
+                data["stage"] = false_stage
+                original.write_text(json.dumps(data), encoding="utf-8")
+                with self.subTest(false_stage=false_stage):
+                    audit = inspect_case_manifest(run)
+                    self.assertFalse(audit["valid"])
+                    self.assertIn(issue, audit["issues"])
+
     def test_csv_rejects_nonfinite_numeric_values_without_publishing(self):
         from decimal import Decimal
         with tempfile.TemporaryDirectory() as td:
