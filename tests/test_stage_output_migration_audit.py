@@ -42,6 +42,28 @@ class NativeStageMigrationAuditTests(unittest.TestCase):
             self.assertEqual(data["assessment"],"FILESYSTEM_ONLY_NOT_SOLVER_OR_ETABS_EQUIVALENCE")
 
 
+    def test_unmanifested_run_folders_and_linked_cases_are_visible(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"export"
+            missing=root/"02_GRAVITY"/"RUNS"/"ULS"/"X"/"run_without_manifest"
+            missing.mkdir(parents=True)
+            reference=root/"02_GRAVITY"/"RUNS"/"ULS"/"Y"
+            external=Path(td)/"external"
+            external.mkdir()
+            try:
+                reference.symlink_to(external, target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host cannot create a directory symlink")
+            before=list(external.iterdir())
+            report=audit_stage_migration(root)
+            gravity=next(x for x in report["stages"] if x["stage"]=="GRAVITY")
+            problems={row["problem"] for row in gravity["unreadable_or_invalid_manifests"]}
+            self.assertIn("MISSING_CASE_MANIFEST",problems)
+            self.assertIn("SYMLINKED_RUN_CASE_REFUSED",problems)
+            self.assertEqual(gravity["run_manifest_count"],0)
+            self.assertEqual(list(external.iterdir()),before)
+            self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
+
     def test_nonobject_manifest_is_reported_instead_of_crashing(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
