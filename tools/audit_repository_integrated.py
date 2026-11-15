@@ -149,9 +149,21 @@ def import_graph(root: Path, source_entries: list[dict]) -> dict:
                     name = ".".join([*base, *([node.module] if node.module else [])])
                 else:
                     name = node.module or ""
-                # 'from package import name' may import a symbol rather than a
-                # submodule; inspect only its explicitly stated module target.
+                # Imports may name a package *and* explicitly load one of
+                # its tracked submodules.  For example, "from . import wall"
+                # (including within __init__.py) or
+                # "from components.model import assembly" creates a real
+                # dependency on assembly.py.  The older scanner recorded only
+                # the package and missed those edges/cycles.  Do not flag an
+                # absent alias as a missing module: it may be a normal symbol
+                # exported by the package.
                 requests = [(name, node.lineno)] if name else []
+                for alias in node.names:
+                    if alias.name == "*":
+                        continue
+                    candidate = name + "." + alias.name if name else alias.name
+                    if candidate in module_to_path:
+                        requests.append((candidate, node.lineno))
             elif isinstance(node, ast.Call):
                 name = node.func.id if isinstance(node.func, ast.Name) else (
                     node.func.attr if isinstance(node.func, ast.Attribute) else "")
