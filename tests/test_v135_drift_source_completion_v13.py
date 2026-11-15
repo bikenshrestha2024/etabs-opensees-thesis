@@ -82,6 +82,34 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "SOURCE_MODEL_SHA_MISMATCH_EXCLUDED")
                 for r in report["tables"]["Open items"]))
 
+    def test_finite_source_values_cannot_publish_overflowed_utilization(self):
+        from components.validation.design_checks import evaluate_checks,combine_actions,COMPONENTS
+        with tempfile.TemporaryDirectory() as td:
+            evidence=Path(td)/"source.json"
+            evidence.write_text("{}")
+            checks=evaluate_checks([{
+                "model_sha256":"a"*64,"reviewed":"true","source":"unit-test",
+                "clause":"reviewed criterion","result_file":str(evidence),
+                "limit_state":"ULS","unit":"kN","demand":1e308,
+                "limit":1e-308
+            }],"a"*64,"deflection")
+            self.assertEqual(checks[0]["status"],"NOT EVALUATED")
+            self.assertIsNone(checks[0]["utilization"] if
+                              not isinstance(checks[0]["utilization"],float) else
+                              checks[0]["utilization"] if
+                              __import__("math").isfinite(checks[0]["utilization"]) else None)
+            case={"case":"ULS_EXTREME","limit_state":"ULS",
+                  "factors":{"A":2.0}}
+            row={"model_sha256":"a"*64,"response_kind":
+                 "signed_first_order_linear_increment","limit_state":"ULS",
+                 "member":"C1","station":"end","axes":"local",
+                 "basis_case":"A",**{field:1e308 for field in COMPONENTS}}
+            combined,issues=combine_actions([row],[case],"a"*64)
+            self.assertEqual(combined,[])
+            self.assertEqual(len(issues),1)
+            self.assertEqual(issues[0]["status"],"NOT EVALUATED")
+            self.assertIn("Nonfinite combined action",issues[0]["reason"])
+
     def test_v135_output_index_marks_no_current_rows_explicitly(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
