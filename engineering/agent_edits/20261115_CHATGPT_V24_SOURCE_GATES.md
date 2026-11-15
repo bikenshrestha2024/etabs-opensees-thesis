@@ -16,3 +16,5 @@
 - `components/validation/case_review.py::collect` source and `tests/test_case_review_canonical_output.py`: recover safely from damaged or nonfinite saved profile, drift and deformation evidence; preserve legacy reader output paths and model SHA checks.
 - Per-file inspected line range recorded in `docs/review/ledger/REVIEW_LEDGER_V24_20261115_TARGETED.csv` with source blob ID.
 - Native Windows GUI remains unexecuted; no originally generated results were overwritten or moved.
+
+- Additional saved-result publisher inspection: `components/validation/case_review.py::export` and corresponding regression now enforce non-linked report directories and atomic XLSX replacement without moving legacy GUI paths. Blob SHA and inspected ranges recorded in dated ledger.
