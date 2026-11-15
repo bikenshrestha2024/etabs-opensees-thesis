@@ -318,7 +318,21 @@ def run(folder,storage=False,nonparallel=False):
     ws=wb.create_sheet('Basis and timing');ws.append(['Source',SOURCE]);ws.append(['Model SHA256',digest]);ws.append(['Started',started]);ws.append(['Elapsed before workbook (s)',elapsed]);ws.append(['Scope',report['scope']])
     from components.inputs.output_contract import style_workbook
     style_workbook(wb)
-    wb.save(output/'Design_Check_Report_V135.xlsx')
+    # Do not truncate the last valid design-check workbook on a failed save.
+    import os,tempfile
+    from components.inputs.output_contract import _refuse_linked_output_target
+    workbook_path=output/'Design_Check_Report_V135.xlsx'
+    _refuse_linked_output_target(workbook_path)
+    fd,staged_name=tempfile.mkstemp(prefix='.design_checks_',
+                                   suffix='.xlsx',dir=output)
+    os.close(fd)
+    staged=Path(staged_name)
+    try:
+        wb.save(staged)
+        _refuse_linked_output_target(workbook_path)
+        os.replace(staged,workbook_path)
+    finally:
+        staged.unlink(missing_ok=True)
     elapsed=time.perf_counter()-start;report['elapsed_s']=elapsed
     report['finished']=datetime.datetime.now().astimezone().isoformat()
     from components.inputs.output_contract import atomic_json
