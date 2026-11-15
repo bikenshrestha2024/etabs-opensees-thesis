@@ -21,3 +21,8 @@ Relevant register IDs: R10. Consult [research reference register](../../../00_RE
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+
+## 2026-11-15 exact mode-count gate
+
+The shared eigensolver and modal audit reject fractional, boolean and nonfinite requested mode counts rather than silently truncating them with `int()`. The MRSM caller validates the count before model assembly; the modal audit validates manually selected X/Y fundamental modes and a positive finite frequency threshold. The already-working integer-count eigen solver and source model parameters are unchanged. Regression: `tests/test_modal_mode_count_contract.py`; engineering review: `REVIEW_MAIN/04_MODAL/20261115_MODAL_MODE_COUNT_NUMERIC_IDENTITY_GATE.md`. Native modal mass, ETABS equivalence, mode-shape physics and NBC 105:2025 acceptance remain NOT_VERIFIED.
