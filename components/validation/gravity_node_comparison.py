@@ -190,8 +190,18 @@ def all_model_node_rows(opensees, topology=None, etabs=None, report=None):
         if tag in support:
             raise ValueError("Duplicate OpenSees support reaction "+tag)
         support[tag]=item
-    etabs_support={str(r.get("point")):r for r in (etabs or {}).get("joint_reactions",[])}
-    etabs_disp={str(r.get("point")):r for r in (etabs or {}).get("support_displacements",[])}
+    etabs_support={}
+    for record in (etabs or {}).get("joint_reactions",[]):
+        point=str(record.get("point"))
+        if point in etabs_support:
+            raise ValueError("Duplicate ETABS support reaction in node inventory: "+point)
+        etabs_support[point]=record
+    etabs_disp={}
+    for record in (etabs or {}).get("support_displacements",[]):
+        point=str(record.get("point"))
+        if point in etabs_disp:
+            raise ValueError("Duplicate ETABS displacement in node inventory: "+point)
+        etabs_disp[point]=record
     comparison={}
     for row in (report or {}).get("rows",[]):
         tag=row.get("opensees_node")
@@ -223,11 +233,13 @@ def all_model_node_rows(opensees, topology=None, etabs=None, report=None):
             etabs_U3_m=d.get("U3") if d else None,
             difference_Uz_m=(float(n["uz_m"])-float(d["U3"]))
               if d and d.get("U3") is not None and n.get("uz_m") is not None else None,
-            etabs_support_Rz_kN=e.get("rz_global_kN") if e else None,
+            etabs_support_Rz_kN=(e.get("rz_global_kN")
+                if e and e.get("global_z_basis")=="GLOBAL_Z_VERIFIED_DEFAULT_AXES" else None),
             opensees_support_Rz_kN=rz,
             support_Rz_difference_kN=(
                 float(rz)-float(e["rz_global_kN"]))
-              if e and e.get("rz_global_kN") is not None and rz is not None else None,
+              if (e and e.get("rz_global_kN") is not None and rz is not None
+                  and e.get("global_z_basis")=="GLOBAL_Z_VERIFIED_DEFAULT_AXES") else None,
             comparison_status=c.get("status",
                "NO_ETABS_SUPPORT_REACTION" if tag not in support else
                "UNMATCHED_OR_NO_ETABS_EVIDENCE"),
@@ -303,7 +315,8 @@ def export_fixed_source_support_reactions(folder, opensees, topology, etabs=None
             status="MISSING_ETABS_REACTION"
         elif et_dist is None or et_dist>tol:
             status="ETABS_OPENSEES_COORDINATE_MISMATCH"
-        elif e_rz is None or not math.isfinite(e_rz):
+        elif e_rz is None or not math.isfinite(e_rz) or (
+                etrec.get("global_z_basis") != "GLOBAL_Z_VERIFIED_DEFAULT_AXES"):
             status="ETABS_GLOBAL_Z_NOT_VERIFIED"
         elif o_rz is None or not math.isfinite(o_rz):
             status="OPENSEES_REACTION_NOT_FINITE"
@@ -325,10 +338,12 @@ def export_fixed_source_support_reactions(folder, opensees, topology, etabs=None
                   key=lambda x:x["abs_difference_kN"],reverse=True)
     op_total=sum(float(x["rz_kN"]) for x in reactions.values()
                  if x.get("rz_kN") is not None)
-    et_total=(sum(float(x["rz_global_kN"]) for x in etabs_by_point.values()
-                  if x.get("rz_global_kN") is not None)
-              if etabs is not None and all(x.get("rz_global_kN") is not None
-                      for x in etabs_by_point.values()) else None)
+    et_total=(sum(float(x["rz_global_kN"]) for x in etabs_by_point.values())
+              if etabs is not None and etabs_by_point and all(
+                  x.get("rz_global_kN") is not None and
+                  x.get("global_z_basis") == "GLOBAL_Z_VERIFIED_DEFAULT_AXES" and
+                  math.isfinite(float(x["rz_global_kN"]))
+                  for x in etabs_by_point.values()) else None)
     matched=len(ranked)
     # A geometrically matched ETABS point with zero saved joint reaction
     # and a significant source-restraint OpenSees reaction is a PHYSICAL
