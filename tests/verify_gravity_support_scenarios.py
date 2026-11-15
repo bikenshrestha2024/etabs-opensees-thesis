@@ -77,6 +77,22 @@ class DualWallGravityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"applied-load equilibrium failed"):
             compare_wall_support_gravity(self.first,self.second)
 
+    def test_reject_stale_equilibrium_percentage_even_if_reactions_balance(self):
+        # Native rows and applied load balance, but the cached summary is
+        # from another run and must not be published as a valid percentage.
+        self.second["report"]["equilibrium_error_percent"]=7.0
+        with self.assertRaisesRegex(ValueError,"reported equilibrium percent disagrees"):
+            compare_wall_support_gravity(self.first,self.second)
+
+    def test_allow_small_equilibrium_rounding_in_report(self):
+        # A 0.005 kN residual remains inside the existing 0.01 kN
+        # comparison floor, and a rounded zero-percent report is reasonable.
+        self.second["reactions"][-1]["rz_kN"]+=0.005
+        self.second["report"]["support_vertical_reaction_kN"]+=0.005
+        result=compare_wall_support_gravity(self.first,self.second)
+        self.assertEqual(result["status"],
+                         "SENSITIVITY_NOT_ETABS_VALIDATION_OR_FOUNDATION_DESIGN")
+
     def test_reject_shared_free_node_geometry_mismatch(self):
         for item in (self.first,self.second):
             item["nodes"].append(dict(tag=909,x_m=3.,y_m=4.,z_m=5.))
