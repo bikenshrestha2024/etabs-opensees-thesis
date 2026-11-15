@@ -55,6 +55,23 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
                 raise ValueError("Comparison tolerances must be finite and nonnegative")
             base[metric]=threshold
     idx={}
+    def semantic_key(row, label):
+        if not isinstance(row,dict):
+            raise ValueError(label+" comparison entry must be a mapping")
+        key=[]
+        for field in fields:
+            value=row.get(field)
+            if (value is None or isinstance(value,bool) or
+                    not isinstance(value,(str,int,float))):
+                raise ValueError(label+" missing/invalid semantic field: "+field)
+            label_value=str(value).strip()
+            # Modal periods and modal masses may legitimately use axis="".
+            # All other identity keys (including units and response basis)
+            # must not be silently defaulted to an empty identifier.
+            if not label_value and field!="axis":
+                raise ValueError(label+" missing semantic field: "+field)
+            key.append(label_value)
+        return tuple(key)
     def numeric_value(row, label, key):
         raw=row.get("value")
         if isinstance(raw,bool):
@@ -67,7 +84,7 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
             raise ValueError("Nonfinite "+label+" result "+repr(key))
         return number
     for r in ref_rows:
-        key=tuple(str(r.get(k,"")) for k in fields)
+        key=semantic_key(r,"ETABS")
         if key in idx:raise ValueError("Duplicate ETABS normalized key: "+repr(key))
         idx[key]=numeric_value(r,"ETABS",key)
     appeared=set()
@@ -75,7 +92,7 @@ def evaluate(open_rows, ref_rows, fields, policy=None):
     result=[]
     for source in open_rows:
         r=dict(source)
-        key=tuple(str(r.get(k,"")) for k in fields)
+        key=semantic_key(r,"OpenSees")
         if key in appeared:raise ValueError("Duplicate OpenSees normalized key: "+repr(key))
         appeared.add(key)
         # Validate ALL OpenSees responses, even unmatched ones: a missing
