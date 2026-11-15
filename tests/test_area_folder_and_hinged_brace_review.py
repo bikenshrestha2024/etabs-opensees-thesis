@@ -23,6 +23,11 @@ class AreaOutputFolderTests(unittest.TestCase):
             expected.mkdir(parents=True)
             self.assertEqual(area_output_directory(root),expected)
             self.assertEqual(area_output_directory(topology_json=root/"topology.json"),expected)
+            generated=root/"custom"/"Reviewed_Area_Call.py"
+            generated.parent.mkdir()
+            generated.write_text("# source-only call\\n",encoding="utf-8")
+            self.assertEqual(area_output_directory(root,generated_output=generated),
+                             generated.parent)
 
     def test_missing_export_directory_is_not_created(self):
         with tempfile.TemporaryDirectory() as td:
