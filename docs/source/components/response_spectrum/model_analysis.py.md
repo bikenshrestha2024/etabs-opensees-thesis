@@ -26,3 +26,9 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 ## 2026-11-12 visible run and export workflow
 
 The existing per-case `CaseLedger` remains authoritative. A top-level status field and indeterminate bar now report **READY / RUNNING / EXPORTING / EXPORTED / COMPLETED / FAILED / REVIEW REQUIRED** and on reopen show the stored `MRSM_Batch_Status_V151.json` completion count. Each stage status is written through the Tk UI thread. Numerical completion is not NBC design acceptance. Preserve model source state, six-case X/Y E0/Eplus/Eminus output, 76-source-supported production baseline pending original six-DOF restraint review, and full selected-model hash in ZIP.
+
+
+
+## 2026-11-15 MRSM root-source consistency
+
+`OpenSees_Model_Response_Spectrum_V132.py` is an exec-loaded compatibility facade. When this module computed `Path(__file__).parents[2]`, it could point outside the active checkout or exported runtime instead of the folder containing the authoritative project-input code. `_runtime_repo_root()` now derives the project root from `_component_source` under the facade, or from this component source's own `__file__` when imported normally. The existing current-EDB/workbook, ULS/SLS and spectrum checks remain in force; this patch changes only folder context, not seismic coefficients, modes or solver loads. Native UI/ETABS equivalence remains unverified.

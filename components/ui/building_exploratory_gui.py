@@ -6,6 +6,17 @@
 from pathlib import Path
 import json,sys,subprocess,threading,queue,datetime,importlib.util,re
 
+
+def _runtime_repo_root():
+    """Repository/runtime root in both direct-module and exec facade contexts.
+
+    Root-level compatibility facades set _component_source to the actual
+    components/<package>/<module>.py. __file__ alone then names the facade
+    and its parents[2] would point outside the active project.
+    """
+    source = globals().get("_component_source", __file__)
+    return Path(source).resolve().parents[2]
+
 def resolve_runner():
     """Resolve the installed facade, whether this code is imported or exec-loaded."""
     spec=importlib.util.find_spec('OpenSees_Building_Exploratory_V138')
@@ -404,7 +415,7 @@ def launch(parent,model_folder,output_folder=None):
         def task():
             code=1
             try:
-                root=Path(__file__).resolve().parents[2]
+                root=_runtime_repo_root()
                 cmd=[sys.executable,'-u','-m',
                      'components.nonlinear_time_history.one_storey_wall_probe',
                      '--source',str(source),'--output',str(destination)]

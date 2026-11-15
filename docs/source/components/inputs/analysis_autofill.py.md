@@ -34,3 +34,9 @@ Separately, workbook adopted empirical/Rayleigh T1 values remain NBC-design-peri
 ## 2026-11-14 source-matched modal reference selection V8
 
 `matching_modal_reference(folder, state, model_sha)` scans both canonical `04_MODAL` and historical analysis-result directories, excluding review snapshots. It returns the newest **explicitly model-SHA + ULS/SLS matching** saved modal result with nonempty mode rows; it never selects the first mismatched file. `populate_linear` and `populate_site` display a source-missing warning rather than auto-filling Tn or damping periods from an unrelated export. A matching serialized JSON source hash is not ETABS physical equivalence and does not establish nonlinear initial tangent stiffness. Unit tests: `tests/test_legacy_reader_migration_v8.py`.
+
+
+
+## 2026-11-15 exec-facade source root consistency
+
+The historical `OpenSees_Linear_Autofill_V124.py` root launcher executes this component through `exec(compile(...), globals(), globals())`: `__file__` then refers to the root facade, not to `components/inputs/analysis_autofill.py`. Previous `Path(__file__).resolve().parents[2]` arguments could resolve above the actual repository and hide original source-verified Aw/T1 workbook values. `_runtime_repo_root()` now prefers the facade's actual `_component_source` and otherwise uses the module's own `__file__`. The same root is used for workbook location, compatibility JSON and implementation fingerprint searches, with no hard-coded numerical value. Source-only tests cover direct imports, root facades and exported runtimes; actual ETABS/Excel period identity remains a separate gate.

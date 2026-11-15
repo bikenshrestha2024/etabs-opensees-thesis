@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "base_sha": "7ec82073a6b330a71649e8e87b7e618f74b9ea4a",
+  "verified_source_bundle": "a539ba5c865f41384e0b2ba62234f363f67f2abd",
+  "code_snapshot_files": 532,
+  "facades_discovered": 59,
+  "scope": "Source-root compatibility across exec-loaded historical facades; full tree facade contract register",
+  "source_findings": [
+    "Root __file__ differs from target components module __file__ under exec facade",
+    "Autofill and MRSM imported original workbook root potentially resolved above active repository",
+    "One-storey diagnostic subprocess cwd potentially outside active code checkout",
+    "Clear beam rebuilt tool lookup potentially outside active repository"
+  ],
+  "changes": [
+    "components/inputs/analysis_autofill.py",
+    "components/response_spectrum/model_analysis.py",
+    "components/ui/building_exploratory_gui.py",
+    "components/gravity/gui_and_reports.py",
+    "tools/audit_repository_integrated.py",
+    "tests/test_facade_runtime_context.py",
+    "tests/test_repository_integrated_audit.py"
+  ],
+  "nonbreaking": [
+    "Root compatibility launcher names unchanged",
+    "Source physics/mass/loads/coefficient constants unchanged",
+    "All caller/export paths retained for backward compatibility"
+  ],
+  "validation": "CI_PENDING",
+  "native_etabs": "NOT_VERIFIED",
+  "native_opensees": "NOT_VERIFIED",
+  "complete_semantic_review": "INCOMPLETE"
+}

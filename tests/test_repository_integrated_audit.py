@@ -99,10 +99,39 @@ class IntegratedAuditTests(unittest.TestCase):
             self.assertTrue(all(unit["semantic_review_status"]=="NOT_REVIEWED"
                                 for unit in units))
             self.assertEqual(result["semantic_review_completed_count"],0)
+            self.assertTrue((out/"09_FACADE_COMPATIBILITY"/"facade_source_context.csv").is_file())
             self.assertIn("src/thesis_core/neutral_model.py",
                           {unit["path"] for unit in units})
             self.assertTrue((out/"README.md").is_file())
             self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
+
+    def test_exec_facade_inventory_marks_real_source_context_risk(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            target=root/"components"/"calculations.py"
+            target.parent.mkdir(parents=True)
+            target.write_text(
+                "from pathlib import Path\n"
+                "def root_for_calculation():\n"
+                "    return Path(__file__).parents[2]\n",
+                encoding="utf-8")
+            facade=root/"OpenSees_Calculations.py"
+            facade.write_text(
+                "from pathlib import Path\n"
+                "_component_source=Path(__file__).parent/'components/calculations.py'\n"
+                "exec(compile(_component_source.read_text(),str(_component_source),'exec'),globals(),globals())\n",
+                encoding="utf-8")
+            from tools.audit_repository_integrated import inspect_exec_facades
+            rows=inspect_exec_facades(
+                root,inventory(root)["active_python_modules"],{
+                    "OpenSees_Calculations.py":{"git_blob_sha":"a"*40},
+                    "components/calculations.py":{"git_blob_sha":"b"*40}})
+            self.assertEqual(len(rows),1)
+            self.assertEqual(rows[0]["implementation"],"components/calculations.py")
+            self.assertTrue(rows[0]["target_present"])
+            self.assertIn("CONTEXT_DEPENDENT",rows[0]["review_status"])
+            self.assertIn("3",rows[0]["implementation_file_context_lines"])
+            self.assertEqual(rows[0]["implementation_git_blob_sha"],"b"*40)
 
     def test_function_review_register_exposes_methods_nested_functions_and_risk(self):
         with tempfile.TemporaryDirectory() as td:

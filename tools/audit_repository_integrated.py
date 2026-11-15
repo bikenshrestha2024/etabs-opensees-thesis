@@ -12,6 +12,7 @@ import argparse
 import ast
 import csv
 import json
+import re
 import subprocess
 import sys
 from collections import Counter, defaultdict
@@ -318,6 +319,55 @@ def inspect_semantic_review_units(root: Path, source_entries: list[dict],
         r["path"], r["start_line"], r["symbol"]))
 
 
+def inspect_exec_facades(root: Path, entries: list[dict],
+                         indexed: dict[str, dict]) -> list[dict]:
+    """Inventory every tracked exec-loaded root compatibility facade.
+
+    A facade executes source in its own globals: __file__ then names the
+    root-level facade, not the implementation under components/. This scan
+    records potential path-context risks; it cannot certify runtime paths.
+    """
+    rows = []
+    for entry in sorted(entries, key=lambda x: x["path"]):
+        rel = entry["path"]
+        if "/" in rel or entry["parse_status"] != "OK":
+            continue
+        code = (root / rel).read_text(encoding="utf-8-sig")
+        if "exec(compile(" not in code:
+            continue
+        target = None
+        found = re.search(r"""['"](components/[^'"]+\.py)['"]""", code)
+        if found:
+            target = found.group(1)
+        else:
+            found = re.search(
+                r"""['"]components['"]\s*/\s*['"]([^'"]+\.py)['"]""", code)
+            if found:
+                target = "components/" + found.group(1)
+        implementation = root / target if target else None
+        exists = bool(implementation and implementation.is_file())
+        source = implementation.read_text(encoding="utf-8-sig") if exists else ""
+        refs = [
+            i for i, line in enumerate(source.splitlines(), 1)
+            if "__file__" in line and not line.lstrip().startswith("#")
+        ]
+        rows.append({
+            "facade": rel,
+            "facade_git_blob_sha": indexed.get(rel, {}).get("git_blob_sha", ""),
+            "implementation": target or "",
+            "implementation_git_blob_sha": indexed.get(target or "", {}).get(
+                "git_blob_sha", ""),
+            "target_present": exists,
+            "implementation_file_context_lines": ";".join(map(str, refs)),
+            "has_runtime_context_helper": "def _runtime_repo_root(" in source,
+            "review_status": (
+                "MISSING_IMPLEMENTATION" if not exists
+                else "CONTEXT_DEPENDENT_REVIEW_REQUIRED" if refs
+                else "STATIC_TARGET_FOUND_NO_FILE_REFERENCE"),
+        })
+    return rows
+
+
 def audit(root: Path) -> dict:
     root = Path(root).resolve(strict=True)
     paths = tracked_paths(root)
@@ -368,6 +418,7 @@ def audit(root: Path) -> dict:
     ]
     graph = import_graph(root, source_entries)
     semantic_units = inspect_semantic_review_units(root, source_entries, identities)
+    facade_contracts = inspect_exec_facades(root, source_entries, identities)
     findings = []
     if secret_candidates:
         findings.append({"id": "P0_PUBLIC_TREE_SECRET_CANDIDATES",
@@ -388,6 +439,14 @@ def audit(root: Path) -> dict:
                          "count": len(source["canonical_missing"]),
                          "evidence": source["canonical_missing"],
                          "gate": "Restore required entry point and run launcher regression."})
+    missing_facades = [row for row in facade_contracts
+                       if not row["target_present"]]
+    if missing_facades:
+        findings.append({"id":"P0_MISSING_EXEC_FACADE_TARGET",
+                         "priority":"P0","status":"CONFIRMED",
+                         "count":len(missing_facades),
+                         "evidence":missing_facades[:25],
+                         "gate":"Restore target or migrate facade plus callers with explicit tests."})
     if missing_src_guides:
         findings.append({"id": "P2_SRC_SOURCE_GUIDES_MISSING",
                          "priority": "P2", "status": "REVIEW_REQUIRED",
@@ -446,6 +505,8 @@ def audit(root: Path) -> dict:
         "tracked_classification_counts": dict(sorted(by_kind.items())),
         "active_python_count": len(source_entries),
         "semantic_review_units": semantic_units,
+        "exec_facade_contracts": facade_contracts,
+        "exec_facade_count": len(facade_contracts),
         "semantic_review_unit_count": len(semantic_units),
         "semantic_review_completed_count": 0,
         "active_source_parse_failures": source["syntax_errors"],
@@ -534,6 +595,16 @@ def save(report: dict, directory: Path) -> tuple[Path, Path]:
         writer=csv.DictWriter(stream, fieldnames=columns)
         writer.writeheader()
         writer.writerows(report["semantic_review_units"])
+    facades = directory / "09_FACADE_COMPATIBILITY" / "facade_source_context.csv"
+    facades.parent.mkdir(parents=True, exist_ok=True)
+    with facades.open("w",encoding="utf-8",newline="") as stream:
+        columns=("facade","facade_git_blob_sha","implementation",
+                 "implementation_git_blob_sha","target_present",
+                 "implementation_file_context_lines",
+                 "has_runtime_context_helper","review_status")
+        writer=csv.DictWriter(stream,fieldnames=columns)
+        writer.writeheader()
+        writer.writerows(report["exec_facade_contracts"])
     for target, data in pieces:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",

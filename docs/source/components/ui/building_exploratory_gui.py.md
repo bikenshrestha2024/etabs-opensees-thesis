@@ -21,3 +21,9 @@ References are indexed in [the research source register](../../../00_RESEARCH_RE
 Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.
 
 [Source module index](../../00_SOURCE_GUIDE_INDEX.md) · [G00–G10 acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md)
+
+
+
+## 2026-11-15 one-storey probe process working directory
+
+The 1-wall-quadrilateral diagnostic worker launches `python -m components.nonlinear_time_history.one_storey_wall_probe`. The historical root facade changes `__file__`, which previously made the derived subprocess `cwd` point outside the actual runtime. The new `_runtime_repo_root()` uses the facade's `_component_source` when present and the direct component path otherwise. This only corrects the module-search directory, not wall topology, loads, material values, condensation or nonlinear solver behavior. The isolated element probe is **not** full-building NLTHA.

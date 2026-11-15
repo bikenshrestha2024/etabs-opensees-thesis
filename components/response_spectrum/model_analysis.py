@@ -2,6 +2,17 @@
 from pathlib import Path
 import csv,json,math,time
 import numpy as np
+
+
+def _runtime_repo_root():
+    """Repository/runtime root in both direct-module and exec facade contexts.
+
+    Root-level compatibility facades set _component_source to the actual
+    components/<package>/<module>.py. __file__ alone then names the facade
+    and its parents[2] would point outside the active project.
+    """
+    source = globals().get("_component_source", __file__)
+    return Path(source).resolve().parents[2]
 from OpenSees_Timing_V130 import timed_outputs
 from NBC105_Spectrum_Scaling_V115 import spectral_shape_ch
 from OpenSees_Response_Checks_V132 import write_csv,drift_check
@@ -334,7 +345,7 @@ def launch(parent,folder):
     from components.inputs.project_workbooks import source_limit_state,require_source_state,analysis_output_folder
     model_state,model_state_evidence=source_limit_state(folder)
     initial_state=model_state or 'ULS'
-    root=Path(__file__).parents[2]
+    root=_runtime_repo_root()
     values=import_project_inputs(root,folder,initial_state)['values'];fields={}
     period_defaults,period_note=mrsm_period_defaults(folder,values,initial_state)
     defaults=dict(limit_state=initial_state,soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=period_defaults['T1_X'],T1_Y=period_defaults['T1_Y'],nmodes=40,damping=.05)

@@ -7,6 +7,17 @@ import json
 import math
 
 
+def _runtime_repo_root():
+    """Repository/runtime root in both direct-module and exec facade contexts.
+
+    Root-level compatibility facades set _component_source to the actual
+    components/<package>/<module>.py. __file__ alone then names the facade
+    and its parents[2] would point outside the active project.
+    """
+    source = globals().get("_component_source", __file__)
+    return Path(source).resolve().parents[2]
+
+
 
 def matching_modal_reference(folder, state, model_sha):
     """[REF docs/source/components/inputs/analysis_autofill.py.md]
@@ -48,7 +59,7 @@ def populate_linear(gui, folder):
     from OpenSees_Project_Inputs_V123 import import_project_inputs
     folder=Path(folder)
     for attr in ('t1x','t1y','p1','p2','tnx','tny'):getattr(gui,attr).set('')
-    inputs=import_project_inputs(Path(__file__).resolve().parents[2],folder,gui.ls.get())
+    inputs=import_project_inputs(_runtime_repo_root(),folder,gui.ls.get())
     gui.project_input_audit=inputs;v=inputs['values']
     for axis in ('x','y'):
         value=v.get('workbook_adopted_t'+axis)
@@ -73,10 +84,10 @@ def populate_linear(gui, folder):
         inputs['notes'].append('Modal input reference: '+str(modal))
         from OpenSees_Model_Audit_V130 import implementation_digest
         reference_sha=result.get('implementation_sha256')
-        compatibility_path=Path(__file__).parent/'NUMERICAL_INPUT_COMPATIBILITY_V132.json'
+        compatibility_path=_runtime_repo_root()/'NUMERICAL_INPUT_COMPATIBILITY_V132.json'
         compatibility=json.loads(compatibility_path.read_text(encoding='utf-8-sig')) if compatibility_path.is_file() else {}
         from OpenSees_Model_Audit_V130 import modal_numeric_digest
-        implementation_matches=result.get('modal_numeric_sha256')==modal_numeric_digest(Path(__file__).parent) or result.get('modal_numeric_sha256') in compatibility or reference_sha==implementation_digest(Path(__file__).parent) or reference_sha in compatibility
+        implementation_matches=result.get('modal_numeric_sha256')==modal_numeric_digest(_runtime_repo_root()) or result.get('modal_numeric_sha256') in compatibility or reference_sha==implementation_digest(_runtime_repo_root()) or reference_sha in compatibility
         if reference_sha in compatibility:inputs['notes'].append('Imported known-compatible V'+str(compatibility[reference_sha]['release'])+' modal reference with exact model-payload match; the transient runner rechecks fresh eigenmode damping.')
         state_matches=result.get('limit_state','ULS')==gui.ls.get()
         model_matches=result.get('model_sha256')==model_sha and model_sha is not None
@@ -183,7 +194,7 @@ def populate_available(gui,folder=None,role='linear_model_script'):
 
 def populate_site(app,folder=None):
     from OpenSees_Project_Inputs_V123 import import_project_inputs
-    folder=Path(folder or r'D:/Thesis Opensees/Etabs Nodes Export');inputs=import_project_inputs(Path(__file__).resolve().parents[2],folder);v=inputs['values']
+    folder=Path(folder or r'D:/Thesis Opensees/Etabs Nodes Export');inputs=import_project_inputs(_runtime_repo_root(),folder);v=inputs['values']
     if hasattr(app,'omegas') and 'omegas' in v:app.omegas.set(str(v['omegas']))
     for target,source in [('soil','soil'),('z','Z'),('imp','I'),('rmu','rmu'),('omega','omegau'),('t1x','workbook_adopted_tx'),('t1y','workbook_adopted_ty')]:
         if source in v:getattr(app,target).set(str(v[source]))
