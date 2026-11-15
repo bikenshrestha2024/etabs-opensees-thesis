@@ -15,6 +15,7 @@ on:
       - "tests/test_display_ids_storey.py"
       - "tests/test_id_audit_display_labels.py"
       - "tests/test_id_audit_roles.py"
+      - "tests/test_shared_3d_prefix_selector.py"
       - ".github/workflows/export-staging-regressions.yml"
   pull_request:
     paths:
@@ -43,5 +44,6 @@ jobs:
           tests/test_display_ids_storey.py
           tests/test_id_audit_display_labels.py
           tests/test_id_audit_roles.py
+          tests/test_shared_3d_prefix_selector.py
           tests/test_gravity_evidence_stage.py
           tests/test_export_mirror.py

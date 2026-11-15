@@ -14,6 +14,8 @@ PREFIXES = {
     "CONVENTIONAL OUTRIGGER": "CO",
     "BELT TRUSS": "BT",
     "CAP TRUSS": "CT",
+    "FVD": "FVD",
+    "BRB": "BRB",
     "SHEAR WALL": "SW",
     "FLOOR": "FL",
 }
@@ -32,6 +34,10 @@ _ROLE_BY_CATEGORY = {
     "CONVENTIONAL OUTRIGGER": ("CO", "BRACE", "CO"),
     "BELT TRUSS": ("BT", "BRACE", "BT"),
     "CAP TRUSS": ("CT", "BRACE", "CT"),
+    # These labels are sourced ONLY from explicitly typed export categories.
+    # A generic brace or link must never be guessed to be an FVD/BRB.
+    "FVD": ("FVD", "DEVICE", ""),
+    "BRB": ("BRB", "DEVICE", ""),
     "SHEAR WALL": ("SW", "SHEAR WALL", ""),
     "FLOOR": ("FL", "FLOOR", ""),
 }
