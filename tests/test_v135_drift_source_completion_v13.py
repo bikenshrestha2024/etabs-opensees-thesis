@@ -82,6 +82,26 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "SOURCE_MODEL_SHA_MISMATCH_EXCLUDED")
                 for r in report["tables"]["Open items"]))
 
+    def test_v135_rejects_linked_editable_criteria_source(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            (root/"OpenSees_Complete_Model_Data_V118.json").write_text(
+                '{"frames":[],"shells":[]}',encoding="utf-8")
+            old=root/"OpenSees_Analysis_Results"/"Design_Checks_V135"
+            old.mkdir(parents=True)
+            outside=root/"private_criteria.csv"
+            outside.write_text("reviewed,source\ntrue,outside\n",encoding="utf-8")
+            linked=old/"Section_Criteria_V135.csv"
+            try:
+                linked.symlink_to(outside)
+            except (OSError,NotImplementedError):
+                self.skipTest("Symlinks not supported")
+            with patch("components.validation.settings_audit.audit",
+                       return_value={"rows":[]}):
+                with self.assertRaisesRegex(ValueError,"linked editable criteria"):
+                    run(root)
+            self.assertEqual(outside.read_text(),"reviewed,source\ntrue,outside\n")
+
     def test_finite_drift_inputs_with_overflowed_ratios_are_excluded(self):
         from components.validation.design_checks import scan_drift
         with tempfile.TemporaryDirectory() as td:
