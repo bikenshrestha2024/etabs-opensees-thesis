@@ -50,12 +50,40 @@ def compare_wall_support_gravity(source_result, continuous_result):
             maximum_downward_Uz_m=scalar(rep,"max_downward_vertical_displacement_m"),
             support_count=len(payload["reactions"]),
             additional_wall_base_nodes=len(payload.get("added_wall_support_tags",[]))))
-    source_by={str(r["node_tag"]):r for r in source_result["reactions"]}
-    continuous_by={str(r["node_tag"]):r for r in continuous_result["reactions"]}
-    coords={str(n["tag"]):n for n in continuous_result["nodes"]}
+    def indexed_rows(payload, key, tag_field, mode):
+        found={}
+        for row in payload[key]:
+            tag=str(row[tag_field])
+            if tag in found:
+                raise ValueError("Duplicate "+mode+" "+key+" tag: "+tag)
+            found[tag]=row
+        return found
+    source_by=indexed_rows(source_result,"reactions","node_tag",SOURCE)
+    continuous_by=indexed_rows(continuous_result,"reactions","node_tag",CONTINUOUS)
+    source_coords=indexed_rows(source_result,"nodes","tag",SOURCE)
+    coords=indexed_rows(continuous_result,"nodes","tag",CONTINUOUS)
+    for mode,react,nodes in ((SOURCE,source_by,source_coords),
+                             (CONTINUOUS,continuous_by,coords)):
+        for tag in react:
+            if tag not in nodes:
+                raise ValueError(mode+" support reaction lacks source coordinates: "+tag)
+        for tag,node in nodes.items():
+            try:
+                xyz=tuple(float(node[k]) for k in ("x_m","y_m","z_m"))
+            except (KeyError,TypeError,ValueError,OverflowError) as exc:
+                raise ValueError(mode+" invalid support node coordinates: "+tag) from exc
+            if not all(math.isfinite(v) for v in xyz):
+                raise ValueError(mode+" nonfinite support node coordinates: "+tag)
+    # Shared native node tags cannot be compared when the two independently
+    # solved models do not agree on their actual global coordinates.
+    for tag in source_by.keys() & continuous_by.keys():
+        p=source_coords[tag]; q=coords[tag]
+        if any(abs(float(p[k])-float(q[k]))>1e-6 for k in ("x_m","y_m","z_m")):
+            raise ValueError("Shared support tag has differing geometry: "+tag)
     rows=[]
     for tag in sorted(set(source_by)|set(continuous_by),key=lambda v:int(v)):
-        aa=source_by.get(tag);bb=continuous_by.get(tag);c=coords.get(tag,{})
+        aa=source_by.get(tag);bb=continuous_by.get(tag)
+        c=coords.get(tag,source_coords.get(tag,{}))
         ra=scalar(aa,"rz_kN") if aa else None
         rb=scalar(bb,"rz_kN") if bb else None
         rows.append(dict(node_tag=tag,x_m=c.get("x_m"),y_m=c.get("y_m"),
