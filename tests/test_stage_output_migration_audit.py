@@ -68,6 +68,43 @@ class NativeStageMigrationAuditTests(unittest.TestCase):
             self.assertEqual(list(external.iterdir()),before)
             self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
 
+    def test_linked_input_folder_or_manifest_is_never_counted_as_local_evidence(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"selected_case"
+            root.mkdir()
+            external=Path(td)/"outside"
+            external.mkdir()
+            outside_manifest=external/"CASE_MANIFEST.json"
+            outside_manifest.write_text('{"private":"untouched"}', encoding="utf-8")
+            original=outside_manifest.read_bytes()
+            for case_id, linked_at, problem in (
+                ("LINKED_INPUT", "directory", "SYMLINKED_RUN_INPUT_SOURCE_REFUSED"),
+                ("LINKED_FILE", "file", "SYMLINKED_RUN_MANIFEST_REFUSED"),
+            ):
+                run=root/"04_MODAL"/"RUNS"/"ULS"/case_id/"run001"
+                run.mkdir(parents=True)
+                source=run/"00_INPUT_SOURCE"
+                try:
+                    if linked_at=="directory":
+                        source.symlink_to(external, target_is_directory=True)
+                    else:
+                        source.mkdir()
+                        (source/"CASE_MANIFEST.json").symlink_to(outside_manifest)
+                except (OSError,NotImplementedError):
+                    self.skipTest("Host does not allow symlinks")
+                report=audit_stage_migration(root)
+                modal=next(row for row in report["stages"]
+                           if row["stage"]=="MODAL")
+                problems={item["problem"] for item in
+                          modal["unreadable_or_invalid_manifests"]}
+                self.assertIn(problem, problems)
+                self.assertEqual(modal["run_manifest_count"],0)
+                self.assertEqual(modal["linked_run_path_count"],
+                                 1 if linked_at=="directory" else 2)
+                self.assertEqual(modal["solver_status_counts"],{})
+                self.assertEqual(outside_manifest.read_bytes(),original)
+            self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
+
     def test_write_refuses_linked_migration_audit_destinations(self):
         from tools.audit_stage_output_migration import main
         for segment in ("09_SOFTWARE_DIAGNOSTICS",

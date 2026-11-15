@@ -93,3 +93,8 @@ Use `--mirror` for byte-identical categorized copies first. If an existing copy 
 ## Source governance
 
 Project engineering conventions: `AGENTS.md`, `KNOWLEDGE_BASE/06_COORDINATED_RUNBOOK/`, `REVIEW_MAIN/README.md`, `components/inputs/output_layout.py`. NBC 105:2025 governs seismic actions and seismic acceptance; **folder numbering is a software/provenance policy**, not a code clause. The required project-adopted conventional slab flexural stiffness remains 0.25 Ig / 0.35 Ig per IS 16700:2023 Table 5 (project setting, not an NBC prescription). Any physical section modifier requires generated solver-command evidence before model equivalence is accepted.
+
+
+## 2026-11-15 manifest-link audit visibility
+
+Additional output-integrity defect: the stage migration auditor's exact-depth walk used `.is_file()` for case manifests, which follows symlinks, while its recursive manifest inventory skipped symlinked files/directories. Consequently linked `00_INPUT_SOURCE` or `CASE_MANIFEST.json` could be **silently absent** from the issue list. The amended inspector reports explicit `SYMLINKED_RUN_INPUT_SOURCE_REFUSED` / `SYMLINKED_RUN_MANIFEST_REFUSED` findings, counts linked paths and does not read outside the selected export. This is path/provenance correctness, not evidence of OpenSees solver validation.

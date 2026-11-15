@@ -96,3 +96,8 @@ Regression: `tests/test_unified_output_contract.py` tests mismatched stage/case/
 ## 2026-11-15 manifest symlink ancestry safeguard
 
 The read-only `inspect_case_manifest` function now checks the **unresolved** run directory and every parent for symlinks before resolving paths. Previously, resolving a run path could hide a symlinked stage or case ancestor, allowing a redirected manifest to appear valid. A detected linked parent returns `LINKED_CASE_MANIFEST_PATH` without reading the redirected manifest. The same check protects `record_case_status`, which depends on the inspection gate. A synthetic local symlink regression test verifies non-mutation. This does not eliminate concurrent filesystem races or validate physical ETABS/OpenSees analysis.
+
+
+## Linked input-source evidence visibility (2026-11-15)
+
+`tools/audit_stage_output_migration.py` checks every canonical `RUNS/<state>/<case>/<run>/00_INPUT_SOURCE/CASE_MANIFEST.json` location without following links. A symlinked `00_INPUT_SOURCE` directory is inventoried as `SYMLINKED_RUN_INPUT_SOURCE_REFUSED`; a symlinked manifest is reported as `SYMLINKED_RUN_MANIFEST_REFUSED`. Previously the depth walk could silently treat these files as present while the `rglob` step skipped them, producing an inaccurate zero-issue output. Both are excluded from run counts, included in linked-path totals, and do not count as solver evidence. Deterministic filesystem-only tests cover the cases. No user ETABS file or structural result is migrated by this audit.

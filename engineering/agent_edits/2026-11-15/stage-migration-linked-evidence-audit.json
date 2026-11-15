@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 (GitHub connector)",
+  "baseline_sha": "19861e549d49ef32dbf3a92be0da4b4e8aa0f3d3",
+  "scope": "Stage output migration auditor reports symlinked canonical input folders and manifest files rather than silently omitting them",
+  "files_changed": [
+    "tools/audit_stage_output_migration.py",
+    "tests/test_stage_output_migration_audit.py",
+    "docs/source/components/inputs/output_contract.py.md",
+    "REVIEW_MAIN/08_SOFTWARE_SECURITY/20261114_CANONICAL_STAGE_FOLDER_AND_MIGRATION_AUDIT.md"
+  ],
+  "test_plan": "GitHub Windows source/output contract smoke and Deep output integrity CI",
+  "not_performed": [
+    "Native ETABS OAPI runs",
+    "Full building OpenSees NLTHA",
+    "Root Python executable relocation",
+    "ETABS vs OpenSees foundation reaction verification"
+  ],
+  "decision": "No source file moves; preserve 01-07 stage writers/readers and historical outputs",
+  "status": "PENDING_CI"
+}

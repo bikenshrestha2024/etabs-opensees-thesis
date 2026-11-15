@@ -73,12 +73,27 @@ def audit_stage_migration(export_dir):
                             unmanifested.append({
                                 "manifest":run_dir.relative_to(root).as_posix(),
                                 "problem":"SYMLINKED_RUN_FOLDER_REFUSED"})
-                        elif run_dir.is_dir() and not (
-                                run_dir/"00_INPUT_SOURCE"/"CASE_MANIFEST.json").is_file():
-                            unmanifested.append({
-                                "manifest":(run_dir/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
-                                           ).relative_to(root).as_posix(),
-                                "problem":"MISSING_CASE_MANIFEST"})
+                            continue
+                        if not run_dir.is_dir():
+                            continue
+                        source_dir = run_dir/"00_INPUT_SOURCE"
+                        manifest_path = source_dir/"CASE_MANIFEST.json"
+                        # A linked input folder or linked manifest must not be
+                        # treated as evidence from the selected export case.
+                        # pathlib.rglob does not consistently enumerate files
+                        # beneath such links, so check the exact canonical
+                        # location explicitly before the manifest scan.
+                        if source_dir.is_symlink():
+                            problem = "SYMLINKED_RUN_INPUT_SOURCE_REFUSED"
+                        elif manifest_path.is_symlink():
+                            problem = "SYMLINKED_RUN_MANIFEST_REFUSED"
+                        elif not manifest_path.is_file():
+                            problem = "MISSING_CASE_MANIFEST"
+                        else:
+                            continue
+                        unmanifested.append({
+                            "manifest":manifest_path.relative_to(root).as_posix(),
+                            "problem":problem})
             for p in sorted(runs.rglob("CASE_MANIFEST.json")):
                 if p.is_symlink() or any(q.is_symlink() for q in p.parents if q!=root):
                     continue
