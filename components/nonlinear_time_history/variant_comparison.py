@@ -39,6 +39,10 @@ def validate_variant_manifest(payload):
     for r in rows:
         if not r.get("model_export_path") or not r.get("model_file_sha256"):
             raise ValueError(f"{r['variant']}: missing independent model export/hash")
+        digest=r["model_file_sha256"]
+        if (not isinstance(digest,str) or len(digest)!=64 or
+                any(ch not in "0123456789abcdefABCDEF" for ch in digest)):
+            raise ValueError(f"{r['variant']}: invalid model export SHA256")
         if not isinstance(r.get("outrigger_floors"),list):
             raise ValueError(f"{r['variant']}: outrigger floors must be listed")
         if r["variant"]=="M0" and r["outrigger_floors"]:
@@ -71,14 +75,46 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
                 raise ValueError(f"{variant} case {key} not a full-duration numerical screen")
             if gate.get("accepted_channels_finite") is not True:
                 raise ValueError(f"{variant} case {key} has unverified finite channels")
+            # Same duration evidence is mandatory for the 224-case completion
+            # audit and for the M0–M6 aggregation. A status flag alone is
+            # insufficient evidence of a complete accepted history.
+            durations={}
+            for field in ("full_record_duration_s","requested_duration_s",
+                          "achieved_time_s"):
+                raw=gate.get(field)
+                if isinstance(raw,bool):
+                    raise ValueError(f"{variant} case {key}: invalid {field}")
+                try:
+                    val=float(raw)
+                except (ValueError,TypeError,OverflowError) as exc:
+                    raise ValueError(f"{variant} case {key}: missing/invalid {field}") from exc
+                if not math.isfinite(val) or val<=0:
+                    raise ValueError(f"{variant} case {key}: invalid {field}")
+                durations[field]=val
+            if (abs(durations["full_record_duration_s"]-
+                    durations["requested_duration_s"])>1e-7 or
+                abs(durations["requested_duration_s"]-
+                    durations["achieved_time_s"])>1e-7):
+                raise ValueError(f"{variant} case {key}: incomplete accepted duration")
+            raw_states=gate.get("accepted_states")
+            if isinstance(raw_states,bool) or not isinstance(raw_states,int) or raw_states<2:
+                raise ValueError(f"{variant} case {key}: invalid accepted state count")
             if c.get("variant_id")!=variant:
                 raise ValueError(f"{variant} case {key} reports a different variant ID")
             if c.get("model_sha256")!=variant_manifest[variant]["model_file_sha256"]:
                 raise ValueError(f"{variant} case {key} source export hash differs from manifest")
-            if c.get("record_sha256") is None:
-                raise ValueError(f"{variant} case {key} has no ground motion hash")
+            digest=c.get("record_sha256")
+            if (not isinstance(digest,str) or len(digest)!=64 or
+                    any(ch not in "0123456789abcdefABCDEF" for ch in digest)):
+                raise ValueError(f"{variant} case {key} has missing/invalid ground motion SHA256")
             for name in METRICS:
-                value=float(c[name])
+                raw=c.get(name)
+                if isinstance(raw,bool):
+                    raise ValueError(f"{variant} invalid metric {name}")
+                try:
+                    value=float(raw)
+                except (TypeError,ValueError,OverflowError) as exc:
+                    raise ValueError(f"{variant} invalid metric {name}") from exc
                 if not math.isfinite(value) or value<0:
                     raise ValueError(f"{variant} invalid metric {name}")
             keyed[key]=c
