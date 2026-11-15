@@ -21,3 +21,10 @@ Relevant register IDs: R01 R04 R05 R10 R12 R13. Consult [research reference regi
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+
+## 2026-11-15 verified context contract source review
+
+Irregularity response checker original workbook import and subprocess launch project root previously derived Path(__file__).parent (direct import sees components/validation, facade sees repository root). Source-aware project root fixes both without changing story force/mass formulas; do not claim source model validated.
+
+Scope of tests: synthetic direct-module import, exec-root facade, exported-runtime facade path consistency in `tests/test_facade_runtime_context.py`. No native ETABS/OpenSees, source workbook or full engineering model was executed in these path-only regressions.

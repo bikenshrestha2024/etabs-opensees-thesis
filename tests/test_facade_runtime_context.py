@@ -17,6 +17,12 @@ MODULES={
     "components/response_spectrum/model_analysis.py":"OpenSees_Model_Response_Spectrum_V132.py",
     "components/ui/building_exploratory_gui.py":"OpenSees_Building_Exploratory_GUI_V138.py",
     "components/gravity/gui_and_reports.py":"OpenSees_Gravity_GUI_V110.py",
+    "components/inputs/project_workbooks.py":"OpenSees_Project_Inputs_V123.py",
+    "components/model/assembly.py":"OpenSees_Complete_Export_V118.py",
+    "components/modal/gui_and_reports.py":"OpenSees_Modal_GUI_NBC105_V111.py",
+    "components/validation/irregularity_review.py":"OpenSees_Irregularity_Review_V134.py",
+    "components/ui/literature_demo_gui.py":"OpenSees_Literature_Demo_GUI_V137.py",
+    "components/ui/window_manager.py":"OpenSees_Window_Manager_V129.py",
 }
 
 

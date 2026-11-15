@@ -46,3 +46,10 @@ Publication extension: the resolver also reads excel/SOURCE_REGISTRY.json with
 paths relative to the registry. Git LFS pointers are reported with a pull
 instruction. copy_project_workbooks copies the three established small inputs
 to export/excel/source and retains verified references to larger source files.
+
+
+## 2026-11-15 verified context contract source review
+
+Authoritative project workbook source registry fallback previously used Path(__file__).parents[2], incorrect under root exec facade OpenSees_Project_Inputs_V123 and could miss project_sources.private.json / excel/SOURCE_REGISTRY.json. Source-aware _runtime_repo_root now uses _component_source (when root facade) or real component __file__ (when direct import). Preserve labeled Aw/T1 workbook values and EDB matching; no source EDB/XLSX change.
+
+Scope of tests: synthetic direct-module import, exec-root facade, exported-runtime facade path consistency in `tests/test_facade_runtime_context.py`. No native ETABS/OpenSees, source workbook or full engineering model was executed in these path-only regressions.

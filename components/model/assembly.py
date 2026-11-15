@@ -18,6 +18,15 @@ end moments are retained, unlike the old endpoint-force-only load audit.
 __release__ = '134'
 from OpenSees_Timing_V130 import timed_outputs
 from pathlib import Path
+
+
+def _runtime_repo_root():
+    """Actual project root under both direct imports and root exec facades.
+
+    Root compatibility facades execute component source with __file__ still
+    naming the facade. Their _component_source points to the real module.
+    """
+    return Path(globals().get("_component_source", __file__)).resolve().parents[2]
 import ast
 import csv
 import json
@@ -429,7 +438,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
     Numerical source defects block model building with a precise report.
     Nonlinear calibration is never inferred from a section name or benchmark.
     """
-    folder=Path(folder).resolve(); runtime_dir=Path(runtime_dir or Path(__file__).parent)
+    folder=Path(folder).resolve(); runtime_dir=Path(runtime_dir or _runtime_repo_root())
     report=dict(version=118,assembly_errors=[],warnings=[],analysis_ready=False,
                 elastic_scope='Connected elastic conversion model; ETABS response comparison required',
                 nonlinear_ready=False)
@@ -1317,7 +1326,7 @@ def autoselect_inputs(gui, export_dir, role):
         data=_read(data_file); height.set(str(max(p[2] for p in data['nodes'].values())-data['base_z_m']))
     try:
         from OpenSees_Project_Inputs_V123 import populate
-        if role=='modal_model_script' and hasattr(gui,'aw_x'):populate(gui,Path(__file__).parent,folder)
+        if role=='modal_model_script' and hasattr(gui,'aw_x'):populate(gui,_runtime_repo_root(),folder)
         if role in ('linear_model_script','nonlinear_model_script') and hasattr(gui,'t1x'):
             from OpenSees_Linear_Autofill_V124 import populate_linear
             populate_linear(gui,folder)

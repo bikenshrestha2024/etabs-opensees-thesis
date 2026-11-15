@@ -11,12 +11,21 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+
+
+def _runtime_repo_root():
+    """Actual project root under both direct imports and root exec facades.
+
+    Root compatibility facades execute component source with __file__ still
+    naming the facade. Their _component_source points to the real module.
+    """
+    return Path(globals().get("_component_source", __file__)).resolve().parents[2]
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 
 def _runner_source(model, output, nmodes, solver, period_inputs, mode_x, mode_y, limit_state='ULS'):
-    helper_dir = str(Path(__file__).resolve().parent)
+    helper_dir = str(_runtime_repo_root())
     return f'''import json, runpy, sys, traceback, os
 from pathlib import Path
 MODEL = Path({str(model)!r})
@@ -309,7 +318,7 @@ class ModalAuditGUI:
     def _sync_project_system(self):
         try:
             from OpenSees_Project_Inputs_V123 import import_project_inputs
-            data=import_project_inputs(Path(__file__).parent,Path(self.model.get()).parent)
+            data=import_project_inputs(_runtime_repo_root(),Path(self.model.get()).parent)
             system=str(data['values'].get('system_excel','')).strip()
             if not system:return
             text=system.lower()

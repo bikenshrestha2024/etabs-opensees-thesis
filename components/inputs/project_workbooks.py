@@ -6,6 +6,15 @@ compliance or replaces the independent ETABS/OpenSees reconciliation.
 
 __release__ = '134'
 from pathlib import Path
+
+
+def _runtime_repo_root():
+    """Actual project root under both direct imports and root exec facades.
+
+    Root compatibility facades execute component source with __file__ still
+    naming the facade. Their _component_source points to the real module.
+    """
+    return Path(globals().get("_component_source", __file__)).resolve().parents[2]
 import json
 import math
 import re
@@ -32,9 +41,9 @@ def registered_project_source(export_dir, role, *, missing_lfs='error'):
                 h.update(block)
         return h.hexdigest()
     locations = [Path(export_dir)/'project_sources.private.json',
-                 Path(__file__).resolve().parents[2]/'project_sources.private.json',
+                 _runtime_repo_root()/'project_sources.private.json',
                  Path(export_dir)/'excel'/'SOURCE_REGISTRY.json',
-                 Path(__file__).resolve().parents[2]/'excel'/'SOURCE_REGISTRY.json']
+                 _runtime_repo_root()/'excel'/'SOURCE_REGISTRY.json']
     if os.environ.get('OPENSEES_PROJECT_SOURCES'):
         locations.insert(0, Path(os.environ['OPENSEES_PROJECT_SOURCES']))
     current = _source_edb_path(export_dir)

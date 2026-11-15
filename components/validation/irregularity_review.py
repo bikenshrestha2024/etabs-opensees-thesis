@@ -1,5 +1,14 @@
 """NBC 5.4 geometry checks and centered-load stiffness/torsion diagnostics."""
 from pathlib import Path
+
+
+def _runtime_repo_root():
+    """Actual project root under both direct imports and root exec facades.
+
+    Root compatibility facades execute component source with __file__ still
+    naming the facade. Their _component_source points to the real module.
+    """
+    return Path(globals().get("_component_source", __file__)).resolve().parents[2]
 import json,csv,math,hashlib,time
 from OpenSees_Timing_V130 import timed_outputs
 
@@ -69,7 +78,7 @@ def run_model_review(folder,output_dir,states=('SLS','ULS'),review_file=None):
                 low=groups[i-1]['master_xyz'][2] if i else data['base_z_m'];members=[(data['nodes'][str(n)],float(m)) for n,m in data['nodal_mass'].items() if low+1e-7<data['nodes'][str(n)][2]<=g['master_xyz'][2]+1e-7];mass=sum(m for p,m in members)
                 if mass<=0:raise ValueError('Nonpositive effective floor mass at '+str(g['storey_number']))
                 masses.append(mass);centers.append([sum(p[j]*m for p,m in members)/mass for j in (0,1)]);heights.append(g['master_xyz'][2]-data['base_z_m'])
-            values=import_project_inputs(Path(__file__).parent,folder,state)['values'];period=values.get('workbook_adopted_t'+axis.lower());k=1. if period is None else max(1.,min(2.,1.+(float(period)-.5)/2.));shape=[m*h**k for m,h in zip(masses,heights)];base_force=.01*sum(masses)*9.80665;forces=[base_force*v/sum(shape) for v in shape]
+            values=import_project_inputs(_runtime_repo_root(),folder,state)['values'];period=values.get('workbook_adopted_t'+axis.lower());k=1. if period is None else max(1.,min(2.,1.+(float(period)-.5)/2.));shape=[m*h**k for m,h in zip(masses,heights)];base_force=.01*sum(masses)*9.80665;forces=[base_force*v/sum(shape) for v in shape]
             ops.timeSeries('Linear',880001);ops.pattern('Plain',880001,880001)
             for g,cm,force in zip(groups,centers,forces):
                 f=[0.]*6;f[dof]=force;f[5]=-(cm[1]-g['master_xyz'][1])*force if axis=='X' else (cm[0]-g['master_xyz'][0])*force;ops.load(g['master_tag'],*f)
@@ -145,7 +154,7 @@ def launch(parent,folder):
         pending=[r for r in result['checks'] if r.get('status')=='NOT EVALUATED']
         status.set('Overall: '+result['overall']+' | '+str(len(pending))+' checks pending. Soft-storey/torsion: Calculate selected state(s). Weak storey: provide strength capacities. Discontinuities: provide reviewed load-path evidence. | '+result['scope']);win._irregularity_result=result
     def run():
-        button.configure(state='disabled');out.mkdir(parents=True,exist_ok=True);selected=[states.get()];root=Path(__file__).parent
+        button.configure(state='disabled');out.mkdir(parents=True,exist_ok=True);selected=[states.get()];root=_runtime_repo_root()
         script='import sys;sys.path.insert(0,'+repr(str(root))+');from OpenSees_Irregularity_Review_V134 import run_model_review;run_model_review('+repr(str(folder.resolve()))+','+repr(str(out.resolve()))+','+repr(selected)+','+repr(review.get().strip() or None)+')'
         def worker():
             try:

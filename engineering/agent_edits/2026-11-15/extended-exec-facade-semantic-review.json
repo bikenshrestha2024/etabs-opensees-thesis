@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "base_sha": "a8eb174d56d82d3c8b9f92691631daab02f6e7fe",
+  "scope": "Six additional confirmed facade-sensitive project root lookups in existing active model/input/modal/GUI modules",
+  "source_snapshot": "a539ba5c865f41384e0b2ba62234f363f67f2abd",
+  "active_python_snapshot": 532,
+  "root_exec_facades": 59,
+  "patches": [
+    "components/inputs/project_workbooks.py",
+    "components/model/assembly.py",
+    "components/modal/gui_and_reports.py",
+    "components/validation/irregularity_review.py",
+    "components/ui/literature_demo_gui.py",
+    "components/ui/window_manager.py"
+  ],
+  "tests": [
+    "tests.test_facade_runtime_context"
+  ],
+  "preservation": [
+    "No ETABS EDB, adopted Excel workbook or ground motion data changed",
+    "Root entry points preserved",
+    "Numerical physics/masses/loads/materials unchanged",
+    "Generated script __file__ literals left as generated-runtime references"
+  ],
+  "engineering_acceptance": "NOT_VERIFIED",
+  "full_semantic_review": "INCOMPLETE",
+  "ci": "PENDING"
+}

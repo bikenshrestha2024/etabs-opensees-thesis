@@ -2,6 +2,16 @@
 
 __release__ = '134'
 import tkinter as tk
+from pathlib import Path
+
+
+def _runtime_repo_root():
+    """Actual project root under both direct imports and root exec facades.
+
+    Root compatibility facades execute component source with __file__ still
+    naming the facade. Their _component_source points to the real module.
+    """
+    return Path(globals().get("_component_source", __file__)).resolve().parents[2]
 
 def restore(window):
     try:
@@ -34,12 +44,12 @@ def install_windows_menu(root):
         from pathlib import Path
         win=tk.Toplevel(root);win.title('Method and parameter evidence — V134');win.geometry('1000x750')
         text=tk.Text(win,wrap='word');text.pack(fill='both',expand=True)
-        text.insert('end',(Path(__file__).parent/'DECISIONS_AND_SOURCES_V134.md').read_text(encoding='utf-8'));text.configure(state='disabled')
+        text.insert('end',(_runtime_repo_root()/'DECISIONS_AND_SOURCES_V134.md').read_text(encoding='utf-8'));text.configure(state='disabled')
     menu.add_command(label='Method and parameter sources',command=evidence)
     def coverage():
         from pathlib import Path
         win=tk.Toplevel(root);win.title('Requested feature coverage — V134');win.geometry('1100x780')
         text=tk.Text(win,wrap='word');text.pack(fill='both',expand=True)
-        text.insert('end',(Path(__file__).parent/'REQUEST_COVERAGE_V134.md').read_text(encoding='utf-8-sig'));text.configure(state='disabled')
+        text.insert('end',(_runtime_repo_root()/'REQUEST_COVERAGE_V134.md').read_text(encoding='utf-8-sig'));text.configure(state='disabled')
     menu.add_command(label='Requested feature coverage',command=coverage)
     root.bind_all('<Control-Shift-R>',lambda event:[restore(w) for w in [root]+collect(root)],add='+')

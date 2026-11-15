@@ -26,3 +26,10 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 ## Modal GUI process cancellation (2026-11-04)
 
 The shared `panel` already has a **Stop selected batch** control; avoid duplicating it. In the worker, after `proc.wait()`, check the saved cancellation flag **before** reading any generated modal JSON or interpreting a nonzero exit code. Label an operator cancellation `CANCELLED` and skip queued ULS/SLS states; clear the process pointer in `finally`. `components.shared.case_status.modal_exit_status` is tested by `tests/verify_modal_cancel_status.py`. This is UI lifecycle integrity, not an eigenvalue validation or proof that an external executable terminated without child processes.
+
+
+## 2026-11-15 verified context contract source review
+
+NBC 105 modal child runner source and original input workbook import previously derived helper/project root using Path(__file__).parent, dependent on direct-module vs root exec facade context. Source-aware root used for both. Mode selection, actual original workbook, Ritz/eigen etc remain unchanged; native ETABS/OpenSees equivalence not verified.
+
+Scope of tests: synthetic direct-module import, exec-root facade, exported-runtime facade path consistency in `tests/test_facade_runtime_context.py`. No native ETABS/OpenSees, source workbook or full engineering model was executed in these path-only regressions.

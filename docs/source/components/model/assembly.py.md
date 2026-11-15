@@ -16,3 +16,10 @@ Source: [OpenSees E-SFI 3D](https://opensees.github.io/OpenSeesDocumentation/use
 only the three small calculator/scaling workbooks under excel/source and a
 verified private source registry where available. Large ETABS tables remain
 referenced. No model assembly, stiffness or solver equations changed.
+
+
+## 2026-11-15 verified context contract source review
+
+Direct-import prepare_complete_export previously defaulted runtime_dir to components/model instead of actual project/runtime root; original root facade happened to work. Modal input populate(gui,Path(__file__).parent,folder) likewise depended on facade. Both now use _runtime_repo_root. Do not touch __file__ strings inside generated model/GUI scripts; those belong to generated-runtime context. No geometry or element physics changes.
+
+Scope of tests: synthetic direct-module import, exec-root facade, exported-runtime facade path consistency in `tests/test_facade_runtime_context.py`. No native ETABS/OpenSees, source workbook or full engineering model was executed in these path-only regressions.

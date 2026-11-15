@@ -21,3 +21,10 @@ Relevant register IDs: See module's underlying computational dependencies. Consu
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+
+## 2026-11-15 verified context contract source review
+
+Window manager’s root research decision/source summary and request-coverage document lookup previously derived Path(__file__).parent and differed between direct import and facade. Added explicit Path import and source-aware root, preserving existing GUI command names and menu layout.
+
+Scope of tests: synthetic direct-module import, exec-root facade, exported-runtime facade path consistency in `tests/test_facade_runtime_context.py`. No native ETABS/OpenSees, source workbook or full engineering model was executed in these path-only regressions.
