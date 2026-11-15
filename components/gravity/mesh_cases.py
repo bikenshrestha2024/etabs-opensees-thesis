@@ -241,6 +241,8 @@ def recover_assembled_mesh_workbook(folder, subdivisions):
     Model and saved configuration SHA must match, and the original source
     hashes must still match the staged run's source manifest. This is a
     spreadsheet recovery only, NOT gravity convergence/ETABS acceptance.
+
+    [REF docs/source/components/gravity/mesh_cases.py.md]
     """
     root=_refuse_linked_chain(folder).resolve(strict=True)
     n=validated_mesh_size(subdivisions)
