@@ -52,3 +52,14 @@ The supplied `OpenSees_Material_Section_Library_20261115_173540.xlsx` has tabs `
 - [Kolozvari, Lopez and Massone (2023)](https://doi.org/10.1016/j.engstruct.2023.116700): E-SFI-MVLEM-3D wall methodology, not a calibration of this building's reinforcement.
 
 **Acceptance**: software report/UI checks via exact PR CI; native ETABS/OpenSees and thesis engineering gates NOT_RUN.
+
+
+## 6. Spreadsheet-formula granularity and evidence limitations
+
+Further non-destructive workbook-level inspection confirmed:
+- Both MESH_04 workbooks: `Surface load formulas` and `Surface seismic preload` each have **28,000 data rows** (sheet range A1:Q28001); `Member weight formulas` has **3,862 frame segment rows** (A1:I3863). Their source cell example for a 2.25 m² area uses Floor Finish 1.5 kN/m², Live 4 kN/m² and Partition 1.5 kN/m².
+- MESH_08 workbook: those corresponding area-load sheets each have **113,600 data rows** (A1:Q113601); `Member weight formulas` has **7,162 frame segment rows** (A1:I7163). A sampled 0.5625 m² cell shares the same unit pressures, indicating smaller subdivision, not a separate loading case.
+- Sampled `self_weight_floor` formulas use `=O5*P5*Q5`; sampled `Material unit formulas` use `=C2/1000`. These saved formula cells have no numeric cached result in the uploaded OOXML; independently calculating/cross-checking all thousands of rows is **NOT DONE**. The `Vertical load path` narrative explicitly states rigidDiaphragm(3) constrains UX/UY/RZ, **not UZ**, and warns against imposing a second beam tributary load on the same source shell area.
+- No model stress/force or source-native ETABS support-reaction convergence evidence is contained in these identity rows. A spreadsheet with a 4-mesh/8-mesh formula sheet cannot prove slab bending force delivery, primary32 support equivalence or dynamic mesh convergence.
+
+The material workbook contains five sheets and source E-modulus/property values, but representative beam cover 25 mm, tie 12 mm, longitudinal bar 16 mm and four bars per side are marked editable illustrations; **not** project as-built reinforcement. This review is a targeted header/sample/identity/formula inspection, not cell-by-cell recalculation of all large workbook sheets.
