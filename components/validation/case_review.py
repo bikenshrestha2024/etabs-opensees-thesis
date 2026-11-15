@@ -1,6 +1,6 @@
 """Compare saved responses and expose combination/preload coverage without inventing runs."""
 from pathlib import Path
-import json,csv,os,math
+import json,csv,os,math,tempfile
 
 def collect(folder):
     from OpenSees_Design_Checks_V135 import scan_drift,combinations
@@ -143,6 +143,10 @@ def export(folder):
     # Derived review, not a source model or a seismic solver case. Publish in
     # one diagnostics module regardless of whether launched from export or case.
     out=export_root_for(folder)/'09_SOFTWARE_DIAGNOSTICS'/'CASE_REVIEW_V142'
+    # A linked diagnostics folder must not redirect private engineering
+    # evidence outside the selected export root.
+    if out.parent.is_symlink() or out.is_symlink():
+        raise ValueError('Refusing linked case-review output directory')
     out.mkdir(parents=True,exist_ok=True)
     wb=Workbook();wb.remove(wb.active)
     for key,title in [('drift','Saved drift'),('deflection','Saved deflection'),('preload_profiles','PDelta preload provenance'),('combination_coverage','Combination coverage'),('issues','Read errors')]:
@@ -158,7 +162,19 @@ def export(folder):
     note.append(['Linear time history is a linear transient model about a selected preloaded state. It is not a full nonlinear PDelta time-history solution. Positive CQC component envelopes are not concurrent deformed shapes.'])
     from components.inputs.output_contract import style_workbook, atomic_json
     style_workbook(wb)
-    wb.save(out/'All_Case_Review_V142.xlsx');atomic_json(out/'All_Case_Review_V142.json',result);return result,out
+    # Preserve the historical GUI workbook name but publish it atomically,
+    # so a failed save cannot replace a previously usable report with a
+    # truncated XLSX. The JSON writer already uses an atomic replacement.
+    fd,temp_name=tempfile.mkstemp(prefix='.case_review_',suffix='.xlsx',dir=out)
+    os.close(fd)
+    staged=Path(temp_name)
+    try:
+        wb.save(staged)
+        os.replace(staged,out/'All_Case_Review_V142.xlsx')
+    finally:
+        staged.unlink(missing_ok=True)
+    atomic_json(out/'All_Case_Review_V142.json',result)
+    return result,out
 
 
 def launch(parent,folder):
