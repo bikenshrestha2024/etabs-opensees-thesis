@@ -51,6 +51,29 @@ class GravityNodeAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"Nonfinite ETABS"):
                 compare_support_nodes(etabs,opensees)
 
+    def test_original_support_export_requires_verified_global_axis(self):
+        osdata=dict(nodes=[dict(tag=1,x_m=0,y_m=0,z_m=0)],
+                    reactions=[dict(node_tag=1,rz_kN=100.)])
+        topo={"node_map":[dict(opensees_node_tag=1,etabs_point_name="A",
+                               coordinates_m=[0,0,0])]}
+        with tempfile.TemporaryDirectory() as td:
+            for basis in ("POINT_LOCAL_ROTATED", "UNVERIFIED", None):
+                etabs={"joint_reactions":[dict(point="A",x_m=0,y_m=0,z_m=0,
+                    rz_global_kN=100.,**({"global_z_basis":basis} if basis else {}))]}
+                report=export_fixed_source_support_reactions(
+                    Path(td)/str(basis),osdata,topo,etabs,expected_tags=[1])
+                self.assertEqual(report["matched_count"],0)
+                self.assertEqual(report["rows"][0]["status"],"ETABS_GLOBAL_Z_NOT_VERIFIED")
+
+    def test_node_inventory_rejects_duplicated_etabs_evidence(self):
+        from components.validation.gravity_node_comparison import all_model_node_rows
+        doubled={"joint_reactions":[self.etabs["joint_reactions"][0]]*2}
+        with self.assertRaisesRegex(ValueError,"Duplicate ETABS support reaction"):
+            all_model_node_rows(self.os,etabs=doubled)
+        doubled={"support_displacements":[dict(point="A",U3=0)]*2}
+        with self.assertRaisesRegex(ValueError,"Duplicate ETABS displacement"):
+            all_model_node_rows(self.os,etabs=doubled)
+
     def test_ranks_real_one_to_one_reaction_discrepancy(self):
         report=compare_support_nodes(self.etabs,self.os,tolerance_m=.01)
         self.assertEqual(report['valid_one_to_one_global_z_count'],2)
