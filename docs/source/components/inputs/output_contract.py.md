@@ -77,3 +77,11 @@ Without `--write`, the audit is read-only and prints summary status. It does not
 ## V22 migration inventory: missing runs and linked diagnostics
 
 The read-only stage audit now reports `MISSING_CASE_MANIFEST` when a canonical `RUNS/<state>/<case>/<run-id>` directory exists without `00_INPUT_SOURCE/CASE_MANIFEST.json`. It flags linked intermediate state/case/run paths without descending through them. Each JSON stage entry and workbook Stage summary include `missing_run_manifest_count` and `linked_run_path_count` separately from total manifest count; the detailed Missing or inconsistent sheet gives exact affected paths. The explicit `--write` publisher refuses linked `09_SOFTWARE_DIAGNOSTICS`, `MIGRATION_AUDITS` and `RUNS` destinations before creating its JSON/Excel report. These checks only inventory filesystem evidence; they do **not** infer that a solver ran or migrate old writers. Regression: `tests/test_stage_output_migration_audit.py`.
+
+## V27 — fail-closed identifiers and linked destinations (2026-11-15)
+
+`safe_component()` now rejects missing/boolean run identifiers, instead of converting them into `None`/`True`/`False` literal directory names. `inspect_case_manifest()` now requires exact string identity of `case_id`, `state`, and `run_id`, rejecting surrounding whitespace or missing values even when a stripped value would be syntactically safe. This is a provenance and identity check; it does not change historic case names or move old results.
+
+`atomic_json()` and `write_table()` now check for pre-existing symlinks in the entire target path ancestor chain and at the final file name. The validation runs before creating any directories, after creating the parent, and before `os.replace`; the output remains atomic for ordinary local filesystem writes. As with ordinary `Path.is_symlink()` checks, OS-level concurrent directory swaps/junction semantics are not fully solved; do not treat this as a multi-user adversarial filesystem security boundary. The change preserves the source JSON/CSV content and filenames, and does not write to source EDB/Excel.
+
+Regression: `tests/test_unified_output_contract.py`. This is software validation only, not an ETABS/OpenSees physics acceptance gate.
