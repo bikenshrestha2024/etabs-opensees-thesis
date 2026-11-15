@@ -80,6 +80,43 @@ class ReviewSourceIntegrityTests(unittest.TestCase):
             self.assertEqual(selected[0]["source_identity_status"],
                              "MATCHED_SERIALIZED_MODEL_SHA_NOT_ETABS_EQUIVALENCE")
 
+    def test_corrupted_or_linked_canonical_manifest_excludes_response(self):
+        from components.validation.saved_case_identity import (
+            source_model_hash_evidence,identity_screen)
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            case=root/"05_MRSM"/"RUNS"/"ULS"/"X_E0"/"r1"
+            results=case/"02_RESULTS"
+            results.mkdir(parents=True)
+            payload=results/"MRSM_Results_V132.json"
+            payload.write_text(json.dumps({"X_E0":{"model_sha256":"a"*64}}))
+            manifest=case/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+            manifest.parent.mkdir()
+            for invalid in ('{not-json', '[]', '{"model_sha256":"bad"}'):
+                manifest.write_text(invalid)
+                evidence=source_model_hash_evidence(payload,"X_E0")
+                self.assertTrue(evidence["invalid_manifest"])
+                self.assertIsNone(evidence["model_sha256"])
+                selected,issues=identity_screen(
+                    [{"file":str(payload),"case":"X_E0"}],
+                    expected_model_sha="a"*64)
+                self.assertEqual(selected,[])
+                self.assertEqual(issues[0]["status"],"INVALID_RUN_MANIFEST_EXCLUDED")
+            manifest.unlink()
+            external=root/"external_manifest.json"
+            external.write_text(json.dumps({"model_sha256":"a"*64}))
+            try:
+                manifest.symlink_to(external)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host does not support file symlinks")
+            selected,issues=identity_screen(
+                [{"file":str(payload),"case":"X_E0"}],
+                expected_model_sha="a"*64)
+            self.assertEqual(selected,[])
+            self.assertEqual(issues[0]["status"],"INVALID_RUN_MANIFEST_EXCLUDED")
+            self.assertEqual(external.read_text(),
+                             json.dumps({"model_sha256":"a"*64}))
+
     def test_manifest_sha_and_missing_legacy_identity(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
