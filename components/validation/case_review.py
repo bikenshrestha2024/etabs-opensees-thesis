@@ -1,6 +1,6 @@
 """Compare saved responses and expose combination/preload coverage without inventing runs."""
 from pathlib import Path
-import json,csv,os
+import json,csv,os,math
 
 def collect(folder):
     from OpenSees_Design_Checks_V135 import scan_drift,combinations
@@ -30,26 +30,71 @@ def collect(folder):
     rows=unique
     profiles=[]
     for path in folder.rglob('Gravity_Profile_*_V142.json'):
-        item=json.loads(path.read_text(encoding='utf-8-sig'));profiles.append(dict(file=str(path),limit_state=item.get('limit_state'),**item.get('gravity_context',{})))
+        if path.is_symlink():
+            issues.append(dict(status='LINKED_GRAVITY_PROFILE_REFUSED',file=str(path)))
+            continue
+        try:
+            item=json.loads(path.read_text(encoding='utf-8-sig'))
+            if not isinstance(item,dict) or not isinstance(item.get('gravity_context',{}),dict):
+                raise ValueError('Gravity profile/context must be JSON objects')
+            profiles.append(dict(file=str(path),limit_state=item.get('limit_state'),
+                                 **item.get('gravity_context',{})))
+        except (OSError,ValueError,TypeError) as exc:
+            issues.append(dict(status='INVALID_GRAVITY_PROFILE',file=str(path),error=str(exc)))
     deflections=[]
     for root in roots:
       for path in root.rglob('Floor_Edge_Drift_*.csv'):
-        with path.open(encoding='utf-8-sig',newline='') as stream:
-            for row in csv.DictReader(stream):
-                if row.get('floor_displacement_m') not in (None,''):deflections.append(dict(file=str(path),case=path.stem,limit_state=row.get('limit_state',''),storey=row.get('story_number'),axis=row.get('axis',''),displacement_m=float(row['floor_displacement_m']),scope='Saved floor-edge response; verify source model and combination before comparison'))
+        if path.is_symlink():
+            issues.append(dict(status='LINKED_FLOOR_EDGE_DRIFT_REFUSED',file=str(path)))
+            continue
+        try:
+            with path.open(encoding='utf-8-sig',newline='') as stream:
+                for row in csv.DictReader(stream):
+                    if row.get('floor_displacement_m') in (None,''):
+                        continue
+                    number=float(row['floor_displacement_m'])
+                    if not math.isfinite(number):
+                        raise ValueError('Nonfinite floor-edge displacement')
+                    deflections.append(dict(file=str(path),case=path.stem,
+                        limit_state=row.get('limit_state',''),
+                        storey=row.get('story_number'),axis=row.get('axis',''),
+                        displacement_m=number,
+                        scope='Saved floor-edge response; verify source model and combination before comparison'))
+        except (OSError,ValueError,TypeError,OverflowError,csv.Error) as exc:
+            issues.append(dict(status='INVALID_FLOOR_EDGE_DRIFT',file=str(path),error=str(exc)))
+            deflections=[row for row in deflections if row.get('file')!=str(path)]
     for root in roots:
       for path in root.rglob('Deformation_*.json'):
+        if path.is_symlink():
+            issues.append(dict(status='LINKED_DEFORMATION_REFUSED',file=str(path)))
+            continue
         try:
-            item=json.loads(path.read_text(encoding='utf-8-sig')); state=item.get('limit_state','')
+            item=json.loads(path.read_text(encoding='utf-8-sig'))
+            if not isinstance(item,dict):
+                raise ValueError('Deformation document must be a JSON object')
+            state=item.get('limit_state','')
             if state not in ('ULS','SLS'):continue
+            nodes=item.get('nodes',{})
+            displacements=item.get('displacements',{})
+            if not isinstance(nodes,dict) or not isinstance(displacements,dict):
+                raise ValueError('Deformation nodes/displacements must be objects')
             levels={}
-            for tag,xyz in item.get('nodes',{}).items():
-                u=item.get('displacements',{}).get(str(tag),[])
+            for tag,xyz in nodes.items():
+                u=displacements.get(str(tag),[])
                 if len(u)<2:continue
-                z=round(float(xyz[2]),7)
-                for i,axis in enumerate(('X','Y')):levels[z,axis]=max(levels.get((z,axis),0.),abs(float(u[i])))
-            for (z,axis),value in levels.items():deflections.append(dict(file=str(path),case=path.stem,limit_state=state,storey=z,axis=axis,displacement_m=value,scope='Maximum absolute saved nodal component at elevation (m); CQC envelopes are non-concurrent; no force-only scale applied'))
-        except (ValueError,KeyError,TypeError) as exc:issues.append(dict(file=str(path),error=str(exc)))
+                z=float(xyz[2])
+                components=[float(u[idx]) for idx in (0,1)]
+                if not all(math.isfinite(v) for v in (z,*components)):
+                    raise ValueError('Nonfinite deformation elevation/displacement')
+                z=round(z,7)
+                for idx,axis in enumerate(('X','Y')):
+                    levels[z,axis]=max(levels.get((z,axis),0.),abs(components[idx]))
+            for (z,axis),value in levels.items():
+                deflections.append(dict(file=str(path),case=path.stem,
+                    limit_state=state,storey=z,axis=axis,displacement_m=value,
+                    scope='Maximum absolute saved nodal component at elevation (m); CQC envelopes are non-concurrent; no force-only scale applied'))
+        except (OSError,ValueError,KeyError,TypeError,IndexError,OverflowError) as exc:
+            issues.append(dict(status='INVALID_DEFORMATION_RESULT',file=str(path),error=str(exc)))
     coverage=[]
     for case in combinations(nonparallel=True):
         for method in ('ESM','MRSM','LTH'):
