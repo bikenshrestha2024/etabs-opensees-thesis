@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 via GitHub connector",
+  "baseline_sha": "8df1fe5f60748c34d38710bd6040435fc4783ed5",
+  "scope": "Freeze observed GitHub Actions acceptance status of integrated audit and update consolidated defect ledger",
+  "source_evidence": {
+    "source_commit": "88dc181a3d58dbb4d7ec177d84e0961074dd4c84",
+    "integrated_ci_run": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43687116810",
+    "report_artifact_id": 14150908105,
+    "tracked_paths": 3036,
+    "active_python": 530,
+    "static_gate": "PASS",
+    "eager_import_cycles": 0,
+    "deferred_possible_cycles": 4,
+    "unresolved_explicit_local_imports": 0,
+    "missing_src_guides": 0,
+    "source_parse_failures": 0,
+    "writer_occurrences": 1017,
+    "legacy_literal_occurrences": 96,
+    "secret_pattern_candidates_current_tree": 0
+  },
+  "changed_paths": [
+    "REVIEW_MAIN/08_SOFTWARE_SECURITY/20261115_V31_INTEGRATED_REPOSITORY_AUDIT.md",
+    "docs/review/ledger/20261115_V31_INTEGRATED_FINDINGS.csv"
+  ],
+  "engineering_acceptance": "NOT_VERIFIED",
+  "no_source_model_mutation": true,
+  "limitations": "CI output is not native ETABS/OpenSees/Windows validation or full semantic review; historical snapshots not line-by-line reviewed"
+}
