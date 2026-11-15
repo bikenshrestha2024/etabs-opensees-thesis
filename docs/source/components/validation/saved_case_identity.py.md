@@ -30,3 +30,11 @@ Regression: `tests/test_saved_case_identity_v142.py` includes mismatched manifes
 ## V25 — canonical manifest integrity is a hard exclusion (2026-11-15)
 
 `source_model_hash_evidence()` now exposes `invalid_manifest` and `manifest_path`. A present but malformed, unreadable, missing-hash or symlinked `00_INPUT_SOURCE/CASE_MANIFEST.json` cannot be silently downgraded to an absent legacy manifest while an embedded model hash remains apparently verified. `identity_screen()` excludes the corresponding row under `INVALID_RUN_MANIFEST_EXCLUDED`, retains the exact source path and leaves original data unchanged. A genuinely missing legacy manifest is still treated by the established `NOT_VERIFIED`/available-payload policy, not as a fabricated error. This is serialized model *identity* screening, not ETABS equivalence or experimental calibration. Regression: `tests/test_saved_case_identity_v142.py`.
+
+## V29 — linked source and explicit malformed SHA fail-closed (2026-11-15)
+
+`source_model_hash_evidence()` now keeps track of whether the user-visible result path or one of its original path ancestors is symbolic-linked **before** calling `Path.resolve()`. A linked numeric response or ESM response META sidecar receives `linked_source=True`, no trustworthy `model_sha256` is returned, and `identity_screen()` excludes the row under `LINKED_RESULT_EVIDENCE_EXCLUDED`. `current_export_model_sha()` refuses a linked canonical serialized JSON model file instead of hashing an external alias.
+
+An **explicitly recorded malformed** result `model_sha256` (including nonhex 64 characters, bool or numeric values) is now distinguished from a genuinely omitted optional digest: the former is excluded under `INVALID_RESULT_MODEL_SHA_EXCLUDED`, even when a neighboring manifest claims a valid model SHA; the latter follows existing historical `NOT_VERIFIED`/manifest-only behavior. A matching 64-hex digest is still only a serialized source identity screen, not ETABS/OpenSees physical-equivalence acceptance.
+
+Regressions: `tests/test_saved_case_identity_v142.py` and `tests/test_post_v8_missing_coverage_v9.py`. The latter previously treated malformed source digests as unverified and was updated after the full Linux suite reported the now-invalid expectation. The original data is always read-only.
