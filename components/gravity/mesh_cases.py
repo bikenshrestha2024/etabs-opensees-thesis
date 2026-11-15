@@ -174,6 +174,50 @@ def stage_case(folder, subdivisions):
     return run_dir
 
 
+def package_mesh_case(folder, subdivisions):
+    """Package one independent mesh case without merging distinct run identities.
+
+    A ZIP is a diagnostic export, not evidence of a completed gravity solve.
+    Store it at 02_MODEL/SLAB_LOAD_PATH/UPLOAD_PACKAGES/MESH_nn.zip.
+    Existing case data are read-only; symlinks and recursive uploads refused.
+    """
+    import zipfile
+    root=_refuse_linked_chain(folder).resolve(strict=True)
+    n=validated_mesh_size(subdivisions)
+    case=_refuse_linked_chain(case_base(root,n))
+    if not case.is_dir():
+        raise FileNotFoundError(f"MESH_{n:02d} case has no outputs to package")
+    output=root/"02_MODEL"/"SLAB_LOAD_PATH"/"UPLOAD_PACKAGES"/f"MESH_{n:02d}.zip"
+    _refuse_linked_chain(output)
+    files=[]
+    for p in sorted(case.rglob("*")):
+        _refuse_linked_chain(p)
+        if p.is_file() and not p.name.endswith(".processing.json"):
+            files.append(p)
+    if not files:
+        raise ValueError(f"MESH_{n:02d} has no saved files")
+    output.parent.mkdir(parents=True,exist_ok=True)
+    temporary=output.with_suffix(".zip.tmp")
+    _refuse_linked_chain(temporary)
+    manifest={"mesh_subdivisions":n,
+              "status":"DIAGNOSTIC_PACKAGE_NOT_SOLVER_ACCEPTANCE",
+              "files":{p.relative_to(case).as_posix():digest(p) for p in files}}
+    try:
+        with zipfile.ZipFile(temporary,"w",compression=zipfile.ZIP_DEFLATED,
+                             compresslevel=6,allowZip64=True) as z:
+            for p in files:
+                z.write(p,arcname=f"MESH_{n:02d}/"+p.relative_to(case).as_posix())
+            z.writestr(f"MESH_{n:02d}/ZIP_SHA256_MANIFEST.json",
+                       json.dumps(manifest,indent=2))
+        with zipfile.ZipFile(temporary) as check:
+            bad=check.testzip()
+            if bad:raise IOError("ZIP checksum failed: "+bad)
+        temporary.replace(output)
+    finally:
+        if temporary.exists():temporary.unlink()
+    return output
+
+
 def build_case(folder, subdivisions, *, runtime_dir=None):
     """Stage, assemble fresh mesh and export formula workbook for that mesh only.
 
