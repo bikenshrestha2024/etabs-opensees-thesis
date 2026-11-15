@@ -42,6 +42,13 @@ class GroundAccelerationTests(unittest.TestCase):
           with self.assertRaisesRegex(ValueError,"Nonfinite relative"):
              relative_to_absolute_floor_acceleration((0.,0.),(invalid,0.))
 
+ def test_acceleration_overflow_after_conversion_or_addition_rejected(self):
+    huge=[([1e308,1e308],.01,"g"),self.records[1]]
+    with self.assertRaisesRegex(ValueError,"Nonfinite converted ground"):
+       applied_ground_acceleration(huge,time_s=.005,orientation="XY")
+    with self.assertRaisesRegex(ValueError,"Nonfinite reconstructed absolute"):
+       relative_to_absolute_floor_acceleration((1e308,0.),(1e308,0.))
+
  def test_unsupported_units_and_orientation(self):
     with self.assertRaises(ValueError):
        applied_ground_acceleration(self.records,time_s=.01,orientation="XZ")
