@@ -156,6 +156,24 @@ class Tests(unittest.TestCase):
             evaluate([dict(base,value=1e308)],[dict(base,value=-1e308)],
                      FIELDS,{"assumptions_verified":True})
 
+    def test_semantic_identity_must_include_real_units_and_basis(self):
+        base=dict(method="MRSM",limit_state="ULS",case="X_E0",axis="X",
+                  location="25",metric="drift_ratio",unit="ratio",
+                  basis="CQC_design_response",value=.01)
+        for label in ("case","method","location","metric","unit","basis"):
+            with self.subTest(field=label):
+                invalid=dict(base)
+                invalid.pop(label)
+                with self.assertRaisesRegex(ValueError,"semantic field"):
+                    evaluate([invalid],[base],FIELDS)
+                with self.assertRaisesRegex(ValueError,"semantic field"):
+                    evaluate([base],[invalid],FIELDS)
+        # Empty axis remains allowed for true axis-independent modal periods.
+        modal=dict(base,method="MODAL",case="MODAL",axis="",metric="period",
+                   unit="s",basis="MODE_PERIOD",location="1")
+        self.assertEqual(evaluate([modal],[modal],FIELDS)[0]["status"],
+                         "NOT_COMPARABLE")
+
     def test_invalid_comparison_policy_and_thresholds_fail_closed(self):
         base=dict(method="MRSM",limit_state="ULS",case="X_E0",axis="X",
                   location="BASE",metric="base_shear",unit="kN",
