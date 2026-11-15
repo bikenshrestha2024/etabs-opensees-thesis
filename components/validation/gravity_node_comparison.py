@@ -70,13 +70,19 @@ def compare_support_nodes(etabs,opensees,*,tolerance_m=0.01):
         if point in etabs_points:
             raise ValueError("Duplicate ETABS support point in selected result case: "+point)
         etabs_points.add(point)
+        # JointReact can be reported in ETABS point-local axes. A numeric
+        # value alone does not prove it is a GLOBAL Z reaction. Only the
+        # extractor's explicit unrotated-axis evidence is comparable.
+        basis=row.get("global_z_basis","UNVERIFIED")
         if row.get("rz_global_kN") is None:
             usable=False
             rz=None
         else:
             rz=float(row["rz_global_kN"])
-            usable=math.isfinite(rz)
-        eitems.append((point,loc,rz,usable,row.get("global_z_basis","UNVERIFIED")))
+            if not math.isfinite(rz):
+                raise ValueError("Nonfinite ETABS global Z support reaction at " + point)
+            usable=(basis=="GLOBAL_Z_VERIFIED_DEFAULT_AXES")
+        eitems.append((point,loc,rz,usable,basis))
     candidates=[]
     e_candidates=defaultdict(list)
     o_candidates=defaultdict(list)
