@@ -53,14 +53,40 @@ def inspect_case(output_dir, variant, state, earthquake, orientation):
             raise ValueError("Reported model variant/state/orientation differs from matrix")
         if a.get("pair_id") not in (earthquake, earthquake.replace(" ","_")):
             raise ValueError("Reported earthquake pair differs from matrix")
-        if not isinstance(a.get("record_sha256"),str) or len(a["record_sha256"])!=64:
-            raise ValueError("Missing paired record SHA256")
-        if not isinstance(a.get("model_sha256"),str) or len(a["model_sha256"])!=64:
-            raise ValueError("Missing model SHA256")
+        # A 64-character nonhex string is not a SHA256 digest, and cannot
+        # be used as provenance of either the model or the paired record.
+        for label in ("record_sha256","model_sha256"):
+            digest=a.get(label)
+            if (not isinstance(digest,str) or len(digest)!=64 or
+                    any(c not in "0123456789abcdefABCDEF" for c in digest)):
+                raise ValueError("Missing/invalid "+label+" SHA256")
         if b.get("status")!="FULL_DURATION_NUMERIC_SCREEN" or b.get("full_record_completed") is not True:
             raise ValueError("Accepted history did not reach full record")
         if b.get("accepted_channels_finite") is not True:
             raise ValueError("Accepted history contains nonfinite responses")
+        # A standalone boolean from a stale or hand-edited gate is not enough.
+        # Check the measured last accepted state against the actual source
+        # record duration and the requested endpoint in seconds.
+        durations={}
+        for key in ("full_record_duration_s","requested_duration_s","achieved_time_s"):
+            try:
+                number=float(b[key])
+            except (KeyError,ValueError,TypeError,OverflowError) as exc:
+                raise ValueError("Missing/invalid accepted duration: "+key) from exc
+            if not math.isfinite(number) or number<=0:
+                raise ValueError("Nonpositive/nonfinite accepted duration: "+key)
+            durations[key]=number
+        record=durations["full_record_duration_s"]
+        requested=durations["requested_duration_s"]
+        achieved=durations["achieved_time_s"]
+        if abs(record-requested)>1e-7 or abs(achieved-requested)>1e-7:
+            raise ValueError("Accepted duration does not reach full source record")
+        try:
+            accepted_states=int(b["accepted_states"])
+        except (KeyError,TypeError,ValueError,OverflowError) as exc:
+            raise ValueError("Missing/invalid accepted state count") from exc
+        if accepted_states<2 or isinstance(b["accepted_states"],bool):
+            raise ValueError("Accepted history requires at least two accepted states")
         if a.get("diagnostic_excitation")!="XY":
             raise ValueError("X-only/Y-only diagnostic cannot count as a full paired record")
         for name in REQUIRED_METRICS:
