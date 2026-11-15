@@ -82,6 +82,28 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "SOURCE_MODEL_SHA_MISMATCH_EXCLUDED")
                 for r in report["tables"]["Open items"]))
 
+    def test_v135_refuses_linked_templates_or_model_source(self):
+        from components.validation.design_checks import templates
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            outside=root/"outside"
+            outside.mkdir()
+            output=root/"09_SOFTWARE_DIAGNOSTICS"
+            try:
+                output.symlink_to(outside,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Symbolic links unsupported")
+            with self.assertRaisesRegex(ValueError,"linked derived-output"):
+                templates(output/"DESIGN_CHECKS_V135")
+            self.assertEqual(list(outside.iterdir()),[])
+            model=root/"OpenSees_Complete_Model_Data_V118.json"
+            linked=root/"actual_model.json"
+            linked.write_text('{"frames":[],"shells":[]}')
+            model.symlink_to(linked)
+            with self.assertRaisesRegex(ValueError,"linked authoritative"):
+                run(root)
+            self.assertEqual(list(outside.iterdir()),[])
+
     def test_v135_workbook_publishes_without_temp_residue(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
