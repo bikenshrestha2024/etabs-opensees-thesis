@@ -1,0 +1,12 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "parent_change": "c994fd68989f0c5a0863d53a8bea56630d8bd9c9",
+  "trigger": "NLTHA Python quality workflow 43689880952 failure in synthetic source-only reaction fixture",
+  "issue": "Fixture removed original source-only node 2 before asserting its status, causing StopIteration",
+  "fix": "Preserve source node 2 with Rz=40 and node 1 with Rz=80 so total 120 balances both cases; production source unchanged",
+  "test": "tests.verify_gravity_support_scenarios",
+  "engineering_acceptance": "NOT_VERIFIED",
+  "native_solver": "NOT_RUN",
+  "status": "PENDING_CI"
+}

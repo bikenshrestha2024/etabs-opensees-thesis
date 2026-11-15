@@ -90,7 +90,10 @@ class DualWallGravityTests(unittest.TestCase):
         self.second["report"]["support_vertical_reaction_kN"]=120.
         self.second["report"]["applied_vertical_load_kN"]=120.
         self.first["report"]["applied_vertical_load_kN"]=120.
-        self.first["reactions"]=[dict(node_tag=1,rz_kN=120.)]
+        # Preserve source-only node 2 with a nonzero reaction; the two
+        # independent case totals must still each balance 120 kN.
+        self.first["reactions"]=[dict(node_tag=1,rz_kN=80.),
+                                 dict(node_tag=2,rz_kN=40.)]
         self.first["report"]["support_vertical_reaction_kN"]=120.
         result=compare_wall_support_gravity(self.first,self.second)
         self.assertEqual(next(row["status"] for row in result["per_node"]
