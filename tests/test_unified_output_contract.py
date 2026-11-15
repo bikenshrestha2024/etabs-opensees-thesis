@@ -70,6 +70,27 @@ class UnifiedOutputContractTests(unittest.TestCase):
                     record_case_status(run,"VERIFIED_ETABS_EQUIVALENCE")
             self.assertEqual(len(list(root.rglob("CASE_MANIFEST.json"))),len(STAGE_FOLDERS))
 
+    def test_linked_stage_or_case_folder_is_refused_without_external_writes(self):
+        for linked_at in ("stage", "runs", "state", "case"):
+            with self.subTest(linked_at=linked_at):
+                with tempfile.TemporaryDirectory() as td:
+                    root = Path(td) / "export"
+                    outside = Path(td) / "outside"
+                    root.mkdir()
+                    outside.mkdir()
+                    parts = ("02_GRAVITY", "RUNS", "ULS", "X")
+                    depth = {"stage": 0, "runs": 1, "state": 2, "case": 3}[linked_at]
+                    link = root.joinpath(*parts[:depth + 1])
+                    link.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        link.symlink_to(outside, target_is_directory=True)
+                    except (OSError, NotImplementedError):
+                        self.skipTest("Host cannot create directory symlinks")
+                    with self.assertRaisesRegex(ValueError, "linked run-output"):
+                        create_case_run(root, "GRAVITY", "X", state="ULS")
+                    self.assertEqual(list(outside.iterdir()), [])
+                    self.assertFalse((root / "02_GRAVITY" / "RUNS" / "ULS" / "X" / "00_INPUT_SOURCE" / "CASE_MANIFEST.json").exists())
+
     def test_path_safety_and_format_writers(self):
         for value in ("../hack","C:/temp","a\\b","CON","COM4","COM9",
                       "LPT4","LPT9","", "A." ):
