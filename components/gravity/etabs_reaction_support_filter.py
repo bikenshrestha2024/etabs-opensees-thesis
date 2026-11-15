@@ -52,8 +52,16 @@ def classify_supports(etabs_table, connectivity, original_supports, *, tolerance
     if not math.isfinite(tolerance_kN) or tolerance_kN < 0:
         raise ValueError("Reaction-zero tolerance must be finite and nonnegative")
     selected, excluded, details = {}, [], []
-    original_fixed = {str(k): list(v) for k,v in original_supports.items()
-                      if len(v) == 6 and bool(v[2])}
+    # Never silently omit corrupted source restraints: a missing point
+    # changes the physical boundary condition before the 32/76/97 audit.
+    original_fixed={}
+    for node,flags in original_supports.items():
+        if (not isinstance(flags,(list,tuple)) or len(flags)!=6 or
+                any(type(flag) not in (bool,int) or flag not in (0,1,False,True)
+                    for flag in flags)):
+            raise ValueError("Invalid original six-DOF restraint flags at node "+str(node))
+        if bool(flags[2]):
+            original_fixed[str(node)]=[int(flag) for flag in flags]
     if not original_fixed:
         raise ValueError("No vertical source support restraints in assembled model")
     for tag in sorted(original_fixed, key=lambda s:int(s)):
