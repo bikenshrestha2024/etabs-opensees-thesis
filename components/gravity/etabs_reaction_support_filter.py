@@ -177,15 +177,25 @@ def export_primary_32_comparison(gravity_result, audit_json, output_dir):
                 "wall stiffness, beam end-zone weight or equivalent load path.",
         node_reactions=rows)
     out=Path(output_dir)
-    out.mkdir(parents=True,exist_ok=True)
-    (out/"Primary_32_ETABS_OpenSees_Reactions.json").write_text(
-        json.dumps(summary,indent=2,allow_nan=False),encoding="utf-8")
+    if out.is_symlink() or out.parent.is_symlink():
+        raise ValueError("Refusing linked primary-32 evidence output directory")
+    targets={
+        "json":out/"Primary_32_ETABS_OpenSees_Reactions.json",
+        "csv":out/"Primary_32_ETABS_OpenSees_Reactions.csv",
+        "xlsx":out/"Primary_32_ETABS_OpenSees_Reactions.xlsx",
+    }
+    if any(target.is_symlink() for target in targets.values()):
+        raise ValueError("Refusing linked primary-32 evidence output file")
+    # Shared staged writers guarantee that invalid engineering values never
+    # replace an existing JSON/CSV result with a partially written document.
+    from components.inputs.output_contract import atomic_json, write_table
+    # Validate the entire report before writing any output.
+    json.dumps(summary,allow_nan=False)
     columns=("opensees_node","etabs_unique_name","etabs_FZ_kN",
              "opensees_FZ_kN","delta_kN","percent_delta","abs_delta_kN")
-    with (out/"Primary_32_ETABS_OpenSees_Reactions.csv").open(
-        "w",newline="",encoding="utf-8-sig") as stream:
-        w=csv.DictWriter(stream,fieldnames=columns)
-        w.writeheader();w.writerows(rows)
+    out.mkdir(parents=True,exist_ok=True)
+    atomic_json(targets["json"],summary)
+    write_table(targets["csv"],rows,columns=columns)
     from openpyxl import Workbook
     from openpyxl.styles import Font,PatternFill
     wb=Workbook();sheet=wb.active;sheet.title="32 support comparison"
@@ -203,6 +213,15 @@ def export_primary_32_comparison(gravity_result, audit_json, output_dir):
             info.append([key,value])
     info.column_dimensions["A"].width=38
     info.column_dimensions["B"].width=95
-    wb.save(out/"Primary_32_ETABS_OpenSees_Reactions.xlsx")
+    import os
+    import tempfile
+    fd,name=tempfile.mkstemp(prefix=".primary32_",suffix=".xlsx",dir=out)
+    os.close(fd)
+    stage=Path(name)
+    try:
+        wb.save(stage)
+        os.replace(stage,targets["xlsx"])
+    finally:
+        stage.unlink(missing_ok=True)
     return summary
 
