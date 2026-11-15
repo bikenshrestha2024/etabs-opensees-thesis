@@ -1,0 +1,54 @@
+name: Windows source and output contract smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'components/inputs/**'
+      - 'components/gravity/support_scenarios.py'
+      - 'components/nonlinear_time_history/full_record_gate.py'
+      - 'tools/audit_soil_c_case_completion.py'
+      - 'tests/test_project_output_layout_v171.py'
+      - 'tests/test_unified_output_contract.py'
+      - 'tests/test_stage_output_migration_audit.py'
+      - 'tests/verify_gravity_support_scenarios.py'
+      - 'tests/verify_soil_c_case_completion.py'
+      - '.github/workflows/windows-source-contract.yml'
+  pull_request:
+    paths:
+      - 'components/inputs/**'
+      - 'components/gravity/support_scenarios.py'
+      - 'tools/audit_soil_c_case_completion.py'
+      - '.github/workflows/windows-source-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-headless:
+    name: Windows 3.12 headless contracts (NOT ETABS / GUI acceptance)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install only source-test dependencies
+        run: python -m pip install --disable-pip-version-check openpyxl numpy
+      - name: Confirm Python/Tcl availability without opening GUI windows
+        run: |
+          python -c "import sys, tkinter; interpreter=tkinter.Tcl(); print('Python:',sys.version); print('Tcl:',interpreter.eval('info patchlevel')); print('HEADLESS ONLY: native ETABS and graphical GUI were NOT executed')"
+      - name: Run read-only output and gravity support contracts
+        run: |
+          python -m unittest discover -s tests -p test_project_output_layout_v171.py -v
+          python -m unittest discover -s tests -p test_unified_output_contract.py -v
+          python -m unittest discover -s tests -p test_stage_output_migration_audit.py -v
+          python tests/verify_gravity_support_scenarios.py
+          python tests/verify_soil_c_case_completion.py
+          python tests/verify_full_record_gate.py
+      - name: State the native validation boundary
+        run: |
+          echo "PASS means headless Python source contracts only."
+          echo "Still requires Windows Tk desktop interactions, ETABS OAPI, 32/76/97 support source evidence, and native OpenSees full records."
