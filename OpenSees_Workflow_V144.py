@@ -40,26 +40,43 @@ def workflow_status(folder):
     """[REF docs/source/OpenSees_Workflow_V144.py.md]
     Candidate file presence only. Search legacy and model/state result trees.
     """
-    root=Path(folder)
-    out=root/'OpenSees_Analysis_Results'
-    def find_candidate(*patterns):
-        for base in (out,root):
-            if not base.is_dir():continue
+    root=Path(folder).expanduser().resolve()
+    from components.inputs.output_layout import STAGE_FOLDERS
+    legacy=root/"OpenSees_Analysis_Results"
+    def find_candidate(stage, *patterns):
+        # Do not browse unrelated stage roots, generated processing sidecars,
+        # source symlinks or historical runtime snapshots.
+        bases=([root] if stage=="SOURCE" else
+               [root/STAGE_FOLDERS[stage],legacy])
+        for base in bases:
+            if not base.is_dir() or base.is_symlink():
+                continue
             for pattern in patterns:
-                try:match=next(base.glob(pattern),None)
-                except (OSError,ValueError):match=None
-                if match is not None and match.is_file():return str(match)
+                try:
+                    matches=sorted(base.glob(pattern))
+                except (OSError,ValueError):
+                    continue
+                for match in matches:
+                    if (match.is_file() and not match.is_symlink() and
+                            not match.name.casefold().endswith(".processing.json")):
+                        return str(match)
         return None
     sources=[
-        find_candidate('OpenSees_Complete_Export_Report_V118.json','01_ETABS_EXPORT/**/OpenSees_Complete_Export_Report_V118.json'),
-        find_candidate('OpenSees_Complete_Model_Config_V118.json','01_ETABS_EXPORT/**/OpenSees_Complete_Model_Config_V118.json'),
-        find_candidate('OpenSees_Complete_Gravity_Check_V118.json','**/Gravity_*/**/*Gravity*Check*.json','**/Gravity_*/**/*Gravity*Result*.json'),
-        find_candidate('Modal_ULS/NBC105_Modal_V111.json','Modal_SLS/NBC105_Modal_V111.json','**/Modal_ULS/*.json','**/Modal_SLS/*.json'),
-        find_candidate('NBC105_ESM_Calculation_*.json','**/NBC105_ESM_Calculation_*.json'),
-        find_candidate('MRSM_ULS/*.json','MRSM_SLS/*.json','**/MRSM_ULS/*.json','**/MRSM_SLS/*.json'),
-        find_candidate('LTH_*/*Summary*.json','**/LTH_*/*Summary*.json','**/LTH_*/*Performance*.json'),
-        find_candidate('EXPLORATORY_*/*Summary*.json','**/EXPLORATORY_*/*Summary*.json'),
-        find_candidate('NLTH_*/*Summary*.json','**/NLTH_*/*Summary*.json')
+        find_candidate("SOURCE",'OpenSees_Complete_Export_Report_V118.json',
+                       '01_ETABS_EXPORT/**/OpenSees_Complete_Export_Report_V118.json'),
+        find_candidate("SOURCE",'OpenSees_Complete_Model_Config_V118.json',
+                       '01_ETABS_EXPORT/**/OpenSees_Complete_Model_Config_V118.json'),
+        find_candidate("GRAVITY",'**/OpenSees_Complete_Gravity_Check_V118.json',
+                       '**/*Gravity*Check*.json','**/*Gravity*Result*.json'),
+        find_candidate("MODAL",'**/NBC105_Modal_V111.json','**/*Modal*Summary*.json'),
+        find_candidate("ESM",'**/NBC105_ESM_Calculation_*.json','**/*ESM*Summary*.json'),
+        find_candidate("MRSM",'**/*MRSM*Summary*.json','**/*MRSM*Result*.json',
+                       '**/MRSM_ULS/*.json','**/MRSM_SLS/*.json'),
+        find_candidate("LTHA",'**/LTH_*/*Summary*.json','**/LTH_*/*Performance*.json'),
+        find_candidate("NLTHA",'**/EXPLORATORY_*/*Summary*.json',
+                       '**/BUILDING_TRIAL*/*Summary*.json'),
+        find_candidate("NLTHA",'**/NLTH_*/*Summary*.json',
+                       '**/*Nonlinear*Summary*.json')
     ]
     return [
         ('CANDIDATE FILE FOUND - VALIDATION REQUIRED',
@@ -89,7 +106,20 @@ def launch(parent=None,folder=None):
     def export():
         facts=refresh()
         if facts:
-            target=Path(path.get())/'Available_Inputs_And_Steps_V144.json';target.write_text(json.dumps(facts,indent=2),encoding='utf8');messagebox.showinfo('Saved',str(target),parent=win)
+            from datetime import datetime
+            from uuid import uuid4
+            root=Path(path.get()).expanduser().resolve()
+            stage=root/'01_ETABS_EXPORT'
+            manifest=stage/'00_MANIFEST'
+            target_dir=manifest/'INPUT_READINESS'
+            if any(p.is_symlink() for p in (stage,manifest,target_dir)):
+                raise ValueError('Refusing linked workflow output folder')
+            target_dir.mkdir(parents=True,exist_ok=True)
+            target=target_dir/('Available_Inputs_And_Steps_V144_'
+                +datetime.now().strftime('%Y%m%d_%H%M%S_%f')+'_'+uuid4().hex[:8]+'.json')
+            with target.open('x',encoding='utf-8') as stream:
+                json.dump(facts,stream,indent=2)
+            messagebox.showinfo('Saved',str(target),parent=win)
     ttk.Button(bar,text='Refresh available data',command=refresh).pack(side='left');ttk.Button(bar,text='Export inventory + steps',command=export).pack(side='left');refresh()
     if parent is None:win.mainloop()
     return win
