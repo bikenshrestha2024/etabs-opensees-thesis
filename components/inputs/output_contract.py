@@ -234,9 +234,16 @@ def inspect_case_manifest(run_dir, *, expected_stage=None):
     Reports missing/inconsistent evidence as issues. Never converts solver
     status into engineering compliance, and never modifies archived outputs.
     """
-    run=Path(run_dir).expanduser().resolve()
+    raw_run=Path(run_dir).expanduser()
+    run=raw_run.resolve()
     path=run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
     issues=[]
+    # Read-only inspection must not silently accept redirected source identity.
+    if (raw_run.is_symlink() or (run/"00_INPUT_SOURCE").is_symlink()
+            or path.is_symlink()):
+        return {"run":str(run),"valid":False,
+                "issues":["LINKED_CASE_MANIFEST_PATH"],
+                "solver_status":"UNKNOWN","engineering_acceptance":"NOT_VERIFIED"}
     if not path.is_file():
         return {"run":str(run),"valid":False,"issues":["MISSING_CASE_MANIFEST"],
                 "solver_status":"UNKNOWN","engineering_acceptance":"NOT_VERIFIED"}
@@ -352,7 +359,12 @@ def record_case_status(run_dir, status, *, message=None):
     status = str(status)
     if status not in STATUSES:
         raise ValueError("Unsupported solver status")
+    inspected=inspect_case_manifest(run_dir)
+    if not inspected["valid"]:
+        raise ValueError("Refusing status update for invalid case manifest: " +
+                         ", ".join(inspected["issues"]))
     file = Path(run_dir) / "00_INPUT_SOURCE" / "CASE_MANIFEST.json"
+    _refuse_linked_output_target(file)
     data = json.loads(file.read_text(encoding="utf-8"))
     if data.get("schema") != SCHEMA:
         raise ValueError("Unknown case manifest schema")
