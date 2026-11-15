@@ -57,3 +57,7 @@ The *Nonlinear model readiness* GUI now distinguishes missing **production** ass
 - Project-specific reinforcement, wall confinement, slab beam load path, bracing, damper and P-Delta qualification.
 - Full 45.29-s Kobe/Hector or other complete record run and XY/YX sensitivity convergence; the user's 0.1-s result is `TRUNCATED_DIAGNOSTIC` even though it accepted 21 time samples.
 - Initial tangent eigenperiods should be measured on the nonlinear domain at the reviewed gravity equilibrium; the user's trial 2.21147-s first eigenperiod is **not** the adopted NBC empirical/Rayleigh period and is not Tn90.
+
+## V21 input-screen correction (2026-11-15)
+
+The first-storey candidate selector now refuses an exported wall quadrilateral containing any nonfinite X/Y/Z coordinate or incorrect coordinate dimensionality before ranking candidates by base elevation. Previously, NaN/Infinity could enter the geometric sort/width logic; such a quad is **not** a valid isolate-and-run specimen. Regression: `tests/verify_one_storey_wall_probe.py::TestOneStoreyPanel::test_nonfinite_source_panel_is_not_selected`. This source screening does not perform the native E-SFI test or resolve the 25-storey X-wall first-step failure.
