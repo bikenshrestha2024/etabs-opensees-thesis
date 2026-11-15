@@ -15,6 +15,9 @@ from components.inputs.project_output_layout import create_project_layout, case_
 
 
 class UnifiedOutputContractTests(unittest.TestCase):
+    # Windows temp paths may use 8.3 RUNNER~1 aliases; the production
+    # output API intentionally returns resolved physical paths. Compare
+    # canonical paths rather than syntactic spellings of the same folder.
     def test_canonical_aliases_and_no_side_effects(self):
         self.assertEqual(canonical_stage_folder("06_LINEAR_TH"), "06_LINEAR_TIME_HISTORY")
         self.assertEqual(canonical_stage_folder("07_NONLINEAR_TH"), "07_NONLINEAR_TIME_HISTORY")
@@ -25,7 +28,7 @@ class UnifiedOutputContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)/"export"
             legacy=root/"06_LINEAR_TH"/"case"
-            self.assertEqual(export_root_for(legacy),root)
+            self.assertEqual(export_root_for(legacy),root.resolve())
             self.assertEqual(result_roots(legacy,stages=("LTHA",)),())
             self.assertFalse(root.exists())
 
@@ -48,7 +51,7 @@ class UnifiedOutputContractTests(unittest.TestCase):
             for name in ("REVIEW_MAIN","00_SOURCE_MANIFEST",
                          "09_SOFTWARE_DIAGNOSTICS"):
                 nested=root/name/"RUNS"/"case"
-                self.assertEqual(export_root_for(nested),root)
+                self.assertEqual(export_root_for(nested),root.resolve())
             self.assertFalse(root.exists())
 
     def test_uniform_case_folders_and_manifest_is_not_approval(self):
@@ -209,7 +212,7 @@ class UnifiedOutputContractTests(unittest.TestCase):
             self.assertNotIn("06_LINEAR_TH",ctx["modules"])
             self.assertIn("02_MODEL",ctx["modules"])
             case=case_folder(ctx,"06_LINEAR_TH","X_PLUS",limit_state="ULS")
-            self.assertEqual(case,out/"06_LINEAR_TIME_HISTORY"/"ULS"/"X_PLUS")
+            self.assertEqual(case,(out/"06_LINEAR_TIME_HISTORY"/"ULS"/"X_PLUS").resolve())
             self.assertEqual(edb.read_bytes(),b"unchanged test source")
 
 
