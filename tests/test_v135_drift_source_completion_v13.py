@@ -1,6 +1,7 @@
 """Fail-closed V135 drift: source identity + completed solver run are required."""
 import hashlib
 import json
+import csv
 import tempfile
 import unittest
 from pathlib import Path
@@ -163,9 +164,42 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
             self.assertEqual(idx["tables"]["Seismic drift"]["status"],
                              "NO_CURRENT_ROWS_PRIOR_CSV_NOT_REPLACED")
             self.assertEqual(prior.read_text(),"historical csv must not appear current\n")
+            current=out/idx["tables"]["Seismic drift"]["current_csv"]
+            self.assertTrue(current.is_file())
+            self.assertEqual(idx["tables"]["Seismic drift"]["current_status"],
+                             "CURRENT_EMPTY_NO_DATA")
+            self.assertEqual(current.read_text().splitlines()[0].startswith("file,case"),True)
+            self.assertEqual(len(current.read_text().splitlines()),1)
+            manifest=out/idx["current_run_manifest"]
+            self.assertTrue(manifest.is_file())
+            self.assertEqual(json.loads(manifest.read_text())["model_sha256"],
+                             report["model_sha256"])
             self.assertTrue((out/"Design_Check_V135.log").is_file())
             self.assertEqual(list(out.glob(".design_check_log_*.partial")),[])
             self.assertEqual(list(out.glob(".design_checks_*.xlsx")),[])
+
+    def test_v135_new_run_immutability_and_full_current_empty_output_set(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            (root/"OpenSees_Complete_Model_Data_V118.json").write_text(
+                '{"frames":[],"shells":[]}',encoding="utf-8")
+            with patch("components.validation.settings_audit.audit",
+                       return_value={"rows":[]}):
+                first,out=run(root)
+                prior=json.loads((out/"Design_Check_Output_Index_V135.json").read_text())
+                second,_=run(root)
+            newer=json.loads((out/"Design_Check_Output_Index_V135.json").read_text())
+            self.assertNotEqual(prior["current_run_id"],newer["current_run_id"])
+            for title,meta in newer["tables"].items():
+                csv_file=out/meta["current_csv"]
+                self.assertTrue(csv_file.is_file(),title)
+                with csv_file.open(encoding="utf-8-sig",newline="") as stream:
+                    current_rows=list(csv.DictReader(stream))
+                self.assertEqual(len(current_rows),meta["current_row_count"])
+            self.assertTrue((out/prior["current_run_manifest"]).is_file())
+            self.assertTrue((out/newer["current_run_manifest"]).is_file())
+            self.assertEqual(first["overall"],"INCOMPLETE")
+            self.assertEqual(second["overall"],"INCOMPLETE")
 
     def test_v135_refuses_linked_templates_or_model_source(self):
         from components.validation.design_checks import templates
