@@ -110,7 +110,7 @@ class GravityBundleTests(unittest.TestCase):
         etabs.write_text(json.dumps({"joint_reactions":[
             {"point":str(i),"x_m":float(i),"y_m":0.0,"z_m":0.0,
              "rz_global_kN":76/32 if i<=32 else 0.0,
-             "global_z_basis":"GLOBAL_Z_VERIFIED"}
+             "global_z_basis":"GLOBAL_Z_VERIFIED_DEFAULT_AXES"}
             for i in range(1,77)]}),encoding="utf8")
         audit,archive=export_bundle(
             self.export,self.gravity,self.root/"out_dual",
