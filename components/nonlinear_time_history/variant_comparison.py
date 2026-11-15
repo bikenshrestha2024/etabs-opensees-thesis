@@ -71,7 +71,7 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
             if key[0] not in ("ULS","SLS") or key[2] not in ("XY","YX") or not key[1]:
                 raise ValueError(f"{variant} unsupported case key {key}")
             gate=c.get("completion_gate",{})
-            if not gate.get("full_record_completed") or gate.get("status")!="FULL_DURATION_NUMERIC_SCREEN":
+            if gate.get("full_record_completed") is not True or gate.get("status")!="FULL_DURATION_NUMERIC_SCREEN":
                 raise ValueError(f"{variant} case {key} not a full-duration numerical screen")
             if gate.get("accepted_channels_finite") is not True:
                 raise ValueError(f"{variant} case {key} has unverified finite channels")
