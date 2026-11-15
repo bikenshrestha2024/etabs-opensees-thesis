@@ -1,6 +1,6 @@
 # Numbered launch order
 
-Main program: **[01.py](../01.py)**. Run from Spyder or `python 01.py`.
+Canonical workflow: **[01_WORKFLOW_START.py](../01_WORKFLOW_START.py)**. The short **[01.py](../01.py)** remains a supported Spyder compatibility alias. Run either with Python from the repository root.
 
 This list is generated from `tools/audit_active_repository.py::CANONICAL`.
 It provides one canonical entry per number; old root aliases remain for compatibility.
@@ -8,7 +8,7 @@ Numbers locate modules; follow the engineering acceptance gates before execution
 
 | Order | Canonical launcher |
 |---|---|
-| 01 | [01.py](../01.py) |
+| 01 | [01_WORKFLOW_START.py](../01_WORKFLOW_START.py) (alias: [01.py](../01.py)) |
 | 02 | [02_INPUT_READINESS.py](../02_INPUT_READINESS.py) |
 | 03 | [03_MATERIAL_PARAMETER_SETUP.py](../03_MATERIAL_PARAMETER_SETUP.py) |
 | 04 | [04_LITERATURE_MATERIAL_PROFILES.py](../04_LITERATURE_MATERIAL_PROFILES.py) |
