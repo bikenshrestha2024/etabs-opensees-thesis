@@ -16,6 +16,7 @@ import re
 import tempfile
 from datetime import datetime, timezone
 from decimal import Decimal
+from numbers import Integral, Real
 from pathlib import Path
 from uuid import uuid4
 
@@ -93,7 +94,8 @@ def write_table(path, rows, *, columns):
                 # not be silently published as a result in an otherwise valid CSV.
                 for column in columns:
                     value = row.get(column)
-                    if isinstance(value, (float, Decimal)) and not math.isfinite(value):
+                    if (isinstance(value, Decimal) or
+                            (isinstance(value, Real) and not isinstance(value, Integral))) and not math.isfinite(value):
                         raise ValueError(
                             f"Nonfinite numeric CSV evidence in column {column!r}")
                 writer.writerow(row)
