@@ -57,5 +57,34 @@ class CaseReviewCanonicalOutputTests(unittest.TestCase):
             self.assertEqual(result["preload_profiles"],[])
             self.assertEqual(result["deflection"],[])
 
+    def test_export_rejects_linked_diagnostics_without_external_writes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"export"
+            outside=Path(td)/"outside"
+            root.mkdir()
+            outside.mkdir()
+            try:
+                (root/"09_SOFTWARE_DIAGNOSTICS").symlink_to(
+                    outside,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host has no directory symlink support")
+            with self.assertRaisesRegex(ValueError,"linked case-review"):
+                export(root)
+            self.assertEqual(list(outside.iterdir()),[])
+
+    def test_excel_report_is_replaced_without_partial_files(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            result,out=export(root)
+            xlsx=out/"All_Case_Review_V142.xlsx"
+            self.assertTrue(xlsx.is_file())
+            self.assertEqual(list(out.glob(".case_review_*")),[])
+            from openpyxl import load_workbook
+            book=load_workbook(xlsx,read_only=True)
+            self.assertIn("Read errors",book.sheetnames)
+            book.close()
+            export(root)
+            self.assertEqual(list(out.glob(".case_review_*")),[])
+
 if __name__=="__main__":
     unittest.main()
