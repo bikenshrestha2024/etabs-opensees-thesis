@@ -34,5 +34,28 @@ class CaseReviewCanonicalOutputTests(unittest.TestCase):
             self.assertEqual(len(exported2["drift"]),1)
 
 
+    def test_corrupt_evidence_is_reported_and_not_plotted(self):
+        import json
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            (root/"Gravity_Profile_ULS_V142.json").write_text(
+                '["not-a-gravity-profile"]',encoding="utf-8")
+            stage=root/"03_ESM"/"RUNS"/"ULS"/"X"/"case"
+            stage.mkdir(parents=True)
+            (stage/"Floor_Edge_Drift_ULS.csv").write_text(
+                "limit_state,story_number,axis,floor_displacement_m\n"
+                "ULS,25,X,0.012\nULS,24,X,NaN\n",encoding="utf-8")
+            (stage/"Deformation_ULS.json").write_text(
+                json.dumps({"limit_state":"ULS",
+                            "nodes":{"1":[0,0,95]},
+                            "displacements":{"1":["NaN",0]}}))
+            result=collect(root)
+            statuses={r.get("status") for r in result["issues"]}
+            self.assertIn("INVALID_GRAVITY_PROFILE",statuses)
+            self.assertIn("INVALID_FLOOR_EDGE_DRIFT",statuses)
+            self.assertIn("INVALID_DEFORMATION_RESULT",statuses)
+            self.assertEqual(result["preload_profiles"],[])
+            self.assertEqual(result["deflection"],[])
+
 if __name__=="__main__":
     unittest.main()
