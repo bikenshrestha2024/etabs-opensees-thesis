@@ -52,6 +52,27 @@ class Primary32Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"Missing=.*41"):
                 classify_supports(self.path,self.topology,self.original)
 
+    def test_32_comparison_refuses_duplicate_mapping_and_nonfinite_source(self):
+        import copy
+        _,audit=classify_supports(self.path,self.topology,self.original)
+        result=dict(ok=True,wall_support_strategy=MODE,
+                    support_node_tags=list(PROJECT_PRIMARY_32),
+                    reactions=[dict(node_tag=i,rz_kN=1000.)
+                               for i in PROJECT_PRIMARY_32],
+                    report=dict(support_vertical_reaction_kN=32000.))
+        duplicated=copy.deepcopy(audit)
+        duplicated["mapping"].append(copy.deepcopy(next(
+            row for row in duplicated["mapping"] if row["selected"])))
+        with self.assertRaisesRegex(ValueError,"Duplicate selected ETABS"):
+            export_primary_32_comparison(result,duplicated,Path(self.tmp.name)/"dup")
+        invalid=copy.deepcopy(audit)
+        next(row for row in invalid["mapping"] if row["selected"]
+             )["etabs_FZ_kN"]=float("nan")
+        with self.assertRaisesRegex(ValueError,"Nonfinite original ETABS"):
+            export_primary_32_comparison(result,invalid,Path(self.tmp.name)/"nan")
+        self.assertFalse((Path(self.tmp.name)/"dup").exists())
+        self.assertFalse((Path(self.tmp.name)/"nan").exists())
+
     def test_export_refuses_linked_destinations_and_preserves_report(self):
         import json
         selected,audit=classify_supports(self.path,self.topology,self.original)
