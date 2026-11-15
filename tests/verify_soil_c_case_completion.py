@@ -40,13 +40,48 @@ class MatrixAuditTests(unittest.TestCase):
             (d/"Case_Summary.json").write_text(json.dumps(source))
             (d/"Accepted_History_Completion_Gate.json").write_text(json.dumps({
                 "status":"FULL_DURATION_NUMERIC_SCREEN",
-                "full_record_completed":True,"accepted_channels_finite":True}))
+                "full_record_completed":True,"accepted_channels_finite":True,
+                "full_record_duration_s":1.0,"requested_duration_s":1.0,
+                "achieved_time_s":1.0,"accepted_states":201}))
             result=inspect_case(d.parent,"M0","ULS","Kobe","XY")
             self.assertEqual(result["status"],"RESEARCH_ONLY_FULL_RECORD")
             source["orientation"]="YX"
             (d/"Case_Summary.json").write_text(json.dumps(source))
             result=inspect_case(d.parent,"M0","ULS","Kobe","XY")
             self.assertEqual(result["status"],"INCOMPLETE")
+
+    def test_unverified_digest_and_fabricated_duration_are_not_completed(self):
+        with tempfile.TemporaryDirectory() as td:
+            d=Path(td)/"XY"
+            d.mkdir()
+            summary=dict(variant_id="M0",limit_state="ULS",pair_id="Kobe",
+                         orientation="XY",record_sha256="a"*64,
+                         model_sha256="b"*64,diagnostic_excitation="XY",
+                         peak_roof_UX_m=1,peak_roof_UY_m=1,
+                         max_story_drift_X=.01,max_story_drift_Y=.01,
+                         peak_base_shear_X_kN=1,peak_base_shear_Y_kN=1,
+                         peak_roof_torsion_rad=.01)
+            gate=dict(status="FULL_DURATION_NUMERIC_SCREEN",
+                      full_record_completed=True,accepted_channels_finite=True,
+                      full_record_duration_s=45.29,requested_duration_s=45.29,
+                      achieved_time_s=45.29,accepted_states=200)
+            summary_path=d/"Case_Summary.json"
+            gate_path=d/"Accepted_History_Completion_Gate.json"
+            def audit():
+                summary_path.write_text(json.dumps(summary))
+                gate_path.write_text(json.dumps(gate))
+                return inspect_case(d.parent,"M0","ULS","Kobe","XY")
+            self.assertEqual(audit()["status"],"RESEARCH_ONLY_FULL_RECORD")
+            summary["record_sha256"]="Z"*64
+            self.assertEqual(audit()["status"],"INCOMPLETE")
+            summary["record_sha256"]="a"*64
+            gate["achieved_time_s"]=.1
+            invalid=audit()
+            self.assertEqual(invalid["status"],"INCOMPLETE")
+            self.assertIn("duration",invalid["reason"])
+            gate["achieved_time_s"]=45.29
+            gate["accepted_states"]=1
+            self.assertEqual(audit()["status"],"INCOMPLETE")
 
 if __name__=="__main__":
     unittest.main()
