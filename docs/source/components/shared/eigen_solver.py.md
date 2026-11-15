@@ -21,3 +21,8 @@ References are indexed in [the research source register](../../../00_RESEARCH_RE
 Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.
 
 [Source module index](../../00_SOURCE_GUIDE_INDEX.md) · [G00–G10 acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md)
+
+
+## 2026-11-15 exact mode-count gate
+
+The shared eigensolver and modal audit reject fractional, boolean and nonfinite requested mode counts rather than silently truncating them with `int()`. The MRSM caller validates the count before model assembly; the modal audit validates manually selected X/Y fundamental modes and a positive finite frequency threshold. The already-working integer-count eigen solver and source model parameters are unchanged. Regression: `tests/test_modal_mode_count_contract.py`; engineering review: `REVIEW_MAIN/04_MODAL/20261115_MODAL_MODE_COUNT_NUMERIC_IDENTITY_GATE.md`. Native modal mass, ETABS equivalence, mode-shape physics and NBC 105:2025 acceptance remain NOT_VERIFIED.
