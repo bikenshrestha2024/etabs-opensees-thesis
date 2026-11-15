@@ -235,7 +235,13 @@ def run(folder,storage=False,nonparallel=False):
     if model.is_symlink():
         raise ValueError('Refusing linked authoritative serialized model source')
     if not model.is_file():raise ValueError('Select export folder containing OpenSees_Complete_Model_Data_V118.json')
-    digest=hashlib.sha256(model.read_bytes()).hexdigest();data=json.loads(model.read_text(encoding='utf-8-sig'))
+    # Hash precisely the bytes parsed below; a file replaced between two
+    # independent reads must not acquire a fingerprint for another payload.
+    source_bytes=model.read_bytes()
+    digest=hashlib.sha256(source_bytes).hexdigest()
+    data=json.loads(source_bytes.decode('utf-8-sig'))
+    if not isinstance(data,dict):
+        raise ValueError('Serialized model must contain a JSON object')
     output,legacy=design_check_locations(folder)
     # Prefer user-edited criteria in the original legacy directory until
     # migrated explicitly. Blank canonical templates must not replace them.
@@ -283,6 +289,12 @@ def run(folder,storage=False,nonparallel=False):
         # input, never discard/edit it or treat a header-only file as evidence.
         fresh=output/filename
         old=legacy/filename
+        # Do not cross a linked criteria path even when a later fallback is
+        # available; silent fallback could obscure conflicting user edits.
+        from components.inputs.output_contract import _refuse_linked_output_target
+        for candidate in (fresh,old):
+            if candidate.is_symlink():
+                raise ValueError('Refusing linked editable criteria input: '+str(candidate))
         fresh_rows=read_rows(fresh) if fresh.is_file() else []
         old_rows=read_rows(old) if old.is_file() else []
         if fresh_rows:
