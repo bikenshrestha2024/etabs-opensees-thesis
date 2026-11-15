@@ -15,9 +15,11 @@ def suite():
                 for axis in ("XY","YX"):
                     cases.append(dict(variant_id=model,model_sha256="a"*64,
                         limit_state=limit,pair_id=pair,
-                        orientation=axis,record_sha256=pair,
+                        orientation=axis,record_sha256=("%064x" % int(pair[1:])),
                         completion_gate=dict(status="FULL_DURATION_NUMERIC_SCREEN",
-                            full_record_completed=True,accepted_channels_finite=True),
+                            full_record_completed=True,accepted_channels_finite=True,
+                            full_record_duration_s=45.29,requested_duration_s=45.29,
+                            achieved_time_s=45.29,accepted_states=200),
                         **{k:.01 if "drift" in k else 1. for k in METRICS}))
         data[model]=cases
     return data
@@ -56,7 +58,8 @@ class CompareTests(unittest.TestCase):
                     for pair in ("P4","P5","P6","P7","P8"):
                         template=next(x for x in data[variant]
                            if x["limit_state"]==limit and x["orientation"]==orientation)
-                        fresh=dict(template,pair_id=pair,record_sha256=pair)
+                        fresh=dict(template,pair_id=pair,
+                                   record_sha256=("%064x" % int(pair[1:])))
                         data[variant].append(fresh)
         # One huge pair P8 should influence the AVERAGE but not replace it
         # with an unlabelled pooled maximum.
@@ -85,6 +88,30 @@ class CompareTests(unittest.TestCase):
         data["M2"][0]["variant_id"]="M1"
         with self.assertRaisesRegex(ValueError,"variant ID"):
             compare_completed_cases(manifest(),data)
+    def test_reject_forged_duration_and_motion_hash_in_variant_aggregation(self):
+        for field,value in (("achieved_time_s",.1),
+                            ("requested_duration_s",.1),
+                            ("full_record_duration_s",float("nan")),
+                            ("accepted_states",1)):
+            data=suite()
+            data["M2"][0]["completion_gate"][field]=value
+            with self.subTest(field=field),self.assertRaises(ValueError):
+                compare_completed_cases(manifest(),data)
+        data=suite()
+        data["M2"][0]["record_sha256"]="not-a-valid-motion-source"
+        with self.assertRaisesRegex(ValueError,"SHA256"):
+            compare_completed_cases(manifest(),data)
+
+    def test_reject_nonhex_model_fingerprint_and_non_numeric_metric(self):
+        p=manifest()
+        p["variants"][0]["model_file_sha256"]="Z"*64
+        with self.assertRaisesRegex(ValueError,"model export SHA256"):
+            validate_variant_manifest(p)
+        data=suite()
+        data["M1"][0]["max_story_drift_X"]="not-numeric"
+        with self.assertRaisesRegex(ValueError,"invalid metric"):
+            compare_completed_cases(manifest(),data)
+
     def test_reject_trial(self):
         data=suite();data["M3"][0]["completion_gate"]["full_record_completed"]=False
         with self.assertRaisesRegex(ValueError,"full-duration"):
