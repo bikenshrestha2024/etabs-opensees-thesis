@@ -61,7 +61,11 @@ def applied_ground_acceleration(records, *, time_s, orientation, excitation="XY"
         if unit not in CONVERSION:
             raise ValueError("Unsupported acceleration unit: "+str(unit))
         enabled=excitation=="XY" or excitation=="X" and direction==0 or excitation=="Y" and direction==1
-        result.append(_sample_path(values,dt,time_s)*CONVERSION[unit]*scale if enabled else 0.)
+        acceleration = (_sample_path(values,dt,time_s)*CONVERSION[unit]*scale
+                        if enabled else 0.)
+        if not math.isfinite(acceleration):
+            raise ValueError("Nonfinite converted ground acceleration")
+        result.append(acceleration)
     return tuple(result)
 
 
@@ -73,4 +77,7 @@ def relative_to_absolute_floor_acceleration(node_relative_xyz,ground_xy):
               float(ground_xy[0]), float(ground_xy[1]))
     if not all(math.isfinite(value) for value in values):
         raise ValueError("Nonfinite relative or support acceleration")
-    return (values[0]+values[2], values[1]+values[3])
+    absolute = (values[0]+values[2], values[1]+values[3])
+    if not all(math.isfinite(value) for value in absolute):
+        raise ValueError("Nonfinite reconstructed absolute acceleration")
+    return absolute
