@@ -1,0 +1,21 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 via GitHub connector",
+  "baseline_sha": "2ce26c4ac24eef40502bd27e393cd870b9a8177f",
+  "scope": "Close CI-evidence status in consolidated gravity and tracked index review ledger",
+  "tested_code_commit": "11c7638119c5f09f43c18861afff587dfd207959",
+  "verified_results": {
+    "integrated": 43690030077,
+    "repository": 43690030045,
+    "nltha_quality": 43690030098,
+    "windows_headless": 43690030059,
+    "literature": 43690030055,
+    "whole_tree_coverage_previous_code": 43689880929,
+    "all_success": true,
+    "tracked_paths": 3042,
+    "active_python": 530,
+    "static_gate": "PASS"
+  },
+  "source_model_changes": false,
+  "remaining": "Native ETABS 32/76/97 supports, wall transient and full ESM/MRSM NLTHA numerical evidence are NOT_VERIFIED"
+}

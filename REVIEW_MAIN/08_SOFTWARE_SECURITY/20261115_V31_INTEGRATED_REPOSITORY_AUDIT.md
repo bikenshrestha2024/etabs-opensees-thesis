@@ -161,3 +161,21 @@ The integrated report publisher now writes a structured, local/read-only audit e
 **Regression coverage and CI:** add adversarial cases for reaction total versus applied mismatch, changed nonreaction geometry, source-only label, `src` classification and historic snapshot types. Run the gravity comparator regression inside conda-forge based `repository-integrity.yml` (openpyxl used for Excel output), and coverage regression inside integrated CI. All user EDB/XLSX/ground motions and original case outputs remain untouched.
 
 **Remaining independent gates:** native three-case support/geometry/restraint comparison, original Excel Aw/T1/EDB SHA integration, ESM/MRSM model mass and drifts, 25-storey X-wall first-step NLTHA, complete M0–M6 full-duration sensitivity and Windows Spyder GUI usability. No static Python pass can close these gates.
+
+
+## V32 final static gate verification — commit `11c7638119c5f09f43c18861afff587dfd207959` (2026-11-15)
+
+The coordinated gravity and tracked-file categorization change was committed as `c994fd68989f0c5a0863d53a8bea56630d8bd9c9`. Its first NLTHA Python-quality run [failed](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43689880952) on a **new test fixture**: the synthetic SOURCE_ONLY test accidentally deleted source reaction node 2, then attempted to assert a result row for that nonexistent node. No native engineering model data or production solver inputs were changed. Commit `11c7638119c5f09f43c18861afff587dfd207959` retains source reactions node 1 = 80 kN and node 2 = 40 kN; the continuous case totals 90+30 = 120 kN, so both maintain 120 kN downward applied gravity. The expected `SOURCE_ONLY` row is now physically and logically present.
+
+**Final six checks (all passed):**
+
+- [Integrated inventory/structured source review](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43690030077) — SUCCESS.
+- [Whole-Git tracked coverage inventory](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43689880929) — SUCCESS on the preceding source revision (classifications identical on the corrective fixture-only commit).
+- [Repository compilation and navigation, with gravity scenario regressions](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43690030045) — SUCCESS.
+- [NLTHA Python quality, including gravity scenario synthetic tests](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43690030098) — SUCCESS.
+- [Windows source/output contract smoke](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43690030059) — SUCCESS; not interactive ETABS/Spyder.
+- [Literature provenance audit](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43690030055) — SUCCESS.
+
+The [integrated GitHub artifact](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43690030077) was downloaded and its `00_OVERVIEW/integrated_audit.json` inspected: **3,042 Git-tracked paths, 530 active Python files, zero active parser failures, zero explicit unresolved local imports, zero current-tree secret pattern candidates, `static_audit=PASS`**. Four static import-cycle candidate groups remain review-required, and 96 legacy output literal occurrences remain migration candidates, not confirmed failing writers. All original source files and numeric assumptions are untouched.
+
+**Engineering acceptance remains blocked:** the 32/76/97 physical restraint representation, independently sourced ETABS gravity comparisons, slab and wall load paths, nonlinear X-wall first-step element 110280, ESM/MRSM NBC105 design matching, real ground-motion full-duration M0–M6 runs, and native Windows UI operation were not executed during this static test pass. Do not interpret these software-only checks as resolved physical discrepancies.
