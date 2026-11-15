@@ -284,6 +284,7 @@ on:
       - 'components/validation/case_review.py'
       - 'components/validation/design_checks.py'
       - 'tests/test_design_checks_canonical_v135.py'
+      - 'tests/test_v135_drift_source_completion_v13.py'
       - 'components/modal/gui_and_reports.py'
       - 'components/ui/results.py'
       - 'tests/test_modal_canonical_output_v2.py'
