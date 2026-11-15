@@ -82,6 +82,25 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "SOURCE_MODEL_SHA_MISMATCH_EXCLUDED")
                 for r in report["tables"]["Open items"]))
 
+    def test_derived_design_csv_publication_is_atomic(self):
+        from components.validation.design_checks import write_rows
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            output=root/"Design_Checks_V135"/"Seismic_drift.csv"
+            output.parent.mkdir()
+            output.write_text("existing evidence stays\\n")
+            with self.assertRaisesRegex(ValueError,"Nonfinite numeric CSV"):
+                write_rows(output,[{"case":"X_E0","drift":0.003},
+                                   {"case":"Y_E0","drift":float("nan")}])
+            self.assertEqual(output.read_text(),"existing evidence stays\\n")
+            self.assertEqual(list(output.parent.glob(".writing_*.partial")),[])
+            write_rows(output,[{"case":"X_E0","drift":0.003}])
+            self.assertIn("X_E0,0.003",output.read_text())
+            # Empty rows retain legacy no-write behavior; they do not fabricate evidence.
+            before=output.read_bytes()
+            write_rows(output,[])
+            self.assertEqual(before,output.read_bytes())
+
     def test_mixed_valid_invalid_rows_do_not_leak_drift_passes(self):
         from components.validation.design_checks import scan_drift
         with tempfile.TemporaryDirectory() as td:
