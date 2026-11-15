@@ -178,6 +178,8 @@ def package_mesh_case(folder, subdivisions):
     """Package one independent mesh case without merging distinct run identities.
 
     A ZIP is a diagnostic export, not evidence of a completed gravity solve.
+
+    [REF docs/source/components/gravity/mesh_cases.py.md]
     Store it at 02_MODEL/SLAB_LOAD_PATH/UPLOAD_PACKAGES/MESH_nn.zip.
     Existing case data are read-only; symlinks and recursive uploads refused.
     """
