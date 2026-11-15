@@ -48,6 +48,69 @@ class MeshCasesTests(unittest.TestCase):
         self.assertEqual(before,{p:mesh.digest(self.root/p) for p in mesh.REQUIRED_SOURCE})
         self.assertEqual(json.loads((self.root/mesh.REQUIRED_SOURCE[3]).read_text()),self.original)
 
+    def test_source_and_derived_config_have_separate_digest_evidence(self):
+        original_sha={p:mesh.digest(self.root/p) for p in mesh.REQUIRED_SOURCE}
+        path=mesh.stage_case(self.root,8)
+        manifest=json.loads((path/"MESH_CASE_PROVENANCE.json").read_text())
+        self.assertEqual(manifest["original_source_file_sha256"],original_sha)
+        name=mesh.REQUIRED_SOURCE[3]
+        self.assertEqual(manifest["original_source_file_sha256"][name],
+                         mesh.digest(self.root/name))
+        self.assertEqual(manifest["source_file_sha256"][name],
+                         mesh.digest(path/name))
+        self.assertNotEqual(manifest["source_file_sha256"][name],
+                            manifest["original_source_file_sha256"][name])
+        self.assertEqual(json.loads((self.root/name).read_text()),self.original)
+
+    def test_symlinked_source_is_refused_before_run_creation(self):
+        outside=self.root.parent/f"linked-source-{self.root.name}.json"
+        outside.write_text('{"private":"do not copy"}')
+        source=self.root/mesh.REQUIRED_SOURCE[0]
+        source.unlink()
+        try:
+            source.symlink_to(outside)
+        except (OSError,NotImplementedError):
+            outside.unlink()
+            self.skipTest("Host cannot create source symlinks")
+        try:
+            with self.assertRaisesRegex(ValueError,"linked mesh"):
+                mesh.stage_case(self.root,4)
+            self.assertFalse((self.root/"02_MODEL").exists())
+            self.assertEqual(outside.read_text(),'{"private":"do not copy"}')
+        finally:
+            outside.unlink()
+
+    def test_symlinked_output_parent_is_refused_and_external_target_untouched(self):
+        with tempfile.TemporaryDirectory() as td:
+            external=Path(td)/"external"
+            external.mkdir()
+            alias=self.root/"02_MODEL"
+            try:
+                alias.symlink_to(external,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host cannot create directory symlinks")
+            with self.assertRaisesRegex(ValueError,"linked mesh"):
+                mesh.stage_case(self.root,8)
+            self.assertEqual(list(external.iterdir()),[])
+            with self.assertRaisesRegex(ValueError,"linked mesh"):
+                mesh.prepared_configs(self.root)
+            self.assertEqual(list(external.iterdir()),[])
+
+    def test_prepared_configs_preflight_rejects_linked_8_before_writing_4(self):
+        with tempfile.TemporaryDirectory() as td:
+            outside=Path(td)/"external.json"
+            outside.write_text('{"private":true}')
+            target=self.root/"02_MODEL"/"SLAB_LOAD_PATH"/"PREPARED_CONFIGS"
+            target.mkdir(parents=True)
+            try:
+                (target/"Model_Config_MESH_08.json").symlink_to(outside)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host cannot create file symlinks")
+            with self.assertRaisesRegex(ValueError,"linked mesh"):
+                mesh.prepared_configs(self.root)
+            self.assertFalse((target/"Model_Config_MESH_04.json").exists())
+            self.assertEqual(outside.read_text(),'{"private":true}')
+
     def test_reject_prepared_config_with_changed_source_settings(self):
         mesh.prepared_configs(self.root)
         root_config=self.root/mesh.REQUIRED_SOURCE[3]

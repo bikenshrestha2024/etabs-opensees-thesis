@@ -17,6 +17,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+def _refuse_linked_chain(path):
+    """Refuse linked roots/parents before resolve or output creation."""
+    candidate=Path(path).expanduser()
+    if any(part.is_symlink() for part in (candidate,*candidate.parents)):
+        raise ValueError("Refusing linked disk-audit source or output path")
+    return candidate
+
+
 def _sha256(path):
     h = hashlib.sha256()
     with path.open("rb") as src:
@@ -33,7 +41,7 @@ def scan_output(root, *, max_large=50, hash_duplicates=True):
     NOT duplicates and must never be deleted based on name alone.
     Symlinked files/directories are intentionally not followed.
     """
-    root = Path(root).expanduser().resolve(strict=True)
+    root = _refuse_linked_chain(root).resolve(strict=True)
     if not root.is_dir():
         raise NotADirectoryError(str(root))
     entries = []
@@ -112,7 +120,7 @@ def scan_output(root, *, max_large=50, hash_duplicates=True):
 
 def write_report(report, destination):
     """Write only to a fresh dedicated review directory; never alter source runs."""
-    out = Path(destination).expanduser().resolve()
+    out = _refuse_linked_chain(destination).resolve()
     if out.exists() and any(out.iterdir()):
         raise FileExistsError("Report destination already contains files: " + str(out))
     out.mkdir(parents=True, exist_ok=True)

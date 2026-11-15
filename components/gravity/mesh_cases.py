@@ -38,6 +38,34 @@ def digest(path):
     return sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _refuse_linked_chain(path):
+    """Check existing path components before resolving a selected source/output.
+
+    A mesh staging operation must not silently traverse linked ETABS source
+    data, prepared configurations or folders outside the selected export.
+    """
+    candidate = Path(path).expanduser()
+    for part in (candidate, *candidate.parents):
+        if part.is_symlink():
+            raise ValueError("Refusing linked mesh source/output path: " + str(candidate))
+    return candidate
+
+
+def _read_source_manifest(folder):
+    """Preflight every available source file before creating a new mesh run."""
+    original = {}
+    for name in REQUIRED_SOURCE + OPTIONAL_SOURCE:
+        source = _refuse_linked_chain(folder / name)
+        if not source.exists():
+            if name in REQUIRED_SOURCE:
+                raise FileNotFoundError("Missing required ETABS audit input: " + name)
+            continue
+        if not source.is_file():
+            raise ValueError("Not a regular ETABS audit source: " + name)
+        original[name] = digest(source)
+    return original
+
+
 def case_base(folder, subdivisions):
     """Independent case directory. [REF docs/source/components/gravity/mesh_cases.py.md]"""
     n = int(subdivisions)
@@ -50,16 +78,21 @@ def prepared_configs(folder):
     """Create three labeled *configurations*, not completed analysis cases.
     [REF docs/source/components/gravity/mesh_cases.py.md]
     """
-    folder = Path(folder).resolve()
-    config_path = folder / REQUIRED_SOURCE[3]
+    folder = _refuse_linked_chain(folder).resolve(strict=True)
+    config_path = _refuse_linked_chain(folder / REQUIRED_SOURCE[3])
     if not config_path.is_file():
         raise FileNotFoundError("Export the ETABS source model and config first.")
     cfg = json.loads(config_path.read_text(encoding="utf-8-sig"))
     target_dir = folder / "02_MODEL" / "SLAB_LOAD_PATH" / "PREPARED_CONFIGS"
+    _refuse_linked_chain(target_dir)
+    # Preflight *all* destinations before writing any derived config.
+    targets = [
+        _refuse_linked_chain(target_dir / f"Model_Config_MESH_{n:02d}.json")
+        for n in MESH_SIZES
+    ]
     target_dir.mkdir(parents=True, exist_ok=True)
     result = []
-    for n in MESH_SIZES:
-        target = target_dir / f"Model_Config_MESH_{n:02d}.json"
+    for n, target in zip(MESH_SIZES, targets):
         prepared = dict(cfg, floor_subdivisions=n)
         # No output implies an assembled/solved case. Replacements here are
         # config-only and checked again when copied to a unique run directory.
@@ -72,14 +105,17 @@ def stage_case(folder, subdivisions):
     """Copy source inputs into an isolated, unique case run; never mutate root.
     [REF docs/source/components/gravity/mesh_cases.py.md]
     """
-    folder = Path(folder).resolve()
+    folder = _refuse_linked_chain(folder).resolve(strict=True)
     n = int(subdivisions)
     parent = case_base(folder, n) / "RUNS"
-    missing = [f for f in REQUIRED_SOURCE if not (folder / f).is_file()]
-    if missing:
-        raise FileNotFoundError("This export has missing required ETABS audit inputs: " + ", ".join(missing))
+    # Verify the entire path before any mkdir/copy. The config is source
+    # evidence and the newly staged config is intentionally a derived variant.
+    _refuse_linked_chain(parent)
+    source_digests = _read_source_manifest(folder)
     root_config = json.loads((folder / REQUIRED_SOURCE[3]).read_text(encoding="utf-8-sig"))
-    prepared = folder / "02_MODEL" / "SLAB_LOAD_PATH" / "PREPARED_CONFIGS" / f"Model_Config_MESH_{n:02d}.json"
+    prepared = _refuse_linked_chain(
+        folder / "02_MODEL" / "SLAB_LOAD_PATH" / "PREPARED_CONFIGS"
+        / f"Model_Config_MESH_{n:02d}.json")
     if prepared.is_file():
         chosen = json.loads(prepared.read_text(encoding="utf-8-sig"))
         expected = dict(root_config, floor_subdivisions=n)
@@ -94,12 +130,15 @@ def stage_case(folder, subdivisions):
     run_dir = parent / f"RUN_{run_id}"
     run_dir.mkdir(parents=True, exist_ok=False)
     provenance = {}
-    for filename in REQUIRED_SOURCE + OPTIONAL_SOURCE:
-        source = folder / filename
-        if source.is_file():
-            target = run_dir / filename
-            shutil.copy2(source, target)
-            provenance[filename] = digest(target)
+    for filename, original_sha in source_digests.items():
+        source = _refuse_linked_chain(folder / filename)
+        target = _refuse_linked_chain(run_dir / filename)
+        shutil.copy2(source, target)
+        staged_sha = digest(target)
+        # Detect source changes during staging, not only changes in the copy.
+        if staged_sha != original_sha or digest(source) != original_sha:
+            raise RuntimeError("ETABS source changed during mesh staging: " + filename)
+        provenance[filename] = staged_sha
     config = run_dir / REQUIRED_SOURCE[3]
     config.write_text(json.dumps(chosen, indent=2, ensure_ascii=False), encoding="utf-8")
     provenance[config.name] = digest(config)
@@ -110,6 +149,7 @@ def stage_case(folder, subdivisions):
         "source_model_unchanged": True,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "source_file_sha256": provenance,
+        "original_source_file_sha256": source_digests,
         "meaning": "ETABS saved source audit copied to mesh-specific folder; no solver executed",
     }
     (run_dir / "MESH_CASE_PROVENANCE.json").write_text(

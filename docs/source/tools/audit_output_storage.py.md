@@ -38,3 +38,8 @@ See [Gravity support/load-path review](../../../REVIEW_MAIN/01_GRAVITY/20261112_
 ## Canonical diagnostics output V15
 
 With `--root <case>` and no explicit `--out`, a new report now belongs to the selected export case under `09_SOFTWARE_DIAGNOSTICS/DISK_AUDITS/RUNS/<UTC>/`, with `JSON/DISK_AUDIT.json`, `CSV/LARGEST_FILES.csv`, `CSV/EXACT_DUPLICATES.csv`, and `REPORT/READ_FIRST.md`. The explicit `--out` option retains the user-selected report root. Legacy flat/sibling reports are preserved, not moved or overwritten. The disk scan precedes the new report output, so the report does not count its own bytes; previously saved audits are counted on future scans. This is a disk-footprint inventory, **not structural or numerical validation**.
+
+
+## 2026-11-15 linked-path audit boundary
+
+The static local disk audit refuses a symlinked selected root and any symlink in the report destination's existing ancestor chain **before** resolution, preventing its read-only scanning/writing from silently operating on an unrelated external project directory. Symlinked children are still skipped during the walk. Test fixtures under `tests/test_output_storage_audit.py` verify the source alias and linked report-parent cases leave the external folder untouched. This is a normal Python filesystem guard, not an OS-level race-proof sandbox; disk footprint duplication is not evidence of ETABS/OpenSees correctness.

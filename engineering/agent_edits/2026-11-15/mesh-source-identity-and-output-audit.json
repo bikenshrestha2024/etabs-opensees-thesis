@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "baseline_sha": "c672400d9a356af1666b496261beba49f1386033",
+  "task": "Coordinated provenance and output-path hardening for 4/8/16 mesh staging and disk audit",
+  "source_files_inspected": [
+    "AGENTS.md",
+    "engineering/rules/ENGINEERING_GATES.md",
+    "components/gravity/mesh_cases.py",
+    "components/gravity/support_scenarios.py",
+    "tools/audit_output_storage.py",
+    "tests/test_model_mesh_case_workflow.py",
+    "tests/test_output_storage_audit.py",
+    ".github/workflows/integrated-repository-audit.yml",
+    ".github/workflows/nltha-quality.yml"
+  ],
+  "modified_source": [
+    "components/gravity/mesh_cases.py",
+    "tools/audit_output_storage.py"
+  ],
+  "regressions": [
+    "tests/test_model_mesh_case_workflow.py",
+    "tests/test_output_storage_audit.py"
+  ],
+  "kept": [
+    "source ETABS EDB, original source JSON and Excel workbooks",
+    "source parameters and analysis configuration",
+    "original archived/historical results",
+    "all existing saved-case run paths and GUI launchers"
+  ],
+  "engineering_gates": {
+    "source_identity": "CI_PENDING",
+    "mesh_4_8_16_native": "NOT_VERIFIED",
+    "gravity_32_76_97": "NOT_VERIFIED",
+    "nonlinear_x_wall": "NOT_VERIFIED",
+    "nbc105_acceptance": "NOT_VERIFIED"
+  },
+  "security": "Only source code and synthetic fixture tests; no confidential export data/keys included",
+  "limitations": [
+    "Source-file hashing and symlink preflight are not OS-level race-proof file locks",
+    "No native ShellMITC4, gravity or ETABS comparative numerical execution",
+    "Complete 530-module semantic audit not achieved"
+  ]
+}

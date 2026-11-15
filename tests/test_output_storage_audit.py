@@ -55,6 +55,39 @@ class OutputStorageAuditTests(unittest.TestCase):
             self.assertEqual(report["total_files"],1)
             self.assertEqual(report["status"],"DISK_FOOTPRINT_ONLY_NOT_ENGINEERING_EQUIVALENCE")
 
+    def test_linked_source_and_output_roots_are_refused_before_resolution(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            original=base/"original"
+            original.mkdir()
+            (original/"private_result.json").write_text('{"private":true}')
+            redirected=base/"linked_root"
+            try:
+                redirected.symlink_to(original,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host cannot create a directory symlink")
+            with self.assertRaisesRegex(ValueError,"linked disk-audit"):
+                scan_output(redirected)
+            with self.assertRaisesRegex(ValueError,"linked disk-audit"):
+                write_report({"status":"synthetic"},redirected/"new_audit")
+            self.assertEqual([p.name for p in original.iterdir()],
+                             ["private_result.json"])
+            self.assertFalse((original/"new_audit").exists())
+
+    def test_linked_parent_in_report_path_cannot_redirect_outputs(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            outside=base/"outside"
+            outside.mkdir()
+            alias=base/"alias"
+            try:
+                alias.symlink_to(outside,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host cannot create a directory symlink")
+            with self.assertRaisesRegex(ValueError,"linked disk-audit"):
+                write_report({},alias/"08_AUDIT")
+            self.assertEqual(list(outside.iterdir()),[])
+
     def test_no_hash_does_not_infer_duplicate_from_equal_size(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
