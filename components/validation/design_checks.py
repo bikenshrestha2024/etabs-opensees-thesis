@@ -113,7 +113,10 @@ def scan_drift(folder):
                 state=r.get('limit_state','').upper()
                 if state not in ('ULS','SLS'):raise ValueError('Drift result lacks limit_state')
                 d=abs(number(r['design_drift_ratio']));limit=.025 if state=='ULS' else .006
-                parsed.append(dict(file=str(p),case=p.stem,limit_state=state,storey=r.get('story_number',r.get('story','')),axis=r.get('axis',''),edge=r.get('edge','master'),demand=d,limit=limit,utilization=d/limit,status='PASS' if d<=limit else 'FAIL',clause='NBC 105:2025 5.5.3',scope='Saved-result check; verify selected current model and completed case. Not a section strength result.'))
+                utilization=d/limit
+                if not math.isfinite(utilization):
+                    raise ValueError('Nonfinite CSV drift utilization from finite demand')
+                parsed.append(dict(file=str(p),case=p.stem,limit_state=state,storey=r.get('story_number',r.get('story','')),axis=r.get('axis',''),edge=r.get('edge','master'),demand=d,limit=limit,utilization=utilization,status='PASS' if d<=limit else 'FAIL',clause='NBC 105:2025 5.5.3',scope='Saved-result check; verify selected current model and completed case. Not a section strength result.'))
             out.extend(parsed)
         except Exception as e:issues.append(dict(file=str(p),status='NOT EVALUATED',reason=str(e)))
     # MRSM stores story checks in result JSON, without separate drift CSV.
@@ -129,7 +132,10 @@ def scan_drift(folder):
                 state=r['limit_state'];limit={'ULS':.025,'SLS':.006}[state]
                 for s in r['stories']:
                     d=abs(number(s['design_drift_ratio']))
-                    parsed.append(dict(file=str(p),case=case,limit_state=state,storey=s.get('story_number',''),axis=r.get('axis',''),edge='CQC design drift',demand=d,limit=limit,utilization=d/limit,status='PASS' if d<=limit else 'FAIL',clause='NBC 105:2025 5.5.3',scope='Saved CQC drift; no force-only scale applied to displacement. Verify source model.'))
+                    utilization=d/limit
+                    if not math.isfinite(utilization):
+                        raise ValueError('Nonfinite MRSM drift utilization from finite demand')
+                    parsed.append(dict(file=str(p),case=case,limit_state=state,storey=s.get('story_number',''),axis=r.get('axis',''),edge='CQC design drift',demand=d,limit=limit,utilization=utilization,status='PASS' if d<=limit else 'FAIL',clause='NBC 105:2025 5.5.3',scope='Saved CQC drift; no force-only scale applied to displacement. Verify source model.'))
             out.extend(parsed)
         except Exception as e:issues.append(dict(file=str(p),status='NOT EVALUATED',reason=str(e)))
     return out,issues
