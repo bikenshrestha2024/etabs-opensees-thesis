@@ -25,6 +25,32 @@ class GravityNodeAuditTests(unittest.TestCase):
                  rz_global_kN=220,global_z_basis='GLOBAL_Z_VERIFIED_DEFAULT_AXES'),
             dict(point='C',x_m=19,y_m=0,z_m=0,
                  rz_global_kN=70,global_z_basis='GLOBAL_Z_VERIFIED_DEFAULT_AXES')])
+    def test_numeric_etabs_reaction_without_verified_axis_remains_unverified(self):
+        for basis in ("POINT_LOCAL_ROTATED", "POINT_LOCAL_AXES_UNAVAILABLE",
+                      "UNVERIFIED", None):
+            with self.subTest(basis=basis):
+                etabs={"joint_reactions":[dict(
+                    point="A", x_m=0, y_m=0, z_m=0,
+                    rz_global_kN=100.0,
+                    **({"global_z_basis":basis} if basis is not None else {}))]}
+                opensees={"nodes":[dict(tag=1,x_m=0,y_m=0,z_m=0)],
+                           "reactions":[dict(node_tag=1,rz_kN=100.0)]}
+                report=compare_support_nodes(etabs,opensees)
+                self.assertEqual(report["valid_one_to_one_global_z_count"],0)
+                self.assertEqual(report["axis_unverified_count"],1)
+                self.assertEqual(report["rows"][0]["status"],"MATCHED_AXES_UNVERIFIED")
+                self.assertIsNone(report["rows"][0]["delta_etabs_minus_opensees_kN"])
+
+    def test_nonfinite_etabs_global_z_refused(self):
+        for value in (float("nan"),float("inf"),-float("inf")):
+            etabs={"joint_reactions":[dict(
+                point="A",x_m=0,y_m=0,z_m=0,
+                rz_global_kN=value,global_z_basis="GLOBAL_Z_VERIFIED_DEFAULT_AXES")]}
+            opensees={"nodes":[dict(tag=1,x_m=0,y_m=0,z_m=0)],
+                       "reactions":[dict(node_tag=1,rz_kN=100.0)]}
+            with self.assertRaisesRegex(ValueError,"Nonfinite ETABS"):
+                compare_support_nodes(etabs,opensees)
+
     def test_ranks_real_one_to_one_reaction_discrepancy(self):
         report=compare_support_nodes(self.etabs,self.os,tolerance_m=.01)
         self.assertEqual(report['valid_one_to_one_global_z_count'],2)
