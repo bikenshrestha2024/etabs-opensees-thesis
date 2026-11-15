@@ -41,23 +41,39 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
             self.assertEqual(row["run_completion_status"],"NO_RUN_COMPLETION_MANIFEST")
             manifest=results.parent/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
             manifest.parent.mkdir()
+            # Previously this incomplete, schema-less manifest was accepted
+            # as proof that the native MRSM run completed. It is not.
             manifest.write_text(json.dumps({
                 "solver_status":"COMPLETED_SOLVER_ONLY",
                 "model_sha256":digest
             }))
             report=assess()
+            self.assertEqual(report["drift_run_completion_unverified_row_count"],1)
+            self.assertEqual(report["tables"]["Seismic drift"][0]["status"],
+                             "NOT EVALUATED")
+            self.assertEqual(report["tables"]["Seismic drift"][0]["run_completion_status"],
+                             "INVALID_RUN_MANIFEST")
+            from components.inputs.output_contract import RUN_SUBFOLDERS,SCHEMA
+            for folder in RUN_SUBFOLDERS:
+                (results.parent/folder).mkdir(exist_ok=True)
+            valid_manifest={
+                "schema":SCHEMA,"stage":"05_MRSM","state":"ULS",
+                "case_id":"case","run_id":"run1","units":"kN-m-s",
+                "solver_status":"COMPLETED_SOLVER_ONLY",
+                "structural_acceptance":"NOT_VERIFIED",
+                "model_sha256":digest,"source_edb_sha256":None,
+            }
+            manifest.write_text(json.dumps(valid_manifest))
+            report=assess()
             self.assertEqual(report["drift_run_completion_unverified_row_count"],0)
             self.assertEqual(report["tables"]["Seismic drift"][0]["status"],"PASS")
-            manifest.write_text(json.dumps({
-                "solver_status":"INCOMPLETE","model_sha256":digest
-            }))
+            incomplete=dict(valid_manifest,solver_status="INCOMPLETE")
+            manifest.write_text(json.dumps(incomplete))
             report=assess()
             self.assertEqual(report["tables"]["Seismic drift"][0]["status"],
                              "NOT EVALUATED")
             save_response("b"*64)
-            manifest.write_text(json.dumps({
-                "solver_status":"COMPLETED_SOLVER_ONLY","model_sha256":digest
-            }))
+            manifest.write_text(json.dumps(valid_manifest))
             report=assess()
             self.assertEqual(report["tables"]["Seismic drift"],[])
             self.assertGreater(report["drift_source_mismatch_excluded_count"],0)
@@ -65,6 +81,28 @@ class V135DriftSourceAndCompletionTests(unittest.TestCase):
                 "SOURCE_MANIFEST_RESULT_SHA_CONFLICT_EXCLUDED",
                 "SOURCE_MODEL_SHA_MISMATCH_EXCLUDED")
                 for r in report["tables"]["Open items"]))
+
+    def test_manifest_misfiled_identity_blocks_completed_drift_status(self):
+        from components.inputs.output_contract import create_case_run,record_case_status
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            folder=create_case_run(root,"MRSM","X_E0",state="ULS",
+                                   model_sha256="a"*64)
+            result=folder/"02_RESULTS"/"MRSM_Results_V132.json"
+            result.write_text('{"X_E0":{}}')
+            record_case_status(folder,"COMPLETED_SOLVER_ONLY")
+            self.assertEqual(saved_drift_solver_status(result),"COMPLETED_SOLVER_ONLY")
+            manifest=folder/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+            data=json.loads(manifest.read_text())
+            for field,bad in (("case_id","another_case"),
+                              ("stage","03_ESM"),("run_id","another_run")):
+                corrupt=dict(data)
+                corrupt[field]=bad
+                manifest.write_text(json.dumps(corrupt))
+                with self.subTest(field=field):
+                    self.assertEqual(saved_drift_solver_status(result),
+                                     "INVALID_RUN_MANIFEST")
+            self.assertEqual(json.loads(manifest.read_text())["run_id"],"another_run")
 
     def test_legacy_drift_csv_without_hash_cannot_be_marked_pass(self):
         with tempfile.TemporaryDirectory() as td:
