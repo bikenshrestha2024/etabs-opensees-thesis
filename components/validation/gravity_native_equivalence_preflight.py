@@ -83,16 +83,90 @@ def assess(source_folder, *, primary_audit=None):
                      for x in topology.get("node_map",[])
                      if x.get("opensees_node_tag") is not None
                      and x.get("etabs_point_name") is not None}
+    # Object-level ETABS line objects are not necessarily physical frame
+    # elements. A line with no source section may only subdivide a wall edge.
+    # Compare SOURCE topology against the actually ASSEMBLED solver connectivity,
+    # and never infer that a fixed ETABS object point has a physical support
+    # reaction without its internal analysis mesh identity.
+    source_elements=topology.get("elements")
+    solver_frames=model.get("frames")
+    solver_shells=model.get("shells")
+    topology_complete=(isinstance(source_elements,list)
+                       and isinstance(solver_frames,list)
+                       and isinstance(solver_shells,list))
+    source_frame_adj,source_shell_adj={},{}
+    solver_frame_adj,solver_shell_adj={},{}
+    if topology_complete:
+        from collections import defaultdict
+        source_frame_adj=defaultdict(list)
+        source_shell_adj=defaultdict(list)
+        solver_frame_adj=defaultdict(list)
+        solver_shell_adj=defaultdict(list)
+        for element in source_elements:
+            destination=(source_shell_adj if element.get("category") in
+                         ("FLOOR","SHEAR WALL") else source_frame_adj)
+            for n in element.get("node_tags",[]):
+                destination[str(n)].append(element)
+        for key,destination in (("frames",solver_frame_adj),("shells",solver_shell_adj)):
+            for element in model[key]:
+                for n in element.get("nodes",[]):
+                    destination[str(n)].append(element)
     support_rows = []
     for tag in sorted(source_tags | primary, key=int):
         flags = original.get(tag, [0] * 6)
+        summary=dict()
+        if topology_complete:
+            src_fr=source_frame_adj.get(tag,[])
+            src_sh=source_shell_adj.get(tag,[])
+            sol_fr=solver_frame_adj.get(tag,[])
+            sol_sh=solver_shell_adj.get(tag,[])
+            summary=dict(
+                source_frame_incidence=len(src_fr),
+                source_unassigned_frame_incidence=sum(
+                    not x.get("assigned_section") for x in src_fr),
+                source_shell_incidence=len(src_sh),
+                solver_frame_incidence=len(sol_fr),
+                solver_shell_incidence=len(sol_sh),
+                assembled_support_class=(
+                    "SHELL_ONLY" if sol_sh and not sol_fr else
+                    "FRAME_ONLY" if sol_fr and not sol_sh else
+                    "MIXED" if sol_fr and sol_sh else "NO_ASSEMBLED_ELEMENT"))
+        else:
+            summary=dict(source_frame_incidence=None,
+                         source_unassigned_frame_incidence=None,
+                         source_shell_incidence=None,solver_frame_incidence=None,
+                         solver_shell_incidence=None,
+                         assembled_support_class="CONNECTIVITY_NOT_IN_EXPORT")
         support_rows.append(dict(opensees_node=int(tag),
             etabs_point=native_points.get(tag),
             source_dof="".join(str(int(x)) for x in flags),
             primary32_selected=(tag in primary),
             native_source_uz_restrained=bool(original_vertical.get(tag)),
             released_in_primary32=(tag in source_tags - primary),
-            provenance="SOURCE_EXPORT_RESTRAINT_NOT_NATIVE_INTERNAL_AUTOMESH"))
+            provenance="SOURCE_EXPORT_RESTRAINT_NOT_NATIVE_INTERNAL_AUTOMESH",
+            **summary))
+    released_rows=[r for r in support_rows if r["released_in_primary32"]]
+    support_topology_summary={
+        "status":("SOURCE_AND_ASSEMBLED_CONNECTIVITY_ONLY_NOT_ETABS_INTERNAL_MESH"
+                  if topology_complete else "ASSEMBLED_TOPOLOGY_NOT_AVAILABLE"),
+        "released_original_restraints_count":len(released_rows),
+        "released_are_assembled_shell_only":(
+            sum(r["assembled_support_class"]=="SHELL_ONLY" for r in released_rows)
+            if topology_complete else None),
+        "released_are_assembled_frame_connected":(
+            sum(r["solver_frame_incidence"]>0 for r in released_rows)
+            if topology_complete else None),
+        "released_incident_source_unassigned_frame_lines":(
+            sum(r["source_unassigned_frame_incidence"] for r in released_rows)
+            if topology_complete else None),
+        "released_incident_assembled_shell_cells":(
+            sum(r["solver_shell_incidence"] for r in released_rows)
+            if topology_complete else None),
+        "note":"Source ETABS object reaction FZ=0 does not establish that the "
+               "ETABS internal shell analysis mesh has no vertical support "
+               "reaction. Inspect CSI JointReact Obj/Elm and wall auto-mesh "
+               "edge restraints before changing source fixities."
+    }
     offsets = []
     native_frames = meta.get("frames") or {}
     for obj, records in sorted(native_frames.items()):
@@ -150,6 +224,7 @@ def assess(source_folder, *, primary_audit=None):
         native_offset_missing_or_invalid_count=missing_offsets,
         native_frame_rigid_end_zone_review_count=nonzero_rigid,
         comparison=mismatch, blockers=reasons,
+        support_topology_summary=support_topology_summary,
         support_rows=support_rows, offset_rows=offsets)
 
 
