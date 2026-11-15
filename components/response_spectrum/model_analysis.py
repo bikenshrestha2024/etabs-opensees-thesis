@@ -49,6 +49,8 @@ def run_model_spectrum(folder,config,output_dir):
     if overrides.is_file() and json.loads(overrides.read_text(encoding='utf-8-sig')).get('active'):raise ValueError('MRSM requires the elastic baseline; nonlinear replacements are unsupported.')
     if not all(math.isfinite(float(config[k])) and float(config[k])>0 for k in ('Z','I','rmu','omegau','omegas','T1_X','T1_Y')):raise ValueError('Spectrum inputs and adopted periods must be positive.')
     if not 0<float(config.get('damping',.05))<=.05:raise ValueError('Damping must be positive and no greater than 5 percent.')
+    from components.shared.eigen_solver import validated_mode_count
+    requested_modes = validated_mode_count(config.get('nmodes',40), name='nmodes')
     import hashlib
     from OpenSees_Model_Audit_V130 import implementation_digest,modal_numeric_digest
     source_signature=implementation_digest();numeric_signature=modal_numeric_digest()
@@ -63,7 +65,7 @@ def run_model_spectrum(folder,config,output_dir):
         print('[MRSM STAGE]',state,axis,'gravity converged; solving eigenmodes, then CQC response and NBC force scaling. This is one state of the selected batch.',flush=True)
         from components.modal.analysis import modal_response_nodes
         modal=run_nbc105_modal_audit(
-            ops, nmodes=int(config.get('nmodes',40)),
+            ops, nmodes=requested_modes,
             output_dir=out/('Modal_'+axis),
             story_nodes=modal_response_nodes(data))
         modal.update(limit_state=state,model_sha256=model_signature,implementation_sha256=source_signature,modal_numeric_sha256=numeric_signature)
