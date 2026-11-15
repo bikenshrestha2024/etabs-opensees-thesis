@@ -44,6 +44,31 @@ class OrganizedGravityCaseTests(unittest.TestCase):
             for strategy in strategies:
                 self.assertTrue((selection / "02_GRAVITY" / strategy).is_dir())
 
+    def test_canonical_gravity_run_does_not_create_nested_stage(self):
+        with tempfile.TemporaryDirectory() as temp:
+            selection = Path(temp)
+            canonical = selection / "02_GRAVITY" / "RUNS" / "ULS" / "X"
+            native = canonical / "20261115T000000Z"
+            native.mkdir(parents=True)
+            result = native / "Gravity_Result_V110.json"
+            result.write_text('{"ok":true}', encoding="utf-8")
+            record = {
+                "result_path": str(result),
+                "scenario": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+                "profile": "AS_CONFIGURED",
+                "support_count": 32,
+                "model_sha256": "a" * 64,
+                "applied_load_kN": 100.0,
+                "summed_reaction_kN": 100.0,
+                "equilibrium_error_percent": 0.0,
+            }
+            published = publish_gravity_case_index(canonical, record)
+            self.assertEqual(published.parent.parent, selection / "02_GRAVITY")
+            self.assertTrue((selection / "02_GRAVITY" / "LATEST_GRAVITY_CASES.json").exists())
+            self.assertFalse((canonical / "02_GRAVITY").exists())
+            self.assertEqual(result.read_text(), '{"ok":true}')
+
+
 
 if __name__ == "__main__":
     unittest.main()
