@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "baseline_sha": "5ccfabc41baad04e170a256cbde1f41ef5044a3d",
+  "source_commit": "78c2c8ddb82c8f9780577749bb8b176a2d31b468",
+  "scope": "Freeze CI-verified static repository and benchmark gates; add root audit navigation",
+  "test_evidence": {
+    "integrated": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43688867468",
+    "repository": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43688867387",
+    "nltha_python": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43688867386",
+    "literature": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43688867398",
+    "artifact_id": 14151253023,
+    "tracked_paths": 3039,
+    "active_python": 530,
+    "exact_git_blob_duplicate_groups": 405,
+    "with_historical": 384,
+    "active_source_parse_failures": 0,
+    "static_gate": "PASS"
+  },
+  "changed_paths": [
+    "README.md",
+    "REVIEW_MAIN/08_SOFTWARE_SECURITY/20261115_V31_INTEGRATED_REPOSITORY_AUDIT.md",
+    "docs/review/ledger/20261115_V31_INTEGRATED_FINDINGS.csv"
+  ],
+  "engineering_acceptance": "NOT_VERIFIED",
+  "windows_native": "NOT_PERFORMED",
+  "original_model_modified": false
+}
