@@ -73,3 +73,7 @@ Without `--write`, the audit is read-only and prints summary status. It does not
 2. Run `tests/test_unified_output_contract.py`, existing folder tests, `tests/test_project_output_layout_v171.py`, and a native Windows smoke case.
 3. Verify that old results still open, new exact stage outputs are discovered once, source hash/case is preserved, output status is truthful and no original model/workbook was modified.
 4. Record stage-specific acceptance or blocker under `REVIEW_MAIN`. **Do not mass-migrate numerical output names or rename solver native IDs.**
+
+## V22 migration inventory: missing runs and linked diagnostics
+
+The read-only stage audit now reports `MISSING_CASE_MANIFEST` when a canonical `RUNS/<state>/<case>/<run-id>` directory exists without `00_INPUT_SOURCE/CASE_MANIFEST.json`. It flags linked intermediate state/case/run paths without descending through them. Each JSON stage entry and workbook Stage summary include `missing_run_manifest_count` and `linked_run_path_count` separately from total manifest count; the detailed Missing or inconsistent sheet gives exact affected paths. The explicit `--write` publisher refuses linked `09_SOFTWARE_DIAGNOSTICS`, `MIGRATION_AUDITS` and `RUNS` destinations before creating its JSON/Excel report. These checks only inventory filesystem evidence; they do **not** infer that a solver ran or migrate old writers. Regression: `tests/test_stage_output_migration_audit.py`.
