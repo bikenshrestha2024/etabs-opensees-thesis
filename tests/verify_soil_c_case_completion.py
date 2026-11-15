@@ -82,6 +82,9 @@ class MatrixAuditTests(unittest.TestCase):
             gate["achieved_time_s"]=45.29
             gate["accepted_states"]=1
             self.assertEqual(audit()["status"],"INCOMPLETE")
+            for invalid_count in (True, 2.9, "200", None):
+                gate["accepted_states"]=invalid_count
+                self.assertEqual(audit()["status"],"INCOMPLETE")
 
 if __name__=="__main__":
     unittest.main()
