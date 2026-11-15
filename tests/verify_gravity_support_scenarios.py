@@ -1,4 +1,5 @@
 """Synthetic two-gravity-case support strategy audit tests."""
+import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,6 +31,10 @@ class DualWallGravityTests(unittest.TestCase):
         self.assertEqual(audit['max_Uz_difference_m'],0.004)
         self.assertEqual(
             [r for r in audit['per_node'] if r['status']=='CONTINUOUS_ONLY'][0]['node_tag'],'101')
+    @unittest.skipUnless(importlib.util.find_spec("openpyxl") is not None,
+                         "Workbook export requires optional openpyxl dependency")
+    def test_excel_export_when_openpyxl_is_installed(self):
+        audit=compare_wall_support_gravity(self.first,self.second)
         with tempfile.TemporaryDirectory() as d:
             dest=export_wall_support_comparison(audit,d)
             self.assertTrue((dest/'Gravity_Wall_Base_Strategy_Comparison.xlsx').exists())
@@ -76,6 +81,22 @@ class DualWallGravityTests(unittest.TestCase):
         self.second["report"]["support_vertical_reaction_kN"]=280.0
         with self.assertRaisesRegex(ValueError,"applied-load equilibrium failed"):
             compare_wall_support_gravity(self.first,self.second)
+
+    def test_reject_stale_equilibrium_percentage_even_if_reactions_balance(self):
+        # Native rows and applied load balance, but the cached summary is
+        # from another run and must not be published as a valid percentage.
+        self.second["report"]["equilibrium_error_percent"]=7.0
+        with self.assertRaisesRegex(ValueError,"reported equilibrium percent disagrees"):
+            compare_wall_support_gravity(self.first,self.second)
+
+    def test_allow_small_equilibrium_rounding_in_report(self):
+        # A 0.005 kN residual remains inside the existing 0.01 kN
+        # comparison floor, and a rounded zero-percent report is reasonable.
+        self.second["reactions"][-1]["rz_kN"]+=0.005
+        self.second["report"]["support_vertical_reaction_kN"]+=0.005
+        result=compare_wall_support_gravity(self.first,self.second)
+        self.assertEqual(result["status"],
+                         "SENSITIVITY_NOT_ETABS_VALIDATION_OR_FOUNDATION_DESIGN")
 
     def test_reject_shared_free_node_geometry_mismatch(self):
         for item in (self.first,self.second):
