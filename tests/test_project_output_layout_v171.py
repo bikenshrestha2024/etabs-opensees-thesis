@@ -37,6 +37,61 @@ class ProjectOutputLayoutTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 create_project_layout(source, output)
 
+    def test_project_layout_rejects_linked_manifest_and_stage_without_writes(self):
+        for linked_component in ("00_SOURCE_MANIFEST", "02_GRAVITY"):
+            with self.subTest(linked_component=linked_component):
+                with tempfile.TemporaryDirectory() as d:
+                    base = Path(d)
+                    source = base / "source.EDB"
+                    source.write_bytes(b"original private source")
+                    output = base / "export"
+                    outside = base / "outside"
+                    output.mkdir()
+                    outside.mkdir()
+                    try:
+                        (output / linked_component).symlink_to(
+                            outside, target_is_directory=True)
+                    except (OSError, NotImplementedError):
+                        self.skipTest("Directory symlinks unavailable")
+                    with self.assertRaisesRegex(ValueError, "linked"):
+                        create_project_layout(source, output)
+                    self.assertEqual(list(outside.iterdir()), [])
+                    self.assertEqual(source.read_bytes(), b"original private source")
+                    self.assertFalse((output / "00_SOURCE_MANIFEST" /
+                                      "PROJECT_CONTEXT.json").exists())
+
+    def test_invalid_existing_manifest_blocks_non_destructively(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            source = base / "model.EDB"
+            source.write_bytes(b"source bytes")
+            folder = base / "out" / "00_SOURCE_MANIFEST"
+            folder.mkdir(parents=True)
+            manifest = folder / "PROJECT_CONTEXT.json"
+            manifest.write_text('["unexpected", "list"]', encoding="utf-8")
+            original = manifest.read_bytes()
+            with self.assertRaisesRegex(ValueError, "JSON object"):
+                create_project_layout(source, folder.parent)
+            self.assertEqual(manifest.read_bytes(), original)
+            self.assertFalse((base / "out" / "02_GRAVITY").exists())
+
+    def test_case_folder_rejects_linked_case_component(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            source = base / "model.EDB"
+            source.write_bytes(b"source bytes")
+            layout = create_project_layout(source, base / "export")
+            outside = base / "outside"
+            outside.mkdir()
+            link = base / "export" / "03_ESM" / "ULS"
+            try:
+                link.symlink_to(outside, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("Directory symlinks unavailable")
+            with self.assertRaisesRegex(ValueError, "linked"):
+                case_folder(layout, "ESM", "X_E0", limit_state="ULS")
+            self.assertEqual(list(outside.iterdir()), [])
+
     def test_optional_workbook_lfs_does_not_block_source(self):
         from components.inputs.lfs_workbook_recovery import audit_optional_gui_workbooks
         with tempfile.TemporaryDirectory() as d:
