@@ -1,0 +1,35 @@
+name: Whole-Git tracked review coverage inventory
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/audit_tracked_review_coverage.py'
+      - 'tests/test_tracked_review_coverage_v23.py'
+      - '.github/workflows/review-coverage-inventory.yml'
+  pull_request:
+    paths:
+      - 'tools/audit_tracked_review_coverage.py'
+      - 'tests/test_tracked_review_coverage_v23.py'
+
+permissions:
+  contents: read
+
+jobs:
+  static-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify read-only Git-index coverage and output safety
+        run: python -m unittest tests.test_tracked_review_coverage_v23 -v
+      - name: Print current tracked-file coverage baseline
+        run: python tools/audit_tracked_review_coverage.py --repo .
+      - name: State limits
+        run: |
+          echo "Git file discovery and test execution do not establish line-by-line semantic review."
+          echo "No ETABS OAPI, OpenSees model, real earthquake record or graphical Windows GUI was tested."
