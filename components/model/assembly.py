@@ -545,11 +545,10 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                            physical_depth_m=float(row['depth_m']),
                            hinged_brace=hinged,release_i=hinged and u==0.,release_j=hinged and v==1.)
                 frame_elements.append(child); children.append(child)
+                if hinged:
+                    hinged_release_review[-1]["solver_element_tags"].append(
+                        100000+len(frame_elements))
             segments[obj]=children
-            if hinged:
-                hinged_release_review[-1]["solver_element_tags"]=[
-                    100001+frame_elements.index(ch) for ch in children
-                ]
         report["hinged_brace_release_review"]={
             "count":len(hinged_release_review),
             "status":"SOURCE_RELEASE_PATTERN_RECORDED_NOT_ENGINEERING_VALIDATED",
