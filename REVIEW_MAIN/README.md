@@ -1,3 +1,5 @@
+**Current researcher-adopted outrigger member idealization (2026-11-15):** [DB-OUT-2026-11-15-01 — provisional pin-ended steel diagonals](00_MODEL/20261115_PROVISIONAL_HINGED_OUTRIGGER_BRACE_DESIGN_BASIS.md). **YES** as a working two-force truss diagonal model; **NOT** a blanket chord/core/column/interface hinge or nonlinear brace calibration. The 112 source ETABS release warnings remain traceable and the reviewed nonlinear failure gate remains unchanged. See [native release audit](00_MODEL/20261115_AREA_HINGED_BRACE_AND_MESH_EVIDENCE.md).
+
 > **Numbered top-level navigation:** [07 — Thesis review backbone](../07_REVIEW_MAIN/README.md). This existing `REVIEW_MAIN/` folder retains the authoritative issues and source links; no files or evidence were duplicated or moved.
 
 **Canonical output organization and migration audit:** [2026-11-14 folder-stage review](08_SOFTWARE_SECURITY/20261114_CANONICAL_STAGE_FOLDER_AND_MIGRATION_AUDIT.md). Local source/copy inventory is generated with `22_AUDIT_EXPORT_FOLDERS.py` and kept outside GitHub.
