@@ -52,6 +52,33 @@ class Primary32Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"Missing=.*41"):
                 classify_supports(self.path,self.topology,self.original)
 
+    def test_export_refuses_linked_destinations_and_preserves_report(self):
+        import json
+        selected,audit=classify_supports(self.path,self.topology,self.original)
+        result=dict(ok=True,wall_support_strategy=MODE,
+                    support_node_tags=list(PROJECT_PRIMARY_32),
+                    reactions=[dict(node_tag=i,rz_kN=1000.)
+                               for i in PROJECT_PRIMARY_32],
+                    report=dict(support_vertical_reaction_kN=32000.))
+        external=Path(self.tmp.name)/"outside"
+        external.mkdir()
+        link=Path(self.tmp.name)/"linked_output"
+        try:
+            link.symlink_to(external,target_is_directory=True)
+        except (OSError,NotImplementedError):
+            self.skipTest("Host cannot create directory symlink")
+        with self.assertRaisesRegex(ValueError,"linked primary-32"):
+            export_primary_32_comparison(result,audit,link)
+        self.assertEqual(list(external.iterdir()),[])
+        output=Path(self.tmp.name)/"safe_output"
+        export_primary_32_comparison(result,audit,output)
+        self.assertEqual(list(output.glob(".primary32_*")),[])
+        self.assertTrue((output/"Primary_32_ETABS_OpenSees_Reactions.csv").is_file())
+        self.assertTrue((output/"Primary_32_ETABS_OpenSees_Reactions.xlsx").is_file())
+        self.assertEqual(json.loads(
+            (output/"Primary_32_ETABS_OpenSees_Reactions.json").read_text()
+        )["structural_validation"],"NOT_ESTABLISHED")
+
     def test_original_six_dof_restraints_must_be_explicit_binary(self):
         for invalid in ([1,1,1], "111111", [1,1,"0",1,1,1],
                         [1,1,2,1,1,1], [1,1,0.5,1,1,1], None):
