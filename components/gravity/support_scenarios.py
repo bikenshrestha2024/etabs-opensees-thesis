@@ -89,6 +89,15 @@ def compare_wall_support_gravity(source_result, continuous_result):
         # rows and yet be grossly out of balance against its applied gravity.
         if abs(actual-applied)>max(0.01,abs(applied)*1e-6):
             raise ValueError(mode+" gravity reaction and applied-load equilibrium failed")
+        # A source report can retain a stale equilibrium percentage even
+        # when its individual reactions and reported total are correct.
+        # Cross-check the displayed percentage against the same actual rows.
+        # The tolerance permits the existing 0.01 kN force rounding floor.
+        recorded_error=scalar(payload["report"],"equilibrium_error_percent")
+        expected_error=100.0*abs(actual-applied)/max(abs(applied),1e-12)
+        percent_rounding=100.0*0.01/max(abs(applied),1e-12)
+        if abs(abs(recorded_error)-expected_error)>max(1e-4,percent_rounding):
+            raise ValueError(mode+" reported equilibrium percent disagrees with reactions")
     # The two runs claim the same geometry. Check ALL shared geometry nodes,
     # including nodes without vertical reactions, not only shared supports.
     # Added wall-base mesh nodes may legitimately exist in only one case.
