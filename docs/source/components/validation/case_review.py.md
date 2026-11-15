@@ -21,3 +21,9 @@ Relevant register IDs: R01 R04 R05 R10 R12 R13. Consult [research reference regi
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+## V24 saved-result reader fault isolation (2026-11-15)
+
+`collect()` is a **read-only** consumer of both canonical stage result roots and archived `OpenSees_Analysis_Results`. Previously it could stop the entire review on malformed gravity-profile JSON or floor-edge displacement CSV, and it could admit nonfinite (NaN/Inf) deformation data to plotted evidence. Its new file-specific error statuses are `INVALID_GRAVITY_PROFILE`, `INVALID_FLOOR_EDGE_DRIFT`, `INVALID_DEFORMATION_RESULT`, plus `LINKED_*_REFUSED` for linked input files. A partly-read invalid floor-edge CSV contributes **no** deflection rows: valid rows from a broken CSV cannot be silently treated as a complete result. Other files may still be reviewed. The pre-existing `identity_screen()` remains responsible for excluding demonstrated model-SHA conflicts; missing SHA is still `NOT_VERIFIED`, not proof of ETABS/OpenSees compatibility. Regression: `tests/test_case_review_canonical_output.py`.
+
+**Output path compatibility:** the `export()` review workbook still publishes the historical `09_SOFTWARE_DIAGNOSTICS/CASE_REVIEW_V142` folder expected by existing GUI consumers. Do not mass-move it without a writer+reader compatibility test. Its numerical plots are review-only and do not assert native solver completion or model equivalence.
