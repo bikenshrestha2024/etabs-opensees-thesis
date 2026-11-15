@@ -68,6 +68,27 @@ class NativeStageMigrationAuditTests(unittest.TestCase):
             self.assertEqual(list(external.iterdir()),before)
             self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
 
+    def test_write_refuses_linked_migration_audit_destinations(self):
+        from tools.audit_stage_output_migration import main
+        for segment in ("09_SOFTWARE_DIAGNOSTICS",
+                        "09_SOFTWARE_DIAGNOSTICS/MIGRATION_AUDITS",
+                        "09_SOFTWARE_DIAGNOSTICS/MIGRATION_AUDITS/RUNS"):
+            with self.subTest(segment=segment):
+                with tempfile.TemporaryDirectory() as td:
+                    root=Path(td)/"export"
+                    root.mkdir()
+                    outside=Path(td)/"outside"
+                    outside.mkdir()
+                    link=root/segment
+                    link.parent.mkdir(parents=True,exist_ok=True)
+                    try:
+                        link.symlink_to(outside,target_is_directory=True)
+                    except (OSError,NotImplementedError):
+                        self.skipTest("Host cannot create symlinks")
+                    with self.assertRaisesRegex(ValueError,"linked migration-audit"):
+                        main([str(root),"--write"])
+                    self.assertEqual(list(outside.iterdir()), [])
+
     def test_nonobject_manifest_is_reported_instead_of_crashing(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
