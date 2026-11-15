@@ -24,3 +24,8 @@
 `member_identity(category, explicit_role=None)` preserves **family BRACE** separately from the thesis role `BR` (ordinary brace), `CO` (conventional outrigger spanning core wall to exterior column), `BT` (belt/perimeter outrigger member), and `CT` (25th-storey cap-truss/outtrigger member). The original source ETABS category is separately retained. **A frame at the roof, or any diagonal, is not automatically CT/CO/BT**: ETABS group membership, source element ID and geometry/drawings must confirm that. An explicitly reviewed ETABS `BEAM` can be assigned a truss role as presentation metadata without changing its OpenSees section or elements. Source `COLUMN`, `FLOOR`, wall and device types cannot be silently converted into brace roles. `FVD` and `BRB` require their own actual element/device source mapping and are not inferred from a SHS section.
 
 The extra classification information does **not** modify ETABS topology, IDs, OpenSees integer tags, material parameters or recorder references. See `tests/test_export_workflow_roles.py` and `tests/test_id_audit_roles.py`.
+
+
+## 2026-11-15 — source-only device aliases
+
+`PREFIXES` now recognizes exact source categories `FVD` and `BRB`, keeping those names in a separate `DEVICE` family for display. **No physical source ETABS `LINK`, generic `BRACE`, `BEAM` or `SHS` is reclassified automatically.** Device type, property and original OpenSees link constitutive implementation remain independently checked. If the saved source has no exact FVD/BRB categories, the selector displays no mapped members rather than injecting simulated device tags. This is a presentation and source-provenance extension, not device-material calibration. Test: `tests/test_shared_3d_prefix_selector.py`.
