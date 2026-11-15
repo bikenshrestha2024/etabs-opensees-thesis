@@ -64,6 +64,11 @@ class DualWallGravityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"lacks source coordinates"):
             compare_wall_support_gravity(self.first,self.second)
 
+    def test_reaction_report_must_agree_with_actual_support_rows(self):
+        self.second["report"]["support_vertical_reaction_kN"]=301.
+        with self.assertRaisesRegex(ValueError,"total differs"):
+            compare_wall_support_gravity(self.first,self.second)
+
     def test_reject_nonfinite_gravity_support_coordinates(self):
         self.first["nodes"][0]["x_m"]=float("nan")
         with self.assertRaisesRegex(ValueError,"nonfinite support node"):
