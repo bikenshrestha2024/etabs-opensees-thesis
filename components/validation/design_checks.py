@@ -144,19 +144,16 @@ def saved_drift_solver_status(response_file):
 
     An archived result with no run manifest is unverified, not zero response.
     """
-    path=Path(response_file).resolve()
-    from components.inputs.output_contract import STATUSES
+    path=Path(response_file).expanduser().resolve()
+    from components.inputs.output_contract import inspect_case_manifest
     for parent in (path.parent,*path.parents):
         manifest=parent/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
-        if manifest.is_file():
-            try:
-                document=json.loads(manifest.read_text(encoding="utf-8-sig"))
-                if not isinstance(document,dict):
-                    return "INVALID_RUN_MANIFEST"
-                status=document.get("solver_status")
-                return status if status in STATUSES else "INVALID_RUN_STATUS"
-            except (OSError,ValueError,TypeError):
-                return "UNREADABLE_RUN_MANIFEST"
+        if manifest.is_file() or manifest.is_symlink():
+            # A scalar solver status and matching SHA in a forged/misfiled
+            # manifest do NOT prove that this exact canonical run completed.
+            review=inspect_case_manifest(parent)
+            return (review["solver_status"] if review["valid"] else
+                    "INVALID_RUN_MANIFEST")
         if parent.name.casefold() in ("03_esm","05_mrsm",
                 "06_linear_time_history","07_nonlinear_time_history",
                 "opensees_analysis_results"):
