@@ -29,3 +29,11 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 `scan_drift()` reads each CSV and MRSM JSON as a single all-or-nothing unit before appending saved result rows. A later NaN/Inf, missing state/field, malformed case or corrupted JSON rejects *all rows from that file* and records an issue; symlinked saved CSV/JSON source files are refused. Neither a partially parsed CSV nor an early case of a malformed MRSM result may silently contribute a PASS to the design-check table.
 
 Regressions: `tests/test_v135_drift_source_completion_v13.py` (full canonical vs malformed manifest, mixed valid/invalid CSV/MRSM, and case/stage/run mismatch). CI path filtering now includes this test file for push changes.
+
+## V29 — atomic derived report publishing and source protection (2026-11-15)
+
+The existing `write_rows(path, rows)` preserves its data columns and no-op for genuinely empty rows but now publishes nonempty derived V135 CSV reports via shared `components.inputs.output_contract.write_table()`. Nonfinite source values or IO errors will not truncate the prior completed CSV. This does **not** mean that an empty current table removes/refreshes a historical CSV: stale same-name reports remain an open compatibility migration issue.
+
+`run()` stages the V135 generated XLSX in a uniquely named file in the same report directory, validates the output destination against preexisting symlinks and atomically replaces the prior workbook only after `openpyxl` successfully saves it. Source model `OpenSees_Complete_Model_Data_V118.json` is refused when its direct path is linked. `templates()` also refuses linked destinations, and uses exclusive file creation for otherwise missing criteria templates rather than potentially truncating a concurrently created user-edited input.
+
+The V135 multi-file CSV, XLSX, JSON and text-log set is **not one atomic transaction**. The workbook and derived CSV changes do not edit original Excel Aw/T1, ETABS EDB or historical imported source criteria. Tests: `tests/test_v135_drift_source_completion_v13.py`; verified non-native GitHub quality/compilation is **not** a model qualification or physical drift benchmark.
