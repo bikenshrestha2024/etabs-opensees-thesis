@@ -491,6 +491,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         if meta.get('errors'): report['warnings'].append(f"{len(meta['errors'])} source metadata queries failed; inspect OpenSees_Source_Model_Metadata_V118.json before claiming ETABS equivalence")
         nodes,shells,area_children=_mesh_areas(source_nodes,topology['elements'],area_rows,materials,cfg.get('floor_subdivisions',4))
         frame_elements=[]; segments={}; null_frames=[]
+        hinged_release_review=[]
+
         for e in topology['elements']:
             if e['dimension']!='line_2_node': continue
             obj=str(e['etabs_object']); row=frame_rows[obj]
@@ -513,6 +515,23 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                         and not any(release[2]+release[3]))
                 if not hinged: raise ValueError(identity+': unsupported end releases or partial fixity')
                 report['warnings'].append(identity+': hinged brace mapped with end My/Mz releases and zero torsional transfer; nonlinear hinge implementation remains gated')
+                # Exact source arrays and three independent ID namespaces
+                # are retained so engineers can review the connection, not
+                # delete warnings or guess it is a BRB/fully moment-released.
+                hinged_release_review.append({
+                    "etabs_unique_frame_id": obj,
+                    "opensees_topology_preview_tag": e.get("element_tag"),
+                    "solver_element_tags": [],
+                    "etabs_category": e["category"],
+                    "etabs_section": row["assigned_section"],
+                    "etabs_GetReleases_raw": release,
+                    "elastic_idealization": "elasticBeamColumn My/Mz end releases; torsional GJ=0",
+                    "research_nonlinear_idealization": "corotTruss + Steel01 axial-only without buckling/fracture",
+                    "reviewed_nonlinear_status": "BLOCKED_UNVERIFIED_CONNECTION_AND_BRACE",
+                    "engineering_action": "Compare full ETABS end release vectors, actual connection DOFs, "
+                                          "outrigger/belt/cap brace group, axial-only assumption, "
+                                          "compression buckling, cyclic degradation and native element responses."
+                })
             insertion=frame_meta.get('GetInsertionPoint',[])
             _validate_insertion_point(insertion, identity)
             for n,r in nodes.items():
@@ -526,7 +545,18 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                            physical_depth_m=float(row['depth_m']),
                            hinged_brace=hinged,release_i=hinged and u==0.,release_j=hinged and v==1.)
                 frame_elements.append(child); children.append(child)
+                if hinged:
+                    hinged_release_review[-1]["solver_element_tags"].append(
+                        100000+len(frame_elements))
             segments[obj]=children
+        report["hinged_brace_release_review"]={
+            "count":len(hinged_release_review),
+            "status":"SOURCE_RELEASE_PATTERN_RECORDED_NOT_ENGINEERING_VALIDATED",
+            "members":hinged_release_review,
+            "note":"OpenSees topology preview tags are not assembled solver tags. "
+                   "Exact ETABS releases and section behavior must be reviewed; "
+                   "elastic success does not certify NLTHA hinged-brace transfer."
+        }
         active={n for e in frame_elements+shells for n in e['nodes']}
         nodes={n:p for n,p in nodes.items() if n in active}
         # Separate physical RCC joint-volume ownership from stiffness end offsets.

@@ -483,6 +483,30 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
     return out,json_path
 
 
+def area_output_directory(export_dir=None, *, topology_json=None, generated_output=None):
+    """Resolve the existing area-integration output folder for GUI browsing.
+
+    [REF docs/source/components/sections/area_elements.py.md] This is purely
+    navigational: never create folders, run analysis, or infer calibration.
+    """
+    if generated_output:
+        generated=Path(generated_output).expanduser().resolve()
+        if generated.is_file():
+            return generated.parent
+    if export_dir:
+        export=Path(export_dir).expanduser().resolve()
+    elif topology_json:
+        export=Path(topology_json).expanduser().resolve().parent
+    else:
+        raise ValueError("Select an ETABS export directory or topology JSON")
+    if not export.is_dir():
+        raise FileNotFoundError(f"Selected ETABS export folder is absent: {export}")
+    target=export/"02_MODEL"/"AREA_INTEGRATION"
+    if target.is_symlink() or (export/"02_MODEL").is_symlink():
+        raise ValueError("Refusing symlinked area-integration output location")
+    return target if target.is_dir() else export
+
+
 def launch_area_integration_gui(parent=None, export_dir=None):
     """Write a reviewed area-stage call for insertion into the model builder."""
     import tkinter as tk
@@ -490,7 +514,7 @@ def launch_area_integration_gui(parent=None, export_dir=None):
 
     win = tk.Toplevel(parent) if parent else tk.Tk()
     win.title("ETABS area mesh → OpenSeesPy | floors + nonlinear walls")
-    win.geometry("1050x540")
+    win.geometry("1050x580")
     win.minsize(850, 470)
     paths = {key: tk.StringVar() for key in ("topology", "audit", "config", "output")}
     if export_dir is not None:
@@ -565,6 +589,23 @@ def launch_area_integration_gui(parent=None, export_dir=None):
                 f'Excel: {workbook}\\nJSON: {manifest}\\n\\nSOURCE REVIEW ONLY: no elements, loads or dynamic analysis executed.',parent=win)
         except Exception as exc:messagebox.showerror('Area inventory',str(exc),parent=win)
     ttk.Button(root,text="Export area-object inventory (Excel + JSON)",command=export_inventory).pack(anchor="w",pady=4)
+    def open_output_folder():
+        try:
+            import os
+            import subprocess
+            import sys
+            selected=area_output_directory(export_dir,
+                topology_json=paths["topology"].get().strip() or None,
+                generated_output=paths["output"].get().strip() or None)
+            if sys.platform=="win32":
+                os.startfile(str(selected))
+            elif sys.platform=="darwin":
+                subprocess.Popen(["open",str(selected)])
+            else:
+                subprocess.Popen(["xdg-open",str(selected)])
+        except Exception as exc:
+            messagebox.showerror("Open output folder",str(exc),parent=win)
+    ttk.Button(root,text="Open output folder",command=open_output_folder).pack(anchor="w",pady=4)
     ttk.Label(root, text="References: Kolozvari, Lopez & Massone (2023), Engineering Structures 294, 116700, doi:10.1016/j.engstruct.2023.116700; E-SFI-MVLEM-3D user docs at github.com/kkolozvari/E-SFI-MVLEM-3D. NBC 105:2025 §7.3.12 governs wall segment/coupling beam representation. ShellMITC4 + elastic plate section is a linear floor panel, not nonlinear slab RC.", wraplength=1000).pack(anchor="w", pady=(8, 0))
     return win
 
