@@ -1,0 +1,40 @@
+name: Integrated tracked-tree, dependency and output review
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-inventory:
+    name: Full tracked inventory + active AST/import/output gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Execute focused audit regression tests
+        run: |
+          python -m unittest -v tests.test_repository_integrated_audit tests.verify_active_repository_audit tests.test_deep_output_inventory_v16
+      - name: Inspect tracked tree and active Python, never execute solver/ETABS
+        run: |
+          python tools/audit_repository_integrated.py --repo . --output audit/integrated --fail-on-static-blockers
+      - name: Preserve per-file register, dependency graph and consolidated findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integrated-repository-static-audit
+          path: audit/integrated/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Explicit validation boundary
+        if: always()
+        run: |
+          echo "Tracked file metadata inventory is NOT a semantic review of every source file."
+          echo "Native ETABS, OpenSees, Spyder, full NLTHA and NBC compliance remain NOT_VERIFIED."

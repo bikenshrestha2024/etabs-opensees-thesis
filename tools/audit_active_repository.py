@@ -18,7 +18,7 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_ROOTS = ("components", "tests", "tools")
+SOURCE_ROOTS = ("components", "src", "tests", "tools")
 CANONICAL = {
     1: "01_WORKFLOW_START.py",
     2: "02_INPUT_READINESS.py",
@@ -72,9 +72,18 @@ def _sha(path):
 
 def inspect_one_python(path, root=ROOT):
     """Parse and compile Python syntax and return symbols; never execute it."""
-    source = path.read_text(encoding="utf-8-sig", errors="replace")
     rel = path.relative_to(root).as_posix()
-    data = dict(path=rel, lines=len(source.splitlines()), sha256=_sha(path),
+    # Malformed source is a failed audit, not silently repaired source code.
+    try:
+        if path.is_symlink():
+            raise OSError("Linked source is not trusted")
+        source = path.read_text(encoding="utf-8-sig", errors="strict")
+        digest = _sha(path)
+    except (OSError, UnicodeError) as exc:
+        return dict(path=rel, lines=None, sha256=None,
+                    parse_status="SOURCE_READ_ERROR", classes=[], functions=[],
+                    imports=[], source_error=type(exc).__name__)
+    data = dict(path=rel, lines=len(source.splitlines()), sha256=digest,
                 parse_status="OK", classes=[], functions=[], imports=[])
     try:
         parsed = ast.parse(source, filename=str(path))
@@ -99,12 +108,12 @@ def inspect_one_python(path, root=ROOT):
 def inventory(root=ROOT):
     root = Path(root)
     entries = []
-    entries.extend(inspect_one_python(p, root) for p in sorted(root.glob("*.py")))
+    entries.extend(inspect_one_python(p, root) for p in sorted(root.glob("*.py")) if p.is_file())
     for folder in SOURCE_ROOTS:
         target = root / folder
         if target.exists():
             entries += [inspect_one_python(p, root) for p in sorted(target.rglob("*.py"))
-                        if "__pycache__" not in p.parts]
+                        if p.is_file() and "__pycache__" not in p.parts]
     numbered = defaultdict(list)
     for p in root.glob("*.py"):
         match = re.match(r"^(\d{2})_.+\.py$", p.name)

@@ -37,6 +37,20 @@ class DeepOutputInventoryTests(unittest.TestCase):
             self.assertEqual(src.read_bytes(), old_bytes)
             self.assertFalse((repo / "09_SOFTWARE_DIAGNOSTICS").exists())
 
+    def test_writer_inventory_scans_new_standalone_src_tree(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            pkg=root/"src"/"opensees_engine"
+            pkg.mkdir(parents=True)
+            (pkg/"standalone.py").write_text(
+                "def publish(target):\n    target.write_text('result')\n",
+                encoding="utf-8")
+            report=scan_source(root)
+            self.assertEqual(report["totals"]["files"],1)
+            self.assertIn("src/opensees_engine/standalone.py",
+                          [x["source"] for x in report["files"]])
+            self.assertGreaterEqual(report["totals"]["possible_write_calls"],1)
+
     def test_builtin_and_path_open_modes_are_detected_by_position(self):
         with tempfile.TemporaryDirectory() as td:
             repo = Path(td)

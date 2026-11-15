@@ -42,7 +42,7 @@ WRITE_METHODS = frozenset({
     "writestr", "write", "copyfile", "copy2", "replace",
 })
 ROOT_SCRIPTS = (".py",)
-SOURCE_FOLDERS = ("components", "tools")
+SOURCE_FOLDERS = ("components", "src", "tools")
 
 
 def source_files(repo):

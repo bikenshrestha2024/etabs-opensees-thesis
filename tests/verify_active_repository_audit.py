@@ -47,6 +47,23 @@ class AuditTests(unittest.TestCase):
             self.assertIn("22_NBC105_INPUT_SYNC.py", result["canonical_missing"])
             self.assertIn("37_THESIS_EVIDENCE_DASHBOARD.py", result["canonical_missing"])
 
+    def test_new_src_packages_are_inventoried_and_invalid_utf8_is_reported(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            pkg=root/"src"/"opensees_engine"
+            pkg.mkdir(parents=True)
+            good=pkg/"standalone.py"
+            good.write_text("def build():\n    return 42\n",encoding="utf-8")
+            bad=pkg/"unreadable.py"
+            bad.write_bytes(b"\xff\xfe\xf0")
+            report=inventory(root)
+            paths={entry["path"]:entry for entry in report["active_python_modules"]}
+            self.assertIn("src/opensees_engine/standalone.py",paths)
+            self.assertEqual(paths["src/opensees_engine/standalone.py"]["parse_status"],"OK")
+            self.assertEqual(paths["src/opensees_engine/unreadable.py"]["parse_status"],"SOURCE_READ_ERROR")
+            self.assertIn("src/opensees_engine/unreadable.py",
+                          {x["path"] for x in report["syntax_errors"]})
+
     def test_current_navigation_matches_canonical_tools_and_links(self):
         root=Path(__file__).resolve().parents[1]
         index=root/"docs/programs/00_PROGRAM_INDEX.md"

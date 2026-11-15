@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 via GitHub connector",
+  "branch": "main",
+  "baseline_sha": "36d346da02e13d93f622288b1caa8f59ced3ad55",
+  "workstream": "Unified repository-wide inventory and static import/output/security discovery",
+  "classification": "Extend existing audits, add one orchestration module rather than duplicate scanners",
+  "confirmed_findings": [
+    "tools/audit_active_repository.py omitted src/ opt-in architecture",
+    "tools/audit_live_output_writers.py omitted src/ writer references",
+    "tools/audit_active_repository.py silently replaced malformed UTF-8"
+  ],
+  "changed_modules": [
+    "tools/audit_active_repository.py",
+    "tools/audit_live_output_writers.py",
+    "tools/audit_repository_integrated.py"
+  ],
+  "tests": [
+    "tests/verify_active_repository_audit.py",
+    "tests/test_deep_output_inventory_v16.py",
+    "tests/test_repository_integrated_audit.py"
+  ],
+  "workflow": ".github/workflows/integrated-repository-audit.yml",
+  "review": "REVIEW_MAIN/08_SOFTWARE_SECURITY/20261115_V31_INTEGRATED_REPOSITORY_AUDIT.md",
+  "preserve": [
+    "Root launchers 01-21",
+    "Existing source EDB and original Excel workbooks",
+    "OpenSees/ETABS analysis algorithms and original files",
+    "Historical archived snapshots and path-dependent readers"
+  ],
+  "acceptance": {
+    "static_source": "PENDING_GITHUB_CI",
+    "every_file_semantically_reviewed": false,
+    "native_etabs": false,
+    "native_opensees": false,
+    "gui_windows": false,
+    "code_compliance": false
+  },
+  "limitations": [
+    "Tracked files and AST imports/writers only; dynamic runtime behavior untested",
+    "Existing security scanner flags current tree only, not Git history",
+    "No native user EDB/workbook, confidential model or ground motion uploaded"
+  ],
+  "user_requested_commit": "main"
+}
