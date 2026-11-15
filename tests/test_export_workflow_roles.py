@@ -25,8 +25,12 @@ class OutputAndIdentityTests(unittest.TestCase):
             with self.subTest(category=category,role=role):
                 with self.assertRaises(ValueError):
                     member_identity(category,role)
+        self.assertEqual(member_identity("FVD")["prefix"],"FVD")
+        self.assertEqual(member_identity("BRB")["prefix"],"BRB")
+        # The source must explicitly classify the device. Neither LINK nor
+        # an ordinary BRACE silently becomes FVD or BRB.
         with self.assertRaisesRegex(ValueError,"Unclassified"):
-            member_identity("FVD")  # Device source mapping is separate.
+            member_identity("LINK")
 
     def test_canonical_stage_scoped_finds_and_no_false_completion(self):
         with tempfile.TemporaryDirectory() as temp:
