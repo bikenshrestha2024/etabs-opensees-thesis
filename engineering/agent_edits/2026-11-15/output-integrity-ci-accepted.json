@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "baseline_sha": "c8e79d3f812d3f6ca1eb70580f58ec463ef3e471",
+  "verified_commit": "c3c67cb11c40af6abf20ac43d51ac695d234cf2e",
+  "mesh_commit": "7f675504bfed6e1cbad3c4cf7149a8b1f6acdbd5",
+  "fixture_fix": "8ac9194de3a5bc851aac6ce1bf461ec0d9fc7ddb",
+  "ci_results": {
+    "integrated": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43691792284",
+    "compile": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43691792273",
+    "nltha_python": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43691792298",
+    "literature": "https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/43691792327"
+  },
+  "all_four": "PASS",
+  "native_etabs": "NOT_VERIFIED",
+  "native_opensees_full_building": "NOT_VERIFIED",
+  "nbc105": "NOT_VERIFIED",
+  "files_changed": [
+    "REVIEW_MAIN/08_SOFTWARE_SECURITY/20261115_V31_INTEGRATED_REPOSITORY_AUDIT.md",
+    "docs/review/ledger/20261115_V31_INTEGRATED_FINDINGS.csv"
+  ],
+  "source_data_unchanged": true
+}
