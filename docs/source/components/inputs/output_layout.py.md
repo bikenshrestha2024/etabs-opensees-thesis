@@ -17,3 +17,8 @@
 
 ## Cross-stage index from existing export organizer
 The optional `write_stage_index(export_dir)` writes atomically to `01_ETABS_EXPORT/00_MANIFEST/analysis_stage_index.json`, recording the seven canonical stage names, whether each folder exists, number and relative path of saved review snapshots, latest pointer (where present), and whether the historical `OpenSees_Analysis_Results` tree exists. This is invoked by existing `09_ORGANIZE_ETABS_EXPORT.py` after creating its non-destructive audit mirror. It does not create missing stage directories or look inside EDB, Excel or solver files; `engineering_status` is always `NOT_ASSESSED_BY_FILE_INDEX`. A missing stage is not proof no run ever happened in a legacy location. A stage with a folder is not proof a model was solved. Source review: 2026-11-14 UI/folder evidence.
+
+
+## 2026-11-15 stage index path consistency
+
+`write_stage_index` refuses a selected export root (or its parent path) that is a symlink **before** calling `resolve()`. The stage index now differentiates `legacy_analysis_results_present=false` from `legacy_analysis_results_link_refused=true` when an old `OpenSees_Analysis_Results` path is linked. For ESM, a symlinked `LATEST_ESM_COMBINED_EXPORT.txt` is ignored so an ordinary unlinked `LATEST_ORGANIZED_RESULT.txt` remains discoverable. Previous index consumers retain the original fields; one additive boolean field was introduced. Tests use synthetic temporary paths only; this does not change the canonical output folder mapping or relocate existing result files.

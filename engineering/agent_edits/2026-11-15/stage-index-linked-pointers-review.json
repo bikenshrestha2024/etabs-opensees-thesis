@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "branch": "main",
+  "baseline_sha": "e9fdcb0be5270753d745f49a6059013e772499ee",
+  "scope": "Correct stage index output navigation handling of linked root, linked legacy results and unsafe linked ESM latest pointer",
+  "source_module": "components/inputs/output_layout.py",
+  "regression_module": "tests/test_output_layout.py",
+  "verification": "Run headless deep output integrity and Windows source contract CI after commit",
+  "assumptions_unchanged": [
+    "ETABS EDB and authoritative Excel workbook",
+    "NBC 105:2025 implementation",
+    "OpenSees solver routines and masses",
+    "legacy reader paths"
+  ],
+  "limitations": [
+    "Static navigation/path correctness only, no native ETABS analysis",
+    "No full repository semantic audit",
+    "No direct Windows GUI/Spyder interaction",
+    "Potential concurrent filesystem race not eliminated"
+  ],
+  "status": "PENDING_CI"
+}

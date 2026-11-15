@@ -103,3 +103,8 @@ Additional output-integrity defect: the stage migration auditor's exact-depth wa
 ## 2026-11-15 linked legacy results root (software audit finding)
 
 The canonical folder auditor already refused linked analysis stages but still used `legacy_analysis.is_dir()` for `OpenSees_Analysis_Results`, following a linked legacy root into another folder and listing external case names. Corrected with an explicit symlink refusal, a blocked finding and synthetic test. Engineering acceptance remains independent of folder auditing. No user models, results or existing legacy directories are moved.
+
+
+## 2026-11-15 stage-index source/link consistency
+
+`components/inputs/output_layout.py::write_stage_index` now rejects linked selected roots before resolving paths, flags legacy results root links without marking them as present, and ignores unsafe linked ESM latest pointers rather than hiding an otherwise valid generic latest pointer. Added non-native tests and extended source documentation. Engineering analysis, native Windows/ETABS and full solver verification remain out of scope of this narrow output-navigation correction.

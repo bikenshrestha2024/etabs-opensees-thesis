@@ -160,7 +160,12 @@ def write_stage_index(export_dir):
     contents of private EDB/XLSX files. Explicitly separates folder presence
     from executed/validated analysis state.
     """
-    root = Path(export_dir).expanduser().resolve(strict=True)
+    selected = Path(export_dir).expanduser()
+    # Inspect the original path before resolution, which otherwise hides
+    # symlinked project roots and parent directories.
+    if any(part.is_symlink() for part in (selected, *selected.parents)):
+        raise ValueError("Refusing stage index for linked export root")
+    root = selected.resolve(strict=True)
     if not root.is_dir():
         raise NotADirectoryError(root)
     stages = []
@@ -175,7 +180,9 @@ def write_stage_index(export_dir):
         latest = snapshot_root / "LATEST_ORGANIZED_RESULT.txt"
         if name == "ESM":
             latest_esm = snapshot_root / "LATEST_ESM_COMBINED_EXPORT.txt"
-            if latest_esm.is_file():
+            # A linked ESM-specific pointer must not suppress a valid
+            # general latest pointer in the published navigation index.
+            if latest_esm.is_file() and not latest_esm.is_symlink():
                 latest = latest_esm
         stages.append({
             "stage": name, "folder": folder,
@@ -208,7 +215,10 @@ def write_stage_index(export_dir):
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "status": "FILE_NAVIGATION_ONLY_NOT_SOLVER_OR_CODE_VALIDATION",
         "legacy_analysis_results_present": (
-            root / "OpenSees_Analysis_Results").is_dir(),
+            (root / "OpenSees_Analysis_Results").is_dir()
+            and not (root / "OpenSees_Analysis_Results").is_symlink()),
+        "legacy_analysis_results_link_refused": (
+            (root / "OpenSees_Analysis_Results").is_symlink()),
         "stages": stages,
         "auxiliary_stages": auxiliary_stages,
     }

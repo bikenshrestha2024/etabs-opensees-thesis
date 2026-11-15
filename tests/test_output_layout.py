@@ -70,6 +70,49 @@ class OutputLayoutTests(unittest.TestCase):
             self.assertEqual((root / "source.EDB").read_bytes(), b"original model")
             self.assertNotIn("original model", index_path.read_text())
 
+    def test_stage_index_rejects_linked_export_root(self):
+        with tempfile.TemporaryDirectory() as td:
+            actual=Path(td)/"original"
+            actual.mkdir()
+            alias=Path(td)/"linked_export"
+            try:
+                alias.symlink_to(actual,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host does not allow directory symlinks")
+            with self.assertRaisesRegex(ValueError,"linked export root"):
+                write_stage_index(alias)
+            self.assertFalse((actual/"01_ETABS_EXPORT").exists())
+
+    def test_stage_index_reports_linked_legacy_and_uses_safe_esm_pointer(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"case"
+            root.mkdir()
+            mirror=root/"01_ETABS_EXPORT"
+            mirror.mkdir()
+            esm=root/"03_ESM"/"REVIEW_SNAPSHOTS"
+            esm.mkdir(parents=True)
+            general=esm/"LATEST_ORGANIZED_RESULT.txt"
+            general.write_text("local snapshot id",encoding="utf-8")
+            outside=Path(td)/"outside"
+            outside.mkdir()
+            target=outside/"PRIVATE.txt"
+            target.write_text("private model",encoding="utf-8")
+            try:
+                (esm/"LATEST_ESM_COMBINED_EXPORT.txt").symlink_to(target)
+                (root/"OpenSees_Analysis_Results").symlink_to(outside,
+                                                              target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Host does not allow symbolic links")
+            path=write_stage_index(root)
+            manifest=json.loads(path.read_text(encoding="utf-8"))
+            self.assertFalse(manifest["legacy_analysis_results_present"])
+            self.assertTrue(manifest["legacy_analysis_results_link_refused"])
+            esm_row=next(row for row in manifest["stages"] if row["stage"]=="ESM")
+            self.assertEqual(esm_row["latest_pointer"],
+                             "03_ESM/REVIEW_SNAPSHOTS/LATEST_ORGANIZED_RESULT.txt")
+            self.assertNotIn("private model",path.read_text(encoding="utf-8"))
+            self.assertEqual(target.read_text(encoding="utf-8"),"private model")
+
     def test_unknown_stage_fails_closed(self):
         with self.assertRaises(ValueError):
             review_snapshots_for("D:/thesis/export", "gravity2")
