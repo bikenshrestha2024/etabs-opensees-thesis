@@ -16,3 +16,10 @@ No ETABS `.EDB`, source Excel, FVD/BRB physical assignment, wall/brace/slab topo
 **Validation targets:** focused synthetic Python/OpenPyXL test generates 3 Plotly views and tests distinct member aliases, unchanged Excel ID columns, re-export idempotency, and JS syntax (when Node is available). UI interaction in the user's Chrome/Spyder Windows environment remains a **manual acceptance gate**, and the application requires regenerating the saved 3D HTML views from the updated repo; old already-generated local HTML does not update itself.
 
 **Status:** SOFTWARE_UI_CHANGE_ONLY / NATIVE_ETABS_PHYSICS_NOT_TESTED.
+
+
+## Subsequent source correctness review — stored Plotly structure filters
+
+The embedded structural-storey Plotly postscript in `components/ui/application.py` was another independent UI surface (the original screenshot's large white filter panel). It has now been streamlined: Storey, Element, Section remain visible; ETABS source object ID and topology tag move into an expandable `Source object filters` section. The picked ETABS/OpenSees node/section readout remains visible and never changes source tag meanings. Plotly selection overlays are additional traces, not in the original `meta`/coordinates arrays; the original code's `gd.data.forEach((t,i)=> original[i]...)` could throw after a highlight was added. The revised source filter restricts both its coordinate restorations and Plotly trace visibility to only the captured original trace count, leaving the highlight overlay independent and avoiding the undefined snapshot access. These changes are presentational; not an analysis result.
+
+Acceptance update: `tests/test_shared_3d_prefix_selector.py` now guards that source trace range, plus generated HTML/JS selection controls for three different Plotly views. The separate Tk/Matplotlib UI does not currently use this HTML selector; it remains a distinct change target if later required.
