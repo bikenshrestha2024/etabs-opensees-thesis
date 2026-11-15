@@ -35,3 +35,10 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 **Engineering gates:** Visual categorization is not approval. The workflow preserves existing source-read-only ETABS import, prerequisite checks and independently launched analytical modules. Tab order is explanatory, not a batch dependency solver; do not interpret a later tab as passed unless its real gate evidence exists.
 
 **Verification:** `tests/test_main_launcher_workflow_layout.py` checks compile-time AST, original callback registration count, known module launch handlers, search and log. Native Windows 125%/150% scaling, ETABS COM and dynamic menu keyboard navigation still require manual verification.
+
+
+## 2026-11-15 — export organization and readiness message
+
+The ETABS export GUI now exposes a default-on **Create SHA-verified categorized export copies** checkbox. After native extraction+assembly, the app uses the existing `components.inputs.export_mirror.export_mirror` to copy root generated evidence into `01_ETABS_EXPORT/01_SOURCE..09_REVIEW`, and writes `01_ETABS_EXPORT/00_MANIFEST/analysis_stage_index.json`. It **never relocates/removes** original flat files or changes solver source paths. An already-existing categorized file with different content causes a distinct `EXPORT_ORGANIZATION_NEEDS_REVIEW` log, not a false model conversion failure; the operator must inspect the file hash conflict. Running export a second time is not a reason to overwrite evidence. This is a synchronous copy stage and may take time for the project's large generated HTML/JSON files.
+
+The success dialog now distinguishes `elastic_assembled` from `analysis_ready` and `nonlinear_ready`: a clean assembly error list is **not** physics, source equivalence or material-calibration acceptance. Stage viewers only discover candidates until SHA/case status and native engineering checks pass.
