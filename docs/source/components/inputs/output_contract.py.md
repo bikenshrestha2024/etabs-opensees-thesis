@@ -91,3 +91,8 @@ Regression: `tests/test_unified_output_contract.py`. This is software validation
 `record_case_status()` now obtains a read-only `inspect_case_manifest(run_dir)` result and **refuses every invalid or misfiled manifest** before changing `solver_status`. A valid schema string alone is insufficient: stage/state/case/run path identity, declared units, SHA syntax, enumerated subfolders and status constraints are checked together. The inspector also reports `LINKED_CASE_MANIFEST_PATH` when the run root, `00_INPUT_SOURCE` directory or manifest file is a direct symlink; it does not rewrite old results. Existing valid new-run transitions remain compatible. This gate does **not** independently verify the ETABS EDB, physical load path, native solver completion or engineering certification.
 
 Regression: `tests/test_unified_output_contract.py` tests mismatched stage/case/run/units, linked source manifest and unchanged original JSON on refusal.
+
+
+## 2026-11-15 manifest symlink ancestry safeguard
+
+The read-only `inspect_case_manifest` function now checks the **unresolved** run directory and every parent for symlinks before resolving paths. Previously, resolving a run path could hide a symlinked stage or case ancestor, allowing a redirected manifest to appear valid. A detected linked parent returns `LINKED_CASE_MANIFEST_PATH` without reading the redirected manifest. The same check protects `record_case_status`, which depends on the inspection gate. A synthetic local symlink regression test verifies non-mutation. This does not eliminate concurrent filesystem races or validate physical ETABS/OpenSees analysis.

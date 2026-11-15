@@ -94,6 +94,31 @@ class UnifiedOutputContractTests(unittest.TestCase):
             record_case_status(run,"RUNNING")
             self.assertEqual(json.loads(manifest.read_text())["solver_status"],"RUNNING")
 
+    def test_manifest_refuses_symlinked_parent_stage_before_reading(self):
+        from components.inputs.output_contract import inspect_case_manifest
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            outside=root/"outside"
+            outside.mkdir()
+            actual=create_case_run(outside,"GRAVITY","X_E0",state="ULS")
+            manifest=actual/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+            original=manifest.read_bytes()
+            project=root/"project"
+            project.mkdir()
+            linked=project/"02_GRAVITY"
+            try:
+                linked.symlink_to(outside/"02_GRAVITY",target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Directory symlinks unavailable")
+            alias=linked/"RUNS"/"ULS"/"X_E0"/actual.name
+            checked=inspect_case_manifest(alias)
+            self.assertFalse(checked["valid"])
+            self.assertIn("LINKED_CASE_MANIFEST_PATH",checked["issues"])
+            self.assertEqual(manifest.read_bytes(),original)
+            with self.assertRaisesRegex(ValueError,"invalid case manifest"):
+                record_case_status(alias,"COMPLETED_SOLVER_ONLY")
+            self.assertEqual(manifest.read_bytes(),original)
+
     def test_record_status_refuses_linked_case_manifest(self):
         from components.inputs.output_contract import inspect_case_manifest
         with tempfile.TemporaryDirectory() as td:

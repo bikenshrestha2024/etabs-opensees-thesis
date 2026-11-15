@@ -235,12 +235,16 @@ def inspect_case_manifest(run_dir, *, expected_stage=None):
     status into engineering compliance, and never modifies archived outputs.
     """
     raw_run=Path(run_dir).expanduser()
+    # Inspect the unresolved path before .resolve() erases symlink evidence.
+    # A linked ancestor can redirect an otherwise convincing case manifest.
+    if any(component.is_symlink() for component in (raw_run, *raw_run.parents)):
+        return {"run":str(raw_run),"valid":False,
+                "issues":["LINKED_CASE_MANIFEST_PATH"],
+                "solver_status":"UNKNOWN","engineering_acceptance":"NOT_VERIFIED"}
     run=raw_run.resolve()
     path=run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
     issues=[]
-    # Read-only inspection must not silently accept redirected source identity.
-    if (raw_run.is_symlink() or (run/"00_INPUT_SOURCE").is_symlink()
-            or path.is_symlink()):
+    if (run/"00_INPUT_SOURCE").is_symlink() or path.is_symlink():
         return {"run":str(run),"valid":False,
                 "issues":["LINKED_CASE_MANIFEST_PATH"],
                 "solver_status":"UNKNOWN","engineering_acceptance":"NOT_VERIFIED"}

@@ -66,3 +66,8 @@ Seven additional V137–V164 documentation-only reports were moved into `archive
 ## Output mirror integrity correction (2026-11-15)
 
 Inspected `components/inputs/export_mirror.py`: existing conflict handling was per-file inside the copy loop, so a later SHA mismatch could leave earlier categorized source copies created without publishing a current manifest. Implemented a whole-batch SHA preflight and two explicit negative tests, keeping all original flat export files in place. This improves deterministic safety of the already established `01_ETABS_EXPORT` categorized mirror; it **does not** migrate analysis-stage writers/readers or claim global transaction/ETABS equivalence. All non-native output regressions must pass CI before relying on the new behavior.
+
+
+## Output-manifest ancestry correction (2026-11-15)
+
+`components/inputs/output_contract.py::inspect_case_manifest` previously resolved the run directory before inspecting symlinks, checking only the supplied run itself and the post-resolution manifest. A linked **parent** such as `02_GRAVITY` could evade the check. The reader now refuses any symlink in the original run path chain, returning `LINKED_CASE_MANIFEST_PATH`, and the existing status-update precondition inherits the protection. Synthetic regression coverage checks that the external manifest remains untouched. Native solver evidence still pending.

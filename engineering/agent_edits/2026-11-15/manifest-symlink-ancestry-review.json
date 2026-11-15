@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 via GitHub connector",
+  "baseline_sha": "9ae47063f4eb4ffb3a6ee48ff785a441ada553dc",
+  "scope": "Read-only analysis case manifest inspection refuses symlinked parent stages before path resolution",
+  "inspected": [
+    "components/inputs/output_contract.py",
+    "tests/test_unified_output_contract.py",
+    "components/inputs/output_layout.py",
+    "components/inputs/project_output_layout.py",
+    "tools/audit_stage_output_migration.py"
+  ],
+  "changed": [
+    "components/inputs/output_contract.py",
+    "tests/test_unified_output_contract.py",
+    "docs/source/components/inputs/output_contract.py.md",
+    "docs/review/20261115_ROOT_LAYOUT_AND_COMPATIBILITY_AUDIT.md"
+  ],
+  "test_plan": "Windows source and output contract CI on main; native ETABS/OpenSees and desktop Spyder GUI not executed",
+  "engineering_acceptance": "NOT_VERIFIED",
+  "limitations": [
+    "Does not prevent symlink races under concurrent filesystem mutation",
+    "Does not relocate active launchers or solver outputs",
+    "Review is scoped to identified code paths, not line-by-line semantics of all tracked files"
+  ]
+}
