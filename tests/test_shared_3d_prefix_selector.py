@@ -55,6 +55,19 @@ class Shared3DPrefixSelection(unittest.TestCase):
                 '<div class="plotly-graph-div"></div></body></html>',
                 encoding="utf-8")
 
+    def test_structural_source_filter_does_not_mutate_selection_overlay_trace(self):
+        # Source postscript owns only the ORIGINAL Plotly traces. The shared
+        # ID inspector adds a temporary trace; source filters must not index
+        # original[i] for that new trace or hide it when filtering storeys.
+        source=(Path(__file__).resolve().parents[1]/
+                "components/ui/application.py").read_text(encoding="utf-8")
+        self.assertIn('gd.data.slice(0,original.length).forEach',source)
+        self.assertIn('Plotly.restyle(gd,{visible:vis},meta.map((_,i)=>i))',source)
+        self.assertIn('class="source-3d-advanced"',source)
+        self.assertIn('id="storyFilter"',source)
+        self.assertIn('id="sectionFilter"',source)
+        self.assertIn('id="opsIdFilter"',source)
+
     def test_prefix_selection_and_focus_shared_across_all_plotly_views(self):
         from openpyxl import load_workbook
         with tempfile.TemporaryDirectory() as directory:
