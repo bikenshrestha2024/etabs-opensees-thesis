@@ -45,6 +45,14 @@ METHOD_MARKERS = {
 }
 
 
+def _refuse_linked_chain(path):
+    """Refuse path redirection through selected roots, parents or latest links."""
+    selected=Path(path).expanduser()
+    if any(item.is_symlink() for item in (selected,*selected.parents)):
+        raise ValueError("Refusing linked organized-result source/output path")
+    return selected
+
+
 def sha256(path):
     """[REF docs/source/components/ui/organized_results.py.md] Hash saved evidence exactly."""
     h = hashlib.sha256()
@@ -143,7 +151,7 @@ def publish_organized_results(results_root, *, gravity_root=None,
     An optional gravity_root includes the independently selected gravity GUI
     output if it lives elsewhere. Do not recurse through earlier snapshots.
     """
-    root = Path(results_root).expanduser().resolve()
+    root = _refuse_linked_chain(results_root).resolve()
     if not root.is_dir():
         raise FileNotFoundError("Selected analysis result directory does not exist: " + str(root))
     allowed = frozenset(selected_modules) if selected_modules is not None else None
@@ -151,13 +159,16 @@ def publish_organized_results(results_root, *, gravity_root=None,
         raise ValueError("Unknown or empty selected modules")
     roots = [("Analysis", root)]
     if gravity_root:
-        grav = Path(gravity_root).expanduser().resolve()
+        grav = _refuse_linked_chain(gravity_root).resolve()
         if not grav.is_dir():
             raise FileNotFoundError("Selected gravity output root missing: " + str(grav))
         if grav != root and grav not in root.parents and root not in grav.parents:
             roots.append(("GravityGUI", grav))
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    parent = Path(destination_parent).expanduser().resolve() if destination_parent else root / "Organized_Results"
+    parent = (_refuse_linked_chain(destination_parent).resolve()
+              if destination_parent else root / "Organized_Results")
+    _refuse_linked_chain(parent)
+    _refuse_linked_chain(parent / "LATEST_ORGANIZED_RESULT.txt")
     if parent == root:
         raise ValueError("Destination parent may not be the source results root")
     if parent in root.parents:
@@ -165,7 +176,6 @@ def publish_organized_results(results_root, *, gravity_root=None,
     from components.inputs.output_contract import safe_component
     bundle_name = safe_component(bundle_name)
     destination = parent / stamp
-    destination.mkdir(parents=True, exist_ok=False)
     manifest = {
         "schema": "thesis-module-evidence-v1",
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -193,13 +203,21 @@ def publish_organized_results(results_root, *, gravity_root=None,
             listed.append((source_label, source_root, path, rel, module))
     if not listed:
         raise ValueError("No classifiable saved results. No ZIPs generated; check module output roots.")
+    # Prehash the *original selected sources* before creating any review
+    # output. A later mutation must not be mistaken for a verified snapshot.
+    expected_hashes={}
+    for _source_label, _source_root, original, _rel, _module in listed:
+        _refuse_linked_chain(original)
+        expected_hashes[original]=sha256(original)
+    destination.mkdir(parents=True, exist_ok=False)
     for source_label, source_root, original, rel, module in listed:
         dest = destination / module / source_label / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
+        _refuse_linked_chain(original)
         shutil.copy2(original, dest)
-        digest = sha256(original)
-        if sha256(dest) != digest:
-            raise IOError("Postcopy SHA256 mismatch: " + str(original))
+        digest = expected_hashes[original]
+        if sha256(dest) != digest or sha256(original) != digest:
+            raise IOError("Source or snapshot changed during copy: " + str(original))
         manifest["entries"].append({
             "module": module, "source": str(original),
             "snapshot": dest.relative_to(destination).as_posix(),

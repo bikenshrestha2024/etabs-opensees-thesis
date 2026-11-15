@@ -94,3 +94,10 @@ This does **not** convert the historical all-module publisher into a canonical w
 ### V15 upload-manifest path privacy
 
 The complete local `EVIDENCE_MANIFEST.json` retains absolute source paths for native provenance review. The **ZIP-internal** `EVIDENCE_MANIFEST.json` now replaces local absolute directory/file paths with `<REDACTED_LOCAL_PATH>`, while retaining archive relative snapshot paths, SHA256 and file sizes. It adds `source_path_policy=LOCAL_PATHS_REDACTED_FOR_UPLOAD_ZIP`. A subset ZIP contains only manifest entries for that subset. **Payloads are not scanned or sanitized**: run a private-data/secrets review of scripts, JSON, CSV, workbooks and logs before uploading to a public destination.
+
+
+## 2026-11-15 transaction preflight and path-integrity follow-up
+
+The snapshot generator now inventories and SHA256-fingerprints **all eligible source files before it creates the dated destination**. No classifiable files means no empty `Organized_Results/<timestamp>` run or new latest pointer. Source and optional gravity roots, explicit destination parent and `LATEST_ORGANIZED_RESULT.txt` are rejected if their original paths or ancestors are symbolic links, before `resolve()` could hide redirection. After each snapshot copy, the archived bytes and re-read source must both match the original preflight hash: a result that mutates during the copy is not certified as immutable evidence, and `LATEST_ORGANIZED_RESULT.txt` is not advanced when copy validation fails. Newly-created incomplete snapshots may remain as diagnostic evidence but are not presented as latest results.
+
+`tests/test_organized_results.py` includes no-eligible-files, source-mutation-during-copy and linked selected source/pointer regressions. This is still a file-evidence publisher, not a full multi-file atomic transaction, native solver proof, sensitive-payload scanner or 3D gravity/earthquake equivalence check. Review ZIP payloads manually before public uploads.

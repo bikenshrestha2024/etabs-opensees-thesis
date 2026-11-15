@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from components.ui.organized_results import classify, publish_organized_results, sha256
 
@@ -69,6 +70,64 @@ class OrganizedReviewTests(unittest.TestCase):
                 self.assertNotIn("project_sources.private",archive)
                 self.assertNotIn("PROJECT_CONTEXT",archive)
                 self.assertNotIn("OLD_CASE",archive)
+
+    def test_no_eligible_files_creates_no_empty_review_run(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"case"
+            root.mkdir()
+            (root/"PRIVATE.EDB").write_bytes(b"private original")
+            with self.assertRaisesRegex(ValueError,"No classifiable saved results"):
+                publish_organized_results(root)
+            self.assertFalse((root/"Organized_Results").exists())
+
+    def test_source_mutating_during_copy_never_updates_latest_pointer(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"case"
+            root.mkdir()
+            source=root/"Gravity_Result.json"
+            source.write_text('{"version":"before"}',encoding="utf-8")
+            import components.ui.organized_results as organizer
+            original_copy=organizer.shutil.copy2
+            def mutate_after_copy(src,dst,*args,**kwargs):
+                result=original_copy(src,dst,*args,**kwargs)
+                source.write_text('{"version":"changed"}',encoding="utf-8")
+                return result
+            with patch.object(organizer.shutil,"copy2",side_effect=mutate_after_copy):
+                with self.assertRaisesRegex(IOError,"Source or snapshot changed"):
+                    publish_organized_results(root)
+            self.assertFalse((root/"Organized_Results"/"LATEST_ORGANIZED_RESULT.txt").exists())
+            self.assertEqual(source.read_text(), '{"version":"changed"}')
+
+    def test_symlinked_source_and_latest_output_link_are_refused(self):
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            original=base/"private"
+            original.mkdir()
+            (original/"Gravity_Result.json").write_text('{"private":true}')
+            alias=base/"linked"
+            try:
+                alias.symlink_to(original,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Directory symlinks not supported")
+            with self.assertRaisesRegex(ValueError,"linked organized-result"):
+                publish_organized_results(alias)
+            self.assertFalse((original/"Organized_Results").exists())
+
+            selected=base/"selected"
+            selected.mkdir()
+            (selected/"Gravity_Result.json").write_text('{"result":1}')
+            parent=selected/"Organized_Results"
+            parent.mkdir()
+            target=base/"outside_pointer.txt"
+            target.write_text("keep this private pointer")
+            try:
+                (parent/"LATEST_ORGANIZED_RESULT.txt").symlink_to(target)
+            except (OSError,NotImplementedError):
+                self.skipTest("File symlinks not supported")
+            with self.assertRaisesRegex(ValueError,"linked organized-result"):
+                publish_organized_results(selected)
+            self.assertEqual(target.read_text(),"keep this private pointer")
+            self.assertFalse(any(p.is_dir() for p in parent.iterdir()))
 
     def test_bundle_name_rejects_windows_reserved_names(self):
         with tempfile.TemporaryDirectory() as td:

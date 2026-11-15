@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-15",
+  "editor": "ChatGPT GPT-6 GitHub connector",
+  "base_sha": "8ac9194de3a5bc851aac6ce1bf461ec0d9fc7ddb",
+  "scope": "Output forensic snapshot preflight and source SHA consistency",
+  "source": [
+    "components/ui/organized_results.py",
+    "components/inputs/output_layout.py"
+  ],
+  "regressions": [
+    "tests/test_organized_results.py"
+  ],
+  "confirmed_findings": [
+    "Empty run dir before no-evidence check",
+    "Original SHA computed after copying rather than before",
+    "Unrefused linked selected source/gravity roots and latest pointer"
+  ],
+  "physical_calculations_changed": false,
+  "model_files_changed": false,
+  "existing_zips_and_legacy_paths_preserved": true,
+  "native_windows_validation": "NOT_VERIFIED",
+  "ci_status": "PENDING_GITHUB_ACTIONS"
+}
