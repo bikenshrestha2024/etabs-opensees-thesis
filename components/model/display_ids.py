@@ -40,6 +40,8 @@ _ROLE_BY_CATEGORY = {
 def member_identity(category, explicit_role=None):
     """Return display prefix, main family, and thesis brace subcategory.
 
+    [REF docs/source/components/model/display_ids.py.md] Display-only source
+    role mapping; user-specified 2026-11-15 project member names.
     A source BRACE remains BR unless explicit, reviewed source mapping says
     CO/BT/CT. This helper never changes solver or topology element IDs.
     """
