@@ -376,6 +376,27 @@ def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=
                 u=i/floor_subdivisions;v=j/floor_subdivisions
                 original.append([points[0][k]+u*(points[1][k]-points[0][k])+v*(points[3][k]-points[0][k]) for k in range(3)])
 
+    # Pre-index exactly axis-aligned source planes. Previously every source/grid
+    # point on every storey was rechecked for each panel (quadratic in panel
+    # and mesh point counts). We MUST retain coplanar points outside a panel:
+    # their projected u or v values propagate conforming mesh lines.
+    plane_points = {}
+    plane_resolution = 1_000_000  # 1 µm bins; use +/- one bin at query
+    for _point in original:
+        for _axis in range(3):
+            _key = (_axis, int(round(_point[_axis] * plane_resolution)))
+            plane_points.setdefault(_key, []).append(_point)
+
+    def _coplanar_candidates(panel, normal):
+        _axis = max(range(3), key=lambda index: abs(normal[index]))
+        if abs(abs(normal[_axis]) - 1.) > 1e-12:
+            return original  # preserve exact semantics for inclined planes
+        _center = int(round(panel[0][_axis] * plane_resolution))
+        result = []
+        for _offset in (-1, 0, 1):
+            result.extend(plane_points.get((_axis, _center + _offset), ()))
+        return result
+
     for e in records:
         if e['dimension']!='area_polygon': continue
         obj=str(e['etabs_object']); ns=e['node_tags']
@@ -390,7 +411,7 @@ def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=
         aa,bb,ab=_dot(a,a),_dot(b,b),_dot(a,b); det=aa*bb-ab*ab
         if det<=1e-12: raise ValueError(f'Area {obj}: degenerate geometry')
         uvals={0.,1.}; vvals={0.,1.}
-        for q in original:
+        for q in _coplanar_candidates(p,normal):
             d=_sub(q,p[0])
             if abs(_dot(d,normal))>1e-7: continue
             u=(_dot(d,a)*bb-_dot(d,b)*ab)/det; v=(_dot(d,b)*aa-_dot(d,a)*ab)/det
@@ -490,6 +511,33 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         if meta.get('source_link_count'): raise ValueError('ETABS has LinkObj elements; provide their target device definitions before assembled conversion')
         if meta.get('errors'): report['warnings'].append(f"{len(meta['errors'])} source metadata queries failed; inspect OpenSees_Source_Model_Metadata_V118.json before claiming ETABS equivalence")
         nodes,shells,area_children=_mesh_areas(source_nodes,topology['elements'],area_rows,materials,cfg.get('floor_subdivisions',4))
+        # Spatial lookup for beam intersection cuts. Old implementation
+        # scanned EVERY mesh node for EVERY frame, which becomes intractable
+        # with MESH_08 / MESH_16. Candidate filtering is only a broad phase:
+        # the original exact geometric tolerances and cut behavior remain.
+        _cell_size = 1.5  # metres; independent of selected shell subdivisions
+        _node_bins = {}
+        _node_order = {}
+        for _order, (_tag, _xyz) in enumerate(nodes.items()):
+            _node_order[_tag] = _order
+            _cell = tuple(math.floor(float(value)/_cell_size) for value in _xyz)
+            _node_bins.setdefault(_cell, []).append(_tag)
+
+        def _candidate_frame_nodes(p, q):
+            _low = [math.floor((min(p[k],q[k])-1e-7)/_cell_size)
+                    for k in range(3)]
+            _high = [math.floor((max(p[k],q[k])+1e-7)/_cell_size)
+                     for k in range(3)]
+            _candidate = []
+            for _ix in range(_low[0], _high[0]+1):
+                for _iy in range(_low[1], _high[1]+1):
+                    for _iz in range(_low[2], _high[2]+1):
+                        _candidate.extend(_node_bins.get((_ix,_iy,_iz), ()))
+            # Sorting restores nodes.items() iteration priority in the rare
+            # case of coincident nodes/cut positions.
+            _candidate.sort(key=_node_order.__getitem__)
+            return _candidate
+
         frame_elements=[]; segments={}; null_frames=[]
         hinged_release_review=[]
 
@@ -534,7 +582,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                 })
             insertion=frame_meta.get('GetInsertionPoint',[])
             _validate_insertion_point(insertion, identity)
-            for n,r in nodes.items():
+            for n in _candidate_frame_nodes(p,q):
+                r=nodes[n]
                 d=_sub(r,p); t=_dot(d,x)/length
                 if 1e-7<t<1-1e-7 and math.dist(r,[p[k]+t*(q[k]-p[k]) for k in range(3)])<1e-7: cuts[round(t,9)]=n
             cuts=sorted(cuts.items()); children=[]
