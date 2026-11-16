@@ -63,8 +63,6 @@ All listed paths are actual Git tree entries; field-level documentation is produ
 | MODULE_INDEX_V140.json | 3645 | `e87e2918e8d652854d00a4d53275dd6146719187` | REPORT_OR_DATA |
 | MODULE_INDEX_V141.json | 3704 | `24a3261d9381dfe5b2ed6dd0e3344792939ce0b2` | REPORT_OR_DATA |
 | MODULE_INDEX_V142.json | 3761 | `55c2df297902a66bd120f90fa46ac8af1fba756f` | REPORT_OR_DATA |
-| New_Export_Viewer_Diagnostic/OpenSees_Element_Connectivity.json | 1184718 | `37154fea2646e0bdcf6ed82c7b687bca5d1299ad` | ETABS_SOURCE_EXPORT |
-| New_Export_Viewer_Diagnostic/OpenSees_Source_Model_Metadata_V118.json | 1143608 | `7d657420ca84fc0d2f51b3fbd5e1a6a06164bc25` | ETABS_SOURCE_EXPORT |
 | NUMERICAL_INPUT_COMPATIBILITY_V132.json | 2029 | `d9822583163e1707b8a4d49934d39d34ac72d36d` | REPORT_OR_DATA |
 | OpenSees_Area_Model_Config_TEMPLATE_V116.json | 3481 | `02547396e8e9d58093f85fed3c613bfab0b72d94` | CONFIG_OR_TEMPLATE |
 | OpenSees_Literature_Validation_Metadata_TEMPLATE_V117.json | 1783 | `67eafe21e70d6efe0f8ac3d82b1ce99c4c3d2378` | CONFIG_OR_TEMPLATE |
@@ -310,8 +308,6 @@ All listed paths are actual Git tree entries; field-level documentation is produ
 | Verification_V159/PEER_Web_SteelMPF/report.json | 6396 | `769005ed963326a1df6db9abb7fc407cf11bc0ec` | VALIDATION_EVIDENCE |
 | Verification_V159/PEER_Web_SteelMPF/Selected_Card.json | 5767 | `b92e25773e0ea9d3941937f681955078dc417ed4` | VALIDATION_EVIDENCE |
 | Verification_V160/test160_checks.json | 288 | `52771624b6610ad7d6e504a4d1b87a1e16056c6b` | VALIDATION_EVIDENCE |
-| Viewer_Preview_V141/OpenSees_Element_Connectivity.json | 1184718 | `37154fea2646e0bdcf6ed82c7b687bca5d1299ad` | ETABS_SOURCE_EXPORT |
-| Viewer_Preview_V141/OpenSees_Source_Model_Metadata_V118.json | 1143608 | `7d657420ca84fc0d2f51b3fbd5e1a6a06164bc25` | ETABS_SOURCE_EXPORT |
 | Wall_Validation_Lu_Full/wall_validation.json | 4020 | `4aac188bb24e5e88c5c3d3a0f38af9aabbc74848` | VALIDATION_EVIDENCE |
 | Wall_Validation_Results/wall_validation.json | 4896 | `83342a0bf6d0011d9f183325025a8cf96a81b288` | VALIDATION_EVIDENCE |
 | wall_validation_sources/SOURCE_MANIFEST.json | 1301 | `df7c07bf3d312d971348f7d3cc010737ec74dde5` | MANIFEST |
