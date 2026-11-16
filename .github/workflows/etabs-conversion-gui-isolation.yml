@@ -6,6 +6,7 @@ on:
       - "components/ui/application.py"
       - "tools/etabs_conversion_worker.py"
       - "tests/test_etabs_conversion_gui_isolation.py"
+      - "tests/test_etabs_conversion_worker_report.py"
       - ".github/workflows/etabs-conversion-gui-isolation.yml"
   pull_request:
     paths:
@@ -28,8 +29,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile exporter, worker and GUI
-        run: python -m py_compile components/ui/application.py tools/etabs_conversion_worker.py tests/test_etabs_conversion_gui_isolation.py
+        run: python -m py_compile components/ui/application.py tools/etabs_conversion_worker.py tests/test_etabs_conversion_gui_isolation.py tests/test_etabs_conversion_worker_report.py
       - name: Verify async launcher and fail-closed output status
         run: python -m unittest discover -s tests -p 'test_etabs_conversion_gui_isolation.py' -v
+          python -m unittest discover -s tests -p 'test_etabs_conversion_worker_report.py' -v
       - name: Declare native limitation
         run: echo "Static Python tests only. No ETABS COM, .EDB, OpenSees or native conversion was executed."
