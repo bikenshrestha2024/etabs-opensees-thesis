@@ -41,8 +41,6 @@ Generated from directly parsed local JSON content. Each original JSON receives a
 | Material_Validation_Results_V149/Validation_Report_V149.json | [Schema](files/Material_Validation_Results_V149/Validation_Report_V149.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
 | Material_Validation_Results_V149/Walls/wall_validation.json | [Schema](files/Material_Validation_Results_V149/Walls/wall_validation.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
 | NUMERICAL_INPUT_COMPATIBILITY_V132.json | [Schema](files/NUMERICAL_INPUT_COMPATIBILITY_V132.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
-| New_Export_Viewer_Diagnostic/OpenSees_Element_Connectivity.json | [Schema](files/New_Export_Viewer_Diagnostic/OpenSees_Element_Connectivity.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
-| New_Export_Viewer_Diagnostic/OpenSees_Source_Model_Metadata_V118.json | [Schema](files/New_Export_Viewer_Diagnostic/OpenSees_Source_Model_Metadata_V118.json.md) | ETABS_MODEL_OR_SOURCE_METADATA | PARSED |
 | OpenSees_Area_Model_Config_TEMPLATE_V116.json | [Schema](files/OpenSees_Area_Model_Config_TEMPLATE_V116.json.md) | RUN_CONFIGURATION | PARSED |
 | OpenSees_Literature_Validation_Metadata_TEMPLATE_V117.json | [Schema](files/OpenSees_Literature_Validation_Metadata_TEMPLATE_V117.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
 | OpenSees_Material_Section_Library_V117.json | [Schema](files/OpenSees_Material_Section_Library_V117.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
@@ -269,8 +267,6 @@ Generated from directly parsed local JSON content. Each original JSON receives a
 | Verification_V159/PEER_Web_SteelMPF/Selected_Card.json | [Schema](files/Verification_V159/PEER_Web_SteelMPF/Selected_Card.json.md) | VALIDATION_EVIDENCE | PARSED |
 | Verification_V159/PEER_Web_SteelMPF/report.json | [Schema](files/Verification_V159/PEER_Web_SteelMPF/report.json.md) | VALIDATION_EVIDENCE | PARSED |
 | Verification_V160/test160_checks.json | [Schema](files/Verification_V160/test160_checks.json.md) | VALIDATION_EVIDENCE | PARSED |
-| Viewer_Preview_V141/OpenSees_Element_Connectivity.json | [Schema](files/Viewer_Preview_V141/OpenSees_Element_Connectivity.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
-| Viewer_Preview_V141/OpenSees_Source_Model_Metadata_V118.json | [Schema](files/Viewer_Preview_V141/OpenSees_Source_Model_Metadata_V118.json.md) | ETABS_MODEL_OR_SOURCE_METADATA | PARSED |
 | Wall_Validation_Lu_Full/wall_validation.json | [Schema](files/Wall_Validation_Lu_Full/wall_validation.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
 | Wall_Validation_Results/wall_validation.json | [Schema](files/Wall_Validation_Results/wall_validation.json.md) | PROJECT_DATA_OR_REPORT | PARSED |
 | Worked_Example_V132/Gravity_Storey_Load_Breakdown_V131.json | [Schema](files/Worked_Example_V132/Gravity_Storey_Load_Breakdown_V131.json.md) | HISTORICAL_EXAMPLE_OUTPUT | PARSED |
