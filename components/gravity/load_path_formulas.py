@@ -107,7 +107,7 @@ def vertical_joint_balance(payload, applied_fz_kN):
                          support_Rz_kN=reaction,residual_Fz_kN=totals[tag]-force-reaction))
     return rows
 
-def add_formula_audit(wb,folder,data=None,cfg=None):
+def add_formula_audit(wb,folder,data=None,cfg=None,progress=None):
     from openpyxl.styles import Font,PatternFill
     from openpyxl.workbook.properties import CalcProperties
     folder=Path(folder)
@@ -155,7 +155,11 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     for item in audit.get('applied_area_loads',[]):pressure.setdefault(str(item['object']),[]).append(item)
     multipliers={r['pattern']:float(r['multiplier']) for r in audit.get('etabs_load_pattern_self_weight_multipliers',[]) if r.get('multiplier') is not None}
     surface_row=1
+    if callable(progress):
+        progress('Excel: generating source pressure and loaded-node formulas')
     for index,cell in enumerate(data.get('shells',[]),1):
+        if callable(progress) and index % 10000 == 0:
+            progress(f'Excel: processed {index:,} of {len(data.get("shells", [])):,} assembled shell cells')
         if cell.get('category')!='FLOOR':continue
         entries=[]
         for item in pressure.get(str(cell['object']),[]):entries.append((item['pattern'],'area_load',float(item['value'])*(1 if int(item['direction_code'])==10 else -1),item.get('load_set') or item.get('api','source')))
@@ -178,6 +182,8 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     # The primary worksheet is the full-gravity validation load path (1.0D
     # + 1.0L). Preserve a separate configured seismic-preload view; mass
     # factors remain an independent column in BOTH sheets.
+    if callable(progress):
+        progress(f'Excel: created {surface_row-1:,} surface pressure rows; duplicating seismic preload sheet')
     seismic=wb.copy_worksheet(ws)
     seismic.title='Surface seismic preload'
     for row in range(2,seismic.max_row+1):
@@ -303,10 +309,12 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
         expr=f'=C{row}*1000' if unit=='MPa' else f'=C{row}*6.894757293' if unit=='ksi' else f'=C{row}/1000'
         units.append([item.get('family'),item.get('parameter'),value,unit,target,expr,item.get('status'),item.get('source')])
     units.freeze_panes='A2';units.auto_filter.ref=units.dimensions
+    if callable(progress):
+        progress('Excel: worksheet formulas complete; ready for .xlsx serialization')
     wb.calculation=CalcProperties(calcId=191029,fullCalcOnLoad=True)
 
 
-def export(folder, *, output_root=None):
+def export(folder, *, output_root=None, progress=None):
     """Verified mesh-specific formula workbook from *matching* assembled model.
 
     Validate the config SHA and mesh size BEFORE generating any workbook cells.
@@ -330,7 +338,7 @@ def export(folder, *, output_root=None):
     if not any(e.get('category')=='FLOOR' for e in data.get('shells',[])):
         raise ValueError('No assembled FLOOR shell cells found: a mesh-size-specific workbook would be misleading.')
     wb=Workbook();wb.remove(wb.active)
-    add_formula_audit(wb,folder,data=data,cfg=cfg)
+    add_formula_audit(wb,folder,data=data,cfg=cfg,progress=progress)
     if not wb.worksheets:raise ValueError('Complete model does not contain enough source load-path data')
     root=Path(output_root) if output_root is not None else folder/'02_MODEL'/'SLAB_LOAD_PATH'/f'MESH_{n:02d}'
     excel_dir=root/'EXCEL';json_dir=root/'JSON'
@@ -338,7 +346,11 @@ def export(folder, *, output_root=None):
     from datetime import datetime
     stamp=datetime.now().strftime('%Y%m%d_%H%M%S_%f')
     path=excel_dir/f'Slab_Load_Path_MESH_{n:02d}_{stamp}_V141.xlsx'
+    if callable(progress):
+        progress('Excel: saving large .xlsx workbook to disk')
     wb.save(path)
+    if callable(progress):
+        progress('Excel: .xlsx workbook saved successfully')
     record=dict(mesh_subdivisions=n,config_sha256=actual,
                 assembled_model=str(model_path),workbook=str(path),
                 floor_shell_cells=sum(e.get('category')=='FLOOR' for e in data.get('shells',[])),
