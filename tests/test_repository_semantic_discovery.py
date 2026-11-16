@@ -1,10 +1,13 @@
 """Offline source discovery: immutable inventories and honest acceptance boundaries."""
 import pathlib
+import ast
 import subprocess
 import tempfile
 import unittest
 
-from tools.repository_semantic_discovery import classify, collect, write_report
+from tools.repository_semantic_discovery import (
+    classify, collect, write_report, _resolve_imports, _io_call_candidates
+)
 
 
 class DiscoveryTests(unittest.TestCase):
@@ -51,6 +54,35 @@ class DiscoveryTests(unittest.TestCase):
             self.assertTrue((output/"TRACKED_INVENTORY.csv").is_file())
             self.assertTrue((output/"SYMBOL_DISCOVERY_NOT_REVIEWED.csv").is_file())
             self.assertTrue((output/"READ_ME_FIRST.md").is_file())
+
+    def test_static_dependency_edges_are_classified_not_claimed_executed(self):
+        files=[
+            {"path":"components/__init__.py","is_python":True},
+            {"path":"components/model/__init__.py","is_python":True},
+            {"path":"components/model/assembly.py","is_python":True},
+        ]
+        rows=_resolve_imports(files,[
+            ("components/model/assembly.py","components.model",True,1),
+            ("components/model/assembly.py","os",False,2),
+            ("components/model/assembly.py","not_a_package_x",False,3),
+            ("components/model/assembly.py",".assembly",True,4),
+        ])
+        self.assertEqual(rows[0]["resolution"],"LOCAL_TRACKED_EXACT")
+        self.assertEqual(rows[1]["resolution"],"PYTHON_STDLIB")
+        self.assertEqual(rows[2]["resolution"],"EXTERNAL_OR_DYNAMIC_REQUIRES_ENV_CHECK")
+        self.assertEqual(rows[3]["resolution"],"LOCAL_TRACKED_EXACT")
+
+    def test_output_writer_reader_candidates_are_not_marked_verified(self):
+        tree=ast.parse(
+            "from pathlib import Path\n"
+            "Path('a.json').write_text('x')\n"
+            "Path('a.json').read_text()\n"
+            "with open('record.json','w') as handle: handle.write('x')\n"
+        )
+        rows=_io_call_candidates(tree,"components/sample.py")
+        self.assertTrue(any(x["kind"]=="WRITE_CANDIDATE" for x in rows))
+        self.assertTrue(any(x["kind"]=="READ_CANDIDATE" for x in rows))
+        self.assertTrue(all(x["contract_status"]=="NOT_VERIFIED" for x in rows))
 
     def test_invalid_python_is_not_silently_reviewed(self):
         with tempfile.TemporaryDirectory() as t:
