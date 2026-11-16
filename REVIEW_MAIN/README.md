@@ -107,3 +107,5 @@ OPEN_BLOCKER, OPEN_HIGH, INVESTIGATE, SOURCE_VERIFIED, NUMERICAL_ONLY, ETABS_OPE
 - Indian IS 13920:2016: consult the legally applicable BIS edition/amendments; check actual boundary element, coupling beam, confinement and wall opening details before using in constitutive models.
 
 **Scope limitation:** This initial register is based on user-provided November 11 screenshots/logs and existing GitHub engineering rules; no native ETABS run or complete result ZIP was executed or independently inspected as part of creating this register.
+
+[Repository audit and output locations](../docs/review/ledger/20261116_b8db900/README.md) records the inspected source, where generated software audits belong, and the remaining engineering acceptance gates.

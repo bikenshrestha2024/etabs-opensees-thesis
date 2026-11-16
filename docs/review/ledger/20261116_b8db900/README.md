@@ -47,3 +47,17 @@ Editor: OpenAI Codex desktop. Exact model identifier: UNKNOWN.
 The exact unittest selection in the integrated audit workflow passed on Windows, conda-forge Python 3.12.11 and openpyxl 3.1.5: 203 tests run, 185 passed and 18 skipped. Full unittest discovery could not be used as a passing gate. Direct discovery exited with a Windows process error, and discovery with the repository as top-level rejected the tests directory as nonimportable. The named suite was used to verify the changed entry points.
 
 Native probes, the complete building gravity and modal comparisons, and the full-record suite remain unverified in this checkpoint. The solver mechanics and archived engineering data were not reorganized.
+
+## Where to find and write the evidence
+
+Use this checkpoint for the findings and inspected-source ledger. Generate repository audit data with:
+
+```powershell
+python tools/audit_repository_integrated.py --repo . --output audit/integrated --fail-on-static-blockers
+```
+
+Open `audit/integrated/README.md` to navigate the ten numbered output sections. The index is generated from the files the audit writes. Use the integrated JSON for automation and the subject-specific reports for review. Keep generated audit packages in the audit folder or CI artifacts.
+
+Use the selected export case as the owner of engineering output. The stage directory owns `RUNS/<state>/<case>/<run-id>/`, with `00_INPUT_SOURCE`, `01_LOGS`, `02_RESULTS`, `03_EXCEL`, `04_FIGURES`, `05_COMPARISONS`, `06_REVIEW`, and `07_EXPORT_ZIP`. The [output layout guide](../../../source/components/inputs/output_layout.py.md) records the stage names and legacy read paths. Use [the repository review index](../../../../REVIEW_MAIN/README.md) for curated engineering evidence.
+
+The six GitHub checks observed on the original regression commit `034613e` completed successfully. The output index has an additional regression that checks every generated artifact is linked.

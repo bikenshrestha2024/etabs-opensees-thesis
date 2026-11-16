@@ -102,7 +102,11 @@ class IntegratedAuditTests(unittest.TestCase):
             self.assertTrue((out/"09_FACADE_COMPATIBILITY"/"facade_source_context.csv").is_file())
             self.assertIn("src/thesis_core/neutral_model.py",
                           {unit["path"] for unit in units})
-            self.assertTrue((out/"README.md").is_file())
+            index = (out / "README.md").read_text(encoding="utf-8")
+            artifacts = {p.relative_to(out).as_posix() for p in out.rglob("*")
+                         if p.is_file() and p.name != "README.md"}
+            for relative in artifacts:
+                self.assertIn(f"]({relative})", index)
             self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
 
     def test_exec_facade_inventory_marks_real_source_context_risk(self):

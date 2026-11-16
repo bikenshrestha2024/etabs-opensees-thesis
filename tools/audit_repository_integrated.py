@@ -622,17 +622,18 @@ def save(report: dict, directory: Path) -> tuple[Path, Path]:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n",
                           encoding="utf-8")
+    artifacts = [summary, register, semantic, facades, *(target for target, _ in pieces)]
+    links = []
+    for path in sorted(artifacts):
+        relative = path.relative_to(directory).as_posix()
+        links.append(f"- [{relative}]({relative})")
+    index = "\n".join(links)
     (directory / "README.md").write_text(
-        "# Static repository audit evidence (not native engineering approval)\n\n"
-        "00_OVERVIEW/ — complete integrated JSON, including tracked file register\n"
-        "01_TRACKED_FILES/ — one-row-per-tracked-file CSV\n"
-        "02_DEPENDENCIES/ — active local import graph and unresolved candidates\n"
-        "03_FINDINGS/ — prioritized issues and review obligations\n"
-        "04_ACCEPTANCE/ — distinct static and native engineering gates\n"
-        "05_OUTPUT_WRITERS/ — potential write calls and legacy reference counts\n"
-        "06_SECURITY/ — redacted current-tree pattern-scan summary\n\n"
-        "A passing static gate is NOT ETABS/OpenSees equivalence, NBC code "
-        "acceptance or a full line-by-line semantic review.\n",
+        "# Static repository audit evidence\n\n"
+        f"{index}\n\n"
+        "Use the integrated JSON for machine processing and the linked reports "
+        "for review by subject. Native engineering acceptance and semantic review "
+        "have separate evidence gates.\n",
         encoding="utf-8")
     return summary, register
 
