@@ -89,13 +89,16 @@ def compact_load_figure(fig, metadata):
         start = float(item["value"])
         end = float(item.get("value_end", start))
         key = (kind, str(item["pattern"]), int(item["level"]), start, end)
-        group = grouped.setdefault(key, dict(x=[], y=[], z=[],
+        group = grouped.setdefault(key, dict(x=[], y=[], z=[], customdata=[],
                                              i=[], j=[], k=[], count=0,
                                              template=trace))
         xyz = [_tolist(getattr(trace, axis, None)) for axis in ("x", "y", "z")]
         if not (len(xyz[0]) == len(xyz[1]) == len(xyz[2])):
             raise ValueError("Load figure coordinate arrays differ")
+        raw_cd = _tolist(getattr(trace, "customdata", None))
+        cd = raw_cd if len(raw_cd) == len(xyz[0]) else [None]*len(xyz[0])
         if kind == "surface":
+            group["customdata"].extend(cd)
             base = len(group["x"])
             group["x"].extend(xyz[0])
             group["y"].extend(xyz[1])
@@ -106,6 +109,7 @@ def compact_load_figure(fig, metadata):
         else:
             for axis, coords in zip(("x", "y", "z"), xyz):
                 group[axis].extend(coords + [None])
+            group["customdata"].extend(cd + [None])
         group["count"] += 1
     new_meta = []
     legend_patterns = set()
@@ -115,13 +119,14 @@ def compact_load_figure(fig, metadata):
         if kind == "surface":
             out.add_trace(go.Mesh3d(
                 x=d["x"], y=d["y"], z=d["z"], i=d["i"], j=d["j"], k=d["k"],
+                customdata=d["customdata"],
                 color=d["template"].color, opacity=d["template"].opacity,
                 name=name, legendgroup=pattern, showlegend=pattern not in legend_patterns,
-                hovertemplate=f"Pattern: {pattern}<br>Storey: {level}<extra></extra>"))
+                hovertemplate=d["template"].hovertemplate))
         else:
             out.add_trace(go.Scatter3d(
                 x=d["x"], y=d["y"], z=d["z"], mode="lines",
-                line=d["template"].line, name=name,
+                customdata=d["customdata"], line=d["template"].line, name=name,
                 legendgroup=pattern, showlegend=pattern not in legend_patterns,
                 hovertemplate=f"Pattern: {pattern}<br>Storey: {level}<extra></extra>"))
         legend_patterns.add(pattern)
