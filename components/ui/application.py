@@ -2339,6 +2339,8 @@ class App:
             command=self._cancel_conversion, state="disabled"
         )
         self.cancel_conversion_btn.pack(anchor="w", pady=(4, 0))
+        ttk.Button(runbar,text="Open ETABS conversion worker log",
+                   command=self._open_conversion_worker_log).pack(anchor="w",pady=(2,0))
         ttk.Label(runbar, textvariable=self.conversion_progress,
                   wraplength=1050).pack(anchor="w", pady=(3, 0))
         ttk.Button(runbar,text="Rebuild assembled model from saved ETABS export",command=self._rebuild_complete_export).pack(anchor="w",pady=(4,0))
@@ -3247,6 +3249,21 @@ class App:
             self.log("[WORKER START FAILED] " + repr(exc))
             messagebox.showerror("ETABS export could not start", str(exc), parent=self.root)
 
+    def _open_conversion_worker_log(self):
+        """[REF docs/source/components/ui/application.py.md] Open only an existing local worker log."""
+        target = Path(self.out.get().strip()).expanduser() / "09_SOFTWARE_DIAGNOSTICS" / "ETABS_Conversion_Worker.log"
+        if not target.is_file():
+            messagebox.showinfo(
+                "Conversion log unavailable",
+                "No worker log is present at:\\n"+str(target)+
+                "\\n\\nStart an export or select the existing export folder.",
+                parent=self.root)
+            return
+        try:
+            os.startfile(str(target.resolve()))
+        except Exception as exc:
+            messagebox.showerror("Cannot open worker log",str(exc),parent=self.root)
+
     def _cancel_conversion(self):
         process = getattr(self, "_conversion_process", None)
         if process is None:
@@ -3289,7 +3306,11 @@ class App:
                         except (json.JSONDecodeError, ValueError):
                             self.log("[WORKER RESULT PARSE ERROR]")
                     else:
-                        if " [STEP START] " in line:
+                        if " [ETABS COM START] " in line:
+                            self._conversion_stage = "ETABS COM: "+line.split(" [ETABS COM START] ",1)[1].strip()
+                        elif " [WORKER STAGE START] " in line:
+                            self._conversion_stage = line.split(" [WORKER STAGE START] ",1)[1].strip()
+                        elif " [STEP START] " in line:
                             self._conversion_stage = line.split(" [STEP START] ", 1)[1].strip()
                         elif " [STEP OK] " in line or " [STEP FAILED] " in line:
                             self._conversion_stage = line.split(" [STEP ", 1)[1].strip()
@@ -3303,7 +3324,9 @@ class App:
                     f"Conversion running: {elapsed}s elapsed | stage: "
                     f"{getattr(self, '_conversion_stage', 'initializing')} | "
                     f"last worker log {silent}s ago. "
-                    "Mesh assembly, ETABS OAPI and 3D HTML export are distinct stages."
+                    ("No worker progress for over 2 min; inspect the worker log, "
+                     "ETABS process and current OAPI call." if silent >= 120 else
+                     "Mesh assembly, ETABS OAPI and 3D HTML export are distinct stages.")
                 )
                 self.root.after(400, self._poll_conversion_worker)
                 return
