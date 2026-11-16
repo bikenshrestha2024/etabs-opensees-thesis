@@ -1,0 +1,89 @@
+"""Isolated ETABS-to-OpenSees source export worker.
+
+Run from the main GUI in a fresh Python process. ETABS COM is created and used
+only inside this process; do not invoke Tk operations from this worker.
+Source EDB must not be edited by this diagnostic runner.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+import traceback
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+
+def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
+    from components.inputs.project_output_layout import create_project_layout
+    from components.inputs.lfs_workbook_recovery import audit_optional_gui_workbooks
+    from components.ui.application import convert_model
+
+    def log(line):
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {line}", flush=True)
+
+    output.mkdir(parents=True, exist_ok=True)
+    context = create_project_layout(str(edb), output)
+    log("[PROJECT_SOURCE] EDB SHA256: " + context["source_edb_sha256"])
+    log("[PROJECT_OUTPUT] Root: " + str(context["output_root"]))
+    optional = audit_optional_gui_workbooks(
+        REPO_ROOT, output, str(edb), log=log
+    )
+    log("[SOURCE_GATE] Optional gravity workbook status: " +
+        str(optional.get("evidence_status")))
+    results = convert_model(str(edb), str(output), log, include_live)
+    report_file = output / "OpenSees_Complete_Export_Report_V118.json"
+    if not report_file.is_file():
+        raise FileNotFoundError("Converter finished but expected report is missing: " +
+                                str(report_file))
+    report = json.loads(report_file.read_text(encoding="utf-8-sig"))
+    if categorize:
+        try:
+            from components.inputs.export_mirror import export_mirror
+            from components.inputs.output_layout import write_stage_index
+            export_mirror(output)
+            write_stage_index(output)
+            log("[EXPORT_ORGANIZED] Categorized mirror generated; legacy outputs retained")
+        except Exception as exc:
+            # Do not label a successfully completed export as failed for a mirror issue.
+            log("[EXPORT_ORGANIZATION_NEEDS_REVIEW] " + repr(exc))
+    errors = report.get("assembly_errors") or []
+    log("[WORKER COMPLETED] Assembly errors recorded: " + str(len(errors)))
+    return {
+        "status": "EXPORT_COMPLETED_REVIEW_REQUIRED",
+        "report": str(report_file),
+        "assembly_errors": errors[:25],
+        "analysis_ready_reported": bool(report.get("analysis_ready", False)),
+        "nonlinear_ready_reported": bool(report.get("nonlinear_ready", False)),
+        "frame_segments": report.get("frame_segments"),
+        "shell_mesh_cells": report.get("shell_mesh_cells"),
+        "model_equivalence": "NOT_VERIFIED"
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--edb", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--include-live", action="store_true")
+    parser.add_argument("--categorize", action="store_true")
+    args = parser.parse_args()
+    try:
+        if not args.edb.is_file():
+            raise FileNotFoundError("ETABS EDB not found: " + str(args.edb))
+        response = run(args.edb.resolve(), args.output.resolve(),
+                       args.include_live, args.categorize)
+        print("[WORKER_RESULT] " + json.dumps(response), flush=True)
+        return 0
+    except Exception:
+        print("[WORKER_ERROR]\n" + traceback.format_exc(), flush=True)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
