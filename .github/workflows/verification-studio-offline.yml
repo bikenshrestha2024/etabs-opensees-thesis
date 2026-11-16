@@ -26,10 +26,10 @@ jobs:
           python-version: "3.12"
       - name: Compile standalone verification modules
         working-directory: tools/verification_studio
-        run: python -m py_compile ETABS_OpenSees_Verification_Studio.py ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py expanded_benchmarks.py test_studio.py
+        run: python -m py_compile ETABS_OpenSees_Verification_Studio.py ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py expanded_benchmarks.py import_verified_runs.py test_studio.py test_import_verified_runs.py
       - name: Verify offline regression tests
         working-directory: tools/verification_studio
-        run: python -m unittest -v test_studio
+        run: python -m unittest -v test_studio test_import_verified_runs
       - name: Verify registry and independent analytical reference calculations
         working-directory: tools/verification_studio
         run: python ETABS_OpenSees_Verification_Studio.py --self-test
