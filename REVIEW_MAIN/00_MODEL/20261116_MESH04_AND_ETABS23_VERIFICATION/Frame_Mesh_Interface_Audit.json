@@ -1,0 +1,265 @@
+{
+  "config_sha256": "4aac1a616a66570dd0e5c58e48759a4f91104391b760a023da56fcaaf0c92c20",
+  "node_count": 11072,
+  "frame_count": 3862,
+  "exact_coincident_groups": [],
+  "frame_tags_at_or_below_1nm": [],
+  "focus_nodes": {
+    "1103": {
+      "xyz_m": [
+        0.0,
+        0.0,
+        41.79999999999999
+      ],
+      "etabs_point": "268",
+      "exact_coincident_tags": [
+        1103
+      ],
+      "frames": [
+        100251,
+        100619,
+        103254,
+        103255
+      ],
+      "shells": [
+        {
+          "row": 225,
+          "area": "29",
+          "category": "FLOOR"
+        }
+      ]
+    },
+    "3751": {
+      "xyz_m": [
+        0.0,
+        1.5,
+        41.79999999999999
+      ],
+      "etabs_point": null,
+      "exact_coincident_tags": [
+        3751
+      ],
+      "frames": [
+        100251,
+        100252
+      ],
+      "shells": [
+        {
+          "row": 225,
+          "area": "29",
+          "category": "FLOOR"
+        },
+        {
+          "row": 226,
+          "area": "29",
+          "category": "FLOOR"
+        }
+      ]
+    },
+    "3754": {
+      "xyz_m": [
+        1.5,
+        0.0,
+        41.79999999999999
+      ],
+      "etabs_point": null,
+      "exact_coincident_tags": [
+        3754
+      ],
+      "frames": [
+        100619,
+        100620
+      ],
+      "shells": [
+        {
+          "row": 225,
+          "area": "29",
+          "category": "FLOOR"
+        },
+        {
+          "row": 229,
+          "area": "29",
+          "category": "FLOOR"
+        }
+      ]
+    }
+  },
+  "focus_frames": {
+    "100251": {
+      "object": "251",
+      "nodes": [
+        1103,
+        3751
+      ],
+      "length": 1.5,
+      "start": 0.0,
+      "end": 1.5,
+      "properties": {
+        "section": "Beam 600*800",
+        "A": 0.48,
+        "Iy": 0.025600000000000008,
+        "Iz": 0.014399999999999998,
+        "J": 0.031101609375,
+        "E": 33541019.999999993,
+        "G": 13975424.999999998,
+        "weight": 24.992617999999997
+      },
+      "category": "BEAM",
+      "basis": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      ],
+      "physical_width_m": 0.6,
+      "physical_depth_m": 0.8,
+      "hinged_brace": false,
+      "release_i": false,
+      "release_j": false,
+      "length_from_coordinates_m": 1.5
+    },
+    "100252": {
+      "object": "251",
+      "nodes": [
+        3751,
+        3752
+      ],
+      "length": 1.5,
+      "start": 1.5,
+      "end": 3.0,
+      "properties": {
+        "section": "Beam 600*800",
+        "A": 0.48,
+        "Iy": 0.025600000000000008,
+        "Iz": 0.014399999999999998,
+        "J": 0.031101609375,
+        "E": 33541019.999999993,
+        "G": 13975424.999999998,
+        "weight": 24.992617999999997
+      },
+      "category": "BEAM",
+      "basis": [
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -0.0,
+          1.0
+        ]
+      ],
+      "physical_width_m": 0.6,
+      "physical_depth_m": 0.8,
+      "hinged_brace": false,
+      "release_i": false,
+      "release_j": false,
+      "length_from_coordinates_m": 1.5
+    },
+    "100619": {
+      "object": "343",
+      "nodes": [
+        1103,
+        3754
+      ],
+      "length": 1.5,
+      "start": 0.0,
+      "end": 1.5,
+      "properties": {
+        "section": "Beam 600*800",
+        "A": 0.48,
+        "Iy": 0.025600000000000008,
+        "Iz": 0.014399999999999998,
+        "J": 0.031101609375,
+        "E": 33541019.999999993,
+        "G": 13975424.999999998,
+        "weight": 24.992617999999997
+      },
+      "category": "BEAM",
+      "basis": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "physical_width_m": 0.6,
+      "physical_depth_m": 0.8,
+      "hinged_brace": false,
+      "release_i": false,
+      "release_j": false,
+      "length_from_coordinates_m": 1.5
+    },
+    "100620": {
+      "object": "343",
+      "nodes": [
+        3754,
+        3759
+      ],
+      "length": 1.5,
+      "start": 1.5,
+      "end": 3.0,
+      "properties": {
+        "section": "Beam 600*800",
+        "A": 0.48,
+        "Iy": 0.025600000000000008,
+        "Iz": 0.014399999999999998,
+        "J": 0.031101609375,
+        "E": 33541019.999999993,
+        "G": 13975424.999999998,
+        "weight": 24.992617999999997
+      },
+      "category": "BEAM",
+      "basis": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "physical_width_m": 0.6,
+      "physical_depth_m": 0.8,
+      "hinged_brace": false,
+      "release_i": false,
+      "release_j": false,
+      "length_from_coordinates_m": 1.5
+    }
+  }
+}
