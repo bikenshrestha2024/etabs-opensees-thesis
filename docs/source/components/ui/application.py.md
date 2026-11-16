@@ -64,3 +64,12 @@ The new Import action "3D actual assembled 4×4 mesh (on demand; no ETABS rerun)
 Four ETABS source 3D/load HTML views are still generated during conversion and remain available by their existing buttons, but the converter no longer automatically opens four browser tabs at completion. They share a single local plotly.min.js via Plotly's include_plotlyjs='directory' output; this avoids repeating the library payload in each HTML. Browser output is local/offline; keep plotly.min.js alongside the source views if moving them. Actual runtime reduction is not established until the user's ETABS_Conversion_Worker.log stages are profiled.
 
 Validation: tests/test_assembled_mesh_view.py and existing GUI workflow layout checks. Native ETABS OAPI and Windows GUI QA remain required. No structural calculation, source EDB or mesh-count policy was altered.
+
+
+### Performance regression follow-up: November 15 to November 16
+
+Source comparison 9041cb6 (November 15) to cb4c296 (November 16) shows 119 intervening commits. A separate ETABS child worker was introduced with mandatory project EDB hash and optional workbook preflight, plus default enabled SHA verified export mirror. The optional role preflight had independently digested the full EDB for every one of the four source roles, even when no registry was configured. It now computes that EDB checksum once per preflight. Workbook hashes still require source equality, and the EDB is still hashed by the separate project-output provenance stage; no source verification has been disabled.
+
+SHA verified categorized export mirroring is now optional/off by default. The original model and existing categorization mechanism remain available through the checkbox for deliberate use. This prevents hashing/copying all flat artifacts as mandatory import completion work. More granular worker logs mark project hash/layout, optional workbook verification, ETABS CreateObjectProgID, ApplicationStart, OpenFile, source point/diaphragm progress, area/frame extraction, assembly, and optional mirroring. An Import button opens the current worker log and a prolonged-no-output warning remains advisory, never forcibly kills ETABS.
+
+This instrumentation does not prove which stage took ~19 minutes on the actual Windows machine. The private time-stamped worker log is the required discriminating evidence. No 4x4 FEM shell mesh, column offsets, ETABS assignments, gravity loads, or analysis solver is changed by this patch.
