@@ -381,8 +381,11 @@ def launch(parent,folder):
     ttk.Label(header,text='Selected mesh subdivisions:').pack(side='left')
     choice=tk.StringVar(value=str(cfg.get('floor_subdivisions',4)) if
                         cfg.get('floor_subdivisions',4) in (4,8,16) else '4')
-    ttk.Combobox(header,textvariable=choice,values=['Current root (hash-checked)','4','8','16'],state='readonly',
-                 width=8).pack(side='left',padx=9)
+    mesh_selector=ttk.Combobox(
+        header,textvariable=choice,
+        values=['Current root (hash-checked)','4','8','16'],
+        state='readonly',width=8)
+    mesh_selector.pack(side='left',padx=9)
     current=ttk.Label(header,text='Current root config: '+str(cfg.get('floor_subdivisions','unknown')))
     current.pack(side='left',padx=10)
 
@@ -438,12 +441,14 @@ def launch(parent,folder):
         # comparison later; no root config, EDB or existing gravity results are
         # changed. Model generation can take time, so never block Tk's loop.
         def report_failure(exc):
+            mesh_selector.configure(state='readonly')
             for b in buttons:b.configure(state='normal')
             status.set('FAILED | '+str(exc))
             log('FAILED MESH_'+str(size).zfill(2)+': '+str(exc))
             messagebox.showerror('Mesh assembly / workbook export failed',
                                  str(exc)+'\n\nIf a model assembled successfully, select "Retry Excel from assembled mesh (no rebuild)" to avoid reassembling it.',parent=win)
         def report_success(result):
+            mesh_selector.configure(state='readonly')
             for b in buttons:b.configure(state='normal')
             status.set('FORMULA EXPORTED | MESH_'+str(size).zfill(2)+' (gravity/ETABS verification still required)')
             log('MESH_'+str(size).zfill(2)+' ASSEMBLED: '+result['assembled_model'])
@@ -454,6 +459,7 @@ def launch(parent,folder):
                 +result['workbook']+
                 '\\n\\nThis is NOT an independently solved gravity or NBC acceptance case.',
                 parent=win)
+        mesh_selector.configure(state='disabled')  # capture exact run size; prevent misleading changes mid-run
         for b in buttons:b.configure(state='disabled')
         status.set('RUNNING | Fresh MESH_'+str(size).zfill(2)+' assembly from saved source audit ...')
         log('START | MESH_'+str(size).zfill(2)+' | new independent model run, not just a renamed spreadsheet')
