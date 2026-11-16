@@ -1,0 +1,56 @@
+name: Pinned repository source discovery and semantic review queue
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/repository_semantic_discovery.py"
+      - "tests/test_repository_semantic_discovery.py"
+      - ".github/workflows/repository-semantic-discovery.yml"
+  pull_request:
+    paths:
+      - "tools/repository_semantic_discovery.py"
+      - "tests/test_repository_semantic_discovery.py"
+      - ".github/workflows/repository-semantic-discovery.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  immutable-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax check and deterministic contract tests
+        run: |
+          python -m py_compile tools/repository_semantic_discovery.py tests/test_repository_semantic_discovery.py
+          python -m unittest discover -s tests -p 'test_repository_semantic_discovery.py' -v
+      - name: Inventory ALL tracked files with pinned Git blob and Python AST symbol provenance
+        run: python tools/repository_semantic_discovery.py --root . --out AUDIT_RUNS/semantic_discovery
+      - name: Print factual discovery status, not semantic completion
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('AUDIT_RUNS/semantic_discovery/DISCOVERY_SUMMARY.json',encoding='utf-8'))
+          print('PINNED HEAD:',d['head'])
+          print('TRACKED FILES:',d['tracked_files'])
+          print('PYTHON FILES:',d['python_files'])
+          print('DISCOVERED SYMBOLS:',d['symbols_discovered'])
+          print('AST ISSUES:',len(d['ast_issues']))
+          print('DUPLICATE BLOBS:',d['duplicate_counts'])
+          print('BY CATEGORY:',d['categories'])
+          print('SEMANTIC REVIEW:',d['acceptance']['S2_COMPLETE_SEMANTIC_REVIEW'])
+          PY
+      - name: Store public-source discovery evidence, NEVER model exports
+        uses: actions/upload-artifact@v4
+        with:
+          name: semantic-discovery-public-source-queue
+          path: AUDIT_RUNS/semantic_discovery/
+          retention-days: 14
