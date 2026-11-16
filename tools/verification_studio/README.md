@@ -89,3 +89,22 @@ python ETABS_OpenSees_Verification_Studio.py
 Both `ETABS_OpenSees_Verification_Studio.py` and `expanded_benchmarks.py` **must be present beside each other**. Do **not** copy only the main script into Downloads. When running the GUI, the main window launches workers through the interpreter you selected, but imports the sibling benchmark module from its own source directory. v2.0.1 distinguishes a missing companion module from a missing OpenSeesPy installation and shows a GUI preflight error.
 
 Case B12 is a standalone analytical check and does **not** require OpenSeesPy; if it reports missing OpenSeesPy, that indicates an incorrectly classified failure or an outdated script.
+
+## Recommended: complete single-file Studio (v2.1)
+
+For a one-file application use **`ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py`**. This file includes all twelve B01–B12 benchmark definitions, GUI, subprocess worker, report generation, the CSI reference index, and the 32-support CSV comparison. **It does not import `expanded_benchmarks.py`.** The two-file v2.0 launcher remains available for backward compatibility.
+
+From a freshly updated repository:
+
+```powershell
+git pull origin main
+conda activate etabs_env312
+cd tools\verification_studio
+python ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py --self-test
+python ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py --cases B12 --output VERIFICATION_RUNS
+python ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py
+```
+
+You may also save **only that one Python file** to a different folder, including Downloads. Run it with the selected Python interpreter that has OpenSeesPy installed. B12 is analytical-only; B01–B11 require native OpenSeesPy. Do not mistake a missing interpreter dependency for a missing companion program.
+
+Reports are saved in a user-selected local folder and should remain private if they contain project-specific reaction data. A PASS validates only the tested component model and recorded tolerances, not the full CSI verification example or ETABS–OpenSees thesis model.
