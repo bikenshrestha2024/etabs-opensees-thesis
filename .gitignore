@@ -39,3 +39,10 @@ security_history_private.json
 # Local source/path audits may contain confidential source names and machine paths.
 # Keep them out of public commits; CI can publish sanitized workflow artifacts.
 /audit/
+
+# Project-specific mesh connectivity/viewer exports contain geometry, sections,
+# node incidences and potentially source identifiers. Keep private to export case.
+REVIEW_MAIN/00_MODEL/20261116_MESH04_AND_ETABS23_VERIFICATION/Frame_Mesh_Interface_Audit.json
+REVIEW_MAIN/00_MODEL/20261116_MESH04_AND_ETABS23_VERIFICATION/MESH_04_Node_Roles.csv
+REVIEW_MAIN/00_MODEL/20261116_MESH04_AND_ETABS23_VERIFICATION/MESH_04_Floor_Mesh_3D.html
+REVIEW_MAIN/00_MODEL/20261116_MESH04_AND_ETABS23_VERIFICATION/MESH_04_Floor_and_Beam_3D.html
