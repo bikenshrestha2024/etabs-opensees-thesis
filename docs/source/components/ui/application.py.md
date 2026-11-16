@@ -51,3 +51,16 @@ The `structure_postscript` within `components/ui/application.py` previously crea
 **Concrete correctness fix:** the original source filter had `gd.data.forEach(... original[i] ...)` using an original trace snapshot. The shared ID highlighter adds a temporary Plotly selection trace after that snapshot. Running a storey/section filter after highlighting could dereference `original[i] === undefined` and fail; the loop is now confined to `gd.data.slice(0,original.length)`, and visibility changes target exactly `meta.map((_,i)=>i)`. The selected highlight overlay is therefore not modified/hidden by source filters. These are purely visualization trace changes, not OpenSees geometry, physical stiffness, links, or engineering calculations.
 
 The prefix/storey/member selector is injected separately by `components/model/id_audit.py` into all three exported Plotly 3D/browser views (and related Plotly HTML). See `REVIEW_MAIN/00_MODEL/20261115_V162_PLOTLY_VIEW_ID_CLASSIFICATION_AND_USABILITY.md`. Regression: `tests/test_shared_3d_prefix_selector.py`. Native ETABS and actual local Chrome UI interaction are not tested by the CI source checks.
+
+
+## 2026-11-16 — runtime stage visibility, ID lookup guard and on-demand assembled mesh
+
+The Import tab's ID lookup button now checks for an actual nonempty HTML before invoking the browser. While an ETABS worker is active, it refuses to show a possibly stale prior-run lookup and explains that the audit is generated during late assembly. After the run, a missing file produces a Tk warning identifying its expected path and the Excel audit status, not Edge ERR_FILE_NOT_FOUND.
+
+The conversion status parses the worker's [STEP START]/[STEP OK] records and displays the current stage, elapsed time, and time since a log line. It logs the selected saved floor_subdivisions at worker start, explicitly distinguishing FE mesh refinement from visualization resolution. The value is never changed by this UI improvement.
+
+The new Import action "3D actual assembled 4×4 mesh (on demand; no ETABS rerun)" creates the view in a background thread from fingerprint-matched, already-assembled OpenSees V118 model files. It neither invokes ETABS nor changes real ShellMITC4 or gravity elements; see docs/source/components/ui/assembled_mesh_view.py.md.
+
+Four ETABS source 3D/load HTML views are still generated during conversion and remain available by their existing buttons, but the converter no longer automatically opens four browser tabs at completion. They share a single local plotly.min.js via Plotly's include_plotlyjs='directory' output; this avoids repeating the library payload in each HTML. Browser output is local/offline; keep plotly.min.js alongside the source views if moving them. Actual runtime reduction is not established until the user's ETABS_Conversion_Worker.log stages are profiled.
+
+Validation: tests/test_assembled_mesh_view.py and existing GUI workflow layout checks. Native ETABS OAPI and Windows GUI QA remain required. No structural calculation, source EDB or mesh-count policy was altered.
