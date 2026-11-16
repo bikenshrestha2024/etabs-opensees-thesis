@@ -3338,7 +3338,7 @@ class App:
                     f"Conversion running: {elapsed}s elapsed | stage: "
                     f"{getattr(self, '_conversion_stage', 'initializing')} | "
                     f"last worker log {silent}s ago. "
-                    ("No worker progress for over 2 min; inspect the worker log, "
+                    + ("No worker progress for over 2 min; inspect the worker log, "
                      "ETABS process and current OAPI call." if silent >= 120 else
                      "Mesh assembly, ETABS OAPI and 3D HTML export are distinct stages.")
                 )
