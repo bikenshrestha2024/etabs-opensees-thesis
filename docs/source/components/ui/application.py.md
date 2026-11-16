@@ -73,3 +73,8 @@ Source comparison 9041cb6 (November 15) to cb4c296 (November 16) shows 119 inter
 SHA verified categorized export mirroring is now optional/off by default. The original model and existing categorization mechanism remain available through the checkbox for deliberate use. This prevents hashing/copying all flat artifacts as mandatory import completion work. More granular worker logs mark project hash/layout, optional workbook verification, ETABS CreateObjectProgID, ApplicationStart, OpenFile, source point/diaphragm progress, area/frame extraction, assembly, and optional mirroring. An Import button opens the current worker log and a prolonged-no-output warning remains advisory, never forcibly kills ETABS.
 
 This instrumentation does not prove which stage took ~19 minutes on the actual Windows machine. The private time-stamped worker log is the required discriminating evidence. No 4x4 FEM shell mesh, column offsets, ETABS assignments, gravity loads, or analysis solver is changed by this patch.
+
+
+### Same-export concurrency protection
+
+The Import-stage separate 4/8/16 slab-mesh workflow and "Rebuild assembled model from saved ETABS export" now reject invocation while the main ETABS worker is still writing the same export folder. Previously users could start a second whole-building mesh assembly and large formula workbook while the original conversion was incomplete, increasing disk/CPU contention and risking inconsistent source inputs. This is a real concurrency risk, not proof that the current 19-minute worker run suffered such overlap. The read-only on-demand assembled 3D viewer also remains unavailable until conversion finishes. No physical mesh reductions or sources are applied.
