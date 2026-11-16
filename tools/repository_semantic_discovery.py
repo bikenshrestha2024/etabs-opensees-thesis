@@ -177,6 +177,20 @@ def collect(root):
     if not (root / ".git").exists():
         raise ValueError("Repository root must be a Git checkout")
     head=git(root, "rev-parse", "HEAD").decode().strip()
+    # The Git index and working-tree source must both match HEAD. A checkout
+    # with local edits can otherwise mix a pinned HEAD with different bytes.
+    # Untracked local/private ETABS data is intentionally not inspected.
+    dirty = subprocess.run(
+        ["git", "-C", str(root), "diff", "--quiet", "HEAD", "--"],
+        capture_output=True, check=False,
+    )
+    if dirty.returncode != 0:
+        if dirty.returncode == 1:
+            raise ValueError(
+                "Tracked source differs from pinned HEAD; commit or restore "
+                "tracked edits before generating an immutable audit."
+            )
+        raise RuntimeError("Cannot verify tracked source against Git HEAD")
     raw=git(root, "ls-files", "-s", "-z").split(b"\0")
     files=[]; symbols=[]; edges=[]; io_ops=[]; duplicate=defaultdict(list)
     failures=[]; patterns=[]; by_category=Counter()
@@ -184,6 +198,8 @@ def collect(root):
         if not entry: continue
         stat, rel=entry.split(b"\t", 1)
         mode, blob, stage=stat.decode().split()
+        if stage != "0":
+            raise ValueError("Unmerged Git index entry cannot form an immutable audit")
         path=rel.decode("utf-8", "surrogateescape")
         category=classify(path)
         by_category[category]+=1
