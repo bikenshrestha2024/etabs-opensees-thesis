@@ -1,6 +1,9 @@
 """Offline regression of registry, metadata, analytical checks and reports."""
 import json
 import pathlib
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -36,6 +39,21 @@ class TestStudio(unittest.TestCase):
                 json.loads((pathlib.Path(t) / 'B12.json').read_text())['status'],
                 'ANALYTICAL_PASS',
             )
+
+    def test_missing_companion_is_not_a_missing_openseespy_claim(self):
+        # Regression for downloaded single-file GUI without its companion module.
+        with tempfile.TemporaryDirectory() as t:
+            folder = pathlib.Path(t)
+            isolated = folder / 'ETABS_OpenSees_Verification_Studio.py'
+            shutil.copyfile(pathlib.Path(studio.__file__), isolated)
+            r = subprocess.run([sys.executable, str(isolated), '--worker', 'B12',
+                                '--output', str(folder / 'run')],
+                               capture_output=True, text=True, timeout=30)
+            result = json.loads((folder / 'run' / 'B12.json').read_text())
+            self.assertEqual(result['status'], 'BLOCKED')
+            self.assertEqual(result['missing_dependency'], 'expanded_benchmarks.py')
+            self.assertIn('Copy expanded_benchmarks.py', result['reason'])
+            self.assertNotIn('OpenSeesPy is not installed', result['reason'])
 
     def test_no_solver_never_passes(self):
         with tempfile.TemporaryDirectory() as t:
