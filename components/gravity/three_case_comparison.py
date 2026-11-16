@@ -74,9 +74,17 @@ def join_source_etabs_reactions(available, reaction_rows):
         mapping[tag] = source
     if len(mapping) != 76:
         raise ValueError("Source ETABS audit is missing or duplicating restrained points")
-    actual = {int(row["node_tag"]) for row in reaction_rows}
-    if not set(mapping).issubset(actual):
-        raise ValueError("Missing source-restrained node tags in solved support comparison")
+    # A 32-only solved run legitimately omits the 44 released source points.
+    # Retain these source rows with NULL solver reactions rather than
+    # crashing or implicitly fabricating results for the missing 76/97 cases.
+    row_by_tag = {}
+    for row in reaction_rows:
+        tag = int(row["node_tag"])
+        if tag in row_by_tag:
+            raise ValueError("Duplicate solved support reaction row at " + str(tag))
+        row_by_tag[tag] = row
+    if not set(mapping).intersection(row_by_tag):
+        raise ValueError("No ETABS source-support tags occur in solved reactions")
     expected32 = {tag for tag, source in mapping.items() if source["selected"]}
     saved32 = {int(row["node_tag"]) for row in payload["reactions"]}
     if expected32 != saved32:
@@ -86,11 +94,11 @@ def join_source_etabs_reactions(available, reaction_rows):
     if abs(audit_total - computed_total) > max(0.01, abs(audit_total)*1e-7):
         raise ValueError("ETABS source 76-support reactions disagree with declared total")
     rows = []
-    for row in reaction_rows:
-        tag = int(row["node_tag"])
+    for tag in sorted(set(mapping) | set(row_by_tag)):
+        row = row_by_tag.get(tag, {})
         source = mapping.get(tag)
         original = float(source["etabs_FZ_kN"]) if source else None
-        values = [row["rz_"+label+"_kN"] for label in ("32", "76", "97")]
+        values = [row.get("rz_"+label+"_kN") for label in ("32", "76", "97")]
         differences = [(v-original if v is not None and original is not None
                         else None) for v in values]
         rows.append(dict(
@@ -107,24 +115,36 @@ def join_source_etabs_reactions(available, reaction_rows):
             delta_76_minus_ETABS_kN=differences[1],
             delta_97_minus_ETABS_kN=differences[2],
             status=("SOURCE_RESTRAINED_ZERO_ETABS_REACTION"
-                    if source and original == 0
+                    if source and abs(original) <= float(audit.get("tolerance_kN", 1e-6))
                     else "SOURCE_RESTRAINED" if source else
                     "NON_SOURCE_97_POINT_NO_ETABS_NODE_REACTION")))
-    abs32 = sum(abs(x["delta_32_minus_ETABS_kN"]) for x in rows
-                if x["delta_32_minus_ETABS_kN"] is not None)
-    abs76 = sum(abs(x["delta_76_minus_ETABS_kN"]) for x in rows
-                if x["delta_76_minus_ETABS_kN"] is not None)
+    # Unsolved scenarios are NULL, never reported as misleading zero error.
+    has_32 = any(x["opensees_32_Rz_kN"] is not None for x in rows)
+    has_76 = any(x["opensees_76_Rz_kN"] is not None for x in rows)
+    abs32 = (sum(abs(x["delta_32_minus_ETABS_kN"]) for x in rows
+                 if x["delta_32_minus_ETABS_kN"] is not None)
+             if has_32 else None)
+    abs76 = (sum(abs(x["delta_76_minus_ETABS_kN"]) for x in rows
+                 if x["delta_76_minus_ETABS_kN"] is not None)
+             if has_76 else None)
     additional44 = [x for x in rows if x["status"] ==
                     "SOURCE_RESTRAINED_ZERO_ETABS_REACTION"]
     summary = {
         "status": "SOURCE_NODE_MAPPED_REACTIONS_NOT_STRUCTURAL_EQUIVALENCE",
         "source_support_count": len(mapping),
         "source_fixed_released_in_32": sum(not x["selected"] for x in mapping.values()),
+        "source_rows_without_any_solved_reaction": sum(
+            tag not in row_by_tag for tag in mapping),
+        "available_solved_case_columns": [
+            label for label in ("32", "76", "97")
+            if any(row.get("rz_"+label+"_kN") is not None
+                   for row in row_by_tag.values())],
         "etabs_total_FZ_kN": computed_total,
         "sum_abs_delta_primary_32_kN": abs32,
         "sum_abs_delta_source_76_kN": abs76,
-        "opensees_76_reaction_at_source_zero_ETABS_points_kN": sum(
-            x["opensees_76_Rz_kN"] or 0 for x in additional44),
+        "opensees_76_reaction_at_source_zero_ETABS_points_kN": (
+            sum(x["opensees_76_Rz_kN"] or 0 for x in additional44)
+            if has_76 else None),
         "warning": "ETABS zero FZ at a fixed point is not proof of a free DOF; "
                    "compare original 6 DOF, shell/rigid-zone load paths, and "
                    "source-identical analysis before accepting any reaction match.",
