@@ -26,13 +26,19 @@ jobs:
           python-version: "3.12"
       - name: Compile standalone verification modules
         working-directory: tools/verification_studio
-        run: python -m py_compile ETABS_OpenSees_Verification_Studio.py expanded_benchmarks.py test_studio.py
+        run: python -m py_compile ETABS_OpenSees_Verification_Studio.py ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py expanded_benchmarks.py test_studio.py
       - name: Verify offline regression tests
         working-directory: tools/verification_studio
         run: python -m unittest -v test_studio
       - name: Verify registry and independent analytical reference calculations
         working-directory: tools/verification_studio
         run: python ETABS_OpenSees_Verification_Studio.py --self-test
+      - name: Verify single-file B12 needs no companion module
+        working-directory: tools/verification_studio
+        run: |
+          python ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py --self-test
+          python ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py --worker B12 --output single_file_ci
+          python -c "import json; r=json.load(open('single_file_ci/B12.json',encoding='utf-8')); assert r['status']=='ANALYTICAL_PASS'; assert len(r['source_sha256'])==1"
       - name: Verify B12 is analytical-only, without claiming solver equivalence
         working-directory: tools/verification_studio
         run: |
