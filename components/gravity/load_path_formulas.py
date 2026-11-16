@@ -350,6 +350,8 @@ def launch(parent,folder):
     """2 Model: nonblocking, isolated three-mesh load-path review interface."""
     import os
     import threading
+    import queue
+    import time
     import tkinter as tk
     from tkinter import ttk, messagebox
     from components.gravity.mesh_cases import prepared_configs, build_case, case_base, package_mesh_case, recover_assembled_mesh_workbook
@@ -392,7 +394,7 @@ def launch(parent,folder):
 
     def log(message):
         text.configure(state='normal')
-        text.insert('end',message+'\\n')
+        text.insert('end',message+'\n')
         text.see('end')
         text.configure(state='disabled')
 
@@ -410,6 +412,25 @@ def launch(parent,folder):
             current_workbook()
             return
         size=int(choice.get())
+        events = queue.SimpleQueue()
+        started_at = time.monotonic()
+        state = {'stage': 'Preparing mesh case'}
+        def receive_progress(message, elapsed):
+            # Only enqueue from background thread. Never mutate Tk directly.
+            events.put((message, elapsed))
+        def poll_progress():
+            if not win.winfo_exists():
+                return
+            while not events.empty():
+                message, elapsed = events.get_nowait()
+                state['stage'] = message
+                log(f'[{elapsed:.1f}s] {message}')
+            if any(b.cget('state') == 'disabled' for b in buttons):
+                elapsed = int(time.monotonic()-started_at)
+                status.set(f'RUNNING MESH_{size:02d} | {elapsed}s elapsed | '
+                           + state['stage'] + ' | GUI active')
+                win.after(500, poll_progress)
+        win.after(500, poll_progress)
         # Separate run snapshots preserve all three models and permit
         # comparison later; no root config, EDB or existing gravity results are
         # changed. Model generation can take time, so never block Tk's loop.
@@ -435,7 +456,7 @@ def launch(parent,folder):
         log('START | MESH_'+str(size).zfill(2)+' | new independent model run, not just a renamed spreadsheet')
         def work():
             try:
-                result=build_case(folder,size)
+                result=build_case(folder,size,progress=receive_progress)
             except Exception as exc:
                 try:win.after(0,lambda e=exc:report_failure(e))
                 except tk.TclError:pass
