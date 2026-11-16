@@ -18,3 +18,20 @@ The source portions listed here were inspected in this conversation using GitHub
 **Not yet reviewed in sufficient depth:** nonlinear element constitutive implementation and OpenSees response extraction, every ESM/MRSM math branch, native P-Delta initial states, all CSV/XLSX/HTML consumers, all legacy launchers, complete project data redaction, all 4,561 discovered symbol contracts, and every external dependency's actual installed version.
 
 Only advance a source symbol from DISCOVERED to REVIEWED after its **actual** arguments/return values, side effects, dimensional conventions, exception handling, downstream uses and executed regression evidence have been inspected and recorded.
+
+## Immutable Git source identities for the manually sampled modules
+
+These are Git **blob SHA-1** identifiers, not file SHA256. They identify precisely the version inspected; later commits must be reviewed against new blobs. The complete machine discovery CSV contains independent file SHA256 values.
+
+| Source file | Git blob SHA-1 |
+| --- | --- |
+| `tools/etabs_conversion_worker.py` | `65d00746e92c0ba452aaae1a1330437e12ea128f` |
+| `components/ui/application.py` | `13f07abe6b7d246abca649d912ca596170591209` |
+| `components/model/assembly.py` | `a7e375e230aa1a1dc93e5fada84f5925fbb54684` |
+| `components/gravity/mesh_cases.py` | `30125152b44884d6bae0de338615e963dbc7bd41` |
+| `components/gravity/load_path_formulas.py` | `4c2fa23231157348b5176c1ef2470b9c2cff4831` |
+| `components/inputs/project_output_layout.py` | `633efbd27102d6925ae9501ffde61408e9f7a640` |
+| `components/inputs/lfs_workbook_recovery.py` | `799fe6ba18b88ad68aa78564f6d8485be66653b9` |
+| `components/inputs/output_contract.py` | `88cc25e6414024a3f4c11d6dfb5f4dc16f232507` |
+| `components/shared/timing.py` | `7c8ac5a48ab7e04966960551fa1ce91a899d93e5` |
+
