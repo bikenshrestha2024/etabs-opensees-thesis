@@ -19,6 +19,43 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
+
+def _report_signature(path):
+    """A complete report must be rewritten by THIS converter invocation."""
+    path = Path(path)
+    if not path.is_file():
+        return None
+    st = path.stat()
+    return (st.st_mtime_ns, st.st_size)
+
+
+def validate_converter_report(report_file, *, old_signature=None):
+    """Fail closed on stale or numerically incomplete assembly reports.
+
+    This is a worker completion contract, not an ETABS equivalence decision.
+    """
+    path = Path(report_file)
+    signature = _report_signature(path)
+    if signature is None or signature == old_signature:
+        raise RuntimeError(
+            "Conversion did not create a fresh OpenSees complete-export report. "
+            "An old report must not be accepted as proof of this run."
+        )
+    document = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(document, dict):
+        raise ValueError("Complete-export report must be a JSON object")
+    errors = document.get("assembly_errors")
+    if not isinstance(errors, list):
+        raise ValueError("Complete-export report lacks the assembly_errors list")
+    if errors:
+        raise RuntimeError(
+            "OpenSees model assembly reported failures; not marking export "
+            "successful. Inspect the private report for complete diagnostics. "
+            f"Recorded assembly error count: {len(errors)}"
+        )
+    return document
+
+
 def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
     from components.inputs.project_output_layout import create_project_layout
     from components.inputs.lfs_workbook_recovery import audit_optional_gui_workbooks
@@ -36,12 +73,12 @@ def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
     )
     log("[SOURCE_GATE] Optional gravity workbook status: " +
         str(optional.get("evidence_status")))
-    results = convert_model(str(edb), str(output), log, include_live)
     report_file = output / "OpenSees_Complete_Export_Report_V118.json"
-    if not report_file.is_file():
-        raise FileNotFoundError("Converter finished but expected report is missing: " +
-                                str(report_file))
-    report = json.loads(report_file.read_text(encoding="utf-8-sig"))
+    previous_signature = _report_signature(report_file)
+    convert_model(str(edb), str(output), log, include_live)
+    report = validate_converter_report(
+        report_file, old_signature=previous_signature
+    )
     if categorize:
         try:
             from components.inputs.export_mirror import export_mirror
