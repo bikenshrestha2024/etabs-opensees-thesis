@@ -3061,9 +3061,25 @@ class App:
             return
         try:
             output.mkdir(parents=True, exist_ok=True)
-            worker = Path(__file__).resolve().parents[2] / "tools" / "etabs_conversion_worker.py"
+            # This module is also executed through a legacy facade using
+            # exec(compile(source, true_filename, "exec"), globals(), globals()).
+            # In that mode global __file__ points to the *launcher* (for
+            # example C:\\Users\\User), NOT to components/ui/application.py.
+            # The method's code.co_filename retains the real implementation
+            # source and therefore locates the repository's tools directory.
+            implementation = Path(type(self)._run.__code__.co_filename).resolve()
+            repo_root = implementation.parents[2]
+            worker = repo_root / "tools" / "etabs_conversion_worker.py"
             if not worker.is_file():
-                raise FileNotFoundError("Conversion worker not found: " + str(worker))
+                raise FileNotFoundError(
+                    "ETABS conversion worker is missing from the active runtime.\\n\\n"
+                    f"Implementation: {implementation}\\n"
+                    f"Expected worker: {worker}\\n\\n"
+                    "Update the complete thesis repository (git pull origin main) "
+                    "and launch 01_MAIN_GUI.py from that checkout. "
+                    "Copying only a legacy launcher or application.py cannot "
+                    "supply its worker."
+                )
             self._log_path = output / "ETABS_OpenSees_Conversion_Log.txt"
             self._log_path.write_text(
                 "ETABS-to-OpenSees worker started at " +
@@ -3087,7 +3103,7 @@ class App:
             with worker_log.open("w", encoding="utf-8") as stream:
                 flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
                 self._conversion_process = subprocess.Popen(
-                    cmd, cwd=str(worker.parent.parent), stdout=stream,
+                    cmd, cwd=str(repo_root), stdout=stream,
                     stderr=subprocess.STDOUT, creationflags=flags,
                 )
             self.runbtn.configure(state="disabled")
