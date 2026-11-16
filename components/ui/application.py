@@ -145,10 +145,19 @@ def _connect_etabs(edb, log):
     errors=[]
     for progid in ("CSI.ETABS.API.ETABSObject",):
         try:
+            log("[ETABS COM START] CreateObjectProgID " + progid)
+            _api_clock=time.perf_counter()
             etabs = helper.CreateObjectProgID(progid)
+            log(f"[ETABS COM OK] CreateObjectProgID: {time.perf_counter()-_api_clock:.2f}s")
+            _api_clock=time.perf_counter()
+            log("[ETABS COM START] ApplicationStart")
             etabs.ApplicationStart()
+            log(f"[ETABS COM OK] ApplicationStart: {time.perf_counter()-_api_clock:.2f}s")
             sap = etabs.SapModel
+            _api_clock=time.perf_counter()
+            log("[ETABS COM START] OpenFile for selected EDB (may be long)")
             ret = sap.File.OpenFile(os.path.abspath(edb))
+            log(f"[ETABS COM OK] OpenFile: {time.perf_counter()-_api_clock:.2f}s")
             if isinstance(ret, (int, float)) and ret != 0: raise RuntimeError(f"OpenFile return code {ret}")
             try: sap.SetPresentUnits(6)  # kN, m, C; confirm in the output log
             except Exception: pass
@@ -158,15 +167,19 @@ def _connect_etabs(edb, log):
     raise RuntimeError("Could not open ETABS model: " + " | ".join(errors))
 
 
-def _point_coords(sap, names):
+def _point_coords(sap, names, log=None):
     pts={}
-    for n in names:
+    _count=len(names); _start=time.perf_counter()
+    for _index,n in enumerate(names,1):
         try:
             r=sap.PointObj.GetCoordCartesian(str(n))
             if isinstance(r,(list,tuple)) and len(r)>=3:
                 xyz=tuple(float(v) for v in r[:3])
                 if all(math.isfinite(v) for v in xyz): pts[str(n)]=xyz
         except Exception: pass
+        if log is not None and _index%200==0:
+            log(f"[ETABS API HEARTBEAT] PointObj.GetCoordCartesian {_index}/{_count}, "
+                f"{time.perf_counter()-_start:.1f}s elapsed")
     return pts
 
 
@@ -845,7 +858,11 @@ def _extract_point_diaphragm_assignments(sap, point_names, log):
         log("WARNING: PointObj.GetDiaphragm unavailable; no ETABS rigid diaphragm memberships will be exported.")
         return {}
     assignments={}; failures=0
-    for point in point_names:
+    _start=time.perf_counter()
+    for _index,point in enumerate(point_names,1):
+        if _index%200==0:
+            log(f"[ETABS API HEARTBEAT] PointObj.GetDiaphragm {_index}/{len(point_names)}, "
+                f"{time.perf_counter()-_start:.1f}s elapsed")
         raw=None
         try:
             raw=method(str(point))
@@ -1302,26 +1319,47 @@ def convert_model(edb, outdir, log, include_live=True):
         # --------------------------------------------------------------------
         _begin_step("ETABS connection and source model extraction")
         etabs,sap=_connect_etabs(edb,log)
+        log("[ETABS API] Model connected; starting point/frame/area inventories")
         point_names=_api_names(sap.PointObj)
         frame_names=_api_names(sap.FrameObj)
         area_names=_api_names(sap.AreaObj)
         link_api=getattr(sap,"LinkObj",None)
         link_names=_api_names(link_api) if link_api is not None else []
         log(f"ETABS object counts: points={len(point_names)}, frames={len(frame_names)}, areas={len(area_names)}, links={len(link_names)}")
-        coords=_point_coords(sap,point_names)
+        _api_clock=time.perf_counter()
+        coords=_point_coords(sap,point_names,log=log)
+        log(f"[ETABS API TIMING] Point coordinates: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         etabs_story_levels = _extract_etabs_story_levels(sap, log)
+        log(f"[ETABS API TIMING] Story levels: {time.perf_counter()-_api_clock:.2f} s")
         # Normalize point names consistently between connectivity and coordinate lookup.
         coords={str(k).strip(): v for k, v in coords.items()}
+        _api_clock=time.perf_counter()
         point_diaphragms=_extract_point_diaphragm_assignments(sap,point_names,log)
+        log(f"[ETABS API TIMING] Diaphragms: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         frame_conn={str(n).strip():[str(p).strip() for p in _get_points(sap.FrameObj,n)] for n in frame_names}
+        log(f"[ETABS API TIMING] Frame endpoints: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         area_conn={str(n).strip():[str(p).strip() for p in _get_points(sap.AreaObj,n)] for n in area_names}
+        log(f"[ETABS API TIMING] Area connectivity: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         link_conn={str(n).strip():[str(p).strip() for p in _get_points(link_api,n)] for n in link_names} if link_api is not None else {}
+        log(f"[ETABS API TIMING] Link connectivity: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         frame_section_assignments, frame_section_defs = _extract_frame_section_assignments(sap, frame_names, log)
+        log(f"[ETABS API TIMING] Frame section assignments: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         area_section_assignments, area_section_defs = _extract_area_section_assignments(sap, area_names, log)
+        log(f"[ETABS API TIMING] Area sections: {time.perf_counter()-_api_clock:.2f} s")
         section_by_obj={str(r["etabs_object"]):r for r in frame_section_assignments}
         area_section_by_obj={str(r.get("etabs_area_object")):r for r in area_section_assignments}
+        _api_clock=time.perf_counter()
         area_loads,area_raw=_extract_area_assignments(sap,area_names,log)
+        log(f"[ETABS API TIMING] Area loads: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         frame_loads,frame_raw=_extract_frame_distributed(sap,frame_names)
+        log(f"[ETABS API TIMING] Frame distributed loads: {time.perf_counter()-_api_clock:.2f} s")
         self_weight_pattern_audit=_extract_etabs_self_weight_patterns(sap)
         log("ETABS load-pattern self-weight multipliers (audit only; no OpenSees recreation): " + ", ".join(f"{q['pattern']}={q['multiplier']}" for q in self_weight_pattern_audit))
         if any(q.get("multiplier") not in (None,0,0.0) for q in self_weight_pattern_audit):
@@ -2014,7 +2052,7 @@ def convert_model(edb, outdir, log, include_live=True):
             structure_meta += [{"category":"__REFERENCE_GRID__","level":0},{"category":"__ELEVATION_LABELS__","level":0}]
             structure_postscript=r"""(function(){const gd=document.getElementById('{plot_id}');const meta=__META__;const bar=document.createElement('div');bar.style='position:relative;z-index:1;box-sizing:border-box;width:calc(100% - 24px);margin:8px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:7px 12px;background:#fff;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font:13px system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 2px 8px #0001';bar.innerHTML='<div class="source-3d-quick" style="display:flex;flex:1 1 600px;gap:10px;flex-wrap:wrap;align-items:center"><label>Storey <select id="storyFilter" style="min-height:30px"><option value="all">All storeys</option></select></label><label>Element <select id="typeFilter" style="min-height:30px"><option value="all">All elements</option></select></label><label>ETABS property <select id="sectionFilter" style="min-height:30px;max-width:230px"><option value="all">All sections/properties</option></select></label></div><details class="source-3d-advanced" style="flex:0 1 auto"><summary style="cursor:pointer;color:#234a7b;font-weight:600">Source object filters</summary><div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 0"><label>ETABS object ID <input id="etabsIdFilter" placeholder="251" style="width:105px;min-height:30px"></label><label>OpenSees topology tag <input id="opsIdFilter" placeholder="11031" style="width:120px;min-height:30px"></label></div></details><strong id="picked" style="flex:1 1 100%;font-size:12px;line-height:1.45;white-space:normal">Hover or click an element to inspect exact source IDs</strong>';gd.parentElement.insertBefore(bar,gd);const ss=bar.querySelector('#storyFilter'),tt=bar.querySelector('#typeFilter'),sf=bar.querySelector('#sectionFilter'),picked=bar.querySelector('#picked');[...new Set(meta.map(x=>x.level).filter(x=>x>0))].sort((a,b)=>a-b).forEach(v=>ss.add(new Option('Storey '+v,String(v))));['BEAM','COLUMN','BRACE','FLOOR','SHEAR WALL SYSTEM','SUPPORTS','OTHER FRAME','OTHER AREA'].forEach(v=>tt.add(new Option(v,v)));[...new Set(meta.map(x=>x.section).filter(x=>x&&x!=='(not applicable)'))].sort().forEach(v=>sf.add(new Option(v,v)));const ef=bar.querySelector('#etabsIdFilter'),of=bar.querySelector('#opsIdFilter');const original=gd.data.map(t=>({x:Array.from(t.x||[]),y:Array.from(t.y||[]),z:Array.from(t.z||[])}));ef.addEventListener('input',upd);of.addEventListener('input',upd);function upd(){const st=ss.value,ty=tt.value,sec=sf.value;const ei=ef.value.trim(),oi=of.value.trim();gd.data.slice(0,original.length).forEach((t,i)=>{const keep=k=>{const c=(t.customdata||[])[k];return (!ei&&!oi)||(c&&(!ei||String(c[0])===ei)&&(!oi||String(c[5])===oi))};Plotly.restyle(gd,{x:[original[i].x.map((v,k)=>keep(k)?v:null)],y:[original[i].y.map((v,k)=>keep(k)?v:null)],z:[original[i].z.map((v,k)=>keep(k)?v:null)]},[i]);});const vis=meta.map(x=>x.category.startsWith('__REFERENCE_')||x.category==='__ELEVATION_LABELS__'||((st==='all'||String(x.level)===st)&&(ty==='all'||(ty==='SHEAR WALL SYSTEM'&&(x.category==='SHEAR WALL'||x.category==='SPANDREL'))||x.category===ty)&&(sec==='all'||x.section===sec)));Plotly.restyle(gd,{visible:vis},meta.map((_,i)=>i));}ss.addEventListener('change',upd);tt.addEventListener('change',upd);sf.addEventListener('change',upd);gd.on('plotly_hover',function(ev){if(!ev||!ev.points||!ev.points.length)return;const cd=ev.points[0].customdata;if(!cd)return;picked.textContent='ETABS object ID: '+cd[0]+' | OpenSees element tag: '+(cd[1]==='SUPPORT'?'N/A (support node)':(cd[5]||'not instantiated in topology export'))+' | '+cd[1]+' | Storey '+cd[2]+' | Node IDs: '+(cd[3]||'')+' | Section/property: '+(cd[1]==='SUPPORT'?'BASE SUPPORT':(cd[4]||'N/A'));});gd.on('plotly_click',function(ev){if(!ev||!ev.points||!ev.points.length)return;const cd=ev.points[0].customdata;if(!cd)return;picked.textContent='SELECTED ETABS object ID: '+cd[0]+' | OpenSees element tag: '+(cd[1]==='SUPPORT'?'N/A (support node)':(cd[5]||'not instantiated in topology export'))+' | '+cd[1]+' | Storey '+cd[2]+' | Section/property: '+(cd[1]==='SUPPORT'?'BASE SUPPORT':(cd[4]||'N/A'))+' | Nodes: '+(cd[3]||'');});})();""".replace('__META__',json.dumps(structure_meta))
             _visual_mark('Structural 3D trace preparation complete')
-            fig_s.write_html(html_structure,include_plotlyjs=True,full_html=True,auto_open=False,post_script=structure_postscript,div_id='structurePlot')
+            fig_s.write_html(html_structure,include_plotlyjs='directory',full_html=True,auto_open=False,post_script=structure_postscript,div_id='structurePlot')
             _visual_mark('Structural 3D HTML serialized')
             # Dedicated 3D connectivity inspector: one trace per original ETABS object,
             # with independent storey, category, and individual-object filters.
@@ -2068,7 +2106,7 @@ def convert_model(edb, outdir, log, include_live=True):
                 height=900,margin=dict(l=0,r=0,t=125,b=0))
             connectivity_postscript = r"""(function(){const gd=document.getElementById('{plot_id}');const meta=__META__;const bar=document.createElement('div');bar.style='position:relative;box-sizing:border-box;width:calc(100% - 24px);margin:8px 12px 4px 12px;display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:8px 12px;align-items:center;background:#fff;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font:13px Arial;box-shadow:0 2px 8px #0001';bar.innerHTML='<label>Storey <select id="st"><option value="all">All storeys</option></select></label><label>Element type <select id="cat"><option value="all">All types</option></select></label><label>ETABS section/property <select id="sec"><option value="all">All sections/properties</option></select></label><label>ETABS object / OpenSees element / node IDs <select id="obj"><option value="all">All elements</option></select></label><strong id="sum">Click an element to inspect ETABS and OpenSees IDs</strong><button id="clearSel" type="button">Clear selection</button><span id="detail" style="flex-basis:100%;font-size:12px;color:#334155">Selected element details will appear here.</span>';gd.parentElement.insertBefore(bar,gd);const st=bar.querySelector('#st'),cat=bar.querySelector('#cat'),sec=bar.querySelector('#sec'),obj=bar.querySelector('#obj'),sum=bar.querySelector('#sum'),detail=bar.querySelector('#detail');let selected=null;[...new Set(meta.map(x=>x.level))].sort((a,b)=>a-b).forEach(v=>st.add(new Option('Storey '+v,String(v))));[...new Set(meta.map(x=>x.category))].sort().forEach(v=>cat.add(new Option(v,v)));[...new Set(meta.map(x=>x.section||'UNASSIGNED'))].sort().forEach(v=>sec.add(new Option(v,v)));function fillObjects(){const old=obj.value;obj.innerHTML='<option value="all">All elements</option>';meta.filter(x=>(cat.value==='all'||x.category===cat.value)&&(st.value==='all'||String(x.level)===st.value)&&(sec.value==='all'||(x.section||'UNASSIGNED')===sec.value)).sort((a,b)=>a.object.localeCompare(b.object,undefined,{numeric:true})).forEach(x=>obj.add(new Option(x.category+' — ETABS '+x.object+' ↔ OpenSees '+(x.element_tag||'not instantiated')+' — '+(x.section||'UNASSIGNED'),x.object)));if([...obj.options].some(o=>o.value===old))obj.value=old;else obj.value='all';}function upd(){fillObjects();const visible=Array(gd.data.length).fill(false);let count=0;meta.forEach(x=>{const ok=(st.value==='all'||String(x.level)===st.value)&&(cat.value==='all'||x.category===cat.value)&&(sec.value==='all'||(x.section||'UNASSIGNED')===sec.value)&&(obj.value==='all'||x.object===obj.value);visible[x.trace]=ok;if(ok)count++;});Plotly.restyle(gd,{visible:visible});sum.textContent=count+' elements shown';if(obj.value!=='all'){const x=meta.find(x=>x.object===obj.value);if(x)showDetail(x);}}function showDetail(x){selected=x;detail.textContent='SELECTED: '+x.category+' | ETABS object ID: '+x.object+' | OpenSees element tag: '+(x.element_tag||'reserved mapping only')+' | Storey: '+x.level+' | ETABS section/property: '+(x.section||'UNASSIGNED')+'. Node pairs: '+(x.nodes||'see hover tooltip');sum.textContent='Selected ETABS '+x.object+' ↔ OpenSees element '+(x.element_tag||'reserved');}st.addEventListener('change',upd);cat.addEventListener('change',()=>{obj.value='all';upd();});sec.addEventListener('change',()=>{obj.value='all';upd();});obj.addEventListener('change',()=>{if(obj.value==='all'){selected=null;detail.textContent='Selection cleared.';upd();}else{const x=meta.find(x=>x.object===obj.value);if(x)showDetail(x);upd();}});bar.querySelector('#clearSel').addEventListener('click',()=>{selected=null;obj.value='all';detail.textContent='Selection cleared.';upd();});gd.on('plotly_click',function(ev){if(!ev||!ev.points||!ev.points.length)return;const cd=ev.points[0].customdata;if(!cd)return;const x=meta.find(x=>x.object===String(cd[0])&&x.category===String(cd[1]));if(x)showDetail(x);});upd();})();""".replace('__META__',json.dumps(connectivity_meta))
             _visual_mark('Connectivity 3D trace preparation complete')
-            fig_c.write_html(html_connectivity_3d, include_plotlyjs=True, full_html=True, auto_open=False,
+            fig_c.write_html(html_connectivity_3d, include_plotlyjs='directory', full_html=True, auto_open=False,
                 post_script=connectivity_postscript, div_id='connectivity3dPlot')
             _visual_mark('Connectivity 3D HTML serialized')
             # Load view: translucent area surfaces (not oversized 3D cones), pattern colors,
@@ -2153,7 +2191,7 @@ def convert_model(edb, outdir, log, include_live=True):
             load_meta=[{"trace":item[0],"pattern":item[1],"level":item[2],"value":item[3],"object":item[4],**({"value_end":item[5]} if len(item)>5 else {})} for item in load_trace_meta]
             load_postscript=r"""(function(){const gd=document.getElementById('{plot_id}');const meta=__META__;const bar=document.createElement('div');bar.style='position:relative;box-sizing:border-box;width:calc(100% - 24px);margin:8px 12px 4px 12px;display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:8px 12px;align-items:center;background:#fff;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font:14px Arial;box-shadow:0 2px 8px #0001';bar.innerHTML='<label>Storey <select id="storyFilter"><option value="all">All storeys</option></select></label><label>Load pattern <select id="patternFilter"><option value="all">All patterns</option></select></label><label>UDL value <select id="valueFilter"><option value="all">All values</option></select></label><strong id="loadSummary">All assignments</strong>';gd.parentElement.insertBefore(bar,gd);const ss=bar.querySelector('#storyFilter'),pp=bar.querySelector('#patternFilter'),vv=bar.querySelector('#valueFilter'),sum=bar.querySelector('#loadSummary');[...new Set(meta.map(x=>x.level))].sort((a,b)=>a-b).forEach(v=>ss.add(new Option('Storey '+v,String(v))));[...new Set(meta.map(x=>x.pattern))].sort().forEach(v=>pp.add(new Option(v,v)));[...new Set(meta.filter(x=>String(x.object).startsWith('FRAME:')).flatMap(x=>[Number(x.value.toFixed(3)),...(x.value_end===undefined?[]:[Number(Number(x.value_end).toFixed(3))])]).filter(v=>Number.isFinite(v)))].sort((a,b)=>a-b).forEach(v=>vv.add(new Option(v+' kN/m',String(v))));function upd(){const st=ss.value,pat=pp.value,val=vv.value;const vis=Array(gd.data.length).fill(false);vis[0]=true;const chosen=meta.filter(x=>(st==='all'||String(x.level)===st)&&(pat==='all'||x.pattern===pat)&&(val==='all'||!String(x.object).startsWith('FRAME:')||(Math.abs(x.value-Number(val))<0.001)||(x.value_end!==undefined&&Math.abs(Number(x.value_end)-Number(val))<0.001)));chosen.forEach(x=>vis[x.trace]=true);Plotly.restyle(gd,{visible:vis});const vals=chosen.map(x=>x.value);const uniq=[...new Set(vals.map(v=>Number(v.toPrecision(5))))];const frameCount=chosen.filter(x=>String(x.object).startsWith('FRAME:')).length;sum.textContent=chosen.length+' load traces/triangles • '+(frameCount?frameCount+' frame-load traces; ':'')+(uniq.length===1&&uniq.length?'value: '+uniq[0]:'values: '+(vals.length?Math.min(...vals).toPrecision(4)+' to '+Math.max(...vals).toPrecision(4):'none'));Plotly.relayout(gd,{title:'Load assignments — UDL arrow preview (visual only) • '+(st==='all'?'all storeys':'Storey '+st)+' • '+(pat==='all'?'all patterns':pat)});}ss.addEventListener('change',upd);pp.addEventListener('change',upd);vv.addEventListener('change',upd);upd();})();""".replace('__META__',json.dumps(load_meta))
             _visual_mark('3D loading trace preparation complete')
-            fig_l.write_html(html_loads,include_plotlyjs=True,full_html=True,auto_open=False,post_script=load_postscript,div_id='loadPlot')
+            fig_l.write_html(html_loads,include_plotlyjs='directory',full_html=True,auto_open=False,post_script=load_postscript,div_id='loadPlot')
             _visual_mark('3D loading HTML serialized')
 
             # Additional plan-view page: much easier to confirm which floor areas are loaded.
@@ -2191,7 +2229,7 @@ def convert_model(edb, outdir, log, include_live=True):
             plan_meta_json=[{"trace":idx,"pattern":p,"level":lev,"value":val,"object":obj,"kind":kind} for idx,p,lev,val,obj,kind in plan_meta]
             plan_postscript=r"""(function(){const gd=document.getElementById('{plot_id}');const meta=__META__;const bar=document.createElement('div');bar.style='position:relative;box-sizing:border-box;width:calc(100% - 24px);margin:8px 12px 4px 12px;display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:8px 12px;align-items:center;background:#fff;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;font:14px Arial;box-shadow:0 2px 8px #0001';bar.innerHTML='<label>View <select id="viewFilter"><option value="load">Loads</option><option value="diaphragm">Rigid diaphragms</option><option value="both">Loads + diaphragms</option></select></label><label>Storey <select id="storyFilter"><option value="all">All storeys</option></select></label><label>Load pattern <select id="patternFilter"><option value="all">All patterns</option></select></label><strong id="loadSummary">Choose a view</strong>';gd.parentElement.insertBefore(bar,gd);if(!meta.some(x=>x.kind==='load')){bar.insertAdjacentHTML('beforeend','<strong style="color:#b45309">No area loads extracted. Inspect API audit; this does not mean zero gravity load. Showing diaphragms.</strong>');bar.querySelector('#viewFilter').value='diaphragm';}const vv=bar.querySelector('#viewFilter'),ss=bar.querySelector('#storyFilter'),pp=bar.querySelector('#patternFilter'),sum=bar.querySelector('#loadSummary');[...new Set(meta.map(x=>x.level))].sort((a,b)=>a-b).forEach(v=>ss.add(new Option('Storey '+v,String(v))));[...new Set(meta.filter(x=>x.kind==='load').map(x=>x.pattern))].sort().forEach(v=>pp.add(new Option(v,v)));function upd(){const view=vv.value,st=ss.value,pat=pp.value;pp.disabled=view==='diaphragm';const vis=Array(gd.data.length).fill(false);const chosen=meta.filter(x=>(st==='all'||String(x.level)===st)&&(view==='both'||x.kind===view)&&(x.kind!=='load'||pat==='all'||x.pattern===pat));chosen.forEach(x=>vis[x.trace]=true);Plotly.restyle(gd,{visible:vis});const nLoads=chosen.filter(x=>x.kind==='load').length,nDia=chosen.filter(x=>x.kind==='diaphragm').length;sum.textContent=nLoads+' load areas • '+nDia+' diaphragm markers'+(view==='diaphragm'&&!nDia?' • no rigid diaphragms extracted':'');Plotly.relayout(gd,{title:'Floor plan — '+(view==='load'?'loads':view==='diaphragm'?'rigid diaphragm membership':'loads + diaphragm membership')+' • '+(st==='all'?'all storeys':'Storey '+st)});}vv.addEventListener('change',upd);ss.addEventListener('change',upd);pp.addEventListener('change',upd);upd();})();""".replace('__META__',json.dumps(plan_meta_json))
             _visual_mark('Floor-plan trace preparation complete')
-            fig_p.write_html(html_plan,include_plotlyjs=True,full_html=True,auto_open=False,post_script=plan_postscript,div_id='planPlot')
+            fig_p.write_html(html_plan,include_plotlyjs='directory',full_html=True,auto_open=False,post_script=plan_postscript,div_id='planPlot')
             _visual_mark('Floor-plan HTML serialized')
             import webbrowser
         # CSV report (standard library only)
@@ -2220,12 +2258,11 @@ def convert_model(edb, outdir, log, include_live=True):
         log("Complete export report: "+str(Path(outdir)/manifest['report']))
         log("Assembly errors: "+str(assembly_report['assembly_errors']))
         _finish_step("OK")
-        # Shared controls must be installed before any browser tab opens.
-        import webbrowser
-        webbrowser.open(Path(html_structure).resolve().as_uri())
-        webbrowser.open(Path(html_connectivity_3d).resolve().as_uri())
-        webbrowser.open(Path(html_loads).resolve().as_uri())
-        webbrowser.open(Path(html_plan).resolve().as_uri())
+        # Four full Plotly views previously opened automatically at the END
+        # of every export. That stalls the desktop/browser and obscures the
+        # worker's completion, especially for large model view HTML.
+        # Keep the files and existing manual GUI view buttons unchanged.
+        log("[VIEWER READY] Four source audit HTML views saved. Open from the Import panel on demand; no browser tabs launched automatically.")
         _conversion_succeeded=True
         return out_py,html_loads,audit_json,section_gui_path
     except Exception as exc:
@@ -2258,7 +2295,7 @@ class App:
         ttk.Button(toolbar,text="Open implementation files",command=lambda:os.startfile(str(source_folder))).pack(side="left",padx=(0,8))
         self.edb=tk.StringVar(); self.out=tk.StringVar(value=os.environ.get("OPENSEES_PROJECT_FOLDER",r"D:\Thesis Opensees\Etabs Nodes Export"))
         self.include_live=tk.BooleanVar(value=True)
-        self.categorize_export=tk.BooleanVar(value=True)
+        self.categorize_export=tk.BooleanVar(value=False)
         ttk.Label(toolbar,text='Active launcher: '+Path(__file__).name).pack(side="right",padx=8)
         def repair_runtime():
             from OpenSees_Release_Health_V142 import repair
@@ -2291,7 +2328,7 @@ class App:
         ttk.Button(source,text="Browse…",command=self._browse_dir).grid(row=1,column=2,padx=(8,0),pady=3)
         self.include_live.set(True)
         ttk.Checkbutton(source,text="Include live area load in ETABS load audit preview",variable=self.include_live).grid(row=2,column=0,columnspan=2,sticky="w",pady=(4,0))
-        ttk.Checkbutton(source,text="Create SHA-verified categorized export copies (keep original flat files)",variable=self.categorize_export).grid(row=3,column=0,columnspan=3,sticky="w",pady=(4,0))
+        ttk.Checkbutton(source,text="Also create SHA-verified categorized copies (optional; slower on large exports)",variable=self.categorize_export).grid(row=3,column=0,columnspan=3,sticky="w",pady=(4,0))
         runbar=ttk.Frame(shell); runbar.pack(fill="x",pady=(0,8))
         self.runbtn=ttk.Button(runbar,text="RUN ETABS → OPENSEESPY EXPORT  |  Assemble model, loads, mass and analysis-file manifest",style="Primary.TButton",command=self._run)
         self.runbtn.pack(fill="x",ipady=5)
@@ -2302,6 +2339,8 @@ class App:
             command=self._cancel_conversion, state="disabled"
         )
         self.cancel_conversion_btn.pack(anchor="w", pady=(4, 0))
+        ttk.Button(runbar,text="Open ETABS conversion worker log",
+                   command=self._open_conversion_worker_log).pack(anchor="w",pady=(2,0))
         ttk.Label(runbar, textvariable=self.conversion_progress,
                   wraplength=1050).pack(anchor="w", pady=(3, 0))
         ttk.Button(runbar,text="Rebuild assembled model from saved ETABS export",command=self._rebuild_complete_export).pack(anchor="w",pady=(4,0))
@@ -2389,12 +2428,13 @@ class App:
             action(group_0_0,text=label,command=lambda name=name:open_saved(name))
         action(group_0_1,text='Numbered workflow / input values',command=lambda:__import__('OpenSees_Workflow_V144').launch(self.root,self.out.get()))
         action(group_0_0,text="Open ETABS connectivity + load views",command=self._show_last_exports)
-        action(group_0_1,text="ETABS / OpenSees ID lookup + Excel support audit",command=lambda: __import__("webbrowser").open((Path(self.out.get())/"OpenSees_ID_Lookup.html").resolve().as_uri()))
+        action(group_0_0,text="3D actual assembled 4×4 mesh (on demand; no ETABS rerun)",command=self._open_assembled_mesh_view)
+        action(group_0_1,text="ETABS / OpenSees ID lookup + Excel support audit",command=self._open_id_lookup)
         action(group_0_1,text="Open ETABS frame / area load audit",command=self._open_load_audit_explanation)
         action(group_1_0,text="ETABS section mapping → OpenSees fiber sections",command=self._open_section_mapping)
         action(group_1_0,text="OpenSees RC fiber section builder — Concrete01 + Steel02",command=self._open_fiber_section_builder)
         action(group_1_0,text="ETABS RC column size / bar review",command=self._open_column_section_review)
-        action(group_1_1,text='Slab load path / mesh + Excel formulas',command=lambda:__import__('OpenSees_Load_Path_V141').launch(self.root,self.out.get()))
+        action(group_1_1,text='Slab load path / mesh + Excel formulas',command=self._open_slab_mesh_stage)
         action(group_2_1,text='ULS/SLS drift / deflection + combination / PDelta review',command=lambda:__import__('OpenSees_Case_Review_V142').launch(self.root,self.out.get()))
         action(group_2_1,text='NBC settings audit - values and unresolved inputs',command=lambda:__import__('components.validation.settings_audit',fromlist=['launch']).launch(self.root,self.out.get()))
         action(group_6_0,text='ETABS comparison - modal / ESM / MRSM',command=lambda:__import__('components.validation.etabs_comparison',fromlist=['launch']).launch(self.root,self.out.get()))
@@ -3026,6 +3066,95 @@ class App:
         if target:
             try: os.startfile(target)
             except Exception as exc: messagebox.showerror("Could not open ETABS load view",str(exc),parent=self.root)
+    def _open_slab_mesh_stage(self):
+        """[REF docs/source/components/ui/application.py.md] Prevent concurrent model writes."""
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showwarning(
+                "Complete ETABS import first",
+                "A conversion is still writing the selected export. Building a "
+                "separate 4/8/16 mesh case or formula workbook simultaneously "
+                "would compete for disk/CPU and may read incomplete input files. "
+                "Use the actual assembled 3D viewer after conversion, or "
+                "start an independent mesh case from a completed saved export.",
+                parent=self.root)
+            return
+        return __import__('OpenSees_Load_Path_V141').launch(self.root,self.out.get())
+
+    def _open_assembled_mesh_view(self):
+        """[REF docs/source/components/ui/application.py.md] Render real solver mesh off the GUI thread."""
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showinfo(
+                "Mesh export in progress",
+                "The conversion is not finished. A 4×4 display must read the "
+                "completed assembled model; it cannot safely use a partial model.",
+                parent=self.root)
+            return
+        if getattr(self, "_assembled_view_running", False):
+            messagebox.showinfo("Mesh view", "Mesh viewer is already generating.", parent=self.root)
+            return
+        export_root = Path(self.out.get().strip()).expanduser()
+        if not (export_root / "OpenSees_Complete_Model_Data_V118.json").is_file():
+            messagebox.showwarning(
+                "Assembled mesh unavailable",
+                "No completed assembled model exists in the selected export. "
+                "Run conversion or rebuild from saved ETABS exports first.",
+                parent=self.root)
+            return
+        self._assembled_view_running = True
+        self.log("[VIEW] Generating batched actual assembled mesh from saved model only.")
+        import threading
+        def worker():
+            try:
+                from components.ui.assembled_mesh_view import render
+                target = render(export_root)
+                result = (target, None)
+            except Exception as exc:
+                result = (None, str(exc))
+            def complete():
+                self._assembled_view_running = False
+                target, error = result
+                if error:
+                    self.log("[VIEW ERROR] " + error)
+                    messagebox.showerror("Assembled mesh view failed", error, parent=self.root)
+                else:
+                    self.log("[VIEW READY] " + str(target))
+                    __import__("webbrowser").open(target.resolve().as_uri())
+            self.root.after(0, complete)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _open_id_lookup(self):
+        """[REF docs/source/components/ui/application.py.md] Open only a complete, present ID audit.
+
+        Do not launch Edge on a missing file, or present an old result from
+        the same output folder while a new conversion is running.
+        """
+        output = Path(self.out.get().strip()).expanduser()
+        target = output / "OpenSees_ID_Lookup.html"
+        workbook = output / "OpenSees_ID_and_Support_Audit.xlsx"
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showinfo(
+                "ID audit not ready",
+                "ETABS conversion is still running. The ID lookup is generated "
+                "during the final assembly stage. Check the current stage and "
+                "worker log before opening this output. An earlier HTML file "
+                "in the same folder could belong to a previous run.",
+                parent=self.root)
+            return
+        if not target.is_file() or target.stat().st_size == 0:
+            available = ("The Excel support audit is available at:\\n" + str(workbook)
+                         if workbook.is_file() else
+                         "The Excel support audit is also not generated yet.")
+            messagebox.showwarning(
+                "ID lookup not generated",
+                "No completed ID lookup HTML exists at:\\n" + str(target) +
+                "\\n\\n" + available +
+                "\\n\\nCheck the conversion worker log for the last completed "
+                "stage. Do not interpret a missing HTML as a missing model.",
+                parent=self.root)
+            return
+        import webbrowser
+        webbrowser.open(target.resolve().as_uri())
+
     def _open_load_audit_explanation(self):
         from OpenSees_Mapping_GUI_V125 import show_load_audit
         return show_load_audit(self.root,self.out.get())
@@ -3100,6 +3229,21 @@ class App:
             self._conversion_started_at = time.monotonic()
             self._conversion_last_activity = self._conversion_started_at
             self._conversion_cancel_requested = False
+            self._conversion_stage = "Starting ETABS worker"
+            config_path = output / "OpenSees_Complete_Model_Config_V118.json"
+            if config_path.is_file():
+                try:
+                    cfg = json.loads(config_path.read_text(encoding="utf-8-sig"))
+                    n = cfg.get("floor_subdivisions", 4)
+                    self.log(
+                        f"[MESH PREFLIGHT] floor_subdivisions={n!r}: "
+                        "this is the actual finite-element mesh per source "
+                        "panel direction, not the 3D viewer resolution. "
+                        "No mesh setting has been changed.")
+                except (OSError, ValueError, TypeError) as exc:
+                    self.log("[MESH PREFLIGHT REVIEW] Could not parse saved config: " + str(exc))
+            else:
+                self.log("[MESH PREFLIGHT] No saved mesh config. Model assembly defaults to 4 subdivisions per source-panel direction.")
             with worker_log.open("w", encoding="utf-8") as stream:
                 flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
                 self._conversion_process = subprocess.Popen(
@@ -3118,6 +3262,21 @@ class App:
             self.cancel_conversion_btn.configure(state="disabled")
             self.log("[WORKER START FAILED] " + repr(exc))
             messagebox.showerror("ETABS export could not start", str(exc), parent=self.root)
+
+    def _open_conversion_worker_log(self):
+        """[REF docs/source/components/ui/application.py.md] Open only an existing local worker log."""
+        target = Path(self.out.get().strip()).expanduser() / "09_SOFTWARE_DIAGNOSTICS" / "ETABS_Conversion_Worker.log"
+        if not target.is_file():
+            messagebox.showinfo(
+                "Conversion log unavailable",
+                "No worker log is present at:\\n"+str(target)+
+                "\\n\\nStart an export or select the existing export folder.",
+                parent=self.root)
+            return
+        try:
+            os.startfile(str(target.resolve()))
+        except Exception as exc:
+            messagebox.showerror("Cannot open worker log",str(exc),parent=self.root)
 
     def _cancel_conversion(self):
         process = getattr(self, "_conversion_process", None)
@@ -3161,6 +3320,14 @@ class App:
                         except (json.JSONDecodeError, ValueError):
                             self.log("[WORKER RESULT PARSE ERROR]")
                     else:
+                        if " [ETABS COM START] " in line:
+                            self._conversion_stage = "ETABS COM: "+line.split(" [ETABS COM START] ",1)[1].strip()
+                        elif " [WORKER STAGE START] " in line:
+                            self._conversion_stage = line.split(" [WORKER STAGE START] ",1)[1].strip()
+                        elif " [STEP START] " in line:
+                            self._conversion_stage = line.split(" [STEP START] ", 1)[1].strip()
+                        elif " [STEP OK] " in line or " [STEP FAILED] " in line:
+                            self._conversion_stage = line.split(" [STEP ", 1)[1].strip()
                         self.log("[CHILD] " + line)
                     self._conversion_last_activity = time.monotonic()
             returncode = process.poll()
@@ -3168,8 +3335,12 @@ class App:
             silent = int(time.monotonic() - self._conversion_last_activity)
             if returncode is None:
                 self.conversion_progress.set(
-                    f"Conversion running: {elapsed}s elapsed; last output {silent}s ago. "
-                    "Tk GUI is responsive; long ETABS API calls may still be executing."
+                    f"Conversion running: {elapsed}s elapsed | stage: "
+                    f"{getattr(self, '_conversion_stage', 'initializing')} | "
+                    f"last worker log {silent}s ago. "
+                    ("No worker progress for over 2 min; inspect the worker log, "
+                     "ETABS process and current OAPI call." if silent >= 120 else
+                     "Mesh assembly, ETABS OAPI and 3D HTML export are distinct stages.")
                 )
                 self.root.after(400, self._poll_conversion_worker)
                 return
@@ -3260,6 +3431,13 @@ class App:
 
     def _rebuild_complete_export(self):
         """Regenerate model entries after editing the V118 config; no ETABS run."""
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showwarning(
+                "ETABS import still running",
+                "Rebuilding the selected export while ETABS is writing it can "
+                "invalidate both runs. Finish/cancel the first conversion and "
+                "inspect its status before rebuilding.",parent=self.root)
+            return
         try:
             from OpenSees_Complete_Export_V118 import prepare_complete_export
             # Synchronize the selected project's copied runtime BEFORE rebuild.

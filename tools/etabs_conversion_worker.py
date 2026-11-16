@@ -65,26 +65,38 @@ def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {line}", flush=True)
 
     output.mkdir(parents=True, exist_ok=True)
+    stage_clock = time.perf_counter()
+    log("[WORKER STAGE START] Source EDB digest and project layout")
     context = create_project_layout(str(edb), output)
+    log(f"[WORKER STAGE OK] Source EDB digest and project layout: {time.perf_counter()-stage_clock:.2f}s")
     log("[PROJECT_SOURCE] EDB SHA256: " + context["source_edb_sha256"])
     log("[PROJECT_OUTPUT] Root: " + str(context["output_root"]))
+    stage_clock = time.perf_counter()
+    log("[WORKER STAGE START] Optional workbook verification")
     optional = audit_optional_gui_workbooks(
         REPO_ROOT, output, str(edb), log=log
     )
+    log(f"[WORKER STAGE OK] Optional workbook verification: {time.perf_counter()-stage_clock:.2f}s")
     log("[SOURCE_GATE] Optional gravity workbook status: " +
         str(optional.get("evidence_status")))
     report_file = output / "OpenSees_Complete_Export_Report_V118.json"
     previous_signature = _report_signature(report_file)
+    stage_clock = time.perf_counter()
+    log("[WORKER STAGE START] ETABS import, source viewer export, model assembly")
     convert_model(str(edb), str(output), log, include_live)
+    log(f"[WORKER STAGE OK] ETABS import and assembly: {time.perf_counter()-stage_clock:.2f}s")
     report = validate_converter_report(
         report_file, old_signature=previous_signature
     )
     if categorize:
+        log("[WORKER STAGE START] Optional SHA-verified categorized export mirror")
+        mirror_clock=time.perf_counter()
         try:
             from components.inputs.export_mirror import export_mirror
             from components.inputs.output_layout import write_stage_index
             export_mirror(output)
             write_stage_index(output)
+            log(f"[WORKER STAGE OK] Optional categorized mirror: {time.perf_counter()-mirror_clock:.2f}s")
             log("[EXPORT_ORGANIZED] Categorized mirror generated; legacy outputs retained")
         except Exception as exc:
             # Do not label a successfully completed export as failed for a mirror issue.

@@ -51,3 +51,30 @@ The `structure_postscript` within `components/ui/application.py` previously crea
 **Concrete correctness fix:** the original source filter had `gd.data.forEach(... original[i] ...)` using an original trace snapshot. The shared ID highlighter adds a temporary Plotly selection trace after that snapshot. Running a storey/section filter after highlighting could dereference `original[i] === undefined` and fail; the loop is now confined to `gd.data.slice(0,original.length)`, and visibility changes target exactly `meta.map((_,i)=>i)`. The selected highlight overlay is therefore not modified/hidden by source filters. These are purely visualization trace changes, not OpenSees geometry, physical stiffness, links, or engineering calculations.
 
 The prefix/storey/member selector is injected separately by `components/model/id_audit.py` into all three exported Plotly 3D/browser views (and related Plotly HTML). See `REVIEW_MAIN/00_MODEL/20261115_V162_PLOTLY_VIEW_ID_CLASSIFICATION_AND_USABILITY.md`. Regression: `tests/test_shared_3d_prefix_selector.py`. Native ETABS and actual local Chrome UI interaction are not tested by the CI source checks.
+
+
+## 2026-11-16 — runtime stage visibility, ID lookup guard and on-demand assembled mesh
+
+The Import tab's ID lookup button now checks for an actual nonempty HTML before invoking the browser. While an ETABS worker is active, it refuses to show a possibly stale prior-run lookup and explains that the audit is generated during late assembly. After the run, a missing file produces a Tk warning identifying its expected path and the Excel audit status, not Edge ERR_FILE_NOT_FOUND.
+
+The conversion status parses the worker's [STEP START]/[STEP OK] records and displays the current stage, elapsed time, and time since a log line. It logs the selected saved floor_subdivisions at worker start, explicitly distinguishing FE mesh refinement from visualization resolution. The value is never changed by this UI improvement.
+
+The new Import action "3D actual assembled 4×4 mesh (on demand; no ETABS rerun)" creates the view in a background thread from fingerprint-matched, already-assembled OpenSees V118 model files. It neither invokes ETABS nor changes real ShellMITC4 or gravity elements; see docs/source/components/ui/assembled_mesh_view.py.md.
+
+Four ETABS source 3D/load HTML views are still generated during conversion and remain available by their existing buttons, but the converter no longer automatically opens four browser tabs at completion. They share a single local plotly.min.js via Plotly's include_plotlyjs='directory' output; this avoids repeating the library payload in each HTML. Browser output is local/offline; keep plotly.min.js alongside the source views if moving them. Actual runtime reduction is not established until the user's ETABS_Conversion_Worker.log stages are profiled.
+
+Validation: tests/test_assembled_mesh_view.py and existing GUI workflow layout checks. Native ETABS OAPI and Windows GUI QA remain required. No structural calculation, source EDB or mesh-count policy was altered.
+
+
+### Performance regression follow-up: November 15 to November 16
+
+Source comparison 9041cb6 (November 15) to cb4c296 (November 16) shows 119 intervening commits. A separate ETABS child worker was introduced with mandatory project EDB hash and optional workbook preflight, plus default enabled SHA verified export mirror. The optional role preflight had independently digested the full EDB for every one of the four source roles, even when no registry was configured. It now computes that EDB checksum once per preflight. Workbook hashes still require source equality, and the EDB is still hashed by the separate project-output provenance stage; no source verification has been disabled.
+
+SHA verified categorized export mirroring is now optional/off by default. The original model and existing categorization mechanism remain available through the checkbox for deliberate use. This prevents hashing/copying all flat artifacts as mandatory import completion work. More granular worker logs mark project hash/layout, optional workbook verification, ETABS CreateObjectProgID, ApplicationStart, OpenFile, source point/diaphragm progress, area/frame extraction, assembly, and optional mirroring. An Import button opens the current worker log and a prolonged-no-output warning remains advisory, never forcibly kills ETABS.
+
+This instrumentation does not prove which stage took ~19 minutes on the actual Windows machine. The private time-stamped worker log is the required discriminating evidence. No 4x4 FEM shell mesh, column offsets, ETABS assignments, gravity loads, or analysis solver is changed by this patch.
+
+
+### Same-export concurrency protection
+
+The Import-stage separate 4/8/16 slab-mesh workflow and "Rebuild assembled model from saved ETABS export" now reject invocation while the main ETABS worker is still writing the same export folder. Previously users could start a second whole-building mesh assembly and large formula workbook while the original conversion was incomplete, increasing disk/CPU contention and risking inconsistent source inputs. This is a real concurrency risk, not proof that the current 19-minute worker run suffered such overlap. The read-only on-demand assembled 3D viewer also remains unavailable until conversion finishes. No physical mesh reductions or sources are applied.

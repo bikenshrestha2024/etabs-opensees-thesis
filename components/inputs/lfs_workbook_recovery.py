@@ -88,10 +88,15 @@ def recover_lfs_pointer(path, *, expected_sha256, timeout_seconds=180, log=None)
         return False, "GIT_LFS_RECOVERY_UNAVAILABLE"
 
 
-def _registered_source(runtime_root, edb, role, export_dir=None):
-    """Pick only SHA-bound sources matching the selected physical EDB."""
+def _registered_source(runtime_root, edb, role, export_dir=None, *, edb_hash=None):
+    """Pick only SHA-bound sources matching the selected physical EDB.
+
+    [REF docs/source/components/inputs/lfs_workbook_recovery.py.md]
+    Reuse the already computed EDB digest within ONE immutable preflight.
+    """
     root = Path(runtime_root).resolve()
-    edb_hash = digest(edb)
+    if edb_hash is None:
+        edb_hash = digest(edb)
     locations = ([Path(export_dir).resolve() / "project_sources.private.json"]
                  if export_dir is not None else [])
     locations.extend([root / "project_sources.private.json",
@@ -129,7 +134,8 @@ def audit_optional_gui_workbooks(runtime_root, export_dir, edb, *, log=None):
     roles = ("etabs_full_table", "etabs_assignment", "nbc_calculator", "slab_load_path")
     rows = {}
     for role in roles:
-        found = _registered_source(runtime_root, edb, role, export_dir)
+        found = _registered_source(runtime_root, edb, role, export_dir,
+                                   edb_hash=sha)
         if found is None:
             rows[role] = {"status": "NOT_REGISTERED_OPTIONAL"}
             continue
