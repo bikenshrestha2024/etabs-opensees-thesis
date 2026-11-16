@@ -145,10 +145,19 @@ def _connect_etabs(edb, log):
     errors=[]
     for progid in ("CSI.ETABS.API.ETABSObject",):
         try:
+            log("[ETABS COM START] CreateObjectProgID " + progid)
+            _api_clock=time.perf_counter()
             etabs = helper.CreateObjectProgID(progid)
+            log(f"[ETABS COM OK] CreateObjectProgID: {time.perf_counter()-_api_clock:.2f}s")
+            _api_clock=time.perf_counter()
+            log("[ETABS COM START] ApplicationStart")
             etabs.ApplicationStart()
+            log(f"[ETABS COM OK] ApplicationStart: {time.perf_counter()-_api_clock:.2f}s")
             sap = etabs.SapModel
+            _api_clock=time.perf_counter()
+            log("[ETABS COM START] OpenFile for selected EDB (may be long)")
             ret = sap.File.OpenFile(os.path.abspath(edb))
+            log(f"[ETABS COM OK] OpenFile: {time.perf_counter()-_api_clock:.2f}s")
             if isinstance(ret, (int, float)) and ret != 0: raise RuntimeError(f"OpenFile return code {ret}")
             try: sap.SetPresentUnits(6)  # kN, m, C; confirm in the output log
             except Exception: pass
