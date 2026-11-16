@@ -158,15 +158,19 @@ def _connect_etabs(edb, log):
     raise RuntimeError("Could not open ETABS model: " + " | ".join(errors))
 
 
-def _point_coords(sap, names):
+def _point_coords(sap, names, log=None):
     pts={}
-    for n in names:
+    _count=len(names); _start=time.perf_counter()
+    for _index,n in enumerate(names,1):
         try:
             r=sap.PointObj.GetCoordCartesian(str(n))
             if isinstance(r,(list,tuple)) and len(r)>=3:
                 xyz=tuple(float(v) for v in r[:3])
                 if all(math.isfinite(v) for v in xyz): pts[str(n)]=xyz
         except Exception: pass
+        if log is not None and _index%200==0:
+            log(f"[ETABS API HEARTBEAT] PointObj.GetCoordCartesian {_index}/{_count}, "
+                f"{time.perf_counter()-_start:.1f}s elapsed")
     return pts
 
 
@@ -845,7 +849,11 @@ def _extract_point_diaphragm_assignments(sap, point_names, log):
         log("WARNING: PointObj.GetDiaphragm unavailable; no ETABS rigid diaphragm memberships will be exported.")
         return {}
     assignments={}; failures=0
-    for point in point_names:
+    _start=time.perf_counter()
+    for _index,point in enumerate(point_names,1):
+        if _index%200==0:
+            log(f"[ETABS API HEARTBEAT] PointObj.GetDiaphragm {_index}/{len(point_names)}, "
+                f"{time.perf_counter()-_start:.1f}s elapsed")
         raw=None
         try:
             raw=method(str(point))
@@ -1302,26 +1310,47 @@ def convert_model(edb, outdir, log, include_live=True):
         # --------------------------------------------------------------------
         _begin_step("ETABS connection and source model extraction")
         etabs,sap=_connect_etabs(edb,log)
+        log("[ETABS API] Model connected; starting point/frame/area inventories")
         point_names=_api_names(sap.PointObj)
         frame_names=_api_names(sap.FrameObj)
         area_names=_api_names(sap.AreaObj)
         link_api=getattr(sap,"LinkObj",None)
         link_names=_api_names(link_api) if link_api is not None else []
         log(f"ETABS object counts: points={len(point_names)}, frames={len(frame_names)}, areas={len(area_names)}, links={len(link_names)}")
-        coords=_point_coords(sap,point_names)
+        _api_clock=time.perf_counter()
+        coords=_point_coords(sap,point_names,log=log)
+        log(f"[ETABS API TIMING] Point coordinates: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         etabs_story_levels = _extract_etabs_story_levels(sap, log)
+        log(f"[ETABS API TIMING] Story levels: {time.perf_counter()-_api_clock:.2f} s")
         # Normalize point names consistently between connectivity and coordinate lookup.
         coords={str(k).strip(): v for k, v in coords.items()}
+        _api_clock=time.perf_counter()
         point_diaphragms=_extract_point_diaphragm_assignments(sap,point_names,log)
+        log(f"[ETABS API TIMING] Diaphragms: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         frame_conn={str(n).strip():[str(p).strip() for p in _get_points(sap.FrameObj,n)] for n in frame_names}
+        log(f"[ETABS API TIMING] Frame endpoints: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         area_conn={str(n).strip():[str(p).strip() for p in _get_points(sap.AreaObj,n)] for n in area_names}
+        log(f"[ETABS API TIMING] Area connectivity: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         link_conn={str(n).strip():[str(p).strip() for p in _get_points(link_api,n)] for n in link_names} if link_api is not None else {}
+        log(f"[ETABS API TIMING] Link connectivity: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         frame_section_assignments, frame_section_defs = _extract_frame_section_assignments(sap, frame_names, log)
+        log(f"[ETABS API TIMING] Frame section assignments: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         area_section_assignments, area_section_defs = _extract_area_section_assignments(sap, area_names, log)
+        log(f"[ETABS API TIMING] Area sections: {time.perf_counter()-_api_clock:.2f} s")
         section_by_obj={str(r["etabs_object"]):r for r in frame_section_assignments}
         area_section_by_obj={str(r.get("etabs_area_object")):r for r in area_section_assignments}
+        _api_clock=time.perf_counter()
         area_loads,area_raw=_extract_area_assignments(sap,area_names,log)
+        log(f"[ETABS API TIMING] Area loads: {time.perf_counter()-_api_clock:.2f} s")
+        _api_clock=time.perf_counter()
         frame_loads,frame_raw=_extract_frame_distributed(sap,frame_names)
+        log(f"[ETABS API TIMING] Frame distributed loads: {time.perf_counter()-_api_clock:.2f} s")
         self_weight_pattern_audit=_extract_etabs_self_weight_patterns(sap)
         log("ETABS load-pattern self-weight multipliers (audit only; no OpenSees recreation): " + ", ".join(f"{q['pattern']}={q['multiplier']}" for q in self_weight_pattern_audit))
         if any(q.get("multiplier") not in (None,0,0.0) for q in self_weight_pattern_audit):
@@ -2257,7 +2286,7 @@ class App:
         ttk.Button(toolbar,text="Open implementation files",command=lambda:os.startfile(str(source_folder))).pack(side="left",padx=(0,8))
         self.edb=tk.StringVar(); self.out=tk.StringVar(value=os.environ.get("OPENSEES_PROJECT_FOLDER",r"D:\Thesis Opensees\Etabs Nodes Export"))
         self.include_live=tk.BooleanVar(value=True)
-        self.categorize_export=tk.BooleanVar(value=True)
+        self.categorize_export=tk.BooleanVar(value=False)
         ttk.Label(toolbar,text='Active launcher: '+Path(__file__).name).pack(side="right",padx=8)
         def repair_runtime():
             from OpenSees_Release_Health_V142 import repair
@@ -2290,7 +2319,7 @@ class App:
         ttk.Button(source,text="Browse…",command=self._browse_dir).grid(row=1,column=2,padx=(8,0),pady=3)
         self.include_live.set(True)
         ttk.Checkbutton(source,text="Include live area load in ETABS load audit preview",variable=self.include_live).grid(row=2,column=0,columnspan=2,sticky="w",pady=(4,0))
-        ttk.Checkbutton(source,text="Create SHA-verified categorized export copies (keep original flat files)",variable=self.categorize_export).grid(row=3,column=0,columnspan=3,sticky="w",pady=(4,0))
+        ttk.Checkbutton(source,text="Also create SHA-verified categorized copies (optional; slower on large exports)",variable=self.categorize_export).grid(row=3,column=0,columnspan=3,sticky="w",pady=(4,0))
         runbar=ttk.Frame(shell); runbar.pack(fill="x",pady=(0,8))
         self.runbtn=ttk.Button(runbar,text="RUN ETABS → OPENSEESPY EXPORT  |  Assemble model, loads, mass and analysis-file manifest",style="Primary.TButton",command=self._run)
         self.runbtn.pack(fill="x",ipady=5)
