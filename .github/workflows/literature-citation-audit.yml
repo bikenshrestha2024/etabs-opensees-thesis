@@ -18,7 +18,7 @@ on:
       - '.github/workflows/literature-citation-audit.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: literature-audit-main
@@ -36,19 +36,21 @@ jobs:
           fetch-depth: 1
       - name: Generate source-citation inventory (offline)
         run: python LITERATURE/tools/audit_source_citations.py
-      - name: Publish only generated reference indexes
+      - name: Preserve generated citations for reviewed pull request
+        uses: actions/upload-artifact@v4
+        with:
+          name: literature-citation-review
+          path: |
+            LITERATURE/CODE_CITATION_OCCURRENCES.csv
+            LITERATURE/UNCATALOGUED_DOIS.csv
+            LITERATURE/CODE_CITATION_SCAN_SCOPE.json
+            LITERATURE/*/CODE_REFERENCES.md
+          retention-days: 30
+      - name: Report generated-file drift without committing to main
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- LITERATURE/CODE_CITATION_OCCURRENCES.csv
-          git add -- LITERATURE/UNCATALOGUED_DOIS.csv
-          git add -- LITERATURE/CODE_CITATION_SCAN_SCOPE.json
-          git add -- 'LITERATURE/*/CODE_REFERENCES.md'
-          if ! git diff --cached --quiet; then
-            git commit -m "docs(literature): refresh whole-repository citation provenance [skip ci]"
-            git pull --rebase origin main
-            git push origin HEAD:main
+          if [[ -n "$(git status --porcelain -- LITERATURE/)" ]]; then
+            echo "::notice::Citation inventory changed. Review the artifact and commit separately after provenance checks."
           else
-            echo "Literature citation inventory already current."
+            echo "Citation inventory matches tracked source."
           fi
