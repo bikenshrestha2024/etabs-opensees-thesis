@@ -261,7 +261,10 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
     for sheet in (ws,*node_sheets,weights):
         sheet.freeze_panes='A2';sheet.auto_filter.ref=sheet.dimensions
         for c in sheet[1]:c.font=Font(bold=True,color='FFFFFF');c.fill=PatternFill('solid',fgColor='1E3A5F')
-        for col in sheet.columns:sheet.column_dimensions[col[0].column_letter].width=min(55,max(16,len(str(col[0].value))+2))
+        # Width depends only on the header; iterating sheet.columns walks
+        # every data cell and becomes very expensive for MESH_16.
+        for header in sheet[1]:
+            sheet.column_dimensions[header.column_letter].width=min(55,max(16,len(str(header.value))+2))
     seismic.freeze_panes='A2'
     seismic.auto_filter.ref=seismic.dimensions
     seismic.column_dimensions['G'].width=22
