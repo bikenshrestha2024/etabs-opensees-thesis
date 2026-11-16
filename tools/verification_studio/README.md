@@ -70,3 +70,22 @@ The supplied example 32-support CSV comparator requires **32 explicit one-to-one
 - Nordas, Izzuddin & Li (2025), *Full shell surface coupling along a line with non-conforming meshes*, *Computational Mechanics*, DOI [10.1007/s00466-025-02612-6](https://doi.org/10.1007/s00466-025-02612-6). Nonconforming shell-interface method; not validation of this RC beam–slab application.
 
 **Licensing:** the package contains only original Python scripts and original explanatory text. It intentionally excludes CSI copyrighted PDF manuals/EDBs and all private model-derived exports.
+## Troubleshooting: B05–B12 show `No module named 'expanded_benchmarks'`
+
+This error means the **companion Studio Python file is missing from the same folder as the main script**. It does not mean OpenSeesPy is missing when B01–B04 already pass.
+
+On Windows, from your existing repository clone:
+
+```powershell
+cd <path-to-your-etabs-opensees-thesis-repository>
+git pull origin main
+conda activate etabs_env312
+cd tools\verification_studio
+python -c "import openseespy.opensees as ops; print(ops.version())"
+python ETABS_OpenSees_Verification_Studio.py --cases B12 --output VERIFICATION_RUNS
+python ETABS_OpenSees_Verification_Studio.py
+```
+
+Both `ETABS_OpenSees_Verification_Studio.py` and `expanded_benchmarks.py` **must be present beside each other**. Do **not** copy only the main script into Downloads. When running the GUI, the main window launches workers through the interpreter you selected, but imports the sibling benchmark module from its own source directory. v2.0.1 distinguishes a missing companion module from a missing OpenSeesPy installation and shows a GUI preflight error.
+
+Case B12 is a standalone analytical check and does **not** require OpenSeesPy; if it reports missing OpenSeesPy, that indicates an incorrectly classified failure or an outdated script.
