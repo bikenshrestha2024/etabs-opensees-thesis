@@ -2264,6 +2264,15 @@ class App:
         runbar=ttk.Frame(shell); runbar.pack(fill="x",pady=(0,8))
         self.runbtn=ttk.Button(runbar,text="RUN ETABS → OPENSEESPY EXPORT  |  Assemble model, loads, mass and analysis-file manifest",style="Primary.TButton",command=self._run)
         self.runbtn.pack(fill="x",ipady=5)
+        self._conversion_process = None
+        self.conversion_progress = tk.StringVar(value="ETABS conversion idle")
+        self.cancel_conversion_btn = ttk.Button(
+            runbar, text="Cancel active ETABS conversion",
+            command=self._cancel_conversion, state="disabled"
+        )
+        self.cancel_conversion_btn.pack(anchor="w", pady=(4, 0))
+        ttk.Label(runbar, textvariable=self.conversion_progress,
+                  wraplength=1050).pack(anchor="w", pady=(3, 0))
         ttk.Button(runbar,text="Rebuild assembled model from saved ETABS export",command=self._rebuild_complete_export).pack(anchor="w",pady=(4,0))
         # One working stage at a time; every legacy callback is registered exactly once.
         nav=ttk.Frame(shell);nav.pack(fill="x",pady=(0,9))
@@ -2998,60 +3007,186 @@ class App:
                 with open(log_path,"a",encoding="utf-8") as lf: lf.write(line+"\n")
             except Exception: pass
     def _run(self):
-        if not self.edb.get().strip(): messagebox.showerror("Missing model","Select an ETABS EDB first."); return
-        self.runbtn.configure(state="disabled")
+        """Start ETABS conversion in a dedicated process so Tk stays responsive.
+
+        COM/ETABS is confined to the child. Do not use a Python worker thread
+        for COM calls, and do not run the converter on the GUI event loop.
+        """
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showinfo("Conversion already running",
+                                "Check progress below or cancel the active run.",
+                                parent=self.root)
+            return
+        edb = Path(self.edb.get().strip()).expanduser()
+        output = Path(self.out.get().strip()).expanduser()
+        if not edb.is_file() or edb.suffix.lower() != ".edb":
+            messagebox.showerror("Missing ETABS model",
+                                 "Select an existing ETABS .EDB source file.",
+                                 parent=self.root)
+            return
+        if not str(self.out.get()).strip():
+            messagebox.showerror("Missing output folder",
+                                 "Select a project export folder.", parent=self.root)
+            return
         try:
-            log_dir=Path(self.out.get().strip() or ".").expanduser()
-            log_dir.mkdir(parents=True,exist_ok=True)
-            self._log_path=log_dir/"ETABS_OpenSees_Conversion_Log.txt"
-            with open(self._log_path,"w",encoding="utf-8") as lf:
-                lf.write(f"ETABS to OpenSeesPy conversion log\nStarted: {time.strftime('%Y-%m-%d %H:%M:%S')}\nSource EDB: {self.edb.get().strip()}\n\n")
-            self.log(f"Detailed timestamped log: {self._log_path}")
-            from components.inputs.project_output_layout import create_project_layout
-            context = create_project_layout(self.edb.get().strip(), log_dir)
-            self.log("[PROJECT_SOURCE] EDB SHA256: " +
-                     context["source_edb_sha256"])
-            self.log("[PROJECT_OUTPUT] Root: " + context["output_root"] +
-                     " | Manifest: " +
-                     str(log_dir / "00_SOURCE_MANIFEST" / "PROJECT_CONTEXT.json"))
-            self.log("[PROJECT_OUTPUT] Existing legacy analysis locations are "
-                     "preserved until module output readers are migrated.")
-            # Core conversion uses the selected EDB through ETABS OAPI, NOT a
-            # historical full-table XLSX. A Git LFS pointer or absent optional
-            # workbook must not interrupt geometry/section/load extraction.
-            # Gravity-native workbook validation remains an independent gate.
-            from components.inputs.lfs_workbook_recovery import audit_optional_gui_workbooks
-            optional_audit = audit_optional_gui_workbooks(
-                Path(__file__).resolve().parents[2], log_dir,
-                self.edb.get().strip(), log=self.log)
-            self.log("[SOURCE_GATE] EDB conversion independent of optional "
-                     "workbooks; gravity-native evidence remains unverified "
-                     "when an input is absent: " +
-                     str(optional_audit.get("evidence_status")))
-            result=convert_model(self.edb.get().strip(),self.out.get().strip(),self.log,self.include_live.get())
-            self._last_exports=result
+            output.mkdir(parents=True, exist_ok=True)
+            worker = Path(__file__).resolve().parents[2] / "tools" / "etabs_conversion_worker.py"
+            if not worker.is_file():
+                raise FileNotFoundError("Conversion worker not found: " + str(worker))
+            self._log_path = output / "ETABS_OpenSees_Conversion_Log.txt"
+            self._log_path.write_text(
+                "ETABS-to-OpenSees worker started at " +
+                time.strftime("%Y-%m-%d %H:%M:%S") + "\n",
+                encoding="utf-8"
+            )
+            worker_log = output / "09_SOFTWARE_DIAGNOSTICS" / "ETABS_Conversion_Worker.log"
+            worker_log.parent.mkdir(parents=True, exist_ok=True)
+            cmd = [sys.executable, "-u", str(worker),
+                   "--edb", str(edb.resolve()), "--output", str(output.resolve())]
+            if self.include_live.get():
+                cmd.append("--include-live")
             if self.categorize_export.get():
-                self._sync_export_mirror()
-            report_path=Path(self.out.get())/'OpenSees_Complete_Export_Report_V118.json'
-            assembly=json.loads(report_path.read_text(encoding='utf-8-sig'))
-            if assembly['assembly_errors']:
-                messagebox.showwarning('Export created — model assembly needs inputs',
-                    'Analysis files are linked automatically. The model entry reports these unresolved inputs:\n\n'+'\n'.join(assembly['assembly_errors'])+'\n\nReport: '+str(report_path),parent=self.root)
+                cmd.append("--categorize")
+            self._conversion_log_file = worker_log
+            self._conversion_log_offset = 0
+            self._conversion_result = None
+            self._conversion_started_at = time.monotonic()
+            self._conversion_last_activity = self._conversion_started_at
+            self._conversion_cancel_requested = False
+            with worker_log.open("w", encoding="utf-8") as stream:
+                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                self._conversion_process = subprocess.Popen(
+                    cmd, cwd=str(worker.parent.parent), stdout=stream,
+                    stderr=subprocess.STDOUT, creationflags=flags,
+                )
+            self.runbtn.configure(state="disabled")
+            self.cancel_conversion_btn.configure(state="normal")
+            self.conversion_progress.set("Export in child process; monitoring log…")
+            self.log("[WORKER STARTED] PID " + str(self._conversion_process.pid) +
+                     ". Output folder: " + str(output))
+            self.root.after(250, self._poll_conversion_worker)
+        except Exception as exc:
+            self._conversion_process = None
+            self.runbtn.configure(state="normal")
+            self.cancel_conversion_btn.configure(state="disabled")
+            self.log("[WORKER START FAILED] " + repr(exc))
+            messagebox.showerror("ETABS export could not start", str(exc), parent=self.root)
+
+    def _cancel_conversion(self):
+        process = getattr(self, "_conversion_process", None)
+        if process is None:
+            return
+        if not messagebox.askyesno(
+                "Cancel conversion",
+                "Stop the separate conversion worker? Partial output is not "
+                "accepted as a completed export. ETABS itself may remain open; "
+                "do not save the original EDB from an unfinished run.",
+                parent=self.root):
+            return
+        self._conversion_cancel_requested = True
+        self.conversion_progress.set("Cancelling conversion worker…")
+        try:
+            process.terminate()
+        except OSError as exc:
+            self.log("[CANCEL ERROR] " + str(exc))
+
+    def _poll_conversion_worker(self):
+        process = getattr(self, "_conversion_process", None)
+        if process is None:
+            return
+        try:
+            worker_log = self._conversion_log_file
+            if worker_log.is_file():
+                with worker_log.open("r", encoding="utf-8", errors="replace") as stream:
+                    stream.seek(self._conversion_log_offset)
+                    # Cap each poll to avoid freezing Tk while rendering a huge log.
+                    batch = [stream.readline() for _ in range(160)]
+                    self._conversion_log_offset = stream.tell()
+                for line in batch:
+                    if not line:
+                        break
+                    line = line.rstrip()
+                    if line.startswith("[WORKER_RESULT] "):
+                        try:
+                            self._conversion_result = json.loads(
+                                line[len("[WORKER_RESULT] "):]
+                            )
+                        except (json.JSONDecodeError, ValueError):
+                            self.log("[WORKER RESULT PARSE ERROR]")
+                    else:
+                        self.log("[CHILD] " + line)
+                    self._conversion_last_activity = time.monotonic()
+            returncode = process.poll()
+            elapsed = int(time.monotonic() - self._conversion_started_at)
+            silent = int(time.monotonic() - self._conversion_last_activity)
+            if returncode is None:
+                self.conversion_progress.set(
+                    f"Conversion running: {elapsed}s elapsed; last output {silent}s ago. "
+                    "Tk GUI is responsive; long ETABS API calls may still be executing."
+                )
+                self.root.after(400, self._poll_conversion_worker)
+                return
+            # Drain pending log lines after a fast process exit.
+            with self._conversion_log_file.open("r", encoding="utf-8",
+                                                errors="replace") as stream:
+                stream.seek(self._conversion_log_offset)
+                for line in stream:
+                    line = line.rstrip()
+                    if line.startswith("[WORKER_RESULT] "):
+                        try:
+                            self._conversion_result = json.loads(
+                                line[len("[WORKER_RESULT] "):]
+                            )
+                        except (json.JSONDecodeError, ValueError):
+                            self.log("[WORKER RESULT PARSE ERROR]")
+                    else:
+                        self.log("[CHILD] " + line)
+            cancelled = self._conversion_cancel_requested
+            result = self._conversion_result
+            self._conversion_process = None
+            self.runbtn.configure(state="normal")
+            self.cancel_conversion_btn.configure(state="disabled")
+            if cancelled:
+                self.conversion_progress.set("CANCELLED — output remains unverified")
+                self.log("[WORKER CANCELLED] Partial files must not be used for analysis.")
+            elif returncode == 0 and isinstance(result, dict):
+                self.conversion_progress.set(
+                    "EXPORT COMPLETED — engineering validation still required"
+                )
+                self.log("[WORKER COMPLETE] Report: " + str(result.get("report")))
+                self._last_exports = (
+                    None, str(Path(self.out.get()) / "OpenSees_Load_Assignment_3D.html")
+                )
+                if result.get("assembly_errors"):
+                    self.log("[ENGINEERING REVIEW] " +
+                             "; ".join(str(x) for x in result["assembly_errors"][:10]))
+                messagebox.showinfo(
+                    "ETABS conversion finished",
+                    "The independent worker completed successfully.\n\n"
+                    "Engineering equivalence and nonlinear readiness are NOT "
+                    "automatically verified.\n\n"
+                    "Report: " + str(result.get("report")), parent=self.root
+                )
             else:
-                analysis_ready=bool(assembly.get('analysis_ready',False))
-                nonlinear_ready=bool(assembly.get('nonlinear_ready',False))
-                readiness=('Engineering readiness: '+('REVIEW REQUIRED' if not analysis_ready else 'reported ready')
-                           +' | Nonlinear readiness: '+('REVIEW REQUIRED' if not nonlinear_ready else 'reported ready'))
-                messagebox.showinfo('Elastic assembly created — validation required',
-                    f"Assembled {assembly['frame_segments']} frame segments and {assembly['shell_mesh_cells']} wall/slab shell cells.\n\n"
-                    +readiness
-                    +"\n\nSaved loads/mass/diaphragms are evidence for comparison, not proof of ETABS parity. "
-                    +"Stage viewers can discover saved candidates but must validate the source model SHA, case identity, "
-                    +"status and completeness. Nonlinear analysis remains gated on real project material/rebar and benchmarks."
-                    +"\n\nReport: "+str(report_path),parent=self.root)
-        except Exception as e:
-            self.log("ERROR: "+repr(e)); self.log(traceback.format_exc()); messagebox.showerror("Conversion failed",str(e))
-        finally:self.runbtn.configure(state="normal")
+                self.conversion_progress.set(
+                    f"EXPORT FAILED (worker exit {returncode}) — inspect log"
+                )
+                self.log("[WORKER FAILED] Exit code " + str(returncode) +
+                         ". Detailed log: " + str(self._conversion_log_file))
+                messagebox.showerror(
+                    "ETABS conversion failed",
+                    "The converter did not complete. Inspect the last logged stage:\n" +
+                    str(self._conversion_log_file), parent=self.root
+                )
+        except Exception as exc:
+            self.log("[WORKER POLLING ERROR] " + repr(exc))
+            # Avoid a silent event-loop stall if an IO error occurs mid run.
+            if process.poll() is None:
+                self.root.after(700, self._poll_conversion_worker)
+            else:
+                self._conversion_process = None
+                self.runbtn.configure(state="normal")
+                self.cancel_conversion_btn.configure(state="disabled")
 
     def _sync_export_mirror(self):
         """Create hash-verified categorized copies, keeping flat legacy readers.
