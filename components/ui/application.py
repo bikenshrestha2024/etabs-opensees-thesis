@@ -3367,7 +3367,11 @@ class App:
                         except (json.JSONDecodeError, ValueError):
                             self.log("[WORKER RESULT PARSE ERROR]")
                     else:
-                        if " [ETABS COM START] " in line:
+                        if " [ASSEMBLY PHASE START] " in line:
+                            self._conversion_stage = "Assembly: " + line.split(" [ASSEMBLY PHASE START] ", 1)[1].strip()
+                        elif " [ASSEMBLY HEARTBEAT] " in line:
+                            self._conversion_stage = "Assembly: " + line.split(" [ASSEMBLY HEARTBEAT] ", 1)[1].strip()
+                        elif " [ETABS COM START] " in line:
                             self._conversion_stage = "ETABS COM: "+line.split(" [ETABS COM START] ",1)[1].strip()
                         elif " [WORKER STAGE START] " in line:
                             self._conversion_stage = line.split(" [WORKER STAGE START] ",1)[1].strip()
