@@ -57,6 +57,36 @@ class TestConversionGuiIsolation(unittest.TestCase):
         self.assertIn("model_equivalence", self.worker_source)
         self.assertIn("NOT_VERIFIED", self.worker_source)
 
+    def test_worker_resolves_from_compiled_module_not_legacy_launcher(self):
+        run = method(self.gui_cls, "_run")
+        # The facade may execute compiled implementation with a different
+        # global __file__. Only the callable's code origin is reliable.
+        snippet = ast.get_source_segment(self.app_source, run)
+        self.assertIn("type(self)._run.__code__.co_filename", snippet)
+        self.assertIn('repo_root / "tools" / "etabs_conversion_worker.py"', snippet)
+        self.assertIn('cmd, cwd=str(repo_root)', snippet)
+        self.assertNotIn('worker = Path(__file__).resolve().parents[2]', snippet)
+
+    def test_exec_facade_preserves_implementation_code_filename(self):
+        with __import__("tempfile").TemporaryDirectory() as td:
+            real_source = Path(td) / "repo" / "components" / "ui" / "application.py"
+            real_source.parent.mkdir(parents=True)
+            real_source.write_text(
+                "class Dummy:\\n"
+                "    def _run(self):\\n"
+                "        return __file__\\n",
+                encoding="utf-8",
+            )
+            namespace = {"__file__": str(Path(td) / "launcher.py")}
+            exec(compile(real_source.read_text(), str(real_source), "exec"),
+                 namespace, namespace)
+            instance = namespace["Dummy"]()
+            self.assertEqual(instance._run(), namespace["__file__"])
+            self.assertEqual(
+                Path(type(instance)._run.__code__.co_filename).resolve(),
+                real_source.resolve(),
+            )
+
     def test_source_has_single_export_button_binding(self):
         self.assertEqual(self.app_source.count("command=self._run)"), 1)
         self.assertIn("command=self._cancel_conversion", self.app_source)
