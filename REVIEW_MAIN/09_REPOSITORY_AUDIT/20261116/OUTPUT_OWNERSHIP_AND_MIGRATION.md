@@ -12,9 +12,13 @@ Source of truth: `components/inputs/output_layout.py` and `components/inputs/out
     REVIEW_SNAPSHOTS/
   02_MODEL/
     SLAB_LOAD_PATH/
-      MESH_04/{CONFIGS,ASSEMBLED,EXCEL,JSON,...}
-      MESH_08/{CONFIGS,ASSEMBLED,EXCEL,JSON,...}
-      MESH_16/{CONFIGS,ASSEMBLED,EXCEL,JSON,...}
+      PREPARED_CONFIGS/           # config-only, no solver/model build
+      MESH_04/
+        RUNS/RUN_<timestamp>_<id>/ # independent staged source + assembled model
+        EXCEL/                     # workbook copies specific to mesh size
+        JSON/                      # workbook provenance/manifest
+      MESH_08/                    # same independent RUNS, EXCEL, JSON convention
+      MESH_16/                    # same independent RUNS, EXCEL, JSON convention
   02_GRAVITY/
   03_ESM/
   04_MODAL/
