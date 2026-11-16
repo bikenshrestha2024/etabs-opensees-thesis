@@ -72,9 +72,9 @@ class TestConversionGuiIsolation(unittest.TestCase):
             real_source = Path(td) / "repo" / "components" / "ui" / "application.py"
             real_source.parent.mkdir(parents=True)
             real_source.write_text(
-                "class Dummy:\\n"
-                "    def _run(self):\\n"
-                "        return __file__\\n",
+                "class Dummy:\n"
+                "    def _run(self):\n"
+                "        return __file__\n",
                 encoding="utf-8",
             )
             namespace = {"__file__": str(Path(td) / "launcher.py")}
