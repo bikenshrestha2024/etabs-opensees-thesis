@@ -28,7 +28,7 @@ class IndexedShellMeshTests(unittest.TestCase):
         rows = {"floorA": dict(assigned_property="Slab 150",
                                property_type="slab", material_name="M30",
                                thickness_m=.15,
-                               material_values={"E": 30e6, "nu": .2,
+                               material_values={"E": 30e6, "poisson_ratio": .2,
                                                 "weight_per_volume": 25.})}
         _, shells, by_source = _mesh_areas(nodes, records, rows, {}, 4)
         self.assertEqual(len(shells), 20)
@@ -44,7 +44,7 @@ class IndexedShellMeshTests(unittest.TestCase):
                       etabs_object="A",node_tags=[1,2,3,4])]
         rows={"A":dict(assigned_property="Slab",property_type="slab",
                        material_name="M30",thickness_m=.15,
-                       material_values={"E":30e6,"nu":.2,"weight_per_volume":25.})}
+                       material_values={"E":30e6,"poisson_ratio":.2,"weight_per_volume":25.})}
         for n in (4,8,16):
             with self.subTest(n=n):
                 out,shells,_ = _mesh_areas(nodes,records,rows,{},n)
