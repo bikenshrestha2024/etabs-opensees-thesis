@@ -50,3 +50,6 @@ REVIEW_MAIN/00_MODEL/20261116_MESH04_AND_ETABS23_VERIFICATION/MESH_04_Floor_and_
 # Independent Studio native benchmark results are local private evidence.
 /VERIFICATION_RUNS/
 /VERIFICATION_RUNS*/
+
+# Pinned semantic discovery outputs: generated on CI/local machine, never auto-published as model evidence.
+/AUDIT_RUNS/
