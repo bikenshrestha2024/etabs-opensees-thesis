@@ -46,3 +46,11 @@ Use R10 for NBC code interpretation, R01–R04/R12/R13 for wall/model experiment
 The 2026-11-15 1.0D+1.0L exported ETABS global `FZ=311367.313600 kN` matches OpenSees solved `Rz=311367.31387955 kN` only in **global arithmetic**. The native 76-source support ledger has **44 fully source-restrained points with ETABS FZ=0**. The primary32 diagnostic releases those restraints; the 76-support OpenSees solver carries approximately **104463.014 kN** at them. Aggregate absolute node mismatches are **37297.027 kN (32 model)** and **208926.027 kN (76 model)**. The native preflight flags 1367 rigid-end-zone metadata records. Therefore no case may be tagged ETABS support/reaction **physically equivalent** without source restraint/analysis-element mapping and stiffness/load-path tests. New full-76 source mapping output is implemented in `components/gravity/three_case_comparison.py`. See [full native discrepancy review](../REVIEW_MAIN/01_GRAVITY/20261115_FULL_76_SUPPORT_REACTIONS_AND_NATIVE_DISCREPANCY.md).
 
 **G02/G03 remain OPEN**. The 32-support case is a sensitivity case; don't remove 44 fixed DOFs from the original source model or rewrite reactions to force agreement.
+
+## 2026-11-16 independent verification Studio evidence
+
+The standalone B01–B12 OpenSeesPy Studio (separate from the production thesis model) has user-submitted results of **B01–B11 native PASS** plus **B12 ANALYTICAL_PASS**, 58/58 recorded metrics passed. This is useful `INDEPENDENT_COMPONENT_BENCHMARK` evidence only. B06 proves 54 kN slab-patch gravity equilibrium across MESH_04/08/16; it does not prove ETABS matched load path or deflection mesh convergence. B12 verifies a constitutive equation only, not a native viscous device.
+
+A local private evidence importer validates JSON reports and exports a sanitized `EVIDENCE_CONSISTENT` status; **this does not promote G00–G10 thesis qualification**, the 32 physical support-equivalence gate, wall calibration or X-wall NLTHA convergence.
+
+See [12-case review](../REVIEW_MAIN/00_MODEL/20261116_B01_B12_STUDIO_RESULTS_AND_ACCEPTANCE.md) and [verification matrix](../tools/verification_studio/THESIS_VALIDATION_MATRIX.md).
