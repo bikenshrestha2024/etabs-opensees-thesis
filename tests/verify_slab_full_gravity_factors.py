@@ -55,6 +55,38 @@ class SlabProfilesTest(unittest.TestCase):
             wb.save(output)
             self.assertTrue(output.is_file())
 
+    def test_reduced_slab_weight_retains_assembled_source_ledger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            (folder / "OpenSees_Load_Conversion_Audit.json").write_text(
+                json.dumps({"etabs_load_pattern_self_weight_multipliers": [
+                    {"pattern": "Dead", "multiplier": 1},
+                ]}), encoding="utf-8")
+            data = {
+                "shells": [{
+                    "object": 29, "category": "FLOOR", "nodes": [1, 2, 3, 4],
+                    "area": 1.0, "properties": {"thickness": .2, "weight": 25},
+                }],
+                "frames": [],
+                "nodes": {1: [0, 0, 3], 2: [1, 0, 3], 3: [1, 1, 3], 4: [0, 1, 3]},
+                "joint_volume_weight_policy": "VERIFIED_SINGLE_OWNER",
+            }
+            cfg = {"gravity_factors": {"Dead": 1}, "mass_factors": {"Dead": 1}}
+            wb = Workbook()
+            detail = wb.create_sheet("Source detail")
+            detail.append(["source", "pattern", "component", "gravity_factor",
+                           "unfactored_kN", "applied_kN"])
+            detail.append(["AREA:29", "Dead", "self_weight_floor", 1, 2.5, 2.5])
+
+            add_formula_audit(wb, folder, data, cfg)
+
+            self.assertEqual(detail["E2"].value, 2.5)
+            self.assertEqual(wb["Surface load formulas"]["I2"].value, "=E2*F2")
+            self.assertTrue(any(
+                "gross" in row[0].casefold() and "diagnostic" in row[0].casefold()
+                for row in wb["Vertical load path"].values
+            ))
+
     def test_missing_seismic_factor_must_fail(self):
         with tempfile.TemporaryDirectory() as tmp:
             from unittest.mock import patch

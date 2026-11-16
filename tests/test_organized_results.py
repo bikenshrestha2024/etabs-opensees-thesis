@@ -129,6 +129,37 @@ class OrganizedReviewTests(unittest.TestCase):
             self.assertEqual(target.read_text(),"keep this private pointer")
             self.assertFalse(any(p.is_dir() for p in parent.iterdir()))
 
+    def test_bundle_name_cannot_replace_module_archive(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "Gravity_Result.json").write_text("{}")
+            (root / "Modal_Result.json").write_text("{}")
+            for bundle in ("Gravity", "GRAVITY"):
+                with self.subTest(bundle=bundle):
+                    with self.assertRaisesRegex(ValueError, "module archive"):
+                        publish_organized_results(root, bundle_name=bundle)
+                    self.assertFalse((root / "Organized_Results").exists())
+
+    def test_module_archive_totals_match_its_contents(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "Gravity_Result.json").write_text("{}")
+            (root / "Modal_Result.json").write_text("{}")
+            result = publish_organized_results(root)
+            for archive, expected in (
+                    ("Gravity", {"Gravity": 1}),
+                    ("Modal", {"Modal": 1}),
+                    ("ALL_MODULES", {"Gravity": 1, "Modal": 1})):
+                with self.subTest(archive=archive):
+                    with zipfile.ZipFile(result["zip_files"][archive]) as package:
+                        manifest = json.loads(package.read("EVIDENCE_MANIFEST.json"))
+                        for entry in manifest["entries"]:
+                            self.assertIn(entry["snapshot"], package.namelist())
+                    self.assertEqual(manifest["file_count"], sum(expected.values()))
+                    self.assertEqual(
+                        {name: count for name, count in manifest["modules"].items() if count},
+                        expected)
+
     def test_bundle_name_rejects_windows_reserved_names(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)

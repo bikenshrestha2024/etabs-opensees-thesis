@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from zipfile import ZipFile
 
 from components.equivalent_static.organized_exports import build_combined_esm_export
 from components.validation.etabs_direct_api import validate_mapping
@@ -62,12 +63,17 @@ class ESMCombinedExportTests(unittest.TestCase):
             self.assertTrue(any("/CSV/" in r["snapshot_path"] for r in index["files"]))
             from openpyxl import load_workbook
             wb=load_workbook(result["workbook"],read_only=True,data_only=True)
-            self.assertIn("Case Summary",wb.sheetnames)
-            self.assertIn("Storey Forces",wb.sheetnames)
-            self.assertIn("Validation Gates",wb.sheetnames)
-            self.assertIn("Solver Batch Status",wb.sheetnames)
-            self.assertIn("REQUIRES",str(tuple(wb["Validation Gates"].values)))
-            self.assertTrue(Path(result["zip"]).is_file())
+            try:
+                self.assertIn("Case Summary",wb.sheetnames)
+                self.assertIn("Storey Forces",wb.sheetnames)
+                self.assertIn("Validation Gates",wb.sheetnames)
+                self.assertIn("Solver Batch Status",wb.sheetnames)
+                self.assertIn("REQUIRES",str(tuple(wb["Validation Gates"].values)))
+            finally:
+                wb.close()
+            with ZipFile(result["zip"]) as archive:
+                self.assertTrue(all(row["snapshot_path"] in archive.namelist()
+                                    for row in index["files"]))
 
     def test_running_batch_not_misreported_as_completed(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -142,9 +148,12 @@ class ESMCombinedExportTests(unittest.TestCase):
             result=build_combined_esm_export(root)
             from openpyxl import load_workbook
             wb=load_workbook(result["workbook"],read_only=True,data_only=True)
-            rows=list(wb["Case Summary"].values)
-            self.assertIn("INVALID SOURCE",str(rows))
-            self.assertNotIn("VERIFIED NATIVE ETABS",str(rows))
+            try:
+                rows=list(wb["Case Summary"].values)
+                self.assertIn("INVALID SOURCE",str(rows))
+                self.assertNotIn("VERIFIED NATIVE ETABS",str(rows))
+            finally:
+                wb.close()
 
 
 class ESMGuiSafetyTests(unittest.TestCase):

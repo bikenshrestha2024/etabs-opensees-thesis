@@ -66,7 +66,10 @@ def unit_and_scale(source_units,pair_scale,*,already_scaled=False):
     # amplitude changes. Only UNIT conversion is permissible at import.
     if already_scaled and not math.isclose(scale,1.0,rel_tol=0,abs_tol=1e-12):
         raise ValueError("Already matched/scaled source: OpenSees pair scale must be 1.0")
-    return UNITS_TO_M_S2[units]*scale
+    factor=UNITS_TO_M_S2[units]*scale
+    if not math.isfinite(factor):
+        raise ValueError("Converted acceleration factor must be finite")
+    return factor
 
 def applied_motion_manifest(*,orientation,record_a,record_b,dt_s,units_a,
                             units_b,pair_scale,already_scaled=False):

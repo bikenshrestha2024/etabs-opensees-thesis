@@ -65,3 +65,5 @@ To advance this ledger: branch from the current latest revision, select a small 
 | 8 Soil C records and full M0–M6 XY/YX NLTHA | NOT RUN |
 | NBC 105:2025 project design compliance | NOT EVALUATED |
 | Experimentally validated core/FVD/BRB material models | REQUIRES PROJECT EVIDENCE |
+
+Current review checkpoint: [2026-11-16 repository audit and inspected source spans](20261116_b8db900/README.md).

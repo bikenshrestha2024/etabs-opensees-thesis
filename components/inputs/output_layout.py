@@ -96,12 +96,10 @@ def result_roots(source_path, *, stages=None, include_legacy=True):
     if include_legacy:
         candidates.append(root / "OpenSees_Analysis_Results")
     for key in keys:
-        canonical = root / canonical_stage_folder(key)
-        candidates.append(canonical)
-        if str(key).upper() == "LTHA":
-            candidates.append(root / "06_LINEAR_TH")
-        elif str(key).upper() == "NLTHA":
-            candidates.append(root / "07_NONLINEAR_TH")
+        folder = canonical_stage_folder(key)
+        candidates.append(root / folder)
+        candidates.extend(root / alias for alias, stage in LEGACY_STAGE_ALIASES.items()
+                          if STAGE_FOLDERS[stage] == folder)
     # A specific user-selected case that is outside the above trees is valid,
     # but don't re-scan it when its parent is already in the roots.
     if source != root and source.is_dir():

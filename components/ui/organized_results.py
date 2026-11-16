@@ -175,6 +175,8 @@ def publish_organized_results(results_root, *, gravity_root=None,
         raise ValueError("Destination parent cannot be an ancestor of the source results root")
     from components.inputs.output_contract import safe_component
     bundle_name = safe_component(bundle_name)
+    if bundle_name.casefold() in {module.casefold() for module in MODULES}:
+        raise ValueError("Bundle name conflicts with a module archive: " + bundle_name)
     destination = parent / stamp
     manifest = {
         "schema": "thesis-module-evidence-v1",
@@ -268,10 +270,16 @@ def publish_organized_results(results_root, *, gravity_root=None,
     def archive(name, entries):
         target = zipdir / (name + "_Review_UPLOAD.zip")
         visible = {item["snapshot"] for item in entries}
-        limited = dict(upload_manifest, entries=[
-            item for item in upload_manifest["entries"]
-            if item["snapshot"] in visible
-        ], file_count=len(entries))
+        subset_counts = {module: 0 for module in MODULES}
+        for entry in entries:
+            subset_counts[entry["module"]] += 1
+        limited = dict(
+            upload_manifest,
+            entries=[item for item in upload_manifest["entries"]
+                     if item["snapshot"] in visible],
+            file_count=len(entries),
+            modules=subset_counts,
+        )
         with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED,
                              compresslevel=6, allowZip64=True) as z:
             z.writestr("EVIDENCE_MANIFEST.json",

@@ -1,0 +1,18 @@
+path,baseline_git_blob,inspected_lines,coverage,review_subject
+components/equivalent_static/organized_exports.py,f4aaba759f3dce0c589a5cf5194d236294b44fb4,1-319,full,Portable paths and saved batch evidence
+components/gravity/load_path_formulas.py,51f4fc083444bc5196326ede3c8a4145d0b8f4dd,1-336,partial,Retained slab ledger and gross diagnostics
+components/gravity/reaction_case_registry.py,834dd4e204853fd2ee790cb7f2f5e900e2124bbe,1-267,full,Registry concurrency and stored evidence
+components/gravity/storey_loads.py,e6fe6960e671e193aa9fb599d3ed871e85fb4737,1-69,full,Load ledger construction
+components/gravity/support_scenarios.py,434a5dca6d94dfb47cdf12feb67df2ad02e9697b,1-162,full,Base sensitivity scope
+components/inputs/output_contract.py,8c1cbba5ab5fc7fe49a636cfacfdc00b40530c5e,1-385,full,Manifest inputs and solver status normalization
+components/inputs/output_layout.py,15a94f28b62b9e55c98fa0c59bc7b9b5d4eb8dc7,1-242,full,Stage aliases and compatibility lookups
+components/model/assembly.py,4b54036f379749513755e605e9420681beea8729,345-565;661-924;993-1156,partial,"Connectivity, cuts, load ownership and recorder provenance"
+components/nonlinear_time_history/full_record_gate.py,59cdf27eb1c32a3532d29579f75e51fde9cede21,1-135,partial,Completion checks and sampling scope
+components/nonlinear_time_history/nbc105_horizontal_input.py,efd11a3101a0a805e6c0a7668963f9ca03fbc10e,1-109,full,Bidirectional input units and scaling
+components/nonlinear_time_history/soil_c_nltha_suite.py,73958d7c3a03f45e0b3a1aa4c455ef109fd77e77,212-279,partial,Source fingerprint and explicit endpoint extension
+components/nonlinear_time_history/thesis_quality.py,75bb5cb218ff885e3a67245f7bb5f7a808dbfc92,1-225,full,Isolation-manifest provenance
+components/nonlinear_time_history/variant_comparison.py,6d4ebd02beed34d2f0a4616f739fc525e49bda3d,1-219,full,Numeric normalization and matching comparators
+components/response_spectrum/model_analysis.py,5168c2f77d2a6e74716da930abb789ab372dbad9,211-273,partial,MRSM saved-case evidence
+components/ui/organized_results.py,0c7693bf480452e534b73aa18c9810a0737d2629,1-43;48-300,partial,Archive isolation and entry counts
+tools/audit_active_repository.py,7dcaffd631c5e1c27d1eb62316246091130f90cc,1-175,partial,Inventory scan scope
+tools/audit_repository_integrated.py,3e9ab842115566596f7392e74a04eddcfeedb902,1-150;445-575,partial,Tracked audit and gate consistency

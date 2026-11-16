@@ -101,3 +101,5 @@ The read-only `inspect_case_manifest` function now checks the **unresolved** run
 ## Linked input-source evidence visibility (2026-11-15)
 
 `tools/audit_stage_output_migration.py` checks every canonical `RUNS/<state>/<case>/<run>/00_INPUT_SOURCE/CASE_MANIFEST.json` location without following links. A symlinked `00_INPUT_SOURCE` directory is inventoried as `SYMLINKED_RUN_INPUT_SOURCE_REFUSED`; a symlinked manifest is reported as `SYMLINKED_RUN_MANIFEST_REFUSED`. Previously the depth walk could silently treat these files as present while the `rglob` step skipped them, producing an inaccurate zero-issue output. Both are excluded from run counts, included in linked-path totals, and do not count as solver evidence. Deterministic filesystem-only tests cover the cases. No user ETABS file or structural result is migrated by this audit.
+
+Manifest inspection reports INVALID_SOLVER_STATUS and returns UNKNOWN for malformed or unrecognized solver status values, including JSON arrays and objects.

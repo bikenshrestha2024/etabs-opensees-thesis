@@ -62,6 +62,7 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
         raise ValueError("All M0–M6 case collections are required")
     variant_manifest={r["variant"]:r for r in payload["variants"]}
     grouped={}
+    duration_tolerance_s=1e-7
     for variant,cases in summaries.items():
         if not isinstance(cases,list) or not cases:raise ValueError(variant+" has no completed cases")
         keyed={}
@@ -92,9 +93,9 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
                     raise ValueError(f"{variant} case {key}: invalid {field}")
                 durations[field]=val
             if (abs(durations["full_record_duration_s"]-
-                    durations["requested_duration_s"])>1e-7 or
+                    durations["requested_duration_s"])>duration_tolerance_s or
                 abs(durations["requested_duration_s"]-
-                    durations["achieved_time_s"])>1e-7):
+                    durations["achieved_time_s"])>duration_tolerance_s):
                 raise ValueError(f"{variant} case {key}: incomplete accepted duration")
             raw_states=gate.get("accepted_states")
             if isinstance(raw_states,bool) or not isinstance(raw_states,int) or raw_states<2:
@@ -107,6 +108,7 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
             if (not isinstance(digest,str) or len(digest)!=64 or
                     any(ch not in "0123456789abcdefABCDEF" for ch in digest)):
                 raise ValueError(f"{variant} case {key} has missing/invalid ground motion SHA256")
+            metrics={}
             for name in METRICS:
                 raw=c.get(name)
                 if isinstance(raw,bool):
@@ -117,7 +119,8 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
                     raise ValueError(f"{variant} invalid metric {name}") from exc
                 if not math.isfinite(value) or value<0:
                     raise ValueError(f"{variant} invalid metric {name}")
-            keyed[key]=c
+                metrics[name]=value
+            keyed[key]={**c, **metrics, "completion_gate":{**gate, **durations}}
         grouped[variant]=keyed
     reference=grouped["M0"]
     keys=set(reference)
@@ -127,6 +130,10 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
         for key,c in cases.items():
             if c["record_sha256"]!=reference[key]["record_sha256"]:
                 raise ValueError(f"{variant}: motion source SHA differs in {key}")
+            duration=c["completion_gate"]["full_record_duration_s"]
+            reference_duration=reference[key]["completion_gate"]["full_record_duration_s"]
+            if abs(duration-reference_duration)>duration_tolerance_s:
+                raise ValueError(f"{variant}: full record duration differs in {key}")
     for limit in ("ULS","SLS"):
         pairs={key[1] for key in keys if key[0]==limit}
         if len(pairs)<require_pairs:
@@ -146,8 +153,8 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
             base_subset={key:case for key,case in reference.items() if key[0]==limit}
             by_limit_state[limit][variant]={}
             for metric in METRICS:
-                maximum=max(float(case[metric]) for case in subset.values())
-                base=max(float(case[metric]) for case in base_subset.values())
+                maximum=max(case[metric] for case in subset.values())
+                base=max(case[metric] for case in base_subset.values())
                 # For 8 pairs the response aggregation rule is AVERAGE.
                 # Within each pair, report the larger XY/YX demand as a
                 # CONSERVATIVE ENGINEERING ORIENTATION RULE, explicitly
@@ -155,11 +162,11 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
                 # This never includes a failed or missing response-history case.
                 pair_ids=sorted({key[1] for key in subset})
                 pair_governing={
-                    pair:max(float(subset[(limit,pair,orientation)][metric])
+                    pair:max(subset[(limit,pair,orientation)][metric]
                              for orientation in ("XY","YX"))
                     for pair in pair_ids}
                 m0_pair_governing={
-                    pair:max(float(base_subset[(limit,pair,orientation)][metric])
+                    pair:max(base_subset[(limit,pair,orientation)][metric]
                              for orientation in ("XY","YX"))
                     for pair in pair_ids}
                 rule=aggregation_by_state[limit]

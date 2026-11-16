@@ -28,6 +28,8 @@ class EarthquakeInputTests(unittest.TestCase):
     self.assertAlmostEqual(unit_and_scale("m/s2",1.45),1.45)
     with self.assertRaisesRegex(ValueError,"must be 1.0"):unit_and_scale("g",1.45,already_scaled=True)
     self.assertAlmostEqual(unit_and_scale("g",1.0,already_scaled=True),9.80665)
+    with self.assertRaisesRegex(ValueError, "factor must be finite"):
+        unit_and_scale("g", 1e308)
  def test_two_horizontal_and_same_scale(self):
     base=dict(record_a="a.at2",record_b="b.at2",dt_s=.005,
               units_a="g",units_b="m/s2",pair_scale=1.45)

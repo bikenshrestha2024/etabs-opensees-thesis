@@ -22,3 +22,6 @@ The optional `write_stage_index(export_dir)` writes atomically to `01_ETABS_EXPO
 ## 2026-11-15 stage index path consistency
 
 `write_stage_index` refuses a selected export root (or its parent path) that is a symlink **before** calling `resolve()`. The stage index now differentiates `legacy_analysis_results_present=false` from `legacy_analysis_results_link_refused=true` when an old `OpenSees_Analysis_Results` path is linked. For ESM, a symlinked `LATEST_ESM_COMBINED_EXPORT.txt` is ignored so an ordinary unlinked `LATEST_ORGANIZED_RESULT.txt` remains discoverable. Previous index consumers retain the original fields; one additive boolean field was introduced. Tests use synthetic temporary paths only; this does not change the canonical output folder mapping or relocate existing result files.
+
+
+`result_roots()` resolves legacy linear and nonlinear history folders consistently for a stage key, canonical folder name, or legacy alias. When both layouts exist, discovery returns the canonical stage before the corresponding legacy stage.

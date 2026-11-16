@@ -290,6 +290,30 @@ class IntegratedAuditTests(unittest.TestCase):
             self.assertIn("P0_MISSING_CANONICAL_LAUNCHER",
                           {x["id"] for x in output["findings"]})
 
+    def test_missing_facade_target_blocks_audit(self):
+        from tools.audit_active_repository import CANONICAL
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subprocess.run(["git", "init", "-q", str(root)], check=True,
+                           capture_output=True)
+            for name in CANONICAL.values():
+                (root / name).write_text("pass\n", encoding="utf-8")
+            (root / "OpenSees_Calculations.py").write_text(
+                "from pathlib import Path\n"
+                "_component_source = Path(__file__).parent / 'components/missing.py'\n"
+                "exec(compile(_component_source.read_text(), str(_component_source), 'exec'))\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "-C", str(root), "add", "-A"],
+                           check=True, capture_output=True)
+
+            output = audit(root)
+
+            self.assertIn("P0_MISSING_EXEC_FACADE_TARGET",
+                          {finding["id"] for finding in output["findings"]})
+            self.assertEqual(output["acceptance"]["static_audit"], "BLOCKED")
+
     def test_metadata_classifier_excludes_archived_python_from_active_set(self):
         self.assertEqual(classify_file("Saved_Project_V156/frozen.py"),
                          "ARCHIVE_OR_RESEARCH_SNAPSHOT_METADATA_ONLY")

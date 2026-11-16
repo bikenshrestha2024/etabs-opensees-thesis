@@ -535,6 +535,7 @@ def audit(root: Path) -> dict:
         "acceptance": {
             "static_audit": "PASS" if not source["syntax_errors"]
                 and not source["canonical_missing"] and not writers["parse_errors"]
+                and not missing_facades
                 else "BLOCKED",
             "function_level_semantic_review": "INCOMPLETE_NOT_EXECUTED",
             "import_semantics": "REVIEW_REQUIRED",

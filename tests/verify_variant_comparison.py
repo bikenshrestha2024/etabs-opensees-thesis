@@ -28,6 +28,18 @@ class CompareTests(unittest.TestCase):
         result=compare_completed_cases(manifest(),suite())
         self.assertEqual(result["paired_case_keys"],12)
         self.assertEqual(result["status"],"RESEARCH_SCREEN_ONLY_NOT_THESIS_VALIDATION")
+    def test_numeric_text_metrics_match_numeric_inputs(self):
+        data=suite()
+        data["M1"][0]["peak_roof_UX_m"]=10.0
+        data["M1"][1]["peak_roof_UX_m"]=2.0
+        expected=compare_completed_cases(manifest(),data)
+        for cases in data.values():
+            for case in cases:
+                for name in METRICS:
+                    case[name]=str(case[name])
+        self.assertEqual(compare_completed_cases(manifest(),data),expected)
+        self.assertEqual(data["M1"][0]["peak_roof_UX_m"],"10.0")
+
     def test_uls_sls_separated_and_seven_pairs_not_decided(self):
         data=suite()
         for c in data["M1"]:
@@ -100,6 +112,14 @@ class CompareTests(unittest.TestCase):
         data=suite()
         data["M2"][0]["record_sha256"]="not-a-valid-motion-source"
         with self.assertRaisesRegex(ValueError,"SHA256"):
+            compare_completed_cases(manifest(),data)
+
+    def test_reject_different_full_duration_for_same_motion(self):
+        data=suite()
+        gate=data["M2"][0]["completion_gate"]
+        for field in ("full_record_duration_s", "requested_duration_s", "achieved_time_s"):
+            gate[field]+=1.0
+        with self.assertRaisesRegex(ValueError, "duration differs"):
             compare_completed_cases(manifest(),data)
 
     def test_reject_nonhex_model_fingerprint_and_non_numeric_metric(self):

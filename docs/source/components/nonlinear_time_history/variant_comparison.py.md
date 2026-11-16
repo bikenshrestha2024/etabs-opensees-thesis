@@ -26,3 +26,5 @@ The ULS and SLS outputs now retain both `maximum` of all orientation-cases AND a
 ## V24 — no forged full-duration variant aggregation (2026-11-15)
 
 `compare_completed_cases()` now applies the duration and provenance checks already used by the 224-case completion scanner: each input completion gate must have a finite positive source/requested/achieved duration matching within 1e-7 seconds and an integer accepted-state count of at least 2. Every model-export and paired-ground-motion SHA256 must be 64 hexadecimal characters; invalid or missing/nonfinite metrics raise a deliberate `ValueError`. A `full_record_completed=true` flag alone is no longer sufficient to qualify a case for M0–M6 comparative metrics. This is a solver-free evidence contract, **not** verification that the raw accepted-history CSV or source-record SHA actually matches the claimed values. Independent native verification remains mandatory. Regression: `tests/verify_variant_comparison.py`.
+
+Comparisons normalize validated numeric metrics once without changing the input summaries. Matched variant cases must also agree on source duration within 1e-7 s.

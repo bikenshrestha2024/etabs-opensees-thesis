@@ -9,3 +9,5 @@ Inputs and output: five verified feature answers (unknown supported), orientatio
 Engineering restrictions: support input UniformExcitation returns relative nodal displacements, not absolute. The recorded structural model, masses and constraints require independent checks.
 
 Tests: `tests/verify_nbc105_horizontal_input.py`. See [full clause guide](../../../programs/33_NBC105_XY_YX_VERTICAL_AND_SCALE_GUIDE.md).
+
+The unit converter rejects a scale when multiplication by the acceleration unit factor overflows the finite float range.

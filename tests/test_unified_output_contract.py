@@ -18,6 +18,20 @@ class UnifiedOutputContractTests(unittest.TestCase):
     # Windows temp paths may use 8.3 RUNNER~1 aliases; the production
     # output API intentionally returns resolved physical paths. Compare
     # canonical paths rather than syntactic spellings of the same folder.
+    def test_result_roots_legacy_fallback_accepts_all_stage_spellings(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for key, canonical, alias in (
+                    ("LTHA", "06_LINEAR_TIME_HISTORY", "06_LINEAR_TH"),
+                    ("NLTHA", "07_NONLINEAR_TIME_HISTORY", "07_NONLINEAR_TH")):
+                legacy = root / alias
+                legacy.mkdir()
+                for stage in (key, canonical, alias, f" {key.lower()} "):
+                    with self.subTest(stage=stage):
+                        self.assertEqual(
+                            result_roots(root, stages=(stage,), include_legacy=False),
+                            (legacy.resolve(),))
+
     def test_canonical_aliases_and_no_side_effects(self):
         self.assertEqual(canonical_stage_folder("06_LINEAR_TH"), "06_LINEAR_TIME_HISTORY")
         self.assertEqual(canonical_stage_folder("07_NONLINEAR_TH"), "07_NONLINEAR_TIME_HISTORY")
@@ -72,6 +86,22 @@ class UnifiedOutputContractTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     record_case_status(run,"VERIFIED_ETABS_EQUIVALENCE")
             self.assertEqual(len(list(root.rglob("CASE_MANIFEST.json"))),len(STAGE_FOLDERS))
+
+    def test_inspect_manifest_reports_nonscalar_solver_status(self):
+        from components.inputs.output_contract import inspect_case_manifest
+
+        with tempfile.TemporaryDirectory() as td:
+            run = create_case_run(Path(td), "GRAVITY", "gravity", state="ULS")
+            manifest = run / "00_INPUT_SOURCE" / "CASE_MANIFEST.json"
+            original = json.loads(manifest.read_text(encoding="utf-8"))
+            for invalid_status in ([], {}):
+                with self.subTest(status=invalid_status):
+                    manifest.write_text(json.dumps({
+                        **original, "solver_status": invalid_status,
+                    }), encoding="utf-8")
+                    result = inspect_case_manifest(run)
+                    self.assertFalse(result["valid"])
+                    self.assertIn("INVALID_SOLVER_STATUS", result["issues"])
 
     def test_record_status_refuses_wrong_run_identity_and_preserves_source(self):
         with tempfile.TemporaryDirectory() as td:

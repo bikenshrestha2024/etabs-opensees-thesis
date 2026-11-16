@@ -259,8 +259,10 @@ def inspect_case_manifest(run_dir, *, expected_stage=None):
     if not isinstance(data,dict) or data.get("schema")!=SCHEMA:
         issues.append("UNKNOWN_SCHEMA")
         data=data if isinstance(data,dict) else {}
-    if data.get("solver_status") not in STATUSES:
+    solver_status = data.get("solver_status")
+    if not isinstance(solver_status, str) or solver_status not in STATUSES:
         issues.append("INVALID_SOLVER_STATUS")
+        solver_status = "UNKNOWN"
     if data.get("units") not in ("kN-m-s","kN-mm-s"):
         issues.append("UNDECLARED_MODEL_UNITS")
     for name in ("case_id","state","run_id"):
@@ -302,13 +304,13 @@ def inspect_case_manifest(run_dir, *, expected_stage=None):
     acceptance=data.get("structural_acceptance","NOT_VERIFIED")
     if acceptance not in ("NOT_VERIFIED","VERIFIED_BY_ENGINEERING_REVIEW"):
         issues.append("UNKNOWN_ACCEPTANCE_STATUS")
-    if data.get("solver_status")=="VERIFIED_ETABS_EQUIVALENCE":
+    if solver_status=="VERIFIED_ETABS_EQUIVALENCE":
         # No automated tool may certify a model from a manifest string alone.
         issues.append("MANUAL_ENGINEERING_CERTIFICATION_REQUIRED")
     return {"run":str(run),"valid":not issues,"issues":issues,
             "stage":data.get("stage"),"state":data.get("state"),
             "case_id":data.get("case_id"),"run_id":data.get("run_id"),
-            "solver_status":data.get("solver_status","UNKNOWN"),
+            "solver_status":solver_status,
             "engineering_acceptance":acceptance,
             "model_sha256_recorded":bool(data.get("model_sha256")),
             "source_edb_sha256_recorded":bool(data.get("source_edb_sha256")),

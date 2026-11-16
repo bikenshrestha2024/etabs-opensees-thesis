@@ -119,3 +119,14 @@ Every new `Loaded node path` sheet is capped at the Excel row limit **including 
 The GUI additionally offers **Current root (hash-checked)** (unchanged existing workbook check), separate `4`, `8`, `16` selected new assemblies, **Retry Excel from assembled mesh (no rebuild)** (source manifest + assembled config hash validation), and one-click **ZIP selected mesh** after saving case files. The ZIP includes source run snapshots, workbooks and structured case evidence; SHA256-manifested, no false gravity-solver acceptance. See `docs/source/components/gravity/mesh_cases.py.md`.
 
 **Important:** full MESH_16 workbook with millions of rows may still be computationally expensive in OpenPyXL; this fixes row-limit correctness and avoids unnecessary FE reassembly, but large Windows memory/storage and Excel recalculation behavior require native tests. If no verified saved assembled MESH_16 exists, recovery fails explicitly.
+
+## Single-owner volume policy in the workbook
+
+When the assembled model uses `VERIFIED_SINGLE_OWNER`, the source-detail
+worksheet keeps the recorded unfactored floor self-weight from the assembled
+ledger. The applied weight uses that recorded value and the source gravity
+factor. The surface worksheets and node-path worksheets still reconstruct
+gross weights from shell geometry and material density. The vertical-load
+path notes identify those rows as diagnostics before volume corrections.
+The workbook change does not change assembled loads, seismic mass, or solver
+results. `tests.verify_slab_full_gravity_factors` covers both workbook profiles.

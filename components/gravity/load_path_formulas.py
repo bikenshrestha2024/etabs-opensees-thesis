@@ -116,6 +116,9 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
         return json.loads(path.read_text(encoding='utf-8-sig')) if path.is_file() else {}
     data=read('OpenSees_Complete_Model_Data_V118.json') if data is None else data;cfg=read('OpenSees_Complete_Model_Config_V118.json') if cfg is None else cfg;audit=read('OpenSees_Load_Conversion_Audit.json')
     if not data:return
+    reduced_slab_weight = data.get(
+        'joint_volume_weight_policy', cfg.get('joint_volume_weight_policy')
+    ) == 'VERIFIED_SINGLE_OWNER'
     # Formula arithmetic replaces only derived cells, never recorded solver DOFs.
     for title in ('Source detail','Source load detail'):
         if title in wb:
@@ -199,6 +202,10 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
         for row in range(2,sheet.max_row+1):
             obj=str(sheet.cell(row,cols['source']).value).removeprefix('AREA:')
             comp=sheet.cell(row,cols['component']).value
+            # The assembled source ledger already includes retained volume.
+            # A gross cell sum would discard that correction.
+            if reduced_slab_weight and comp == 'self_weight_floor':
+                continue
             if obj in floor_objects and comp in ('area_load','self_weight_floor'):
                 pattern=f'{letter(cols["pattern"])}{row}';component=f'{letter(cols["component"])}{row}'
                 sheet.cell(row,cols['unfactored_kN'],f'=SUMIFS(\'Surface load formulas\'!I$2:I${end},\'Surface load formulas\'!A$2:A${end},"{obj}",\'Surface load formulas\'!C$2:C${end},{pattern},\'Surface load formulas\'!B$2:B${end},{component})')
@@ -219,6 +226,12 @@ def add_formula_audit(wb,folder,data=None,cfg=None):
         'https://openseespydoc.readthedocs.io/en/latest/src/ShellMITC4.html',
         'https://opensees.berkeley.edu/OpenSees/api/doxygen2/html/RigidDiaphragm_8cpp-source.html',
         'https://opensees.berkeley.edu/OpenSees/api/doxygen2/html/ShellMITC4_8cpp-source.html'] :notes.append([line])
+    if reduced_slab_weight:
+        notes.append([
+            'Floor self-weight rows on both surface sheets and in Loaded node path '
+            'are gross-weight diagnostics before single-owner volume corrections. '
+            'Source details and storey totals retain the assembled reduced self-weight.'
+        ])
     # Display the actual assembled mesh identity, not merely a GUI selection.
     mesh=wb.create_sheet('Mesh identity',0)
     mesh.append(['Parameter','Value','Interpretation'])

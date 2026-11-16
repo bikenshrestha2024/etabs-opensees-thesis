@@ -248,7 +248,7 @@ def build_combined_esm_export(output_root):
             target = destination_dir / (source.stem + "_" + _sha256(source)[:12] + source.suffix)
         shutil.copy2(source, target)
         manifest.append({
-            "source_path": str(source), "snapshot_path": str(target.relative_to(snapshot)),
+            "source_path": str(source), "snapshot_path": target.relative_to(snapshot).as_posix(),
             "sha256": _sha256(source), "bytes": source.stat().st_size,
             "module": _MODULES[module], "state": state, "case": case,
         })
