@@ -84,6 +84,27 @@ class DiscoveryTests(unittest.TestCase):
         self.assertTrue(any(x["kind"]=="READ_CANDIDATE" for x in rows))
         self.assertTrue(all(x["contract_status"]=="NOT_VERIFIED" for x in rows))
 
+    def test_dirty_tracked_source_rejected_not_mislabeled_pinned_head(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=pathlib.Path(td)/"repo";root.mkdir()
+            def run(*args):
+                subprocess.run(["git","-C",str(root),*args],
+                               check=True,capture_output=True)
+            run("init","-q")
+            source=root/"components"/"analysis.py"
+            source.parent.mkdir()
+            source.write_text("def accepted(): return 1\n")
+            run("add",".")
+            run("-c","user.email=audit@example.invalid",
+                "-c","user.name=Test","commit","-qm","baseline")
+            source.write_text("def changed_without_commit(): return 2\n")
+            with self.assertRaisesRegex(ValueError,"Tracked source differs"):
+                collect(root)
+            source.write_text("def accepted(): return 1\n")
+            result=collect(root)
+            self.assertEqual(result["tracked_files"],1)
+            self.assertEqual(result["symbols"][0]["symbol"],"accepted")
+
     def test_invalid_python_is_not_silently_reviewed(self):
         with tempfile.TemporaryDirectory() as t:
             root=pathlib.Path(t)/"repo";root.mkdir()
