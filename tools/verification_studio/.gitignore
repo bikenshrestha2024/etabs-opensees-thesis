@@ -1,0 +1,7 @@
+/VERIFICATION_RUNS/
+/COMPARISON/
+/*.html
+/*.json
+/*.csv
+/__pycache__/
+*.pyc
