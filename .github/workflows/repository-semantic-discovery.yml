@@ -3,16 +3,12 @@ name: Pinned repository source discovery and semantic review queue
 on:
   push:
     branches: [main]
-    paths:
-      - "tools/repository_semantic_discovery.py"
-      - "tests/test_repository_semantic_discovery.py"
-      - ".github/workflows/repository-semantic-discovery.yml"
   pull_request:
-    paths:
-      - "tools/repository_semantic_discovery.py"
-      - "tests/test_repository_semantic_discovery.py"
-      - ".github/workflows/repository-semantic-discovery.yml"
   workflow_dispatch:
+
+concurrency:
+  group: source-discovery-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
