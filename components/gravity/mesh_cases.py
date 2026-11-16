@@ -347,7 +347,7 @@ def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
         from OpenSees_Load_Path_V141 import export
         emit(f'MESH_{n:02d}: writing full formula workbook (may be large)')
         workbook_started = perf_counter()
-        workbook = export(run_dir, output_root=case_base(folder, n))
+        workbook = export(run_dir, output_root=case_base(folder, n), progress=emit)
         emit(f'MESH_{n:02d}: workbook completed in {perf_counter()-workbook_started:.1f}s')
         result = record(
             "FORMULA_WORKBOOK_CREATED_NOT_GRAVITY_VERIFIED",
