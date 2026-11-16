@@ -290,7 +290,7 @@ def recover_assembled_mesh_workbook(folder, subdivisions):
         f"No completed SHA-matched assembled MESH_{n:02d} run found. Build the mesh first.")
 
 
-def build_case(folder, subdivisions, *, runtime_dir=None):
+def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
     """Stage, assemble fresh mesh and export formula workbook for that mesh only.
 
     This is intentionally a potentially expensive operation and must run in a
@@ -298,8 +298,16 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
     remain separate. On failure keep the case run + error JSON for diagnosis.
     [REF docs/source/components/gravity/mesh_cases.py.md]
     """
-    run_dir = stage_case(folder, subdivisions)
+    import time
+    from time import perf_counter
     n = validated_mesh_size(subdivisions)
+    started = perf_counter()
+    def emit(message):
+        if callable(progress):
+            progress(message, perf_counter()-started)
+    emit(f'MESH_{n:02d}: verifying source SHA and copying inputs')
+    run_dir = stage_case(folder, subdivisions)
+    emit(f'MESH_{n:02d}: inputs staged; starting independent full-model assembly')
     log = run_dir / "MESH_BUILD_STATUS.json"
     def record(status, **extra):
         report = dict(mesh_subdivisions=n, status=status, run_directory=str(run_dir),
@@ -307,6 +315,7 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
         log.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
         return report
     record("ASSEMBLY_RUNNING")
+    assembly_started = perf_counter()
     assembly_complete=False
     try:
         from OpenSees_Complete_Export_V118 import prepare_complete_export
@@ -316,6 +325,7 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
             from components.model import assembly
             runtime_dir = Path(assembly.__file__).resolve().parents[2]
         manifest, report = prepare_complete_export(str(run_dir), runtime_dir=Path(runtime_dir))
+        emit(f'MESH_{n:02d}: assembly completed in {perf_counter()-assembly_started:.1f}s; checking result')
         if report.get("assembly_errors") or not manifest.get("elastic_assembled"):
             raise RuntimeError("Mesh assembly blocked: " + "; ".join(report.get("assembly_errors", [])))
         # Verify that the model identity was derived from this run's saved cfg.
@@ -335,7 +345,10 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
         record("MODEL_ASSEMBLED_FORMULA_EXPORT_RUNNING",
                assembled_model=str(model_path),config_sha256=digest(cfgpath))
         from OpenSees_Load_Path_V141 import export
+        emit(f'MESH_{n:02d}: writing full formula workbook (may be large)')
+        workbook_started = perf_counter()
         workbook = export(run_dir, output_root=case_base(folder, n))
+        emit(f'MESH_{n:02d}: workbook completed in {perf_counter()-workbook_started:.1f}s')
         result = record(
             "FORMULA_WORKBOOK_CREATED_NOT_GRAVITY_VERIFIED",
             workbook=str(workbook),
@@ -344,6 +357,7 @@ def build_case(folder, subdivisions, *, runtime_dir=None):
             source_case_provenance=str(run_dir / "MESH_CASE_PROVENANCE.json"),
             note="No OpenSees gravity cases have been solved; reaction, drift, and load-path equivalence remain unverified.",
         )
+        emit(f'MESH_{n:02d}: complete in {perf_counter()-started:.1f}s')
         return result
     except Exception as exc:
         record("WORKBOOK_EXPORT_FAILED_MODEL_ASSEMBLED" if assembly_complete
