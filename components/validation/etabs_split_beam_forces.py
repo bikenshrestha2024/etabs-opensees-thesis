@@ -71,6 +71,7 @@ def _stream_rows(path):
 
 
 def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9):
+    """[REF docs/source/components/validation/etabs_split_beam_forces.py.md]"""
     if not inputs or len(inputs) < 1:
         raise ValueError("At least one ETABS beam-force workbook required")
     paths = [Path(x).resolve() for x in inputs]
@@ -143,6 +144,7 @@ def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9):
 
 
 def main(argv=None):
+    """[REF docs/source/components/validation/etabs_split_beam_forces.py.md]"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output_dir")
     parser.add_argument("inputs", nargs="+")
