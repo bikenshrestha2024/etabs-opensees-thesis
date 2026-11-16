@@ -30,6 +30,6 @@ jobs:
       - name: Compile exporter, worker and GUI
         run: python -m py_compile components/ui/application.py tools/etabs_conversion_worker.py tests/test_etabs_conversion_gui_isolation.py
       - name: Verify async launcher and fail-closed output status
-        run: python -m unittest -v tests.test_etabs_conversion_gui_isolation
+        run: python -m unittest discover -s tests -p 'test_etabs_conversion_gui_isolation.py' -v
       - name: Declare native limitation
         run: echo "Static Python tests only. No ETABS COM, .EDB, OpenSees or native conversion was executed."
