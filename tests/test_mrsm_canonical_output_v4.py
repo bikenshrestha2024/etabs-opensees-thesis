@@ -15,7 +15,16 @@ def make_cases(digest="a"*64, state="ULS"):
     return {
         axis+ecc:{
             "axis":axis,"limit_state":state,"model_sha256":digest,
-            "stories":[{"story_number":1,"design_drift_ratio":0.01}]
+            "unscaled_modal_base_shear_kN":100.,
+            "reference_ESM_base_shear_kN":120.,
+            "force_scale":1.2,
+            "scaled_modal_base_shear_kN":120.,
+            "mass_participation_percent":95.,
+            "status":"ANALYSIS COMPLETE / DESIGN COMBINATIONS REQUIRE REVIEW",
+            "stories":[{"story_number":1,"height_m":3.8,
+                        "design_displacement_m":.01,
+                        "scaled_story_shear_kN":120.,
+                        "design_drift_ratio":0.01}]
         } for axis in ("X","Y") for ecc in ("_E0","_Eplus","_Eminus")
     }
 
@@ -79,8 +88,41 @@ class MRSMOutputTests(unittest.TestCase):
             broken=make_cases()
             broken["Y_Eminus"]["stories"][0].pop("design_drift_ratio")
             file.write_text(json.dumps(broken))
-            with self.assertRaisesRegex(ValueError,"missing design drift"):
+            with self.assertRaisesRegex(ValueError,"missing design_drift_ratio"):
                 validate_mrsm_case_output(root,state="ULS")
+
+    def test_missing_force_mass_and_inconsistent_scale_are_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            output=Path(td)/"MRSM_Results_V132.json"
+            for field in ("unscaled_modal_base_shear_kN",
+                          "scaled_modal_base_shear_kN",
+                          "force_scale","mass_participation_percent"):
+                rows=make_cases()
+                rows["X_E0"].pop(field)
+                output.write_text(json.dumps(rows))
+                with self.assertRaisesRegex(ValueError,"missing/invalid required numeric"):
+                    validate_mrsm_case_output(td,state="ULS")
+            for value in (0.0,-1.0,float("nan"),float("inf")):
+                rows=make_cases()
+                rows["Y_Eplus"]["unscaled_modal_base_shear_kN"]=value
+                output.write_text(json.dumps(rows))
+                with self.assertRaises(ValueError):
+                    validate_mrsm_case_output(td,state="ULS")
+            rows=make_cases()
+            rows["X_Eminus"]["scaled_modal_base_shear_kN"]=180.
+            output.write_text(json.dumps(rows))
+            with self.assertRaisesRegex(ValueError,"inconsistent force-scaled"):
+                validate_mrsm_case_output(td,state="ULS")
+            rows=make_cases()
+            rows["X_E0"]["mass_participation_percent"]=42.
+            output.write_text(json.dumps(rows))
+            with self.assertRaisesRegex(ValueError,"modal mass"):
+                validate_mrsm_case_output(td,state="ULS")
+            rows=make_cases()
+            rows["Y_E0"]["stories"][0].pop("scaled_story_shear_kN")
+            output.write_text(json.dumps(rows))
+            with self.assertRaisesRegex(ValueError,"missing scaled_story_shear"):
+                validate_mrsm_case_output(td,state="ULS")
 
     def test_snapshots_and_zip_do_not_contribute(self):
         with tempfile.TemporaryDirectory() as td:
