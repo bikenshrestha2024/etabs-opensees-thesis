@@ -12,6 +12,9 @@ on:
       - "components/gravity/gui_and_reports.py"
       - "components/gravity/load_path_formulas.py"
       - "components/gravity/mesh_cases.py"
+      - "components/model/assembly.py"
+      - "components/gravity/load_path_formulas.py"
+      - "tests/test_mesh_spatial_performance_regressions.py"
       - "components/sections/area_elements.py"
       - "tests/test_gravity_evidence_stage.py"
       - "tests/test_export_mirror.py"
@@ -56,3 +59,4 @@ jobs:
           tests/test_export_mirror.py
           tests/test_model_mesh_case_workflow.py
           tests/test_slab_mesh_excel_paging.py
+          tests/test_mesh_spatial_performance_regressions.py
