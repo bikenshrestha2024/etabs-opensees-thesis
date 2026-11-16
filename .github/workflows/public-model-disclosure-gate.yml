@@ -1,0 +1,45 @@
+name: Public model output disclosure boundary
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publication-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  forbid-accidental-model-viewers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test publication classifier with synthetic paths
+        run: |
+          python -m py_compile tools/audit_public_model_disclosure.py tests/test_public_model_disclosure_gate.py
+          python -m unittest discover -s tests -p 'test_public_model_disclosure_gate.py' -v
+      - name: Block tracked generated ETABS viewer/source files
+        run: python tools/audit_public_model_disclosure.py --repo . --output audit/public_model_disclosure.json
+      - name: Preserve disclosure review, including residual manual candidates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-model-disclosure-path-review
+          path: audit/public_model_disclosure.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Declare limitations
+        if: always()
+        run: |
+          echo "Current tracked-path scan only; not a history purge, content audit or native engineering verification."
