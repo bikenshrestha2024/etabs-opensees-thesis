@@ -25,3 +25,7 @@ python tools/verification_studio/import_verified_runs.py --results "<PRIVATE_RUN
 ```
 
 The importer is strict about case/status/metric identity and emits an evidence-consistency report, **not ETABS–OpenSees equivalence**.
+
+### From the main thesis GUI
+
+Open **NLTHA Readiness / Evidence Dashboard**, then use **OpenSees B01–B12 verification** to start a separate standalone benchmark GUI. After completing the run, choose **Import B01–B12 evidence**, select either the run folder or its `cases` subfolder, and inspect the status written under your **selected private project** at `REVIEW_MAIN/VERIFICATION_STUDIO/B01_B12_COMPONENT_EVIDENCE_SUMMARY.json`. The importer process writes its diagnostic log under the project's `OpenSees_Analysis_Results/Readiness_Diagnostics/`. This never changes source geometry, materials, supports, numerical model status, or native ETABS equivalence.
