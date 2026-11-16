@@ -1,6 +1,7 @@
 """Offline regression of registry, metadata, analytical checks and reports."""
 import json
 import pathlib
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,34 @@ class TestStudio(unittest.TestCase):
             self.assertEqual(result['missing_dependency'], 'expanded_benchmarks.py')
             self.assertIn('Copy expanded_benchmarks.py', result['reason'])
             self.assertNotIn('OpenSeesPy is not installed', result['reason'])
+
+    def test_all_in_one_standalone(self):
+        # Self-contained B01-B12 runner must work without importing the sibling.
+        source = pathlib.Path(__file__).with_name(
+            'ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py'
+        )
+        spec = importlib.util.spec_from_file_location('verification_single_file', source)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.assertEqual(len(module.CASES), 12)
+        self.assertEqual(len(module.REFERENCE_INDEX), 15)
+        result = module._run_case(None, 'B12', .01)
+        self.assertEqual(result['status'], 'ANALYTICAL_PASS')
+        self.assertEqual(len(result['metrics']), 7)
+        self.assertEqual(result['etabs_native_equivalence'], 'NOT_VERIFIED')
+        with tempfile.TemporaryDirectory() as tempdir:
+            isolated = pathlib.Path(tempdir) / source.name
+            shutil.copyfile(source, isolated)
+            output = pathlib.Path(tempdir) / 'run'
+            run = subprocess.run(
+                [sys.executable, str(isolated), '--worker', 'B12', '--output', str(output)],
+                capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(run.returncode, 0, run.stderr)
+            saved = json.loads((output / 'B12.json').read_text())
+            self.assertEqual(saved['status'], 'ANALYTICAL_PASS')
+            self.assertIn(source.name, saved['source_sha256'])
+            self.assertEqual(len(saved['source_sha256']), 1)
 
     def test_no_solver_never_passes(self):
         with tempfile.TemporaryDirectory() as t:
