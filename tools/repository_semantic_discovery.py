@@ -50,6 +50,13 @@ def _symbols(module, file_sha256):
     class Walker(ast.NodeVisitor):
         def __init__(self): self.stack=[]
         def visit_ClassDef(self, node):
+            rows.append({
+                "symbol":".".join(self.stack+[node.name]),
+                "kind":"class", "start_line":node.lineno,
+                "end_line":node.end_lineno, "sha256_file":file_sha256,
+                "review_status":"DISCOVERED_NOT_SEMANTICALLY_REVIEWED",
+                "reviewer":"", "caller_contract":"", "test_evidence":""
+            })
             self.stack.append(node.name)
             self.generic_visit(node)
             self.stack.pop()
