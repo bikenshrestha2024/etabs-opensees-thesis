@@ -2389,6 +2389,7 @@ class App:
             action(group_0_0,text=label,command=lambda name=name:open_saved(name))
         action(group_0_1,text='Numbered workflow / input values',command=lambda:__import__('OpenSees_Workflow_V144').launch(self.root,self.out.get()))
         action(group_0_0,text="Open ETABS connectivity + load views",command=self._show_last_exports)
+        action(group_0_0,text="3D actual assembled 4×4 mesh (on demand; no ETABS rerun)",command=self._open_assembled_mesh_view)
         action(group_0_1,text="ETABS / OpenSees ID lookup + Excel support audit",command=self._open_id_lookup)
         action(group_0_1,text="Open ETABS frame / area load audit",command=self._open_load_audit_explanation)
         action(group_1_0,text="ETABS section mapping → OpenSees fiber sections",command=self._open_section_mapping)
@@ -3026,6 +3027,48 @@ class App:
         if target:
             try: os.startfile(target)
             except Exception as exc: messagebox.showerror("Could not open ETABS load view",str(exc),parent=self.root)
+    def _open_assembled_mesh_view(self):
+        """[REF docs/source/components/ui/application.py.md] Render real solver mesh off the GUI thread."""
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showinfo(
+                "Mesh export in progress",
+                "The conversion is not finished. A 4×4 display must read the "
+                "completed assembled model; it cannot safely use a partial model.",
+                parent=self.root)
+            return
+        if getattr(self, "_assembled_view_running", False):
+            messagebox.showinfo("Mesh view", "Mesh viewer is already generating.", parent=self.root)
+            return
+        export_root = Path(self.out.get().strip()).expanduser()
+        if not (export_root / "OpenSees_Complete_Model_Data_V118.json").is_file():
+            messagebox.showwarning(
+                "Assembled mesh unavailable",
+                "No completed assembled model exists in the selected export. "
+                "Run conversion or rebuild from saved ETABS exports first.",
+                parent=self.root)
+            return
+        self._assembled_view_running = True
+        self.log("[VIEW] Generating batched actual assembled mesh from saved model only.")
+        import threading
+        def worker():
+            try:
+                from components.ui.assembled_mesh_view import render
+                target = render(export_root)
+                result = (target, None)
+            except Exception as exc:
+                result = (None, str(exc))
+            def complete():
+                self._assembled_view_running = False
+                target, error = result
+                if error:
+                    self.log("[VIEW ERROR] " + error)
+                    messagebox.showerror("Assembled mesh view failed", error, parent=self.root)
+                else:
+                    self.log("[VIEW READY] " + str(target))
+                    __import__("webbrowser").open(target.resolve().as_uri())
+            self.root.after(0, complete)
+        threading.Thread(target=worker, daemon=True).start()
+
     def _open_id_lookup(self):
         """[REF docs/source/components/ui/application.py.md] Open only a complete, present ID audit.
 
