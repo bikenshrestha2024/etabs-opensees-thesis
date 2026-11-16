@@ -11,3 +11,17 @@ Use `python tools/run_standalone_benchmark.py` only for the demonstrated small e
 ## Standalone OpenSeesPy verification (B01–B12)
 
 [Verification Studio v2 source and Windows launcher](../tools/verification_studio/README.md) · [Thesis acceptance matrix](../tools/verification_studio/THESIS_VALIDATION_MATRIX.md). Run separately from the thesis workflow; offline CI tests are not evidence of native ETABS/OpenSees equivalence. Keep generated run records local and private.
+
+## Completed user-submitted B01–B12 benchmark run (2026-11-16)
+
+The independent Verification Studio v2.1.0 single-file run records **11 native component PASS + 1 analytical-only PASS (B12), 58/58 recorded metrics passed** with OpenSeesPy 3.8.0. [Engineering evidence and open acceptance gates](../REVIEW_MAIN/00_MODEL/20261116_B01_B12_STUDIO_RESULTS_AND_ACCEPTANCE.md).
+
+The **main model-readiness GUI now includes “OpenSees B01–B12 verification”**, launching the standalone Studio in a separate Python process. This does not change model readiness status or the production solver.
+
+To validate your private local report folder without publishing it:
+
+```powershell
+python tools/verification_studio/import_verified_runs.py --results "<PRIVATE_RUN>/cases" --out "<PRIVATE_CASE>/REVIEW_MAIN/VERIFICATION_STUDIO/B01_B12_SUMMARY.json"
+```
+
+The importer is strict about case/status/metric identity and emits an evidence-consistency report, **not ETABS–OpenSees equivalence**.
