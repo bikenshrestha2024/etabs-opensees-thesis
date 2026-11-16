@@ -2389,7 +2389,7 @@ class App:
             action(group_0_0,text=label,command=lambda name=name:open_saved(name))
         action(group_0_1,text='Numbered workflow / input values',command=lambda:__import__('OpenSees_Workflow_V144').launch(self.root,self.out.get()))
         action(group_0_0,text="Open ETABS connectivity + load views",command=self._show_last_exports)
-        action(group_0_1,text="ETABS / OpenSees ID lookup + Excel support audit",command=lambda: __import__("webbrowser").open((Path(self.out.get())/"OpenSees_ID_Lookup.html").resolve().as_uri()))
+        action(group_0_1,text="ETABS / OpenSees ID lookup + Excel support audit",command=self._open_id_lookup)
         action(group_0_1,text="Open ETABS frame / area load audit",command=self._open_load_audit_explanation)
         action(group_1_0,text="ETABS section mapping → OpenSees fiber sections",command=self._open_section_mapping)
         action(group_1_0,text="OpenSees RC fiber section builder — Concrete01 + Steel02",command=self._open_fiber_section_builder)
@@ -3026,6 +3026,39 @@ class App:
         if target:
             try: os.startfile(target)
             except Exception as exc: messagebox.showerror("Could not open ETABS load view",str(exc),parent=self.root)
+    def _open_id_lookup(self):
+        """[REF docs/source/components/ui/application.py.md] Open only a complete, present ID audit.
+
+        Do not launch Edge on a missing file, or present an old result from
+        the same output folder while a new conversion is running.
+        """
+        output = Path(self.out.get().strip()).expanduser()
+        target = output / "OpenSees_ID_Lookup.html"
+        workbook = output / "OpenSees_ID_and_Support_Audit.xlsx"
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showinfo(
+                "ID audit not ready",
+                "ETABS conversion is still running. The ID lookup is generated "
+                "during the final assembly stage. Check the current stage and "
+                "worker log before opening this output. An earlier HTML file "
+                "in the same folder could belong to a previous run.",
+                parent=self.root)
+            return
+        if not target.is_file() or target.stat().st_size == 0:
+            available = ("The Excel support audit is available at:\\n" + str(workbook)
+                         if workbook.is_file() else
+                         "The Excel support audit is also not generated yet.")
+            messagebox.showwarning(
+                "ID lookup not generated",
+                "No completed ID lookup HTML exists at:\\n" + str(target) +
+                "\\n\\n" + available +
+                "\\n\\nCheck the conversion worker log for the last completed "
+                "stage. Do not interpret a missing HTML as a missing model.",
+                parent=self.root)
+            return
+        import webbrowser
+        webbrowser.open(target.resolve().as_uri())
+
     def _open_load_audit_explanation(self):
         from OpenSees_Mapping_GUI_V125 import show_load_audit
         return show_load_audit(self.root,self.out.get())
@@ -3100,6 +3133,21 @@ class App:
             self._conversion_started_at = time.monotonic()
             self._conversion_last_activity = self._conversion_started_at
             self._conversion_cancel_requested = False
+            self._conversion_stage = "Starting ETABS worker"
+            config_path = output / "OpenSees_Complete_Model_Config_V118.json"
+            if config_path.is_file():
+                try:
+                    cfg = json.loads(config_path.read_text(encoding="utf-8-sig"))
+                    n = cfg.get("floor_subdivisions", 4)
+                    self.log(
+                        f"[MESH PREFLIGHT] floor_subdivisions={n!r}: "
+                        "this is the actual finite-element mesh per source "
+                        "panel direction, not the 3D viewer resolution. "
+                        "No mesh setting has been changed.")
+                except (OSError, ValueError, TypeError) as exc:
+                    self.log("[MESH PREFLIGHT REVIEW] Could not parse saved config: " + str(exc))
+            else:
+                self.log("[MESH PREFLIGHT] No saved mesh config. Model assembly defaults to 4 subdivisions per source-panel direction.")
             with worker_log.open("w", encoding="utf-8") as stream:
                 flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
                 self._conversion_process = subprocess.Popen(
@@ -3161,6 +3209,10 @@ class App:
                         except (json.JSONDecodeError, ValueError):
                             self.log("[WORKER RESULT PARSE ERROR]")
                     else:
+                        if " [STEP START] " in line:
+                            self._conversion_stage = line.split(" [STEP START] ", 1)[1].strip()
+                        elif " [STEP OK] " in line or " [STEP FAILED] " in line:
+                            self._conversion_stage = line.split(" [STEP ", 1)[1].strip()
                         self.log("[CHILD] " + line)
                     self._conversion_last_activity = time.monotonic()
             returncode = process.poll()
@@ -3168,8 +3220,10 @@ class App:
             silent = int(time.monotonic() - self._conversion_last_activity)
             if returncode is None:
                 self.conversion_progress.set(
-                    f"Conversion running: {elapsed}s elapsed; last output {silent}s ago. "
-                    "Tk GUI is responsive; long ETABS API calls may still be executing."
+                    f"Conversion running: {elapsed}s elapsed | stage: "
+                    f"{getattr(self, '_conversion_stage', 'initializing')} | "
+                    f"last worker log {silent}s ago. "
+                    "Mesh assembly, ETABS OAPI and 3D HTML export are distinct stages."
                 )
                 self.root.after(400, self._poll_conversion_worker)
                 return
