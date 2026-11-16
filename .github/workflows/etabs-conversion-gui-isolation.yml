@@ -1,0 +1,35 @@
+name: ETABS conversion GUI isolation regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - "components/ui/application.py"
+      - "tools/etabs_conversion_worker.py"
+      - "tests/test_etabs_conversion_gui_isolation.py"
+      - ".github/workflows/etabs-conversion-gui-isolation.yml"
+  pull_request:
+    paths:
+      - "components/ui/application.py"
+      - "tools/etabs_conversion_worker.py"
+      - "tests/test_etabs_conversion_gui_isolation.py"
+      - ".github/workflows/etabs-conversion-gui-isolation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gui-async-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile exporter, worker and GUI
+        run: python -m py_compile components/ui/application.py tools/etabs_conversion_worker.py tests/test_etabs_conversion_gui_isolation.py
+      - name: Verify async launcher and fail-closed output status
+        run: python -m unittest -v tests.test_etabs_conversion_gui_isolation
+      - name: Declare native limitation
+        run: echo "Static Python tests only. No ETABS COM, .EDB, OpenSees or native conversion was executed."
