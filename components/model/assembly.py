@@ -34,6 +34,7 @@ import math
 import os
 import shutil
 import hashlib
+import time
 
 MANIFEST = 'OpenSees_Export_Manifest_V118.json'
 
@@ -400,8 +401,15 @@ def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=
             result.extend(plane_points.get((_axis, _center + _offset), ()))
         return result
 
+    _mesh_clock=time.perf_counter()
+    _mesh_panels=0
     for e in records:
         if e['dimension']!='area_polygon': continue
+        _mesh_panels+=1
+        if _mesh_panels%75==0:
+            print(f"[ASSEMBLY HEARTBEAT] mesh_panels={_mesh_panels}; "
+                  f"shell_cells={len(shells)}; "
+                  f"mesh_elapsed_s={time.perf_counter()-_mesh_clock:.2f}",flush=True)
         obj=str(e['etabs_object']); ns=e['node_tags']
         if len(ns)!=4: raise ValueError(f'Area {obj}: only four-node polygons are supported')
         p=[nodes[int(n)] for n in ns]; a=_sub(p[1],p[0]); b=_sub(p[3],p[0]); cross=_cross(a,b)
@@ -513,7 +521,14 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         if meta.get('additional_point_masses'): raise ValueError('ETABS has additional assigned point masses: reconcile these with load-derived mass in the complete-model config first')
         if meta.get('source_link_count'): raise ValueError('ETABS has LinkObj elements; provide their target device definitions before assembled conversion')
         if meta.get('errors'): report['warnings'].append(f"{len(meta['errors'])} source metadata queries failed; inspect OpenSees_Source_Model_Metadata_V118.json before claiming ETABS equivalence")
+        _phase_clock=time.perf_counter()
+        print("[ASSEMBLY PHASE START] Conforming ShellMITC4 mesh",flush=True)
         nodes,shells,area_children=_mesh_areas(source_nodes,topology['elements'],area_rows,materials,cfg.get('floor_subdivisions',4))
+        print(f"[ASSEMBLY PHASE OK] Conforming ShellMITC4 mesh | "
+              f"seconds={time.perf_counter()-_phase_clock:.3f} | "
+              f"nodes={len(nodes)} | cells={len(shells)}",flush=True)
+        _phase_clock=time.perf_counter()
+        print("[ASSEMBLY PHASE START] Frame-node spatial index",flush=True)
         # Spatial lookup for beam intersection cuts. Old implementation
         # scanned EVERY mesh node for EVERY frame, which becomes intractable
         # with MESH_08 / MESH_16. Candidate filtering is only a broad phase:
@@ -541,11 +556,22 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
             _candidate.sort(key=_node_order.__getitem__)
             return _candidate
 
+        print(f"[ASSEMBLY PHASE OK] Frame-node spatial index | "
+              f"seconds={time.perf_counter()-_phase_clock:.3f} | "
+              f"occupied_bins={len(_node_bins)}",flush=True)
+        _phase_clock=time.perf_counter()
+        print("[ASSEMBLY PHASE START] Frame segment connectivity",flush=True)
         frame_elements=[]; segments={}; null_frames=[]
         hinged_release_review=[]
 
+        _frame_count=0
         for e in topology['elements']:
             if e['dimension']!='line_2_node': continue
+            _frame_count+=1
+            if _frame_count%250==0:
+                print(f"[ASSEMBLY HEARTBEAT] frames={_frame_count}; "
+                      f"segments={len(frame_elements)}; "
+                      f"frame_elapsed_s={time.perf_counter()-_phase_clock:.2f}",flush=True)
             obj=str(e['etabs_object']); row=frame_rows[obj]
             if not row.get('assigned_section'):
                 null_frames.append(obj); continue  # ETABS None section carries no stiffness or self-weight.
@@ -601,6 +627,11 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                     hinged_release_review[-1]["solver_element_tags"].append(
                         100000+len(frame_elements))
             segments[obj]=children
+        print(f"[ASSEMBLY PHASE OK] Frame segment connectivity | "
+              f"seconds={time.perf_counter()-_phase_clock:.3f} | "
+              f"frames={_frame_count} | segments={len(frame_elements)}",flush=True)
+        _phase_clock=time.perf_counter()
+        print("[ASSEMBLY PHASE START] Member offsets, beam weights and joint-volume audits",flush=True)
         report["hinged_brace_release_review"]={
             "count":len(hinged_release_review),
             "status":"SOURCE_RELEASE_PATTERN_RECORDED_NOT_ENGINEERING_VALIDATED",
@@ -941,7 +972,13 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         from OpenSees_Storey_Gravity_V131 import export_storey_gravity
         report['storey_gravity']=export_storey_gravity(folder,payload,cfg,meta.get('pattern_types',{}))
         from OpenSees_Model_Audit_V130 import audit
+        print(f"[ASSEMBLY PHASE OK] Model data, member audits and load ledger | "
+              f"seconds={time.perf_counter()-_phase_clock:.3f}",flush=True)
+        _phase_clock=time.perf_counter()
+        print("[ASSEMBLY PHASE START] Independent load-path audit",flush=True)
         report['load_path_audit']=audit(folder,payload,topology,loads)
+        print(f"[ASSEMBLY PHASE OK] Independent load-path audit | "
+              f"seconds={time.perf_counter()-_phase_clock:.3f}",flush=True)
         _write(folder/'OpenSees_Complete_Model_Data_V118.json',payload)
         report.update(frame_objects=len(segments),frame_segments=len(frame_elements),area_objects=len(area_children),
                       shell_mesh_cells=len(shells),source_nodes=len(source_nodes),mesh_nodes=len(nodes),
