@@ -71,6 +71,39 @@ def _finite_load_quantity(value, label, *, positive=False):
     return numeric
 
 
+
+def _validated_support_tags(support_nodes):
+    """Reject duplicate/invalid foundation reaction tags before solver work.
+
+    Reaction sums must not count one physical support more than once. This
+    check validates the supplied selection, not source restraint semantics.
+    """
+    if isinstance(support_nodes, (str, bytes)):
+        raise ValueError("support_nodes must be a sequence of unique positive integer node tags")
+    try:
+        supplied = list(support_nodes)
+    except TypeError as exc:
+        raise ValueError("support_nodes must be a sequence of node tags") from exc
+    if not supplied:
+        raise ValueError("support_nodes must contain at least one node tag")
+    tags = []
+    for tag in supplied:
+        if isinstance(tag, bool):
+            raise ValueError("support node tags cannot be boolean")
+        if isinstance(tag, numbers.Integral):
+            value = int(tag)
+        elif isinstance(tag, str) and tag.isascii() and tag.isdecimal():
+            value = int(tag)
+        else:
+            raise ValueError("support node tags must be positive exact integers")
+        if value < 1:
+            raise ValueError("support node tags must be positive exact integers")
+        tags.append(value)
+    if len(tags) != len(set(tags)):
+        raise ValueError("Duplicate support node tags would double-count reactions")
+    return tags
+
+
 def _configure_common(ops, *, system=DEFAULT_SYSTEM, system_options=(),
                       numberer=DEFAULT_NUMBERER,
                       constraints=DEFAULT_CONSTRAINTS):
@@ -255,11 +288,9 @@ def run_gravity_stage(ops, support_nodes, total_applied_vertical_load_kN, *,
     equilibrium check succeeds.
     """
     nsteps = _positive_exact_steps(nsteps)
-    supports = [int(n) for n in support_nodes]
+    supports = _validated_support_tags(support_nodes)
     applied = _finite_load_quantity(total_applied_vertical_load_kN,
                                     "total_applied_vertical_load_kN", positive=True)
-    if not supports:
-        raise ValueError("support_nodes must contain at least one node tag")
     limit = _finite_load_quantity(equilibrium_tolerance_percent,
                                   "equilibrium_tolerance_percent")
     if limit < 0.0:
