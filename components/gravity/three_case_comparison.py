@@ -118,10 +118,15 @@ def join_source_etabs_reactions(available, reaction_rows):
                     if source and abs(original) <= float(audit.get("tolerance_kN", 1e-6))
                     else "SOURCE_RESTRAINED" if source else
                     "NON_SOURCE_97_POINT_NO_ETABS_NODE_REACTION")))
-    abs32 = sum(abs(x["delta_32_minus_ETABS_kN"]) for x in rows
-                if x["delta_32_minus_ETABS_kN"] is not None)
-    abs76 = sum(abs(x["delta_76_minus_ETABS_kN"]) for x in rows
-                if x["delta_76_minus_ETABS_kN"] is not None)
+    # Unsolved scenarios are NULL, never reported as misleading zero error.
+    has_32 = any(x["opensees_32_Rz_kN"] is not None for x in rows)
+    has_76 = any(x["opensees_76_Rz_kN"] is not None for x in rows)
+    abs32 = (sum(abs(x["delta_32_minus_ETABS_kN"]) for x in rows
+                 if x["delta_32_minus_ETABS_kN"] is not None)
+             if has_32 else None)
+    abs76 = (sum(abs(x["delta_76_minus_ETABS_kN"]) for x in rows
+                 if x["delta_76_minus_ETABS_kN"] is not None)
+             if has_76 else None)
     additional44 = [x for x in rows if x["status"] ==
                     "SOURCE_RESTRAINED_ZERO_ETABS_REACTION"]
     summary = {
@@ -137,8 +142,9 @@ def join_source_etabs_reactions(available, reaction_rows):
         "etabs_total_FZ_kN": computed_total,
         "sum_abs_delta_primary_32_kN": abs32,
         "sum_abs_delta_source_76_kN": abs76,
-        "opensees_76_reaction_at_source_zero_ETABS_points_kN": sum(
-            x["opensees_76_Rz_kN"] or 0 for x in additional44),
+        "opensees_76_reaction_at_source_zero_ETABS_points_kN": (
+            sum(x["opensees_76_Rz_kN"] or 0 for x in additional44)
+            if has_76 else None),
         "warning": "ETABS zero FZ at a fixed point is not proof of a free DOF; "
                    "compare original 6 DOF, shell/rigid-zone load paths, and "
                    "source-identical analysis before accepting any reaction match.",
