@@ -51,6 +51,7 @@ This produces a reproducible source inventory on the *current* checkout; it does
 
 ## Related lifecycle
 
+- [Second-pass verified numerical integrity and public-model disclosure findings](SECOND_PASS_SOURCE_AND_DISCLOSURE_REVIEW.md)
 - [Confirmed fixes and review blockers](FINDINGS_AND_FIXES.md)
 - [Source inspection ledger](MANUAL_REVIEW_LEDGER.md)
 - [Engineering acceptance gates](ENGINEERING_ACCEPTANCE.md)
