@@ -3,6 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from components.shared.timing import timed_outputs, StageTimer
 
 
@@ -45,9 +46,13 @@ class TimingMetadataLayoutTests(unittest.TestCase):
     def test_explicit_stage_timer_uses_same_metadata_subfolder(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
+            (root/"untouched.csv").write_text("previous")
             timer=StageTimer(root,"modal")
             (root/"frequencies.csv").write_text("frequency\\n3.6\\n")
-            timer.finish("solver-only")
+            with patch("components.shared.timing.time.time", return_value=10**10):
+                timer.finish("solver-only")
+            self.assertFalse((root/"00_PROCESSING_METADATA"/"ARTIFACTS"/
+                              "untouched.csv.processing.json").exists())
             self.assertTrue((root/"00_PROCESSING_METADATA"/"ARTIFACTS"/
                              "frequencies.csv.processing.json").is_file())
             self.assertFalse((root/"frequencies.csv.processing.json").exists())

@@ -79,14 +79,28 @@ def timed_outputs(stage,argument):
 class StageTimer:
     def __init__(self,folder,stage):
         self.folder=Path(folder);self.stage=stage;self.clock=time.perf_counter();self.started=stamp();self.finished=False
+        self.initial_files = self._artifact_stats()
+
+    def _artifact_stats(self):
+        artifacts = {}
+        for path in self.folder.glob('*'):
+            if (path.is_symlink() or not path.is_file()
+                    or path.name.endswith('.processing.json')
+                    or path.name.startswith(('OUTPUT_TIMING_INDEX', 'Processing_Timings'))):
+                continue
+            try:
+                info = path.stat()
+            except FileNotFoundError:
+                continue
+            artifacts[path] = (info.st_mtime_ns, info.st_size)
+        return artifacts
+
     def finish(self,status='unconfirmed — inspect solver exit log'):
         if self.finished:return
         self.finished=True;elapsed=time.perf_counter()-self.clock
         data=dict(stage=self.stage,started_at=self.started,finished_at=stamp(),elapsed_seconds=elapsed,status=status,time_scope='Entire processing stage, not individual write latency')
         self.folder.mkdir(parents=True,exist_ok=True)
-        threshold=time.time()-elapsed
-        files=[p for p in self.folder.glob('*') if p.is_file() and not p.is_symlink()
-               and p.stat().st_mtime>=threshold and not p.name.endswith('.processing.json')
-               and not p.name.startswith(('OUTPUT_TIMING_INDEX','Processing_Timings'))]
+        files = [path for path, stat in self._artifact_stats().items()
+                 if self.initial_files.get(path) != stat]
         _write_metadata(self.folder,files,data)
         print(f'[TIMING] {self.stage} | {status} | elapsed={elapsed:.3f}s | start={self.started} | finish={data["finished_at"]}',flush=True)

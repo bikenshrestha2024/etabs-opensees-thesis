@@ -33,7 +33,10 @@ class DisplayRoleOutputTests(unittest.TestCase):
             load_workbook=self.make_case(root,{"1308":"CO","1309":"BT","1310":"CT"})
             export_id_audit(root)
             wb=load_workbook(root/"OpenSees_ID_and_Support_Audit.xlsx",read_only=True)
-            rows=list(wb["Elements"].values)
+            try:
+                rows=list(wb["Elements"].values)
+            finally:
+                wb.close()
             self.assertEqual([r[9] for r in rows[1:]],["CO2501","BT2501","CT2501","BR2501"])
             self.assertEqual([r[10] for r in rows[1:]],["BRACE"]*4)
             self.assertEqual([r[11] for r in rows[1:]],["CO","BT","CT","BR"])
