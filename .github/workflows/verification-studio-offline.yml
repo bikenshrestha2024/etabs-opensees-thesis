@@ -1,0 +1,45 @@
+name: Offline OpenSeesPy verification studio integrity
+
+on:
+  push:
+    paths:
+      - "tools/verification_studio/**"
+      - ".github/workflows/verification-studio-offline.yml"
+  pull_request:
+    paths:
+      - "tools/verification_studio/**"
+      - ".github/workflows/verification-studio-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-studio:
+    name: Standalone source, reporting and fail-closed checks (no native solver)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile standalone verification modules
+        working-directory: tools/verification_studio
+        run: python -m py_compile ETABS_OpenSees_Verification_Studio.py expanded_benchmarks.py test_studio.py
+      - name: Verify offline regression tests
+        working-directory: tools/verification_studio
+        run: python -m unittest -v test_studio
+      - name: Verify registry and independent analytical reference calculations
+        working-directory: tools/verification_studio
+        run: python ETABS_OpenSees_Verification_Studio.py --self-test
+      - name: Verify B12 is analytical-only, without claiming solver equivalence
+        working-directory: tools/verification_studio
+        run: |
+          python ETABS_OpenSees_Verification_Studio.py --worker B12 --output offline_ci
+          python -c "import json; r=json.load(open('offline_ci/B12.json',encoding='utf-8')); assert r['status']=='ANALYTICAL_PASS'; assert r['etabs_native_equivalence']=='NOT_VERIFIED'"
+      - name: Numerical acceptance boundary
+        run: |
+          echo "CI here does not run native OpenSeesPy or ETABS."
+          echo "Passing static tests does not imply B01-B11 native benchmark acceptance."
+          echo "Thesis 32-support equivalence, wall NLTHA and native mesh checks remain NOT_VERIFIED."
