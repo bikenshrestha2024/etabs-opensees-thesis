@@ -368,6 +368,32 @@ def launch(parent, folder):
         except Exception as exc:
             messagebox.showerror("Verification studio", str(exc), parent=win)
 
+    def import_studio_evidence():
+        """Import user-run Studio JSON into private case review; never approve a model."""
+        try:
+            selected = filedialog.askdirectory(
+                parent=win, title="Select private B01–B12 verification run (or cases folder)"
+            )
+            if not selected:
+                return
+            source = Path(selected).expanduser().resolve()
+            if not (source / "B01.json").is_file() and (source / "cases" / "B01.json").is_file():
+                source = source / "cases"
+            project_root = Path(project_var.get()).expanduser().resolve()
+            if not project_root.is_dir():
+                raise NotADirectoryError("Selected project folder does not exist")
+            destination = (
+                project_root / "REVIEW_MAIN" / "VERIFICATION_STUDIO" /
+                "B01_B12_COMPONENT_EVIDENCE_SUMMARY.json"
+            )
+            _spawn_tool(
+                ["tools/verification_studio/import_verified_runs.py",
+                 "--results", str(source), "--out", str(destination)],
+                "Local benchmark evidence consistency review",
+            )
+        except Exception as exc:
+            messagebox.showerror("Studio evidence importer", str(exc), parent=win)
+
     buttons = ttk.Frame(outer)
     buttons.pack(fill="x", pady=(10, 0))
     for caption, callback in (
@@ -384,6 +410,7 @@ def launch(parent, folder):
         ("Generate wall X/Y probes", generate_wall_probes),
         ("Native FVD/BRB test", run_device_benchmark),
         ("OpenSees B01–B12 verification", open_verification_studio),
+        ("Import B01–B12 evidence", import_studio_evidence),
         ("Knowledge base — 5W1H", open_knowledge_base)
     ):
         ttk.Button(actions, text=caption, command=callback).pack(side="left", padx=3)
