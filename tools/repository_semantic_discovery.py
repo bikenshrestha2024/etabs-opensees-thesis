@@ -97,13 +97,88 @@ def _risks(tree):
     return flags
 
 
+
+def _module_name(path):
+    name=path[:-3].replace("/", ".")
+    return name.removesuffix(".__init__")
+
+
+def _resolve_imports(files, edges):
+    """Classify static imports conservatively; dynamic imports require review."""
+    import sys
+    by_path={f["path"] for f in files if f["is_python"]}
+    modules={_module_name(p):p for p in by_path}
+    out=[]
+    for source,imported,relative,line in edges:
+        target=imported
+        if imported.startswith("."):
+            dots=len(imported)-len(imported.lstrip("."))
+            remainder=imported[dots:]
+            parts=_module_name(source).split(".")[:-1]
+            if dots>len(parts):
+                target=None
+            else:
+                prefix=parts[:len(parts)-dots+1]
+                target=".".join([*prefix,remainder]) if remainder else ".".join(prefix)
+        if target in modules:
+            resolution="LOCAL_TRACKED_EXACT"
+            destination=modules[target]
+        elif target and any(x.startswith(target+".") for x in modules):
+            resolution="LOCAL_TRACKED_PACKAGE"
+            destination=""
+        elif target and target.split(".")[0] in sys.stdlib_module_names:
+            resolution="PYTHON_STDLIB"
+            destination=""
+        elif target is None:
+            resolution="RELATIVE_IMPORT_REQUIRES_REVIEW"
+            destination=""
+        else:
+            resolution="EXTERNAL_OR_DYNAMIC_REQUIRES_ENV_CHECK"
+            destination=""
+        out.append({"source":source,"imported":imported,"resolved":target or "",
+                    "resolution":resolution,"target_path":destination,
+                    "line":line})
+    return out
+
+
+def _io_call_candidates(tree, path):
+    """AST candidates only, not a validated output contract."""
+    reader={"read_text", "read_bytes", "read_csv", "read_excel",
+            "load_workbook", "load", "read_json", "read_parquet"}
+    writer={"write_text", "write_bytes", "to_csv", "to_excel",
+            "save", "dump", "dumps", "atomic_json",
+            "write_table", "writestr", "write_stage_index"}
+    out=[]
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        f=node.func
+        label=f.id if isinstance(f,ast.Name) else (
+            f.attr if isinstance(f,ast.Attribute) else "")
+        if label in reader or label in writer or label=="open":
+            mode=""
+            if label=="open" and len(node.args)>1 and isinstance(node.args[1],ast.Constant):
+                mode=str(node.args[1].value)
+            if label=="open":
+                kind="WRITE_CANDIDATE" if any(c in mode for c in "wax+") else (
+                    "READ_CANDIDATE" if mode else "UNKNOWN_IO_MODE")
+            else:
+                kind="WRITE_CANDIDATE" if label in writer else "READ_CANDIDATE"
+            first=node.args[0] if node.args else None
+            literal=first.value if isinstance(first,ast.Constant) and isinstance(first.value,str) else ""
+            out.append({"source":path,"line":node.lineno,"call":label,
+                        "kind":kind,"literal_argument":literal,
+                        "contract_status":"NOT_VERIFIED"})
+    return out
+
+
 def collect(root):
     root=Path(root).resolve()
     if not (root / ".git").exists():
         raise ValueError("Repository root must be a Git checkout")
     head=git(root, "rev-parse", "HEAD").decode().strip()
     raw=git(root, "ls-files", "-s", "-z").split(b"\0")
-    files=[]; symbols=[]; edges=[]; duplicate=defaultdict(list)
+    files=[]; symbols=[]; edges=[]; io_ops=[]; duplicate=defaultdict(list)
     failures=[]; patterns=[]; by_category=Counter()
     for entry in raw:
         if not entry: continue
@@ -134,12 +209,14 @@ def collect(root):
                         edges.append((path,alias.name,False,n.lineno))
                 elif isinstance(n,ast.ImportFrom):
                     edges.append((path,"."*n.level+(n.module or ""),True,n.lineno))
+            io_ops.extend(_io_call_candidates(tree,path))
             for line,pattern in _risks(tree):
                 patterns.append({"path":path,"line":line,"pattern":pattern,
                                  "status":"CANDIDATE_NEEDS_MANUAL_REVIEW"})
         except (SyntaxError, UnicodeError, OSError, ValueError) as exc:
             failures.append({"path":path,"type":type(exc).__name__,
                              "line":getattr(exc,"lineno",None)})
+    resolved_edges=_resolve_imports(files,edges)
     duplicate_groups=[{"sha1":sha,"count":len(items),"sample":items[:5]}
                       for sha,items in duplicate.items() if len(items)>1]
     duplicates_by_category=Counter()
@@ -156,8 +233,11 @@ def collect(root):
         "ast_issues":failures,
         "duplicate_blob_groups":duplicate_groups,
         "duplicate_counts":dict(duplicates_by_category),
+        "import_classifications":dict(Counter(x["resolution"] for x in resolved_edges)),
+        "output_io_candidates":len(io_ops),
         "files":files, "symbols":symbols,
-        "import_edges":edges, "risk_patterns":patterns,
+        "import_edges":edges, "resolved_imports":resolved_edges,
+        "io_candidates":io_ops, "risk_patterns":patterns,
         "acceptance":{
             "S1_DISCOVERY":"COMPLETED_AT_PINNED_HEAD",
             "S2_COMPLETE_SEMANTIC_REVIEW":"NOT_VERIFIED",
@@ -186,10 +266,17 @@ def write_report(result, out):
     save_csv("IMPORT_EDGES.csv",["source","imported","relative","line"],
              [dict(zip(["source","imported","relative","line"],r))
               for r in result["import_edges"]])
+    save_csv("RESOLVED_IMPORT_CLASSIFICATION.csv",
+             ["source","imported","resolved","resolution","target_path","line"],
+             result["resolved_imports"])
+    save_csv("OUTPUT_READER_WRITER_REVIEW_QUEUE.csv",
+             ["source","line","call","kind","literal_argument","contract_status"],
+             result["io_candidates"])
     save_csv("SUSPICIOUS_PATTERN_QUEUE.csv",
              ["path","line","pattern","status"],result["risk_patterns"])
     summary={k:v for k,v in result.items() if k not in (
-        "files","symbols","import_edges","risk_patterns","duplicate_blob_groups")}
+        "files","symbols","import_edges","resolved_imports",
+        "io_candidates","risk_patterns","duplicate_blob_groups")}
     summary["duplicate_blob_examples"]=result["duplicate_blob_groups"][:25]
     (out/"DISCOVERY_SUMMARY.json").write_text(json.dumps(
         summary,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
