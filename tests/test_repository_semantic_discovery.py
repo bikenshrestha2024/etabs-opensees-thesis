@@ -58,6 +58,10 @@ class DiscoveryTests(unittest.TestCase):
             subprocess.run(["git","-C",str(root),"init","-q"],check=True)
             (root/"broken.py").write_text("def broken(:\n pass\n")
             subprocess.run(["git","-C",str(root),"add","broken.py"],check=True)
+            subprocess.run([
+                "git","-C",str(root),"-c","user.email=audit@example.invalid",
+                "-c","user.name=Test","commit","-qm","bad syntax fixture"
+            ],check=True)
             result=collect(root)
             self.assertEqual(len(result["ast_issues"]),1)
             self.assertEqual(result["ast_issues"][0]["path"],"broken.py")
