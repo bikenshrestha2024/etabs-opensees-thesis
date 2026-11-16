@@ -35,6 +35,7 @@ jobs:
           python -m unittest tests.verify_gravity_support_scenarios -v
           python -m unittest tests.test_etabs_split_beam_forces tests.test_gravity_partial_source_comparison -v
           python -m unittest tests.test_assembled_mesh_view -v
+          python -m unittest tests.test_source_view_compaction -v
           python -m unittest tests.test_conversion_progress_status_runtime -v
           python -m unittest tests.test_import_workbook_digest_cache -v
           python -m unittest discover -s tests -p 'test_repository_layout.py' -v
