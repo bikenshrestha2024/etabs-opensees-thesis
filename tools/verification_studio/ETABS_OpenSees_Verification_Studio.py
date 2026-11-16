@@ -12,6 +12,7 @@ import argparse
 import csv
 import datetime as dt
 import html
+import importlib.util
 import json
 import math
 import os
@@ -23,7 +24,7 @@ import threading
 import traceback
 import uuid
 
-APP_VERSION = '2.0.0'
+APP_VERSION = '2.0.1'
 GRAVITY = 9.80665
 CASES = [
  ('B01', 'CSI Example 01, Case II — propped beam', 'STATIC FRAME', 'Published CSI reaction and moment (component benchmark)'),
@@ -172,8 +173,21 @@ def _run_case(ops,case,tol):
         result['verification_scope']='INDEPENDENT_COMPONENT_BENCHMARK'
         result['etabs_native_equivalence']='NOT_VERIFIED'
         return result
-    import expanded_benchmarks
-    return expanded_benchmarks.run(case,ops,tol)
+    # Import explicitly beside this program: GUI worker may run from a different CWD.
+    sibling = Path(__file__).resolve().parent / 'expanded_benchmarks.py'
+    if not sibling.is_file():
+        raise FileNotFoundError(
+            f'Missing companion benchmark module: {sibling}. '
+            'Copy expanded_benchmarks.py into the same directory as '
+            'ETABS_OpenSees_Verification_Studio.py, or run from the GitHub '
+            'tools/verification_studio folder after git pull origin main.'
+        )
+    spec = importlib.util.spec_from_file_location('_studio_expanded_benchmarks', sibling)
+    if spec is None or spec.loader is None:
+        raise ImportError(f'Cannot load companion benchmark module at {sibling}')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.run(case,ops,tol)
 
 def run_worker(case, tolerance, destination):
     destination=Path(destination);destination.mkdir(parents=True,exist_ok=True)
@@ -187,9 +201,18 @@ def run_worker(case, tolerance, destination):
             import openseespy.opensees as ops
             result=_run_case(ops,case,tolerance)
             result['solver']='OpenSeesPy';result['solver_version']=str(ops.version()) if hasattr(ops,'version') else 'unavailable'
-    except ImportError as exc:
+    except FileNotFoundError as exc:
         result={'case_id':case,'title':next(c[1] for c in CASES if c[0]==case),'status':'BLOCKED',
-                'reason':'OpenSeesPy is not installed in the selected Python environment: '+str(exc), 'metrics':[]}
+                'reason':str(exc),'missing_dependency':'expanded_benchmarks.py','metrics':[]}
+    except (ImportError, ModuleNotFoundError) as exc:
+        missing = str(getattr(exc,'name', '') or '')
+        if missing.startswith('openseespy'):
+            reason = 'OpenSeesPy is not installed in the selected Python environment: ' + str(exc)
+        else:
+            reason = ('Benchmark module or its dependency could not be imported: ' + str(exc) +
+                      '. Check that expanded_benchmarks.py is beside the Studio script.')
+        result={'case_id':case,'title':next(c[1] for c in CASES if c[0]==case),'status':'BLOCKED',
+                'reason':reason,'missing_dependency':missing,'metrics':[]}
     except Exception as exc:
         result={'case_id':case,'title':next(c[1] for c in CASES if c[0]==case),'status':'ERROR',
                 'reason':str(exc),'traceback':traceback.format_exc(), 'metrics':[]}
@@ -312,6 +335,14 @@ def run_gui():
             root_out=Path(output_var.get()).expanduser();root_out.mkdir(parents=True,exist_ok=True)
         except (ValueError,AssertionError,OSError):
             messagebox.showerror('Invalid inputs','Specify an existing Python interpreter, writable output directory, and tolerance between 0 and 1.');return
+        if any(cid not in ('B01','B02','B03','B04') for cid in cids):
+            companion = Path(__file__).resolve().parent / 'expanded_benchmarks.py'
+            if not companion.is_file():
+                messagebox.showerror('Benchmark module missing',
+                    'B05–B12 require expanded_benchmarks.py beside this Studio script.\n\n'
+                    'Expected:\n' + str(companion) + '\n\n'
+                    'Run the current program from your cloned repository under tools/verification_studio.')
+                return
         folder=root_out/(dt.datetime.now().strftime('%Y%m%d_%H%M%S')+'_'+uuid.uuid4().hex[:6]);folder.mkdir()
         state['working']=True;set_controls('disabled');notebook.select(logtab)
         def worker():
