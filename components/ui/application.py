@@ -2434,7 +2434,7 @@ class App:
         action(group_1_0,text="ETABS section mapping → OpenSees fiber sections",command=self._open_section_mapping)
         action(group_1_0,text="OpenSees RC fiber section builder — Concrete01 + Steel02",command=self._open_fiber_section_builder)
         action(group_1_0,text="ETABS RC column size / bar review",command=self._open_column_section_review)
-        action(group_1_1,text='Slab load path / mesh + Excel formulas',command=lambda:__import__('OpenSees_Load_Path_V141').launch(self.root,self.out.get()))
+        action(group_1_1,text='Slab load path / mesh + Excel formulas',command=self._open_slab_mesh_stage)
         action(group_2_1,text='ULS/SLS drift / deflection + combination / PDelta review',command=lambda:__import__('OpenSees_Case_Review_V142').launch(self.root,self.out.get()))
         action(group_2_1,text='NBC settings audit - values and unresolved inputs',command=lambda:__import__('components.validation.settings_audit',fromlist=['launch']).launch(self.root,self.out.get()))
         action(group_6_0,text='ETABS comparison - modal / ESM / MRSM',command=lambda:__import__('components.validation.etabs_comparison',fromlist=['launch']).launch(self.root,self.out.get()))
@@ -3066,6 +3066,20 @@ class App:
         if target:
             try: os.startfile(target)
             except Exception as exc: messagebox.showerror("Could not open ETABS load view",str(exc),parent=self.root)
+    def _open_slab_mesh_stage(self):
+        """[REF docs/source/components/ui/application.py.md] Prevent concurrent model writes."""
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showwarning(
+                "Complete ETABS import first",
+                "A conversion is still writing the selected export. Building a "
+                "separate 4/8/16 mesh case or formula workbook simultaneously "
+                "would compete for disk/CPU and may read incomplete input files. "
+                "Use the actual assembled 3D viewer after conversion, or "
+                "start an independent mesh case from a completed saved export.",
+                parent=self.root)
+            return
+        return __import__('OpenSees_Load_Path_V141').launch(self.root,self.out.get())
+
     def _open_assembled_mesh_view(self):
         """[REF docs/source/components/ui/application.py.md] Render real solver mesh off the GUI thread."""
         if getattr(self, "_conversion_process", None) is not None:
@@ -3417,6 +3431,13 @@ class App:
 
     def _rebuild_complete_export(self):
         """Regenerate model entries after editing the V118 config; no ETABS run."""
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showwarning(
+                "ETABS import still running",
+                "Rebuilding the selected export while ETABS is writing it can "
+                "invalidate both runs. Finish/cancel the first conversion and "
+                "inspect its status before rebuilding.",parent=self.root)
+            return
         try:
             from OpenSees_Complete_Export_V118 import prepare_complete_export
             # Synchronize the selected project's copied runtime BEFORE rebuild.
