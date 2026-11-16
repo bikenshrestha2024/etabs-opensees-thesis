@@ -389,7 +389,10 @@ def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=
 
     def _coplanar_candidates(panel, normal):
         _axis = max(range(3), key=lambda index: abs(normal[index]))
-        if abs(abs(normal[_axis]) - 1.) > 1e-12:
+        # A nearly axis-aligned panel may still be measurably tilted over a
+        # long span; only use constant-coordinate buckets for an exactly
+        # axis-aligned normal. All other planes retain full-scan semantics.
+        if any(abs(normal[k]) > 1e-12 for k in range(3) if k != _axis):
             return original  # preserve exact semantics for inclined planes
         _center = int(round(panel[0][_axis] * plane_resolution))
         result = []
