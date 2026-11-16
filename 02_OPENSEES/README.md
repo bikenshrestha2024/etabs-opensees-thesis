@@ -7,3 +7,7 @@ The new `src/thesis_core/` neutral schema and `src/opensees_engine/` minimal ben
 Use `python tools/run_standalone_benchmark.py` only for the demonstrated small elastic benchmark. It requires OpenSeesPy but does not need ETABS. Project-scale acceptance remains blocked by the existing engineering gates.
 
 [Beginner guide](../engineering/topics/OPENSEES.md) · [future dependency boundary](../engineering/rules/MODULE_BOUNDARIES.md)
+
+## Standalone OpenSeesPy verification (B01–B12)
+
+[Verification Studio v2 source and Windows launcher](../tools/verification_studio/README.md) · [Thesis acceptance matrix](../tools/verification_studio/THESIS_VALIDATION_MATRIX.md). Run separately from the thesis workflow; offline CI tests are not evidence of native ETABS/OpenSees equivalence. Keep generated run records local and private.
