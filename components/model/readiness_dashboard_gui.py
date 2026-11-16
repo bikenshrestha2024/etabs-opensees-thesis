@@ -358,6 +358,16 @@ def launch(parent, folder):
         except Exception as exc:
             messagebox.showerror("Device diagnostics", str(exc), parent=win)
 
+    def open_verification_studio():
+        """Launch independent B01–B12 benchmark GUI, not a model acceptance gate."""
+        try:
+            _spawn_tool(
+                ["tools/verification_studio/ETABS_OpenSees_Verification_Studio_ALL_IN_ONE.py"],
+                "Independent OpenSeesPy verification studio",
+            )
+        except Exception as exc:
+            messagebox.showerror("Verification studio", str(exc), parent=win)
+
     buttons = ttk.Frame(outer)
     buttons.pack(fill="x", pady=(10, 0))
     for caption, callback in (
@@ -373,6 +383,7 @@ def launch(parent, folder):
         ("Material validation", open_materials),
         ("Generate wall X/Y probes", generate_wall_probes),
         ("Native FVD/BRB test", run_device_benchmark),
+        ("OpenSees B01–B12 verification", open_verification_studio),
         ("Knowledge base — 5W1H", open_knowledge_base)
     ):
         ttk.Button(actions, text=caption, command=callback).pack(side="left", padx=3)
