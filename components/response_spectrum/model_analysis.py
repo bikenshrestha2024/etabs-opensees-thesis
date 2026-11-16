@@ -238,11 +238,60 @@ def validate_mrsm_case_output(output, *, state, expected_model_sha256=None):
             raise ValueError("MRSM response direction mismatch: "+key)
         if not isinstance(result.get("stories"),list) or not result["stories"]:
             raise ValueError("MRSM case has no storey results: "+key)
+        # A six-case JSON with only drift values is not a complete response.
+        # Verify the scalar force/mass outputs before treating saved files as
+        # solver-only complete. This is still NOT an ETABS/NBC acceptance gate.
+        numeric_scalars = (
+            "unscaled_modal_base_shear_kN",
+            "reference_ESM_base_shear_kN",
+            "force_scale",
+            "scaled_modal_base_shear_kN",
+            "mass_participation_percent",
+        )
+        values = {}
+        for field in numeric_scalars:
+            try:
+                raw = result[field]
+                if isinstance(raw, bool):
+                    raise TypeError("Boolean is not a numeric result")
+                values[field] = float(raw)
+            except (KeyError, TypeError, ValueError, OverflowError) as exc:
+                raise ValueError(
+                    f"MRSM {key} missing/invalid required numeric {field}"
+                ) from exc
+            if not math.isfinite(values[field]):
+                raise ValueError(f"MRSM {key} nonfinite {field}")
+        if any(values[field] <= 0 for field in (
+            "unscaled_modal_base_shear_kN",
+            "reference_ESM_base_shear_kN",
+            "scaled_modal_base_shear_kN",
+        )):
+            raise ValueError(f"MRSM {key} base shear must be positive")
+        if values["force_scale"] < 1.0:
+            raise ValueError(f"MRSM {key} force scale cannot be below one")
+        if not 90.0 <= values["mass_participation_percent"] <= 100.0 + 1e-6:
+            raise ValueError(f"MRSM {key} insufficient/invalid modal mass")
+        expected_scaled = (
+            values["unscaled_modal_base_shear_kN"] * values["force_scale"]
+        )
+        if not math.isclose(
+            expected_scaled, values["scaled_modal_base_shear_kN"],
+            rel_tol=1e-6, abs_tol=1e-5,
+        ):
+            raise ValueError(f"MRSM {key} inconsistent force-scaled base shear")
+        response_status = result.get("status")
+        if not isinstance(response_status, str) or not response_status.strip():
+            raise ValueError(f"MRSM {key} missing response-status review flag")
+
         for position,row in enumerate(result["stories"],start=1):
             if not isinstance(row,dict):
                 raise ValueError(f"MRSM {key} story {position} is not a response object")
-            if "design_drift_ratio" not in row:
-                raise ValueError(f"MRSM {key} story {position} missing design drift")
+            for required in ("story_number", "scaled_story_shear_kN",
+                             "design_displacement_m", "design_drift_ratio"):
+                if required not in row:
+                    raise ValueError(
+                        f"MRSM {key} story {position} missing {required}"
+                    )
             try:
                 drift=float(row["design_drift_ratio"])
             except (ValueError,TypeError,OverflowError) as exc:
