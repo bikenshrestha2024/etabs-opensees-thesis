@@ -91,6 +91,25 @@ class DeferredStoreyWorkbookTests(unittest.TestCase):
         self.assertEqual(marker["status"],"FORMULA_WORKBOOK_EXPORT_FAILED")
         self.assertNotIn("workbook_sha256",marker)
 
+    def test_successful_but_corrupt_zip_is_not_marked_ready(self):
+        import sys
+        import types
+        extra=types.ModuleType("OpenSees_Load_Path_V141")
+        extra.add_formula_audit=lambda wb,folder,data,cfg:wb.create_sheet("Formula")
+        old=self.root/"Gravity_Storey_Load_Breakdown_V131.xlsx"
+        old.write_bytes(b"KNOWN_PREVIOUS_EVIDENCE")
+        def corrupt_save(wb,path):
+            Path(path).write_bytes(b"NOT_AN_XLSX_ZIP")
+        with patch.dict(sys.modules,{"OpenSees_Load_Path_V141":extra}), \
+             patch("openpyxl.workbook.workbook.Workbook.save",
+                   autospec=True,side_effect=corrupt_save):
+            with self.assertRaisesRegex(ValueError,"invalid XLSX"):
+                export_storey_gravity(self.root,self.data,self.cfg,generate_workbook=True)
+        self.assertEqual(old.read_bytes(),b"KNOWN_PREVIOUS_EVIDENCE")
+        marker=json.loads((self.root/"Gravity_Storey_Workbook_Status_V131.json").read_text())
+        self.assertEqual(marker["status"],"FORMULA_WORKBOOK_EXPORT_FAILED")
+        self.assertFalse(list(self.root.glob(".gravity_*.xlsx")))
+
     def test_optional_workbook_sha256_streams_file_instead_of_reading_all_bytes(self):
         import sys
         import types
