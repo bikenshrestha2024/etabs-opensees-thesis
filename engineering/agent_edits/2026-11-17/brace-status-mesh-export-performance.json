@@ -69,5 +69,15 @@
     "change": "Filter explicit nonwall and horizontal polygons in opt-in wall propagation helper; preserve legacy vertical wall quads, SOURCE_ONLY and confirmation requirement.",
     "tests": "17 focused tests passed after failing regression (floor edge gained two fixed nodes before fix).",
     "native_status": "Not run; user supplied 32-support diagnostic result analyzed privately, not modified or promoted."
+  },
+  "current_runtime_documentation": {
+    "request": "Document long completed gravity run; use latest photos and exclude previous model assumptions; integrate authorized work into main",
+    "classification": "DOCUMENTATION_ONLY",
+    "report": "REVIEW_MAIN/01_GRAVITY/20261117_CURRENT_GRAVITY_DELAY_AND_MODEL_IDENTITY.md",
+    "finding": "58s solver-return interval, 1885s uninstrumented postsolver reporting/audit gap, 1953s observed total; imported runtime identity unknown",
+    "benchmark": "Actual old/current formula functions, 1000 synthetic cells: 2.624802/0.208730 seconds, excludes save and solver",
+    "privacy": "Raw log, model paths and spreadsheets retained outside repository",
+    "limitations": "No native rerun; synchronous gravity postprocessing remains; earlier model comparisons require matching identity",
+    "integration_verification": "411 unittest tests passed; active pytest suite 454 passed, 229 subtests passed, using isolated temporary storage outside host synthetic Git markers. No native run."
   }
 }
