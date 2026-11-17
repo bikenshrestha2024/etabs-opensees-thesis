@@ -324,7 +324,8 @@ def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
             # resolve runtime from the real source module rather than cwd.
             from components.model import assembly
             runtime_dir = Path(assembly.__file__).resolve().parents[2]
-        manifest, report = prepare_complete_export(str(run_dir), runtime_dir=Path(runtime_dir))
+        manifest, report = prepare_complete_export(
+            str(run_dir), runtime_dir=Path(runtime_dir), progress=emit)
         emit(f'MESH_{n:02d}: assembly completed in {perf_counter()-assembly_started:.1f}s; checking result')
         if report.get("assembly_errors") or not manifest.get("elastic_assembled"):
             raise RuntimeError("Mesh assembly blocked: " + "; ".join(report.get("assembly_errors", [])))

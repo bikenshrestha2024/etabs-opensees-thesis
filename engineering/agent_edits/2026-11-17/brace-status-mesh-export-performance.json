@@ -1,0 +1,47 @@
+{
+  "editor": "OpenAI Codex desktop",
+  "model": "GPT-6",
+  "branch": "review/brace-status-mesh-export-performance",
+  "base_sha": "8b318ec7b4545f2f880558d1fbe7428202cf56d5",
+  "classification": "EXTEND_EXISTING",
+  "task": "Correct completed elastic brace messages and quadratic slab Excel node-path paging; forward assembly progress.",
+  "changed_files": [
+    ".github/workflows/export-staging-regressions.yml",
+    "components/gravity/load_path_formulas.py",
+    "components/gravity/mesh_cases.py",
+    "components/model/assembly.py",
+    "docs/source/components/gravity/load_path_formulas.py.md",
+    "docs/source/components/gravity/mesh_cases.py.md",
+    "docs/source/components/model/assembly.py.md",
+    "tests/test_area_folder_and_hinged_brace_review.py",
+    "tests/test_model_mesh_case_workflow.py",
+    "tests/test_slab_mesh_excel_paging.py",
+    "engineering/agent_edits/2026-11-17/brace-status-mesh-export-performance.json"
+  ],
+  "prior_search": "Existing assembly and mesh helpers, tests, guides and open PRs inspected; no duplicate implementation added.",
+  "tests": {
+    "focused": "35 passed: python -m unittest tests.test_area_folder_and_hinged_brace_review tests.test_slab_mesh_excel_paging tests.test_model_mesh_case_workflow tests.test_mesh_spatial_performance_regressions tests.test_mesh_workbook_publication tests.test_deferred_storey_workbook tests.test_facade_runtime_context -v",
+    "full_discovery": "python -m unittest discover -s tests -p test*.py: 413 tests, 9 errors from unavailable dependencies",
+    "full_discovery_errors": [
+      "test_assembled_mesh_view: plotly missing",
+      "test_source_view_compaction: plotly missing",
+      "test_display_ids_storey: pytest missing",
+      "test_excel_publication: pytest missing",
+      "test_export_mirror: pytest missing",
+      "test_gravity_evidence_stage: pytest missing",
+      "test_gravity_native_equivalence_preflight: pytest missing",
+      "test_lfs_workbook_recovery: pytest missing",
+      "test_project_source_reuse: pytest missing"
+    ],
+    "syntax": "compileall passed for three changed production modules",
+    "diff": "git diff --check passed",
+    "review": "Independent code reviewer: no actionable correctness findings"
+  },
+  "deferred": [
+    "Windows ETABS GUI and full-model 4/8/16 rebuild timing",
+    "Native OpenSees element response and ETABS equivalence",
+    "Reviewed nonlinear brace connection/buckling/fracture qualification"
+  ],
+  "privacy": "No uploaded project data or private paths included in this commit.",
+  "utc": "2026-11-17T16:21:44.861305+00:00"
+}

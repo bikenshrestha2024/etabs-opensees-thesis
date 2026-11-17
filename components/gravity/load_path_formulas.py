@@ -137,13 +137,18 @@ def add_formula_audit(wb,folder,data=None,cfg=None,progress=None):
     links=wb.create_sheet('Loaded node path')
     links.append(node_headers)
     node_sheet_number=1
+    node_sheet_row=1
     def append_node_path(record):
-        nonlocal links,node_sheet_number
-        if links.max_row>=MAX_ROW:
+        nonlocal links,node_sheet_number,node_sheet_row
+        # Worksheet.max_row scans all existing cells. Calling it for every
+        # node made this mesh ledger quadratic in its number of rows.
+        if node_sheet_row>=MAX_ROW:
             node_sheet_number+=1
             links=wb.create_sheet(f'Loaded node path {node_sheet_number:02d}')
             links.append(node_headers)
+            node_sheet_row=1
         links.append(record)
+        node_sheet_row+=1
     adjacency={};walls={}
     for tag,e in enumerate(data.get('frames',[]),100001):
         if e['category']=='BEAM':

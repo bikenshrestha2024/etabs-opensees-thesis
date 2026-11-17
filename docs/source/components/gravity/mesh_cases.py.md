@@ -32,3 +32,14 @@ The shared `validated_mesh_size` function accepts only **integer** 4, 8, 16 or t
 `recover_assembled_mesh_workbook` examines the latest saved assembled run and compares original source audit SHA256 to `MESH_CASE_PROVENANCE`, staged config to a freshly derived `root_config + floor_subdivisions` and model `config_sha256` to the staged config. Only a complete SHA-matched saved floor mesh may be used to **re-export the formula workbook**, never a stale model, a settings-only PREPARED_CONFIG or a fake solver gravity result. This permits recovery after an Excel row-limit error without rerunning expensive assembly. It records `FORMULA_WORKBOOK_REEXPORTED_NOT_GRAVITY_VERIFIED`. Native gravity and ETABS equivalence are still not established.
 
 Tests: `tests/test_model_mesh_case_workflow.py`; `tests/test_slab_mesh_excel_paging.py`. User 2026-11-15 MESH_04 and MESH_08 manifests had 7,000 and 28,400 floor shell cells respectively, and explicitly said `FORMULA_AUDIT_ONLY_NOT_SOLVER_VERIFICATION`. MESH_16 was aborted by Excel before a complete workbook was saved; do not mark it as passed until recovery and actual native solver checks.
+
+
+## 2026-11-17 — assembly phases in slab-study progress
+
+`build_case` forwards `prepare_complete_export` progress through its existing
+elapsed-time adapter. The GUI receives mesh, spatial-index, frame, load-ledger,
+runtime-packaging and mapping-workbook stages before assembly returns.
+No global stdout redirection or Tk calls from the worker are introduced.
+`tests/test_model_mesh_case_workflow.py` checks the callback bridge; the real
+assembly callback is exercised by the synthetic brace export test. Mesh SHA
+validation, source snapshots and separate gravity acceptance remain unchanged.

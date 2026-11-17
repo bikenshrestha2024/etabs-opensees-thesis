@@ -29,6 +29,27 @@ class MeshCasesTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_build_forwards_internal_assembly_progress_to_gui_callback(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        def assemble(folder,*,runtime_dir,progress):
+            progress('Frame segment connectivity')
+            folder=Path(folder)
+            (folder/'OpenSees_Complete_Model_Data_V118.json').write_text(json.dumps(
+                {'config_sha256':mesh.digest(folder/mesh.REQUIRED_SOURCE[3])}))
+            return {'elastic_assembled':True},{'assembly_errors':[]}
+        def export(folder,*,output_root,progress):
+            return output_root/'synthetic.xlsx'
+        received=[]
+        with patch.dict('sys.modules',{
+            'OpenSees_Complete_Export_V118':SimpleNamespace(prepare_complete_export=assemble),
+            'OpenSees_Load_Path_V141':SimpleNamespace(export=export)}):
+            result=mesh.build_case(self.root,8,runtime_dir=self.root,
+                                   progress=lambda message,elapsed:received.append((message,elapsed)))
+        self.assertTrue(any(message=='Frame segment connectivity' and elapsed>=0
+                            for message,elapsed in received))
+        self.assertEqual(result['status'],'FORMULA_WORKBOOK_CREATED_NOT_GRAVITY_VERIFIED')
+
     def test_three_configurations_are_not_assembled_models(self):
         files=mesh.prepared_configs(self.root)
         self.assertEqual([p.name for p in files],
