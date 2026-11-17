@@ -520,8 +520,21 @@ def audit(root: Path) -> dict:
     ]
     graph = import_graph(root, source_entries)
     semantic_units = inspect_semantic_review_units(root, source_entries, identities)
+    semantic_units,review_attestation_errors = apply_source_review_attestations(
+        root,semantic_units,identities)
+    source_review_attested_count=sum(
+        1 for unit in semantic_units if unit["semantic_review_status"]
+        == "SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED")
     facade_contracts = inspect_exec_facades(root, source_entries, identities)
     findings = []
+    if review_attestation_errors:
+        findings.append({
+            "id":"P1_STALE_OR_UNSAFE_SOURCE_REVIEW_ATTESTATION",
+            "priority":"P1","status":"CONFIRMED",
+            "count":len(review_attestation_errors),
+            "evidence":review_attestation_errors[:30],
+            "gate":"Update the exact source blob SHA and independently reviewed "
+                   "evidence/test references; never auto-carry approval across edits."})
     if secret_candidates:
         findings.append({"id": "P0_PUBLIC_TREE_SECRET_CANDIDATES",
                          "priority": "P0", "status": "REVIEW_REQUIRED",
@@ -610,7 +623,11 @@ def audit(root: Path) -> dict:
         "exec_facade_contracts": facade_contracts,
         "exec_facade_count": len(facade_contracts),
         "semantic_review_unit_count": len(semantic_units),
+        # AI-assisted source inspections are tracked separately from completed
+        # independent semantic review or engineering certification.
         "semantic_review_completed_count": 0,
+        "source_review_attested_count":source_review_attested_count,
+        "source_review_attestation_issues":review_attestation_errors,
         "active_source_parse_failures": source["syntax_errors"],
         "missing_src_source_guides": missing_src_guides,
         "canonical_missing": source["canonical_missing"],
@@ -625,8 +642,10 @@ def audit(root: Path) -> dict:
         "acceptance": {
             "static_audit": "PASS" if not source["syntax_errors"]
                 and not source["canonical_missing"] and not writers["parse_errors"]
-                and not missing_facades
+                and not missing_facades and not review_attestation_errors
                 else "BLOCKED",
+            "source_review_attestations":
+                "PASS" if not review_attestation_errors else "BLOCKED",
             "function_level_semantic_review": "INCOMPLETE_NOT_EXECUTED",
             "import_semantics": "REVIEW_REQUIRED",
             "source_guide_semantics": "NOT_REVIEWED",
@@ -667,6 +686,13 @@ def save(report: dict, directory: Path) -> tuple[Path, Path]:
         (directory / "05_OUTPUT_WRITERS" / "writer_summary.json",
          {"schema": report["schema"], "totals": report["writer_scan_totals"],
           "parse_failures": report["writer_parse_failures"]}),
+        (directory / "08_SEMANTIC_REVIEW" / "attestation_validation.json",
+         {"schema":report["schema"],
+          "source_review_attested_count":report["source_review_attested_count"],
+          "independent_semantic_review_completed_count":
+              report["semantic_review_completed_count"],
+          "issues":report["source_review_attestation_issues"],
+          "engineering_acceptance":"NOT_VERIFIED"}),
         (directory / "07_ARCHIVE_PROVENANCE" / "exact_blob_duplicates.json",
          {"schema":report["schema"],"git_revision":report["git_revision"],
           "git_identity_scope":report["git_identity_scope"],
