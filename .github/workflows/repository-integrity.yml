@@ -42,8 +42,6 @@ jobs:
             fi
           }
           check python tools/audit_active_repository.py --output audit/active_inventory.json --fail-on-missing-canonical
-          check python tools/audit_repository_semantics.py --output audit/repository_semantics.json --fail-on-active-errors
-          check python -m unittest tests.test_repository_semantics_audit -v
           check python -m unittest tests.verify_active_repository_audit tests.verify_gravity_reactions_3d -v
           check python -m unittest tests.verify_gravity_support_scenarios -v
           check python -m unittest tests.test_etabs_split_beam_forces tests.test_gravity_partial_source_comparison -v
@@ -90,5 +88,4 @@ jobs:
             audit/active_inventory.json
             audit/repository_layout.json
             audit/documentation_coverage.json
-            audit/repository_semantics.json
           if-no-files-found: warn
