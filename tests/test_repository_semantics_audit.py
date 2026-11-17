@@ -71,6 +71,21 @@ class SemanticRepositoryInventoryTests(unittest.TestCase):
                              report["unresolved_local_dependencies"]))
         self.assertEqual(report["status"], "STATIC_TRIAGE_ONLY")
 
+    def test_nested_namespace_package_and_package_relative_import(self):
+        self.add("components/model/assembly.py", "VALUE=7\\n")
+        self.add("components/worker.py",
+                 "from components.model import assembly\\n"
+                 "def run(): return assembly.VALUE\\n")
+        self.add("src/thesis_core/__init__.py",
+                 "from .neutral_model import MODEL\\n")
+        self.add("src/thesis_core/neutral_model.py", "MODEL=5\\n")
+        report=audit_repository(self.root)
+        self.assertEqual(report["status"],"STATIC_TRIAGE_ONLY")
+        self.assertFalse(report["unresolved_local_dependencies"])
+        targets={(x["source"],x["target"]) for x in report["local_dependency_edges"]}
+        self.assertIn(("src/thesis_core/__init__.py",
+                       "src/thesis_core/neutral_model.py"),targets)
+
     def test_unsafe_patterns_are_review_candidates_not_false_certificates(self):
         self.add("tools/runtime.py", (
             "def launch(command):\n"
