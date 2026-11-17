@@ -167,10 +167,29 @@ def import_graph(root: Path, source_entries: list[dict]) -> dict:
             elif isinstance(node, ast.Call):
                 name = node.func.id if isinstance(node.func, ast.Name) else (
                     node.func.attr if isinstance(node.func, ast.Attribute) else "")
-                if name in ("__import__", "import_module"):
-                    dynamic.append({"source": rel, "line": node.lineno,
-                                    "kind": "DYNAMIC_IMPORT_REVIEW"})
-                continue
+                # Literal importlib / __import__ targets are statically
+                # resolvable even inside deferred GUI/runner callbacks.
+                # Variable-derived names remain advisory; NEVER execute them.
+                known_importlib = (
+                    isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "importlib"
+                    and name == "import_module")
+                known_builtin = (isinstance(node.func, ast.Name)
+                                 and name == "__import__")
+                if not (known_importlib or known_builtin):
+                    continue
+                literal = (node.args[0].value if node.args
+                           and isinstance(node.args[0], ast.Constant)
+                           and isinstance(node.args[0].value, str)
+                           else None)
+                dynamic.append({"source": rel, "line": node.lineno,
+                                "kind": ("LITERAL_DYNAMIC_IMPORT" if literal
+                                         else "DYNAMIC_IMPORT_REVIEW")})
+                if literal and not literal.startswith("."):
+                    requests = [(literal, node.lineno)]
+                else:
+                    continue
             else:
                 continue
             for name, line in requests:
