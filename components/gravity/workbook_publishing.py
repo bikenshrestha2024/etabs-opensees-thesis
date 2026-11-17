@@ -15,6 +15,7 @@ from pathlib import Path
 def publish_workbook(workbook, destination, *, temp_prefix=".gravity_") -> str:
     """Save and hash a large XLSX without corrupting an existing destination.
 
+    [REF docs/source/components/gravity/workbook_publishing.py.md]
     Returns SHA256 of exactly the newly published XLSX bytes. Saves in an
     exclusive temporary file under the destination directory, verifies that
     the ZIP central directory contains minimum workbook parts, streams its
