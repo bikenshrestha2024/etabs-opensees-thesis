@@ -113,6 +113,15 @@ def compare_time_step_results(coarse,fine,*,max_relative_difference=None):
     for key in ("limit_state", "orientation", "diagnostic_excitation"):
         if not isinstance(coarse.get(key), str) or not coarse[key].strip() or coarse[key] != fine.get(key):
             raise ValueError("Time-step comparison case identity missing or differs: " + key)
+    # Legacy summaries omit these optional identifiers. If either report
+    # explicitly states the identity, both must agree; comparing cases
+    # from different variants/events is not a time-step convergence study.
+    for key in ("variant_id", "pair_id"):
+        a,b=coarse.get(key),fine.get(key)
+        if a is not None or b is not None:
+            if (not isinstance(a,str) or not a.strip()
+                    or not isinstance(b,str) or not b.strip() or a!=b):
+                raise ValueError("Time-step comparison case identity missing or differs: " + key)
     if max_relative_difference is not None:
         try:
             tol=float(max_relative_difference)
