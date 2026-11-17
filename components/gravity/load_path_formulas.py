@@ -342,22 +342,28 @@ def export(folder, *, output_root=None, progress=None):
     if not wb.worksheets:raise ValueError('Complete model does not contain enough source load-path data')
     root=Path(output_root) if output_root is not None else folder/'02_MODEL'/'SLAB_LOAD_PATH'/f'MESH_{n:02d}'
     excel_dir=root/'EXCEL';json_dir=root/'JSON'
+    from components.inputs.output_contract import (
+        _refuse_linked_output_target,atomic_json)
+    _refuse_linked_output_target(excel_dir)
+    _refuse_linked_output_target(json_dir)
     excel_dir.mkdir(parents=True,exist_ok=True);json_dir.mkdir(parents=True,exist_ok=True)
     from datetime import datetime
     stamp=datetime.now().strftime('%Y%m%d_%H%M%S_%f')
     path=excel_dir/f'Slab_Load_Path_MESH_{n:02d}_{stamp}_V141.xlsx'
     if callable(progress):
         progress('Excel: saving large .xlsx workbook to disk')
-    wb.save(path)
+    from components.gravity.workbook_publishing import publish_workbook
+    workbook_sha256=publish_workbook(wb,path,temp_prefix='.mesh_')
     if callable(progress):
-        progress('Excel: .xlsx workbook saved successfully')
+        progress('Excel: validated .xlsx workbook atomically saved successfully')
     record=dict(mesh_subdivisions=n,config_sha256=actual,
                 assembled_model=str(model_path),workbook=str(path),
+                workbook_sha256=workbook_sha256,
                 floor_shell_cells=sum(e.get('category')=='FLOOR' for e in data.get('shells',[])),
                 total_shell_cells=len(data.get('shells',[])),
                 validity='FORMULA_AUDIT_ONLY_NOT_SOLVER_VERIFICATION',
                 warning='No reactions, beam forces or mesh-convergence results are inferred. Run separate matching gravity solves with ETABS response comparison')
-    (json_dir/f'Slab_Load_Path_MESH_{n:02d}_{stamp}_MANIFEST.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
+    atomic_json(json_dir/f'Slab_Load_Path_MESH_{n:02d}_{stamp}_MANIFEST.json',record)
     return path
 
 
