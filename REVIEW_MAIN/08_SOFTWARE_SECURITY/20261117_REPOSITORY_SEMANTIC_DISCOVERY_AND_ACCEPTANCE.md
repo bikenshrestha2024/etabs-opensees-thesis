@@ -71,3 +71,11 @@ Manual inspection of source searches shows many `exec(compile(...))` occurrences
 ## What remains OPEN
 
 This audit improves systematic discovery, the integrated dependency graph and reliability of CI tests. **It does not mean all 3,149 files or every generated function-level review unit has been manually read and semantically accepted.** The existing function review register correctly starts each unit at `NOT_REVIEWED`; never bulk-promote to accepted. Production physics, source EDB and numerical solver are not modified in this audit branch. Native Windows ETABS v23 / OpenSeesPy comparisons and all thesis engineering acceptance tests remain open under issue #75.
+
+## 2026-11-17 follow-up: exact-source semantic-attestation gate
+
+The original integrated function review register correctly marked all source symbols NOT_REVIEWED, but had no way to retain narrowly reviewed functions after their code, tests and review notes were inspected. New repo-tracked docs/review/ledger/semantic_review_attestations.csv attaches an exact **Git blob SHA**, symbol, reviewer, evidence document and runnable test to each narrowly inspected source function. The canonical integrated scanner now rejects changed/stale blobs, duplicate entries, unsafe/untracked evidence and unknown symbols; CI becomes BLOCKED until corrected.
+
+First attested source scopes: gravity workbook atomic publisher, storey-gravity exporter, mesh-formula workbook exporter and explicit NBC Excel reference reader. These were examined specifically for source/model provenance, worksheet publication, SHA streaming, output integrity and failure propagation, with reproducible red-then-green tests in PRs #97/#98. The status SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED is deliberately distinct from full independent semantic review and all native ETABS/OpenSees / NBC acceptance; semantic_review_completed_count remains 0. The generated audit/integrated/08_SEMANTIC_REVIEW/attestation_validation.json records precise attested counts and violations without promoting unrelated source functions.
+
+**Remaining 3,000+ tracked file baseline and all unreviewed active symbols stay in the authoritative review queue.** Do not interpret four narrowly scoped code reviews or zero static dependency failures as complete thesis engineering validation.
