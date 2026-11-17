@@ -43,6 +43,27 @@ class TimingMetadataLayoutTests(unittest.TestCase):
             self.assertEqual(status["status"],"failed")
             self.assertEqual((root/"partial.json").read_text(),"{}")
 
+    def test_new_fast_output_detected_despite_clock_filesystem_skew(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            (root/"original.json").write_text('{"old":true}',encoding="utf-8")
+            @timed_outputs("very short failed export","output")
+            def fail(output):
+                (Path(output)/"new_failure.json").write_text('{"partial":true}')
+                raise RuntimeError("original solver exception retained")
+            # Filesystem timestamps need not match the wall clock's
+            # nanosecond resolution or be strictly later than invocation.
+            with patch("components.shared.timing.time.time_ns",
+                       return_value=10**20):
+                with self.assertRaisesRegex(RuntimeError,"original solver"):
+                    fail(root)
+            expected=root/"00_PROCESSING_METADATA"/"ARTIFACTS"
+            marker=expected/"new_failure.json.processing.json"
+            self.assertTrue(marker.is_file(),
+                            "Newly written failure evidence must not be lost")
+            self.assertEqual(json.loads(marker.read_text())["status"],"failed")
+            self.assertFalse((expected/"original.json.processing.json").exists())
+
     def test_explicit_stage_timer_uses_same_metadata_subfolder(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
