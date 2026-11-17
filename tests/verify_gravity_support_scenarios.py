@@ -39,6 +39,23 @@ class DualWallGravityTests(unittest.TestCase):
             dest=export_wall_support_comparison(audit,d)
             self.assertTrue((dest/'Gravity_Wall_Base_Strategy_Comparison.xlsx').exists())
             self.assertTrue((dest/'Gravity_Wall_Base_Nodal_Reaction_Differences.csv').exists())
+    def test_reject_mixed_source_model_identity(self):
+        self.first["model_sha256"] = "a" * 64
+        self.second["model_sha256"] = "b" * 64
+        with self.assertRaisesRegex(ValueError, "source model"):
+            compare_wall_support_gravity(self.first, self.second)
+
+        self.second.pop("model_sha256")
+        with self.assertRaisesRegex(ValueError, "source model"):
+            compare_wall_support_gravity(self.first, self.second)
+
+    def test_accept_identical_explicit_source_model_identity(self):
+        self.first["model_sha256"] = "a" * 64
+        self.second["model_sha256"] = "a" * 64
+        result = compare_wall_support_gravity(self.first, self.second)
+        self.assertEqual(result["status"],
+                         "SENSITIVITY_NOT_ETABS_VALIDATION_OR_FOUNDATION_DESIGN")
+
     def test_mixed_gravity_factors_are_rejected(self):
         self.second['gravity_profile']='AS_CONFIGURED'
         with self.assertRaisesRegex(ValueError,'not full'):
