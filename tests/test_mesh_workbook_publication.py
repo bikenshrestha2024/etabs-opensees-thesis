@@ -62,6 +62,33 @@ class MeshWorkbookPublicationTests(unittest.TestCase):
                          "FORMULA_AUDIT_ONLY_NOT_SOLVER_VERIFICATION")
         self.assertFalse(list((self.output/"EXCEL").glob(".mesh_*.xlsx")))
 
+    def test_atomic_writer_rejects_redirected_symlink_output(self):
+        from openpyxl import Workbook
+        from components.gravity.workbook_publishing import publish_workbook
+        other=self.root/"private_destination"
+        other.mkdir()
+        link=self.root/"redirected_output"
+        try:
+            link.symlink_to(other,target_is_directory=True)
+        except (OSError,NotImplementedError):
+            self.skipTest("Host cannot create folder symlinks")
+        target=link/"unreviewed.xlsx"
+        with self.assertRaisesRegex(ValueError,"linked XLSX"):
+            publish_workbook(Workbook(),target,temp_prefix=".mesh_")
+        self.assertEqual(list(other.iterdir()),[])
+
+    def test_atomic_writer_preserves_previous_file_if_excel_has_file_lock(self):
+        from openpyxl import Workbook
+        from components.gravity.workbook_publishing import publish_workbook
+        target=self.root/"existing.xlsx"
+        target.write_bytes(b"PRIOR_EVIDENCE_UNCHANGED")
+        with patch("components.gravity.workbook_publishing.os.replace",
+                   side_effect=PermissionError("Excel has the file open")):
+            with self.assertRaisesRegex(PermissionError,"Excel"):
+                publish_workbook(Workbook(),target,temp_prefix=".mesh_")
+        self.assertEqual(target.read_bytes(),b"PRIOR_EVIDENCE_UNCHANGED")
+        self.assertFalse(list(self.root.glob(".mesh_*.xlsx")))
+
     def test_successful_corrupt_mesh_xlsx_is_not_marked_ready(self):
         from components.gravity.load_path_formulas import export
         def wrong_save(wb,path):
