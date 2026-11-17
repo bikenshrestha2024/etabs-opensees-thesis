@@ -101,6 +101,24 @@ class SemanticRepositoryInventoryTests(unittest.TestCase):
         self.assertEqual(report["status"], "STATIC_TRIAGE_ONLY")
         self.assertIn("NOT_NATIVE_ENGINEERING_VALIDATION", report["scope"])
 
+    def test_critical_review_queue_exposes_dependency_concentration(self):
+        self.add("components/__init__.py", "")
+        self.add("components/core.py", "def calculate(): return 42\n")
+        self.add("components/a.py", "from components.core import calculate\n")
+        self.add("components/b.py",
+                 "import components.core\n"
+                 "def run():\n"
+                 "    try:\n"
+                 "        return components.core.calculate()\n"
+                 "    except Exception:\n"
+                 "        pass\n")
+        report=audit_repository(self.root)
+        self.assertEqual(report["review_candidate_counts"]["SWALLOWED_EXCEPTION"],1)
+        self.assertEqual(report["dependency_in_degree"]["components/core.py"],2)
+        queue={row["path"]:row for row in report["priority_review_queue"]}
+        self.assertEqual(queue["components/core.py"]["incoming_local_dependencies"],2)
+        self.assertEqual(queue["components/b.py"]["advisory_count"],1)
+
     def test_legacy_names_and_directory_counts_are_reproducible(self):
         self.add("01_MAIN_GUI.py", "import components.core\n")
         self.add("components/__init__.py", "")
