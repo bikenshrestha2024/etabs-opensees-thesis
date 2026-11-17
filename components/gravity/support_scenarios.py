@@ -25,6 +25,16 @@ def compare_wall_support_gravity(source_result, continuous_result):
     [REF docs/review/GRAVITY_ETABS_COMPARISON.md]
     """
     results={SOURCE:source_result,CONTINUOUS:continuous_result}
+    # Source-equivalent restraint sensitivity requires a common underlying
+    # source model. Equal applied gravity or joint XYZ alone is insufficient.
+    # If source identity is present in either result, it must be a complete,
+    # matching SHA-256 pair. All-absent legacy snapshots remain diagnostic only.
+    model_digests=[payload.get("model_sha256") for payload in results.values()]
+    if any(digest is not None for digest in model_digests):
+        if any(not isinstance(digest, str) or len(digest)!=64
+               or any(c not in "0123456789abcdefABCDEF" for c in digest)
+               for digest in model_digests) or len(set(model_digests)) != 1:
+            raise ValueError("Gravity source model SHA256 missing, invalid, or differs between support strategies")
     for mode,payload in results.items():
         if not payload.get("ok"):
             raise ValueError(mode+" did not complete gravity analysis")

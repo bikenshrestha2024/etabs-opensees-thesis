@@ -39,6 +39,23 @@ class DualWallGravityTests(unittest.TestCase):
             dest=export_wall_support_comparison(audit,d)
             self.assertTrue((dest/'Gravity_Wall_Base_Strategy_Comparison.xlsx').exists())
             self.assertTrue((dest/'Gravity_Wall_Base_Nodal_Reaction_Differences.csv').exists())
+    def test_reject_mixed_source_model_identity(self):
+        self.first["model_sha256"] = "a" * 64
+        self.second["model_sha256"] = "b" * 64
+        with self.assertRaisesRegex(ValueError, "source model"):
+            compare_wall_support_gravity(self.first, self.second)
+
+        self.second.pop("model_sha256")
+        with self.assertRaisesRegex(ValueError, "source model"):
+            compare_wall_support_gravity(self.first, self.second)
+
+    def test_accept_identical_explicit_source_model_identity(self):
+        self.first["model_sha256"] = "a" * 64
+        self.second["model_sha256"] = "a" * 64
+        result = compare_wall_support_gravity(self.first, self.second)
+        self.assertEqual(result["status"],
+                         "SENSITIVITY_NOT_ETABS_VALIDATION_OR_FOUNDATION_DESIGN")
+
     def test_mixed_gravity_factors_are_rejected(self):
         self.second['gravity_profile']='AS_CONFIGURED'
         with self.assertRaisesRegex(ValueError,'not full'):
@@ -124,6 +141,16 @@ class DualWallGravityTests(unittest.TestCase):
         self.first["nodes"][0]["x_m"]=float("nan")
         with self.assertRaisesRegex(ValueError,"nonfinite support node"):
             compare_wall_support_gravity(self.first,self.second)
+
+    def test_native_gravity_runner_records_executed_model_sha256(self):
+        # The comparison guard is useful only if newly executed solver
+        # results actually emit a model-file fingerprint.
+        gui=(Path(__file__).resolve().parents[1] /
+             "components/gravity/gui_and_reports.py").read_text(encoding="utf8")
+        self.assertIn("import hashlib", gui)
+        self.assertIn(
+            "hashlib.sha256(MODEL_SCRIPT.read_bytes()).hexdigest()", gui)
+        self.assertIn("'model_sha256':MODEL_SHA256", gui)
 
     def test_gui_uses_isolated_output_directories(self):
         src=(Path(__file__).resolve().parents[1]/
