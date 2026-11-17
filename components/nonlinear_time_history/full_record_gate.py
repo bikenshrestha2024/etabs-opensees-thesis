@@ -123,6 +123,8 @@ def compare_time_step_results(coarse,fine,*,max_relative_difference=None):
                     or not isinstance(b,str) or not b.strip() or a!=b):
                 raise ValueError("Time-step comparison case identity missing or differs: " + key)
     if max_relative_difference is not None:
+        if isinstance(max_relative_difference, bool):
+            raise ValueError("Invalid time-step comparison tolerance")
         try:
             tol=float(max_relative_difference)
         except (TypeError, ValueError, OverflowError) as exc:
@@ -132,6 +134,8 @@ def compare_time_step_results(coarse,fine,*,max_relative_difference=None):
         max_relative_difference=tol
     for name,report in (("coarse",coarse),("fine",fine)):
         for key in ("min_accepted_step_s","max_accepted_step_s"):
+            if isinstance(report.get(key), bool):
+                raise ValueError(f"{name} time-step evidence missing/invalid {key}")
             try:
                 value=float(report[key])
             except (KeyError,TypeError,ValueError,OverflowError) as exc:
@@ -143,9 +147,17 @@ def compare_time_step_results(coarse,fine,*,max_relative_difference=None):
     fields=("peak_roof_UX_m","peak_roof_UY_m","max_story_drift_X","max_story_drift_Y")
     values={}
     for key in fields:
-        a,b=float(coarse[key]),float(fine[key])
+        raw_a,raw_b=coarse.get(key),fine.get(key)
+        if isinstance(raw_a,bool) or isinstance(raw_b,bool):
+            raise ValueError(f"Invalid time-step metric {key}: boolean")
+        try:
+            a,b=float(raw_a),float(raw_b)
+        except (TypeError,ValueError,OverflowError) as exc:
+            raise ValueError(f"Invalid time-step metric {key}: missing/non-numeric") from exc
         if not all(math.isfinite(x) for x in (a,b)):
             raise ValueError(f"Nonfinite time-step metric {key}")
+        if a<0 or b<0:
+            raise ValueError(f"Invalid time-step metric {key}: negative peak demand")
         values[key]=dict(coarse=a,fine=b,relative_difference=abs(b-a)/max(abs(b),1e-12))
     passed=None if max_relative_difference is None else all(
         item["relative_difference"]<=max_relative_difference for item in values.values())
