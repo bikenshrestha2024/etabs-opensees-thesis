@@ -31,7 +31,7 @@ class LayoutAuditTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
-            (root / "BROKEN.md").write_bytes(b"\\xff\\xfe")
+            (root / "BROKEN.md").write_bytes(bytes((0xff, 0xfe)))
             (root / "OLD_NOTE.md").write_text("history", encoding="utf-8")
             subprocess.run(["git", "-C", str(root), "add", "."], check=True)
             report = audit(root)
