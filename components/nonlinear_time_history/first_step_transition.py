@@ -55,6 +55,7 @@ def capture_transition(ops, path, *, stage, focus_tags,
     target = Path(path)
     state = snapshot_selected_state(
         ops, target, suspect_tags=tags, stage=stage)
+    state["stage"] = stage
     state["source_model_sha256"] = source_model_sha256
     state["solver_state_modified"] = False
     state["mass_audit"] = {}
