@@ -142,6 +142,16 @@ class DualWallGravityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"nonfinite support node"):
             compare_wall_support_gravity(self.first,self.second)
 
+    def test_native_gravity_runner_records_executed_model_sha256(self):
+        # The comparison guard is useful only if newly executed solver
+        # results actually emit a model-file fingerprint.
+        gui=(Path(__file__).resolve().parents[1] /
+             "components/gravity/gui_and_reports.py").read_text(encoding="utf8")
+        self.assertIn("import hashlib", gui)
+        self.assertIn(
+            "hashlib.sha256(MODEL_SCRIPT.read_bytes()).hexdigest()", gui)
+        self.assertIn("'model_sha256':MODEL_SHA256", gui)
+
     def test_gui_uses_isolated_output_directories(self):
         src=(Path(__file__).resolve().parents[1]/
              'components/gravity/gui_and_reports.py').read_text(encoding='utf8')
