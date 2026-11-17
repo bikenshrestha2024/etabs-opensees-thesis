@@ -17,7 +17,9 @@
     "tests/test_model_mesh_case_workflow.py",
     "tests/test_slab_mesh_excel_paging.py",
     "engineering/agent_edits/2026-11-17/brace-status-mesh-export-performance.json",
-    ".github/workflows/integrated-repository-audit.yml"
+    ".github/workflows/integrated-repository-audit.yml",
+    "docs/review/ledger/semantic_review_attestations.csv",
+    "REVIEW_MAIN/01_GRAVITY/20261117_XLSX_ATOMIC_PUBLICATION_AND_SEMANTIC_EVIDENCE.md"
   ],
   "prior_search": "Existing assembly and mesh helpers, tests, guides and open PRs inspected; no duplicate implementation added.",
   "tests": {
@@ -37,7 +39,7 @@
     "syntax": "compileall passed for three changed production modules",
     "diff": "git diff --check passed",
     "review": "Independent code reviewer: no actionable correctness findings",
-    "ci_followup": "Initial targeted and integrated CI runs reached new brace test and failed because NumPy was absent. Add NumPy to both existing lightweight job dependency installs; rerun required."
+    "ci_followup": "After NumPy dependency correction, dedicated export CI passed and 243 integrated regressions passed (1 skipped). Integrated static audit found stale load_path_formulas.export module SHA. Re-inspected unchanged export function and refreshed its function-only attestation/evidence; rerun static audit."
   },
   "deferred": [
     "Windows ETABS GUI and full-model 4/8/16 rebuild timing",
