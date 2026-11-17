@@ -64,3 +64,22 @@ Repository-scoped outputs: `audit/repository_semantics.json` (generated CI artif
 ## 6. Provenance and limitations
 
 Only repository code, filename metadata and prior documented gravity/solver evidence were available. The private Windows EDB, full raw solver model/results and 531 MB workbook were not executed or evaluated in this static audit. GitHub CI can check syntax/dependency/provenance and Linux-compatible unit tests, but cannot certify ETABS v23 OAPI and nonlinear physical calibration.
+
+## 7. Audited CI discovery evidence and confirmed workflow defects
+
+The first expanded GitHub Actions run on the audit branch reported **3,154 tracked files** (five new tracked audit artifacts on top of the 3,149-file baseline), 348 active runtime Python modules, 225 test Python modules, 1,216 historical snapshot files, 1,362 tracked non-Python files and 3 other provenance-only Python files. The source graph contained 1,038 local dependency edges. After correcting PEP 420 namespace and relative `__init__` handling, active parsing/compilation and resolvable local import checks both reported **zero exceptions**. This is a *static gate only*.
+
+The analyzer reports 147 advisory patterns: 71 dynamic `exec`/`eval` calls and 76 pass-only exception handlers. Manual GitHub code search shows that many dynamic-execution calls are **root compatibility facades** that execute local component module code to preserve older exported source contracts; they are not automatically arbitrary command injection. Several exception suppressions are intentional cleanup or GUI parsing fallbacks, but they need contextual review on critical paths. Do not automatically remove them. The priority queue identifies `components/inputs/project_workbooks.py` (63 import edges), `components/inputs/output_contract.py` and `components/inputs/output_layout.py` (44 each), plus the numbered export/GUI facades and engineering assembly code as central modules.
+
+**CI-001 CONFIRMED:** The `.github/workflows/repository-integrity.yml` multi-command block did not stop after a failed Python test. Earlier Actions jobs returned green despite explicit `FAILED (failures=1)` in logs. The audit branch now sets `set -euo pipefail` and enables `--fail-on-active-errors`; this is a genuine continuous-integration reliability correction. This strict gate subsequently exposed two pre-existing brittle Plotly regression assertions:
+- `tests/test_assembled_mesh_view.py` compared an unescaped literal `4×4` to Plotly's JSON-escaped Unicode title. The visual model was unchanged; assertion now checks the serialized title.
+- `tests/test_source_view_compaction.py` compared a list of expected triangle indices to a tuple of identical values, triggering a false failure. The test now compares equivalent tuple representations.
+
+These fixes concern **tests and CI correctness**, not physical ShellMITC4 element formulation or ETABS load flow. All later CI tests must still be run under strict exit handling before any merge.
+
+## 8. Review hold points
+
+- Open: specific root compatibility `exec` facades and ignored exceptions in gravity/export, modal, ESM/MRSM and NLTHA require targeted manual trust-boundary audit; code-search advisories are not proof of attack.
+- Open: all gravity/analysis outputs must retain source model SHA, exact load pattern and support labels; static output folder inventory cannot certify old consumer compatibility after renames.
+- Open: equivalent wall support regions, ETABS native analysis joints, material and damper benchmark calibration, NBC 105:2025 code-purpose matrix and full nonlinear completed history acceptance remain native-model gates.
+- The new `audit/repository_semantics.json` is an ACTIONS ARTIFACT; it must not be committed as a research result nor conflated with a final physics review.
