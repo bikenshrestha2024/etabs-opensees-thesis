@@ -49,6 +49,23 @@ class TestDirectExcelReference(unittest.TestCase):
             self.assertEqual(ref['source_identity'],'SAME_EDB_PATH_REFERENCE')
             self.assertFalse(ref['code_accepted'])
 
+    def test_direct_xlsx_sha_streams_without_eager_whole_file_memory(self):
+        from unittest.mock import patch
+        import hashlib
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);path=prepared(root)
+            original=Path.read_bytes
+            def guarded_read(source):
+                if Path(source).suffix.casefold()==".xlsx":
+                    raise AssertionError("Large XLSX must not be read entirely for checksum")
+                return original(source)
+            with patch.object(Path,"read_bytes",guarded_read):
+                ref=read_explicit_excel_calculation(path,root,"ULS")
+            self.assertEqual(ref["workbook_sha256"],
+                             hashlib.sha256(original(path)).hexdigest())
+            self.assertEqual(ref["source_identity"],"SAME_EDB_PATH_REFERENCE")
+            self.assertFalse(ref["code_accepted"])
+
     def test_explicit_different_copy_edb_is_diagnostic_only(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)

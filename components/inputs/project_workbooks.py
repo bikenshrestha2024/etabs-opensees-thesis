@@ -572,6 +572,12 @@ def read_explicit_excel_calculation(workbook_path, export_dir, limit_state):
     status=('SAME_EDB_PATH_REFERENCE' if exact else
             'BYTE_IDENTICAL_EDB_REFERENCE' if identical else
             'DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY')
+    # Source XLSX can be very large. Compute provenance without allocating
+    # the entire OOXML archive in memory after openpyxl has read its cells.
+    # Python 3.12 file_digest consumes the already-open stream in bounded chunks.
+    import hashlib
+    with path.open('rb') as workbook_stream:
+        workbook_sha256=hashlib.file_digest(workbook_stream,'sha256').hexdigest()
     return dict(values=values,cells=cells,source_workbook=str(path),
                 source_sheet=source_sheet,workbook_source_edb=source,
                 current_export_source_edb=current,source_identity=status,
@@ -581,7 +587,7 @@ def read_explicit_excel_calculation(workbook_path, export_dir, limit_state):
                         'piers. A different source EDB is a research comparison only; '
                         'wall openings, effective area and code acceptance remain '
                         'unverified until reconciled.'),
-                workbook_sha256=__import__('hashlib').sha256(path.read_bytes()).hexdigest())
+                workbook_sha256=workbook_sha256)
 
 
 def scaling_workbook_diagnostics(root,export_dir,limit_state='ULS'):

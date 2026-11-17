@@ -53,3 +53,11 @@ to export/excel/source and retains verified references to larger source files.
 Authoritative project workbook source registry fallback previously used Path(__file__).parents[2], incorrect under root exec facade OpenSees_Project_Inputs_V123 and could miss project_sources.private.json / excel/SOURCE_REGISTRY.json. Source-aware _runtime_repo_root now uses _component_source (when root facade) or real component __file__ (when direct import). Preserve labeled Aw/T1 workbook values and EDB matching; no source EDB/XLSX change.
 
 Scope of tests: synthetic direct-module import, exec-root facade, exported-runtime facade path consistency in `tests/test_facade_runtime_context.py`. No native ETABS/OpenSees, source workbook or full engineering model was executed in these path-only regressions.
+
+## 2026-11-17 — explicit NBC Excel reader memory and provenance review
+
+The source-inspected read_explicit_excel_calculation(workbook_path, export_dir, limit_state) uses openpyxl in read-only/data-only mode to extract labelled Aw-X/Y and optional adopted T1X/Y. The method separately classifies same-source EDB path, byte-identical EDB copy and DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY; **code_accepted remains false**. This is source evidence, not NBC design acceptance.
+
+A confirmed memory issue existed in the final provenance check: hashlib.sha256(path.read_bytes()) duplicated the entire Excel source ZIP in Python memory after it had been parsed. On a large user-selected workbook, this creates an avoidable full-file allocation and may induce swapping or failure. The correction uses hashlib.file_digest(open_binary_stream, 'sha256') on Python 3.12, preserving the exact digest, Aw/T extraction, source identity and research-only restrictions. A deterministic test forbids whole-file XLSX Path.read_bytes() and checks the output SHA against an independently computed expected digest.
+
+This correction does NOT change NBC 105:2025 Aw calculations, source piers/opening grouping, ULS/SLS source state, effective period, ESM/MRSM factors, root EDB selection or native OpenSees model assembly. Large workbook parsing may still take time and must be profiled separately. Native ETC/ETABS numerical and 32/76/97 reaction comparisons remain unverified.
