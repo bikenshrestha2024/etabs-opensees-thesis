@@ -160,7 +160,8 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
         else:
             if rc == 0:
                 evidence_path = diagnostics.get("evidence_output_path")
-                if evidence_path and Path(evidence_path).is_file():
+                if (evidence_path and Path(evidence_path).is_file()
+                        and not diagnostics.get("preserve_first_step_failure_evidence")):
                     Path(evidence_path).unlink()
                 diagnostics['minimum_accepted_dt_s']=min(float(dt),diagnostics.get('minimum_accepted_dt_s',float(dt)))
                 try:diagnostics['max_convergence_iterations']=max(ops.testIter(),diagnostics.get('max_convergence_iterations',0))
@@ -272,6 +273,49 @@ def _run_analysis(config):
                     model.parent / "OpenSees_Complete_Element_Map_V118.json"
                 ),
             })
+            # A diagnostic-only companion to the existing bounded Newton
+            # recovery, informed by the fork's gravity/eigen/TH analysis order.
+            # This does NOT import its frame model, Steel02 constants or
+            # Rayleigh formulation into the E-SFI-MVLEM-3D building.
+            first_step_diagnostic=config.get("diagnostic_first_step_wall",False)
+            if type(first_step_diagnostic) is not bool:
+                raise ValueError("diagnostic_first_step_wall must be a boolean")
+            first_step_files=[]
+            if first_step_diagnostic:
+                from components.nonlinear_time_history.first_step_transition import (
+                    capture_transition, compare_first_step_stages,
+                    diagnostic_focus_tags)
+                focus_tags=diagnostic_focus_tags(config)
+                focus_dir=(out/"09_SOFTWARE_DIAGNOSTICS"/
+                           "NLTHA_FIRST_STEP"/case)
+                focus_dir.mkdir(parents=True,exist_ok=True)
+                import hashlib
+                with model.open("rb") as source_script:
+                    focus_source_sha=hashlib.file_digest(
+                        source_script,"sha256").hexdigest()
+                profiler.solver_diagnostics["suspect_tags"]=focus_tags
+                profiler.solver_diagnostics[
+                    "preserve_first_step_failure_evidence"]=True
+                print(f"[FIRST STEP DIAGNOSTIC] {case}: "
+                      f"focused solver tags={focus_tags}; no model changes",
+                      flush=True)
+                def write_focus(stage):
+                    path=focus_dir/(stage+".json")
+                    evidence=capture_transition(
+                        ops,path,stage=stage,focus_tags=focus_tags,
+                        source_model_sha256=focus_source_sha)
+                    first_step_files.append(path)
+                    print(f"[FIRST STEP DIAGNOSTIC] {stage}: "
+                          f"{evidence['status']}",flush=True)
+                    return evidence
+                def summarize_focus():
+                    if first_step_files:
+                        comparison=compare_first_step_stages(
+                            first_step_files,
+                            focus_dir/"FIRST_STEP_TRANSITION_REVIEW.json")
+                        print("[FIRST STEP DIAGNOSTIC] comparison: "+
+                              comparison["status"]+
+                              " (root cause NOT established)",flush=True)
             sys.path.insert(0, str(model.parent))
             if "openseespy.opensees" in sys.modules:
                 del sys.modules["openseespy.opensees"]
@@ -296,6 +340,8 @@ def _run_analysis(config):
                 # being applied twice. See REVIEW_MAIN/00_MODEL/
                 # 20261113_NBC_IS_INITIAL_PDELTA_CODE_HIERARCHY.md.
                 ops.loadConst("-time", 0.0)
+                if first_step_diagnostic:
+                    write_focus("GRAVITY_FROZEN")
                 periods = (float(config["damping_period_1_s"]), float(config["damping_period_2_s"]))
                 if min(periods) <= 0: raise ValueError("Both Rayleigh calibration periods must be positive.")
                 zeta = float(config["damping_ratio_percent"]) / 100.0
@@ -315,6 +361,8 @@ def _run_analysis(config):
                 from components.shared.eigen_solver import solve_eigen
                 eigenvalues = solve_eigen(ops,ncheck)
                 profiler.add('damping_eigenanalysis',phase_clock)
+                if first_step_diagnostic:
+                    write_focus("AFTER_EIGEN")
                 frequencies = [math.sqrt(float(v)) for v in eigenvalues if float(v) > 0]
                 if not frequencies: raise RuntimeError("Eigen analysis returned no positive frequencies for Rayleigh damping check.")
                 damping_model=config.get("damping_model","Rayleigh committed")
@@ -380,6 +428,8 @@ def _run_analysis(config):
                 # an independent step bound; it is not Tn/100.
                 linear_solver = config.get("linear_solver", "UmfPack")
                 _configure_nonlinear_transient(ops, linear_solver=linear_solver)
+                if first_step_diagnostic:
+                    write_focus("BEFORE_EXCITATION")
                 # Record every accepted adaptive substep, including intermediate peaks.
                 gravity_offsets={s["node"]:list(ops.nodeDisp(s["node"])) for s in stories}
                 # Read-only response recording: this does not change the
@@ -454,13 +504,25 @@ def _run_analysis(config):
                     verify_numeric_accepted_row(row, row_index=len(lines))
                     lines.append(row)
                     stream.append(row)
+                    if first_step_diagnostic and not any(
+                            path.name=="FIRST_ACCEPTED_STEP.json"
+                            for path in first_step_files):
+                        write_focus("FIRST_ACCEPTED_STEP")
+                        summarize_focus()
                     profiler.internal_steps+=1
                     profiler.sample_seconds+=time.perf_counter()-sample_clock
                 profiler.solve_clock=time.perf_counter()
                 for step in range(nsteps):
                     dt_this = min(dt, max(0.0, duration - float(ops.getTime())))
                     if dt_this <= 1.0e-12: break
-                    substeps = _advance_nonlinear_interval(ops, dt_this, on_accept=record_accepted,diagnostics=profiler.solver_diagnostics)
+                    try:
+                        substeps = _advance_nonlinear_interval(
+                            ops, dt_this, on_accept=record_accepted,
+                            diagnostics=profiler.solver_diagnostics)
+                    except Exception:
+                        if first_step_diagnostic:
+                            summarize_focus()
+                        raise
                     if (step + 1) % max(1, nsteps // 20) == 0 or time.perf_counter()>=next_progress_at:
                         print(f"[PROGRESS] {case}: {step + 1}/{nsteps} steps, t={ops.getTime():.3f}s", flush=True)
                         profiler.progress(step+1,nsteps);stream.flush();next_progress_at=time.perf_counter()+10.
