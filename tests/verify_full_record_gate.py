@@ -8,6 +8,13 @@ class GateTests(unittest.TestCase):
                                    dict(time_s=.005,drift=.01)],.005,.005)
         self.assertTrue(r["full_record_completed"])
         self.assertFalse(r["model_verification_complete"])
+    def test_time_tolerance_cannot_bypass_full_duration(self):
+        rows=[dict(time_s=0.,drift=0.),dict(time_s=.1,drift=.02)]
+        for invalid in (float("nan"),float("inf"),-0.01,True,1.0):
+            with self.subTest(tolerance=invalid):
+                with self.assertRaisesRegex(ValueError,"time tolerance"):
+                    verify_accepted_history(rows,1.,1.,time_tolerance_s=invalid)
+
     def test_truncated(self):
         r=verify_accepted_history([dict(time_s=0.,drift=0.),dict(time_s=.005,drift=.01)],10.,.005)
         self.assertEqual(r["status"],"TRUNCATED_DIAGNOSTIC")
