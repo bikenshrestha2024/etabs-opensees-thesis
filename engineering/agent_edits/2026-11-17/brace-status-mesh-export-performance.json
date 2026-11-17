@@ -16,7 +16,8 @@
     "tests/test_area_folder_and_hinged_brace_review.py",
     "tests/test_model_mesh_case_workflow.py",
     "tests/test_slab_mesh_excel_paging.py",
-    "engineering/agent_edits/2026-11-17/brace-status-mesh-export-performance.json"
+    "engineering/agent_edits/2026-11-17/brace-status-mesh-export-performance.json",
+    ".github/workflows/integrated-repository-audit.yml"
   ],
   "prior_search": "Existing assembly and mesh helpers, tests, guides and open PRs inspected; no duplicate implementation added.",
   "tests": {
@@ -35,7 +36,8 @@
     ],
     "syntax": "compileall passed for three changed production modules",
     "diff": "git diff --check passed",
-    "review": "Independent code reviewer: no actionable correctness findings"
+    "review": "Independent code reviewer: no actionable correctness findings",
+    "ci_followup": "Initial targeted and integrated CI runs reached new brace test and failed because NumPy was absent. Add NumPy to both existing lightweight job dependency installs; rerun required."
   },
   "deferred": [
     "Windows ETABS GUI and full-model 4/8/16 rebuild timing",

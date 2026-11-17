@@ -53,7 +53,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install minimal isolated dependencies
-        run: python -m pip install --disable-pip-version-check pytest openpyxl
+        run: python -m pip install --disable-pip-version-check pytest openpyxl numpy
       - name: Run non-native staging and ID tests
         run: >-
           python -m pytest -q
