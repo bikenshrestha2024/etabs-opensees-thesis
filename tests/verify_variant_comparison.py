@@ -89,10 +89,13 @@ class CompareTests(unittest.TestCase):
 
     def test_reject_different_record_hash_for_xy_yx_same_pair(self):
         data=suite()
-        for case in data["M2"]:
-            if (case["limit_state"],case["pair_id"],case["orientation"]) == ("ULS","P1","YX"):
-                case["record_sha256"]="f"*64
-                break
+        # Existing cross-variant SHA checks reject a mismatch affecting
+        # only M2. The gap occurs when the same wrong YX record is used
+        # throughout ALL seven variants while XY uses a different record.
+        for cases in data.values():
+            for case in cases:
+                if (case["limit_state"],case["pair_id"],case["orientation"]) == ("ULS","P1","YX"):
+                    case["record_sha256"]="f"*64
         with self.assertRaisesRegex(ValueError,"orientation.*record|record.*orientation"):
             compare_completed_cases(manifest(),data)
 
