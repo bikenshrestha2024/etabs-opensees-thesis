@@ -350,6 +350,77 @@ def inspect_semantic_review_units(root: Path, source_entries: list[dict],
         r["path"], r["start_line"], r["symbol"]))
 
 
+def apply_source_review_attestations(root: Path, units: list[dict],
+                                      indexed: dict[str, dict]) -> tuple[list[dict], list[dict]]:
+    """Conservatively annotate exact-SHA source inspections, never certify FEM.
+
+    [REF docs/source/tools/audit_repository_integrated.py.md]
+    A source edit invalidates its earlier attestation. A missing, untracked,
+    redirected or duplicate evidence record blocks static-review approval.
+    """
+    register=root/"docs"/"review"/"ledger"/"semantic_review_attestations.csv"
+    updated=[dict(unit) for unit in units]
+    if not register.is_file():
+        return updated,[]
+    columns=("path","symbol","git_blob_sha","reviewer","evidence","test","status")
+    with register.open(encoding="utf-8-sig",newline="") as stream:
+        reader=csv.DictReader(stream)
+        if not reader.fieldnames or any(c not in reader.fieldnames for c in columns):
+            return updated,[{"code":"INVALID_REVIEW_LEDGER_COLUMNS",
+                             "path":"docs/review/ledger/semantic_review_attestations.csv"}]
+        entries=list(reader)
+    lookup={(item["path"],item["symbol"]):item for item in updated}
+    errors=[];valid=[];seen=set();blocked=set()
+    def issue(code,key):
+        errors.append({"code":code,"path":key[0],"symbol":key[1]})
+        blocked.add(key)
+    def tracked_safe(raw,kind):
+        if not isinstance(raw,str) or not raw or "\\" in raw:
+            return False
+        path=Path(raw)
+        if (path.is_absolute() or ".." in path.parts
+                or not raw.startswith(
+                    ("REVIEW_MAIN/","docs/review/ledger/") if kind=="evidence"
+                    else ("tests/",))):
+            return False
+        target=root/path
+        return (raw in indexed and target.is_file() and
+                not any(p.is_symlink() for p in (target,*target.parents)
+                        if p!=root and root in p.parents))
+    for row in entries:
+        key=(row.get("path",""),row.get("symbol",""))
+        if key in seen:
+            issue("DUPLICATE_ATTESTATION",key)
+        seen.add(key)
+        current=lookup.get(key)
+        if current is None:
+            issue("UNKNOWN_SOURCE_SYMBOL",key)
+            continue
+        if row.get("status")!="SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED":
+            issue("INVALID_SEMANTIC_REVIEW_STATUS",key)
+        sha=row.get("git_blob_sha","")
+        if (not re.fullmatch(r"[a-f0-9]{40}",sha) or
+                sha!=current.get("git_blob_sha") or
+                sha!=indexed.get(key[0],{}).get("git_blob_sha")):
+            issue("STALE_SOURCE_SHA",key)
+        if not row.get("reviewer","").strip():
+            issue("MISSING_REVIEWER",key)
+        if not tracked_safe(row.get("evidence",""),"evidence"):
+            issue("UNSAFE_EVIDENCE_PATH",key)
+        tests=row.get("test","").split("|")
+        if not tests or any(not tracked_safe(t,"test") for t in tests):
+            issue("UNSAFE_TEST_PATH",key)
+        valid.append((key,row))
+    for key,row in valid:
+        if key in blocked:
+            continue
+        entry=lookup[key]
+        entry["semantic_review_status"]="SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED"
+        entry["reviewer"]=row["reviewer"]
+        entry["evidence"]=row["evidence"]
+    return updated,sorted(errors,key=lambda x:(x["path"],x["symbol"],x["code"]))
+
+
 def inspect_exec_facades(root: Path, entries: list[dict],
                          indexed: dict[str, dict]) -> list[dict]:
     """Inventory every tracked exec-loaded root compatibility facade.
