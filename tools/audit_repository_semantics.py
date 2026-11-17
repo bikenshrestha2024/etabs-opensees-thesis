@@ -140,10 +140,12 @@ def _imports(tree):
     return imports
 
 
-def _resolve_import(source_module, imported, level, modules, namespace_heads):
+def _resolve_import(source_module, imported, level, modules, namespace_heads,
+                    *, is_package_init=False):
     if level:
         components = source_module.split(".")
-        parent = components[:-1]
+        # A package __init__.py denotes the package itself, not a child module.
+        parent = components if is_package_init else components[:-1]
         up = level - 1
         if up > len(parent):
             return None, "BAD_RELATIVE_IMPORT"
@@ -176,6 +178,13 @@ def audit_repository(root: Path = DEFAULT_ROOT) -> dict:
     }
     namespace_heads = set(RUNTIME_DIRS | ANALYSIS_DIRS)
     namespace_heads.update(name for name in modules if "." not in name)
+    # Namespace packages are importable without __init__.py (PEP 420).
+    # Every parent directory containing tracked active/test Python belongs
+    # to the local Python package path, but a nonexistent child does not.
+    for name in modules:
+        parts=name.split(".")
+        namespace_heads.update(".".join(parts[:i])
+                               for i in range(1,len(parts)))
     runtime, errors, edges, missing, candidates = [], [], [], [], []
     tops, groups = Counter(), Counter()
     for item in entries:
@@ -206,8 +215,9 @@ def audit_repository(root: Path = DEFAULT_ROOT) -> dict:
             if key in seen:
                 continue
             seen.add(key)
-            target, reason = _resolve_import(mod, imported, level, modules,
-                                             namespace_heads)
+            target, reason = _resolve_import(
+                mod, imported, level, modules, namespace_heads,
+                is_package_init=path.endswith("/__init__.py"))
             if reason == "RESOLVED":
                 if target != path:
                     edges.append(dict(source=path, target=target,
