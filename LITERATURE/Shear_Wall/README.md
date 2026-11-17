@@ -24,3 +24,8 @@
 - Record source file/code location in the [citation occurrences ledger](../CODE_CITATION_OCCURRENCES.csv) when available; **absence from a partial snapshot is not proof the repository does not cite the paper**.
 - Original PDF: private user-uploaded papers are not mirrored to public GitHub without a verified redistribution license.
 - Citation counts are dated, source-specific bibliometric snapshots and may be blank.
+
+
+## November 2026 nonlinear wall convergence research
+
+- [2026 refined SFI-MVLEM consistent-tangent preprint/institutional report and LFSAFE benchmark](2026_REFINED_SFI_TANGENT_CONVERGENCE_REVIEW.md). This is a research lead; no claim that the external 2026 formulation is installed in the E-SFI-MVLEM-3D solver.
