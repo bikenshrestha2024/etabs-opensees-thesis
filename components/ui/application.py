@@ -2477,6 +2477,8 @@ class App:
         action(group_0_0,text="Open ETABS connectivity + load views",command=self._show_last_exports)
         action(group_0_0,text="Refresh saved 3D view controls (no ETABS/model assembly)",command=self._refresh_saved_source_views)
         action(group_0_0,text="3D actual assembled 4×4 mesh (on demand; no ETABS rerun)",command=self._open_assembled_mesh_view)
+        action(group_0_1,text="Generate full gravity load-path Excel (on demand; no ETABS rerun)",command=self._generate_storey_gravity_excel)
+        ttk.Label(group_0_1,text="For ETABS/Excel gravity source-load review. This workbook does not calculate 32/76/97 solver reactions; use reaction comparison reports for restraint equivalence.",wraplength=420,justify="left",foreground="#59677b").pack(anchor="w",pady=(0,6))
         action(group_0_1,text="ETABS / OpenSees ID lookup + Excel support audit",command=self._open_id_lookup)
         action(group_0_1,text="Open ETABS frame / area load audit",command=self._open_load_audit_explanation)
         action(group_1_0,text="ETABS section mapping → OpenSees fiber sections",command=self._open_section_mapping)
