@@ -87,6 +87,15 @@ class CompareTests(unittest.TestCase):
         self.assertAlmostEqual(u["nbc105_aggregate_reduction_percent"],-200.)
         self.assertFalse(u["aggregate_is_code_approval"])
 
+    def test_reject_different_record_hash_for_xy_yx_same_pair(self):
+        data=suite()
+        for case in data["M2"]:
+            if (case["limit_state"],case["pair_id"],case["orientation"]) == ("ULS","P1","YX"):
+                case["record_sha256"]="f"*64
+                break
+        with self.assertRaisesRegex(ValueError,"orientation.*record|record.*orientation"):
+            compare_completed_cases(manifest(),data)
+
     def test_reject_changed_mass(self):
         p=manifest();p["variants"][3]["mass_basis_sha256"]="c"*64
         with self.assertRaisesRegex(ValueError,"mass_basis"):
