@@ -34,7 +34,7 @@ MATERIAL_OVERRIDE_BOUNDS = {
     'frame.E0_mpa': (10000., 300000.),
     'frame.steel_b': (0., .5),
     'frame.steel_R0': (1., 50.),
-    'frame.steel_cR1': (.001, 50.),
+    'frame.steel_cR1': (.001, .999999),
     'frame.steel_cR2': (.001, 1.),
     'wall.fpcc_mpa': (-300., -1.),
     'wall.epcc': (-.1, -1e-8),
@@ -51,7 +51,7 @@ MATERIAL_OVERRIDE_BOUNDS = {
     'wall.bp': (0., .5),
     'wall.bn': (0., .5),
     'wall.R0': (1., 50.),
-    'wall.cR1': (.001, 50.),
+    'wall.cR1': (.001, .999999),
     'wall.cR2': (.001, 1.),
     'wall.a1': (0., 10.),
     'wall.a2': (0., 10.),
@@ -121,7 +121,20 @@ FRAME_OVERRIDE_TARGETS = {
 
 
 def validate_frame_section_parameters(section):
-    """Reject Concrete01 cover/core curves with incompatible peak/residual points."""
+    """Reject incompatible concrete curves and unphysical steel transitions.
+
+    [REF docs/source/components/nonlinear_time_history/research_building_materials.py.md]
+    For the normalized OpenSees Menegotto transition, cR1>=1 can
+    drive the limiting transition curvature R below zero under cycling.
+    A paper's absolute coefficient a1=18.5 must first be converted
+    to cR1=a1/R0, not passed directly into Steel02/SteelMPF.
+    """
+    if "steel_cR1" in section:
+        value=float(section["steel_cR1"])
+        if not math.isfinite(value) or not 0.0 < value < 1.0:
+            raise ValueError(
+                "Frame Steel02 cR1 must be between 0 and 1; "
+                "convert any absolute Menegotto a1 using cR1=a1/R0")
     for label, peak_key, residual_key, peak_strain_key, ultimate_key in (
         ('cover', 'cover_fc_mpa', 'cover_fcu_mpa', 'cover_epsc0', 'cover_epsU'),
         ('core', 'core_fcc_mpa', 'core_fpcu_mpa', 'core_epsc0', 'core_epsU'),

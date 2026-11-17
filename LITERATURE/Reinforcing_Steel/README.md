@@ -13,3 +13,8 @@
 - Record source file/code location in the [citation occurrences ledger](../CODE_CITATION_OCCURRENCES.csv) when available; **absence from a partial snapshot is not proof the repository does not cite the paper**.
 - Original PDF: private user-uploaded papers are not mirrored to public GitHub without a verified redistribution license.
 - Citation counts are dated, source-specific bibliometric snapshots and may be blank.
+
+
+## November 2026 verified uploaded paper
+
+- [Carreño, Lotfizadeh, Conte and Restrepo (2020): Steel02 Grade 60 material parameter card](CARRENO_2020_STEEL02_PARAMETER_CARD.md), DOI 10.1061/(ASCE)ST.1943-541X.0002505, Table 12 (uploaded private PDF page 16); distinguishes ASTM A615/A706 and Fe500 and avoids publishing copyrighted PDF.
