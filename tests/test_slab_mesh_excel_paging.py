@@ -31,10 +31,22 @@ class MeshExcelPagingTests(unittest.TestCase):
                 json.dumps({"etabs_load_pattern_self_weight_multipliers":[
                     {"pattern":"Self Weight","multiplier":1.0}]}))
             wb=Workbook()
+            # max_row scans every existing cell in a normal worksheet.
+            # Paging must not trigger that scan once per appended node.
+            from openpyxl.worksheet.worksheet import Worksheet
+            max_row=Worksheet.max_row.fget
+            scans=[]
+            def measured_max_row(sheet):
+                if sheet.title.startswith('Loaded node path'):
+                    scans.append(sheet.title)
+                return max_row(sheet)
             # Seven source cells produce 7 surface records and 28 node rows.
             # Force a test-only smaller limit (9 rows including header).
-            with patch("openpyxl.xml.constants.MAX_ROW",9):
+            with patch("openpyxl.xml.constants.MAX_ROW",9), patch.object(
+                    Worksheet,'max_row',property(measured_max_row)):
                 add_formula_audit(wb,folder,data=data,cfg=cfg)
+            self.assertLessEqual(len(scans),12,
+                                 'Node append must use O(1) paging, not repeated full-sheet scans')
             pages=[s for s in wb.worksheets if
                    s.title=="Loaded node path" or (s.title.startswith("Loaded node path ") and
                    s.title.removeprefix("Loaded node path ").isdecimal())]

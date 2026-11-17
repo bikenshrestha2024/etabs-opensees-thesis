@@ -37,3 +37,44 @@ The V118 complete export report now includes `hinged_brace_release_review` with 
 ## 2026-11-15 researcher-adopted pin-ended diagonal assumption
 
 The researcher has approved **retaining the existing ETABS pin-ended steel diagonal outrigger-brace assumption provisionally** while progressing source comparison and exploratory studies. This is **not** acceptance of the 112 members as physically verified pins, nor a blanket hinge for chord, belt, core/panel-zone, cap-truss or peripheral-column connections. The decision record [DB-OUT-2026-11-15-01](../../../../REVIEW_MAIN/00_MODEL/20261115_PROVISIONAL_HINGED_OUTRIGGER_BRACE_DESIGN_BASIS.md) grounds this modeling choice in the CTBUH outrigger guide §§2.2/2.8 and Jin Mao §3.5 example, Gunda & Anthugari (2022), and general truss/FEM mechanics (Shrikhande); these sources **do not** explicitly calibrate this ETABS member-end release pattern. Existing `GetReleases` parsing, elastic beam rotational releases and exploratory axial truss remain unchanged. The reviewed nonlinear `hinged_brace` rejection remains in force pending source connections, native benchmark, nonlinear buckling/connection and device calibration.
+
+
+## 2026-11-17 — completed elastic brace IDs and assembly progress
+
+Per-member elastic messages are now emitted after successful model-data
+assembly using the actual `solver_element_tags` already recorded by the frame
+segment loop. The pre-assembly identity string is retained for unsupported
+release errors only. Completed members record
+`elastic_status=ASSEMBLED_SOURCE_END_RELEASES`; they no longer claim their tags
+are pending or conflate elastic source releases with nonlinear hinges.
+The separate reviewed nonlinear warning and
+`BLOCKED_UNVERIFIED_CONNECTION_AND_BRACE` status remain: neither source
+releases nor a successful elastic export calibrates connection behavior,
+compression buckling or cyclic fracture. No constitutive equations changed.
+
+`prepare_complete_export(..., progress=None)` accepts an optional single-string
+callback alongside existing stdout logging. Phase starts/completions and frame
+heartbeats can reach a GUI queue without redirecting process-wide stdout.
+Runtime packaging and mapping-workbook generation also report their stage.
+Callbacks run synchronously in the caller's worker thread and must be quick;
+they must not touch Tk widgets directly. Existing callers need no changes.
+
+The synthetic complete-export fixture in
+`tests/test_area_folder_and_hinged_brace_review.py` checks a source brace split
+into two assigned tags, raw release preservation, completed elastic messages,
+nonlinear blocking and phase callbacks. This is solver-free assembly evidence,
+not a native element or project calibration test.
+
+
+## 2026-11-17 — keep wall and floor restraint propagation independent
+
+`_resolve_refined_wall_supports` applied the opt-in confirmed WALL propagation
+policy to every area polygon, including floor edges. It now ignores explicit
+non-wall categories and horizontal polygons. Unclassified legacy vertical wall
+quads remain compatible. Source-only supports and the explicit source-confirmation
+requirement are unchanged; this correction does not enable propagation or alter
+existing saved models. Synthetic tests in `tests/verify_wall_base_restraints.py`
+check a restrained floor edge receives no added nodes, while a confirmed vertical
+wall edge still does. Exact ETABS analysis-node restraints and source hashes must
+be verified independently; a screenshot of a setting is not a per-object source
+manifest or a native equivalence result.

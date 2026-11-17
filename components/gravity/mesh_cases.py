@@ -235,7 +235,7 @@ def package_mesh_case(folder, subdivisions):
     return output
 
 
-def recover_assembled_mesh_workbook(folder, subdivisions):
+def recover_assembled_mesh_workbook(folder, subdivisions, *, progress=None):
     """Re-export a workbook without reassembling an already verified mesh.
 
     Model and saved configuration SHA must match, and the original source
@@ -277,7 +277,10 @@ def recover_assembled_mesh_workbook(folder, subdivisions):
         if not any(e.get("category")=="FLOOR" for e in assembled.get("shells",[])):
             raise ValueError("Assembled model contains no FLOOR shell cells")
         from OpenSees_Load_Path_V141 import export
-        workbook=export(run,output_root=case)
+        kwargs={'output_root':case}
+        if progress is not None:
+            kwargs['progress']=progress
+        workbook=export(run,**kwargs)
         status=dict(status="FORMULA_WORKBOOK_REEXPORTED_NOT_GRAVITY_VERIFIED",
                     mesh_subdivisions=n,workbook=str(workbook),
                     assembled_model=str(model),config_sha256=digest(cfg_file),
@@ -302,11 +305,23 @@ def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
     from time import perf_counter
     n = validated_mesh_size(subdivisions)
     started = perf_counter()
+    run_dir = None
     def emit(message):
+        if run_dir is not None:
+            with (run_dir/'MESH_RUN.log').open('a',encoding='utf-8') as stream:
+                stream.write(f'[{perf_counter()-started:.1f}s] {message}\n')
         if callable(progress):
             progress(message, perf_counter()-started)
     emit(f'MESH_{n:02d}: verifying source SHA and copying inputs')
     run_dir = stage_case(folder, subdivisions)
+    import sys
+    identity=dict(python_executable=sys.executable,python_version=sys.version,
+                  mesh_cases_path=str(Path(__file__).resolve()),
+                  mesh_cases_disk_sha256=digest(__file__),
+                  hash_scope="Current disk files; restart Python after updates. Not an in-memory code attestation.")
+    (run_dir/'MESH_RUNTIME_IDENTITY.json').write_text(
+        json.dumps(identity,indent=2),encoding='utf-8')
+    emit(f"Runtime Python: {sys.executable}; mesh code: {identity['mesh_cases_path']}")
     emit(f'MESH_{n:02d}: inputs staged; starting independent full-model assembly')
     log = run_dir / "MESH_BUILD_STATUS.json"
     def record(status, **extra):
@@ -319,12 +334,19 @@ def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
     assembly_complete=False
     try:
         from OpenSees_Complete_Export_V118 import prepare_complete_export
+        import inspect
+        assembly_file=Path(inspect.getsourcefile(inspect.unwrap(prepare_complete_export))).resolve()
+        identity.update(assembly_path=str(assembly_file),assembly_disk_sha256=digest(assembly_file))
+        (run_dir/'MESH_RUNTIME_IDENTITY.json').write_text(
+            json.dumps(identity,indent=2),encoding='utf-8')
+        emit(f'Assembly code: {assembly_file}')
         if runtime_dir is None:
             # This package may be loaded through legacy compatibility facades;
             # resolve runtime from the real source module rather than cwd.
             from components.model import assembly
             runtime_dir = Path(assembly.__file__).resolve().parents[2]
-        manifest, report = prepare_complete_export(str(run_dir), runtime_dir=Path(runtime_dir))
+        manifest, report = prepare_complete_export(
+            str(run_dir), runtime_dir=Path(runtime_dir), progress=emit)
         emit(f'MESH_{n:02d}: assembly completed in {perf_counter()-assembly_started:.1f}s; checking result')
         if report.get("assembly_errors") or not manifest.get("elastic_assembled"):
             raise RuntimeError("Mesh assembly blocked: " + "; ".join(report.get("assembly_errors", [])))
@@ -360,6 +382,29 @@ def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
         emit(f'MESH_{n:02d}: complete in {perf_counter()-started:.1f}s')
         return result
     except Exception as exc:
+        import traceback
+        (run_dir/'MESH_FAILURE_TRACEBACK.txt').write_text(traceback.format_exc(),encoding='utf-8')
+        emit(f'FAILED: {type(exc).__name__}: {exc}')
         record("WORKBOOK_EXPORT_FAILED_MODEL_ASSEMBLED" if assembly_complete
                else "ASSEMBLY_FAILED", error=f"{type(exc).__name__}: {exc}")
         raise
+
+
+def main(argv=None):
+    """Recover a SHA-matched saved mesh workbook without Tk or rebuilding.
+
+    [REF docs/source/components/gravity/mesh_cases.py.md] No solver is run.
+    """
+    import argparse
+    parser=argparse.ArgumentParser(description='Recover Excel from a saved independent mesh assembly')
+    parser.add_argument('folder',type=Path,help='Original ETABS export root')
+    parser.add_argument('--mesh',required=True,choices=('4','8','16'))
+    args=parser.parse_args(argv)
+    result=recover_assembled_mesh_workbook(args.folder,args.mesh,
+                                          progress=lambda message:print(message,flush=True))
+    print(json.dumps(result,indent=2),flush=True)
+    return result
+
+
+if __name__=='__main__':
+    main()

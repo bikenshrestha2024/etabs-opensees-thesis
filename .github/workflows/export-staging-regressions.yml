@@ -15,6 +15,9 @@ on:
       - "components/model/assembly.py"
       - "components/gravity/load_path_formulas.py"
       - "tests/test_mesh_spatial_performance_regressions.py"
+      - "tests/test_area_folder_and_hinged_brace_review.py"
+      - "tests/test_mesh_workbook_publication.py"
+      - "tests/verify_wall_base_restraints.py"
       - "components/sections/area_elements.py"
       - "tests/test_gravity_evidence_stage.py"
       - "tests/test_export_mirror.py"
@@ -33,6 +36,13 @@ on:
       - "components/model/**"
       - "components/gravity/gui_and_reports.py"
       - "tests/test_*display*.py"
+      - "tests/test_area_folder_and_hinged_brace_review.py"
+      - "tests/test_mesh_workbook_publication.py"
+      - "tests/verify_wall_base_restraints.py"
+      - "tests/test_model_mesh_case_workflow.py"
+      - "tests/test_slab_mesh_excel_paging.py"
+      - "components/gravity/load_path_formulas.py"
+      - "components/gravity/mesh_cases.py"
       - "tests/test_id_audit_roles.py"
       - "tests/test_gravity_evidence_stage.py"
       - "tests/test_export_mirror.py"
@@ -47,7 +57,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install minimal isolated dependencies
-        run: python -m pip install --disable-pip-version-check pytest openpyxl
+        run: python -m pip install --disable-pip-version-check pytest openpyxl numpy
       - name: Run non-native staging and ID tests
         run: >-
           python -m pytest -q
@@ -60,3 +70,6 @@ jobs:
           tests/test_model_mesh_case_workflow.py
           tests/test_slab_mesh_excel_paging.py
           tests/test_mesh_spatial_performance_regressions.py
+          tests/test_area_folder_and_hinged_brace_review.py
+          tests/test_mesh_workbook_publication.py
+          tests/verify_wall_base_restraints.py

@@ -171,7 +171,13 @@ def _resolve_refined_wall_supports(source_supports, source_nodes, nodes, topolog
         raise ValueError("Wall mesh restraint propagation requires explicit ETABS confirmation")
     for e in topology["elements"]:
         if e.get("dimension")!="area_polygon":continue
+        # Wall and floor edge-restraint assignments are independent in ETABS.
+        # Legacy source quads lack categories; require nonhorizontal geometry
+        # as well before applying this explicitly WALL-only policy.
+        if e.get("category") not in (None,"SHEAR WALL"):continue
         ns=e["node_tags"]
+        elevations=[source_nodes[int(n)][2] for n in ns]
+        if max(elevations)-min(elevations)<1e-7:continue
         for a,b in zip(ns,ns[1:]+ns[:1]):
             if source_supports.get(str(a))!=[1]*6 or source_supports.get(str(b))!=[1]*6:
                 continue
@@ -473,12 +479,17 @@ def _consistent_segment_load(length,basis,start,end,w0,w1):
 
 
 @timed_outputs('Model assembly and export','folder')
-def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
+def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, progress=None):
     """Write the assembled data, load ledger, role manifest and runnable entries.
 
     Numerical source defects block model building with a precise report.
     Nonlinear calibration is never inferred from a section name or benchmark.
     """
+    def emit(message):
+        print(message,flush=True)
+        if callable(progress):
+            progress(message)
+
     folder=Path(folder).resolve(); runtime_dir=Path(runtime_dir or _runtime_repo_root())
     report=dict(version=118,assembly_errors=[],warnings=[],analysis_ready=False,
                 elastic_scope='Connected elastic conversion model; ETABS response comparison required',
@@ -522,13 +533,13 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         if meta.get('source_link_count'): raise ValueError('ETABS has LinkObj elements; provide their target device definitions before assembled conversion')
         if meta.get('errors'): report['warnings'].append(f"{len(meta['errors'])} source metadata queries failed; inspect OpenSees_Source_Model_Metadata_V118.json before claiming ETABS equivalence")
         _phase_clock=time.perf_counter()
-        print("[ASSEMBLY PHASE START] Conforming ShellMITC4 mesh",flush=True)
+        emit("[ASSEMBLY PHASE START] Conforming ShellMITC4 mesh")
         nodes,shells,area_children=_mesh_areas(source_nodes,topology['elements'],area_rows,materials,cfg.get('floor_subdivisions',4))
-        print(f"[ASSEMBLY PHASE OK] Conforming ShellMITC4 mesh | "
+        emit(f"[ASSEMBLY PHASE OK] Conforming ShellMITC4 mesh | "
               f"seconds={time.perf_counter()-_phase_clock:.3f} | "
-              f"nodes={len(nodes)} | cells={len(shells)}",flush=True)
+              f"nodes={len(nodes)} | cells={len(shells)}")
         _phase_clock=time.perf_counter()
-        print("[ASSEMBLY PHASE START] Frame-node spatial index",flush=True)
+        emit("[ASSEMBLY PHASE START] Frame-node spatial index")
         # Spatial lookup for beam intersection cuts. Old implementation
         # scanned EVERY mesh node for EVERY frame, which becomes intractable
         # with MESH_08 / MESH_16. Candidate filtering is only a broad phase:
@@ -556,11 +567,11 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
             _candidate.sort(key=_node_order.__getitem__)
             return _candidate
 
-        print(f"[ASSEMBLY PHASE OK] Frame-node spatial index | "
+        emit(f"[ASSEMBLY PHASE OK] Frame-node spatial index | "
               f"seconds={time.perf_counter()-_phase_clock:.3f} | "
-              f"occupied_bins={len(_node_bins)}",flush=True)
+              f"occupied_bins={len(_node_bins)}")
         _phase_clock=time.perf_counter()
-        print("[ASSEMBLY PHASE START] Frame segment connectivity",flush=True)
+        emit("[ASSEMBLY PHASE START] Frame segment connectivity")
         frame_elements=[]; segments={}; null_frames=[]
         hinged_release_review=[]
 
@@ -569,9 +580,9 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
             if e['dimension']!='line_2_node': continue
             _frame_count+=1
             if _frame_count%250==0:
-                print(f"[ASSEMBLY HEARTBEAT] frames={_frame_count}; "
+                emit(f"[ASSEMBLY HEARTBEAT] frames={_frame_count}; "
                       f"segments={len(frame_elements)}; "
-                      f"frame_elapsed_s={time.perf_counter()-_phase_clock:.2f}",flush=True)
+                      f"frame_elapsed_s={time.perf_counter()-_phase_clock:.2f}")
             obj=str(e['etabs_object']); row=frame_rows[obj]
             if not row.get('assigned_section'):
                 null_frames.append(obj); continue  # ETABS None section carries no stiffness or self-weight.
@@ -591,7 +602,6 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                         and (release[0][3] or release[1][3])
                         and not any(release[2]+release[3]))
                 if not hinged: raise ValueError(identity+': unsupported end releases or partial fixity')
-                report['warnings'].append(identity+': hinged brace mapped with end My/Mz releases and zero torsional transfer; nonlinear hinge implementation remains gated')
                 # Exact source arrays and three independent ID namespaces
                 # are retained so engineers can review the connection, not
                 # delete warnings or guess it is a BRB/fully moment-released.
@@ -627,11 +637,11 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                     hinged_release_review[-1]["solver_element_tags"].append(
                         100000+len(frame_elements))
             segments[obj]=children
-        print(f"[ASSEMBLY PHASE OK] Frame segment connectivity | "
+        emit(f"[ASSEMBLY PHASE OK] Frame segment connectivity | "
               f"seconds={time.perf_counter()-_phase_clock:.3f} | "
-              f"frames={_frame_count} | segments={len(frame_elements)}",flush=True)
+              f"frames={_frame_count} | segments={len(frame_elements)}")
         _phase_clock=time.perf_counter()
-        print("[ASSEMBLY PHASE START] Member offsets, beam weights and joint-volume audits",flush=True)
+        emit("[ASSEMBLY PHASE START] Member offsets, beam weights and joint-volume audits")
         report["hinged_brace_release_review"]={
             "count":len(hinged_release_review),
             "status":"SOURCE_RELEASE_PATTERN_RECORDED_NOT_ENGINEERING_VALIDATED",
@@ -989,13 +999,13 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                 'deferred. Run python -m components.gravity.storey_loads --workbook '
                 'EXPORT_FOLDER without ETABS or model reconstruction.')
         from OpenSees_Model_Audit_V130 import audit
-        print(f"[ASSEMBLY PHASE OK] Model data, member audits and load ledger | "
-              f"seconds={time.perf_counter()-_phase_clock:.3f}",flush=True)
+        emit(f"[ASSEMBLY PHASE OK] Model data, member audits and load ledger | "
+              f"seconds={time.perf_counter()-_phase_clock:.3f}")
         _phase_clock=time.perf_counter()
-        print("[ASSEMBLY PHASE START] Independent load-path audit",flush=True)
+        emit("[ASSEMBLY PHASE START] Independent load-path audit")
         report['load_path_audit']=audit(folder,payload,topology,loads)
-        print(f"[ASSEMBLY PHASE OK] Independent load-path audit | "
-              f"seconds={time.perf_counter()-_phase_clock:.3f}",flush=True)
+        emit(f"[ASSEMBLY PHASE OK] Independent load-path audit | "
+              f"seconds={time.perf_counter()-_phase_clock:.3f}")
         _write(folder/'OpenSees_Complete_Model_Data_V118.json',payload)
         report.update(frame_objects=len(segments),frame_segments=len(frame_elements),area_objects=len(area_children),
                       shell_mesh_cells=len(shells),source_nodes=len(source_nodes),mesh_nodes=len(nodes),
@@ -1003,6 +1013,19 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
                       total_seismic_weight_including_fixed_nodes_kN=sum(nodal_mass.values())*9.80665,
                       active_horizontal_seismic_weight_kN=sum(m for n,m in nodal_mass.items() if not all(supports.get(str(n),[0]*6)[:2]))*9.80665,gravity_by_pattern_kN=ledger,
                       elastic_assembled=True)
+        for member in hinged_release_review:
+            member['elastic_status']='ASSEMBLED_SOURCE_END_RELEASES'
+            report['warnings'].append(
+                f"ETABS frame unique ID {member['etabs_unique_frame_id']} | "
+                f"OpenSees topology tag {member['opensees_topology_preview_tag']} | "
+                f"OpenSees elastic element tags {member['solver_element_tags']}: "
+                "assembled with source My/Mz end releases and zero torsional transfer.")
+        if hinged_release_review:
+            report['warnings'].append(
+                'Reviewed nonlinear brace response unavailable: connection and cyclic '
+                'buckling/fracture behavior are unverified. The exploratory axial-only '
+                'corotTruss + Steel01 model does not establish nonlinear qualification; '
+                'see hinged_brace_release_review.')
         if cfg.get('linear_shell_stiffness_policy')=='TABULATED_REVIEWED_THIN_SHELL':
             report['warnings'].append(
                 'ULS tabulated linear ShellMITC4/ElasticMembranePlateSection candidate selected; OpenSees transverse shear scales with plate bending and DOES NOT exactly equal ETABS source v13/v23. Run tests and separately verify object modifiers before ETABS equivalence.')
@@ -1021,6 +1044,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
     export_id_audit(folder, payload, report)
     # Always emit stable entries. A blocked entry reports the precise defect;
     # analysis windows do not fall back to a stale skeleton or load-only model.
+    emit('[ASSEMBLY PHASE START] Export runtime packaging')
     runtime=folder/'OpenSees_Runtime_V118'; runtime.mkdir(exist_ok=True)
     if (runtime_dir/'components').is_dir() and (runtime_dir/'components').resolve()!=(runtime/'components').resolve():
         shutil.copytree(runtime_dir/'components',runtime/'components',dirs_exist_ok=True)
@@ -1092,7 +1116,9 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         "from pathlib import Path\nimport sys\nimport tkinter as tk\nHERE=Path(__file__).resolve().parent\nsys.path.insert(0,str(HERE/'OpenSees_Runtime_V118'))\nfrom ETABS_to_OpenSeesPy_Section_Review_V116_NBC105_Area_NLTHA import App\nif __name__=='__main__':\n    root=tk.Tk()\n    from OpenSees_Window_Manager_V129 import install_windows_menu\n    install_windows_menu(root)\n    app=App(root)\n    app.out.set(str(HERE))\n    root.mainloop()\n")
     _write(folder/MANIFEST,manifest); _write(folder/manifest['report'],report)
     from OpenSees_Mapping_Audit_V125 import export_excel
+    emit('[ASSEMBLY PHASE START] Mapping and load audit workbook')
     export_excel(folder)
+    emit('[ASSEMBLY PHASE OK] Export and mapping workbook complete')
     return manifest,report
 
 

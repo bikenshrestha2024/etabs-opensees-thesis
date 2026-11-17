@@ -137,3 +137,42 @@ results. `tests.verify_slab_full_gravity_factors` covers both workbook profiles.
 The mesh-specific export(folder, output_root=...) writer previously saved XLSX directly to its final timestamped filename and wrote an un-hashed success manifest. An interrupted or corrupt XLSX could be left in the EXCEL directory, and the manifest did not prove the bytes persisted there. The exporter now calls components.gravity.workbook_publishing.publish_workbook and writes an atomic JSON manifest carrying workbook_sha256. Linked EXCEL/JSON output parents are refused.
 
 This is **output integrity only**, not a modification of shell loads, Excel formulas, member weights, 4/8/16 mesh cases, structure stiffness, gravity reaction balance or seismic mass. Separate assembled-model SHA matching remains mandatory. ZIP validation is not formula evaluation or native physical acceptance; compare native ETABS+OpenSees solved reactions, wall-base resultants and beam bending/shear independently.
+
+
+## 2026-11-17 — constant-time node-path paging
+
+`add_formula_audit` tracks the current node-sheet row locally. Calling
+openpyxl `Worksheet.max_row` before every append scanned every accumulated
+cell and made node-path generation quadratic. The counter resets to 1 for
+each new header, preserving Excel row limits, every node row, formula target
+and the page-index counts. No loads or solver inputs change.
+
+A synthetic one-pattern, four-node-per-cell benchmark on this Linux Python
+3.12 host measured formula generation only (not XLSX serialization):
+
+| Floor cells | Before (s) | After (s) |
+|---|---:|---:|
+| 250 | 0.187 | 0.082 |
+| 500 | 0.549 | 0.095 |
+| 1000 | 2.187 | 0.192 |
+
+These are illustrative host measurements, not a full-building Windows timing
+claim. `tests/test_slab_mesh_excel_paging.py` checks bounded dimension scans,
+all 28 fixture node rows across four reduced-limit pages, formula references,
+index counts and a saved/reopened XLSX. Native gravity and ETABS parity remain
+separate checks.
+
+
+## 2026-11-17 — root workbook GUI freeze and overlapping exports
+
+`current_workbook` formerly invoked the entire `export` operation synchronously
+on Tk's main thread. The advanced root-export button was also missing from the
+shared disabled-controls list. It could start a second large workbook while an
+independent mesh assembly/export was active. Both workbook-only routes now use
+`_workbook_job`: a background worker reports progress/result/error through a
+queue, polled only by Tk's main loop. No Tk method is called by these workers.
+The root button joins the shared controls; busy requests return without starting
+another export. Controls restore on success and exception. No model loads or
+solver equations change. Synthetic worker scheduling, completion, failure and
+busy-click checks are in `tests/test_mesh_workbook_publication.py`. Windows GUI
+and peak-memory measurements remain pending.

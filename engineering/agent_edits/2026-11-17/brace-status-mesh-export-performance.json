@@ -1,0 +1,83 @@
+{
+  "editor": "OpenAI Codex desktop",
+  "model": "GPT-6",
+  "branch": "review/brace-status-mesh-export-performance",
+  "base_sha": "8b318ec7b4545f2f880558d1fbe7428202cf56d5",
+  "classification": "EXTEND_EXISTING",
+  "task": "Correct completed elastic brace messages and quadratic slab Excel node-path paging; forward assembly progress.",
+  "changed_files": [
+    ".github/workflows/export-staging-regressions.yml",
+    "components/gravity/load_path_formulas.py",
+    "components/gravity/mesh_cases.py",
+    "components/model/assembly.py",
+    "docs/source/components/gravity/load_path_formulas.py.md",
+    "docs/source/components/gravity/mesh_cases.py.md",
+    "docs/source/components/model/assembly.py.md",
+    "tests/test_area_folder_and_hinged_brace_review.py",
+    "tests/test_model_mesh_case_workflow.py",
+    "tests/test_slab_mesh_excel_paging.py",
+    "engineering/agent_edits/2026-11-17/brace-status-mesh-export-performance.json",
+    ".github/workflows/integrated-repository-audit.yml",
+    "docs/review/ledger/semantic_review_attestations.csv",
+    "REVIEW_MAIN/01_GRAVITY/20261117_XLSX_ATOMIC_PUBLICATION_AND_SEMANTIC_EVIDENCE.md"
+  ],
+  "prior_search": "Existing assembly and mesh helpers, tests, guides and open PRs inspected; no duplicate implementation added.",
+  "tests": {
+    "focused": "35 passed: python -m unittest tests.test_area_folder_and_hinged_brace_review tests.test_slab_mesh_excel_paging tests.test_model_mesh_case_workflow tests.test_mesh_spatial_performance_regressions tests.test_mesh_workbook_publication tests.test_deferred_storey_workbook tests.test_facade_runtime_context -v",
+    "full_discovery": "python -m unittest discover -s tests -p test*.py: 413 tests, 9 errors from unavailable dependencies",
+    "full_discovery_errors": [
+      "test_assembled_mesh_view: plotly missing",
+      "test_source_view_compaction: plotly missing",
+      "test_display_ids_storey: pytest missing",
+      "test_excel_publication: pytest missing",
+      "test_export_mirror: pytest missing",
+      "test_gravity_evidence_stage: pytest missing",
+      "test_gravity_native_equivalence_preflight: pytest missing",
+      "test_lfs_workbook_recovery: pytest missing",
+      "test_project_source_reuse: pytest missing"
+    ],
+    "syntax": "compileall passed for three changed production modules",
+    "diff": "git diff --check passed",
+    "review": "Independent code reviewer: no actionable correctness findings",
+    "ci_followup": "After NumPy dependency correction, dedicated export CI passed and 243 integrated regressions passed (1 skipped). Integrated static audit found stale load_path_formulas.export module SHA. Re-inspected unchanged export function and refreshed its function-only attestation/evidence; rerun static audit."
+  },
+  "deferred": [
+    "Windows ETABS GUI and full-model 4/8/16 rebuild timing",
+    "Native OpenSees element response and ETABS equivalence",
+    "Reviewed nonlinear brace connection/buckling/fracture qualification"
+  ],
+  "privacy": "No uploaded project data or private paths included in this commit.",
+  "utc": "2026-11-17T16:21:44.861305+00:00",
+  "followup": {
+    "request": "Incomplete mesh GUI run and nonlinear brace resource investigation",
+    "base_sha": "c0c19f43678da8852b7fd7a1c9fc5d7e3eb8830d",
+    "changes": "Durable build stage log, actual interpreter/module identity, original traceback, terminal workbook recovery using existing SHA validation. Literature resource note.",
+    "tests": "23 focused unittest tests passed; native Windows environment inaccessible from cloud.",
+    "limitations": "No new nonlinear constitutive adapter or project qualification; no claim that user Windows run completed."
+  },
+  "gui_freeze_followup": {
+    "classification": "EXTEND_EXISTING",
+    "root_cause": "Root workbook callback ran Excel generation synchronously on Tk main thread; advanced root button allowed overlapping build/export.",
+    "fix": "Queued worker for root workbook/recovery; main-loop result delivery; shared disabled-controls guard.",
+    "evidence_scope": "Synthetic scheduling/exception tests, current uploaded beam/slab arithmetic audit privately retained; no matching native per-node reaction solve.",
+    "known_attachment_limits": "Three force XLSX files exceed 32MiB transfer limit.",
+    "verification": "34 focused tests passed; full local discovery 415 tests, 9 errors from absent pytest/plotly (same dependency-limited modules listed previously). Reviewer found no actionable regression. Native Windows pending."
+  },
+  "wall_edge_scope_fix": {
+    "base": "25f6687ff6d370c5a27f102c20264213d2fb3e90",
+    "reason": "Confirmed-wall edge option accidentally processed floor polygons too; screenshot demonstrates independently selectable wall/floor settings.",
+    "change": "Filter explicit nonwall and horizontal polygons in opt-in wall propagation helper; preserve legacy vertical wall quads, SOURCE_ONLY and confirmation requirement.",
+    "tests": "17 focused tests passed after failing regression (floor edge gained two fixed nodes before fix).",
+    "native_status": "Not run; user supplied 32-support diagnostic result analyzed privately, not modified or promoted."
+  },
+  "current_runtime_documentation": {
+    "request": "Document long completed gravity run; use latest photos and exclude previous model assumptions; integrate authorized work into main",
+    "classification": "DOCUMENTATION_ONLY",
+    "report": "REVIEW_MAIN/01_GRAVITY/20261117_CURRENT_GRAVITY_DELAY_AND_MODEL_IDENTITY.md",
+    "finding": "58s solver-return interval, 1885s uninstrumented postsolver reporting/audit gap, 1953s observed total; imported runtime identity unknown",
+    "benchmark": "Actual old/current formula functions, 1000 synthetic cells: 2.624802/0.208730 seconds, excludes save and solver",
+    "privacy": "Raw log, model paths and spreadsheets retained outside repository",
+    "limitations": "No native rerun; synchronous gravity postprocessing remains; earlier model comparisons require matching identity",
+    "integration_verification": "411 unittest tests passed; active pytest suite 454 passed, 229 subtests passed, using isolated temporary storage outside host synthetic Git markers. No native run."
+  }
+}

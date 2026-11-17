@@ -47,3 +47,33 @@
 - All original ETABS/OpenSees model geometry, supports, loads, shell mesh/frames, FVD/BRB classifications and M0–M6 physics remain unchanged.
 
 **Disposition:** Confirmed artifact-integrity defects corrected in source pending exact-head CI. Physical model acceptance and full repository function-level semantic audit remain OPEN under issue #75.
+
+
+## PR #112 follow-up — paging performance and current-blob inspection
+
+The module blob changed because `add_formula_audit` now uses a local row
+counter instead of scanning `Worksheet.max_row` for every node append. The
+`export` function (current lines 322–371) was re-inspected: it still checks the
+exact saved config SHA and FLOOR mesh before creating the workbook, validates
+output targets, atomically publishes the XLSX, then writes the checksum-bearing
+manifest. Its code is unchanged by this performance fix. The current-blob
+attestation for **export only** is refreshed after that inspection and the
+passing publication/mesh-identity tests; this does not attest the whole module.
+
+The 35 focused local tests include interrupted/corrupt workbook publication,
+SHA identity and paging save/reopen. On PR head 3b628c6f the dedicated export CI
+passed, and all 243 integrated regression tests passed (one skipped); the
+remaining integrated static failure identified this stale module-blob
+attestation. This follow-up records the actual inspected function and evidence
+rather than disabling that gate. Native Windows timing and physical acceptance
+remain OPEN.
+
+
+## Root-export GUI follow-up
+
+The source module changed again in its GUI callbacks. Re-inspection confirms
+`export` retains its existing config-SHA/FLOOR checks and atomic publisher,
+with no change to its function body. Its full-module checksum is refreshed in
+the existing function-only attestation. `_workbook_job` now keeps workbook-only
+export/recovery off Tk's thread and prevents overlapping mesh/root workbook
+jobs. This inspection does not attest the whole module or native Windows UI.

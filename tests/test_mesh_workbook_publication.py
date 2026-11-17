@@ -103,5 +103,54 @@ class MeshWorkbookPublicationTests(unittest.TestCase):
         self.assertFalse(list((self.output/"JSON").glob("*MANIFEST.json")))
 
 
+class MeshWorkbookGuiThreadTests(unittest.TestCase):
+    def test_workbook_worker_keeps_export_and_tk_completion_separate(self):
+        import ast,queue
+        from types import SimpleNamespace
+        source=(Path(__file__).resolve().parents[1]/'components/gravity/load_path_formulas.py').read_text()
+        tree=ast.parse(source)
+        launch=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='launch')
+        helper=next((n for n in launch.body if isinstance(n,ast.FunctionDef) and n.name=='_workbook_job'),None)
+        self.assertIsNotNone(helper,'Root Excel export needs a queued worker, not direct Tk-thread export')
+        class Button:
+            def __init__(self):self.state='normal'
+            def cget(self,key):return self.state
+            def configure(self,**kw):self.state=kw['state']
+        class Window:
+            def __init__(self):self.pending=[]
+            def winfo_exists(self):return True
+            def after(self,ms,callback):self.pending.append(callback)
+        workers=[];completed=[];messages=[];status=[]
+        class Thread:
+            def __init__(self,*,target,**kw):self.target=target
+            def start(self):workers.append(self.target)
+        win=Window();buttons=[Button(),Button()];selector=Button()
+        env=dict(queue=queue,threading=SimpleNamespace(Thread=Thread),win=win,
+                 buttons=buttons,mesh_selector=selector,log=messages.append,
+                 status=SimpleNamespace(set=status.append))
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[helper],type_ignores=[])),'gui_worker','exec'),env)
+        calls=[]
+        def work(progress):calls.append('export');progress('saving');return 'saved.xlsx'
+        env['_workbook_job'](work,completed.append,'Exporting')
+        self.assertEqual(calls,[])
+        self.assertTrue(all(b.state=='disabled' for b in buttons))
+        # A second click while any mesh/export task is active must do nothing.
+        env['_workbook_job'](work,completed.append,'Again')
+        self.assertEqual(len(workers),1)
+        workers.pop()()
+        self.assertEqual(completed,[])  # worker never invokes Tk-facing callback
+        win.pending.pop(0)()
+        self.assertEqual(completed,['saved.xlsx'])
+        self.assertIn('saving',messages)
+        self.assertTrue(all(b.state=='normal' for b in buttons))
+        def failing_work(progress):raise ValueError('synthetic save failure')
+        env['_workbook_job'](failing_work,completed.append,'Exporting')
+        workers.pop()()
+        win.pending.pop(0)()
+        self.assertIn('ValueError: synthetic save failure',status[-1])
+        self.assertTrue(all(b.state=='normal' for b in buttons))
+        self.assertEqual(completed,['saved.xlsx'])
+
+
 if __name__=="__main__":
     unittest.main()
