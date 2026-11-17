@@ -109,3 +109,6 @@ OPEN_BLOCKER, OPEN_HIGH, INVESTIGATE, SOURCE_VERIFIED, NUMERICAL_ONLY, ETABS_OPE
 **Scope limitation:** This initial register is based on user-provided November 11 screenshots/logs and existing GitHub engineering rules; no native ETABS run or complete result ZIP was executed or independently inspected as part of creating this register.
 
 [Repository audit and output locations](../docs/review/ledger/20261116_b8db900/README.md) records the inspected source, where generated software audits belong, and the remaining engineering acceptance gates.
+
+
+**2026-11-17 NLTHA source-and-literature case:** [Steel02 Carreño parameter mapping, normalized cR1 safety, recent wall-tangent research and unresolved native gates](04_NONLINEAR/20261117_STEEL02_CARRENO_AND_WALL_TANGENT_SEMANTIC_AUDIT.md). This is a focused semantic correction, **not** completion of the all-function review or structural-model verification.
