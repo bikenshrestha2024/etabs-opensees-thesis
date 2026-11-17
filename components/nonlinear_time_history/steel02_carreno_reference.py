@@ -62,7 +62,7 @@ def build_carreno_study(*, nominal_fy_mpa=500.0):
     return {
         "status":"RESEARCH_PLANNING_ONLY_NOT_CALIBRATION",
         "reference":{"title":"Material Model Parameters for the Giuffre-Menegotto-Pinto Uniaxial Steel Stress-Strain Model",
-                     "authors":["R. Carreño","K. Lotfizadeh","J. I. Restrepo","J. P. Conte"],
+                     "authors":["R. Carreño","K. H. Lotfizadeh","J. P. Conte","J. I. Restrepo"],
                      "year":2020,"doi":DOI,
                      "url":"https://doi.org/"+DOI,
                      "locator":"Table 12, journal page 04019205-16, PDF page 16 (unmachined bars)"},
