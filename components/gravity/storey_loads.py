@@ -1,6 +1,6 @@
 """Storey gravity ledger from exact assembled source nodal contributions."""
 from pathlib import Path
-import csv,json,math,hashlib,shutil,datetime,time,os,tempfile
+import csv,json,math,hashlib,shutil,datetime,time,os,tempfile,zipfile
 from OpenSees_Timing_V130 import timed_outputs
 
 COLUMNS=['beam_self_weight_kN','column_self_weight_kN','brace_self_weight_kN','shear_wall_self_weight_kN','slab_self_weight_kN','other_self_weight_kN','floor_finish_kN','partition_kN','other_dead_kN','live_kN','storage_live_kN','roof_live_kN','unclassified_kN']
@@ -121,6 +121,16 @@ def export_storey_gravity(folder,data,config,pattern_types=None,*,generate_workb
         wb.save(staged)
         print(f'[OPTIONAL EXCEL DONE] XLSX serialization: '
               f'{time.perf_counter()-_save_started:.3f}s',flush=True)
+        # A return from a writer alone does not prove the resulting bytes are
+        # a usable XLSX. Validate ZIP directory and core spreadsheet parts,
+        # without loading large worksheet XML or formulas into memory.
+        try:
+            with zipfile.ZipFile(staged) as archive:
+                parts=set(archive.namelist())
+                if not {'[Content_Types].xml','xl/workbook.xml'}.issubset(parts):
+                    raise ValueError('invalid XLSX: missing workbook ZIP parts')
+        except zipfile.BadZipFile as exc:
+            raise ValueError('invalid XLSX: serialization did not produce a ZIP') from exc
         digest=hashlib.sha256()
         with staged.open('rb') as stream:
             for chunk in iter(lambda:stream.read(1024*1024),b''):
