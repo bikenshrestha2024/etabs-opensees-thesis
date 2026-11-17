@@ -221,6 +221,29 @@ class IntegratedAuditTests(unittest.TestCase):
             self.assertIn(("components/audit_fixture/__init__.py",
                            "components/audit_fixture/left.py"), edges)
 
+    def test_literal_dynamic_import_resolves_real_local_target_without_runtime_execution(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            pkg=root/"components"/"dynamic_case"
+            pkg.mkdir(parents=True)
+            (pkg/"target.py").write_text("VALUE=1\n",encoding="utf-8")
+            (pkg/"lazy.py").write_text(
+                "import importlib\n"
+                "def later():\n"
+                "    return importlib.import_module('components.dynamic_case.target')\n"
+                "def missing():\n"
+                "    return __import__('components.dynamic_case.absent')\n",
+                encoding="utf-8")
+            graph=import_graph(root, inventory(root)["active_python_modules"])
+            edges={(x["from"],x["to"]) for x in graph["direct_local_edges"]}
+            self.assertIn(("components/dynamic_case/lazy.py",
+                           "components/dynamic_case/target.py"),edges)
+            self.assertTrue(any(x["import"]=="components.dynamic_case.absent"
+                                for x in graph["unresolved_explicit_local_imports"]))
+            self.assertGreater(graph["deferred_import_edges"],0)
+            self.assertTrue(any(x["kind"]=="LITERAL_DYNAMIC_IMPORT"
+                                for x in graph["dynamic_import_review"]))
+
     def test_from_package_import_tracked_submodule_and_exported_symbol(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)

@@ -61,7 +61,7 @@ class TestSourceViewCompaction(unittest.TestCase):
         self.assertEqual(len(batched.data),2)
         self.assertEqual(items[0]["count"],4)
         self.assertEqual(len(batched.data[1].x),12)
-        self.assertEqual(list(batched.data[1].i),(0,3,6,9))
+        self.assertEqual(tuple(batched.data[1].i),(0,3,6,9))
         self.assertEqual(batched.data[1].customdata[6][0],"2")
         self.assertIn("customdata[0]",batched.data[1].hovertemplate)
         self.assertEqual(len(fig.data),5)

@@ -45,7 +45,10 @@ class AssembledMeshViewerTests(unittest.TestCase):
         target = render(self.root)
         self.assertTrue(target.is_file())
         self.assertIn("02_MODEL", str(target))
-        self.assertIn("4×4", target.read_text(encoding="utf-8"))
+        # Plotly JSON serializes non-ASCII title characters using Unicode
+        # escapes; the browser renders the same 4×4 heading.
+        self.assertIn(json.dumps("4×4")[1:-1],
+                      target.read_text(encoding="utf-8"))
         self.assertTrue((target.parent / "plotly.min.js").is_file())
         self.assertEqual(
             (self.root / "OpenSees_Complete_Model_Data_V118.json").read_bytes(),

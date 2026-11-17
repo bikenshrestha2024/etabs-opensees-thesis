@@ -30,39 +30,55 @@ jobs:
       - name: Compile active sources and verify workflow navigation
         shell: micromamba-shell {0}
         run: |
-          python tools/audit_active_repository.py --output audit/active_inventory.json --fail-on-missing-canonical
-          python -m unittest tests.verify_active_repository_audit tests.verify_gravity_reactions_3d -v
-          python -m unittest tests.verify_gravity_support_scenarios -v
-          python -m unittest tests.test_etabs_split_beam_forces tests.test_gravity_partial_source_comparison -v
-          python -m unittest tests.test_assembled_mesh_view -v
-          python -m unittest tests.test_source_view_compaction -v
-          python -m unittest tests.test_saved_view_refresh -v
-          python -m unittest tests.test_deferred_storey_workbook -v
-          python -m unittest tests.test_gravity_excel_import_action -v
-          python -m unittest tests.test_conversion_progress_status_runtime -v
-          python -m unittest tests.test_import_workbook_digest_cache -v
-          python -m unittest discover -s tests -p 'test_repository_layout.py' -v
-          python -m unittest discover -s tests -p 'test_historical_note_archive.py' -v
-          python tools/audit_repository_layout.py --output audit/repository_layout.json
-          python -m unittest discover -s tests -p 'test_project_output_layout_v171.py' -v
-          python -m unittest discover -s tests -p 'test_gravity_organized_case_index_v172.py' -v
-          python -m unittest discover -s tests -p 'test_gravity_gui_action_layout.py' -v
-          python -m unittest discover -s tests -p 'test_main_launcher_workflow_layout.py' -v
-          python -m unittest discover -s tests -p 'test_engineering_qa_navigation.py' -v
-          python -m unittest discover -s tests -p 'test_main_launcher_short_alias.py' -v
-          python -m unittest discover -s tests -p 'test_model_stage_mesh_area_inventory.py' -v
-          python -m unittest discover -s tests -p 'test_model_citation_viewer.py' -v
-          python -m unittest discover -s tests -p 'test_import01_audit_and_workflow.py' -v
-          python -m unittest discover -s tests -p 'test_esm_organized_export_gui.py' -v
-          python -m unittest discover -s tests -p 'test_linear_reaction_vectorization.py' -v
-          python -m unittest discover -s tests -p 'test_nbc105_load_case_purpose.py' -v
-          python -m unittest discover -s tests -p 'test_history_inspection_scopes.py' -v
-          python -m unittest tests.verify_readiness_dashboard -v
-          python -m unittest discover -s tests -p 'test_knowledge_map.py' -v
-          python -m unittest discover -s tests -p 'test_documentation_coverage.py' -v
-          python -m unittest discover -s tests -p 'test_literature_pdf_intake.py' -v
-          python tools/audit_knowledge_map.py
-          python tools/audit_documentation_coverage.py --output audit/documentation_coverage.json --fail-on-missing-component-guides
+          set -uo pipefail
+          failed=0
+          check() {
+            if "$@"; then
+              echo "[CHECK PASS] $*"
+            else
+              code=$?
+              failed=$((failed+1))
+              echo "::error::[CHECK FAIL exit=$code] $*"
+            fi
+          }
+          check python tools/audit_active_repository.py --output audit/active_inventory.json --fail-on-missing-canonical
+          check python -m unittest tests.verify_active_repository_audit tests.verify_gravity_reactions_3d -v
+          check python -m unittest tests.verify_gravity_support_scenarios -v
+          check python -m unittest tests.test_etabs_split_beam_forces tests.test_gravity_partial_source_comparison -v
+          check python -m unittest tests.test_assembled_mesh_view -v
+          check python -m unittest tests.test_source_view_compaction -v
+          check python -m unittest tests.test_saved_view_refresh -v
+          check python -m unittest tests.test_deferred_storey_workbook -v
+          check python -m unittest tests.test_gravity_excel_import_action -v
+          check python -m unittest tests.test_conversion_progress_status_runtime -v
+          check python -m unittest tests.test_import_workbook_digest_cache -v
+          check python -m unittest discover -s tests -p 'test_repository_layout.py' -v
+          check python -m unittest discover -s tests -p 'test_historical_note_archive.py' -v
+          check python tools/audit_repository_layout.py --output audit/repository_layout.json
+          check python -m unittest discover -s tests -p 'test_project_output_layout_v171.py' -v
+          check python -m unittest discover -s tests -p 'test_gravity_organized_case_index_v172.py' -v
+          check python -m unittest discover -s tests -p 'test_gravity_gui_action_layout.py' -v
+          check python -m unittest discover -s tests -p 'test_main_launcher_workflow_layout.py' -v
+          check python -m unittest discover -s tests -p 'test_engineering_qa_navigation.py' -v
+          check python -m unittest discover -s tests -p 'test_main_launcher_short_alias.py' -v
+          check python -m unittest discover -s tests -p 'test_model_stage_mesh_area_inventory.py' -v
+          check python -m unittest discover -s tests -p 'test_model_citation_viewer.py' -v
+          check python -m unittest discover -s tests -p 'test_import01_audit_and_workflow.py' -v
+          check python -m unittest discover -s tests -p 'test_esm_organized_export_gui.py' -v
+          check python -m unittest discover -s tests -p 'test_linear_reaction_vectorization.py' -v
+          check python -m unittest discover -s tests -p 'test_nbc105_load_case_purpose.py' -v
+          check python -m unittest discover -s tests -p 'test_history_inspection_scopes.py' -v
+          check python -m unittest tests.verify_readiness_dashboard -v
+          check python -m unittest discover -s tests -p 'test_knowledge_map.py' -v
+          check python -m unittest discover -s tests -p 'test_documentation_coverage.py' -v
+          check python -m unittest discover -s tests -p 'test_literature_pdf_intake.py' -v
+          check python tools/audit_knowledge_map.py
+          check python tools/audit_documentation_coverage.py --output audit/documentation_coverage.json --fail-on-missing-component-guides
+          check python -m unittest tests.test_repository_ci_failure_propagation -v
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::$failed repository quality commands failed. Inspect all [CHECK FAIL] records."
+            exit 1
+          fi
       - name: Archive static inventory (not engineering validation)
         if: always()
         uses: actions/upload-artifact@v4

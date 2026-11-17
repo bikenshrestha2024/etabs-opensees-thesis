@@ -66,10 +66,18 @@ class AreaInventoryTests(unittest.TestCase):
             self.assertFalse((root/"02_MODEL").exists())
 
     def test_04_08_16_names_and_hash_guard_present(self):
-        src=(Path(__file__).parents[1]/'components/gravity/load_path_formulas.py').read_text()
-        for token in ('MESH_{n:02d}','config_sha256','Slab_Load_Path_MESH_',
-                      'PREPARED_CONFIGS','for n in (4,8,16)'):
-            self.assertIn(token,src)
+        # After the established module split, mesh-case preparation belongs
+        # to mesh_cases.py; load_path_formulas.py owns the formula exporter.
+        base=Path(__file__).parents[1]/'components/gravity'
+        mesh=(base/'mesh_cases.py').read_text(encoding='utf-8')
+        formula=(base/'load_path_formulas.py').read_text(encoding='utf-8')
+        self.assertIn('MESH_SIZES = (4, 8, 16)',mesh)
+        self.assertIn('PREPARED_CONFIGS',mesh)
+        self.assertIn('for n in MESH_SIZES',mesh)
+        for token in ('MESH_{n:02d}','config_sha256'):
+            self.assertIn(token,mesh)
+            self.assertIn(token,formula)
+        self.assertIn('Slab_Load_Path_MESH_',formula)
 
 
 if __name__=='__main__':
