@@ -1,6 +1,6 @@
 """Storey gravity ledger from exact assembled source nodal contributions."""
 from pathlib import Path
-import csv,json,math,hashlib,shutil,datetime,time,os,tempfile,zipfile
+import csv,json,math,hashlib,shutil,datetime,time
 from OpenSees_Timing_V130 import timed_outputs
 
 COLUMNS=['beam_self_weight_kN','column_self_weight_kN','brace_self_weight_kN','shear_wall_self_weight_kN','slab_self_weight_kN','other_self_weight_kN','floor_finish_kN','partition_kN','other_dead_kN','live_kN','storage_live_kN','roof_live_kN','unclassified_kN']
@@ -104,7 +104,6 @@ def export_storey_gravity(folder,data,config,pattern_types=None,*,generate_workb
         'gravity_total_kN':expected,
         'previous_workbook_retained_until_commit':xlsx.exists()
     },indent=2),encoding='utf-8')
-    staged=None
     try:
         from OpenSees_Load_Path_V141 import add_formula_audit
         _formula_started=time.perf_counter()
@@ -112,38 +111,17 @@ def export_storey_gravity(folder,data,config,pattern_types=None,*,generate_workb
         add_formula_audit(wb,folder,data,config)
         print(f'[OPTIONAL EXCEL DONE] Formula construction: '
               f'{time.perf_counter()-_formula_started:.3f}s',flush=True)
-        fd,stage_name=tempfile.mkstemp(
-            prefix='.gravity_',suffix='.xlsx',dir=folder)
-        os.close(fd)
-        staged=Path(stage_name)
+        from components.gravity.workbook_publishing import publish_workbook
         _save_started=time.perf_counter()
-        print('[OPTIONAL EXCEL START] XLSX serialization',flush=True)
-        wb.save(staged)
-        print(f'[OPTIONAL EXCEL DONE] XLSX serialization: '
+        print('[OPTIONAL EXCEL START] Atomic XLSX serialization and SHA256',flush=True)
+        digest=publish_workbook(wb,xlsx)
+        print(f'[OPTIONAL EXCEL DONE] Atomic XLSX serialization and SHA256: '
               f'{time.perf_counter()-_save_started:.3f}s',flush=True)
-        # A return from a writer alone does not prove the resulting bytes are
-        # a usable XLSX. Validate ZIP directory and core spreadsheet parts,
-        # without loading large worksheet XML or formulas into memory.
-        try:
-            with zipfile.ZipFile(staged) as archive:
-                parts=set(archive.namelist())
-                if not {'[Content_Types].xml','xl/workbook.xml'}.issubset(parts):
-                    raise ValueError('invalid XLSX: missing workbook ZIP parts')
-        except zipfile.BadZipFile as exc:
-            raise ValueError('invalid XLSX: serialization did not produce a ZIP') from exc
-        digest=hashlib.sha256()
-        with staged.open('rb') as stream:
-            for chunk in iter(lambda:stream.read(1024*1024),b''):
-                digest.update(chunk)
-        # Only a fully serialized, checksummed artifact can replace the old
-        # workbook. The move is atomic on the same filesystem.
-        os.replace(staged,xlsx)
-        staged=None
         status.write_text(json.dumps({
             'status':'FORMULA_WORKBOOK_READY',
             'source_model_config_sha256':data.get('config_sha256'),
             'gravity_total_kN':expected,
-            'workbook_sha256':digest.hexdigest(),
+            'workbook_sha256':digest,
             'source_detail_rows':len(detail)},indent=2),encoding='utf-8')
     except Exception as exc:
         status.write_text(json.dumps({
@@ -154,9 +132,6 @@ def export_storey_gravity(folder,data,config,pattern_types=None,*,generate_workb
             'previous_workbook_preserved':xlsx.exists()
         },indent=2),encoding='utf-8')
         raise
-    finally:
-        if staged is not None:
-            staged.unlink(missing_ok=True)
     print(f'[STOREY GRAVITY] {len(table)} levels | applied={actual:.6f} kN | reconciliation={actual-expected:.6g} kN | FORMULA_XLSX=READY',flush=True)
     return report
 
