@@ -230,6 +230,22 @@ def audit_repository(root: Path = DEFAULT_ROOT) -> dict:
     missing.sort(key=lambda x: (x["source"], x["line"], x["imported"]))
     edges.sort(key=lambda x: (x["source"], x["target"], x["line"]))
     candidates.sort(key=lambda x: (x["path"], x["line"], x["code"]))
+    incoming = Counter(x["target"] for x in edges)
+    advisory_by_path = Counter(x["path"] for x in candidates)
+    review_codes = Counter(x["code"] for x in candidates)
+    priority_review_queue = [
+        dict(path=item["path"],
+             incoming_local_dependencies=incoming[item["path"]],
+             advisory_count=advisory_by_path[item["path"]],
+             advisory_codes=sorted({x["code"] for x in candidates
+                                    if x["path"] == item["path"]}),
+             evidence_status="STATIC_TRIAGE_NOT_MANUAL_SEMANTIC_APPROVAL")
+        for item in runtime if item["path"] in incoming
+        or item["path"] in advisory_by_path
+    ]
+    priority_review_queue.sort(key=lambda x: (
+        -(x["incoming_local_dependencies"]*2+x["advisory_count"]),
+        x["path"]))
     return dict(
         schema="THESIS_REPOSITORY_SEMANTIC_DISCOVERY_V1",
         scope=SCOPE,
@@ -251,6 +267,9 @@ def audit_repository(root: Path = DEFAULT_ROOT) -> dict:
         unresolved_local_dependencies=missing,
         local_dependency_edges=edges,
         review_candidates=candidates,
+        dependency_in_degree=dict(sorted(incoming.items())),
+        review_candidate_counts=dict(sorted(review_codes.items())),
+        priority_review_queue=priority_review_queue,
         engineering_gates={
             "G0_TRACKED_TREE": "COVERED_BY_GIT_INDEX_NOT_PRIVATE_LOCAL_FILES",
             "G1_STATIC": "PASS" if not errors and not missing else "FAIL",
@@ -294,7 +313,9 @@ def main(argv=None):
                           summary=report["summary"],
                           unresolved_local_dependencies=report[
                               "unresolved_local_dependencies"][:30],
-                          active_source_errors=report["active_source_errors"][:20]),
+                          active_source_errors=report["active_source_errors"][:20],
+                          review_candidate_counts=report["review_candidate_counts"],
+                          priority_review_queue=report["priority_review_queue"][:20]),
                      indent=2))
     return 1 if (args.fail_on_active_errors and
                  (report["active_source_errors"]
