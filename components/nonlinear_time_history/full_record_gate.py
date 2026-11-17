@@ -40,6 +40,17 @@ def verify_accepted_history(rows, record_end_s, requested_end_s, *,
     end=float(record_end_s);requested=float(requested_end_s)
     if any(not math.isfinite(v) or v<=0 for v in (end,requested)):
         raise ValueError("Nonpositive/nonfinite record duration")
+    # A non-finite or overlarge tolerance can turn an incomplete or
+    # out-of-record response into apparent full-duration completion.
+    if isinstance(time_tolerance_s, bool):
+        raise ValueError("Invalid time tolerance: boolean")
+    try:
+        tolerance = float(time_tolerance_s)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("Invalid time tolerance") from exc
+    if not math.isfinite(tolerance) or tolerance < 0 or tolerance >= min(end, requested):
+        raise ValueError("Invalid time tolerance: must be finite, nonnegative, and below both durations")
+    time_tolerance_s = tolerance
     times=[]
     expected_columns = set(rows[0])
     if "time_s" not in expected_columns or len(expected_columns) < 2:
