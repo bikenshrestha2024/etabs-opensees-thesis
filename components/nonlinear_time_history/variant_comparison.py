@@ -134,6 +134,17 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
             reference_duration=reference[key]["completion_gate"]["full_record_duration_s"]
             if abs(duration-reference_duration)>duration_tolerance_s:
                 raise ValueError(f"{variant}: full record duration differs in {key}")
+    # XY and YX represent orientation swaps of the SAME recorded pair.
+    # Cross-variant equality alone cannot catch a mismatched pair that
+    # appears identically in all seven configurations. Keep ULS and SLS
+    # independent because their independently scaled inputs may differ.
+    for limit,pair,orientation in keys:
+        if orientation != "XY":
+            continue
+        counterpart=reference.get((limit,pair,"YX"))
+        if counterpart is not None and (
+                reference[(limit,pair,"XY")]["record_sha256"] != counterpart["record_sha256"]):
+            raise ValueError(f"{limit} {pair}: XY/YX orientation record SHA differs")
     for limit in ("ULS","SLS"):
         pairs={key[1] for key in keys if key[0]==limit}
         if len(pairs)<require_pairs:
