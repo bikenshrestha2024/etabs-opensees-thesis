@@ -167,7 +167,6 @@
   "components/nonlinear_time_history/research_building_materials.py::brace_steel_parameters",
   "components/nonlinear_time_history/research_building_materials.py::check_project_material_qualification",
   "components/nonlinear_time_history/research_building_materials.py::define_building_materials",
-  "components/nonlinear_time_history/research_building_materials.py::validate_frame_section_parameters",
   "components/nonlinear_time_history/research_building_materials.py::validate_material_overrides",
   "components/nonlinear_time_history/runner_and_gui.py::NonlinearTimeHistoryGUI",
   "components/nonlinear_time_history/runner_and_gui.py::launch_nonlinear_time_history_gui",
