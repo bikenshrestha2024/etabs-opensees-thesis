@@ -2475,6 +2475,7 @@ class App:
             action(group_0_0,text=label,command=lambda name=name:open_saved(name))
         action(group_0_1,text='Numbered workflow / input values',command=lambda:__import__('OpenSees_Workflow_V144').launch(self.root,self.out.get()))
         action(group_0_0,text="Open ETABS connectivity + load views",command=self._show_last_exports)
+        action(group_0_0,text="Refresh saved 3D view controls (no ETABS/model assembly)",command=self._refresh_saved_source_views)
         action(group_0_0,text="3D actual assembled 4×4 mesh (on demand; no ETABS rerun)",command=self._open_assembled_mesh_view)
         action(group_0_1,text="ETABS / OpenSees ID lookup + Excel support audit",command=self._open_id_lookup)
         action(group_0_1,text="Open ETABS frame / area load audit",command=self._open_load_audit_explanation)
@@ -3104,6 +3105,50 @@ class App:
     def _browse_dir(self):
         p=filedialog.askdirectory(title="Select output folder");
         if p:self.out.set(p)
+    def _refresh_saved_source_views(self):
+        """[REF docs/source/components/ui/application.py.md] Offline source-view cosmetics."""
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showwarning(
+                "Export currently running",
+                "Do not edit source HTML while the ETABS conversion worker "
+                "is writing outputs. Run refresh after the worker finishes.",
+                parent=self.root)
+            return
+        if getattr(self, "_source_view_refresh_running", False):
+            messagebox.showinfo("View refresh", "A source-view refresh is already running.",parent=self.root)
+            return
+        export=Path(self.out.get().strip()).expanduser()
+        if not export.is_dir():
+            messagebox.showwarning("View refresh", "Select an existing export directory.",parent=self.root)
+            return
+        self._source_view_refresh_running=True
+        self.log("[VIEW REFRESH] Updating local HTML controls only; source export remains unchanged.")
+        import threading
+        def work():
+            try:
+                from components.ui.saved_view_refresh import refresh_saved_views
+                result=(refresh_saved_views(export),None)
+            except Exception as exc:
+                result=(None,str(exc))
+            def complete():
+                self._source_view_refresh_running=False
+                report,error=result
+                if error:
+                    self.log("[VIEW REFRESH ERROR] "+error)
+                    messagebox.showerror("View refresh failed",error,parent=self.root)
+                    return
+                self.log("[VIEW REFRESH RESULT] "+json.dumps(report,default=str))
+                messagebox.showinfo(
+                    "Source views refreshed",
+                    ("Status: "+report["status"]+"\\n"
+                     "No ETABS or OpenSees assembly was executed.\\n"
+                     "Close and reopen the local HTML browser tabs to see the changes."
+                     + ("\\nOriginal HTML backed up at:\\n"+report["backup"]
+                        if report.get("backup") else "")),
+                    parent=self.root)
+            self.root.after(0,complete)
+        threading.Thread(target=work,daemon=True).start()
+
     def _show_last_exports(self):
         """Open the most recent ETABS load visualization or select one from disk."""
         target=None
