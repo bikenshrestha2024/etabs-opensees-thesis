@@ -1,3 +1,9 @@
+## Current branch source-review attestations (2026-11-17)
+
+[semantic_review_attestations.csv](semantic_review_attestations.csv) is the exact-source Git blob review ledger for newly source-inspected, regression-backed symbols. **Only an exact blob SHA match** on a tracked source path, identified qualified function, tracked review evidence and tracked test(s) allows the integrated audit to label a function SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED. A changed file, duplicate entry, unsafe/untracked evidence or missing reviewer makes the static audit BLOCKED.
+
+The status is explicitly AI-assisted source inspection, not independent semantic completion or native engineering validation. The authoritative function queue stays under generated audit/integrated/08_SEMANTIC_REVIEW/; its semantic_review_completed_count remains zero. The original November 2026 frozen research baselines below are preserved unchanged.
+
 # File-by-file review ledger — frozen Git baseline
 
 Latest incremental pass: [2026-11-09 report](../REVIEW_20261109.md) and

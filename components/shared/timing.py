@@ -51,6 +51,31 @@ def _write_metadata(folder, files, metadata):
         stream.write(json.dumps(dict(metadata,artifact_count=count),allow_nan=False)+"\n")
     return count
 
+def _snapshot_derived_files(folder):
+    """[REF docs/source/components/shared/timing.py.md]
+    Snapshot derived artifacts without relying on wall-clock mtime thresholds.
+    """
+    found={}
+    if not folder or not folder.is_dir():
+        return found
+    for p in folder.rglob('*'):
+        if p.is_symlink() or not p.is_file():
+            continue
+        rel=p.relative_to(folder)
+        if ('00_PROCESSING_METADATA' in rel.parts
+                or '__pycache__' in rel.parts
+                or p.name.endswith('.processing.json')
+                or p.name in ('Processing_Timings_V130.jsonl',
+                              'OUTPUT_TIMING_INDEX_V130.json')):
+            continue
+        try:
+            stat=p.stat()
+        except FileNotFoundError:
+            continue
+        found[p]=(stat.st_mtime_ns,stat.st_size)
+    return found
+
+
 def timed_outputs(stage,argument):
     def decorate(function):
         @functools.wraps(function)
@@ -59,7 +84,8 @@ def timed_outputs(stage,argument):
             if isinstance(value,dict):value=value.get('output_dir')
             folder=Path(value).resolve() if value else None
             if folder and (folder.is_file() or (not folder.exists() and folder.suffix)):folder=folder.parent
-            started=stamp();clock=time.perf_counter();wall_ns=time.time_ns();status='completed';failure=None
+            before=_snapshot_derived_files(folder)
+            started=stamp();clock=time.perf_counter();status='completed';failure=None
             try:return function(*args,**kwargs)
             except BaseException as exc:
                 status='failed';failure=f'{type(exc).__name__}: {exc}';raise
@@ -68,7 +94,9 @@ def timed_outputs(stage,argument):
                 metadata=dict(stage=stage,started_at=started,finished_at=stamp(),elapsed_seconds=elapsed,status=status,error=failure,time_scope='Entire named processing stage, not individual file-write latency')
                 if folder and folder.exists():
                     try:
-                        files=[p for p in folder.rglob('*') if p.is_file() and not p.is_symlink() and p.stat().st_mtime_ns>=wall_ns and '00_PROCESSING_METADATA' not in p.relative_to(folder).parts and not p.name.endswith('.processing.json') and p.name not in ('Processing_Timings_V130.jsonl','OUTPUT_TIMING_INDEX_V130.json') and '__pycache__' not in p.parts]
+                        after=_snapshot_derived_files(folder)
+                        files=[p for p,signature in after.items()
+                               if before.get(p)!=signature]
                         _write_metadata(folder,files,metadata)
                     except Exception as exc:print(f'[TIMING METADATA ERROR] {stage}: {exc}',flush=True)
                 print(f'[TIMING] {stage} | {status} | elapsed={elapsed:.3f} s | start={started} | finish={metadata["finished_at"]}',flush=True)

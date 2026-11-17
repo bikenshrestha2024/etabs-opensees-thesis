@@ -109,6 +109,79 @@ class IntegratedAuditTests(unittest.TestCase):
                 self.assertIn(f"]({relative})", index)
             self.assertFalse((root/"09_SOFTWARE_DIAGNOSTICS").exists())
 
+    def test_version_pinned_semantic_attestation_marks_only_exact_source(self):
+        from tools.audit_repository_integrated import apply_source_review_attestations
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            source="components/gravity/study.py"
+            proof="REVIEW_MAIN/01_GRAVITY/proof.md"
+            test="tests/test_study.py"
+            for name in (source,proof,test):
+                target=root/name
+                target.parent.mkdir(parents=True,exist_ok=True)
+                target.write_text("source review fixture",encoding="utf-8")
+            folder=root/"docs/review/ledger"
+            folder.mkdir(parents=True,exist_ok=True)
+            with (folder/"semantic_review_attestations.csv").open(
+                    "w",newline="",encoding="utf-8") as stream:
+                writer=csv.DictWriter(stream,fieldnames=(
+                    "path","symbol","git_blob_sha","reviewer",
+                    "evidence","test","status"))
+                writer.writeheader()
+                writer.writerow(dict(
+                    path=source,symbol="export_gravity",git_blob_sha="a"*40,
+                    reviewer="AI_SOURCE_REVIEW_20261117",
+                    evidence=proof,test=test,
+                    status="SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED"))
+            original=[dict(path=source,symbol="export_gravity",
+                           git_blob_sha="a"*40,
+                           semantic_review_status="NOT_REVIEWED",
+                           reviewer="",evidence="")]
+            indexed={name:{"git_blob_sha":"a"*40}
+                     for name in (source,proof,test)}
+            updated,issues=apply_source_review_attestations(
+                root,original,indexed)
+            self.assertEqual(issues,[])
+            self.assertEqual(updated[0]["semantic_review_status"],
+                             "SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED")
+            self.assertEqual(updated[0]["reviewer"],"AI_SOURCE_REVIEW_20261117")
+            self.assertEqual(updated[0]["evidence"],proof)
+
+    def test_attestation_does_not_survive_changed_source_sha_or_unsafe_path(self):
+        from tools.audit_repository_integrated import apply_source_review_attestations
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            folder=root/"docs/review/ledger"
+            folder.mkdir(parents=True)
+            source="components/changed.py"
+            proof="REVIEW_MAIN/proof.md"
+            test="tests/test_changed.py"
+            for name in (source,proof,test):
+                p=root/name
+                p.parent.mkdir(parents=True,exist_ok=True)
+                p.write_text("fixture",encoding="utf-8")
+            file=folder/"semantic_review_attestations.csv"
+            file.write_text(
+                "path,symbol,git_blob_sha,reviewer,evidence,test,status\n"
+                "components/changed.py,solve,"+("a"*40)+
+                ",AI_SOURCE_REVIEW,REVIEW_MAIN/proof.md,tests/test_changed.py,"
+                "SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED\n"
+                "components/changed.py,solve,"+("b"*40)+
+                ",AI_SOURCE_REVIEW,../private,tests/test_changed.py,"
+                "SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED\n",
+                encoding="utf-8")
+            units=[dict(path=source,symbol="solve",git_blob_sha="b"*40,
+                        semantic_review_status="NOT_REVIEWED",
+                        reviewer="",evidence="")]
+            indexed={name:{"git_blob_sha":"b"*40}
+                     for name in (source,proof,test)}
+            updated,issues=apply_source_review_attestations(root,units,indexed)
+            self.assertEqual(updated[0]["semantic_review_status"],"NOT_REVIEWED")
+            codes={entry["code"] for entry in issues}
+            self.assertIn("STALE_SOURCE_SHA",codes)
+            self.assertIn("UNSAFE_EVIDENCE_PATH",codes)
+            self.assertIn("DUPLICATE_ATTESTATION",codes)
+
     def test_exec_facade_inventory_marks_real_source_context_risk(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
