@@ -49,6 +49,7 @@ jobs:
           check python -m unittest tests.test_source_view_compaction -v
           check python -m unittest tests.test_saved_view_refresh -v
           check python -m unittest tests.test_deferred_storey_workbook -v
+          check python -m unittest tests.test_mesh_workbook_publication -v
           check python -m unittest tests.test_gravity_excel_import_action -v
           check python -m unittest tests.test_conversion_progress_status_runtime -v
           check python -m unittest tests.test_import_workbook_digest_cache -v
