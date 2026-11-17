@@ -30,3 +30,8 @@ The old `timed_outputs` and `StageTimer` created `<artifact>.processing.json` be
 This is a **specific writer correction**, not full migration of all legacy export-root sources. Complete root cleanup needs source reader migration, verified SHA manifests, rollback and native regression evidence. Source-only independent tests: `tests/test_timing_metadata_structure.py`; native dependent legacy tests adjusted: `tests/verify_v130.py`.
 
 For explicit stages, `StageTimer` snapshots the size and modification time of immediate output files at startup. On finish it records newly created and observably modified files. Elapsed time uses a monotonic clock, and output selection works across wall-clock adjustments. Same-size rewrites with identical filesystem modification timestamps are indistinguishable from untouched files.
+
+
+## 2026-11-17 short-run failure evidence correction
+
+Prior timed_outputs used nanosecond wall clock and per-file mtime comparisons. Coarse filesystem timestamps could omit a new artifact and its failure-status sidecar. The wrapper now snapshots eligible files before and after each stage and records newly created or changed artifacts, excluding prior unchanged outputs. Failure exceptions propagate and processing sidecars live in 00_PROCESSING_METADATA/ARTIFACTS. Deterministic skew and existing stage tests: tests/test_timing_metadata_structure.py. This is timing metadata integrity, not native solver or engineering acceptance.
