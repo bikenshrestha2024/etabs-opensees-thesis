@@ -54,5 +54,13 @@
     "changes": "Durable build stage log, actual interpreter/module identity, original traceback, terminal workbook recovery using existing SHA validation. Literature resource note.",
     "tests": "23 focused unittest tests passed; native Windows environment inaccessible from cloud.",
     "limitations": "No new nonlinear constitutive adapter or project qualification; no claim that user Windows run completed."
+  },
+  "gui_freeze_followup": {
+    "classification": "EXTEND_EXISTING",
+    "root_cause": "Root workbook callback ran Excel generation synchronously on Tk main thread; advanced root button allowed overlapping build/export.",
+    "fix": "Queued worker for root workbook/recovery; main-loop result delivery; shared disabled-controls guard.",
+    "evidence_scope": "Synthetic scheduling/exception tests, current uploaded beam/slab arithmetic audit privately retained; no matching native per-node reaction solve.",
+    "known_attachment_limits": "Three force XLSX files exceed 32MiB transfer limit.",
+    "verification": "34 focused tests passed; full local discovery 415 tests, 9 errors from absent pytest/plotly (same dependency-limited modules listed previously). Reviewer found no actionable regression. Native Windows pending."
   }
 }

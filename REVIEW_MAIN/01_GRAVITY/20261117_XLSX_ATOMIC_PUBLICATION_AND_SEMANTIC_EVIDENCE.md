@@ -67,3 +67,13 @@ remaining integrated static failure identified this stale module-blob
 attestation. This follow-up records the actual inspected function and evidence
 rather than disabling that gate. Native Windows timing and physical acceptance
 remain OPEN.
+
+
+## Root-export GUI follow-up
+
+The source module changed again in its GUI callbacks. Re-inspection confirms
+`export` retains its existing config-SHA/FLOOR checks and atomic publisher,
+with no change to its function body. Its full-module checksum is refreshed in
+the existing function-only attestation. `_workbook_job` now keeps workbook-only
+export/recovery off Tk's thread and prevents overlapping mesh/root workbook
+jobs. This inspection does not attest the whole module or native Windows UI.

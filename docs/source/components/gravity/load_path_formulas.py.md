@@ -161,3 +161,18 @@ claim. `tests/test_slab_mesh_excel_paging.py` checks bounded dimension scans,
 all 28 fixture node rows across four reduced-limit pages, formula references,
 index counts and a saved/reopened XLSX. Native gravity and ETABS parity remain
 separate checks.
+
+
+## 2026-11-17 — root workbook GUI freeze and overlapping exports
+
+`current_workbook` formerly invoked the entire `export` operation synchronously
+on Tk's main thread. The advanced root-export button was also missing from the
+shared disabled-controls list. It could start a second large workbook while an
+independent mesh assembly/export was active. Both workbook-only routes now use
+`_workbook_job`: a background worker reports progress/result/error through a
+queue, polled only by Tk's main loop. No Tk method is called by these workers.
+The root button joins the shared controls; busy requests return without starting
+another export. Controls restore on success and exception. No model loads or
+solver equations change. Synthetic worker scheduling, completion, failure and
+busy-click checks are in `tests/test_mesh_workbook_publication.py`. Windows GUI
+and peak-memory measurements remain pending.

@@ -497,38 +497,61 @@ def launch(parent,folder):
                 except tk.TclError:pass
         threading.Thread(target=work,name='slab_mesh_'+str(size),daemon=True).start()
 
+    def _workbook_job(work,on_success,label):
+        """[REF docs/source/components/gravity/load_path_formulas.py.md]
+        Run heavy workbook work off Tk; deliver every GUI update by main-loop polling.
+        """
+        if any(b.cget('state')=='disabled' for b in buttons):
+            return  # independent build/recovery/export already owns these controls
+        events=queue.SimpleQueue()
+        mesh_selector.configure(state='disabled')
+        for b in buttons:b.configure(state='disabled')
+        status.set(label)
+        def worker():
+            try:
+                result=work(lambda message:events.put(('progress',message)))
+            except Exception as exc:
+                events.put(('error',f'{type(exc).__name__}: {exc}'))
+            else:
+                events.put(('done',result))
+        def poll():
+            if not win.winfo_exists():return
+            while True:
+                try:kind,value=events.get_nowait()
+                except queue.Empty:break
+                if kind=='progress':
+                    status.set(value);log(value)
+                    continue
+                mesh_selector.configure(state='readonly')
+                for b in buttons:b.configure(state='normal')
+                if kind=='error':
+                    status.set('WORKBOOK FAILED | '+value);log('WORKBOOK FAILED: '+value)
+                else:on_success(value)
+                return
+            win.after(250,poll)
+        threading.Thread(target=worker,daemon=True,name='mesh_workbook_export').start()
+        win.after(250,poll)
+
     def recover_workbook():
         if choice.get()=='Current root (hash-checked)':
             current_workbook()
             return
         size=int(choice.get())
-        status.set(f'RECOVERING | MESH_{size:02d} already-assembled model...')
-        def work():
-            try:
-                result=recover_assembled_mesh_workbook(folder,size)
-            except Exception as exc:
-                win.after(0,lambda e=exc:(
-                    status.set('RECOVERY BLOCKED | '+str(e)),
-                    log('RECOVERY BLOCKED: '+str(e))))
-            else:
-                win.after(0,lambda r=result:(
-                    status.set('FORMULA RECOVERED | '+str(r['workbook'])),
-                    log('FORMULA WORKBOOK RECREATED: '+str(r['workbook']))))
-        threading.Thread(target=work,daemon=True,
-                         name=f'mesh_{size:02d}_workbook_recovery').start()
+        def complete(result):
+            status.set('FORMULA RECOVERED | '+str(result['workbook']))
+            log('FORMULA WORKBOOK RECREATED: '+str(result['workbook']))
+        _workbook_job(
+            lambda progress:recover_assembled_mesh_workbook(folder,size,progress=progress),
+            complete,f'RECOVERING | MESH_{size:02d} already-assembled model...')
 
     def current_workbook():
-        try:
-            workbook=export(folder)
+        def complete(workbook):
             status.set('FORMULA EXPORTED | Original assembled root model; gravity not verified.')
             log('CURRENT MODEL WORKBOOK: '+str(workbook))
             if hasattr(os,'startfile'):os.startfile(str(workbook))
             else:messagebox.showinfo('Workbook exported','Saved: '+str(workbook),parent=win)
-        except Exception as exc:
-            status.set('BLOCKED | '+str(exc))
-            messagebox.showwarning('Stale or incomplete model',
-                str(exc)+'\\n\\nUse "Build selected mesh + Excel" to create a fresh independent case.',
-                parent=win)
+        _workbook_job(lambda progress:export(folder,progress=progress),complete,
+                      'EXPORTING | Existing root mesh workbook...')
     def open_cases():
         root=folder/'02_MODEL'/'SLAB_LOAD_PATH'
         if not root.is_dir():
@@ -562,8 +585,10 @@ def launch(parent,folder):
     buttons.extend((prep_button,build_button,recover_button))
     advanced=ttk.LabelFrame(outer,text='Existing root export — only if it is already rebuilt',padding=9)
     advanced.pack(fill='x',pady=(2,7))
-    ttk.Button(advanced,text='Export root assembled mesh workbook (hash-checked)',
-               command=current_workbook).pack(side='left')
+    root_workbook_button=ttk.Button(advanced,text='Export root assembled mesh workbook (hash-checked)',
+                                    command=current_workbook)
+    root_workbook_button.pack(side='left')
+    buttons.append(root_workbook_button)
     ttk.Label(advanced,text='Choose Current root in the mesh dropdown for a hash-checked root export. A changed mesh setting invalidates older assembly.',
               wraplength=440).pack(side='left',padx=10)
     ttk.Label(outer,text='Run log (copyable)',font=('Segoe UI',10,'bold')).pack(anchor='w')
