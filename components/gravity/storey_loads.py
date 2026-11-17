@@ -1,6 +1,6 @@
 """Storey gravity ledger from exact assembled source nodal contributions."""
 from pathlib import Path
-import csv,json,math,hashlib,shutil,datetime,time
+import csv,json,math,hashlib,shutil,datetime,time,os,tempfile
 from OpenSees_Timing_V130 import timed_outputs
 
 COLUMNS=['beam_self_weight_kN','column_self_weight_kN','brace_self_weight_kN','shear_wall_self_weight_kN','slab_self_weight_kN','other_self_weight_kN','floor_finish_kN','partition_kN','other_dead_kN','live_kN','storage_live_kN','roof_live_kN','unclassified_kN']
@@ -93,23 +93,60 @@ def export_storey_gravity(folder,data,config,pattern_types=None,*,generate_workb
             for header in ws[1]:
                 ws.column_dimensions[header.column_letter].width=min(42,max(16,len(str(header.value))+2))
     wb.create_sheet('Read me').append([note])
-    from OpenSees_Load_Path_V141 import add_formula_audit
-    _formula_started=time.perf_counter()
-    print('[OPTIONAL EXCEL START] Mesh cell/node formula sheets',flush=True)
-    add_formula_audit(wb,folder,data,config)
-    print(f'[OPTIONAL EXCEL DONE] Formula construction: '
-          f'{time.perf_counter()-_formula_started:.3f}s',flush=True)
-    _save_started=time.perf_counter()
-    print('[OPTIONAL EXCEL START] XLSX serialization',flush=True)
-    wb.save(xlsx)
-    print(f'[OPTIONAL EXCEL DONE] XLSX serialization: '
-          f'{time.perf_counter()-_save_started:.3f}s',flush=True)
+    # A formula workbook may be hundreds of MB. Never save directly over a
+    # previously valid artifact or hash the entire XLSX in RAM. The status
+    # distinguishes a currently regenerating workbook from a verified one.
+    if xlsx.is_symlink() or status.is_symlink():
+        raise ValueError('Refusing linked gravity workbook/status destination')
     status.write_text(json.dumps({
-        'status':'FORMULA_WORKBOOK_READY',
+        'status':'FORMULA_WORKBOOK_GENERATING',
         'source_model_config_sha256':data.get('config_sha256'),
         'gravity_total_kN':expected,
-        'workbook_sha256':hashlib.sha256(xlsx.read_bytes()).hexdigest(),
-        'source_detail_rows':len(detail)},indent=2),encoding='utf-8')
+        'previous_workbook_retained_until_commit':xlsx.exists()
+    },indent=2),encoding='utf-8')
+    staged=None
+    try:
+        from OpenSees_Load_Path_V141 import add_formula_audit
+        _formula_started=time.perf_counter()
+        print('[OPTIONAL EXCEL START] Mesh cell/node formula sheets',flush=True)
+        add_formula_audit(wb,folder,data,config)
+        print(f'[OPTIONAL EXCEL DONE] Formula construction: '
+              f'{time.perf_counter()-_formula_started:.3f}s',flush=True)
+        fd,stage_name=tempfile.mkstemp(
+            prefix='.gravity_',suffix='.xlsx',dir=folder)
+        os.close(fd)
+        staged=Path(stage_name)
+        _save_started=time.perf_counter()
+        print('[OPTIONAL EXCEL START] XLSX serialization',flush=True)
+        wb.save(staged)
+        print(f'[OPTIONAL EXCEL DONE] XLSX serialization: '
+              f'{time.perf_counter()-_save_started:.3f}s',flush=True)
+        digest=hashlib.sha256()
+        with staged.open('rb') as stream:
+            for chunk in iter(lambda:stream.read(1024*1024),b''):
+                digest.update(chunk)
+        # Only a fully serialized, checksummed artifact can replace the old
+        # workbook. The move is atomic on the same filesystem.
+        os.replace(staged,xlsx)
+        staged=None
+        status.write_text(json.dumps({
+            'status':'FORMULA_WORKBOOK_READY',
+            'source_model_config_sha256':data.get('config_sha256'),
+            'gravity_total_kN':expected,
+            'workbook_sha256':digest.hexdigest(),
+            'source_detail_rows':len(detail)},indent=2),encoding='utf-8')
+    except Exception as exc:
+        status.write_text(json.dumps({
+            'status':'FORMULA_WORKBOOK_EXPORT_FAILED',
+            'source_model_config_sha256':data.get('config_sha256'),
+            'gravity_total_kN':expected,
+            'error_type':type(exc).__name__,
+            'previous_workbook_preserved':xlsx.exists()
+        },indent=2),encoding='utf-8')
+        raise
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
     print(f'[STOREY GRAVITY] {len(table)} levels | applied={actual:.6f} kN | reconciliation={actual-expected:.6g} kN | FORMULA_XLSX=READY',flush=True)
     return report
 
