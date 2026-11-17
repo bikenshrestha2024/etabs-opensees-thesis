@@ -2496,6 +2496,7 @@ class App:
         action(group_1_0,text="OpenSees material + section library — RC, walls, slab, SHS, FVD, BRB",command=self._open_material_values)
         action(group_1_1,text="FVD / BRB ETABS brace replacement guide",command=self._open_fvd_brb_guide)
         action(group_2_0,text="OpenSees gravity analysis — run, plot + report",command=self._open_gravity_analysis)
+        action(group_2_0,text="Generate detailed storey-gravity Excel from saved model (no ETABS)",command=self._generate_storey_gravity_excel)
         action(group_2_1,text="NBC 105: load combinations, stiffness + mass source",command=self._open_nbc105_settings)
         action(group_2_1,text="ULS / SLS design checks - combinations, drift, sections",command=lambda:__import__("OpenSees_Design_Checks_V135").launch(self.root,self.out.get()))
         action(group_2_1,text="NBC 105 formula reference — periods, ELF + drift",command=self._open_nbc105_formula_reference)
@@ -3171,6 +3172,67 @@ class App:
                 parent=self.root)
             return
         return __import__('OpenSees_Load_Path_V141').launch(self.root,self.out.get())
+
+    def _generate_storey_gravity_excel(self):
+        """[REF docs/source/components/ui/application.py.md] Optional post-export Excel."""
+        if getattr(self, "_conversion_process", None) is not None:
+            messagebox.showwarning(
+                "Conversion active",
+                "Complete the source export before preparing the optional "
+                "mesh-level Excel workbook.",parent=self.root)
+            return
+        if getattr(self, "_storey_gravity_excel_running", False):
+            messagebox.showinfo(
+                "Excel already running",
+                "The detailed gravity formula workbook is already being generated.",
+                parent=self.root)
+            return
+        folder=Path(self.out.get().strip()).expanduser().resolve()
+        needed=("OpenSees_Complete_Model_Data_V118.json",
+                "OpenSees_Complete_Model_Config_V118.json",
+                "OpenSees_Complete_Export_Report_V118.json")
+        if not all((folder/name).is_file() for name in needed):
+            messagebox.showwarning(
+                "Completed model required",
+                "An assembled model, matching configuration and successful "
+                "export report are required. This tool never invokes ETABS.",
+                parent=self.root)
+            return
+        self._storey_gravity_excel_running=True
+        self.log("[GRAVITY EXCEL] Optional large formula workbook generation started "
+                 "from existing model. No ETABS, OpenSees analysis or mesh rebuild.")
+        import threading
+        def run_workbook():
+            try:
+                import subprocess,sys
+                result=subprocess.run(
+                    [sys.executable,"-m","components.gravity.storey_loads",
+                     "--workbook",str(folder)],
+                    cwd=str(Path(__file__).resolve().parents[2]),
+                    capture_output=True,text=True,errors="replace",
+                    check=False)
+                diagnostic=(result.stdout+"\n"+result.stderr).strip()
+                error=None if result.returncode==0 else (
+                    "Workbook helper failed (exit "+str(result.returncode)+").\n"+
+                    diagnostic[-3500:])
+            except Exception as exc:
+                diagnostic=""
+                error=repr(exc)
+            def complete():
+                self._storey_gravity_excel_running=False
+                if diagnostic:
+                    self.log("[GRAVITY EXCEL] "+diagnostic[-3500:])
+                if error:
+                    messagebox.showerror("Gravity workbook",error,parent=self.root)
+                else:
+                    messagebox.showinfo(
+                        "Gravity workbook ready",
+                        "Detailed workbook generated from the saved model:\n"+
+                        str(folder/"Gravity_Storey_Load_Breakdown_V131.xlsx")+
+                        "\nNo ETABS import or model assembly was executed.",
+                        parent=self.root)
+            self.root.after(0,complete)
+        threading.Thread(target=run_workbook,daemon=True).start()
 
     def _open_assembled_mesh_view(self):
         """[REF docs/source/components/ui/application.py.md] Render real solver mesh off the GUI thread."""
