@@ -109,5 +109,35 @@ class GateTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,"case identity"):
                     compare_time_step_results(base,other)
 
+    def test_timestep_rejects_boolean_and_negative_peak_demands(self):
+        base=dict(status="FULL_DURATION_NUMERIC_SCREEN",
+                  model_sha256="a"*64,record_sha256="b"*64,
+                  limit_state="ULS",orientation="XY",diagnostic_excitation="XY",
+                  variant_id="M2",pair_id="Kobe",
+                  min_accepted_step_s=.005,max_accepted_step_s=.01,
+                  peak_roof_UX_m=.01,peak_roof_UY_m=.02,
+                  max_story_drift_X=.003,max_story_drift_Y=.004)
+        fine=dict(base,min_accepted_step_s=.0025,max_accepted_step_s=.005)
+        self.assertEqual(compare_time_step_results(base,fine)["status"],
+                         "COMPARISON_COMPLETE_NOT_PHYSICAL_VALIDATION")
+        for invalid in (True,False,-0.1,None,"FAILED"):
+            with self.subTest(invalid=invalid):
+                modified=dict(fine,peak_roof_UX_m=invalid)
+                with self.assertRaisesRegex(ValueError,"metric"):
+                    compare_time_step_results(base,modified)
+
+    def test_timestep_rejects_boolean_step_size_and_tolerance(self):
+        base=dict(status="FULL_DURATION_NUMERIC_SCREEN",
+                  model_sha256="a"*64,record_sha256="b"*64,
+                  limit_state="ULS",orientation="XY",diagnostic_excitation="XY",
+                  min_accepted_step_s=.005,max_accepted_step_s=.01,
+                  peak_roof_UX_m=.01,peak_roof_UY_m=.02,
+                  max_story_drift_X=.003,max_story_drift_Y=.004)
+        fine=dict(base,min_accepted_step_s=.0025,max_accepted_step_s=.005)
+        with self.assertRaisesRegex(ValueError,"tolerance"):
+            compare_time_step_results(base,fine,max_relative_difference=True)
+        with self.assertRaisesRegex(ValueError,"step evidence"):
+            compare_time_step_results(base,dict(fine,min_accepted_step_s=True))
+
 if __name__=="__main__":unittest.main()
 
