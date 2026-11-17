@@ -42,3 +42,12 @@ The generator requires a complete error-free `OpenSees_Complete_Export_Report_V1
 **Performance validation:** Compare `[TIMING] Storey gravity load classification and workbook`, `[ASSEMBLY PHASE]` and final worker duration before/after under the same source SHA, four mesh divisions and a fresh output. No claim about the new Windows wall clock is made without a measured native run.
 
 **Automated acceptance:** `tests/test_deferred_storey_workbook.py` verifies numerical source detail/level reconciliation, archive of an obsolete XLSX, and refusal to generate a workbook from a stale or failed assembled model. No numerical results are replaced with generic approximations.
+
+
+## 2026-11-17 — actual semantic review of optional Excel publication
+
+The previous on-demand exporter saved directly to the original Gravity_Storey_Load_Breakdown_V131.xlsx and computed SHA256 via xlsx.read_bytes(). Both were reproduced in regression tests as interrupted-save overwrite of previously valid evidence and avoidable whole-file RAM allocation. A third regression showed an apparently successful writer could produce invalid XLSX bytes and still be marked READY.
+
+The gravity source reconciliation and source-detail CSV/JSON are **unchanged**. Formula construction remains in OpenSees_Load_Path_V141. The full workbook now uses the shared components.gravity.workbook_publishing.publish_workbook helper to write an exclusive same-directory temporary XLSX, validate ZIP container, stream SHA256, then atomically commit. The status manifest transitions GENERATING -> READY or EXPORT_FAILED. If save, ZIP validation, hashing or replace fails, the prior workbook stays intact and the status does not report success.
+
+Excel's formula recalculation is a separate verification step (openpyxl does not evaluate formulas). The detailed workbook supports source-load-path comparison but does not directly solve ETABS/OpenSees 32/76/97 support reactions. No changes were made to structural loads, mass, finite-element mesh or boundary conditions.

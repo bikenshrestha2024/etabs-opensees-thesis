@@ -93,23 +93,45 @@ def export_storey_gravity(folder,data,config,pattern_types=None,*,generate_workb
             for header in ws[1]:
                 ws.column_dimensions[header.column_letter].width=min(42,max(16,len(str(header.value))+2))
     wb.create_sheet('Read me').append([note])
-    from OpenSees_Load_Path_V141 import add_formula_audit
-    _formula_started=time.perf_counter()
-    print('[OPTIONAL EXCEL START] Mesh cell/node formula sheets',flush=True)
-    add_formula_audit(wb,folder,data,config)
-    print(f'[OPTIONAL EXCEL DONE] Formula construction: '
-          f'{time.perf_counter()-_formula_started:.3f}s',flush=True)
-    _save_started=time.perf_counter()
-    print('[OPTIONAL EXCEL START] XLSX serialization',flush=True)
-    wb.save(xlsx)
-    print(f'[OPTIONAL EXCEL DONE] XLSX serialization: '
-          f'{time.perf_counter()-_save_started:.3f}s',flush=True)
+    # A formula workbook may be hundreds of MB. Never save directly over a
+    # previously valid artifact or hash the entire XLSX in RAM. The status
+    # distinguishes a currently regenerating workbook from a verified one.
+    if xlsx.is_symlink() or status.is_symlink():
+        raise ValueError('Refusing linked gravity workbook/status destination')
     status.write_text(json.dumps({
-        'status':'FORMULA_WORKBOOK_READY',
+        'status':'FORMULA_WORKBOOK_GENERATING',
         'source_model_config_sha256':data.get('config_sha256'),
         'gravity_total_kN':expected,
-        'workbook_sha256':hashlib.sha256(xlsx.read_bytes()).hexdigest(),
-        'source_detail_rows':len(detail)},indent=2),encoding='utf-8')
+        'previous_workbook_retained_until_commit':xlsx.exists()
+    },indent=2),encoding='utf-8')
+    try:
+        from OpenSees_Load_Path_V141 import add_formula_audit
+        _formula_started=time.perf_counter()
+        print('[OPTIONAL EXCEL START] Mesh cell/node formula sheets',flush=True)
+        add_formula_audit(wb,folder,data,config)
+        print(f'[OPTIONAL EXCEL DONE] Formula construction: '
+              f'{time.perf_counter()-_formula_started:.3f}s',flush=True)
+        from components.gravity.workbook_publishing import publish_workbook
+        _save_started=time.perf_counter()
+        print('[OPTIONAL EXCEL START] Atomic XLSX serialization and SHA256',flush=True)
+        digest=publish_workbook(wb,xlsx)
+        print(f'[OPTIONAL EXCEL DONE] Atomic XLSX serialization and SHA256: '
+              f'{time.perf_counter()-_save_started:.3f}s',flush=True)
+        status.write_text(json.dumps({
+            'status':'FORMULA_WORKBOOK_READY',
+            'source_model_config_sha256':data.get('config_sha256'),
+            'gravity_total_kN':expected,
+            'workbook_sha256':digest,
+            'source_detail_rows':len(detail)},indent=2),encoding='utf-8')
+    except Exception as exc:
+        status.write_text(json.dumps({
+            'status':'FORMULA_WORKBOOK_EXPORT_FAILED',
+            'source_model_config_sha256':data.get('config_sha256'),
+            'gravity_total_kN':expected,
+            'error_type':type(exc).__name__,
+            'previous_workbook_preserved':xlsx.exists()
+        },indent=2),encoding='utf-8')
+        raise
     print(f'[STOREY GRAVITY] {len(table)} levels | applied={actual:.6f} kN | reconciliation={actual-expected:.6g} kN | FORMULA_XLSX=READY',flush=True)
     return report
 

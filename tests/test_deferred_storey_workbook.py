@@ -62,6 +62,79 @@ class DeferredStoreyWorkbookTests(unittest.TestCase):
         self.assertEqual(archived.read_bytes(),b"old workbook from different source EDB")
         self.assertIn("09_SOFTWARE_DIAGNOSTICS",str(archived))
 
+    def test_failed_formula_save_preserves_previous_workbook(self):
+        import sys
+        import types
+        from unittest.mock import patch
+        old=self.root/"Gravity_Storey_Load_Breakdown_V131.xlsx"
+        old.write_bytes(b"PREVIOUS_VALID_WORKBOOK_BYTES")
+        extra=types.ModuleType("OpenSees_Load_Path_V141")
+        extra.add_formula_audit=lambda wb, folder, data, cfg: wb.create_sheet("Formula")
+        attempted=[]
+
+        def broken_save(workbook, path):
+            attempted.append(Path(path))
+            Path(path).write_bytes(b"PARTIAL_XLSX")
+            raise OSError("simulated interrupted XLSX serialization")
+
+        with patch.dict(sys.modules,{"OpenSees_Load_Path_V141":extra}), \
+             patch("openpyxl.workbook.workbook.Workbook.save",
+                   autospec=True,side_effect=broken_save):
+            with self.assertRaisesRegex(OSError,"interrupted XLSX"):
+                export_storey_gravity(self.root,self.data,self.cfg,
+                                     generate_workbook=True)
+        self.assertEqual(old.read_bytes(),b"PREVIOUS_VALID_WORKBOOK_BYTES")
+        self.assertTrue(attempted)
+        self.assertNotEqual(attempted[0],old)
+        self.assertFalse(attempted[0].exists())
+        marker=json.loads((self.root/"Gravity_Storey_Workbook_Status_V131.json").read_text())
+        self.assertEqual(marker["status"],"FORMULA_WORKBOOK_EXPORT_FAILED")
+        self.assertNotIn("workbook_sha256",marker)
+
+    def test_successful_but_corrupt_zip_is_not_marked_ready(self):
+        import sys
+        import types
+        extra=types.ModuleType("OpenSees_Load_Path_V141")
+        extra.add_formula_audit=lambda wb,folder,data,cfg:wb.create_sheet("Formula")
+        old=self.root/"Gravity_Storey_Load_Breakdown_V131.xlsx"
+        old.write_bytes(b"KNOWN_PREVIOUS_EVIDENCE")
+        def corrupt_save(wb,path):
+            Path(path).write_bytes(b"NOT_AN_XLSX_ZIP")
+        with patch.dict(sys.modules,{"OpenSees_Load_Path_V141":extra}), \
+             patch("openpyxl.workbook.workbook.Workbook.save",
+                   autospec=True,side_effect=corrupt_save):
+            with self.assertRaisesRegex(ValueError,"invalid XLSX"):
+                export_storey_gravity(self.root,self.data,self.cfg,generate_workbook=True)
+        self.assertEqual(old.read_bytes(),b"KNOWN_PREVIOUS_EVIDENCE")
+        marker=json.loads((self.root/"Gravity_Storey_Workbook_Status_V131.json").read_text())
+        self.assertEqual(marker["status"],"FORMULA_WORKBOOK_EXPORT_FAILED")
+        self.assertFalse(list(self.root.glob(".gravity_*.xlsx")))
+
+    def test_optional_workbook_sha256_streams_file_instead_of_reading_all_bytes(self):
+        import sys
+        import types
+        extra=types.ModuleType("OpenSees_Load_Path_V141")
+        extra.add_formula_audit=lambda wb, folder, data, cfg: wb.create_sheet("Formula")
+        read_bytes=Path.read_bytes
+
+        def reject_eager_xlsx_read(path):
+            if Path(path).suffix.casefold()==".xlsx":
+                raise AssertionError("XLSX checksum must stream, not read all bytes")
+            return read_bytes(path)
+
+        with patch.dict(sys.modules,{"OpenSees_Load_Path_V141":extra}), \
+             patch.object(Path,"read_bytes",reject_eager_xlsx_read):
+            result=export_storey_gravity(self.root,self.data,self.cfg,
+                                        generate_workbook=True)
+        xlsx=self.root/"Gravity_Storey_Load_Breakdown_V131.xlsx"
+        marker=json.loads((self.root/"Gravity_Storey_Workbook_Status_V131.json").read_text())
+        self.assertEqual(result["total_applied_kN"],17.)
+        self.assertTrue(xlsx.is_file())
+        self.assertEqual(marker["status"],"FORMULA_WORKBOOK_READY")
+        self.assertEqual(marker["workbook_sha256"],
+                         hashlib.sha256(read_bytes(xlsx)).hexdigest())
+        self.assertFalse(list(self.root.glob(".gravity_*.xlsx")))
+
     def test_manual_regeneration_rejects_mismatched_configuration(self):
         cfg=self.root/"OpenSees_Complete_Model_Config_V118.json"
         model=self.root/"OpenSees_Complete_Model_Data_V118.json"
