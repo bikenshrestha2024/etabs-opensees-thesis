@@ -187,4 +187,14 @@ const query=new URLSearchParams(window.location.search);if(query.has('idValue'))
         container='<div id="shared-id-controls-v122">ETABS / OpenSees exact selection controls — initializing...</div>'
         content=re.sub(r'(<body[^>]*>)',lambda m:m.group(1)+viewer_css+container,content,count=1,flags=re.I)
         safe_script=script
-        path.write_text(content.replace('</body>',safe_script+'</body>'),encoding='utf-8')
+        # Refresh only presentation controls after source-verified ID injection.
+        # No ETABS extraction, model remeshing or numerical work is performed.
+        from components.ui.saved_view_refresh import enhance_saved_html
+        html_with_ids=content.replace('</body>',safe_script+'</body>')
+        path.write_text(enhance_saved_html(html_with_ids,path.name)
+                        if path.name in (
+                            'OpenSees_Structural_Elements_By_Storey.html',
+                            'OpenSees_Element_Connectivity_3D.html',
+                            'OpenSees_Load_Assignment_3D.html',
+                            'OpenSees_Load_Assignment_Floor_Plan.html')
+                        else html_with_ids,encoding='utf-8')
