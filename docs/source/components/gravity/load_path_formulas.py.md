@@ -130,3 +130,10 @@ gross weights from shell geometry and material density. The vertical-load
 path notes identify those rows as diagnostics before volume corrections.
 The workbook change does not change assembled loads, seismic mass, or solver
 results. `tests.verify_slab_full_gravity_factors` covers both workbook profiles.
+
+
+## 2026-11-17 — mesh 4/8/16 XLSX evidence publication
+
+The mesh-specific export(folder, output_root=...) writer previously saved XLSX directly to its final timestamped filename and wrote an un-hashed success manifest. An interrupted or corrupt XLSX could be left in the EXCEL directory, and the manifest did not prove the bytes persisted there. The exporter now calls components.gravity.workbook_publishing.publish_workbook and writes an atomic JSON manifest carrying workbook_sha256. Linked EXCEL/JSON output parents are refused.
+
+This is **output integrity only**, not a modification of shell loads, Excel formulas, member weights, 4/8/16 mesh cases, structure stiffness, gravity reaction balance or seismic mass. Separate assembled-model SHA matching remains mandatory. ZIP validation is not formula evaluation or native physical acceptance; compare native ETABS+OpenSees solved reactions, wall-base resultants and beam bending/shear independently.
