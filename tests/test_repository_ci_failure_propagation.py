@@ -16,8 +16,12 @@ class RepositoryCheckFailurePropagationTests(unittest.TestCase):
         self.assertIn('failed=$((failed+1))',source)
         self.assertIn('if [ "$failed" -ne 0 ]; then',source)
         self.assertIn('exit 1',source)
-        self.assertIn("audit/repository_semantics.json",source)
-        self.assertIn("--fail-on-active-errors",source)
+        self.assertIn("audit/active_inventory.json",source)
+        self.assertIn("--fail-on-missing-canonical",source)
+        integrated=(Path(__file__).resolve().parents[1]/
+                    ".github/workflows/integrated-repository-audit.yml").read_text()
+        self.assertIn("audit_repository_integrated.py",integrated)
+        self.assertIn("--fail-on-static-blockers",integrated)
 
 
 if __name__=="__main__":
