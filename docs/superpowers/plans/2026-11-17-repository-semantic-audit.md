@@ -1,71 +1,75 @@
-# Repository-Wide Semantic Audit Implementation Plan
+# Consolidated Repository Semantic Review Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans or superpowers:subagent-driven-development to implement this plan task-by-task. Checklist state is evidence-based; don't mark unsolved native engineering gates done.
 
-**Goal:** Obtain a reproducible, SHA-scoped, evidence-ranked inventory of all tracked thesis repository files, identify production dependency and semantic review risks, safely fix demonstrable defects, and document engineering acceptance gates without treating static CI as native solver validation.
+**Goal:** Review all tracked repository files systematically, fix proven software defects with regression evidence and maintain honest function-level/native-engineering acceptance states.
 
-**Architecture:** Extend existing repository audits, not replace canonical folder routing. A new standard-library-only static checker reads tracked Git paths, recognizes active Python/test/historical artifacts, parses *nested* imports and dynamic literal imports, verifies local module resolution, and records risky patterns as human review candidates. Engineering review and corrections stay on an isolated GitHub branch; generated report files are GitHub Actions artifacts under `audit/`, not tracked numerical results.
+**Architecture:** Use the existing authoritative `tools/audit_repository_integrated.py` and `audit/integrated/` output tree, plus `tools/audit_active_repository.py`, output writer audits, `REVIEW_MAIN/` and GitHub issue #75. Do not create a parallel inventory. Existing `08_SEMANTIC_REVIEW/function_review_register.csv` contains source-tagged *not-yet-reviewed* function units for detailed future verification.
 
-**Tech Stack:** Python 3.12 (conda-forge); stdlib ast, pathlib, subprocess, hashlib/json, unittest; GitHub Actions on Ubuntu for static tests; native Windows ETABS v23/OpenSees and NBC 105:2025 required for physical checks.
+**Tech Stack:** Python 3.12, stdlib AST/Git, openpyxl/Plotly test dependencies, GitHub Actions, native Windows ETABS/OpenSeesPy for structural and time-history acceptance.
 
-**Spec:** User request, 2026-11-17; existing `AGENTS.md`, `docs/00_THESIS_ACCEPTANCE_GATES.md`, `REVIEW_MAIN/README.md`.
+**Spec:** User's 2026-11-17 repository-wide semantic audit request; `AGENTS.md`, `docs/00_THESIS_ACCEPTANCE_GATES.md`, `REVIEW_MAIN/README.md`, GitHub issue #75.
 
-## Global Constraints
+## Global constraints
 
-- Never upload, move or rewrite source EDB/XLSX, confidential model files, ground motions, solved results, LFS data or archived evidence.
-- Preserve 4×4 model mesh and 32/76/97 diagnostic support alternatives; no unverified changes to mass, gravity, material or nonlinear solver.
-- Distinguish ACTIVE_RUNTIME, TEST, HISTORICAL, documentation and generated/snapshot evidence; static checks cannot declare engineering equivalence.
-- Reuse existing project audit output root `audit/`; use `REVIEW_MAIN/08_SOFTWARE_SECURITY/` for discrepancies and source/evidence review.
-- Every significant change requires a reproducible before/after test; blockers prevent merge. All physically significant changes are out of scope until native engineering acceptance.
+- Preserve all EDB/XLSX original files and public/private result boundaries.
+- Keep actual 4×4 ShellMITC4 model, gravity/ESM/MRSM/NLTHA calculations, source restraints and 32/76/97 comparison cases unchanged without native engineering evidence.
+- Active code and tests: detailed dependency/contract inspection; historical snapshots and docs: integrity, provenance, references; do not claim all functions were manually reviewed.
+- Maintain one canonical `audit/integrated` system and review register, no duplicate root-level tools or unsafe bulk moves.
+- Current CI acceptance is **static/automated only**. Native physical-model checks remain explicitly unverified.
 
-## Review Focus
+## Review focus
 
-- Nested/dynamic imports that are not recorded by the current top-level-only AST audit.
-- Lazy GUI callbacks whose targets do not exist until clicked, source-missing Python modules.
-- Historical snapshots mislabelled as active code, duplicated run entry points.
-- Generated outputs/paths with unresolved readers or stale mixed source-model provenance.
-- Security hazards (shell=True/eval/pickle) that require review but must not be auto-labelled as exploitation.
+- Function-local and constant literal dynamic imports, including package submodules and missing local targets.
+- Root compatibility facades with `exec(compile(...))`, their source identity and `__file__` context.
+- Every GUI callback's lazy inputs/outputs and exception propagation.
+- Gravity wall-edge support representation, load source, mesh/beam/wall transfer, 32/76/97 native source restraints.
+- M0–M6 nonlinear material/device calibration and full completed XY/YX records.
 
 ---
 
-### Task 1: Inventory and dependency discovery
+### Task 1: Authoritative inventory and dependency gap
 
-**Files**
-- Create: `tools/audit_repository_semantics.py`
-- Test: `tests/test_repository_semantics_audit.py`
-- Output: `audit/repository_semantics.json` (CI artifact)
+**Modify:** `tools/audit_repository_integrated.py`, `tests/test_repository_integrated_audit.py`
 
-**Interfaces:** `audit_repository(root: Path) -> dict`; `main(argv=None) -> int`.
+- [x] Confirm complete untruncated Git tree: base 3,149 tracked blobs.
+- [x] Inspect existing integrated scanner before adding anything; avoid duplicate report generation.
+- [x] Add synthetic failing test for `importlib.import_module("components.package.module")` and literal `__import__` inside deferred functions.
+- [x] Extend existing graph with those static edges and missing-target candidates; dynamic variable import remains review only.
+- [ ] Verify integrated CI output against the full tracked repository and review literal dynamic candidates.
 
-- [ ] Add failing fixture tests for deep imports, unresolved local imports, historical files and no external path leakage.
-- [ ] Implement tracked-path metadata, SHA-256, active and historical categories, recursive AST imports, static-risk triage.
-- [ ] Run tests on synthetic tree, then full checkout in CI; fail only confirmed active missing local dependencies and parse/compiler failures.
-- [ ] Emit a reproducible JSON report and small, publicly safe terminal summary; review actual violations.
+### Task 2: Correct actual CI reliability defects
 
-### Task 2: Consolidated output and engineering acceptance matrix
+**Modify:** `.github/workflows/repository-integrity.yml` and failing unit assertions.
 
-**Files**
-- Create: `REVIEW_MAIN/08_SOFTWARE_SECURITY/20261117_REPOSITORY_SEMANTIC_DISCOVERY_AND_ACCEPTANCE.md`
-- Update: `REVIEW_MAIN/README.md`
-- Update: `.github/workflows/repository-integrity.yml`
+- [x] Confirmed old workflow could report success despite Python `FAILED (failures=1)` logs.
+- [x] Add per-command failure accounting with nonzero end-of-job exit.
+- [x] Repair incorrect Plotly Unicode/list-vs-tuple test assertions, invalid-UTF8 fixture and outdated launcher action count, without changing physics.
+- [ ] Run complete aggregate suite on exact PR SHA and inspect **every** failed command.
+- [ ] Make regression test demonstrate fail-state propagation and avoid falsely green CI.
 
-- [ ] Add precise coverage/classification method, issue statuses and limits.
-- [ ] Record required native gravity/ESM/MRSM/LTHA/NLTHA acceptance gates, source hashes, numerical tolerances and unverified issues.
-- [ ] Add CI command and artifact retention, no source-model result commits or path migrations.
+### Task 3: Consolidated review and native-engineering acceptance
 
-### Task 3: Independent review and release
+**Modify:** `REVIEW_MAIN/08_SOFTWARE_SECURITY/20261117_REPOSITORY_SEMANTIC_DISCOVERY_AND_ACCEPTANCE.md`, `REVIEW_MAIN/README.md`.
 
-- [ ] Review CI failure details and source-specific cases; fix only confirmed software defects with tests.
-- [ ] Compare branch diff against original main and check no numerical physics modules were modified without evidence.
-- [ ] Mark coverage status honestly: inventory != complete line-by-line semantic review; native validation remains unresolved.
-- [ ] Merge only with all relevant CI green, then record commit and open risks.
+- [x] Classify production, test, archived and documentary sources.
+- [x] Document high-centrality source modules, 32/76/97 issue, wall-first-step failure, source identity and output contracts.
+- [ ] Record exact integrated audit snapshot counts/findings and review each high-priority advisory with source line and test evidence.
+- [ ] Keep engineering acceptance gates OPEN until source-matched Windows ETABS/OpenSees and experiment comparison evidence is supplied.
 
-## Acceptance Gates
+### Task 4: Branch verification and integration
 
-- **G0 Inventory:** no Git tree truncation; all tracked Python paths classified and historic paths kept provenance-only.
-- **G1 Static:** no unreadable/syntax-invalid active Python; confirmed local imports resolve or are documented optional runtime plugins.
-- **G2 Integration:** launcher, GUI callback, source/reader output contracts, original regression suite and tracking tests pass.
-- **G3 Physics:** gravity reaction wall-base resultants and 32/76/97 source restraining evidence reconciled; no passing test currently certifies this.
-- **G4 Dynamics:** eigen/ESM/MRSM/LTHA/NLTHA uses original model SHA, load and mass, code choices, solver completion and native Windows runs.
-- **G5 Security/provenance:** no secrets/source EDB or private outputs committed; originals remain unchanged and outputs under canonical analysis stage roots.
-- **G6 Release:** branch reviewed, checks passed, only then merge; unresolved work itemized without "full engineering pass" claims.
+- [ ] Run full focused CI and integrated tracked source audit; all tests must pass on the exact head SHA.
+- [ ] Review diff to ensure source physics and runtime data paths have not been changed unintentionally.
+- [ ] Merge only validated software audit and test corrections to `main`.
+- [ ] Keep issue #75 open for function-by-function semantic review and native physics acceptance.
+
+## Acceptance gates
+
+G0: whole Git tree accurately classified with immutable Git blobs.
+G1: active Python imports/compilation and facade targets pass.
+G2: test failures propagate; all CI checks pass; no stale data consumers introduced.
+G3: 32/76/97 ETABS vs OpenSees reaction equivalence verified physically (CURRENTLY OPEN).
+G4: NBC 105:2025 dynamic and nonlinear response, calibration and full records verified (CURRENTLY OPEN).
+G5: no private files/secrets or unapproved output migrations.
+G6: exact PR head checks green, independent code diff reviewed, unresolved issues documented.
