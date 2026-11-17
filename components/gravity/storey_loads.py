@@ -129,8 +129,11 @@ def main(argv=None):
         raise ValueError('Config changed since model assembly; refuse stale mesh workbook')
     if not (folder/'OpenSees_Load_Conversion_Audit.json').is_file():
         raise ValueError('Missing original ETABS load audit')
+    metadata_path=folder/'OpenSees_Source_Model_Metadata_V118.json'
+    metadata=json.loads(metadata_path.read_text(encoding='utf-8-sig')) if metadata_path.is_file() else {}
     result=export_storey_gravity(folder,data,cfg,
-                                pattern_types={},generate_workbook=True)
+                                pattern_types=metadata.get('pattern_types',{}),
+                                generate_workbook=True)
     print(json.dumps({
         'status':'FORMULA_WORKBOOK_READY',
         'gravity_total_kN':result['total_applied_kN'],
