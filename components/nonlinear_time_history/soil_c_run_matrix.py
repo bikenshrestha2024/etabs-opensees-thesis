@@ -64,7 +64,15 @@ def create_configs(*,models_json,matched_dir,output_dir,dt_s=.005,
         if not path.is_dir():
             raise NotADirectoryError("No model export folder for "+key+": "+str(path))
         models[key]=str(path)
-    sources=source_map or resolve_sources(matched_dir)
+    # An explicitly supplied source map is authoritative. An empty mapping
+    # must fail closed instead of silently scanning the private matched-data
+    # directory, which can select unrelated files from a different run.
+    if source_map is None:
+        sources=resolve_sources(matched_dir)
+    else:
+        if not source_map:
+            raise ValueError("source_map must contain the 16 explicit event/component mappings")
+        sources=source_map
     root=Path(output_dir).expanduser().resolve()
     configurations=[]
     for variant in VARIANTS:

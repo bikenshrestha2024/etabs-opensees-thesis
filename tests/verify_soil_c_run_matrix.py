@@ -49,4 +49,22 @@ class RunMatrixTests(unittest.TestCase):
       with self.assertRaisesRegex(ValueError,"M0..M6"):
         create_configs(models_json=p,matched_dir=d,output_dir=Path(d)/"out",
           source_map={})
+ def test_explicit_empty_source_map_fails_closed_without_scanning_private_files(self):
+    with tempfile.TemporaryDirectory() as d:
+      root=Path(d)
+      models={}
+      for name in VARIANTS:
+        folder=root/"models"/name
+        folder.mkdir(parents=True)
+        models[name]=str(folder)
+      model_file=root/"model_dirs.json"
+      model_file.write_text(json.dumps(models),encoding="utf-8")
+      output=root/"generated"
+      with patch("components.nonlinear_time_history.soil_c_run_matrix.resolve_sources",
+                 side_effect=AssertionError("explicit source_map must not trigger a private directory scan")):
+        with self.assertRaisesRegex(ValueError,"source_map must contain"):
+          create_configs(models_json=model_file,matched_dir=root,
+                         output_dir=output,source_map={})
+      self.assertFalse(output.exists())
+
 if __name__=="__main__": unittest.main()
