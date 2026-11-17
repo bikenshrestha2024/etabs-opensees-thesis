@@ -171,7 +171,13 @@ def _resolve_refined_wall_supports(source_supports, source_nodes, nodes, topolog
         raise ValueError("Wall mesh restraint propagation requires explicit ETABS confirmation")
     for e in topology["elements"]:
         if e.get("dimension")!="area_polygon":continue
+        # Wall and floor edge-restraint assignments are independent in ETABS.
+        # Legacy source quads lack categories; require nonhorizontal geometry
+        # as well before applying this explicitly WALL-only policy.
+        if e.get("category") not in (None,"SHEAR WALL"):continue
         ns=e["node_tags"]
+        elevations=[source_nodes[int(n)][2] for n in ns]
+        if max(elevations)-min(elevations)<1e-7:continue
         for a,b in zip(ns,ns[1:]+ns[:1]):
             if source_supports.get(str(a))!=[1]*6 or source_supports.get(str(b))!=[1]*6:
                 continue

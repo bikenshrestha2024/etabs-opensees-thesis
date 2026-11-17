@@ -64,3 +64,17 @@ The synthetic complete-export fixture in
 into two assigned tags, raw release preservation, completed elastic messages,
 nonlinear blocking and phase callbacks. This is solver-free assembly evidence,
 not a native element or project calibration test.
+
+
+## 2026-11-17 — keep wall and floor restraint propagation independent
+
+`_resolve_refined_wall_supports` applied the opt-in confirmed WALL propagation
+policy to every area polygon, including floor edges. It now ignores explicit
+non-wall categories and horizontal polygons. Unclassified legacy vertical wall
+quads remain compatible. Source-only supports and the explicit source-confirmation
+requirement are unchanged; this correction does not enable propagation or alter
+existing saved models. Synthetic tests in `tests/verify_wall_base_restraints.py`
+check a restrained floor edge receives no added nodes, while a confirmed vertical
+wall edge still does. Exact ETABS analysis-node restraints and source hashes must
+be verified independently; a screenshot of a setting is not a per-object source
+manifest or a native equivalence result.

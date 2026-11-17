@@ -26,6 +26,19 @@ class WallBaseSupportTests(unittest.TestCase):
         self.assertEqual(added,[101,102])
         self.assertEqual(set(supports),{"1","2","101","102"})
         self.assertNotIn("103",supports)
+    def test_wall_edge_option_does_not_propagate_floor_restraints(self):
+        floor_nodes={1:[0.,0.,0.],2:[6.,0.,0.],3:[6.,3.,0.],4:[0.,3.,0.]}
+        nodes={**floor_nodes,101:[2.,0.,0.],102:[4.,0.,0.]}
+        for category in ('FLOOR',None):
+            with self.subTest(category=category):
+                record={'dimension':'area_polygon','node_tags':[1,2,3,4]}
+                if category is not None:record['category']=category
+                supported,added=_resolve_refined_wall_supports(
+                    self.source_supports,floor_nodes,nodes,{'elements':[record]},
+                    policy='EDGE_PROPAGATE_CONFIRMED',confirmed_edge_extension=True)
+                self.assertEqual(added,[])
+                self.assertEqual(supported,self.source_supports)
+
     def test_cannot_assume_etabs_wall_edge_option(self):
         with self.assertRaisesRegex(ValueError,"explicit ETABS confirmation"):
             _resolve_refined_wall_supports(

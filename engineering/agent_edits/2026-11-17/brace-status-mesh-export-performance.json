@@ -62,5 +62,12 @@
     "evidence_scope": "Synthetic scheduling/exception tests, current uploaded beam/slab arithmetic audit privately retained; no matching native per-node reaction solve.",
     "known_attachment_limits": "Three force XLSX files exceed 32MiB transfer limit.",
     "verification": "34 focused tests passed; full local discovery 415 tests, 9 errors from absent pytest/plotly (same dependency-limited modules listed previously). Reviewer found no actionable regression. Native Windows pending."
+  },
+  "wall_edge_scope_fix": {
+    "base": "25f6687ff6d370c5a27f102c20264213d2fb3e90",
+    "reason": "Confirmed-wall edge option accidentally processed floor polygons too; screenshot demonstrates independently selectable wall/floor settings.",
+    "change": "Filter explicit nonwall and horizontal polygons in opt-in wall propagation helper; preserve legacy vertical wall quads, SOURCE_ONLY and confirmation requirement.",
+    "tests": "17 focused tests passed after failing regression (floor edge gained two fixed nodes before fix).",
+    "native_status": "Not run; user supplied 32-support diagnostic result analyzed privately, not modified or promoted."
   }
 }

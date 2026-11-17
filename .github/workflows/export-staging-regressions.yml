@@ -17,6 +17,7 @@ on:
       - "tests/test_mesh_spatial_performance_regressions.py"
       - "tests/test_area_folder_and_hinged_brace_review.py"
       - "tests/test_mesh_workbook_publication.py"
+      - "tests/verify_wall_base_restraints.py"
       - "components/sections/area_elements.py"
       - "tests/test_gravity_evidence_stage.py"
       - "tests/test_export_mirror.py"
@@ -37,6 +38,7 @@ on:
       - "tests/test_*display*.py"
       - "tests/test_area_folder_and_hinged_brace_review.py"
       - "tests/test_mesh_workbook_publication.py"
+      - "tests/verify_wall_base_restraints.py"
       - "tests/test_model_mesh_case_workflow.py"
       - "tests/test_slab_mesh_excel_paging.py"
       - "components/gravity/load_path_formulas.py"
@@ -70,3 +72,4 @@ jobs:
           tests/test_mesh_spatial_performance_regressions.py
           tests/test_area_folder_and_hinged_brace_review.py
           tests/test_mesh_workbook_publication.py
+          tests/verify_wall_base_restraints.py
