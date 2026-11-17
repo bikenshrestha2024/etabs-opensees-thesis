@@ -970,7 +970,24 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None):
         payload['wall_base_restraint_policy']=cfg['wall_base_restraint_policy']
         payload['added_wall_mesh_support_tags']=extended_wall_supports
         from OpenSees_Storey_Gravity_V131 import export_storey_gravity
-        report['storey_gravity']=export_storey_gravity(folder,payload,cfg,meta.get('pattern_types',{}))
+        # The user-supplied 2026-11-16 worker log measured 1,614.536 s
+        # inside storey gravity and its mesh-level Excel formula exporter.
+        # Keep CSV/JSON numerical reconciliation mandatory. Full XLSX is a
+        # separately generated optional artifact, not a prerequisite for FE
+        # model, gravity preload or nonlinear analysis readiness.
+        _formula_during_import=cfg.get('export_gravity_formula_workbook_on_import',False)
+        if type(_formula_during_import) is not bool:
+            raise ValueError('export_gravity_formula_workbook_on_import must be boolean')
+        report['storey_gravity']=export_storey_gravity(
+            folder,payload,cfg,meta.get('pattern_types',{}),
+            generate_workbook=_formula_during_import)
+        report['storey_gravity_formula_workbook_status']=(
+            'READY' if _formula_during_import else 'DEFERRED_OPTIONAL_FROM_SAVED_MODEL')
+        if not _formula_during_import:
+            report['warnings'].append(
+                'Storey gravity CSV/JSON reconciled; optional mesh-level Excel formulas '
+                'deferred. Run python -m components.gravity.storey_loads --workbook '
+                'EXPORT_FOLDER without ETABS or model reconstruction.')
         from OpenSees_Model_Audit_V130 import audit
         print(f"[ASSEMBLY PHASE OK] Model data, member audits and load ledger | "
               f"seconds={time.perf_counter()-_phase_clock:.3f}",flush=True)
