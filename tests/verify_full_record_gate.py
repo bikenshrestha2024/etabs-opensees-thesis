@@ -87,5 +87,27 @@ class GateTests(unittest.TestCase):
         fine=dict(coarse,orientation='YX',max_accepted_step_s=.01)
         with self.assertRaisesRegex(ValueError,'case identity'):
             compare_time_step_results(coarse,fine)
+    def test_timestep_rejects_different_variant_and_pair_identifiers(self):
+        base=dict(status="FULL_DURATION_NUMERIC_SCREEN",
+                  model_sha256="a"*64, record_sha256="b"*64,
+                  limit_state="ULS",orientation="XY",diagnostic_excitation="XY",
+                  variant_id="M2",pair_id="Kobe",
+                  min_accepted_step_s=.005,max_accepted_step_s=.01,
+                  peak_roof_UX_m=.01,peak_roof_UY_m=.02,
+                  max_story_drift_X=.003,max_story_drift_Y=.004)
+        fine=dict(base,min_accepted_step_s=.0025,max_accepted_step_s=.005)
+        self.assertEqual(compare_time_step_results(base,fine)["status"],
+                         "COMPARISON_COMPLETE_NOT_PHYSICAL_VALIDATION")
+        for field,changed in (("variant_id","M4"),("pair_id","Chi-Chi"),
+                              ("variant_id",None),("pair_id",None)):
+            with self.subTest(field=field,changed=changed):
+                other=dict(fine)
+                if changed is None:
+                    other.pop(field)
+                else:
+                    other[field]=changed
+                with self.assertRaisesRegex(ValueError,"case identity"):
+                    compare_time_step_results(base,other)
+
 if __name__=="__main__":unittest.main()
 
