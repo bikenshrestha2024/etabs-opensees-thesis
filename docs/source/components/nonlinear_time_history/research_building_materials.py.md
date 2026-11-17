@@ -7,3 +7,8 @@ New `check_project_material_qualification` prevents a `THESIS_NLTHA` run using t
 **Tests:** [verify_project_wall_material_gate.py](../../../../tests/verify_project_wall_material_gate.py). [Full engineering review](../../../review/01_WALL_GEOMETRY_MATERIALS_FIRST_STEP.md).
 
 Sources: [PEER Report 2015/12](https://peer.berkeley.edu/sites/default/files/webpeer-2015-12-kristijan_kolozvari_kutay_orakcal_john_wallace.pdf); [OpenSees E-SFI 3D](https://opensees.github.io/OpenSeesDocumentation/user/manual/model/elements/E_SFI_MVLEM_3D.html); https://doi.org/10.1016/j.engstruct.2023.116700.
+
+
+## 2026-11-17 normalized transition-slope safety guard
+
+A newly inspected P1 input-contract risk allowed experimental `frame.steel_cR1` and `wall.cR1` overrides up to 50 even though the local source confirms a NaN under the incorrect direct Menegotto a1=18.5 assignment. The safe normalized OpenSees form requires `cR1=a1/R0` for that source expression and yields 0.925 with R0=20. Only the experimental override upper bound is tightened to <1, with a direct frame-section guard so invalid inputs fail before material creation. **Baseline material files and source-verified PEER .925 conversion remain unchanged.** The user-uploaded Carreño paper recommends cR1=.9 for ASTM Grade 60. The independent source-specific research registry and paper reference card reside in `components/nonlinear_time_history/steel02_carreno_reference.py` and `LITERATURE/Reinforcing_Steel/CARRENO_2020_STEEL02_PARAMETER_CARD.md`. Tests: `tests/test_steel02_carreno_reference.py`. A valid input is not constitutive experimental calibration or a guarantee of nonlinear convergence.
