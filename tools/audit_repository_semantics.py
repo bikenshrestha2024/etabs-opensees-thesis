@@ -153,6 +153,10 @@ def _resolve_import(source_module, imported, level, modules, namespace_heads):
         return None, "AMBIGUOUS"
     if imported in modules:
         return modules[imported], "RESOLVED"
+    # Python 3 namespace packages may have no __init__.py. The caller
+    # can legitimately import their root package without a local .py.
+    if imported in namespace_heads:
+        return None, "NAMESPACE_PACKAGE"
     first = imported.split(".")[0]
     if first not in namespace_heads:
         return None, "EXTERNAL"
