@@ -49,6 +49,12 @@ class MeshCasesTests(unittest.TestCase):
         self.assertTrue(any(message=='Frame segment connectivity' and elapsed>=0
                             for message,elapsed in received))
         self.assertEqual(result['status'],'FORMULA_WORKBOOK_CREATED_NOT_GRAVITY_VERIFIED')
+        run=Path(result['run_directory'])
+        self.assertIn('Frame segment connectivity',(run/'MESH_RUN.log').read_text())
+        identity=json.loads((run/'MESH_RUNTIME_IDENTITY.json').read_text())
+        import sys
+        self.assertEqual(identity['python_executable'],sys.executable)
+        self.assertTrue(identity['mesh_cases_disk_sha256'])
 
     def test_three_configurations_are_not_assembled_models(self):
         files=mesh.prepared_configs(self.root)
@@ -194,7 +200,7 @@ class MeshCasesTests(unittest.TestCase):
             json.dumps({"config_sha256":mesh.digest(cfg),
                         "shells":[{"category":"FLOOR"}]}),encoding="utf-8")
         seen=[]
-        def fake_export(folder,*,output_root):
+        def fake_export(folder,*,output_root,progress=None):
             seen.append((folder,output_root))
             excel=output_root/"EXCEL"/"test.xlsx"
             excel.parent.mkdir(parents=True,exist_ok=True)
@@ -210,6 +216,12 @@ class MeshCasesTests(unittest.TestCase):
         self.assertEqual(
             json.loads((run/"MESH_BUILD_STATUS.json").read_text())["status"],
             "FORMULA_WORKBOOK_REEXPORTED_NOT_GRAVITY_VERIFIED")
+        from contextlib import redirect_stdout
+        import io
+        with patch.dict("sys.modules",{"OpenSees_Load_Path_V141":
+                                      SimpleNamespace(export=fake_export)}), redirect_stdout(io.StringIO()):
+            recovered=mesh.main([str(self.root),'--mesh','16'])
+        self.assertEqual(recovered['assembled_model'],str(run/'OpenSees_Complete_Model_Data_V118.json'))
         # Changing a source file must block reuse of the older run.
         (self.root/"OpenSees_Element_Connectivity.json").write_text(
             '{"changed":true}')

@@ -43,3 +43,20 @@ No global stdout redirection or Tk calls from the worker are introduced.
 `tests/test_model_mesh_case_workflow.py` checks the callback bridge; the real
 assembly callback is exercised by the synthetic brace export test. Mesh SHA
 validation, source snapshots and separate gravity acceptance remain unchanged.
+
+
+## Recovery and runtime identity (2026-11-17 follow-up)
+
+From an updated repository checkout, run
+`python -m components.gravity.mesh_cases EXPORT_ROOT --mesh 4` to invoke the
+existing SHA-checked workbook-only recovery without Tk or remeshing. Stop the
+older GUI worker first to avoid concurrent work and competing memory use.
+Use the original export root, not its MESH_04/RUNS child. This cannot complete
+gravity reactions or establish nonlinear readiness.
+
+New builds persist `MESH_RUN.log` stage messages, `MESH_RUNTIME_IDENTITY.json`
+with Python executable/version, resolved module paths and current on-disk SHA256, and the original
+traceback on failure in `MESH_FAILURE_TRACEBACK.txt`. The paths identify the selected checkout/exported runtime; disk hashes do not
+attest the already loaded Python bytecode. Updating source on disk does not
+reload modules in an already running GUI; restart Python after an update. The CLI also forwards
+spreadsheet generation/save progress to the terminal.
