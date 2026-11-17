@@ -1,85 +1,73 @@
-# 2026-11-17 — repository-wide semantic discovery and release gates
+# 2026-11-17 — Consolidated repository semantic discovery and strict CI review
 
-## 0. Evidence status
+## Evidence and scope (do not claim completed engineering review)
 
-**DISCOVERY/STATIC REVIEW IN PROGRESS — NOT COMPLETE NATIVE SEMANTIC OR ENGINEERING VALIDATION.**
+**Base:** `main` commit `c2bc828e5b34fc04698ea005a8fdc9b3e72db8c9`. The full GitHub recursive tree `fe96a3db824fe43f2fbdf35ebed8478e48d6b2c9` was not truncated: **3,149 tracked blob files**, **786 Python files**, **1,268 Markdown files**, 3,685 tree entries including directories.
 
-Original base: `main` commit `c2bc828e5b34fc04698ea005a8fdc9b3e72db8c9` on 2026-11-17. GitHub recursive tree `fe96a3db824fe43f2fbdf35ebed8478e48d6b2c9` was **not truncated**: 3,685 tree entries, 3,149 blob files, 786 Python files and 1,268 Markdown files. The counts are GitHub snapshot data, not measured from the user's Windows machine.
+**Authoritative machine-readable audit:** `tools/audit_repository_integrated.py --repo . --output audit/integrated --fail-on-static-blockers` — NOT a second independent or competing scanner. The existing `.github/workflows/integrated-repository-audit.yml` generates categorized artifacts:
 
-Existing `tools/audit_active_repository.py` parses/compiles root Python plus components/src/tests/tools but records only *top-level* imports. A helper called from a GUI callback can import a missing module only at click-time without appearing in its dependency inventory. Existing `tools/audit_repository_layout.py` lists Git-tracked filenames and static root references, but cannot certify safe file moves or path consumers. Existing documentation coverage checks verify guide paths, not semantic content. These tools should be retained, not mislabeled as complete engineering analysis.
+```text
+audit/integrated/
+  00_OVERVIEW/integrated_audit.json
+  01_TRACKED_FILES/tracked_file_register.csv
+  02_DEPENDENCIES/import_graph.json
+  03_FINDINGS/consolidated_findings.json
+  04_ACCEPTANCE/acceptance_gates.json
+  05_OUTPUT_WRITERS/writer_summary.json
+  06_SECURITY/secret_scan_summary.json
+  07_ARCHIVE_PROVENANCE/exact_blob_duplicates.json
+  08_SEMANTIC_REVIEW/function_review_register.csv
+  09_FACADE_COMPATIBILITY/facade_source_context.csv
+```
 
-## 1. Source class and review depth
+The integrated audit builds precise immutable tracked Git object identities, classifies archives and duplicate blobs, checks active Python syntax, extracts cross-module and import-cycle edges, inventories source writers, generates qualified function/method `NOT_REVIEWED` units and tracks root `exec(compile(...))` compatibility facades. Passing static gates **never** changes that function register to manually reviewed or asserts ETABS/OpenSees gravity equivalence.
 
-| Source | Initial Git tree entries | Review method | Release meaning |
-| --- | ---: | --- | --- |
-| `docs/` | 1066 | source links, integrity and provenance; audit docs against current code | documentation coverage only |
-| `Saved_Project_V156/` | 566 | preserved snapshot, version and checksums, never production substitution | historical |
-| `tests/` | 230 | parse/compile, executable regression and test source traceability | software evidence |
-| `components/` | 200 | active AST + nested imports, targeted manual engineering review and dynamic tests | production critical |
-| `Worked_Example_V132/` | 168 | preserved examples and benchmark provenance | literature/example only |
-| `REVIEW_MAIN/` | 166 | issue history and acceptance register; preserve each analysis case folder | unresolved/accepted separately |
-| `excel/` | 147 | workbook provenance, formulas and model audit references | not live source code |
-| `archive/` | 122 | integrity and dependencies before any move/delete | archived |
-| `Research_Components/` | 120 | benchmark provenance, not production | research-only |
-| `Verification_V159/` | 96 | reference experiment source versions | historical tests |
+## Discovery by source role
 
-Counts are tree entries and include directories. The machine-readable audit further classifies every Git-tracked file and hashes active Python source (SHA256) without storing file content or private absolute paths.
+| Area | Baseline tree entries (including directories) | Handling |
+|---|---:|---|
+| `docs/` | 1,066 | reference/provenance and documentation-to-source checks |
+| `Saved_Project_V156/` | 566 | preserved snapshots, immutable Git object identity, no active runtime substitution |
+| `tests/` | 230 | source integrity, executable regression suites, native-only tests explicitly separated |
+| `components/` | 200 | priority detailed engineering, source/reader/writer/GUI and dependency review |
+| `Worked_Example_V132/` | 168 | benchmark provenance, not proof of project material calibration |
+| `REVIEW_MAIN/` | 166 | discrepancy cases and acceptance register, authoritative issue ownership |
+| `excel/` | 147 | formula/workbook and output evidence provenance |
+| `archive/` | 122 | preserved history, no unreviewed moves |
+| `Research_Components/` | 120 | research benchmark provenance, not automatically imported |
+| `Verification_V159/` | 96 | preserved verification evidence with source scope |
 
-## 2. Consolidated static findings and decisions
+No mass renaming, deleting, moving archived snapshots or rewriting private ETABS cases is permitted. Canonical local run roots remain `01_ETABS_EXPORT`, `02_GRAVITY`, `03_ESM`, `04_MODAL`, `05_MRSM`, `06_LINEAR_TIME_HISTORY`, `07_NONLINEAR_TIME_HISTORY` plus existing provenance/diagnostic folders; change producers and all consumers together only after compatibility proof.
 
-| ID | Priority | Finding | Confidence | Action / gate |
-| --- | --- | --- | --- | --- |
-| AUD-001 | P1 | Existing active inventory misses function-local imports and literal `importlib.import_module` calls | confirmed by direct code inspection | Add recursive AST dependency graph, unresolved local candidate register and synthetic tests |
-| AUD-002 | P1 | Root-level and nested script dependency/entrypoint reachability not established by source guide existence | verified limitation | Do not declare full review from navigation or documentation tests; inspect actual dependency graph and run native GUI callback tests |
-| AUD-003 | P1 | Existing broad static file relocation scans cannot prove dynamic path consumers | verified limitation | NO bulk moves/deletions; keep folder skeleton and defer migration until writer/reader compatibility is demonstrated |
-| AUD-004 | P0 engineering | 32/76/97 ETABS/OpenSees gravity reactions redistribute at 44 wall-edge nodes despite global weight equilibrium | prior repository audit numerical evidence, **not re-run here** | Export native ETABS analysis-element restraints, wall base force cuts and map OpenSees shell forces; keep gate open |
-| AUD-005 | P0 engineering | NLTHA first-step X wall element 110280 localForce non-finite; material/calibration and source-mesh equivalence unresolved | prior project records, **not re-run here** | Isolated patch/material/P-Delta and no-motion trials before full M0–M6 publication |
-| AUD-006 | P1 software | Previous source converter 1,614.536-s gravity formula workbook stage was deferred in PR #94 | merged code and historical log; **runtime recovery unverified** | Compare Windows before/after runtime with source EDB hash and 4×4 mesh invariants |
-| AUD-007 | P1 security/provenance | Public repo contains generated historical and benchmark artifacts, potentially misleading if treated as current model output | structural tree classification, not a secret finding | Preserve history; no unreviewed disclosure or file moves; use model/source SHA gate for results |
+## Confirmed defects and corrections in this review branch
 
-## 3. Output and folder ownership
+| ID | Priority | Proof | Correction / scope |
+|---|---|---|---|
+| CI-001 | P1 | GitHub Actions reported success even though the unit-test command printed `FAILED (failures=1)` and a later command returned zero | Repository compilation workflow now aggregates each command's exit status and fails the entire job if **any** command fails; dedicated propagation test |
+| CI-002 | P2 | `tests/test_assembled_mesh_view.py` asserted literal `4×4` while Plotly writes equivalent JSON-escaped Unicode | Compare serialized JSON title, no changes to FE mesh |
+| CI-003 | P2 | `tests/test_source_view_compaction.py` compared list to tuple for identical triangle indices | Normalize representation, no changes to rendered geometry |
+| CI-004 | P2 | `tests/test_repository_layout.py` wrote literal `\\xff\\xfe` escape text rather than invalid UTF-8 bytes | Explicit bytes fixture to test actual malformed-file refusal |
+| CI-005 | P2 | `test_main_launcher_workflow_layout.py` fixed total count at 41 and failed after legitimate four new GUI actions | Preserve original callback-by-name assertions while allowing separately tested additions |
+| DEP-001 | P1 | Integrated graph treats even constant-string `importlib.import_module()`/`__import__()` as opaque dynamic imports | Record *statically known* local edges, including deferred callbacks and unresolved local targets; no module is executed |
 
-Canonical local analysis root remains the selected EDB export case. Ownership is by `01_ETABS_EXPORT`, `02_GRAVITY`, `03_ESM`, `04_MODAL`, `05_MRSM`, `06_LINEAR_TIME_HISTORY`, `07_NONLINEAR_TIME_HISTORY`, plus existing `00_PROCESSING_METADATA` and software diagnostic sections. The folder layout is enforced by existing output-contract and reader compatibility tests. File renaming/relocation is NOT an acceptable substitute for fixing the upstream writer and every consumer.
+The new dependency enhancement belongs to `tools/audit_repository_integrated.py`, not a parallel audit implementation. The original 2026-11-15 [engineering review epic #75](https://github.com/bikenshrestha2024/etabs-opensees-thesis/issues/75) remains the authority on full semantic/native acceptance. Existing `docs/review/ledger/`, `engineering/agent_edits/` and `audit/integrated/` paths remain in use.
 
-Repository-scoped outputs: `audit/repository_semantics.json` (generated CI artifact, not checked-in case evidence), `docs/source/tools/audit_repository_semantics.py.md` (audit specification) and `REVIEW_MAIN/08_SOFTWARE_SECURITY/` (human triage and acceptance). Do not reorganize preserved `Saved_Project_`, `Verification_`, worked examples or thesis literature merely to look neat.
+## Advisory findings / priority review queue
 
-## 4. Acceptance gates
+A preliminary branch-only AST cross-check of 348 runtime Python and 225 test modules found 1,038 local dependency references with zero compile errors and zero unresolved imports after namespace correction, and 147 advisory patterns (71 dynamic execution, 76 pass-only exception handlers). That duplicate scanner was **removed** to prevent conflicting inventories; these figures are a preliminary cross-check, not authoritative final integrated-audit results.
 
-- **G0 / inventory:** Git source tree complete, tracked metadata counted, role of every tracked entry defined; all active sources SHA256 fingerprinted.
-- **G1 / static dependency:** Every active Python source parse/compile passes; missing local imports are listed and investigated; dynamic GUI callbacks assessed separately. Advisories do not automatically block.
-- **G2 / software integration:** Canonical numbered workflow and GUI callbacks, ETABS source export, model assembly, output writer/reader, profile warnings, action buttons and module imports pass regression tests.
-- **G3 / gravity:** ETABS source joint restraints, generated mesh/MPC, global source-to-assembled mass and wall/column support region force/moment resultants match adopted tolerances for independently solved 32/76/97 cases. Current: **FAIL/UNVERIFIED**.
-- **G4 / dynamics:** NBC 105:2025 code assumptions, adopted IS P-Delta special cases, modal X/Y, ESM/MRSM base shear/element force/drift, LTHA ground motions, complete NLTHA and source hashes verified on native Windows system. Current: **NOT CERTIFIED**.
-- **G5 / security/privacy:** Unredacted EDB/XLSX/source locations/results/secrets excluded; no new unmanaged generated files at repo root; append-only evidence preserved. Current: requires separate live scan.
-- **G6 / release:** Green CI on exact PR SHA, independent diff review, no physical code changes without native acceptance; unresolved issues explicitly documented. A static CI pass never changes G3/G4 to PASS.
+Manual inspection of source searches shows many `exec(compile(...))` occurrences are repository-root compatibility facades loading known local component source paths; their `__file__` context is already specifically inventoried by the integrated audit. Other exception handlers are deliberate ETABS cleanup, optional imports or GUI parsing fallbacks. None may be called an exploit or engineering defect without specific source/caller evidence. Highest dependency fan-in identified in cross-check: `components/inputs/project_workbooks.py`, `components/inputs/output_contract.py`, `components/inputs/output_layout.py` and the numbered compatibility facades. Their source-identity and output-contract correctness remains high priority.
 
-## 5. Follow-up review sequence
+## Acceptance gates
 
-1. Collect CI artifact `audit/repository_semantics.json` from PR workflow, evaluate each genuinely unresolved local import and inspect its source/call site.
-2. Rank active Python by dependency centrality and workflow criticality: import/assembly, gravity, modal, ESM, MRSM, linear and nonlinear runners, source ID mapping, GUI/event hooks, security/output routing.
-3. Fix independently reproducible software bugs one at a time with failing-to-passing tests, keeping all historical numerical outputs unaltered.
-4. Run Windows ETABS and OpenSees with source-matched EDB, model config, gravity and physical acceptance; attach private evidence externally, not in public GitHub.
-5. Keep the review register OPEN until function-level and engineering acceptance is demonstrably complete. No declaration of "fully audited/validated" is made by this discovery PR.
+- **G0 Inventory:** reconcile exact Git tracked-file counts and blob hashes with the fully enumerated tree; document archived duplicates, no bulk moves.
+- **G1 Static/dependencies:** active Python parsing, imported local targets and facade source compatibility; newly added literal dynamic target cases tested. No unapproved native code execution.
+- **G2 Software integration:** every command's failure must propagate; original launcher callbacks preserved, GUI/source/reader/writer/ZIP contracts, source SHA and finite result gates pass existing CI. Green CI is NOT native engineering acceptance.
+- **G3 ETABS vs OpenSees gravity:** native six-DOF source restraint/analysis-mesh mapping at 32/76/97 nodes, wall-base force/moment cuts, correct loads and source-to-target element mapping; **UNVERIFIED**.
+- **G4 NBC 105:2025 / dynamics:** adopted source Aw and periods; NBC ULS/SLS coefficients, ESM/MRSM, modal, P-Delta initial state, LTHA and complete NLTHA, X-wall 110280 first-step and calibration of FVD/BRB; **UNVERIFIED**.
+- **G5 Security/public provenance:** preserve original EDB/XLSX, site datasets and unredacted logs outside public repository; scan tracked sources and Git history separately.
+- **G6 Merge:** reviewed diff, precise PR-head CI success, unchanged structural source physics, unresolved function-level and native tests recorded.
 
-## 6. Provenance and limitations
+## What remains OPEN
 
-Only repository code, filename metadata and prior documented gravity/solver evidence were available. The private Windows EDB, full raw solver model/results and 531 MB workbook were not executed or evaluated in this static audit. GitHub CI can check syntax/dependency/provenance and Linux-compatible unit tests, but cannot certify ETABS v23 OAPI and nonlinear physical calibration.
-
-## 7. Audited CI discovery evidence and confirmed workflow defects
-
-The first expanded GitHub Actions run on the audit branch reported **3,154 tracked files** (five new tracked audit artifacts on top of the 3,149-file baseline), 348 active runtime Python modules, 225 test Python modules, 1,216 historical snapshot files, 1,362 tracked non-Python files and 3 other provenance-only Python files. The source graph contained 1,038 local dependency edges. After correcting PEP 420 namespace and relative `__init__` handling, active parsing/compilation and resolvable local import checks both reported **zero exceptions**. This is a *static gate only*.
-
-The analyzer reports 147 advisory patterns: 71 dynamic `exec`/`eval` calls and 76 pass-only exception handlers. Manual GitHub code search shows that many dynamic-execution calls are **root compatibility facades** that execute local component module code to preserve older exported source contracts; they are not automatically arbitrary command injection. Several exception suppressions are intentional cleanup or GUI parsing fallbacks, but they need contextual review on critical paths. Do not automatically remove them. The priority queue identifies `components/inputs/project_workbooks.py` (63 import edges), `components/inputs/output_contract.py` and `components/inputs/output_layout.py` (44 each), plus the numbered export/GUI facades and engineering assembly code as central modules.
-
-**CI-001 CONFIRMED:** The `.github/workflows/repository-integrity.yml` multi-command block did not stop after a failed Python test. Earlier Actions jobs returned green despite explicit `FAILED (failures=1)` in logs. The audit branch now sets `set -euo pipefail` and enables `--fail-on-active-errors`; this is a genuine continuous-integration reliability correction. This strict gate subsequently exposed two pre-existing brittle Plotly regression assertions:
-- `tests/test_assembled_mesh_view.py` compared an unescaped literal `4×4` to Plotly's JSON-escaped Unicode title. The visual model was unchanged; assertion now checks the serialized title.
-- `tests/test_source_view_compaction.py` compared a list of expected triangle indices to a tuple of identical values, triggering a false failure. The test now compares equivalent tuple representations.
-
-These fixes concern **tests and CI correctness**, not physical ShellMITC4 element formulation or ETABS load flow. All later CI tests must still be run under strict exit handling before any merge.
-
-## 8. Review hold points
-
-- Open: specific root compatibility `exec` facades and ignored exceptions in gravity/export, modal, ESM/MRSM and NLTHA require targeted manual trust-boundary audit; code-search advisories are not proof of attack.
-- Open: all gravity/analysis outputs must retain source model SHA, exact load pattern and support labels; static output folder inventory cannot certify old consumer compatibility after renames.
-- Open: equivalent wall support regions, ETABS native analysis joints, material and damper benchmark calibration, NBC 105:2025 code-purpose matrix and full nonlinear completed history acceptance remain native-model gates.
-- The new `audit/repository_semantics.json` is an ACTIONS ARTIFACT; it must not be committed as a research result nor conflated with a final physics review.
+This audit improves systematic discovery, the integrated dependency graph and reliability of CI tests. **It does not mean all 3,149 files or every generated function-level review unit has been manually read and semantically accepted.** The existing function review register correctly starts each unit at `NOT_REVIEWED`; never bulk-promote to accepted. Production physics, source EDB and numerical solver are not modified in this audit branch. Native Windows ETABS v23 / OpenSeesPy comparisons and all thesis engineering acceptance tests remain open under issue #75.
