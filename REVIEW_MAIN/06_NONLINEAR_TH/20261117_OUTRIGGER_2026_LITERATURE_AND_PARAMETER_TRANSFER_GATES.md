@@ -1,0 +1,48 @@
+# 2026-11-17 — Damped-outrigger research update and parameter-transfer gates
+
+**Status:** LITERATURE SCREENED / RESEARCH PROPOSALS ONLY. No numerical model, GUI, ETABS workbook, OpenSees constitutive law or selected output has been changed by this document. No full-repository semantic completion or native solver verification is asserted.
+
+**Git baseline inventoried:** `aeddd855e6c5d2fa77d822bcaae13f77b71cbd0b` (`main`, 2026-11-17 11:12:51 UTC), untruncated GitHub recursive tree of **3,170 tracked blob files**, including **173 root blobs**, **190 components/**, **232 tests/**, **142 REVIEW_MAIN/** and **900 docs/**. Counts are tree-snapshot metadata, not source-level review coverage or validation. The previous 3,149/3,039-file audit figures refer to older commits and must not be presented as current. Existing authority: `tools/audit_repository_integrated.py`, `REVIEW_MAIN/08_SOFTWARE_SECURITY/20261117_REPOSITORY_SEMANTIC_DISCOVERY_AND_ACCEPTANCE.md`, and `docs/superpowers/plans/2026-11-17-repository-semantic-audit.md`. Do not add a parallel scanner.
+
+## Newly screened literature — retrieval is not independent reproduction
+
+| Work | Publication / DOI or URL | Applicable idea | Transfer gate |
+| --- | --- | --- | --- |
+| Li, Wang, Xu, Han and Gao, *Optimal design and performance evaluation of outrigger systems augmented with tuned viscous mass dampers* | *Bulletin of Earthquake Engineering* (2026), DOI [10.1007/s10518-026-02595-6](https://doi.org/10.1007/s10518-026-02595-6) | Distinguishes first-mode displacement-targeted and second-mode acceleration-targeted tuned viscous mass damper (TVMD) options | **NOT TRANSFERABLE DIRECTLY** to an ordinary nonlinear fluid viscous damper (FVD) without inertance/tuning spring; investigate as a distinct future model variant |
+| *H2-norm-based tuning design for tuned viscous mass damper (TVMD) outriggers in tall buildings* | *Journal of Building Engineering* (2026), [publisher record](https://www.sciencedirect.com/science/article/pii/S2352710226002603) | Modal targeting and objective-dependent location selection | Research hypothesis; do not replace site-specific 3D nonlinear optimization with a single reduced-order modal result |
+| *Optimal design of damped-outrigger systems under wind and seismic loads in tall buildings* | *Structures* (August 2026), [publisher record](https://www.sciencedirect.com/science/article/pii/S235201242601297X) | Compare drift, acceleration, inelastic BRB deformation, wind-fatigue tradeoffs | Multihazard scope is supplementary; verify damper type and demand metrics before transfer |
+| *A novel damped substructure outrigger (DSO) system for seismic response control of high-rise buildings* | *Structures* (2026), DOI [10.1016/j.istruc.2026.112056](https://doi.org/10.1016/j.istruc.2026.112056) | Alternative dissipation / amplified deformation mechanisms | Comparison concept only; different connection topology cannot be silently substituted |
+| *Seismic performance of irregular-plan structures with ideal Fluid Viscous Damper positioning: a comparative efficiency analysis* | (2026), DOI [10.1080/13467581.2026.2721849](https://doi.org/10.1080/13467581.2026.2721849) | Explicit torsional and plan-asymmetry-aware FVD positioning objective | More directly applicable to the asymmetric plan than symmetric cantilever-only studies; independently verify geometry, record suite, and objective definitions |
+| *Seismic control mechanism of tuned viscous mass damper (TVMD) outriggers* | *Advances in Structural Engineering* (published April 21, 2026), DOI [10.1177/13694332261444877](https://doi.org/10.1177/13694332261444877) | Frequency-dependent equivalent stiffness/damping and multiple-mode effects | Non-proportional / frequency-dependent TVMD is not represented by a single constant equivalent modal damping ratio |
+| *Feasibility Study of Seismic Response Control of a Side Core Type Tall Building by a Novel Damped Outrigger System with Tuned Viscous Mass Dampers* | *Journal of Structural and Construction Engineering* 91(840), 270–281 (Feb 2026), DOI [10.3130/aijs.91.270](https://doi.org/10.3130/aijs.91.270) | Side-core topology and long-duration motion sensitivity | Benchmark geometry/connection assumptions first |
+| *Layout optimization of multi-type dampers in structures under seismic excitation* | *Structural and Multidisciplinary Optimization* 68:206 (2025), [open manuscript PDF](https://ira.lib.polyu.edu.hk/bitstream/10397/116175/1/s00158-025-04147-z.pdf) | Nonproportional damping and layout objective sensitivity | Research comparator; no direct code-formula adoption |
+
+**Source status:** online bibliographic records were screened on 2026-11-17. Full paper methods, datasets, figures, results and licenses were not independently reproduced; citation counts were not verified. Preserve user-uploaded full texts in the private library unless redistribution rights are established. The user-provided Library share URL `libfile_89734eac70388191b108042b3d5ac96c` and ChatGPT conversation-share URL were **not resolved to readable content in this audit**; do not misidentify either as Li et al. or claim they were incorporated.
+
+## Physics and unit-identity gate — a critical outstanding audit
+
+For an idealized exponential fluid viscous damper, the dimensional model is:
+
+`F_d = C |v_rel|^alpha sign(v_rel)`.
+
+Therefore `[C] = force * time^alpha / length^alpha`. For `alpha = 0.3`, it is dimensionally incorrect to describe `C` as `kN/(mm/s)` without indicating the exponent. If a paper reports `C = 700 kN/(mm/s)^0.3`, the consistent conversion to an OpenSees model using **m/s** is `C = 700 * 1000^0.3 kN/(m/s)^0.3` (approximately **5,560.30**), **not 700,000**, which would be a linear `alpha=1` conversion. If an ETABS input uses mm/s, verify its internal link length/time unit conventions and whether the stated 700 is a fitted paper parameter or an ETABS link coefficient. Do **not** change `C` based on this note alone. Also check element local-axis orientation, relative-speed sign, zero-speed regularization, series spring/Maxwell properties, force limits, stroke and force recorder consistency.
+
+**Required tests before any unit correction:** standalone FVD velocity ramp with analytically predicted `F(v)`, dimensional conversion equivalence using identical physical velocity under mm/s and m/s, positive dissipated work `integral F_d*v_rel dt` under sign conventions, loop area at two frequencies, and source-paper parameter trace. Test both `alpha=0.3` and `alpha=1` to catch incorrectly hardcoded factors.
+
+## Proposed M0–M6 study matrix and measurable outcomes
+
+Maintain original **M0 none, M1 conventional, M2 damped, M3 conventional+belt, M4 damped+belt, M5 conventional+belt+cap, M6 damped+belt+cap** as the controlled base comparisons, with no baseline topology or source input changes. For each qualified ULS/SLS run and each XY/YX pair collect: source SHA, record/source units, full record duration and accepted steps, global base force/moment equilibrium, roof X/Y movement, residual drift, story drift envelope, corner displacements, floor accelerations, torsional amplification `Delta_max/Delta_min` subject to the applicable method, outrigger/column axial forces, device force/stroke/velocity/dissipated work, wall strain/curvature/failure flags and solver convergence/energy information.
+
+Use **one-factor-at-a-time diagnostic studies** first for damper coefficient `C`, exponent `alpha`, location and structural stiffness; afterward design a provenance-labeled multi-parameter sensitivity study with interaction terms, not an unsupported global optimum. Compare demands in each ground motion and median/dispersion across the paired suite, without selecting a winner from failed or truncated histories. Parameter cases derived from a different damper type (TVMD, BRB, viscoelastic, inertial) must be explicitly segregated from FVD cases.
+
+## Evidence gates and run order
+
+1. **S0 — full Git inventory:** authoritative audit script on exact HEAD, with per-file status and Git blob identity; this online tree snapshot only confirms enumeration.
+2. **S1 — static contracts:** active parser, import, tests, source-to-output readers and writers, non-finite handling, strict CI failure propagation. Rerun on same exact SHA; **not executed in this document**.
+3. **S2 — gravity model:** resolve native ETABS 32/76/97 base topology, analysis-joint/object reaction reporting and wall-base integrated force/moment comparisons. Existing corrected **311,367.3136 kN** total does not establish local reaction equivalence.
+4. **S3 — component calibration:** cyclic steel/RC/FVD/BRB specimens, source-paper material identity, chosen wall FSAM/E-SFI native element check. No reference paper alone calibrates M30/Fe500 or the building.
+5. **S4 — NLTHA numerical root cause:** isolated zero/X/Y/XY, exact element tag 110280 and node map, finite mass, boundary constraints, wall/steel constitutive units and minimal connected bay. **First-step X-wall failure OPEN**.
+6. **S5 — structural runs:** complete duration, stable `dt` and integration sensitivity, independent energy/reaction checks, M0–M6 X/Y paired cases. No completion credit for truncated trial.
+7. **S6 — thesis result review:** selected Nepal NBC 105:2025 code purposes, limitations and exceptions, independent reviewer acceptance, physically attributable device benefits and recorded uncertainty. **NOT VERIFIED**.
+
+**Implementation boundary:** This is a scoped, testable research review and prioritized engineering hypothesis register. It neither replaces the existing semantic-review ledger nor changes the Python OpenSees link coefficient, material definitions, damping, solver configuration, building loads or user source files.
