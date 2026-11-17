@@ -117,6 +117,9 @@ def compare_first_step_stages(files, output_path):
     if not isinstance(files, (list, tuple)) or not files:
         raise ValueError("At least one existing transition snapshot is required")
     seen = []
+    first_model_sha = None
+    source_identity_seen = False
+    last_stage_index = -1
     for file in files:
         path = Path(file)
         state = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -128,6 +131,22 @@ def compare_first_step_stages(files, output_path):
         if state.get("stage") not in STAGES and state.get("status") not in STAGES:
             raise ValueError("Missing/unknown diagnostic stage: " + str(path))
         stage = state.get("stage", state.get("status"))
+        if stage not in STAGES:
+            raise ValueError("Missing/unknown diagnostic stage: " + str(path))
+        position = STAGES.index(stage)
+        if position <= last_stage_index:
+            raise ValueError("Diagnostic stage files must be strictly chronological")
+        last_stage_index = position
+        digest = state.get("source_model_sha256")
+        if digest is not None and (
+                not isinstance(digest, str)
+                or not re.fullmatch(r"[0-9a-fA-F]{64}", digest)):
+            raise ValueError("Invalid source model SHA256 in " + str(path))
+        if not source_identity_seen:
+            first_model_sha = digest
+            source_identity_seen = True
+        elif digest != first_model_sha:
+            raise ValueError("Diagnostic snapshots refer to different source model hashes")
         seen.append({"stage": stage, "status": state["status"],
                      "source": str(path)})
     last_finite = None

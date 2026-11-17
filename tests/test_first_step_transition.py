@@ -106,6 +106,44 @@ class FirstStepTransitionTests(unittest.TestCase):
             self.assertFalse(report["engineering_root_cause_proven"])
             self.assertEqual(report["last_finite_stage"],"GRAVITY_FROZEN")
 
+    def test_stage_comparison_rejects_mixed_source_model_hashes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            good={"status":"FINITE_WITH_UNSUPPORTED_CHANNELS",
+                  "stage":"GRAVITY_FROZEN",
+                  "source_model_sha256":"a"*64}
+            wrong={**good,"stage":"AFTER_EIGEN",
+                   "source_model_sha256":"b"*64}
+            (root/"one.json").write_text(json.dumps(good))
+            (root/"two.json").write_text(json.dumps(wrong))
+            with self.assertRaisesRegex(ValueError,"source model"):
+                compare_first_step_stages(
+                    [root/"one.json",root/"two.json"],root/"comparison.json")
+            wrong["source_model_sha256"]=None
+            (root/"two.json").write_text(json.dumps(wrong))
+            with self.assertRaisesRegex(ValueError,"source model"):
+                compare_first_step_stages(
+                    [root/"one.json",root/"two.json"],root/"comparison.json")
+            self.assertFalse((root/"comparison.json").exists())
+
+    def test_stage_comparison_requires_strict_chronological_stages(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            first={"status":"FINITE_WITH_UNSUPPORTED_CHANNELS",
+                   "stage":"BEFORE_EXCITATION",
+                   "source_model_sha256":"a"*64}
+            later={**first,"stage":"GRAVITY_FROZEN"}
+            (root/"a.json").write_text(json.dumps(first))
+            (root/"b.json").write_text(json.dumps(later))
+            with self.assertRaisesRegex(ValueError,"chronological"):
+                compare_first_step_stages(
+                    [root/"a.json",root/"b.json"],root/"comparison.json")
+            later["stage"]="BEFORE_EXCITATION"
+            (root/"b.json").write_text(json.dumps(later))
+            with self.assertRaisesRegex(ValueError,"chronological"):
+                compare_first_step_stages(
+                    [root/"a.json",root/"b.json"],root/"comparison.json")
+
     def test_do_not_use_boolean_or_fractional_tags(self):
         for value in (True,0,-1,110280.5,"110280.5"):
             with self.subTest(value=value):
