@@ -393,7 +393,7 @@ def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
 def main(argv=None):
     """Recover a SHA-matched saved mesh workbook without Tk or rebuilding.
 
-    REF docs/source/components/gravity/mesh_cases.py.md. No solver is run.
+    [REF docs/source/components/gravity/mesh_cases.py.md] No solver is run.
     """
     import argparse
     parser=argparse.ArgumentParser(description='Recover Excel from a saved independent mesh assembly')
