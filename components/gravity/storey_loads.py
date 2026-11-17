@@ -1,6 +1,6 @@
 """Storey gravity ledger from exact assembled source nodal contributions."""
 from pathlib import Path
-import csv,json,math,hashlib,shutil,datetime
+import csv,json,math,hashlib,shutil,datetime,time
 from OpenSees_Timing_V130 import timed_outputs
 
 COLUMNS=['beam_self_weight_kN','column_self_weight_kN','brace_self_weight_kN','shear_wall_self_weight_kN','slab_self_weight_kN','other_self_weight_kN','floor_finish_kN','partition_kN','other_dead_kN','live_kN','storage_live_kN','roof_live_kN','unclassified_kN']
@@ -94,8 +94,16 @@ def export_storey_gravity(folder,data,config,pattern_types=None,*,generate_workb
                 ws.column_dimensions[header.column_letter].width=min(42,max(16,len(str(header.value))+2))
     wb.create_sheet('Read me').append([note])
     from OpenSees_Load_Path_V141 import add_formula_audit
+    _formula_started=time.perf_counter()
+    print('[OPTIONAL EXCEL START] Mesh cell/node formula sheets',flush=True)
     add_formula_audit(wb,folder,data,config)
+    print(f'[OPTIONAL EXCEL DONE] Formula construction: '
+          f'{time.perf_counter()-_formula_started:.3f}s',flush=True)
+    _save_started=time.perf_counter()
+    print('[OPTIONAL EXCEL START] XLSX serialization',flush=True)
     wb.save(xlsx)
+    print(f'[OPTIONAL EXCEL DONE] XLSX serialization: '
+          f'{time.perf_counter()-_save_started:.3f}s',flush=True)
     status.write_text(json.dumps({
         'status':'FORMULA_WORKBOOK_READY',
         'source_model_config_sha256':data.get('config_sha256'),
