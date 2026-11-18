@@ -84,6 +84,27 @@ def create_configs(*,models_json,matched_dir,output_dir,dt_s=.005,
         if not source_map:
             raise ValueError("source_map must contain the 16 explicit event/component mappings")
         sources=source_map
+    # Every source component must have a unique explicit identity. When a
+    # caller supplies a map, never silently ignore extra keys or alias the
+    # same waveform under different registered earthquake/component labels.
+    required={(event,comp) for event in EVENT_ORDER for comp in ("A","B")}
+    if not isinstance(sources,dict) or set(sources)!=required:
+        raise ValueError("Expected exactly 16 registered event/component waveform mappings")
+    normalized={}
+    seen_waveforms={}
+    for key in sorted(required):
+        raw=sources[key]
+        if not isinstance(raw,(str,Path)) or not str(raw).strip():
+            raise ValueError("Invalid waveform path for "+str(key))
+        full=str(Path(raw).expanduser().resolve())
+        if full in seen_waveforms:
+            raise ValueError(
+                "Expected distinct waveform source paths: "
+                +str(seen_waveforms[full])+" and "+str(key)
+                +" resolve to "+full)
+        seen_waveforms[full]=key
+        normalized[key]=full
+    sources=normalized
     root=Path(output_dir).expanduser().resolve()
     configurations=[]
     for variant in VARIANTS:
