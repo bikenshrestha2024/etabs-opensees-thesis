@@ -24,8 +24,12 @@ INVARIANTS=("geometry_basis_sha256","mass_basis_sha256",
 
 def validate_variant_manifest(payload):
     """Accept only explicit source provenance, not assumed equal models."""
+    if not isinstance(payload,dict):
+        raise ValueError("Variant manifest must be an object")
     rows=payload.get("variants")
-    if not isinstance(rows,list) or {r.get("variant") for r in rows}!=set(VARIANTS):
+    if (not isinstance(rows,list) or
+            any(not isinstance(r,dict) for r in rows) or
+            {r.get("variant") for r in rows}!=set(VARIANTS)):
         raise ValueError("Exactly one entry is required for each M0–M6 variant")
     if len(rows)!=len(VARIANTS):
         raise ValueError("Duplicate or extra model variant")
@@ -36,9 +40,17 @@ def validate_variant_manifest(payload):
         val=next(iter(values))
         if len(val)!=64 or any(ch not in "0123456789abcdefABCDEF" for ch in val):
             raise ValueError(f"Invalid fingerprint for {key}")
+    seen_export_paths={}
     for r in rows:
-        if not r.get("model_export_path") or not r.get("model_file_sha256"):
+        raw_path=r.get("model_export_path")
+        if not isinstance(raw_path,str) or not raw_path.strip() or not r.get("model_file_sha256"):
             raise ValueError(f"{r['variant']}: missing independent model export/hash")
+        canonical=str(Path(raw_path).expanduser().resolve())
+        if canonical in seen_export_paths:
+            raise ValueError(
+                "M0–M6 require distinct model export paths: "
+                +seen_export_paths[canonical]+" and "+r["variant"])
+        seen_export_paths[canonical]=r["variant"]
         digest=r["model_file_sha256"]
         if (not isinstance(digest,str) or len(digest)!=64 or
                 any(ch not in "0123456789abcdefABCDEF" for ch in digest)):
