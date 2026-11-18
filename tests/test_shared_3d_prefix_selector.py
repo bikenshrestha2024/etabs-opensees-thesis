@@ -74,9 +74,12 @@ class Shared3DPrefixSelection(unittest.TestCase):
             root=Path(directory)
             self.make_fixture(root)
             export_id_audit(root)
-            workbook=load_workbook(root/"OpenSees_ID_and_Support_Audit.xlsx",
-                                  read_only=True,data_only=True)
-            rows=list(workbook["Elements"].values)
+            with (root/"OpenSees_ID_and_Support_Audit.xlsx").open("rb") as stream:
+                workbook=load_workbook(stream,read_only=True,data_only=True)
+                try:
+                    rows=list(workbook["Elements"].values)
+                finally:
+                    workbook.close()
             self.assertEqual([r[9] for r in rows[1:]],
                 ["B2501","C2501","BR2501","CO2501","BT2501",
                  "CT2501","FVD2501","BRB2501","SW2501","FL2501"])

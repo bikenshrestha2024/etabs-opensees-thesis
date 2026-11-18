@@ -37,7 +37,7 @@ class OrganizedGravityCaseTests(unittest.TestCase):
                 summary = json.loads((published / "CASE_SUMMARY.json").read_text())
                 self.assertEqual(summary["support_count"], count)
                 self.assertEqual(summary["support_strategy"], strategy)
-                self.assertEqual(summary["result_path"], str(native_result))
+                self.assertEqual(Path(summary["result_path"]), native_result)
                 self.assertTrue((published / "OPEN_FULL_LEGACY_RUN.url").is_file())
                 self.assertEqual((published / "Gravity_Reactions_V123.png").read_bytes(), b"plot-unchanged")
                 self.assertEqual(native_result.read_text(), '{"ok":true}')

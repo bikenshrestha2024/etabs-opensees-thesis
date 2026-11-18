@@ -932,59 +932,85 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                           for r in profile['rows'][:12])+
                         '. These are NOT adopted NBC effective Aw values. '
                         'Review openings, wall-pier grouping and actual ULS EDB.')
-                aw,segments=_wall_aw_from_patches(H,base,first,patches)
-                if not all(v>0 for v in aw.values()):raise ValueError('Both directions need recognized first-story walls.')
-                for axis in ('X','Y'):
-                    key='aw'+axis.lower()
-                    geometry_key='geometry_aw_'+axis.lower()
-                    values[geometry_key]=aw[axis]
-                    audit.append(dict(field=geometry_key,value=aw[axis],source=str(topology),
-                                      sheet='first-story wall geometry',
-                                      cell='Σ Awi·[0.2+min(Lwi/H,0.9)^2], NBC 105:2025 §5.1.2'))
-                    if key in values:
-                        values['workbook_'+key]=values[key]
-                        try:
-                            workbook_aw=float(values[key])
-                            if not math.isfinite(workbook_aw) or workbook_aw<=0:
-                                notes.append(f'Workbook {key.upper()} must be a finite positive area before use; review the source cell.')
-                            elif not math.isclose(workbook_aw,aw[axis],rel_tol=1e-6,abs_tol=1e-9):
-                                notes.append(f'Workbook {key.upper()} ({workbook_aw:g} m²) differs from the independent exported-geometry estimate ({aw[axis]:g} m²). The reviewed workbook input is preserved; reconcile wall grouping, openings, and Lwi before adopting either value.')
-                        except (TypeError,ValueError):
-                            notes.append(f'Workbook {key.upper()} is not numeric; review the source cell before period calculations.')
+                grouped=None
+                source_edb=_source_edb_path(folder)
+                if source_edb and Path(source_edb).is_file():
+                    from components.inputs.grouped_wall_aw import verify_thesis_two_12m_wall_geometry
+                    try:
+                        grouped=verify_thesis_two_12m_wall_geometry(profile,H)
+                    except ValueError as exc:
+                        notes.append('Reviewed 12 m X wall grouping check did not match this export: '+str(exc))
                     else:
-                        # User's Excel NBC Calculator is the authoritative
-                        # calculation path for effective Aw (including openings).
-                        # Geometry-based shell slices are only diagnostics:
-                        # never silently substitute them for a workbook result.
-                        notes.append(
-                            f'No source-verified Excel {key.upper()} was imported. '
-                            f'Geometry candidate {aw[axis]:g} m² is diagnostic only; '
-                            'select the matching calculation workbook or enter '
-                            'an independently reviewed Aw before ESM periods.'
-                        )
-                values['wall_geometry_segments']=segments
-                notes.append('The automatic geometry estimate merges shell mesh subdivisions and treats separated wall segments independently; it is an audit/fallback, not an interpretation of how to group perforated walls for NBC Aw. A reviewed workbook Aw is preserved for period calculations. Confirm wall/opening grouping, directional Lwi, and whether seismic height H excludes qualifying basements under NBC 105:2025 §5.1.2.')
+                        for axis in ('X','Y'):
+                            key='aw'+axis.lower()
+                            if key in values:
+                                values['workbook_'+key]=values[key]
+                            put(key,grouped['aw_candidate_m2'][axis],topology,
+                                'reviewed first-storey wall groups',axis)
+                        notes.append('Reviewed 2 × 12 m X and 3 × 6 m Y wall groups match the source export geometry. Workbook Aw remains available for historical comparison.')
+                if grouped is None:
+                    aw,segments=_wall_aw_from_patches(H,base,first,patches)
+                    if not all(v>0 for v in aw.values()):raise ValueError('Both directions need recognized first-story walls.')
+                    for axis in ('X','Y'):
+                        key='aw'+axis.lower()
+                        geometry_key='geometry_aw_'+axis.lower()
+                        values[geometry_key]=aw[axis]
+                        audit.append(dict(field=geometry_key,value=aw[axis],source=str(topology),
+                                          sheet='first-story wall geometry',
+                                          cell='Σ Awi·[0.2+min(Lwi/H,0.9)^2], NBC 105:2025 §5.1.2'))
+                        if key in values:
+                            values['workbook_'+key]=values[key]
+                            try:
+                                workbook_aw=float(values[key])
+                                if not math.isfinite(workbook_aw) or workbook_aw<=0:
+                                    notes.append(f'Workbook {key.upper()} must be a finite positive area before use; review the source cell.')
+                                elif not math.isclose(workbook_aw,aw[axis],rel_tol=1e-6,abs_tol=1e-9):
+                                    notes.append(f'Workbook {key.upper()} ({workbook_aw:g} m²) differs from the independent exported-geometry estimate ({aw[axis]:g} m²). The reviewed workbook input is preserved; reconcile wall grouping, openings, and Lwi before adopting either value.')
+                            except (TypeError,ValueError):
+                                notes.append(f'Workbook {key.upper()} is not numeric; review the source cell before period calculations.')
+                        else:
+                            # User's Excel NBC Calculator is the authoritative
+                            # calculation path for effective Aw (including openings).
+                            # Geometry-based shell slices are only diagnostics:
+                            # never silently substitute them for a workbook result.
+                            notes.append(
+                                f'No source-verified Excel {key.upper()} was imported. '
+                                f'Geometry candidate {aw[axis]:g} m² is diagnostic only; '
+                                'select the matching calculation workbook or enter '
+                                'an independently reviewed Aw before ESM periods.'
+                            )
+                    values['wall_geometry_segments']=segments
+                    notes.append('The automatic geometry estimate merges shell mesh subdivisions and treats separated wall segments independently; it is an audit/fallback, not an interpretation of how to group perforated walls for NBC Aw. A reviewed workbook Aw is preserved for period calculations. Confirm wall/opening grouping, directional Lwi, and whether seismic height H excludes qualifying basements under NBC 105:2025 §5.1.2.')
             except Exception as exc:
                 notes.append('Live wall Aw reconstruction unavailable; imported workbook Aw remains a review input: '+str(exc))
-    ray_name='NBC105_Rayleigh_Preliminary_V123'+('_SLS' if state=='SLS' else '')+'.json'
-    ray=analysis_output_folder(folder,state)/ray_name
+    from components.modal.rayleigh import (
+        RAYLEIGH_DISPLACEMENT_BASIS, RAYLEIGH_METHOD_VERSION, rayleigh_result_prefix,
+    )
+    ray_folder=analysis_output_folder(folder,state)
+    ray=ray_folder/(rayleigh_result_prefix(state)+'.json')
     if not ray.is_file():
-        ray=folder/'OpenSees_Analysis_Results'/ray_name
+        old_name='NBC105_Rayleigh_Preliminary_V123'+('_SLS' if state=='SLS' else '')+'.json'
+        if any((directory/old_name).is_file() for directory in
+               (ray_folder,folder/'OpenSees_Analysis_Results')):
+            notes.append(f'Archived {state} Rayleigh report used retained-node displacements. Rerun the preliminary analysis to refresh the periods.')
     data=folder/'OpenSees_Complete_Model_Data_V118.json'
     if ray.is_file() and data.is_file():
         import hashlib
         result=json.loads(ray.read_text(encoding='utf-8-sig'))
         ledger=folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv'
-        valid=(result.get('method_version',0)>=125 and result.get('limit_state')==state
+        valid=(result.get('method_version')==RAYLEIGH_METHOD_VERSION
+               and result.get('displacement_basis')==RAYLEIGH_DISPLACEMENT_BASIS
+               and result.get('limit_state')==state
                and result.get('model_sha256')==hashlib.sha256(data.read_bytes()).hexdigest()
                and ledger.is_file()
                and result.get('story_weights_sha256')==hashlib.sha256(ledger.read_bytes()).hexdigest())
         if valid:
             for axis in ('X','Y'):
-                axis_result=result[axis]
+                axis_result=result.get(axis,{})
                 period=axis_result.get('period_s')
                 aw=values.get('aw'+axis.lower())
-                if (not isinstance(period,(int,float)) or not math.isfinite(period) or period<=0
+                if (axis_result.get('kinematic_audit',{}).get('status')!='VERIFIED_FLOOR_TRANSLATIONS'
+                        or not isinstance(period,(int,float)) or not math.isfinite(period) or period<=0
                         or not isinstance(axis_result.get('Aw_m2'),(int,float))
                         or not math.isfinite(axis_result['Aw_m2']) or axis_result['Aw_m2']<=0
                         or (aw is not None and not math.isclose(axis_result['Aw_m2'],float(aw),rel_tol=1e-8,abs_tol=1e-9))):

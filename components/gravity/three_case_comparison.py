@@ -253,13 +253,16 @@ def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L")
     checks = wb.create_sheet("Evidence status")
     for key, value in native_summary.items():
         if key != "audit_file":
+            if isinstance(value, list):
+                value = ", ".join(map(str, value))
             checks.append(["ETABS_SOURCE_"+key, value])
     checks.append(["Model", str(Path(model_path).resolve())])
     checks.append(["Profile", profile])
     checks.append(["Interpretation", report["interpretation"]])
     for reason in missing:
         checks.append(["MISSING", reason])
-    wb.save(root / "Gravity_32_76_97_Comparison.xlsx")
+    from components.gravity.workbook_publishing import publish_workbook
+    publish_workbook(wb, root / "Gravity_32_76_97_Comparison.xlsx")
     from matplotlib.figure import Figure
     fig = Figure(figsize=(11, 6), layout="constrained")
     left, right = fig.subplots(1, 2)

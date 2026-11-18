@@ -90,6 +90,35 @@ class TestThreeCaseGravity(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "different applied gravity"):
                 collect_cases(self.root, self.model)
 
+    def test_export_writes_solved_case_list_as_excel_text(self):
+        from openpyxl import load_workbook
+
+        result = self.root / "Gravity_Result_V110.json"
+        available = {}
+        for label in ("32", "76", "97"):
+            entry = dict(result_path=str(result), applied_load_kN=100.0,
+                         summed_reaction_kN=100.0, equilibrium_error_percent=0.0)
+            payload = dict(nodes=[dict(tag=1, x_m=0., y_m=0., z_m=0., ux_m=0., uy_m=0., uz_m=0.)],
+                           reactions=[dict(node_tag=1, rz_kN=100.)])
+            available[label] = (entry, payload)
+        metadata = {"available_solved_case_columns": ["32", "76", "97"],
+                    "source_support_count": 76,
+                    "opensees_76_reaction_at_source_zero_ETABS_points_kN": 42.5}
+        with patch("components.gravity.three_case_comparison.collect_cases", return_value=(available, [])), \
+             patch("components.gravity.three_case_comparison.join_source_etabs_reactions", return_value=([], metadata)):
+            report, directory, _ = export_case_comparison(self.root, self.model)
+
+        self.assertEqual(report["etabs_source_support_comparison"]["available_solved_case_columns"],
+                         ["32", "76", "97"])
+        workbook = load_workbook(directory / "Gravity_32_76_97_Comparison.xlsx", read_only=True)
+        try:
+            evidence = dict(workbook["Evidence status"].values)
+            self.assertEqual(evidence["ETABS_SOURCE_available_solved_case_columns"], "32, 76, 97")
+            self.assertEqual(evidence["ETABS_SOURCE_source_support_count"], 76)
+            self.assertEqual(evidence["ETABS_SOURCE_opensees_76_reaction_at_source_zero_ETABS_points_kN"], 42.5)
+        finally:
+            workbook.close()
+
 
 if __name__ == "__main__":
     unittest.main()

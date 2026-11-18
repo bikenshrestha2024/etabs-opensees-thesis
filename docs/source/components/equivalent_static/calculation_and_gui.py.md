@@ -72,3 +72,8 @@ The GUI button names now explicitly show `Complete ESM export ZIP (all evidence)
 **Who/how:** CI uses the static tests in tests/test_esm_organized_export_gui.py; native Windows UI and ETABS/COM cancellation behavior remain to be checked. Green means only the indicated computation/export process finished, not the code/ETABS equivalence or design acceptability. The in-process ETABS linked workflow does not have a safe cancellation contract; Stop refers only to spawned OpenSees analysis batches.
 
 **Review:** ../../../../REVIEW_MAIN/02_ESM/20261112_ESM_GUI_EXPORT_CASE_MAPPING_AND_JOINT_GATES.md
+
+
+## ESM route identity and reviewed wall basis
+
+Successful direct solver batches and linked workbook completion both request the route comparison. New direct runner names start with OpenSees_Direct_NBC105_ESM. Saved runner validation accepts both naming schemes.

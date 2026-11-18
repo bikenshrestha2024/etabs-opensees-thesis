@@ -176,6 +176,7 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
     report=dict(result)
     report["comparison_remark"] = result["esm_eligibility"] if not result.get("code_eligible",True) else "Eligible ESM case"
     report["direction_case"]=suffix
+    report["calculation_route"]="OPENSEES_DIRECT_ESM"
     report["accidental_torsion_included"]=bool(accidental and int(breadth[1])!=0)
     report["accidental_eccentricity_sign"]=int(breadth[1]) if accidental else 0
     report["accidental_eccentricity_m"]=0.05*float(breadth[0])*abs(int(breadth[1])) if accidental else 0.0
@@ -467,7 +468,7 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "print('Master-node displacement/drift results saved under', OUTPUT_DIR)",
         "# Interpret displacements using NBC 105:2025 §§5.5.1, 5.5.3, 6.5 and effective stiffness per §3.4.",
     ]
-    out_py=out/f"OpenSees_NBC105_ESM_Load_And_Static_Analysis_{suffix}_V111.py"
+    out_py=out/f"OpenSees_Direct_NBC105_ESM_Load_And_Static_Analysis_{suffix}_V111.py"
     safe_write(out_py,"\n".join(script)+"\n")
     return tuple([out_json,out_csv,out_py]+[p for p in (out_png,out_xlsx) if p.is_file()])
 
@@ -483,7 +484,7 @@ def verify_generated_esm_result(script_path, export_dir):
     import re
     runner=Path(script_path).expanduser().resolve(strict=True)
     match=re.fullmatch(
-        r"OpenSees_NBC105_ESM_Load_And_Static_Analysis_(.+)_V111",
+        r"OpenSees_(?:Direct_)?NBC105_ESM_Load_And_Static_Analysis_(.+)_V111",
         runner.stem)
     if not match:
         raise ValueError("Unrecognized generated ESM runner: "+runner.name)
@@ -783,6 +784,18 @@ class ESMGui:
                                            filetypes=[("Python engine","*.py")])
         if not engine: return
         out=Path(self.outdir.get())/'ETABS_Linked_ESM'
+        state=self.state.get()
+        from components.inputs.aw_sources import resolve_aw
+        if state=='Both':
+            messagebox.showerror("Select linked limit state","Select the state of the linked ETABS model (ULS or SLS).",parent=self.root)
+            return
+        try:
+            policy=resolve_aw(self.export_dir,state)
+            if policy and policy.get('method')!='EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY':
+                policy=None
+        except (ValueError,OSError) as exc:
+            messagebox.showerror("Wall basis unavailable",str(exc),parent=self.root)
+            return
         out.mkdir(parents=True,exist_ok=True)
         if self._esm_busy:
             messagebox.showwarning("ETABS-linked ESM","Another ESM task is running.",
@@ -793,60 +806,27 @@ class ESMGui:
         self.status.set("ETABS linked ESM: reading model and populating a new Excel copy (no RS scaling).")
         def task():
             try:
-                target,audit,coeff=run_etabs_excel(source,workbook,engine,out,
+                target,audit,_=run_etabs_excel(source,workbook,engine,out,wall_policy=policy,
                     log=lambda msg:self.root.after(0,lambda m=str(msg):self.status.set(m)))
                 def success():
                     self._esm_busy=False
-                    self._set_esm_operation("FINISHED",
-                        "Original ETABS Excel calculation: "+str(target))
-                    self.status.set("ETABS linked Excel ready: "+str(target)+" | provenance "+str(audit))
+                    self._set_esm_operation("FINISHED","ETABS-linked Excel: "+str(target))
+                    self.status.set("ETABS-linked Excel ready: "+str(target)+" | provenance "+str(audit))
+                    if self.state.get()==state:
+                        if policy:
+                            self._apply_reviewed_wall_policy(policy)
+                            self.status.set(self.status.get()+"\nETABS-linked Excel: "+str(target))
+                        elif state in ('ULS','SLS'):
+                            from components.inputs.aw_sources import linked_reference_from_audit
+                            try:
+                                reference=linked_reference_from_audit(
+                                    json.loads(Path(audit).read_text(encoding='utf-8')),audit,
+                                    state=state,current_edb=_source_edb_path(self.export_dir))
+                                self._confirm_and_apply_excel_reference(reference,confirm=False)
+                            except ValueError as exc:
+                                self.status.set(self.status.get()+"\n"+str(exc))
+                    self._refresh_route_comparison(out.parent)
                     self._auto_bundle_seismic_review()
-                    messagebox.showinfo("ETABS Linked ESM",f"Populated original Excel method:\n{target}\n\nAudit:\n{audit}\n\nOpenSees Direct remains available in the dropdown.",parent=self.root)
-                    # [REF NBC105-2025 §5.1.2] the computed Aw/T were previously
-                    # discarded; offer them to the form with their EDB identity.
-                    try:
-                        from components.inputs.aw_sources import linked_reference_from_audit
-                        from components.inputs.project_workbooks import _source_edb_path
-                        reference=linked_reference_from_audit(
-                            json.loads(Path(audit).read_text(encoding='utf-8')),audit,
-                            state=self.state.get(),current_edb=_source_edb_path(self.export_dir))
-                        self._confirm_and_apply_excel_reference(reference,confirm=False)
-                        reviewed=self._apply_reviewed_wall_policy()
-                        if reviewed:
-                            # Preserve the original ETABS-linked Excel engine's
-                            # four-6m X result and its registered SHA. Write an
-                            # independent review workbook for the author's
-                            # geometry-verified two-12m X-wall interpretation.
-                            from openpyxl import Workbook
-                            from hashlib import sha256
-                            original=reference['values']
-                            policy=self._reviewed_aw_policy
-                            review_file=Path(target).with_name(
-                                Path(target).stem+'_GROUPED_WALL_REVIEW.xlsx')
-                            if review_file.exists():
-                                raise FileExistsError('Existing grouped Aw review cannot be overwritten: '+str(review_file))
-                            rev=Workbook();ws=rev.active;ws.title='Aw Method Comparison'
-                            for row in [
-                                ('Method','Aw-X (m2)','Aw-Y (m2)','Engineering status'),
-                                ('Original ETABS-linked workbook four 6m X panels',
-                                 float(original['awx']),float(original['awy']),'HISTORICAL SOURCE FORMULAS PRESERVED'),
-                                ('Export-verified two connected 12m X walls',
-                                 float(policy['X']),float(policy['Y']),'SELECTED RESEARCH Aw; NBC acceptance OPEN'),
-                                ('Selected minus original','=B3-B2','=C3-C2','Different wall grouping, not rounding'),
-                                ('Source EDB',str(source),'','Read-only'),
-                                ('Source model SHA256',str(policy.get('assembled_model_sha256','')),'','Grouped geometry'),
-                                ('Original generated Excel SHA256',sha256(Path(target).read_bytes()).hexdigest(),'','Original file unchanged'),
-                                ('Selected state',self.state.get(),'','ULS/SLS periods require independent Rayleigh runs'),
-                            ]:ws.append(row)
-                            for col,width in {'A':52,'B':50,'C':24,'D':56}.items():ws.column_dimensions[col].width=width
-                            rev.save(str(review_file))
-                            self.status.set(
-                                f"ETABS-linked legacy Aw-X={original['awx']:.9g}; "
-                                f"VERIFIED 12m grouped Aw-X={policy['X']:.9g}. "
-                                f"Separate review workbook: {review_file}")
-                    except Exception as exc:
-                        self.status.set('ETABS-linked Aw/T not applied to the form: '+str(exc))
-                        messagebox.showwarning('ETABS-linked values not applied',str(exc),parent=self.root)
                 self.root.after(0,success)
             except Exception as exc:
                 error=str(exc)
@@ -854,6 +834,15 @@ class ESMGui:
                 self.root.after(0,lambda:messagebox.showerror("ETABS Linked ESM failed",error,parent=self.root))
                 self.root.after(0,lambda:self.status.set("ETABS linked ESM FAILED: "+error))
         threading.Thread(target=task,daemon=True).start()
+
+    def _refresh_route_comparison(self, output, scripts=None):
+        """Publish the calculation comparison after either route finishes."""
+        from components.equivalent_static.etabs_linked_excel import publish_route_comparison
+        try:
+            report=publish_route_comparison(output,self.export_dir,verify_generated_esm_result,scripts=scripts)
+            self.status.set(self.status.get()+"\n"+report)
+        except (OSError,ValueError,KeyError,TypeError) as exc:
+            self.status.set(self.status.get()+"\nESM route comparison pending: "+str(exc))
 
     def _finish_linked_failure(self,error):
         self._esm_busy=False
@@ -1124,7 +1113,7 @@ class ESMGui:
             self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get())))
         self._load_project_inputs()
 
-    def _apply_reviewed_wall_policy(self):
+    def _apply_reviewed_wall_policy(self, result=None):
         """[REF docs/source/components/inputs/grouped_wall_aw.py.md]
         Apply user-selected two-12m wall interpretation only when the current
         exported node and shell source geometry verifies all model dimensions.
@@ -1133,7 +1122,8 @@ class ESMGui:
         state=str(self.state.get()).strip().upper()
         if state not in ('ULS','SLS'):
             return False
-        result=resolve_aw(self.export_dir,state)
+        if result is None:
+            result=resolve_aw(self.export_dir,state)
         if result.get('method')!='EXPORT_NODE_GEOMETRY_MATCHED_12M_X_WALL_POLICY':
             return False
         if not all(result.get(axis) is not None for axis in ('X','Y')):
@@ -1639,6 +1629,7 @@ class ESMGui:
             self.status.set('Running separate '+', '.join(states)+' X/Y Rayleigh reference analyses…')
             def worker():
                 import os
+                from components.modal.rayleigh import RAYLEIGH_PREFIX
                 completed=[]
                 for state in states:
                     command=[self.python_exe.get(),str(script),str(self.export_dir),
@@ -1647,7 +1638,7 @@ class ESMGui:
                         proc=subprocess.run(command,capture_output=True,text=True,
                             errors='replace',encoding='utf-8',
                             env={**dict(os.environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
-                        log=out/('NBC105_Rayleigh_Preliminary_V123_'+state+'.log')
+                        log=out/(RAYLEIGH_PREFIX+'_'+state+'.log')
                         log.write_text(proc.stdout+'\n'+proc.stderr,encoding='utf-8')
                         if proc.returncode:
                             raise RuntimeError(state+' Rayleigh failed (exit '+str(proc.returncode)+
@@ -1860,6 +1851,7 @@ class ESMGui:
             from components.inputs.project_workbooks import require_source_state
             require_source_state(self.export_dir,self.state.get())
             if not self.path.get(): raise ValueError("Choose the verified story-weight CSV first; this dialog does not read an EDB directly.")
+            self._apply_reviewed_wall_policy()
             self._update_periods()
             if not self.T.get().strip() or not self.Z.get().strip(): raise ValueError("Enter the adopted T1 and seismic zoning factor Z from project/geotechnical/code data.")
             # Never relabel a research comparison using a provisional
@@ -2101,7 +2093,7 @@ class ESMGui:
                         rc, status, message = -999, "FAILED", str(exc)
                     finally:
                         self._esm_active_proc = None
-                    entry = {"case": script.name, "status": status,
+                    entry = {"case": script.name, "runner_path": str(script), "status": status,
                              "return_code": rc, "log": str(log_path),
                              "elapsed_s": round(time.monotonic() - started, 3),
                              "error": message if status in ("FAILED","INCOMPLETE") else ""}
@@ -2140,6 +2132,8 @@ class ESMGui:
                         ("ESM batch cancelled; incomplete cases retained. " if
                          process_state=="CANCELLED" else "ESM batch completed. ")
                         +"Status manifest: "+str(state_file))
+                    if completed:
+                        self._refresh_route_comparison(output,scripts)
                     self._auto_bundle_seismic_review()
                     if completed:
                         messagebox.showinfo("ESM child processes finished",

@@ -111,7 +111,7 @@ def bundle_esm_validation(source_export,esm_output,save_under,progress=None,
     # are eligible. This is an archive of scripts, NOT proof they were run.
     for location,label in ((src,"source"),(outputs,"esm")):
         for runner in sorted(location.glob(
-                "OpenSees_NBC105_ESM_Load_And_Static_Analysis_*.py")):
+                "OpenSees_*NBC105_ESM_Load_And_Static_Analysis_*.py")):
             include(runner,"generated_runners/"+label+"/"+runner.name)
     manifest["generated_runner_count"]=sum(
         1 for x in manifest["files"]

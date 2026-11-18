@@ -1,5 +1,7 @@
 # project_workbooks.py — source documentation
 
+The Rayleigh reader accepts V126 with the tied-floor displacement evidence for both axes. It checks state, assembled-model and story-weight fingerprints and directional Aw. Where the source-linked first-storey sections verify the reviewed 12 m X wall geometry, the shared importer uses the grouped Aw before comparing the cached Rayleigh result. V123 is retained for historical review. See [Rayleigh and grouped-wall verification](../../../validation/20261118_RAYLEIGH_RETAINED_DOF_CORRECTION.md).
+
 2026-11-10 extension: `registered_project_source(export_dir, role)` reads
 `project_sources.private.json` in the selected export or code root, or the
 `OPENSEES_PROJECT_SOURCES` location. It checks the current EDB and registered

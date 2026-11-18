@@ -17,6 +17,36 @@ import math
 import hashlib
 
 
+RAYLEIGH_METHOD_VERSION = 126
+RAYLEIGH_DISPLACEMENT_BASIS = 'TORSION_SUPPRESSED_CONSTRAINED_FLOOR_NODES'
+RAYLEIGH_PREFIX = 'NBC105_Rayleigh_Preliminary_V126'
+
+
+def rayleigh_result_prefix(state):
+    return RAYLEIGH_PREFIX + ('' if state == 'ULS' else '_' + state)
+
+
+def _diaphragm_translation(ops, master, members, dof):
+    """Read shared translation in m from a horizontal, torsion-suppressed floor.
+
+    With RZ=0 the rigid diaphragm equations give the same UX/UY at the
+    retained point and every tied node. OpenSees 3.8.0 Transformation can
+    accumulate retained-node translation when a retained MP DOF also has an
+    SP. The physical tied nodes provide the displacement used in the work sum.
+    """
+    if not members:
+        raise RuntimeError(f'Rayleigh diaphragm {master} has no constrained floor nodes.')
+    if any(not abs(ops.nodeDisp(n, 6)) <= 1e-9 for n in members):
+        raise RuntimeError(f'Rayleigh diaphragm {master} has unexpected rotation.')
+    translations = [ops.nodeDisp(n, dof) for n in members]
+    if not all(math.isfinite(value) for value in translations):
+        raise RuntimeError(f'Rayleigh diaphragm {master} has nonfinite floor translations.')
+    spread = max(translations) - min(translations)
+    if spread > 1e-8:
+        raise RuntimeError(f'Rayleigh diaphragm {master} has inconsistent floor translations ({spread:g} m).')
+    return math.fsum(translations) / len(translations), spread
+
+
 @timed_outputs('Preliminary Rayleigh X-Y analysis','folder')
 def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         output_dir=None):
@@ -75,7 +105,11 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     if any(not math.isfinite(w) or w<=0 for w in weights):raise ValueError('Positive finite reconciled seismic story weights are required.')
     H=heights[-1]
     result={'story_weights_sha256':hashlib.sha256((folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').read_bytes()).hexdigest(),'standard':'NBC 105:2025 §5.1.1-§5.1.3','model_sha256':hashlib.sha256(model.read_bytes()).hexdigest(),'gravity_state':'assembled sustained gravity','limit_state':state,'height_m':H,'height_basis':'story-ledger elevations from seismic base; confirm qualifying basements are excluded per §5.1.2','gravity_acceleration_m_s2':9.81,'rayleigh_equation':'T1 = 2*pi*sqrt(sum(Wi*di^2)/(g*sum(Fi*di)))','torsion':'diaphragm rotations restrained during reference lateral perturbation','diagnostic_only':True}
-    prefix='NBC105_Rayleigh_Preliminary_V123'+('' if state=='ULS' else '_'+state)
+    prefix=rayleigh_result_prefix(state)
+    members_by_master={int(d['master_tag']): d['slave_node_tags'] for d in model_data['diaphragms']}
+    supports=tuple(map(int, model_data['supports']))
+    if not supports:
+        raise ValueError('Source support nodes are required for the Rayleigh reaction balance.')
     wb=Workbook();summary=wb.active;summary.title='Summary';summary.append(['Axis','Aw (m2)','Empirical T (s)','Amplified empirical T (s)','Rayleigh T (s)','Adopted T (s)'])
     fig=Figure(figsize=(11,6),layout='constrained');axes=fig.subplots(1,2)
     for axis,aw in [('X',awx),('Y',awy)]:
@@ -97,14 +131,34 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         ops.integrator('LoadControl',0.)
         if ops.analyze(1)!=0:raise RuntimeError('Torsion-suppressed gravity equilibration failed.')
         ops.loadConst('-time',0.)
-        baseline=[ops.nodeDisp(n,dof) for n in masters]
+        baseline=[_diaphragm_translation(ops,n,members_by_master[n],dof)[0] for n in masters]
+        retained_baseline=[ops.nodeDisp(n,dof) for n in masters]
+        ops.reactions()
+        base_before=math.fsum(ops.nodeReaction(n,dof) for n in supports)
         tag=990001;ops.timeSeries('Linear',tag);ops.pattern('Plain',tag,tag)
         for n,f in zip(masters,forces):
             load=[0.]*6;load[dof-1]=f;ops.load(n,*load)
-        ops.wipeAnalysis();configure_nonlinear_static(ops,system='UmfPack',tolerance=1e-8,max_iterations=100)
-        ops.integrator('LoadControl',.1)
-        if ops.analyze(10)!=0:raise RuntimeError(f'{axis} preliminary lateral analysis did not converge; no Rayleigh value was accepted.')
-        u=[ops.nodeDisp(n,dof)-b for n,b in zip(masters,baseline)]
+        configure_nonlinear_static(ops,system='UmfPack',tolerance=1e-8,max_iterations=100,nsteps=1)
+        status=ops.analyze(1)
+        if status!=0:
+            raise RuntimeError(f'{axis} preliminary lateral analysis failed (OpenSees {status}).')
+        load_factor=ops.getLoadFactor(tag)
+        if not math.isclose(load_factor,1.,rel_tol=0.,abs_tol=1e-10):
+            raise RuntimeError(f'{axis} Rayleigh load factor {load_factor:g} differs from 1.')
+        ops.reactions()
+        base_increment=math.fsum(ops.nodeReaction(n,dof) for n in supports)-base_before
+        force_total=math.fsum(forces)
+        reaction_error=abs(base_increment+force_total)/force_total
+        if not reaction_error <= 0.001:
+            raise RuntimeError(f'{axis} incremental base reaction imbalance: {reaction_error:.3%}.')
+        samples=[_diaphragm_translation(ops,n,members_by_master[n],dof) for n in masters]
+        u=[value-b for (value,_),b in zip(samples,baseline)]
+        retained=[ops.nodeDisp(n,dof)-b for n,b in zip(masters,retained_baseline)]
+        kinematic_audit=dict(
+            status='VERIFIED_FLOOR_TRANSLATIONS', steps=1, pattern_factor=load_factor,
+            incremental_base_reaction_kN=base_increment, relative_reaction_error=reaction_error,
+            max_floor_translation_spread_m=max(spread for _,spread in samples),
+            max_retained_translation_difference_m=max(abs(a-b) for a,b in zip(u,retained)))
         denominator=9.81*sum(f*d for f,d in zip(forces,u))
         numerator=sum(w*d*d for w,d in zip(weights,u))
         if not math.isfinite(denominator) or denominator<=0:raise ValueError(f'{axis} Rayleigh denominator is nonpositive or non-finite; inspect displacement signs and constraints.')
@@ -115,6 +169,10 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
             raise RuntimeError(f'{axis}: incomplete or inconsistent all-storey Rayleigh reconstruction')
         if not math.isfinite(period) or period<=0:raise ValueError(f'{axis} Rayleigh period is nonpositive or non-finite.')
         result[axis]=dict(Aw_m2=aw,empirical_period_s=empirical,amplified_empirical_s=1.25*empirical,period_s=period,adopted_period_s=min(period,1.25*empirical),reference_force_exponent_k=k,reference_force_total_kN=sum(forces),rayleigh_numerator_kN_m2=numerator,rayleigh_denominator_gFiDi_kN_m2_s2=denominator,storey_audit=audit,rows=[dict(story=r['story_name'],height_m=float(r['height_m']),master_node=n,weight_kN=w,force_kN=f,displacement_m=d) for r,n,w,f,d in zip(rows,masters,weights,forces,u)])
+        result[axis]['kinematic_audit']=kinematic_audit
+        for record,raw in zip(result[axis]['rows'],retained):
+            record['retained_node_displacement_diagnostic_m']=raw
+            record['constrained_floor_node_count']=len(members_by_master[record['master_node']])
         sheet=wb.create_sheet(axis+' Rayleigh');sheet.append(['Story','Height (m)','Master node','Wi (kN)','Fi (kN)','di (m)','Wi di2 (kN m2)','Fi di (kN m)'])
         for rr in result[axis]['rows']:
             excel_row=sheet.max_row+1
@@ -139,7 +197,9 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         sheet.append(['Source model SHA256',result['model_sha256']])
         sheet.append(['Source weight ledger SHA256',result['story_weights_sha256']])
         sheet.append(['Limit state',state])
-        sheet.append(['Elastic COM displacement','incremental from torsion-suppressed gravity baseline'])
+        sheet.append(['Elastic COM displacement','constrained floor translation increment from torsion-suppressed gravity'])
+        for key,value in kinematic_audit.items():
+            sheet.append([key,value])
         sheet.append(['Independent verification', 'OPEN: native ETABS response and stiffness/restraint matching'])
         for col,width in (('A',38),('B',21),('C',17),('D',20),
                           ('E',20),('F',20),('G',24),('H',20)):
@@ -155,7 +215,9 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     for ext in ('png','pdf'):fig.savefig(out/(prefix+'.'+ext),dpi=300)
     for sheet in wb:sheet.freeze_panes='A2';sheet.auto_filter.ref=sheet.dimensions
     wb.save(out/(prefix+'.xlsx'))
-    result['method_version']=125
+    result['method_version']=RAYLEIGH_METHOD_VERSION
+    result['displacement_basis']=RAYLEIGH_DISPLACEMENT_BASIS
+    result['opensees_version']=ops.version()
     result['reference_fraction']=reference_fraction
     result['baseline_method']='Equilibrate torsion-suppressed gravity before applying reference forces; use incremental translation.'
     (out/(prefix+'.json')).write_text(json.dumps(result,indent=2),encoding='utf-8')

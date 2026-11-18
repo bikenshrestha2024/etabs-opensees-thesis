@@ -169,18 +169,24 @@ class NBC105PeriodTests(unittest.TestCase):
             ledger.write_text('story,height_m\\n1,3\\n',encoding='utf-8')
             model_hash=hashlib.sha256(model.read_bytes()).hexdigest()
             ledger_hash=hashlib.sha256(ledger.read_bytes()).hexdigest()
-            def save(state,period,aw_x=2.,aw_y=3.):
+            def save(state,period,aw_x=2.,aw_y=3.,version=126):
+                kinematics={'status':'VERIFIED_FLOOR_TRANSLATIONS'}
                 payload={
-                    'method_version':125,'limit_state':state,
+                    'method_version':version,'limit_state':state,
+                    'displacement_basis':'TORSION_SUPPRESSED_CONSTRAINED_FLOOR_NODES',
                     'model_sha256':model_hash,'story_weights_sha256':ledger_hash,
-                    'X':{'period_s':period,'Aw_m2':aw_x},
-                    'Y':{'period_s':period+1.,'Aw_m2':aw_y},
+                    'X':{'period_s':period,'Aw_m2':aw_x,'kinematic_audit':kinematics},
+                    'Y':{'period_s':period+1.,'Aw_m2':aw_y,'kinematic_audit':kinematics},
                 }
-                name='NBC105_Rayleigh_Preliminary_V123'+('_SLS' if state=='SLS' else '')+'.json'
+                name=f'NBC105_Rayleigh_Preliminary_V{123 if version==125 else version}'+('_SLS' if state=='SLS' else '')+'.json'
                 output=analysis_output_folder(folder,state)
                 output.mkdir(parents=True,exist_ok=True)
                 (output/name).write_text(json.dumps(payload),encoding='utf-8')
 
+            save('ULS',3.89,version=125)
+            archived=import_project_inputs(ROOT,folder,'ULS')
+            self.assertNotIn('rayleigh_tx',archived['values'])
+            self.assertTrue(any('retained-node displacements' in note for note in archived['notes']))
             save('ULS',1.1)
             save('SLS',2.2)
             uls=import_project_inputs(ROOT,folder,'ULS')

@@ -92,8 +92,8 @@ class ESMBlankRegression(unittest.TestCase):
                 thread.return_value.start.side_effect=start
                 gui._run_rayleigh()
             self.assertEqual(invoked,['ULS','SLS'])
-            self.assertTrue((folder/'NBC105_Rayleigh_Preliminary_V123_ULS.log').is_file())
-            self.assertTrue((folder/'NBC105_Rayleigh_Preliminary_V123_SLS.log').is_file())
+            self.assertTrue((folder/'NBC105_Rayleigh_Preliminary_V126_ULS.log').is_file())
+            self.assertTrue((folder/'NBC105_Rayleigh_Preliminary_V126_SLS.log').is_file())
 
 
 if __name__=='__main__':

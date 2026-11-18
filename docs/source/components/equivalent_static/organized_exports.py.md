@@ -26,3 +26,8 @@ The exporter calls `components.inputs.output_layout.review_snapshots_for(..., 'E
 Relative `snapshot_path` values use forward slashes and match ZIP member names on both Windows and Linux.
 
 **Pending batch identity gate.** A regenerated runner with the same filename can match a previously saved successful status row. Verify the SHA256 of each executed runner against the current script before using historical batch status as evidence of the current inputs. The status file SHA256 fingerprints the saved status, while executed-runner identity requires its own digest recorded at execution.
+
+
+## ESM route identity and reviewed wall basis
+
+Combined snapshots include the calculation comparison and ESM case-specific deformation, drift, irregularity and recorder-index sidecars. Legacy and route-prefixed runners for the same case are reconciled by the batch status.

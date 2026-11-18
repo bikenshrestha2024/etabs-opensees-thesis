@@ -8,6 +8,8 @@ The **applied gravity load must agree** across the cases. The routine does not c
 
 Outputs: `Gravity_Case_Comparison/Case_Comparison.json`, an Excel workbook, two CSV tables, PNG and PDF comparison figures. Missing cases are explicitly listed. Common-node displacements are only compared at tags shared by the available model cases; matching ETABS coordinates and physical restraint conditions need independent proof.
 
+The evidence-status worksheet writes the list of solved scenario labels as comma-separated text. The JSON retains the list, and Excel retains numeric counts and reaction quantities as numbers. The workbook is published atomically.
+
 Tests: `tests/test_gravity_three_case_comparison.py`.
 
 

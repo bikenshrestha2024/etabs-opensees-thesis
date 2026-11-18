@@ -20,6 +20,7 @@ _STATE = re.compile(r"(ULS|SLS)", re.IGNORECASE)
 _MODULES = {
     "etabs": "ETABS_Linked_Equivalent_Static",
     "opensees": "OpenSees_Direct_Equivalent_Static",
+    "comparison": "ETABS_Linked_vs_OpenSees_Direct",
 }
 _CATEGORIES = {
     ".json": "JSON", ".xlsx": "Excel", ".xls": "Excel",
@@ -28,8 +29,9 @@ _CATEGORIES = {
     ".log": "Logs", ".txt": "Logs",
 }
 _DIRECT_PREFIXES = (
-    "NBC105_ESM_", "OpenSees_NBC105_ESM_", "ESM_Source_Diagnostics",
-    "NBC105_Rayleigh_",
+    "NBC105_ESM_", "OpenSees_NBC105_ESM_", "OpenSees_Direct_NBC105_ESM_", "ESM_Source_Diagnostics",
+    "NBC105_Rayleigh_", "Deformation_", "Drift_Check_",
+    "Floor_Edge_Drift_", "Irregularity_", "Response_Recorder_Index_",
 )
 
 
@@ -45,10 +47,14 @@ def _source_files(root):
     """Yield ESM files only; ignore gravity, other analysis and previous snapshots."""
     for source in sorted(root.iterdir()):
         if source.is_file() and source.name.startswith(_DIRECT_PREFIXES):
+            if source.name.startswith(("Deformation_", "Drift_Check_", "Floor_Edge_Drift_",
+                                       "Irregularity_", "Response_Recorder_Index_")) and not _CASE.search(source.name):
+                continue
             if source.suffix.lower() in _CATEGORIES and not source.name.endswith(".processing.json"):
                 yield "opensees", source
     for subfolder, role in (("ETABS_Linked_ESM", "etabs"),
-                            ("ESM_Runner_Status", "opensees")):
+                            ("ESM_Runner_Status", "opensees"),
+                            ("ESM_Route_Comparison", "comparison")):
         folder = root / subfolder
         if folder.is_dir():
             for source in sorted(folder.rglob("*")):
@@ -193,9 +199,17 @@ def _latest_batch_status(root):
         for item in records:
             if not isinstance(item, dict) or not isinstance(item.get("case"), str):
                 raise ValueError("CASE_STATUS contains invalid case row")
-        expected = {file.name for file in root.glob(
-            "OpenSees_NBC105_ESM_Load_And_Static_Analysis_*.py")}
         recorded = [item["case"] for item in records]
+        expected = {file.name for file in root.glob(
+            "OpenSees_*NBC105_ESM_Load_And_Static_Analysis_*.py")}
+        # Historical and route-prefixed runners for the same case can coexist.
+        # Prefer the spelling actually executed in this batch.
+        normalized = {}
+        for name in sorted(expected):
+            key = name.replace("OpenSees_Direct_", "OpenSees_", 1)
+            if key not in normalized or name in recorded:
+                normalized[key] = name
+        expected = set(normalized.values())
         unique_recorded = set(recorded)
         # Do not certify completion on count alone: duplicates or an unrelated
         # older run can otherwise hide a missing X/Y eccentricity case.
