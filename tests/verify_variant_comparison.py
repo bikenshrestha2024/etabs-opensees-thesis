@@ -54,6 +54,7 @@ class CompareTests(unittest.TestCase):
                 for orientation in ("XY","YX"):
                     data[variant].extend([
                         dict(data[variant][0],pair_id=pair,
+                             record_sha256=("%064x" % int(pair[1:])),
                              limit_state=limit,orientation=orientation)
                         for pair in ("P4","P5","P6","P7")])
         # Seven-pair result remains research screening and requests clause interpretation.
