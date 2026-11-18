@@ -157,6 +157,20 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
         if counterpart is not None and (
                 reference[(limit,pair,"XY")]["record_sha256"] != counterpart["record_sha256"]):
             raise ValueError(f"{limit} {pair}: XY/YX orientation record SHA differs")
+    # A distinct earthquake ID cannot be used to disguise the SAME raw
+    # paired motion as an independent sample. Check source identity within
+    # each limit state; ULS and SLS may have separately scaled sources.
+    for limit in ("ULS","SLS"):
+        seen_motion_sources={}
+        for state,pair,orientation in sorted(keys):
+            if state != limit or orientation != "XY":
+                continue
+            digest=reference[(state,pair,orientation)]["record_sha256"].lower()
+            if digest in seen_motion_sources:
+                raise ValueError(
+                    f"{limit}: duplicate motion source for distinct pair IDs "
+                    f"{seen_motion_sources[digest]} and {pair}")
+            seen_motion_sources[digest]=pair
     for limit in ("ULS","SLS"):
         pairs={key[1] for key in keys if key[0]==limit}
         if len(pairs)<require_pairs:
