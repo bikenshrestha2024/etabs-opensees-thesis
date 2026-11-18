@@ -64,6 +64,40 @@ class RunMatrixTests(unittest.TestCase):
                        output_dir=out,source_map=sources)
       self.assertFalse(out.exists())
 
+ def test_explicit_waveform_map_requires_exact_16_distinct_sources(self):
+    with tempfile.TemporaryDirectory() as d:
+      root=Path(d)
+      models={}
+      for name in VARIANTS:
+        p=root/"models"/name
+        p.mkdir(parents=True)
+        models[name]=str(p)
+      meta=root/"models.json"
+      meta.write_text(json.dumps(models),encoding="utf-8")
+      sources={(evt,c):str(root/(evt.replace(" ","_")+"_"+c+".txt"))
+               for evt in EVENT_ORDER for c in ("A","B")}
+      output=root/"out"
+      # Reused component would silently give identical excitation data
+      # under two different source labels.
+      duplicate=dict(sources)
+      duplicate[EVENT_ORDER[1],"A"]=duplicate[EVENT_ORDER[0],"A"]
+      with self.assertRaisesRegex(ValueError,"distinct waveform"):
+        create_configs(models_json=meta,matched_dir=root,
+                       output_dir=output,source_map=duplicate)
+      self.assertFalse(output.exists())
+      # All sixteen event-component assignments must be explicit and exact.
+      missing=dict(sources)
+      missing.pop((EVENT_ORDER[0],"B"))
+      with self.assertRaisesRegex(ValueError,"16.*event/component"):
+        create_configs(models_json=meta,matched_dir=root,
+                       output_dir=output,source_map=missing)
+      extra=dict(sources)
+      extra["UNKNOWN","A"]=str(root/"extra.txt")
+      with self.assertRaisesRegex(ValueError,"16.*event/component"):
+        create_configs(models_json=meta,matched_dir=root,
+                       output_dir=output,source_map=extra)
+      self.assertFalse(output.exists())
+
  def test_unknown_model_variant_rejected(self):
     with tempfile.TemporaryDirectory() as d:
       p=Path(d)/"models.json"
