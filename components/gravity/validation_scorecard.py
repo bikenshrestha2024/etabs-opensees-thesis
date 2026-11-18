@@ -18,9 +18,12 @@ def _read(path):
 
 
 def _num(value):
+    # Boolean flags are not measured forces or physical numeric evidence.
+    if isinstance(value, bool):
+        return None
     try:
         n=float(value)
-    except (ValueError,TypeError):
+    except (ValueError,TypeError,OverflowError):
         return None
     return n if math.isfinite(n) else None
 
@@ -35,6 +38,27 @@ def create_gravity_scorecard(export_dir,gravity_dir,comparison_root,missing,over
     'within diagnostic tolerance' value is merely one prerequisite.
     [REF components/validation/gravity_node_comparison.py compare_support_nodes]
     """
+    # These are screening-only tolerances, not code acceptance limits.
+    # Reject values that would silently invalidate every comparison.
+    for name,value in (
+        ("global_tolerance_percent", global_tolerance_percent),
+        ("node_relative_tolerance_percent", node_relative_tolerance_percent),
+        ("node_absolute_tolerance_kN", node_absolute_tolerance_kN),
+    ):
+        if isinstance(value, bool):
+            raise ValueError(f"Invalid diagnostic tolerance {name}: boolean")
+        try:
+            number=float(value)
+        except (TypeError,ValueError,OverflowError) as exc:
+            raise ValueError(f"Invalid diagnostic tolerance {name}") from exc
+        if not math.isfinite(number) or number < 0:
+            raise ValueError(f"Invalid diagnostic tolerance {name}: finite nonnegative value required")
+        if name == "global_tolerance_percent":
+            global_tolerance_percent=number
+        elif name == "node_relative_tolerance_percent":
+            node_relative_tolerance_percent=number
+        else:
+            node_absolute_tolerance_kN=number
     export_dir=Path(export_dir)
     gravity_dir=Path(gravity_dir)
     comparison_root=Path(comparison_root)

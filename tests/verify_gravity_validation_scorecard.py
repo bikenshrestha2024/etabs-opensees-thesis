@@ -96,6 +96,30 @@ class GravityScorecardTests(unittest.TestCase):
         self.assertEqual(gates["foundation"],
                          "STALE_COMPARISON_REBUILD_AND_RECOMPARE")
 
+    def test_invalid_diagnostic_tolerances_fail_closed(self):
+        invalid=(True, False, -1.0, float("nan"), float("inf"), "not-a-number")
+        names=("global_tolerance_percent",
+               "node_relative_tolerance_percent",
+               "node_absolute_tolerance_kN")
+        for name in names:
+            for value in invalid:
+                with self.subTest(name=name, value=value):
+                    with self.assertRaisesRegex(ValueError, "diagnostic tolerance"):
+                        create_gravity_scorecard(
+                            self.export,self.gravity,self.gravity,[],[],
+                            **{name:value})
+
+    def test_boolean_reaction_value_is_not_numerical_evidence(self):
+        self.diff["etabs_base_FZ_kN"]=True
+        self.diff["opensees_support_FZ_kN"]=True
+        (self.direct/"Direct_Gravity_Comparison.json").write_text(
+            json.dumps(self.diff))
+        result=create_gravity_scorecard(
+            self.export,self.gravity,self.gravity,[],[])
+        rows={row["key"]:row for row in result["rows"]}
+        self.assertEqual(rows["global"]["status"],
+                         "MISSING_ETABS_DIRECT_EVIDENCE")
+
     def test_missing_native_evidence_is_not_accepted(self):
         (self.direct/"Direct_Gravity_Comparison.json").unlink()
         score=create_gravity_scorecard(
