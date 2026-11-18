@@ -99,6 +99,24 @@ class CompareTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"orientation.*record|record.*orientation"):
             compare_completed_cases(manifest(),data)
 
+    def test_duplicate_canonical_variant_export_path_is_rejected(self):
+        p=manifest()
+        p["variants"][2]["model_export_path"]=p["variants"][1]["model_export_path"]
+        with self.assertRaisesRegex(ValueError,"distinct model export paths"):
+            validate_variant_manifest(p)
+        # A differently written path referring to the same directory
+        # must not evade model-version identity checks.
+        p=manifest()
+        p["variants"][2]["model_export_path"]="M1/../M1"
+        with self.assertRaisesRegex(ValueError,"distinct model export paths"):
+            validate_variant_manifest(p)
+
+    def test_missing_or_malformed_variant_manifest_fails_clearly(self):
+        for payload in (None, [], {}, {"variants":[None]}, {"variants":"M0"}):
+            with self.subTest(payload=repr(payload)):
+                with self.assertRaises(ValueError):
+                    validate_variant_manifest(payload)
+
     def test_reject_changed_mass(self):
         p=manifest();p["variants"][3]["mass_basis_sha256"]="c"*64
         with self.assertRaisesRegex(ValueError,"mass_basis"):
