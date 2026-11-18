@@ -12,7 +12,7 @@ class HistoryOutputContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
             model=root/"OpenSees_Complete_Linear_Model.py"
-            model.write_text("assert True\n",encoding="utf-8")
+            model.write_bytes(b"assert True\n")
             for method,stage in (("LTHA","06_LINEAR_TIME_HISTORY"),
                                  ("NLTHA","07_NONLINEAR_TIME_HISTORY")):
                 for unit,basis in (("m","kN-m-s"),("mm","kN-mm-s")):

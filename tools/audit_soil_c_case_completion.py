@@ -6,11 +6,16 @@ qualified optimum. Inputs are from 36_SOIL_C_NLTHA_RUN_MATRIX.py.
 from __future__ import annotations
 import argparse
 import csv
-import hashlib
 import json
 import math
+import sys
 from collections import Counter
 from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from components.nonlinear_time_history.full_record_gate import verify_accepted_history
 
 VARIANTS = frozenset("M"+str(i) for i in range(7))
 EVENTS = frozenset(("Gorkha","Landers","Northridge","Kobe",
@@ -31,7 +36,7 @@ def _read(path):
 
 
 def inspect_case(output_dir, variant, state, earthquake, orientation):
-    """Check real case summary and accepted-history gate, not folder naming."""
+    """Recheck the recorded time history before counting a case as complete."""
     directory=Path(output_dir)/orientation
     result=dict(variant=variant,limit_state=state,event=earthquake,
                 orientation=orientation,status="NOT_RUN")
@@ -40,15 +45,18 @@ def inspect_case(output_dir, variant, state, earthquake, orientation):
         failure=Path(output_dir)/"INCOMPLETE.json"
     summary=directory/"Case_Summary.json"
     gate=directory/"Accepted_History_Completion_Gate.json"
+    history=directory/"Building_Nonlinear_history.csv"
     if failure.is_file():
         result.update(status="FAILED",evidence=str(failure))
         return result
-    if not summary.is_file() or not gate.is_file():
-        if summary.exists() or gate.exists():
-            result.update(status="INCOMPLETE",reason="Missing summary or duration gate")
+    if not all(path.is_file() for path in (summary, gate, history)):
+        if any(path.exists() for path in (summary, gate, history)):
+            result.update(status="INCOMPLETE",reason="Missing summary, duration gate or recorded history")
         return result
     try:
         a=_read(summary); b=_read(gate)
+        if not isinstance(a, dict) or not isinstance(b, dict):
+            raise ValueError("Case summary and duration gate must be JSON objects")
         if a.get("variant_id")!=variant or a.get("limit_state")!=state or a.get("orientation")!=orientation:
             raise ValueError("Reported model variant/state/orientation differs from matrix")
         if a.get("pair_id") not in (earthquake, earthquake.replace(" ","_")):
@@ -69,6 +77,8 @@ def inspect_case(output_dir, variant, state, earthquake, orientation):
         # record duration and the requested endpoint in seconds.
         durations={}
         for key in ("full_record_duration_s","requested_duration_s","achieved_time_s"):
+            if isinstance(b.get(key), bool):
+                raise ValueError("Invalid boolean accepted duration: "+key)
             try:
                 number=float(b[key])
             except (KeyError,ValueError,TypeError,OverflowError) as exc:
@@ -88,6 +98,16 @@ def inspect_case(output_dir, variant, state, earthquake, orientation):
             raise ValueError("Accepted state count must be an integer JSON number")
         if accepted_states<2:
             raise ValueError("Accepted history requires at least two accepted states")
+        with history.open(encoding="utf-8-sig", newline="") as stream:
+            reader = csv.DictReader(stream, strict=True)
+            columns = reader.fieldnames or []
+            if len(columns) != len(set(columns)):
+                raise ValueError("Recorded history contains duplicate column names")
+            trace = verify_accepted_history(list(reader), record, requested)
+        if not trace["full_record_completed"] or abs(trace["achieved_time_s"]-achieved)>1e-7:
+            raise ValueError("Recorded history duration differs from full-duration gate")
+        if trace["accepted_states"] != accepted_states:
+            raise ValueError("Recorded history state count differs from duration gate")
         if a.get("diagnostic_excitation")!="XY":
             raise ValueError("X-only/Y-only diagnostic cannot count as a full paired record")
         for name in REQUIRED_METRICS:
@@ -99,10 +119,11 @@ def inspect_case(output_dir, variant, state, earthquake, orientation):
                 raise ValueError("Nonfinite response metric: "+name)
         result.update(status="RESEARCH_ONLY_FULL_RECORD",
                       evidence=str(summary),
+                      history=str(history),
                       model_sha256=a["model_sha256"],
                       record_sha256=a["record_sha256"])
         return result
-    except (ValueError,TypeError,OSError,KeyError,json.JSONDecodeError) as exc:
+    except (ValueError,TypeError,OSError,KeyError,csv.Error) as exc:
         result.update(status="INCOMPLETE",reason=str(exc))
         return result
 

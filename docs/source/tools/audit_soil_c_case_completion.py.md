@@ -8,7 +8,9 @@ For each orientation case, `Case_Summary.json` must identify variant M0–M6, UL
 
 `Accepted_History_Completion_Gate.json` must explicitly report `FULL_DURATION_NUMERIC_SCREEN`, `full_record_completed=true`, `accepted_channels_finite=true`, at least two accepted states, and finite positive `full_record_duration_s`, `requested_duration_s` and `achieved_time_s` all matching within 1e-7 seconds. A 0.1-second diagnostic with a 45.29-second source record cannot be marked complete simply by setting a boolean. Missing or inconsistent metadata yields `INCOMPLETE` rather than `RESEARCH_ONLY_FULL_RECORD`. Invalid, failed or truncated orientation cases never count toward 224 completions.
 
-**Still required:** independently compute source file hashes, preserve both paired records and orientation, verify a complete accepted numeric history against the raw trace, confirm native ETABS/OpenSees model provenance, qualify project-specific nonlinear wall/frame/device behavior, compare time-step convergence and engineering drift/damage acceptance. A research-only full-record screen is not proof of NBC 105:2025 compliance.
+`Building_Nonlinear_history.csv` must exist in the same orientation directory. The audit reruns the accepted-history checks on its rows, including finite response channels, time zero, strictly increasing time and full duration. The CSV state count and endpoint must agree with the saved gate. When the CSV is missing, invalid or inconsistent, the orientation is `INCOMPLETE`.
+
+**Still required:** independently compute source file hashes, preserve both paired records and orientation, confirm native ETABS/OpenSees model provenance, qualify project-specific nonlinear wall/frame/device behavior, and compare time-step convergence and engineering drift/damage acceptance. NBC 105:2025 compliance requires separate engineering evidence.
 
 ## Reproduction
 

@@ -42,7 +42,22 @@ class MatrixAuditTests(unittest.TestCase):
                 "status":"FULL_DURATION_NUMERIC_SCREEN",
                 "full_record_completed":True,"accepted_channels_finite":True,
                 "full_record_duration_s":1.0,"requested_duration_s":1.0,
-                "achieved_time_s":1.0,"accepted_states":201}))
+                "achieved_time_s":1.0,"accepted_states":3}))
+            result=inspect_case(d.parent,"M0","ULS","Kobe","XY")
+            self.assertEqual(result["status"],"INCOMPLETE")
+            self.assertIn("history",result["reason"])
+            history=d/"Building_Nonlinear_history.csv"
+            for invalid_trace in (
+                "time_s,roof_ux_m\n0,0\n.25,.2\n.5,1\n",
+                "time_s,roof_ux_m\n0,0\n.5,nan\n1,1\n",
+                "time_s,roof_ux_m\n0,0\n1,1\n",
+                "time_s,roof_ux_m,roof_ux_m\n0,0,0\n.5,.2,.2\n1,1,1\n",
+            ):
+                with self.subTest(trace=invalid_trace):
+                    history.write_text(invalid_trace,encoding="utf-8")
+                    result=inspect_case(d.parent,"M0","ULS","Kobe","XY")
+                    self.assertEqual(result["status"],"INCOMPLETE")
+            history.write_text("time_s,roof_ux_m\n0,0\n.5,.2\n1,1\n",encoding="utf-8")
             result=inspect_case(d.parent,"M0","ULS","Kobe","XY")
             self.assertEqual(result["status"],"RESEARCH_ONLY_FULL_RECORD")
             source["orientation"]="YX"
@@ -64,9 +79,11 @@ class MatrixAuditTests(unittest.TestCase):
             gate=dict(status="FULL_DURATION_NUMERIC_SCREEN",
                       full_record_completed=True,accepted_channels_finite=True,
                       full_record_duration_s=45.29,requested_duration_s=45.29,
-                      achieved_time_s=45.29,accepted_states=200)
+                      achieved_time_s=45.29,accepted_states=2)
             summary_path=d/"Case_Summary.json"
             gate_path=d/"Accepted_History_Completion_Gate.json"
+            (d/"Building_Nonlinear_history.csv").write_text(
+                "time_s,roof_ux_m\n0,0\n45.29,1\n",encoding="utf-8")
             def audit():
                 summary_path.write_text(json.dumps(summary))
                 gate_path.write_text(json.dumps(gate))
