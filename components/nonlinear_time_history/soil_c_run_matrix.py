@@ -64,6 +64,17 @@ def create_configs(*,models_json,matched_dir,output_dir,dt_s=.005,
         if not path.is_dir():
             raise NotADirectoryError("No model export folder for "+key+": "+str(path))
         models[key]=str(path)
+    # These labels represent seven independent model variants. Reusing a
+    # canonical export directory under different labels would produce a
+    # valid-looking run matrix whose building physics is duplicated.
+    # Keep this before even resolving waveform inputs or creating outputs.
+    seen_dirs={}
+    for variant,folder in models.items():
+        if folder in seen_dirs:
+            raise ValueError(
+                "M0–M6 require distinct model export directories: "
+                +seen_dirs[folder]+" and "+variant+" both resolve to "+folder)
+        seen_dirs[folder]=variant
     # An explicitly supplied source map is authoritative. An empty mapping
     # must fail closed instead of silently scanning the private matched-data
     # directory, which can select unrelated files from a different run.
