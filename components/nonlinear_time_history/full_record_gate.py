@@ -37,7 +37,12 @@ def verify_accepted_history(rows, record_end_s, requested_end_s, *,
     No declaration of experimental material validation is made here.
     """
     if not rows:raise ValueError("No accepted response samples")
-    end=float(record_end_s);requested=float(requested_end_s)
+    if isinstance(record_end_s, bool) or isinstance(requested_end_s, bool):
+        raise ValueError("Invalid record duration: boolean")
+    try:
+        end=float(record_end_s);requested=float(requested_end_s)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("Invalid record duration: nonnumeric") from exc
     if any(not math.isfinite(v) or v<=0 for v in (end,requested)):
         raise ValueError("Nonpositive/nonfinite record duration")
     # A non-finite or overlarge tolerance can turn an incomplete or
@@ -142,6 +147,9 @@ def compare_time_step_results(coarse,fine,*,max_relative_difference=None):
                 raise ValueError(f"{name} time-step evidence missing/invalid {key}") from exc
             if not math.isfinite(value) or value<=0:
                 raise ValueError(f"{name} time-step evidence {key} must be finite and positive")
+    for name,report in (("coarse",coarse),("fine",fine)):
+        if float(report["min_accepted_step_s"]) > float(report["max_accepted_step_s"]):
+            raise ValueError(f"{name} time-step bounds inverted: min exceeds max")
     if not float(fine["max_accepted_step_s"]) < float(coarse["max_accepted_step_s"]):
         raise ValueError("Fine analysis must have a smaller maximum accepted step than coarse analysis")
     fields=("peak_roof_UX_m","peak_roof_UY_m","max_story_drift_X","max_story_drift_Y")
