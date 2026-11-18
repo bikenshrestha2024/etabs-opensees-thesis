@@ -15,6 +15,31 @@ class GateTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,"time tolerance"):
                     verify_accepted_history(rows,1.,1.,time_tolerance_s=invalid)
 
+    def test_full_record_rejects_boolean_or_malformed_durations(self):
+        rows=[dict(time_s=0.,drift=0.),
+              dict(time_s=1.,drift=.01)]
+        for field in ("record_end_s","requested_end_s"):
+            for bad in (True,False,None,"not-a-duration",float("inf")):
+                kwargs=dict(record_end_s=1.,requested_end_s=1.)
+                kwargs[field]=bad
+                with self.subTest(field=field,value=bad):
+                    with self.assertRaisesRegex(ValueError,"record duration"):
+                        verify_accepted_history(rows,**kwargs)
+
+    def test_timestep_rejects_inverted_step_bounds(self):
+        base=dict(status="FULL_DURATION_NUMERIC_SCREEN",
+                  model_sha256="a"*64,record_sha256="b"*64,
+                  limit_state="ULS",orientation="XY",diagnostic_excitation="XY",
+                  min_accepted_step_s=.02,max_accepted_step_s=.01,
+                  peak_roof_UX_m=.01,peak_roof_UY_m=.02,
+                  max_story_drift_X=.003,max_story_drift_Y=.004)
+        fine=dict(base,min_accepted_step_s=.0025,max_accepted_step_s=.005)
+        with self.assertRaisesRegex(ValueError,"step bounds"):
+            compare_time_step_results(base,fine)
+        coarse=dict(base,min_accepted_step_s=.005)
+        with self.assertRaisesRegex(ValueError,"step bounds"):
+            compare_time_step_results(coarse,dict(fine,min_accepted_step_s=.01))
+
     def test_truncated(self):
         r=verify_accepted_history([dict(time_s=0.,drift=0.),dict(time_s=.005,drift=.01)],10.,.005)
         self.assertEqual(r["status"],"TRUNCATED_DIAGNOSTIC")
