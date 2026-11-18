@@ -42,6 +42,28 @@ class RunMatrixTests(unittest.TestCase):
       self.assertFalse(conf["gorkha_processing_reviewed"])
       with self.assertRaises(FileExistsError):
           create_configs(models_json=meta,matched_dir=root,output_dir=dest,source_map=sources)
+ def test_duplicate_m0_m6_model_export_is_rejected_without_outputs(self):
+    with tempfile.TemporaryDirectory() as d:
+      root=Path(d)
+      paths={}
+      for name in VARIANTS:
+        folder=root/"models"/name
+        folder.mkdir(parents=True)
+        paths[name]=str(folder)
+      # M2 could accidentally point to M1 when a converted model
+      # directory is reused; without validation, all 224 planned
+      # orientations are still generated under misleading labels.
+      paths["M2"]=paths["M1"]
+      meta=root/"model_dirs.json"
+      meta.write_text(json.dumps(paths),encoding="utf-8")
+      sources={(evt,c):str(root/(evt.replace(" ","_")+"_"+c+".txt"))
+                for evt in EVENT_ORDER for c in ("A","B")}
+      out=root/"outputs"
+      with self.assertRaisesRegex(ValueError,"distinct model export"):
+        create_configs(models_json=meta,matched_dir=root,
+                       output_dir=out,source_map=sources)
+      self.assertFalse(out.exists())
+
  def test_unknown_model_variant_rejected(self):
     with tempfile.TemporaryDirectory() as d:
       p=Path(d)/"models.json"
