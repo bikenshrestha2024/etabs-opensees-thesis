@@ -117,6 +117,17 @@ class CompareTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_variant_manifest(payload)
 
+    def test_reject_two_pair_ids_with_identical_motion_source_hash(self):
+        data=suite()
+        # A full-looking study can use the same earthquake seven times
+        # under different pair labels without violating cross-variant SHA.
+        for cases in data.values():
+            for case in cases:
+                if case["pair_id"] == "P2":
+                    case["record_sha256"]="%064x" % 1
+        with self.assertRaisesRegex(ValueError,"distinct.*motion|duplicate.*motion"):
+            compare_completed_cases(manifest(),data)
+
     def test_reject_changed_mass(self):
         p=manifest();p["variants"][3]["mass_basis_sha256"]="c"*64
         with self.assertRaisesRegex(ValueError,"mass_basis"):
