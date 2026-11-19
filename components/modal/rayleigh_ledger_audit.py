@@ -119,3 +119,44 @@ def verify_saved_rayleigh_axis(axis, *, expected_storeys=None):
     if error > .001 or not math.isclose(error, kin["relative_reaction_error"], rel_tol=1e-6, abs_tol=1e-8):
         raise ValueError("Rayleigh saved axis reaction balance contradicts stored forces")
     return rec
+
+
+def verify_storey_elevations(model_diaphragms, ledger_rows, base_z_m, *,
+                             tolerance_m=1e-6):
+    """Require Rayleigh load heights to match assembled diaphragm elevations.
+
+    [REF components/model/assembly.py story_ledger]
+    [REF components/modal/rayleigh.py run]
+
+    Rejects a ledger whose IDs match but elevation/height reference changed.
+    """
+    try:
+        base = float(base_z_m)
+        tol = float(tolerance_m)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("Invalid Rayleigh geometric height basis") from exc
+    if any(not math.isfinite(v) for v in (base, tol)) or tol < 0:
+        raise ValueError("Invalid Rayleigh geometric height tolerance")
+    verify_storey_coverage(model_diaphragms, ledger_rows)
+    model_heights = {}
+    for d in model_diaphragms:
+        tag = int(d["master_tag"])
+        xyz = d["master_xyz"]
+        if len(xyz) != 3:
+            raise ValueError("Rayleigh master coordinates must have 3 components")
+        z = float(xyz[2])
+        if not math.isfinite(z):
+            raise ValueError("Nonfinite Rayleigh master elevation")
+        model_heights[tag] = z-base
+    for row in ledger_rows:
+        tag = int(row["master_node_tag"])
+        actual = float(row["height_m"])
+        expected = model_heights[tag]
+        if not math.isfinite(actual) or actual <= 0 or expected <= 0:
+            raise ValueError("Invalid Rayleigh storey elevation relative to base")
+        if abs(actual-expected) > tol:
+            raise ValueError(
+                f"Rayleigh storey {row['story_number']} ledger height {actual:g} m "
+                f"differs from assembled diaphragm height {expected:g} m"
+            )
+    return len(ledger_rows)
