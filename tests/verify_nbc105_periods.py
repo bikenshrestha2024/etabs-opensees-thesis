@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import sys
 import tempfile
 import types
@@ -167,22 +168,39 @@ class NBC105PeriodTests(unittest.TestCase):
             model.write_text('{"model":"fixture"}',encoding='utf-8')
             ledger=folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv'
             ledger.write_text('story,height_m\\n1,3\\n',encoding='utf-8')
+            config=folder/'OpenSees_Complete_Model_Config_V118.json'
+            config.write_text('{"synthetic":true}',encoding='utf-8')
+            config_hash=hashlib.sha256(config.read_bytes()).hexdigest()
             model_hash=hashlib.sha256(model.read_bytes()).hexdigest()
             ledger_hash=hashlib.sha256(ledger.read_bytes()).hexdigest()
             def save(state,period,aw_x=2.,aw_y=3.,version=126):
-                kinematics={'status':'VERIFIED_FLOOR_TRANSLATIONS'}
+                def evidence(target,aw):
+                    w,f=100.,10.
+                    d=(target/(2*math.pi))**2 * 9.81*f/w
+                    rows=[{'master_node':101,'constrained_floor_node_count':3,
+                           'weight_kN':w,'force_kN':f,'displacement_m':d}]
+                    return {'period_s':target,'Aw_m2':aw,'rows':rows,
+                            'rayleigh_numerator_kN_m2':w*d*d,
+                            'rayleigh_denominator_gFiDi_kN_m2_s2':9.81*f*d,
+                            'reference_force_total_kN':f,
+                            'kinematic_audit':{
+                                'status':'VERIFIED_FLOOR_TRANSLATIONS',
+                                'steps':1,'pattern_factor':1.,
+                                'incremental_base_reaction_kN':-f,
+                                'relative_reaction_error':0.,
+                                'max_floor_translation_spread_m':0.}}
                 payload={
                     'method_version':version,'limit_state':state,
                     'displacement_basis':'TORSION_SUPPRESSED_CONSTRAINED_FLOOR_NODES',
                     'model_sha256':model_hash,'story_weights_sha256':ledger_hash,
-                    'X':{'period_s':period,'Aw_m2':aw_x,'kinematic_audit':kinematics},
-                    'Y':{'period_s':period+1.,'Aw_m2':aw_y,'kinematic_audit':kinematics},
+                    'model_config_sha256':config_hash,
+                    'X':evidence(period,aw_x),
+                    'Y':evidence(period+1.,aw_y),
                 }
                 name=f'NBC105_Rayleigh_Preliminary_V{123 if version==125 else version}'+('_SLS' if state=='SLS' else '')+'.json'
                 output=analysis_output_folder(folder,state)
                 output.mkdir(parents=True,exist_ok=True)
                 (output/name).write_text(json.dumps(payload),encoding='utf-8')
-
             save('ULS',3.89,version=125)
             archived=import_project_inputs(ROOT,folder,'ULS')
             self.assertNotIn('rayleigh_tx',archived['values'])

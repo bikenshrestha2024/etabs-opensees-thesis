@@ -74,7 +74,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     with (folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').open(encoding='utf-8-sig') as stream:rows=list(csv.DictReader(stream))
     if not rows:raise ValueError('Reconciled seismic story weights are required.')
     try:
-        from components.modal.rayleigh_ledger_audit import verify_storey_coverage, verify_rayleigh_sum
+        from components.modal.rayleigh_ledger_audit import verify_storey_coverage, verify_rayleigh_sum, verify_storey_elevations
     except ModuleNotFoundError:
         # Older independently exported OpenSees_Runtime_V118 bundles may not
         # contain newly introduced optional helper files. Keep this historical
@@ -99,8 +99,25 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
             return {'storey_count':len(vals),'period_s':2*math.pi*math.sqrt(num/den),
                     'status':'NUMERICAL_RECONSTRUCTION_ONLY'}
 
+    config_file=folder/'OpenSees_Complete_Model_Config_V118.json'
+    if not config_file.is_file():raise FileNotFoundError('Current Rayleigh model configuration is missing.')
     with model.open(encoding='utf-8-sig') as stream: model_data=json.load(stream)
     covered_storeys=verify_storey_coverage(model_data['diaphragms'],rows)
+    # The legacy runtime fallback keeps earlier exported launchers working,
+    # but must apply the same model-vs-ledger height check.
+    if 'verify_storey_elevations' in locals():
+        verify_storey_elevations(model_data['diaphragms'],rows,model_data['base_z_m'])
+    else:
+        base_z=float(model_data['base_z_m'])
+        heights_by_master={int(d['master_tag']):float(d['master_xyz'][2])-base_z
+                           for d in model_data['diaphragms']}
+        for record in rows:
+            master=int(record['master_node_tag'])
+            expected=heights_by_master[master]
+            actual=float(record['height_m'])
+            if not all(math.isfinite(v) and v>0 for v in (expected,actual)) or abs(expected-actual)>1e-6:
+                raise ValueError('Rayleigh storey height differs from source diaphragm master geometry')
+
     rows.sort(key=lambda r:float(r['height_m']))
     heights=[float(r['height_m']) for r in rows]
     weights=[float(r['dead_load_kN'])+.6*float(r['storage_live_load_kN'])+.3*float(r['other_live_load_kN']) for r in rows]
@@ -109,6 +126,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     if any(not math.isfinite(w) or w<=0 for w in weights):raise ValueError('Positive finite reconciled seismic story weights are required.')
     H=heights[-1]
     result={'story_weights_sha256':hashlib.sha256((folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').read_bytes()).hexdigest(),'standard':'NBC 105:2025 §5.1.1-§5.1.3','model_sha256':hashlib.sha256(model.read_bytes()).hexdigest(),'gravity_state':'assembled sustained gravity','limit_state':state,'height_m':H,'height_basis':'story-ledger elevations from seismic base; confirm qualifying basements are excluded per §5.1.2','gravity_acceleration_m_s2':9.81,'rayleigh_equation':'T1 = 2*pi*sqrt(sum(Wi*di^2)/(g*sum(Fi*di)))','torsion':'diaphragm rotations restrained during reference lateral perturbation','diagnostic_only':True}
+    result['model_config_sha256']=hashlib.sha256(config_file.read_bytes()).hexdigest()
     prefix=rayleigh_result_prefix(state)
     members_by_master={int(d['master_tag']): d['slave_node_tags'] for d in model_data['diaphragms']}
     supports=tuple(map(int, model_data['supports']))

@@ -986,6 +986,7 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
     from components.modal.rayleigh import (
         RAYLEIGH_DISPLACEMENT_BASIS, RAYLEIGH_METHOD_VERSION, rayleigh_result_prefix,
     )
+    from components.modal.rayleigh_ledger_audit import verify_saved_rayleigh_axis
     ray_folder=analysis_output_folder(folder,state)
     ray=ray_folder/(rayleigh_result_prefix(state)+'.json')
     if not ray.is_file():
@@ -998,7 +999,10 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
         import hashlib
         result=json.loads(ray.read_text(encoding='utf-8-sig'))
         ledger=folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv'
-        valid=(result.get('method_version')==RAYLEIGH_METHOD_VERSION
+        config=folder/'OpenSees_Complete_Model_Config_V118.json'
+        valid=(config.is_file()
+               and result.get('model_config_sha256')==hashlib.sha256(config.read_bytes()).hexdigest()
+               and result.get('method_version')==RAYLEIGH_METHOD_VERSION
                and result.get('displacement_basis')==RAYLEIGH_DISPLACEMENT_BASIS
                and result.get('limit_state')==state
                and result.get('model_sha256')==hashlib.sha256(data.read_bytes()).hexdigest()
@@ -1009,12 +1013,23 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                 axis_result=result.get(axis,{})
                 period=axis_result.get('period_s')
                 aw=values.get('aw'+axis.lower())
-                if (axis_result.get('kinematic_audit',{}).get('status')!='VERIFIED_FLOOR_TRANSLATIONS'
-                        or not isinstance(period,(int,float)) or not math.isfinite(period) or period<=0
+                if (not isinstance(period,(int,float)) or isinstance(period,bool)
+                        or not math.isfinite(period) or period<=0
                         or not isinstance(axis_result.get('Aw_m2'),(int,float))
+                        or isinstance(axis_result.get('Aw_m2'),bool)
                         or not math.isfinite(axis_result['Aw_m2']) or axis_result['Aw_m2']<=0
                         or (aw is not None and not math.isclose(axis_result['Aw_m2'],float(aw),rel_tol=1e-8,abs_tol=1e-9))):
                     valid=False
+                    break
+                try:
+                    # The status string alone is not proof. Reconstruct the
+                    # period, force work, floor-translation and reaction audit.
+                    proof=verify_saved_rayleigh_axis(axis_result)
+                    if not math.isclose(proof['period_s'],period,rel_tol=1e-8):
+                        valid=False
+                except (ValueError,TypeError,KeyError,OverflowError):
+                    valid=False
+                if not valid:
                     break
             if valid:
                 for axis in ('X','Y'):put('rayleigh_t'+axis.lower(),result[axis]['period_s'],ray,axis,'period_s')
