@@ -37,6 +37,25 @@ The Codex commit introduces `docs/validation/20261118_RAYLEIGH_RETAINED_DOF_CORR
 4. **Soil C completeness audit:** `inspect_case` checks that summary and duration-gate JSONs contain plausible 64-character SHA-256 strings and that the CSV is complete. It **does not recompute those hashes from private model or waveform bytes**. Synthetic regression is not proof of 224 native analyses. The new code correctly reports `RESEARCH_ONLY_FULL_RECORD`, not design approval.
 5. **Workbook grouping:** the new importer conditionally overwrites live `awx/awy` input values with geometry-derived grouped candidates while retaining `workbook_awx/awy` for audit. This is a **material computational behavior change**, requiring explicit project grouping approval/source geometry matching; don't quietly assume the old workbook Aw or adopted periods survived unchanged. A broad `except Exception` around the importer fallback may hide the exact grouping validation reason in note strings, so preserve/report these notes and fail design-acceptance closed.
 
+## Independent GitHub source-discovery artifact, exact original Codex head
+
+From [pinned source-discovery Actions run 44363501836](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/44363501836), artifact `semantic-discovery-public-source-queue` ID `14455052563`, extracted and independently inspected `DISCOVERY_SUMMARY.json`, `SYMBOL_DISCOVERY_NOT_REVIEWED.csv`, and associated inventory/queue files:
+
+| Result from automated repository-wide inventory | Exact artifact value |
+| --- | ---: |
+| Git tracked files | 3,200 |
+| Python files (all repository categories) | 794 |
+| AST symbols discovered (all categories) | **4,802** |
+| AST parse issues | **0** |
+| Dependency import classifications | 3,697 stdlib; 1,325 local exact; 14 local package; **557 external/dynamic requiring environment** |
+| Output I/O candidates | **4,075** |
+| Duplicate SHA blob groups / extra files | **400 / 478** |
+| Unclassified file manual triage | **110** |
+
+These broad inventory counts are not directly interchangeable with the **older 579 active modules / 4,424 active semantic-review candidates** from a different filtered audit. The changed current audit state has **16** narrow, source-attested/tested functions. The semantic-review backlog therefore remains large; a parser report and stale-hash fix are insufficient for full function-by-function acceptance.
+
+The published Windows GitHub Actions run [44363501763](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/44363501763) is explicitly titled **headless contracts (NOT ETABS / GUI acceptance)**, and logs only Python and filesystem tests. `tests/test_rayleigh_retained_dof.py` uses `pytest.importorskip('openseespy.opensees')` and is not evidence by itself of a successful OpenSees 3.8 full-model run on GitHub Actions. Codex's local-period and gravity numbers are recorded in the project docs, but an independent current-source native replay with complete source and solver inputs remains open.
+
 ## Scope and decisions
 
 **Passed based on the prior main's evidence:** tracked Git metadata enumeration and selected static/import regression. **Failed at audit start:** exact-main integrated static source-attestation and NLTHA documentation-tag jobs. **Pending until green head:** these two software CI gates. **Open:** full source-semantic review, original native ETABS–OpenSees physical parity, first-step X wall material/solver root cause, complete 224 M0–M6 full-duration NLTHA and independent NBC/site-performance acceptance. No numerical physics or source EDB was changed in this CI repair.
