@@ -999,7 +999,10 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
         import hashlib
         result=json.loads(ray.read_text(encoding='utf-8-sig'))
         ledger=folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv'
-        valid=(result.get('method_version')==RAYLEIGH_METHOD_VERSION
+        config=folder/'OpenSees_Complete_Model_Config_V118.json'
+        valid=(config.is_file()
+               and result.get('model_config_sha256')==hashlib.sha256(config.read_bytes()).hexdigest()
+               and result.get('method_version')==RAYLEIGH_METHOD_VERSION
                and result.get('displacement_basis')==RAYLEIGH_DISPLACEMENT_BASIS
                and result.get('limit_state')==state
                and result.get('model_sha256')==hashlib.sha256(data.read_bytes()).hexdigest()
