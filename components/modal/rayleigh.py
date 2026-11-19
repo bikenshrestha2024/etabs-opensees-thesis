@@ -74,7 +74,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     with (folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').open(encoding='utf-8-sig') as stream:rows=list(csv.DictReader(stream))
     if not rows:raise ValueError('Reconciled seismic story weights are required.')
     try:
-        from components.modal.rayleigh_ledger_audit import verify_storey_coverage, verify_rayleigh_sum
+        from components.modal.rayleigh_ledger_audit import verify_storey_coverage, verify_rayleigh_sum, verify_storey_elevations
     except ModuleNotFoundError:
         # Older independently exported OpenSees_Runtime_V118 bundles may not
         # contain newly introduced optional helper files. Keep this historical
@@ -103,6 +103,21 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     if not config_file.is_file():raise FileNotFoundError('Current Rayleigh model configuration is missing.')
     with model.open(encoding='utf-8-sig') as stream: model_data=json.load(stream)
     covered_storeys=verify_storey_coverage(model_data['diaphragms'],rows)
+    # The legacy runtime fallback keeps earlier exported launchers working,
+    # but must apply the same model-vs-ledger height check.
+    if 'verify_storey_elevations' in locals():
+        verify_storey_elevations(model_data['diaphragms'],rows,model_data['base_z_m'])
+    else:
+        base_z=float(model_data['base_z_m'])
+        heights_by_master={int(d['master_tag']):float(d['master_xyz'][2])-base_z
+                           for d in model_data['diaphragms']}
+        for record in rows:
+            master=int(record['master_node_tag'])
+            expected=heights_by_master[master]
+            actual=float(record['height_m'])
+            if not all(math.isfinite(v) and v>0 for v in (expected,actual)) or abs(expected-actual)>1e-6:
+                raise ValueError('Rayleigh storey height differs from source diaphragm master geometry')
+
     rows.sort(key=lambda r:float(r['height_m']))
     heights=[float(r['height_m']) for r in rows]
     weights=[float(r['dead_load_kN'])+.6*float(r['storage_live_load_kN'])+.3*float(r['other_live_load_kN']) for r in rows]
