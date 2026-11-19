@@ -121,12 +121,15 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     rows.sort(key=lambda r:float(r['height_m']))
     heights=[float(r['height_m']) for r in rows]
     weights=[float(r['dead_load_kN'])+.6*float(r['storage_live_load_kN'])+.3*float(r['other_live_load_kN']) for r in rows]
+    from components.modal.rayleigh_mass_audit import audit_rayleigh_mass_elevations
+    mass_elevation_audit=audit_rayleigh_mass_elevations(model_data,rows)
     if any(not math.isfinite(h) or h<=0 for h in heights) or any(b<=a for a,b in zip(heights,heights[1:])):
         raise ValueError('Story heights must be finite, positive, and strictly increasing from the seismic base.')
     if any(not math.isfinite(w) or w<=0 for w in weights):raise ValueError('Positive finite reconciled seismic story weights are required.')
     H=heights[-1]
     result={'story_weights_sha256':hashlib.sha256((folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').read_bytes()).hexdigest(),'standard':'NBC 105:2025 §5.1.1-§5.1.3','model_sha256':hashlib.sha256(model.read_bytes()).hexdigest(),'gravity_state':'assembled sustained gravity','limit_state':state,'height_m':H,'height_basis':'story-ledger elevations from seismic base; confirm qualifying basements are excluded per §5.1.2','gravity_acceleration_m_s2':9.81,'rayleigh_equation':'T1 = 2*pi*sqrt(sum(Wi*di^2)/(g*sum(Fi*di)))','torsion':'diaphragm rotations restrained during reference lateral perturbation','diagnostic_only':True}
     result['model_config_sha256']=hashlib.sha256(config_file.read_bytes()).hexdigest()
+    result['mass_elevation_audit']=mass_elevation_audit
     prefix=rayleigh_result_prefix(state)
     members_by_master={int(d['master_tag']): d['slave_node_tags'] for d in model_data['diaphragms']}
     supports=tuple(map(int, model_data['supports']))
