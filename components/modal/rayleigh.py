@@ -23,6 +23,10 @@ RAYLEIGH_PREFIX = 'NBC105_Rayleigh_Preliminary_V126'
 
 
 def rayleigh_result_prefix(state):
+    """Build the ULS/SLS period output prefix.
+
+    [REF docs/validation/20261118_RAYLEIGH_RETAINED_DOF_CORRECTION.md]
+    """
     return RAYLEIGH_PREFIX + ('' if state == 'ULS' else '_' + state)
 
 

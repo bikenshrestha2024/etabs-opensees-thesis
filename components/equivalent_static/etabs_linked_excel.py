@@ -142,7 +142,11 @@ def check_excel_wall_thickness(workbook_path, excel_rows, inventory, *, toleranc
 
 
 def apply_reviewed_grouped_walls(workbook, policy):
-    """Apply the source-verified two-wall interpretation to the generated copy."""
+    """Apply the source-verified two-wall interpretation to the generated copy.
+
+    [REF docs/validation/20261118_RAYLEIGH_RETAINED_DOF_CORRECTION.md]
+    [REF docs/source/components/equivalent_static/etabs_linked_excel.py.md]
+    """
     from openpyxl import load_workbook
 
     book=load_workbook(workbook)
@@ -301,7 +305,10 @@ def run_etabs_excel(edb,workbook,engine_path,output_dir,log=print,*,wall_policy=
             except Exception as exc: log("ETABS shutdown warning: "+str(exc))
         comtypes.CoUninitialize()
 def publish_route_comparison(output, export_dir, verify_result, *, scripts=None):
-    """Compare linked coefficients to verified, completed direct solver cases."""
+    """Compare linked coefficients to verified, completed direct solver cases.
+
+    [REF docs/source/components/equivalent_static/etabs_linked_excel.py.md]
+    """
     from components.inputs.output_contract import atomic_json
     from components.inputs.project_workbooks import _source_edb_path
     from openpyxl import Workbook
