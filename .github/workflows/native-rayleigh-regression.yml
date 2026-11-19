@@ -1,0 +1,60 @@
+name: Native OpenSeesPy Rayleigh diaphragm benchmark
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/native-rayleigh-regression.yml'
+      - 'components/modal/rayleigh.py'
+      - 'tests/test_rayleigh_retained_dof.py'
+  pull_request:
+    paths:
+      - '.github/workflows/native-rayleigh-regression.yml'
+      - 'components/modal/rayleigh.py'
+      - 'tests/test_rayleigh_retained_dof.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-rayleigh:
+    name: OpenSees 3.8 native diaphragm SP/MP regression (not full-model verification)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned native OpenSeesPy solver and pytest
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'openseespy==3.8.0.0' 'pytest>=8,<10'
+      - name: Assert actual solver import and version before test (skip is not allowed)
+        run: |
+          python - <<'PY'
+          import importlib.metadata
+          import openseespy.opensees as ops
+          assert importlib.metadata.version('openseespy') == '3.8.0.0'
+          assert hasattr(ops, 'analyze') and callable(ops.analyze)
+          print('NATIVE_OPENSEESPY_IMPORTED version=3.8.0.0')
+          PY
+      - name: Run real native retained-DOF regression, preserving failure code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pytest -q -ra tests/test_rayleigh_retained_dof.py 2>&1 | tee native_rayleigh_test.log
+          if grep -Eq '[0-9]+ skipped' native_rayleigh_test.log; then
+            echo 'ERROR: Native Rayleigh benchmark skipped tests; native validation is not accepted.' >&2
+            exit 1
+          fi
+          echo 'NATIVE_RAYLEIGH_BENCHMARK_EXECUTED; full-building ETABS equivalence remains unverified.'
+      - name: Preserve native benchmark log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-rayleigh-benchmark-log
+          path: native_rayleigh_test.log
+          if-no-files-found: warn
+          retention-days: 30
