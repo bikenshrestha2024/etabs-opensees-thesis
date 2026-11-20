@@ -72,19 +72,22 @@ def _require_nonlinear_readiness(config):
     if not path.is_file():
         raise FileNotFoundError(f"Missing NLTHA readiness manifest: {path}. Complete OpenSees_Model_Readiness_Template_V116.json beside the model script.")
     data = json.loads(path.read_text(encoding="utf-8-sig"))
+    from components.model.readiness import diagnose_nonlinear_readiness, format_readiness_blockers
+    diagnosis = diagnose_nonlinear_readiness(config)
+    detail = ("\nBlockers (" + str(len(diagnosis["blockers"])) + "):\n" + format_readiness_blockers(diagnosis)) if diagnosis["blockers"] else ""
     recorded=str(data.get("model_script", "")).strip()
     if not recorded or 'absolute path to' in recorded.lower():
-        raise RuntimeError("The selected file is an uncompleted readiness TEMPLATE. Open Prepare / inspect readiness checklist, complete evidenced items and save its model-bound draft. The V136 editor fixes the previously blank checklist. Your nonlinear configuration also needs a reviewed material file and wall FSAM mappings; changing the checklist alone does not create them.")
+        raise RuntimeError("The selected file is an uncompleted readiness TEMPLATE. Open Prepare / inspect readiness checklist, complete evidenced items and save its model-bound draft. The V136 editor fixes the previously blank checklist. Your nonlinear configuration also needs a reviewed material file and wall FSAM mappings; changing the checklist alone does not create them."+detail)
     bound=Path(recorded).expanduser()
     if not bound.is_absolute():bound=path.parent/bound
     if bound.resolve() != model:
-        raise RuntimeError("Readiness file is bound to "+str(bound.resolve())+" but selected model is "+str(model)+". Select the matching file or prepare a new unapproved draft; existing approval cannot be transferred silently.")
+        raise RuntimeError("Readiness file is bound to "+str(bound.resolve())+" but selected model is "+str(model)+". Select the matching file or prepare a new unapproved draft; existing approval cannot be transferred silently."+detail)
     if data.get('model_script_sha256'):
         import hashlib
-        if data['model_script_sha256']!=hashlib.sha256(model.read_bytes()).hexdigest():raise RuntimeError('Model script changed after readiness review. Review and save a new model-specific checklist.')
+        if data['model_script_sha256']!=hashlib.sha256(model.read_bytes()).hexdigest():raise RuntimeError('Model script changed after readiness review. Review and save a new model-specific checklist.'+detail)
     if data.get("approved_for_nltha") is not True:
         missing=[k.replace('_',' ') for k,v in data.get('checks',{}).items() if v is not True]
-        raise RuntimeError("Nonlinear readiness is not approved. Missing prerequisites: "+'; '.join(missing)+". Open the readiness checklist; this cannot be resolved by changing the model path alone.")
+        raise RuntimeError("Nonlinear readiness is not approved. Missing prerequisites: "+'; '.join(missing)+". Open the readiness checklist; this cannot be resolved by changing the model path alone."+detail)
     keys = (
         "etabs_topology_and_story_mapping_reviewed", "wall_opening_and_coupling_beam_mesh_reviewed",
         "wall_nonlinear_materials_and_reinforcement_cited_calibrated", "frame_concrete_and_rebar_materials_reviewed",
@@ -98,7 +101,7 @@ def _require_nonlinear_readiness(config):
     checks = data.get("checks", {})
     missing = [key for key in keys if checks.get(key) is not True]
     if missing:
-        raise RuntimeError("NLTHA readiness checks are incomplete: " + ", ".join(missing))
+        raise RuntimeError("NLTHA readiness checks are incomplete: " + ", ".join(missing) + detail)
     return {"path": str(path), "model_script": str(model), "check_count": len(keys)}
 
 
