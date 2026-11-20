@@ -54,6 +54,7 @@ class TestWorkingCopy(unittest.TestCase):
             os.chmod(src, stat.S_IREAD)
             digest = hashlib.sha256(src.read_bytes()).hexdigest()
             mtime = src.stat().st_mtime_ns
+            mode_before = stat.S_IMODE(src.stat().st_mode)
             copy = guards.make_edb_working_copy(src, root=d)
             try:
                 self.assertNotEqual(copy.resolve(), src.resolve())
@@ -65,7 +66,7 @@ class TestWorkingCopy(unittest.TestCase):
             self.assertFalse(copy.parent.exists())
             self.assertEqual(hashlib.sha256(src.read_bytes()).hexdigest(), digest)
             self.assertEqual(src.stat().st_mtime_ns, mtime)
-            self.assertEqual(stat.S_IMODE(src.stat().st_mode), stat.S_IREAD)  # mode untouched (root-safe)
+            self.assertEqual(stat.S_IMODE(src.stat().st_mode), mode_before)  # mode untouched (platform-independent)
             self.assertEqual(src.read_bytes(), b"EDBDATA")
             os.chmod(src, stat.S_IWRITE | stat.S_IREAD)
 
@@ -293,7 +294,6 @@ class TestApplicationWiring(unittest.TestCase):
 class TestAssemblyErrorsAreFatal(unittest.TestCase):
     def test_bad_material_row_reaches_report_and_worker_rejects_it(self):
         from tools.etabs_conversion_worker import validate_converter_report
-        from tests.test_area_folder_and_hinged_brace_review import BraceReviewContractTests  # noqa: F401
         with tempfile.TemporaryDirectory() as td:
             folder = Path(td)
             runtime = folder / "runtime_source"
