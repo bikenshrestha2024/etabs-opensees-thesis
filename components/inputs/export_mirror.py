@@ -15,6 +15,7 @@ import tempfile
 
 EXTS = {".json", ".csv", ".xlsx", ".xlsm", ".html", ".py", ".txt"}
 PRIVATE_NAMES = {"project_sources.private.json", "gravity_evidence_manifest.json"}
+LIVE_CONVERSION_LOG = "etabs_opensees_conversion_log.txt"
 
 
 def _digest(path):
@@ -51,7 +52,7 @@ def classification(name):
     return "01_SOURCE"
 
 
-def export_mirror(export_dir):
+def export_mirror(export_dir, *, exclude_live_conversion_log=False):
     """Create categorized copies after a fail-closed, whole-batch preflight.
 
     [REF docs/source/components/inputs/export_mirror.py.md]
@@ -74,10 +75,14 @@ def export_mirror(export_dir):
     # A complete source/destination plan is necessary: failing halfway through
     # the copy phase creates a misleading partially refreshed mirror.
     plan = []
+    excluded_live_logs = []
     for original in sorted(root.iterdir()):
         if not original.is_file() or original.is_symlink():
             continue
         lowered = original.name.casefold()
+        if exclude_live_conversion_log and lowered == LIVE_CONVERSION_LOG:
+            excluded_live_logs.append(str(original))
+            continue
         if (original.suffix.lower() not in EXTS
                 or lowered in PRIVATE_NAMES
                 or lowered.endswith((".processing.json", ".processing.log",
@@ -111,10 +116,14 @@ def export_mirror(export_dir):
                 shutil.copy2(original, part)
                 if _digest(part) != original_hash:
                     raise IOError("Source changed during copy; review manually: " + original.name)
-                # Do not silently replace a file created by another producer.
-                if dest.exists() or dest.is_symlink():
-                    raise ValueError("Destination created during copy: " + str(dest))
-                os.replace(part, dest)
+                # Publish without replacing a path another producer just created.
+                try:
+                    if os.name == "nt":
+                        os.rename(part, dest)
+                    else:
+                        os.link(part, dest)
+                except FileExistsError as exc:
+                    raise ValueError("Destination created during copy: " + str(dest)) from exc
             finally:
                 part.unlink(missing_ok=True)
         entries.append({"original": str(original), "categorized": str(dest),
@@ -123,7 +132,8 @@ def export_mirror(export_dir):
 
     manifest = {"schema": 1, "status": "MIRRORED_LEGACY_PATHS_PRESERVED",
                 "created_utc": datetime.now(timezone.utc).isoformat(),
-                "selected_export": str(root), "files": entries}
+                "selected_export": str(root), "files": entries,
+                "excluded_live_logs": excluded_live_logs}
     if manifest_dir.is_symlink() or manifest_path.is_symlink():
         raise ValueError("Refusing mirror manifest destination symlink")
     manifest_dir.mkdir(parents=True, exist_ok=True)

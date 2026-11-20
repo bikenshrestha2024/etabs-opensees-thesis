@@ -37,7 +37,11 @@ class MeshCasesTests(unittest.TestCase):
             folder=Path(folder)
             (folder/'OpenSees_Complete_Model_Data_V118.json').write_text(json.dumps(
                 {'config_sha256':mesh.digest(folder/mesh.REQUIRED_SOURCE[3])}))
-            return {'elastic_assembled':True},{'assembly_errors':[]}
+            return {'elastic_assembled':True},{
+                'assembly_errors':[], 'frame_segments': 40, 'shell_mesh_cells': 200,
+                'wall_base_support_count': 4, 'total_downward_load_kN': 150.0,
+                'active_horizontal_seismic_weight_kN': 140.0,
+            }
         def export(folder,*,output_root,progress):
             return output_root/'synthetic.xlsx'
         received=[]
@@ -49,6 +53,8 @@ class MeshCasesTests(unittest.TestCase):
         self.assertTrue(any(message=='Frame segment connectivity' and elapsed>=0
                             for message,elapsed in received))
         self.assertEqual(result['status'],'FORMULA_WORKBOOK_CREATED_NOT_GRAVITY_VERIFIED')
+        self.assertEqual(result['assembly_metrics']['applied_gravity_kN'], 150.0)
+        self.assertEqual(result['assembly_metrics']['active_horizontal_seismic_weight_kN'], 140.0)
         run=Path(result['run_directory'])
         self.assertIn('Frame segment connectivity',(run/'MESH_RUN.log').read_text())
         identity=json.loads((run/'MESH_RUNTIME_IDENTITY.json').read_text())
@@ -173,6 +179,9 @@ class MeshCasesTests(unittest.TestCase):
                 json.dumps({"status":"STAGED_NOT_ASSEMBLED"}))
             (folder/"EXCEL").mkdir()
             (folder/"EXCEL"/"sample.xlsx").write_bytes(b"synthetic-only")
+            cache = run/"__pycache__"
+            cache.mkdir()
+            (cache/"runtime.cpython-312.pyc").write_bytes(b"synthetic-cache")
             zip_path=mesh.package_mesh_case(self.root,n)
             self.assertEqual(zip_path.name,f"MESH_{n:02d}.zip")
             self.assertEqual(zip_path.parent.name,"UPLOAD_PACKAGES")
@@ -181,6 +190,7 @@ class MeshCasesTests(unittest.TestCase):
                 names=z.namelist()
                 self.assertIn(f"MESH_{n:02d}/RUNS/RUN_TEST/MESH_BUILD_STATUS.json",names)
                 self.assertIn(f"MESH_{n:02d}/EXCEL/sample.xlsx",names)
+                self.assertFalse(any(name.endswith(".pyc") for name in names))
                 manifest=json.loads(z.read(f"MESH_{n:02d}/ZIP_SHA256_MANIFEST.json"))
                 self.assertEqual(manifest["mesh_subdivisions"],n)
                 self.assertEqual(manifest["status"],

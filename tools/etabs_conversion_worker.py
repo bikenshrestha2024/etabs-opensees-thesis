@@ -88,18 +88,21 @@ def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
     report = validate_converter_report(
         report_file, old_signature=previous_signature
     )
+    mirror = {"status": "not_requested"}
     if categorize:
         log("[WORKER STAGE START] Optional SHA-verified categorized export mirror")
         mirror_clock=time.perf_counter()
         try:
             from components.inputs.export_mirror import export_mirror
             from components.inputs.output_layout import write_stage_index
-            export_mirror(output)
+            manifest = export_mirror(output, exclude_live_conversion_log=True)
             write_stage_index(output)
+            mirror = {"status": "completed", "manifest": str(manifest)}
             log(f"[WORKER STAGE OK] Optional categorized mirror: {time.perf_counter()-mirror_clock:.2f}s")
             log("[EXPORT_ORGANIZED] Categorized mirror generated; legacy outputs retained")
         except Exception as exc:
             # Do not label a successfully completed export as failed for a mirror issue.
+            mirror = {"status": "needs_review", "error": str(exc)}
             log("[EXPORT_ORGANIZATION_NEEDS_REVIEW] " + repr(exc))
     errors = report.get("assembly_errors") or []
     log("[WORKER COMPLETED] Assembly errors recorded: " + str(len(errors)))
@@ -111,6 +114,7 @@ def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
         "nonlinear_ready_reported": bool(report.get("nonlinear_ready", False)),
         "frame_segments": report.get("frame_segments"),
         "shell_mesh_cells": report.get("shell_mesh_cells"),
+        "categorized_mirror": mirror,
         "model_equivalence": "NOT_VERIFIED"
     }
 

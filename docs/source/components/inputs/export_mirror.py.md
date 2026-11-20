@@ -25,3 +25,7 @@ The mirroring tool now hashes and checks **all** candidate destination files bef
 ## 2026-11-15 — automatically requested copy-only categorized files
 
 The export UI now calls this existing fail-closed copier (default-on option) after conversion/rebuild, instead of requiring the user to know to run `09_ORGANIZE_ETABS_EXPORT.py`. Flat path consumers remain unchanged: no generic root-file deletion or unsafe migration. Existing categorized SHA conflicts stop the mirror copy, report an explicit diagnostic, and preserve the original source and prior snapshot. Full stage-native outputs require coordinated writer+reader migrations, tracked separately.
+
+The conversion worker excludes `ETABS_OpenSees_Conversion_Log.txt` during automatic mirroring. The GUI appends to it until the worker exits. The manifest records the exclusion and the original live log remains at the export root. The completion dialog reports the categorized-copy outcome separately from the assembly outcome. A manual mirror run after the conversion can include the closed log.
+
+New files publish with a no-replacement operation after their SHA-256 check. A concurrent writer that creates the destination first retains its file, and this mirror attempt reports the conflict.

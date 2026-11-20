@@ -3528,8 +3528,15 @@ class App:
                 self.conversion_progress.set("CANCELLED — output remains unverified")
                 self.log("[WORKER CANCELLED] Partial files must not be used for analysis.")
             elif returncode == 0 and isinstance(result, dict):
+                mirror = result.get("categorized_mirror") or {}
+                mirror_status = mirror.get("status")
+                mirror_message = {
+                    "completed": "Categorized files copied and SHA-verified.",
+                    "not_requested": "Categorized copy was not requested.",
+                    "needs_review": "Categorized copy needs review. See the conversion worker log.",
+                }.get(mirror_status, "Check the worker log for categorized copy status.")
                 self.conversion_progress.set(
-                    "EXPORT COMPLETED — engineering validation still required"
+                    "Export completed. " + mirror_message
                 )
                 self.log("[WORKER COMPLETE] Report: " + str(result.get("report")))
                 self._last_exports = (
@@ -3540,9 +3547,9 @@ class App:
                              "; ".join(str(x) for x in result["assembly_errors"][:10]))
                 messagebox.showinfo(
                     "ETABS conversion finished",
-                    "The independent worker completed successfully.\n\n"
-                    "Engineering equivalence and nonlinear readiness are NOT "
-                    "automatically verified.\n\n"
+                    "The conversion worker completed.\n\n"
+                    + mirror_message + "\n\n"
+                    "Engineering equivalence and nonlinear readiness require separate checks.\n\n"
                     "Report: " + str(result.get("report")), parent=self.root
                 )
             else:

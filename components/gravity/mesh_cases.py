@@ -200,7 +200,9 @@ def package_mesh_case(folder, subdivisions):
     files=[]
     for p in sorted(case.rglob("*")):
         _refuse_linked_chain(p)
-        if p.is_file() and not p.name.endswith(".processing.json"):
+        relative = p.relative_to(case)
+        if (p.is_file() and not p.name.endswith(".processing.json")
+                and "__pycache__" not in relative.parts and p.suffix.lower() != ".pyc"):
             files.append(p)
     if not files:
         raise ValueError(f"MESH_{n:02d} has no saved files")
@@ -356,6 +358,9 @@ def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
         cfgpath = run_dir / REQUIRED_SOURCE[3]
         if data.get("config_sha256") != digest(cfgpath):
             raise RuntimeError("Mesh model/config SHA256 disagreement after assembly; no workbook exported.")
+        # The workbook exporter reads this JSON again. Release the validation
+        # payload first so a fine mesh does not occupy memory twice at once.
+        del data
         cfg = json.loads(cfgpath.read_text(encoding="utf-8-sig"))
         try:
             assembled_n = validated_mesh_size(cfg.get("floor_subdivisions"))
@@ -377,6 +382,13 @@ def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
             assembled_model=str(model_path),
             config_sha256=digest(cfgpath),
             source_case_provenance=str(run_dir / "MESH_CASE_PROVENANCE.json"),
+            assembly_metrics={
+                "frame_segments": report.get("frame_segments"),
+                "shell_mesh_cells": report.get("shell_mesh_cells"),
+                "support_count": report.get("wall_base_support_count"),
+                "applied_gravity_kN": report.get("total_downward_load_kN"),
+                "active_horizontal_seismic_weight_kN": report.get("active_horizontal_seismic_weight_kN"),
+            },
             note="No OpenSees gravity cases have been solved; reaction, drift, and load-path equivalence remain unverified.",
         )
         emit(f'MESH_{n:02d}: complete in {perf_counter()-started:.1f}s')

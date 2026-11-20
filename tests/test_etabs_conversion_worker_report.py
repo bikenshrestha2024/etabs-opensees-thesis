@@ -2,15 +2,52 @@
 import json
 import os
 from pathlib import Path
+import sys
 import tempfile
 import time
+from types import ModuleType
 import unittest
 from unittest import mock
 
-from tools.etabs_conversion_worker import _report_signature, validate_converter_report
+from tools.etabs_conversion_worker import _report_signature, run, validate_converter_report
 
 
 class TestWorkerReport(unittest.TestCase):
+    def test_categorizing_keeps_the_active_log_and_reports_mirror_conflicts(self):
+        def fake_conversion(_edb, output, _log, _live):
+            folder = Path(output)
+            (folder / "OpenSees_Complete_Export_Report_V118.json").write_text(
+                '{"assembly_errors": []}', encoding="utf-8")
+            (folder / "ETABS_OpenSees_Conversion_Log.txt").write_text("active", encoding="utf-8")
+
+        application = ModuleType("components.ui.application")
+        application.convert_model = fake_conversion
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            mock.patch.dict(sys.modules, {application.__name__: application}),
+            mock.patch("components.inputs.project_output_layout.create_project_layout",
+                       return_value={"source_edb_sha256": "synthetic", "output_root": tmp}),
+            mock.patch("components.inputs.lfs_workbook_recovery.audit_optional_gui_workbooks",
+                       return_value={}),
+            mock.patch("components.inputs.output_layout.write_stage_index"),
+        ):
+            result = run(Path(tmp) / "source.EDB", Path(tmp), False, True)
+            mirror = result["categorized_mirror"]
+            self.assertEqual(mirror["status"], "completed")
+            manifest = json.loads(Path(mirror["manifest"]).read_text(encoding="utf-8"))
+            self.assertEqual(len(manifest["excluded_live_logs"]), 1)
+            self.assertEqual(len(manifest["files"]), 1)
+
+            with (
+                mock.patch("components.inputs.export_mirror.export_mirror",
+                           side_effect=ValueError("existing categorized copy differs")),
+                mock.patch("tools.etabs_conversion_worker._report_signature",
+                           side_effect=[(1, 1), (2, 1)]),
+            ):
+                result = run(Path(tmp) / "source.EDB", Path(tmp), False, True)
+            self.assertEqual(result["categorized_mirror"]["status"], "needs_review")
+            self.assertEqual(result["model_equivalence"], "NOT_VERIFIED")
+
     def test_missing_report_never_counts_as_complete(self):
         with tempfile.TemporaryDirectory() as td:
             with self.assertRaisesRegex(RuntimeError, "fresh"):

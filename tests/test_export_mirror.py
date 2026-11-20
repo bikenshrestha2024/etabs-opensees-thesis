@@ -1,7 +1,9 @@
 """Export organization never mutates flat source files or existing evidence."""
 import hashlib
 import json
+import os
 import pytest
+from components.inputs import export_mirror as mirror_module
 from components.inputs.export_mirror import export_mirror
 
 def test_mirror_preserves_source_and_categorizes(tmp_path):
@@ -21,6 +23,20 @@ def test_mirror_preserves_source_and_categorizes(tmp_path):
     assert hashlib.sha256(original.read_bytes()).hexdigest()==before
     assert len(data["files"])==2
 
+
+def test_worker_mirror_ignores_active_conversion_log(tmp_path):
+    live_log = tmp_path / "ETABS_OpenSees_Conversion_Log.txt"
+    live_log.write_text("active GUI log", encoding="utf-8")
+    report = tmp_path / "OpenSees_Complete_Export_Report_V118.json"
+    report.write_text("{}", encoding="utf-8")
+
+    manifest = export_mirror(tmp_path, exclude_live_conversion_log=True)
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+
+    assert data["excluded_live_logs"] == [str(live_log)]
+    assert [entry["original"] for entry in data["files"]] == [str(report)]
+    assert live_log.read_text(encoding="utf-8") == "active GUI log"
+
 def test_mirror_fails_before_clobbering_existing_different_file(tmp_path):
     (tmp_path/"OpenSees_Element_Connectivity.json").write_text("source")
     target=tmp_path/"01_ETABS_EXPORT"/"02_MAPPING"
@@ -29,6 +45,26 @@ def test_mirror_fails_before_clobbering_existing_different_file(tmp_path):
     with pytest.raises(ValueError, match="differs"):
         export_mirror(tmp_path)
     assert (target/"OpenSees_Element_Connectivity.json").read_text()=="different"
+
+
+def test_mirror_preserves_file_published_by_a_concurrent_writer(tmp_path, monkeypatch):
+    original = tmp_path / "OpenSees_Element_Connectivity.json"
+    original.write_bytes(b"source")
+    dest = tmp_path / "01_ETABS_EXPORT" / "02_MAPPING" / original.name
+    method = "rename" if os.name == "nt" else "link"
+    publish = getattr(os, method)
+
+    def concurrent_publish(temporary, target):
+        assert target == dest
+        dest.write_bytes(b"concurrent writer")
+        return publish(temporary, target)
+
+    monkeypatch.setattr(mirror_module.os, method, concurrent_publish)
+    with pytest.raises(ValueError, match="Destination created during copy"):
+        export_mirror(tmp_path)
+    assert dest.read_bytes() == b"concurrent writer"
+    assert not list(dest.parent.glob("*.partial"))
+    assert not (tmp_path / "01_ETABS_EXPORT" / "00_MANIFEST").exists()
 
 def test_mirror_refuses_symlinked_destination(tmp_path):
     original=tmp_path/"OpenSees_Element_Connectivity.json"
