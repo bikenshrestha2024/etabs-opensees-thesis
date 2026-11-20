@@ -1,5 +1,6 @@
 domain,existing_canonical_path,status,proposed_role,verification_state
 etabs_source_export,OpenSees_Complete_Export_V118.py,EXISTING,ETABS source adapter pending ownership review,NOT_REVIEWED
+etabs_empirical_period_review,tools/etabs_period_review/reconcile.py,NEW_WITH_JUSTIFICATION,Read-only preliminary ETABS input staging and Rayleigh period selection,NATIVE_RERUN_PENDING
 model_assembly,components/model/assembly.py,EXISTING,neutral model conversion candidate NOT migrated,NOT_REVIEWED
 section_mapping,components/sections/definitions.py,EXISTING,section definitions and mapping,NOT_REVIEWED
 gravity_solver,components/gravity/solver_stack.py,EXISTING,gravity analysis with separate ETABS comparison,NOT_REVIEWED
