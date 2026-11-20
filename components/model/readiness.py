@@ -230,6 +230,8 @@ def canonical_fsam_tags_hash(tags: Any) -> Optional[str]:
     """SHA-256 of the canonical JSON of the wall FSAM tag mapping (key order ignored).
 
     Returns None for an empty or absent mapping.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (input binding)]
     """
     import hashlib
     if not tags:
@@ -266,6 +268,8 @@ def current_binding(model_script: Union[str, Path], config: Optional[Dict[str, A
 
     Keys: the three ``BINDING_FIELDS`` plus ``nonlinear_materials_file_resolved``
     (informational only; never compared).
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (input binding)]
     """
     model = Path(model_script).expanduser().resolve()
     cfg_path, opt = _model_options(model, config or {})
@@ -283,13 +287,18 @@ def record_binding(data: Dict[str, Any], model_script: Union[str, Path],
     """Record the current binding hashes into manifest ``data`` (in place) and return it.
 
     Only writes hash fields; never touches approval or any check.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (input binding)]
     """
     data.update(current_binding(model_script, config))
     return data
 
 
 def approval_binding_problems(model_script: Union[str, Path], config: Optional[Dict[str, Any]] = None) -> List[str]:
-    """Reasons an approval cannot be bound (missing material file / FSAM tags). Display/save-time only."""
+    """Reasons an approval cannot be bound (missing material file / FSAM tags). Display/save-time only.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (approval needs material file and FSAM tags)]
+    """
     model = Path(model_script).expanduser().resolve()
     b = current_binding(model, config)
     problems: List[str] = []
@@ -331,6 +340,8 @@ def gate_binding_blockers(diagnosis: Dict[str, Any], data: Dict[str, Any]) -> Li
     Recorded-hash mismatches always count; missing material file / empty FSAM tags
     count only when ``data['approved_for_nltha']`` is True (contradictory approval).
     ``binding_not_recorded`` (legacy manifest) never raises.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (gate behavior)]
     """
     codes = set(BINDING_MISMATCH_CODES)
     if data.get("approved_for_nltha") is True:
@@ -397,6 +408,8 @@ def detect_stale_runtime(path: Union[str, Path], include_children: bool = False)
     first stale copy, else the first copy, else ``None``/``[]``. With ``include_children`` the
     ``OpenSees_Runtime_V*`` folders directly inside the path's own folder are also examined
     (a project folder whose packaged runtime is old). Read-only; works for paths that do not exist.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5a (stale runtime copies); engineering/rules/CORE_RULES.md rule 8]
     """
     p = Path(path).expanduser().resolve()
     start = p if p.is_dir() else p.parent
@@ -419,7 +432,10 @@ def detect_stale_runtime(path: Union[str, Path], include_children: bool = False)
 
 
 def runtime_copy_notice(model_script: Union[str, Path]) -> str:
-    """Loud warning text when the model sits in, or beside, a stale runtime copy; else ''. Display only."""
+    """Loud warning text when the model sits in, or beside, a stale runtime copy; else ''. Display only.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5a (stale runtime copies)]
+    """
     r = detect_stale_runtime(model_script, include_children=True)
     stale = [c for c in r["copies"] if c["stale"]]
     if not stale:
@@ -438,6 +454,8 @@ def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
     project material, wall-FSAM and parameter-review prerequisites. Material
     values are read from ``config`` when present, else from
     ``OpenSees_Complete_Model_Config_V118.json`` beside the model script.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 2; docs/00_THESIS_ACCEPTANCE_GATES.md (solver PASS is not engineering acceptance)]
     """
     import hashlib
     blockers: List[Dict[str, str]] = []
@@ -533,7 +551,10 @@ def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def format_readiness_blockers(diagnosis: Dict[str, Any]) -> str:
-    """Plain-text blocker list for exception messages."""
+    """Plain-text blocker list for exception messages.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 2]
+    """
     lines = [f"  {i}. [{b['code']}] {b['message']} Fix: {b['fix']}"
              for i, b in enumerate(diagnosis.get("blockers", []), 1)]
     return "\n".join(lines)
@@ -548,6 +569,8 @@ def material_prerequisite_notice(diagnosis: Dict[str, Any]) -> str:
     (materials, FSAM, parameter review, unrecorded binding).
 
     Empty string when none apply. Display only; never changes any approval state.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md sections 2 and 4]
     """
     items = [b for b in diagnosis.get("blockers", []) if b.get("code") in _NON_GATE_BLOCKER_CODES]
     if not items:
@@ -573,6 +596,8 @@ def bind_readiness_draft(template_path: Union[str, Path], model_script: Union[st
     is left untouched when it has ``approved_for_nltha`` True (stale hash or
     other model) or cannot be read, so approval cannot be ruled out. A
     stale unapproved draft (other model or changed hash) is rebuilt all-False.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 3; engineering/rules/CORE_RULES.md rule 5]
     """
     import hashlib
     model = Path(model_script).expanduser().resolve()

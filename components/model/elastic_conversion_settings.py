@@ -16,7 +16,11 @@ OPTION_KEYS = {
 
 
 def default_frame_bending(frame, state):
-    """Apply the legacy limit-state bending factors to unoverridden axes."""
+    """Apply the legacy limit-state bending factors to unoverridden axes.
+
+    [REF engineering/rules/CORE_RULES.md rule 5] stiffness changes must not be silent; the factor values
+    are legacy project defaults with no code clause verified here (clause to be verified).
+    """
     if frame["properties"]["E"] > 1e8:
         return 1.
     if frame["category"] == "COLUMN":
@@ -85,7 +89,10 @@ def _offsets(offsets, frames):
 
 
 def compile_settings(config, frames, shells, metadata):
-    """Bind state-specific settings to the actual frame segments and shell objects."""
+    """Bind state-specific settings to the actual frame segments and shell objects.
+
+    [REF engineering/rules/CORE_RULES.md rule 5] explicit, key-checked settings instead of silent stiffness/unit changes.
+    """
     _check_keys(config, ("ULS", "SLS"), "elastic_etabs_comparison")
     frame_ids = {str(e["object"]) for e in frames}
     frame_sections = {e["properties"]["section"] for e in frames}

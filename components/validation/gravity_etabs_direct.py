@@ -772,7 +772,10 @@ _WORKING_COPY_PREFIX="etabs_ingest_"
 
 
 class DroppedPointsError(RuntimeError):
-    """Raised when ETABS point reads fail, so geometry would be silently incomplete."""
+    """Raised when ETABS point reads fail, so geometry would be silently incomplete.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 6 (ETABS ingestion guards)]
+    """
     def __init__(self,label,names):
         self.label=label; self.names=[str(n) for n in names]
         shown=", ".join(self.names[:25])+(" ..." if len(self.names)>25 else "")
@@ -780,7 +783,10 @@ class DroppedPointsError(RuntimeError):
 
 
 def raise_if_points_dropped(label,names,log=None):
-    """Log and raise when any point was dropped; no-op for an empty list."""
+    """Log and raise when any point was dropped; no-op for an empty list.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 6 (ETABS ingestion guards)]
+    """
     names=[str(n) for n in names]
     if not names:return
     err=DroppedPointsError(label,names)
@@ -791,6 +797,7 @@ def raise_if_points_dropped(label,names,log=None):
 def make_edb_working_copy(edb,root=None):
     """Copy the user's EDB into a private temp folder and return the copy path.
 
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 6 (ETABS ingestion guards); engineering/rules/CORE_RULES.md rule 4]
     The source is only read (never chmod-ed or written). The copy is made
     writable even if the source is read-only so ETABS can create its side files
     (.$et, .ebk, .log, .OUT ...) beside it; they live in the same private folder.
@@ -812,6 +819,7 @@ def make_edb_working_copy(edb,root=None):
 def cleanup_edb_working_copy(copy_path,log=None,attempts=4,delay=0.5,sleep=time.sleep):
     """Delete the private working-copy folder (incl. ETABS side files).
 
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 6 (ETABS ingestion guards)]
     Refuses folders not created by make_edb_working_copy. Bounded retry (ETABS can release files late); never raises. Returns True when removed.
     """
     folder=Path(copy_path).parent
@@ -828,7 +836,10 @@ def cleanup_edb_working_copy(copy_path,log=None,attempts=4,delay=0.5,sleep=time.
 
 
 def require_present_units(sap,expected=UNITS_KN_M_C):
-    """SetPresentUnits then read back GetPresentUnits; raise unless it equals expected."""
+    """SetPresentUnits then read back GetPresentUnits; raise unless it equals expected.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 6 (ETABS ingestion guards); engineering/rules/CORE_RULES.md rule 5 (units)]
+    """
     ret=sap.SetPresentUnits(expected)
     if isinstance(ret,(int,float)) and not isinstance(ret,bool) and ret!=0:
         raise RuntimeError(f"SetPresentUnits({expected}) returned {ret}")
@@ -843,7 +854,10 @@ def require_present_units(sap,expected=UNITS_KN_M_C):
 
 
 def collect_point_coords(sap,names,log=None):
-    """Read PointObj.GetCoordCartesian for names; raise DroppedPointsError if any fail."""
+    """Read PointObj.GetCoordCartesian for names; raise DroppedPointsError if any fail.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 6 (ETABS ingestion guards)]
+    """
     pts={}; dropped=[]; total=len(names); start=time.perf_counter()
     for index,n in enumerate(names,1):
         try:
