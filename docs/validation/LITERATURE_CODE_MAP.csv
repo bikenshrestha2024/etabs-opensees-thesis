@@ -1,0 +1,62 @@
+reference_id,series,doi,also_listed_as,status,citing_code_files,citing_test_files,match_kinds,title
+R01,REGISTER,,,CITED_IN_CODE,components/model/readiness_gui.py;components/nonlinear_time_history/building_exploratory.py;components/nonlinear_time_history/material_draft.py;components/nonlinear_time_history/material_source_sets.py;components/nonlinear_time_history/one_storey_wall_probe.py;components/nonlinear_time_history/research_building_materials.py,tests/verify_material_source_sets.py;tests/verify_peer_material_draft_isolation.py,ID;REF-tag,"Kolozvari, Orakcal and Wallace (2015), PEER 2015/12, Shear-Flexure Interaction Modeling for Reinforced Concrete Structural Walls and Columns under Reversed Cyclic Loading"
+R02,REGISTER,10.1016/j.engstruct.2023.116700,L007,CITED_IN_CODE,components/model/assembly.py;components/model/readiness.py;components/nonlinear_time_history/building_exploratory.py;components/nonlinear_time_history/material_draft.py;components/nonlinear_time_history/one_storey_wall_probe.py;components/nonlinear_time_history/research_building_materials.py;components/nonlinear_time_history/runner_and_gui.py;components/nonlinear_time_history/wall_diagnostics.py;components/sections/area_elements.py;components/validation/expanded_workbench_tabs.py;components/validation/material_benchmarks.py;components/validation/reference_library.py;components/validation/wall_validation.py,,DOI;ID;REF-tag,"Kolozvari, Lopez and Massone (2023), Efficient three-dimensional shear-flexure interaction model for reinforced concrete walls"
+R03,REGISTER,10.1002/eqe.4060,L008,UNIMPLEMENTED,,,,"Ji, Sun, Wang and Kolozvari (2023), T-shaped RC walls under high axial force ratios"
+R04,REGISTER,,,UNIMPLEMENTED,,,,"Stokley and Lowes (2024), PEER 2024/11, Evaluation and Calibration of an OpenSees Layered Shell Element Model"
+R05,REGISTER,10.3390/buildings16040711,L010,CITED_IN_CODE,components/nonlinear_time_history/device_recording.py;components/sections/devices.py,,DOI;ID,"Korkmaz and Kircil (2026), supplemental damping in RC buildings equipped with FVDs, Buildings 16, 711"
+R06,REGISTER,10.1007/s10518-026-02428-6,L011,UNIMPLEMENTED,,,,"Ozkaya and Gurbuz (2026), irregular high-rise composite building FVD placements"
+R07,REGISTER,,,CITED_IN_CODE,components/sections/devices.py,,ID,"Guerrero Bobadilla et al. (2025), BRB cumulative ductility and fatigue life, SDEE 199, 109700"
+R08,REGISTER,10.1007/s11803-024-2282-4,L013,UNIMPLEMENTED,,,,"Cao et al. (2024), out-of-plane eccentricity of buckling-restrained braces"
+R09,REGISTER,10.3390/buildings16183751,,UNIMPLEMENTED,,,,"Tian, Lv and Dong (2026), circular steel tube brace hysteresis, Buildings 16, 3751"
+R10,REGISTER,,,CITED_IN_CODE,components/inputs/aw_sources.py;components/model/assembly.py;components/model/section_tags.py;components/nonlinear_time_history/soil_c_physics_preflight.py,tests/verify_plot_and_dashboard.py,ID;REF-tag,"DUDBC NBC 105:2025, Seismic Design of Buildings in Nepal (second revision)"
+R11,REGISTER,,,UNIMPLEMENTED,,,,"Ji, Cheng and Xu (2018), coupled axial tension-shear behavior of RC walls"
+R12,REGISTER,10.1007/s10518-025-02353-0,L015,CITED_IN_CODE,components/nonlinear_time_history/wall_topology.py,,DOI,"Rezapour, Ghassemieh and Hajian (2026), coupled shear walls with asymmetric openings"
+R13,REGISTER,10.1007/s10518-025-02165-2,L016,CITED_IN_CODE,components/sections/area_elements.py,,DOI,"Tura, Orakcal, Gullu and Ilki (2026), layered fixed-strut-angle shell validation against U/H wall tests"
+L001,MASTER,10.1002/tal.413,,CITED_IN_CODE,components/validation/reference_library.py,,DOI,The damped outrigger concept for tall buildings
+L002,MASTER,10.1007/s10518-026-02696-2,,UNIMPLEMENTED,,,,A simple preliminary seismic design procedure for low-to-medium rise reinforced concrete buildings
+L003,MASTER,10.1016/j.strusafe.2020.102062,,UNIMPLEMENTED,,,,Bayesian parameter and joint probability distribution estimation for a hysteretic constitutive model of reinforcing steel
+L004,MASTER,10.1016/j.istruc.2022.06.051,,UNIMPLEMENTED,,,,Parametric study and prediction models of the seismic response of single-degree-of-freedom structural systems equipped with Maxwell material fluid viscous dampers
+L005,MASTER,10.1016/j.engstruct.2021.112386,,UNIMPLEMENTED,,,,Bayesian inference for calibration and validation of uniaxial reinforcing steel models
+L006,MASTER,,,UNIMPLEMENTED,,,,Shear-Flexure Interaction Modeling for Reinforced Concrete Structural Walls and Columns under Reversed Cyclic Loading
+L007,MASTER,10.1016/j.engstruct.2023.116700,R02,CITED_IN_CODE,components/model/assembly.py;components/model/readiness.py;components/nonlinear_time_history/building_exploratory.py;components/nonlinear_time_history/material_draft.py;components/nonlinear_time_history/one_storey_wall_probe.py;components/nonlinear_time_history/research_building_materials.py;components/nonlinear_time_history/runner_and_gui.py;components/nonlinear_time_history/wall_diagnostics.py;components/sections/area_elements.py;components/validation/expanded_workbench_tabs.py;components/validation/material_benchmarks.py;components/validation/reference_library.py;components/validation/wall_validation.py,,DOI,Efficient three-dimensional shear-flexure interaction model for reinforced concrete walls
+L008,MASTER,10.1002/eqe.4060,R03,UNIMPLEMENTED,,,,T-shaped RC walls under high axial force ratios
+L009,MASTER,,,UNIMPLEMENTED,,,,Evaluation and Calibration of an OpenSees Layered Shell Element Model
+L010,MASTER,10.3390/buildings16040711,R05,CITED_IN_CODE,components/nonlinear_time_history/device_recording.py;components/sections/devices.py,,DOI,Supplemental damping in RC buildings equipped with FVDs
+L011,MASTER,10.1007/s10518-026-02428-6,R06,UNIMPLEMENTED,,,,Irregular high-rise composite building FVD placements
+L012,MASTER,,,UNIMPLEMENTED,,,,BRB cumulative ductility and fatigue life
+L013,MASTER,10.1007/s11803-024-2282-4,R08,UNIMPLEMENTED,,,,Out-of-plane eccentricity of buckling-restrained braces
+L014,MASTER,,,UNIMPLEMENTED,,,,Coupled axial tension-shear behavior of RC walls
+L015,MASTER,10.1007/s10518-025-02353-0,R12,CITED_IN_CODE,components/nonlinear_time_history/wall_topology.py,,DOI,Coupled shear walls with asymmetric openings
+L016,MASTER,10.1007/s10518-025-02165-2,R13,CITED_IN_CODE,components/sections/area_elements.py,,DOI,Layered fixed-strut-angle shell validation against U/H wall tests
+L017,MASTER,10.1002/tal.2003,,UNIMPLEMENTED,,,,Optimal parameters for tall buildings with a single viscously damped outrigger considering earthquake and wind loads
+L018,MASTER,10.1016/j.istruc.2026.112348,,UNIMPLEMENTED,,,,Optimal design of damped-outrigger systems under wind and seismic loads in tall buildings
+L019,MASTER,10.1016/j.jobe.2026.115439,,UNIMPLEMENTED,,,,H2-norm-based tuning design for tuned viscous mass damper outriggers
+L020,MASTER,10.1016/j.istruc.2025.110897,,UNIMPLEMENTED,,,,Influence of seismic force reduction factors for wall and outrigger systems on the seismic performance of high-rise outrigger structures
+L021,MASTER,10.1016/j.istruc.2026.112056,,UNIMPLEMENTED,,,,A novel damped substructure outrigger (DSO) system for seismic response control of high-rise buildings
+L022,MASTER,10.1016/j.soildyn.2026.110576,,UNIMPLEMENTED,,,,Mitigation of higher-mode flexural demands in controlled rocking walls using outriggers
+L023,MASTER,10.1016/j.istruc.2025.110753,,UNIMPLEMENTED,,,,A systematic review on seismic resilience in high-rise structures to enhance outrigger systems
+L024,MASTER,10.1002/tal.1098,,UNIMPLEMENTED,,,,Analysis of a high-rise steel structure with viscous damped outriggers
+L025,MASTER,10.1002/eqe.3831,,UNIMPLEMENTED,,,,Shaking table test of a damped-outrigger system incorporating friction dampers
+L026,MASTER,10.1016/j.jweia.2021.104761,,UNIMPLEMENTED,,,,Optimal design of supplemental negative stiffness damped outrigger
+L027,MASTER,10.1016/j.jobe.2023.107209,,UNIMPLEMENTED,,,,Optimal models of outrigger locations and damping parameters
+L028,MASTER,10.1109/mcse.2011.66,,UNIMPLEMENTED,,,,OpenSees: A Framework for Earthquake Engineering Simulation
+L029,MASTER,10.1007/s41062-024-01574-7,,UNIMPLEMENTED,,,,Seismic responses evaluation of tall tubular structures using viscous dampers in outriggers under far fault excitations
+L030,MASTER,10.1016/j.engstruct.2024.118927,,UNIMPLEMENTED,,,,Fluid viscous dampers in tackle-damper configuration: An experimental study
+L031,MASTER,10.1061/(asce)0733-9445(1988)114:8(1804),,UNIMPLEMENTED,,,,Theoretical stress-strain model for confined concrete
+L032,MASTER,10.1061/(asce)0733-9445(1988)114:8(1827),,CITED_IN_CODE,components/validation/grade_cards.py,,DOI,Observed stress-strain behavior of confined concrete
+L033,MASTER,10.1061/(asce)st.1943-541x.0000247,,CITED_IN_CODE,components/validation/reference_library.py,,DOI,Analysis of tall buildings with damped outriggers
+L034,MASTER,10.1016/j.engstruct.2021.112868,,UNIMPLEMENTED,,,,Optimal outrigger locations and damping parameters for single-outrigger systems considering earthquake and wind excitations
+L035,MASTER,10.1002/eqe.2622,,CITED_IN_CODE,components/nonlinear_time_history/runner_and_gui.py;components/validation/reference_library.py,,DOI,Modeling viscous damping in nonlinear response history analysis of buildings for earthquake excitation
+L036,MASTER,10.1016/j.engstruct.2021.113590,,CITED_IN_CODE,components/validation/material_benchmarks.py;components/validation/reference_library.py,,DOI,Validation of an efficient shear-flexure interaction model for planar reinforced concrete walls
+L037,MASTER,10.1038/sdata.2016.18,,UNIMPLEMENTED,,,,The FAIR Guiding Principles for scientific data management and stewardship
+L038,MASTER,,,UNIMPLEMENTED,,,,Verification and Validation (V&V)
+L039,MASTER,10.2495/fsi050111,,UNIMPLEMENTED,,,,Verification and validation in computational solid mechanics and the ASME Standards Committee
+L040,MASTER,,,UNIMPLEMENTED,,,,CEO: Convert ETABS to OpenSees - A Tool for Nonlinear Analysis of Reinforced Concrete Structures Subjected to Earthquakes
+L041,MASTER,10.1002/nme.1620210213,,UNIMPLEMENTED,,,,A Four-Node Plate Bending Element Based on Mindlin/Reissner Plate Theory and a Mixed Interpolation
+L042,MASTER,10.1155/2020/2589735,,UNIMPLEMENTED,,,,Outrigger and Belt-Truss System Design for High-Rise Buildings: A Comprehensive Review Part II—Guideline for Optimum Topology and Size Design
+L043,MASTER,10.1016/j.compstruc.2017.10.010,,UNIMPLEMENTED,,,,New OpenSees models for simulating nonlinear flexural and coupled shear-flexural behavior of RC walls and columns
+L044,MASTER,,,UNIMPLEMENTED,,,,An Overview of the ASME Guide for Verification and Validation in Computational Solid Mechanics
+L045,MASTER,10.1061/(asce)0733-9445(2008)134:4(581),,CITED_IN_CODE,components/nonlinear_time_history/damping_regions.py;components/nonlinear_time_history/energy_balance.py,tests/verify_damping_regions.py,DOI,Unintended Consequences of Modeling Damping in Structures
+L046,MASTER,,,UNIMPLEMENTED,,,,Guidelines for Performance-Based Seismic Design of Tall Buildings Version 2.03
+L047,MASTER,10.1016/j.jobe.2021.102946,,CITED_IN_CODE,components/validation/reference_library.py,,DOI,Three-dimensional shear-flexure interaction model for analysis of non-planar reinforced concrete walls
+L048,MASTER,10.1108/eb023562,,UNIMPLEMENTED,,,,A continuum mechanics based four-node shell element for general non-linear analysis
