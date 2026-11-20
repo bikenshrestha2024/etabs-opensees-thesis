@@ -17,6 +17,8 @@ Renaming did not change solver algorithms or validate numerical output.
 
 [Rename map](00_WORK_ORDER_RENAME_MAP.md) · [Program index](programs/00_PROGRAM_INDEX.md)
 
+[NLTHA readiness workflow](NLTHA_READINESS_WORKFLOW.md): template, bound draft, research material draft, human approval, pending items.
+
 ## Notation and naming contract
 
 - Launcher `NN_`: a stable tool ID, not an execution counter. Use the current index.

@@ -15,6 +15,7 @@ import shutil
 import uuid
 import os
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -761,3 +762,102 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
         report('END','ETABS direct gravity operation ended',
                log=str(logfile),events=str(events),
                scratch_edb=str(working_copy) if working_copy else None)
+
+
+# ---------------------------------------------------------------------------
+# ETABS ingestion guards (GUI-free; used by components/ui/application.py).
+# Native ETABS COM behaviour of these helpers is PENDING verification.
+# ---------------------------------------------------------------------------
+_WORKING_COPY_PREFIX="etabs_ingest_"
+
+
+class DroppedPointsError(RuntimeError):
+    """Raised when ETABS point reads fail, so geometry would be silently incomplete."""
+    def __init__(self,label,names):
+        self.label=label; self.names=[str(n) for n in names]
+        shown=", ".join(self.names[:25])+(" ..." if len(self.names)>25 else "")
+        super().__init__(f"{label}: {len(self.names)} point(s) dropped after COM failure: {shown}")
+
+
+def raise_if_points_dropped(label,names,log=None):
+    """Log and raise when any point was dropped; no-op for an empty list."""
+    names=[str(n) for n in names]
+    if not names:return
+    err=DroppedPointsError(label,names)
+    if callable(log):log("[ETABS INGEST ERROR] "+str(err))
+    raise err
+
+
+def make_edb_working_copy(edb,root=None):
+    """Copy the user's EDB into a private temp folder and return the copy path.
+
+    The source is only read (never chmod-ed or written). The copy is made
+    writable even if the source is read-only so ETABS can create its side files
+    (.$et, .ebk, .log, .OUT ...) beside it; they live in the same private folder.
+    """
+    src=Path(edb)
+    if not src.is_file():raise FileNotFoundError(str(src))
+    folder=Path(tempfile.mkdtemp(prefix=_WORKING_COPY_PREFIX,dir=str(root) if root else None))
+    try:
+        dest=folder/src.name
+        shutil.copyfile(src,dest)
+        os.chmod(dest,0o600|(dest.stat().st_mode&0o777))
+        if dest.stat().st_size!=src.stat().st_size:
+            raise IOError("EDB working copy size mismatch")
+    except BaseException:
+        shutil.rmtree(folder,ignore_errors=True); raise
+    return dest
+
+
+def cleanup_edb_working_copy(copy_path,log=None,attempts=4,delay=0.5,sleep=time.sleep):
+    """Delete the private working-copy folder (incl. ETABS side files).
+
+    Refuses folders not created by make_edb_working_copy. Bounded retry (ETABS can release files late); never raises. Returns True when removed.
+    """
+    folder=Path(copy_path).parent
+    if not folder.name.startswith(_WORKING_COPY_PREFIX):return False
+    removed=False
+    for attempt in range(max(1,int(attempts))):
+        shutil.rmtree(folder,ignore_errors=True)
+        removed=not folder.exists()
+        if removed:break
+        if attempt+1<attempts:sleep(delay)  # ETABS may still hold side files briefly
+    if callable(log):
+        log(("ETABS working copy removed: " if removed else "WARNING: ETABS working copy not fully removed: ")+str(folder))
+    return removed
+
+
+def require_present_units(sap,expected=UNITS_KN_M_C):
+    """SetPresentUnits then read back GetPresentUnits; raise unless it equals expected."""
+    ret=sap.SetPresentUnits(expected)
+    if isinstance(ret,(int,float)) and not isinstance(ret,bool) and ret!=0:
+        raise RuntimeError(f"SetPresentUnits({expected}) returned {ret}")
+    actual=sap.GetPresentUnits()
+    if isinstance(actual,(tuple,list)):actual=actual[0] if actual else None
+    try:actual=int(actual)
+    except (TypeError,ValueError):
+        raise RuntimeError(f"GetPresentUnits read-back unreadable: {actual!r}") from None
+    if actual!=int(expected):
+        raise RuntimeError(f"ETABS present units not {expected} after SetPresentUnits: GetPresentUnits={actual}")
+    return actual
+
+
+def collect_point_coords(sap,names,log=None):
+    """Read PointObj.GetCoordCartesian for names; raise DroppedPointsError if any fail."""
+    pts={}; dropped=[]; total=len(names); start=time.perf_counter()
+    for index,n in enumerate(names,1):
+        try:
+            r=sap.PointObj.GetCoordCartesian(str(n))
+            ok=isinstance(r,(list,tuple)) and len(r)>=3 and not (len(r)>=4 and isinstance(r[3],(int,float)) and r[3]!=0)
+            if ok:
+                xyz=tuple(float(v) for v in r[:3])
+                ok=all(math.isfinite(v) for v in xyz)
+            if ok:pts[str(n)]=xyz
+            else:dropped.append(str(n))
+        except Exception:
+            dropped.append(str(n))
+        if callable(log) and index%200==0:
+            log(f"[ETABS API HEARTBEAT] PointObj.GetCoordCartesian {index}/{total}, "
+                f"{time.perf_counter()-start:.1f}s elapsed")
+    raise_if_points_dropped("PointObj.GetCoordCartesian",dropped,log)
+    return pts
