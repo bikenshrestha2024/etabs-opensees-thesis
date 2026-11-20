@@ -35,3 +35,10 @@ Renaming did not change solver algorithms or validate numerical output.
 Do not bulk rename importable modules, evidence artifacts or legacy aliases.
 Add new behavior to its owning `components/` package. Consolidate duplicate
 implementations only after comparing callers, input/output contracts and tests.
+
+## Headless pytest suite and CI requirements
+
+- `pytest.ini`: `testpaths = tests`, `python_files = test_*.py verify_*.py`, `pythonpath = .`. Plain `python -m pytest -q` from the repository root collects both `test_*.py` and `verify_*.py` (no `PYTHONPATH` needed). Passing explicit file paths still works as before, so existing workflows with file lists are unchanged.
+- `requirements-ci.txt`: numpy, openpyxl, matplotlib, pytest, openseespy (pins copied from `nltha-quality.yml` and `native-rayleigh-regression.yml`), plus unpinned shapely and scipy (no workflow pins them; `components/shared/eigen_solver.py` imports scipy).
+- `conftest.py`: a test or test module whose failure is exactly `ModuleNotFoundError` for `tkinter`, `plotly`, or the ETABS COM modules (`comtypes`, `win32com`, `pythoncom`, `pywintypes`) is reported as SKIPPED with the module name. Assertion failures and any other exception, including ImportError for other modules, still fail. Set `THESIS_STRICT_OPTIONAL_IMPORTS=1` on a full Windows/Spyder environment to turn the conversion off. A skip is not a pass: GUI, plotly and native ETABS behavior stay PENDING until run on Windows.
+- `.github/workflows/tests.yml`: Ubuntu, Python 3.12, `pip install -r requirements-ci.txt`, `python -m pytest -q -ra`; triggers on pull requests and pushes to `main` that touch code, tests or these files, plus manual dispatch. It uses `fetch-depth: 0` because `tests/verify_review_ledger.py` reads historical commits with `git ls-tree`. Existing workflows (including the failure counting in `repository-integrity.yml`) are not modified.
