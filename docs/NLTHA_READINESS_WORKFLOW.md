@@ -37,9 +37,9 @@ Changing the checklist alone does not clear the material and FSAM part of the me
 
 ## 2. See every blocker at once
 
-`diagnose_nonlinear_readiness(config)` in `components/model/readiness.py` returns `{ready, blockers:[{code, message, fix}]}`. It is read-only. Codes: `model_script_missing`, `manifest_missing`, `manifest_unreadable`, `template_unbound`, `bound_to_other_model`, `model_sha_mismatch`, `not_approved`, `check_false:<key>` (one per false key), `material_file_missing`, `material_file_not_found`, `wall_fsam_tags_empty`, `parameters_not_reviewed`.
+`diagnose_nonlinear_readiness(config)` in `components/model/readiness.py` returns `{ready, blockers:[{code, message, fix}]}`. It is read-only. Codes: `model_script_missing`, `manifest_missing`, `manifest_unreadable`, `template_unbound`, `bound_to_other_model`, `model_sha_mismatch`, `not_approved`, `check_false:<key>` (one per false key), `material_file_missing`, `material_file_not_found`, `wall_fsam_tags_empty`, `parameters_not_reviewed`, `binding_not_recorded`, `model_config_changed`, `material_file_changed`, `wall_fsam_tags_changed`.
 
-The gate keeps its original exceptions and messages and now appends this blocker list to each `RuntimeError`. The material, FSAM and `parameters_not_reviewed` blockers are reported in the list but do not by themselves add a new raise; the 16 checks and approval still decide the gate.
+The gate keeps its original exceptions and messages and now appends this blocker list to each `RuntimeError`. The material, FSAM and `parameters_not_reviewed` blockers are reported in the list; for an unapproved manifest they do not add a raise (the 16 checks and approval decide). For an approved manifest the gate also raises on the input-binding blockers in section 5.
 
 ## 3. Create a model-bound UNAPPROVED draft
 
@@ -78,9 +78,23 @@ Consequence for the checks: `wall_nonlinear_materials_and_reinforcement_cited_ca
 4. Complete each of the 16 reviews. Mark a check True only after its evidence exists.
 5. Set `approved_for_nltha` True yourself, last. Any later change to the model script invalidates it (SHA mismatch).
 
-Scope of the binding: approval is bound only to the model script path and its SHA-256. Edits made after approval to `OpenSees_Complete_Model_Config_V118.json`, to the file named by `nonlinear_materials_file`, or to the wall FSAM tags are NOT detected by the gate. `diagnose_nonlinear_readiness` may report material, FSAM or parameters-reviewed blockers while the gate passes; re-check those yourself before every run.
+Scope of the binding: besides the model script path and SHA-256, the manifest records three more SHA-256 values when a draft is bound (`bind_readiness_draft`) and when the readiness GUI saves or rebinds (`record_binding` in `components/model/readiness.py`):
 
-Follow-up (not implemented): make the gate raise on the codes in `_NON_GATE_BLOCKER_CODES` (`components/model/readiness.py`), or record a SHA-256 of the model config and material file in the manifest and compare it at run time.
+| Manifest field | What is hashed | Gate blocker if it differs now |
+|---|---|---|
+| `model_config_sha256` | `OpenSees_Complete_Model_Config_V118.json` beside the model script | `model_config_changed` |
+| `nonlinear_materials_file_sha256` | the resolved `nonlinear_materials_file` | `material_file_changed` |
+| `nonlinear_wall_fsam_tags_sha256` | canonical JSON of `nonlinear_wall_fsam_tags` (key order ignored) | `wall_fsam_tags_changed` |
+
+`nonlinear_materials_file_resolved` is stored for information and is not compared. A hash stored as `null` means the item was absent when recorded; an item that appears or disappears later also counts as a change. Values come from the run config when it carries the key, otherwise from the model config file, the same source `diagnose_nonlinear_readiness` uses.
+
+Gate behavior, after the older checks have passed (so every older message is unchanged):
+
+- A recorded hash that differs from the current file or tags raises `RuntimeError` naming the blocker. Re-review the change and save a new checklist; approval does not carry over.
+- If `approved_for_nltha` is True and the material file is unconfigured or missing, or the FSAM tags are empty, the gate raises (`material_file_missing`, `material_file_not_found`, `wall_fsam_tags_empty`). An approved checklist with no material file is contradictory. The readiness GUI refuses to save an approval in that state. For an unapproved manifest these remain report-only.
+- Older manifests without the hash fields still pass the gate. `diagnose_nonlinear_readiness` reports `binding_not_recorded` (so `ready` is False) and the GUI notice lists it. Save the checklist once to record the hashes.
+
+Limits that remain: `nonlinear_parameters_reviewed` is not part of the hash comparison except through the config file hash; files that the material file itself refers to are not hashed; and the hashes prove the files are unchanged since a human saved the checklist, not that their contents are correct.
 
 ## 6. ETABS ingestion guards
 
@@ -108,7 +122,7 @@ No solver PASS is engineering acceptance.
 ## 8. PENDING (not run)
 
 - Native Windows and ETABS COM runs of the Task 3 ingestion guards (OpenFile on the copy, present-units read-back, side-file cleanup, linked-file paths from the copy location).
-- tkinter GUI behavior (readiness GUI prepare and launch notice); the sandbox has no tkinter.
+- tkinter GUI behavior (readiness GUI prepare, launch notice, and the save/rebind code that records the binding hashes and refuses an unbindable approval); the sandbox has no tkinter. The shared helpers are tested headless.
 - Runtime copies under saved projects (for example `Saved_Project_V156/OpenSees_Runtime_V118/`, launched by `17_BUILDING_FULL_NONLINEAR.py`) keep the pre-branch readiness gate and ingestion until the runtime is refreshed; the `application.py` there still opens the original EDB in place. The statement that the source EDB is not opened applies to the active `components/` code only.
 - Full-model NLTHA on the project building.
 - Project reinforcement schedule and FVD/BRB calibration.

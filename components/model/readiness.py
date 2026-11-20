@@ -213,6 +213,131 @@ def _blocker(code: str, message: str, fix: str) -> Dict[str, str]:
     return {"code": code, "message": message, "fix": fix}
 
 
+BINDING_FIELDS = ("model_config_sha256", "nonlinear_materials_file_sha256",
+                  "nonlinear_wall_fsam_tags_sha256")
+# Blocker codes the run gate raises on when a recorded binding no longer matches.
+BINDING_MISMATCH_CODES = ("model_config_changed", "material_file_changed", "wall_fsam_tags_changed")
+# Contradictions the run gate raises on only for an approved manifest.
+APPROVED_CONTRADICTION_CODES = ("material_file_missing", "material_file_not_found", "wall_fsam_tags_empty")
+
+
+def _file_sha256(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def canonical_fsam_tags_hash(tags: Any) -> Optional[str]:
+    """SHA-256 of the canonical JSON of the wall FSAM tag mapping (key order ignored).
+
+    Returns None for an empty or absent mapping.
+    """
+    import hashlib
+    if not tags:
+        return None
+    payload = json.dumps(tags, sort_keys=True, separators=(",", ":"), ensure_ascii=True, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _model_options(model: Path, config: Dict[str, Any]):
+    """Return ``(config_path, opt)``; ``opt(key)`` prefers run config, else the model config file."""
+    mcfg: Dict[str, Any] = {}
+    mcfg_path = model.with_name(_MODEL_CONFIG_NAME)
+    if mcfg_path.is_file():
+        try:
+            loaded = json.loads(mcfg_path.read_text(encoding="utf-8-sig"))
+            mcfg = loaded if isinstance(loaded, dict) else {}
+        except (OSError, ValueError):
+            mcfg = {}
+
+    def opt(key: str) -> Any:
+        return config[key] if key in config else mcfg.get(key)
+    return mcfg_path, opt
+
+
+def _resolved_material_path(model: Path, material: Any) -> Optional[Path]:
+    if not material:
+        return None
+    mp = Path(str(material)).expanduser()
+    return mp if mp.is_absolute() else model.parent / mp
+
+
+def current_binding(model_script: Union[str, Path], config: Optional[Dict[str, Any]] = None) -> Dict[str, Optional[str]]:
+    """Current SHA-256 binding values for a model (None when the item is absent/unconfigured).
+
+    Keys: the three ``BINDING_FIELDS`` plus ``nonlinear_materials_file_resolved``
+    (informational only; never compared).
+    """
+    model = Path(model_script).expanduser().resolve()
+    cfg_path, opt = _model_options(model, config or {})
+    mp = _resolved_material_path(model, opt("nonlinear_materials_file"))
+    return {
+        "model_config_sha256": _file_sha256(cfg_path) if cfg_path.is_file() else None,
+        "nonlinear_materials_file_resolved": str(mp) if mp else None,
+        "nonlinear_materials_file_sha256": _file_sha256(mp) if mp and mp.is_file() else None,
+        "nonlinear_wall_fsam_tags_sha256": canonical_fsam_tags_hash(opt("nonlinear_wall_fsam_tags")),
+    }
+
+
+def record_binding(data: Dict[str, Any], model_script: Union[str, Path],
+                   config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Record the current binding hashes into manifest ``data`` (in place) and return it.
+
+    Only writes hash fields; never touches approval or any check.
+    """
+    data.update(current_binding(model_script, config))
+    return data
+
+
+def approval_binding_problems(model_script: Union[str, Path], config: Optional[Dict[str, Any]] = None) -> List[str]:
+    """Reasons an approval cannot be bound (missing material file / FSAM tags). Display/save-time only."""
+    model = Path(model_script).expanduser().resolve()
+    b = current_binding(model, config)
+    problems: List[str] = []
+    if b["nonlinear_materials_file_resolved"] is None:
+        problems.append("nonlinear_materials_file is not configured (material file required for approval)")
+    elif b["nonlinear_materials_file_sha256"] is None:
+        problems.append("nonlinear_materials_file does not exist: " + str(b["nonlinear_materials_file_resolved"]))
+    if b["nonlinear_wall_fsam_tags_sha256"] is None:
+        problems.append("nonlinear_wall_fsam_tags is empty (FSAM tag mapping required for approval)")
+    return problems
+
+
+def _binding_blockers(data: Dict[str, Any], model: Path, config: Dict[str, Any]) -> List[Dict[str, str]]:
+    missing = [f for f in BINDING_FIELDS if f not in data]
+    out: List[Dict[str, str]] = []
+    if missing:
+        out.append(_blocker(
+            "binding_not_recorded",
+            "Manifest does not record SHA-256 binding for: " + ", ".join(missing) +
+            ". Edits to the model config, material file or wall FSAM tags are not detected for those items.",
+            "Save the checklist from Prepare / inspect readiness (or rebind the draft) to record the current hashes, then re-review."))
+    now = current_binding(model, config)
+    labels = {
+        "model_config_sha256": ("model_config_changed", _MODEL_CONFIG_NAME, "model config"),
+        "nonlinear_materials_file_sha256": ("material_file_changed", "nonlinear_materials_file", "material file"),
+        "nonlinear_wall_fsam_tags_sha256": ("wall_fsam_tags_changed", "nonlinear_wall_fsam_tags", "wall FSAM tags"),
+    }
+    for field, (code, name, label) in labels.items():
+        if field in data and data[field] != now[field]:
+            out.append(_blocker(
+                code, f"The {label} ({name}) differs from the version recorded at readiness review (SHA-256 mismatch or item removed).",
+                f"Review the changed {label} and save a new model-specific checklist; approval does not carry over."))
+    return out
+
+
+def gate_binding_blockers(diagnosis: Dict[str, Any], data: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Subset of a diagnosis the run gate raises on, for a manifest that passed every older gate check.
+
+    Recorded-hash mismatches always count; missing material file / empty FSAM tags
+    count only when ``data['approved_for_nltha']`` is True (contradictory approval).
+    ``binding_not_recorded`` (legacy manifest) never raises.
+    """
+    codes = set(BINDING_MISMATCH_CODES)
+    if data.get("approved_for_nltha") is True:
+        codes |= set(APPROVED_CONTRADICTION_CODES)
+    return [b for b in diagnosis.get("blockers", []) if b.get("code") in codes]
+
+
 def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
     """Return ``{ready, blockers:[{code,message,fix}]}`` for an NLTHA run config.
 
@@ -232,6 +357,7 @@ def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
     path = Path(config.get("model_readiness_json") or
                 model.with_name("OpenSees_Model_Readiness_V116.json")).expanduser().resolve()
     data: Optional[Dict[str, Any]] = None
+    bound_ok = False
     if not path.is_file():
         blockers.append(_blocker(
             "manifest_missing", f"Readiness manifest not found: {path}",
@@ -248,7 +374,6 @@ def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
                 "Re-create the draft from Prepare / inspect readiness checklist."))
     if data is not None:
         recorded = str(data.get("model_script", "")).strip()
-        bound_ok = False
         if not recorded or "absolute path to" in recorded.lower():
             blockers.append(_blocker(
                 "template_unbound", "The manifest is an uncompleted readiness TEMPLATE (model_script is blank or a placeholder).",
@@ -281,25 +406,14 @@ def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
                     "check_false:" + key, "Check not confirmed: " + key.replace("_", " "),
                     "Attach evidence and mark it reviewed in the readiness checklist only after verification."))
     # Project material prerequisites (same conditions as components.model.nonlinear_preflight.inventory).
-    mcfg: Dict[str, Any] = {}
-    mcfg_path = model.with_name(_MODEL_CONFIG_NAME)
-    if mcfg_path.is_file():
-        try:
-            loaded = json.loads(mcfg_path.read_text(encoding="utf-8-sig"))
-            mcfg = loaded if isinstance(loaded, dict) else {}
-        except (OSError, ValueError):
-            mcfg = {}
-    def _opt(key: str) -> Any:
-        return config[key] if key in config else mcfg.get(key)
+    mcfg_path, _opt = _model_options(model, config)
     material = _opt("nonlinear_materials_file")
     if not material:
         blockers.append(_blocker(
             "material_file_missing", "nonlinear_materials_file is not configured.",
             f"Set nonlinear_materials_file in {_MODEL_CONFIG_NAME} to the reviewed project material definitions; do not copy literature specimen values."))
     else:
-        mp = Path(str(material)).expanduser()
-        if not mp.is_absolute():
-            mp = model.parent / mp
+        mp = _resolved_material_path(model, material)
         if not mp.is_file():
             blockers.append(_blocker(
                 "material_file_not_found", f"Configured nonlinear_materials_file does not exist: {mp}",
@@ -312,6 +426,8 @@ def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
         blockers.append(_blocker(
             "parameters_not_reviewed", "nonlinear_parameters_reviewed is not True.",
             "Review reinforcement, confinement and cyclic parameters, then record the review in the model config."))
+    if data is not None and bound_ok:
+        blockers.extend(_binding_blockers(data, model, config))
     return {"ready": not blockers, "blockers": blockers}
 
 
@@ -323,11 +439,12 @@ def format_readiness_blockers(diagnosis: Dict[str, Any]) -> str:
 
 
 _NON_GATE_BLOCKER_CODES = ("material_file_missing", "material_file_not_found",
-                           "wall_fsam_tags_empty", "parameters_not_reviewed")
+                           "wall_fsam_tags_empty", "parameters_not_reviewed", "binding_not_recorded")
 
 
 def material_prerequisite_notice(diagnosis: Dict[str, Any]) -> str:
-    """Text for blockers the run gate does not itself enforce (materials, FSAM, review).
+    """Text for blockers the run gate does not itself enforce on an unapproved/legacy manifest
+    (materials, FSAM, parameter review, unrecorded binding).
 
     Empty string when none apply. Display only; never changes any approval state.
     """
@@ -335,7 +452,7 @@ def material_prerequisite_notice(diagnosis: Dict[str, Any]) -> str:
     if not items:
         return ""
     lines = ["Material/model prerequisites still open (reported by the diagnosis; the run gate "
-             "does not raise on these, so resolve them before relying on a gate pass):"]
+             "does not raise on these for an unapproved or legacy manifest, so resolve them before relying on a gate pass):"]
     lines += [f"  - [{b['code']}] {b['message']}" for b in items]
     return "\n".join(lines)
 
@@ -383,6 +500,7 @@ def bind_readiness_draft(template_path: Union[str, Path], model_script: Union[st
     data["status"] = "UNAPPROVED DRAFT"
     data["checks"] = dict.fromkeys(READINESS_CHECK_KEYS, False)
     data.setdefault("evidence", {})
+    record_binding(data, model)
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_name(out.name + ".tmp")
     tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")

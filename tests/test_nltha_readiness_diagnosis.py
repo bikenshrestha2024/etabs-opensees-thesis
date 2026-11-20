@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from components.model.readiness import (  # noqa: E402
-    READINESS_CHECK_KEYS, diagnose_nonlinear_readiness)
+    READINESS_CHECK_KEYS, diagnose_nonlinear_readiness, record_binding)
 
 
 def _codes(diag):
@@ -37,6 +37,7 @@ def _bound(model, **over):
             "model_script_sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
             "approved_for_nltha": False,
             "checks": dict.fromkeys(READINESS_CHECK_KEYS, False)}
+    record_binding(data, model)  # current-format manifest; legacy (unbound) cases live in test_nltha_readiness_binding.py
     data.update(over)
     return data
 

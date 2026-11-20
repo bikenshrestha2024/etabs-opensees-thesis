@@ -90,6 +90,8 @@ def launch(parent,model_script,readiness_variable):
     approved=tk.BooleanVar(value=data.get('approved_for_nltha') is True);ttk.Checkbutton(footer,text='I have reviewed the evidence and approve this specific nonlinear model for NLTHA',variable=approved).pack(anchor='w')
     def rebind_draft():
         data.update(model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),approved_for_nltha=False,checks={k:False for k in checks})
+        from components.model.readiness import record_binding
+        record_binding(data,model)
         for var in checks.values():var.set(False)
         approved.set(False)
         path.write_text(json.dumps(data,indent=2),encoding='utf8')
@@ -100,7 +102,13 @@ def launch(parent,model_script,readiness_variable):
             missing=[k for k,v in checks.items() if v.get() and (not evidence[k].get().strip() or evidence[k].get().startswith('INPUT / REVIEW REQUIRED:'))]
             if missing:raise ValueError('Checked items need an evidence reference: '+', '.join(missing))
             if approved.get() and not all(v.get() for v in checks.values()):raise ValueError('Approval requires every prerequisite checked and evidenced')
-            data.update(model_script=str(model),model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),approved_for_nltha=approved.get(),checks={k:v.get() for k,v in checks.items()},evidence={k:v.get().strip() for k,v in evidence.items()});path.write_text(json.dumps(data,indent=2),encoding='utf-8');readiness_variable.set(str(path));messagebox.showinfo('Readiness saved','Draft saved. Missing model/material prerequisites are not bypassed.',parent=win)
+            if approved.get():
+                from components.model.readiness import approval_binding_problems
+                bp=approval_binding_problems(model)
+                if bp:raise ValueError('Approval cannot be bound: '+'; '.join(bp))
+            data.update(model_script=str(model),model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),approved_for_nltha=approved.get(),checks={k:v.get() for k,v in checks.items()},evidence={k:v.get().strip() for k,v in evidence.items()})
+            from components.model.readiness import record_binding
+            record_binding(data,model);path.write_text(json.dumps(data,indent=2),encoding='utf-8');readiness_variable.set(str(path));messagebox.showinfo('Readiness saved','Draft saved. Missing model/material prerequisites are not bypassed.',parent=win)
         except Exception as e:messagebox.showerror('Readiness input',str(e),parent=win)
     ttk.Button(footer,text='Save model-bound checklist',command=save).pack(anchor='w')
     def prepare_peer_draft():

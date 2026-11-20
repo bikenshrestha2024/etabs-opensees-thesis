@@ -102,6 +102,11 @@ def _require_nonlinear_readiness(config):
     missing = [key for key in keys if checks.get(key) is not True]
     if missing:
         raise RuntimeError("NLTHA readiness checks are incomplete: " + ", ".join(missing) + detail)
+    from components.model.readiness import gate_binding_blockers
+    binding = gate_binding_blockers(diagnosis, data)
+    if binding:
+        raise RuntimeError("NLTHA readiness binding check failed (approved manifest no longer matches the model inputs): " +
+                           "; ".join("[" + b["code"] + "] " + b["message"] + " Fix: " + b["fix"] for b in binding) + detail)
     return {"path": str(path), "model_script": str(model), "check_count": len(keys)}
 
 
