@@ -136,7 +136,13 @@ def _api_names(obj, method="GetNameList"):
     except Exception: return []
 
 
-def _connect_etabs(edb, log):
+def _connect_etabs(edb, log, copy_holder=None):
+    """Open a temporary working copy of the EDB (never the original).
+
+    The copy path is appended to copy_holder so the caller can call
+    cleanup_edb_working_copy after ETABS has closed the file.
+    """
+    from components.validation.gravity_etabs_direct import make_edb_working_copy, cleanup_edb_working_copy, require_present_units
     if comtypes is None: raise RuntimeError("comtypes is unavailable. Run in your ETABS Python environment.")
     if not os.path.isfile(edb): raise FileNotFoundError(edb)
     helper = comtypes.client.CreateObject("ETABSv1.Helper")
@@ -155,32 +161,23 @@ def _connect_etabs(edb, log):
             log(f"[ETABS COM OK] ApplicationStart: {time.perf_counter()-_api_clock:.2f}s")
             sap = etabs.SapModel
             _api_clock=time.perf_counter()
-            log("[ETABS COM START] OpenFile for selected EDB (may be long)")
-            ret = sap.File.OpenFile(os.path.abspath(edb))
+            log("[ETABS COM START] OpenFile for temporary working copy of the selected EDB (may be long)")
+            work_edb = make_edb_working_copy(edb)
+            if copy_holder is not None: copy_holder.append(work_edb)
+            log(f"[ETABS WORKING COPY] {work_edb} (original EDB is not opened or modified)")
+            ret = sap.File.OpenFile(os.path.abspath(work_edb))
             log(f"[ETABS COM OK] OpenFile: {time.perf_counter()-_api_clock:.2f}s")
             if isinstance(ret, (int, float)) and ret != 0: raise RuntimeError(f"OpenFile return code {ret}")
-            try: sap.SetPresentUnits(6)  # kN, m, C; confirm in the output log
-            except Exception: pass
-            log("Connected to ETABS; requested present units kN-m-C (API enum 6).")
+            require_present_units(sap, 6)  # kN, m, C; raises on failure or read-back mismatch
+            log("Connected to ETABS; present units verified by GetPresentUnits = kN-m-C (API enum 6).")
             return etabs, sap
         except Exception as e: errors.append(repr(e))
     raise RuntimeError("Could not open ETABS model: " + " | ".join(errors))
 
 
 def _point_coords(sap, names, log=None):
-    pts={}
-    _count=len(names); _start=time.perf_counter()
-    for _index,n in enumerate(names,1):
-        try:
-            r=sap.PointObj.GetCoordCartesian(str(n))
-            if isinstance(r,(list,tuple)) and len(r)>=3:
-                xyz=tuple(float(v) for v in r[:3])
-                if all(math.isfinite(v) for v in xyz): pts[str(n)]=xyz
-        except Exception: pass
-        if log is not None and _index%200==0:
-            log(f"[ETABS API HEARTBEAT] PointObj.GetCoordCartesian {_index}/{_count}, "
-                f"{time.perf_counter()-_start:.1f}s elapsed")
-    return pts
+    from components.validation.gravity_etabs_direct import collect_point_coords
+    return collect_point_coords(sap, names, log=log)
 
 
 def _get_points(api_obj, name):
@@ -857,7 +854,7 @@ def _extract_point_diaphragm_assignments(sap, point_names, log):
     if method is None:
         log("WARNING: PointObj.GetDiaphragm unavailable; no ETABS rigid diaphragm memberships will be exported.")
         return {}
-    assignments={}; failures=0
+    assignments={}; failures=0; failed_points=[]
     _start=time.perf_counter()
     for _index,point in enumerate(point_names,1):
         if _index%200==0:
@@ -868,9 +865,9 @@ def _extract_point_diaphragm_assignments(sap, point_names, log):
             raw=method(str(point))
         except TypeError:
             try: raw=method(str(point),0,"")
-            except Exception: failures+=1; continue
+            except Exception: failures+=1; failed_points.append(str(point)); continue
         except Exception:
-            failures+=1; continue
+            failures+=1; failed_points.append(str(point)); continue
         values=list(raw) if isinstance(raw,(tuple,list)) else [raw]
         strings=[str(v).strip() for v in values if isinstance(v,str) and str(v).strip()]
         if not strings:
@@ -884,6 +881,8 @@ def _extract_point_diaphragm_assignments(sap, point_names, log):
         assignments[str(point)]={"diaphragm_name":name,"option_raw":option,"raw":repr(raw)}
     named=len(assignments)
     log(f"ETABS named point diaphragm assignments extracted: {named}/{len(point_names)}; API read failures={failures}")
+    from components.validation.gravity_etabs_direct import raise_if_points_dropped
+    raise_if_points_dropped("PointObj.GetDiaphragm",failed_points,log)
     return assignments
 
 
@@ -1298,7 +1297,7 @@ if __name__=="__main__": main()
 def convert_model(edb, outdir, log, include_live=True):
     if ops is None: raise RuntimeError("OpenSeesPy not installed in this environment.")
     os.makedirs(outdir,exist_ok=True)
-    etabs=sap=None
+    etabs=sap=None; _edb_copies=[]
     _conversion_started=time.perf_counter(); _step_started=None; _step_name=None; _conversion_succeeded=False
     def _begin_step(name):
         nonlocal _step_started,_step_name
@@ -1318,7 +1317,7 @@ def convert_model(edb, outdir, log, include_live=True):
         # records this request; always verify the active units in the log.
         # --------------------------------------------------------------------
         _begin_step("ETABS connection and source model extraction")
-        etabs,sap=_connect_etabs(edb,log)
+        etabs,sap=_connect_etabs(edb,log,copy_holder=_edb_copies)
         log("[ETABS API] Model connected; starting point/frame/area inventories")
         point_names=_api_names(sap.PointObj)
         frame_names=_api_names(sap.FrameObj)
@@ -2325,6 +2324,9 @@ def convert_model(edb, outdir, log, include_live=True):
         if etabs is not None:
             try: etabs.ApplicationExit(False); log("ETABS application closed without saving.")
             except Exception: pass
+        if _edb_copies:
+            from components.validation.gravity_etabs_direct import cleanup_edb_working_copy
+            for _copy in _edb_copies: cleanup_edb_working_copy(_copy, log)
         _elapsed=time.perf_counter()-_conversion_started
         log(f"[CONVERSION {'COMPLETED' if _conversion_succeeded else 'INCOMPLETE'}] Total elapsed: {_elapsed:.2f} s ({_elapsed/60.0:.2f} min)")
 

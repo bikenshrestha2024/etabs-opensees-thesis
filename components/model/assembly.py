@@ -112,9 +112,12 @@ def _wall_panel_nodes(points, object_id):
     return points
 
 
-def _material_table(folder):
+def _material_table(folder,errors=None):
+    """Read ETABS_Materials.csv; record skipped rows in errors (assembly_errors) when given."""
     p=folder/'ETABS_Materials.csv'
     result={}
+    def note(name,why):
+        if errors is not None: errors.append(f'ETABS material row {name!r} skipped: {why}')
     if p.exists():
         with p.open(encoding='utf-8-sig',newline='') as f:
             for r in csv.DictReader(f):
@@ -122,7 +125,10 @@ def _material_table(folder):
                     iso=ast.literal_eval(r['isotropic']); wm=ast.literal_eval(r['weight_mass'])
                     if iso[-1]==0 and wm[-1]==0:
                         result[r['name']]=dict(E=float(iso[0]),nu=float(iso[1]),weight=float(wm[0]))
-                except (ValueError,TypeError,KeyError,SyntaxError): pass
+                    else:
+                        note(r.get('name'),f'API return code nonzero (isotropic={iso[-1]}, weight_mass={wm[-1]})')
+                except (ValueError,TypeError,KeyError,SyntaxError,IndexError) as exc:
+                    note(r.get('name'),f'unparseable ({type(exc).__name__}: {exc})')
     return result
 
 
@@ -502,7 +508,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
         source_nodes={int(n['opensees_node_tag']):list(map(float,n['coordinates_m'])) for n in topology['node_map']}
         frame_rows={str(r['etabs_object']):r for r in sections['frame_assignments']}
         area_rows={str(r['etabs_area_object']):r for r in sections['area_assignments']}
-        materials=_material_table(folder)
+        materials=_material_table(folder,report['assembly_errors'])
         config_path=folder/'OpenSees_Complete_Model_Config_V118.json'
         default_factors={p:(0. if p.casefold()=='roof live' else .3 if p.casefold()=='live' else 1.)
                          for p in ('Self Weight','Dead','DL','Super Dead','SDead','Floor Finish','Wall','Partition','Live','Roof Live')}
