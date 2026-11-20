@@ -221,9 +221,21 @@ BINDING_MISMATCH_CODES = ("model_config_changed", "material_file_changed", "wall
 APPROVED_CONTRADICTION_CODES = ("material_file_missing", "material_file_not_found", "wall_fsam_tags_empty")
 
 
+class BindingUnreadableError(RuntimeError):
+    """A bound input (model config or material file) exists but cannot be read (for example locked on Windows).
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (input binding; unreadable input fails closed)]
+    """
+
+
 def _file_sha256(path: Path) -> str:
     import hashlib
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise BindingUnreadableError(
+            f"Input file is unreadable, so its SHA-256 binding cannot be computed: {path} ({exc}). "
+            "Close any program that locks it and retry; nothing was approved or changed.") from exc
 
 
 def canonical_fsam_tags_hash(tags: Any) -> Optional[str]:
@@ -300,7 +312,10 @@ def approval_binding_problems(model_script: Union[str, Path], config: Optional[D
     [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (approval needs material file and FSAM tags)]
     """
     model = Path(model_script).expanduser().resolve()
-    b = current_binding(model, config)
+    try:
+        b = current_binding(model, config)
+    except BindingUnreadableError as exc:
+        return [str(exc)]
     problems: List[str] = []
     if b["nonlinear_materials_file_resolved"] is None:
         problems.append("nonlinear_materials_file is not configured (material file required for approval)")
@@ -320,7 +335,12 @@ def _binding_blockers(data: Dict[str, Any], model: Path, config: Dict[str, Any])
             "Manifest does not record SHA-256 binding for: " + ", ".join(missing) +
             ". Edits to the model config, material file or wall FSAM tags are not detected for those items.",
             "Save the checklist from Prepare / inspect readiness (or rebind the draft) to record the current hashes, then re-review."))
-    now = current_binding(model, config)
+    try:
+        now = current_binding(model, config)
+    except BindingUnreadableError as exc:
+        out.append(_blocker("binding_unreadable", str(exc),
+                            "Make the model config and material file readable (close the program locking them), then re-run the check."))
+        return out
     labels = {
         "model_config_sha256": ("model_config_changed", _MODEL_CONFIG_NAME, "model config"),
         "nonlinear_materials_file_sha256": ("material_file_changed", "nonlinear_materials_file", "material file"),
@@ -334,6 +354,52 @@ def _binding_blockers(data: Dict[str, Any], model: Path, config: Dict[str, Any])
     return out
 
 
+def binding_mismatches(data: Dict[str, Any], model_script: Union[str, Path],
+                       config: Optional[Dict[str, Any]] = None) -> List[Dict[str, str]]:
+    """Blockers (``BINDING_MISMATCH_CODES`` only) for hashes recorded in ``data`` that differ from now.
+
+    Read-only. Legacy manifests without the hash fields yield an empty list.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (input binding)]
+    """
+    model = Path(model_script).expanduser().resolve()
+    return [b for b in _binding_blockers(data, model, config or {}) if b["code"] in BINDING_MISMATCH_CODES]
+
+
+def rebind_if_binding_changed(data: Dict[str, Any], model_script: Union[str, Path],
+                              config: Optional[Dict[str, Any]] = None) -> List[Dict[str, str]]:
+    """If recorded hashes differ from the current inputs, reset ``data`` to an UNAPPROVED rebind (in place).
+
+    On a mismatch: ``approved_for_nltha`` False, every check False (the manifest's own keys plus
+    ``READINESS_CHECK_KEYS``), status ``UNAPPROVED DRAFT``, and the current hashes recorded. Evidence text
+    is kept. Returns the mismatch blockers (empty and no change when nothing differs). Never sets anything
+    True. Callers persist ``data``.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (approval does not carry over)]
+    """
+    mismatches = binding_mismatches(data, model_script, config)
+    if mismatches:
+        keys = list(dict.fromkeys([*READINESS_CHECK_KEYS, *(data.get("checks") or {})]))
+        data["approved_for_nltha"] = False
+        data["checks"] = dict.fromkeys(keys, False)
+        data["status"] = "UNAPPROVED DRAFT"
+        record_binding(data, model_script, config)
+    return mismatches
+
+
+def binding_change_notice(mismatches: List[Dict[str, str]]) -> str:
+    """Display text for ``rebind_if_binding_changed`` / ``binding_mismatches`` results; '' when none.
+
+    [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (approval does not carry over)]
+    """
+    if not mismatches:
+        return ""
+    lines = ["Inputs changed since the last readiness save. Approval and all checks were reset to False "
+             "and the current hashes were recorded; re-review each item before approving again:"]
+    lines += [f"  - [{b['code']}] {b['message']}" for b in mismatches]
+    return "\n".join(lines)
+
+
 def gate_binding_blockers(diagnosis: Dict[str, Any], data: Dict[str, Any]) -> List[Dict[str, str]]:
     """Subset of a diagnosis the run gate raises on, for a manifest that passed every older gate check.
 
@@ -343,7 +409,7 @@ def gate_binding_blockers(diagnosis: Dict[str, Any], data: Dict[str, Any]) -> Li
 
     [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (gate behavior)]
     """
-    codes = set(BINDING_MISMATCH_CODES)
+    codes = set(BINDING_MISMATCH_CODES) | {"binding_unreadable"}
     if data.get("approved_for_nltha") is True:
         codes |= set(APPROVED_CONTRADICTION_CODES)
     return [b for b in diagnosis.get("blockers", []) if b.get("code") in codes]

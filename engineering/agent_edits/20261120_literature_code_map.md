@@ -18,10 +18,10 @@ Tests actually run (Linux sandbox, Python 3.13; `openseespy` does not import her
 
 Scientific scope
 - The gap register was written by reading the cited code. No native OpenSees, ETABS or numerical run supports it. It assigns no component the `PROJECT_VERIFIED` tier. The generated map records citations only (provenance), not validation.
-- Finding recorded in the register: R03, R04, R06, R08, R09 and R11 are cited nowhere in components/, src/ or tests/.
+- Finding recorded in the register: R03, R06, R08, R09 and R11 are cited nowhere in components/, src/ or tests/ (re-verified by grep for DOI, URL and author names). Correction: R04 was first listed here as uncited; `components/validation/wall_validation.py` cites it by PEER 2024/11 URL and author names, which the first version of the tool (ID and DOI only) could not see. The tool now also matches Source URL and author-year.
 
 PENDING
 - Native OpenSeesPy and ETABS behaviour statements quoted from docstrings (for example the region-damping facts in `damping_regions.py`) are not re-verified.
 - NBC 105:2025 clause wording used by the code is not compared with the official PDF.
 - Python 3.12 and Windows/Spyder execution of the new tool and test; GitHub-hosted CI run.
-- Master-index rows without a DOI can only match by `L###` ID; none are cited, so all show UNIMPLEMENTED until an ID or DOI is cited. Author-year-only citations are not detected.
+- Master-index rows without a DOI (L006, L009, L012, L014) are linked to R01, R04, R07, R11 only on an exact title, year and first-author match and share those citations (`link_basis` column); every other master row without a match shows `UNKNOWN`. Citations that give none of ID, DOI, Source URL with a path or the register author names are not detected.

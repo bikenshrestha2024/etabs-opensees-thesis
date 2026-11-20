@@ -7,10 +7,10 @@ name: Headless pytest suite
 # runs are not covered here.
 on:
   pull_request:
-    paths: ['*.py', 'components/**', 'src/**', 'tools/**', 'tests/**', 'pytest.ini', 'conftest.py', 'requirements-ci.txt', '.github/workflows/tests.yml']
+    paths: ['*.py', 'components/**', 'src/**', 'tools/**', 'tests/**', 'docs/**', 'LITERATURE/**', 'Saved_Project_V156/**', 'pytest.ini', 'conftest.py', 'requirements-ci.txt', '.github/workflows/tests.yml']
   push:
     branches: [main]
-    paths: ['*.py', 'components/**', 'src/**', 'tools/**', 'tests/**', 'pytest.ini', 'conftest.py', 'requirements-ci.txt', '.github/workflows/tests.yml']
+    paths: ['*.py', 'components/**', 'src/**', 'tools/**', 'tests/**', 'docs/**', 'LITERATURE/**', 'Saved_Project_V156/**', 'pytest.ini', 'conftest.py', 'requirements-ci.txt', '.github/workflows/tests.yml']
   workflow_dispatch:
 
 permissions:

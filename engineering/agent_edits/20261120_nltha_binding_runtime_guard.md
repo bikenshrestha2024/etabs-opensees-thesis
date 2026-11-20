@@ -10,7 +10,15 @@ Edited paths
 - `tests/test_nltha_readiness_binding.py` (new); `tests/test_nltha_readiness_diagnosis.py` (`_bound` helper now records the binding so "current-format manifest" cases keep their meaning).
 - `docs/NLTHA_READINESS_WORKFLOW.md` sections 2 and 5 and the PENDING list.
 
-Tests run (headless, `cd /home/claude/etabs-opensees-thesis && PYTHONPATH=$PWD python -m pytest -q <files>`): see the commit report; exact commands and counts are in the task report.
+Tests run (headless, `cd /home/claude/etabs-opensees-thesis && PYTHONPATH=$PWD python -m pytest -q <files>`): 
+
+Original Task 1 and 2 runs (before this fix wave; counts re-run and confirmed, then rising with the fix-wave tests):
+- `python -m pytest -q -p no:cacheprovider tests/test_nltha_readiness_binding.py tests/test_nltha_readiness_diagnosis.py tests/test_nltha_readiness_bound_draft.py` -> 40 passed originally; 48 passed now (8 fix-wave tests added to the binding file).
+- `python -m pytest -q -p no:cacheprovider tests/test_nltha_stale_runtime.py` -> 12 passed (unchanged).
+- `python -m pytest -q -p no:cacheprovider tests/test_nltha_stale_runtime.py tests/test_nltha_readiness_*.py tests/test_etabs_ingest_guards.py tests/verify_readiness_dashboard.py tests/test_main_launcher_workflow_layout.py` -> 89 passed originally; 97 passed now.
+- `python -m pytest -q -p no:cacheprovider tests/test_repository_integrated_audit.py tests/test_repository_semantic_discovery.py` -> 20 passed, 6 subtests passed (unchanged).
+- `PYTHONPATH=$PWD python tests/verify_ref_tags.py` -> Ran 4 tests OK.
+Fix wave (same note): approval reset on changed config/material/FSAM inputs (`rebind_if_binding_changed`, `binding_change_notice`), `binding_unreadable` fail-closed for locked files; GUI wiring in `readiness_gui.launch` is not executed here (no tkinter).
 
 Scientific gates: code never sets `approved_for_nltha` or any check True. Hashes prove files are unchanged since a human saved the checklist, not that their contents are correct. No solver PASS is claimed as engineering acceptance.
 

@@ -8,7 +8,9 @@ import ast
 import builtins
 import csv
 import io
+import shutil
 import socket
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -126,7 +128,8 @@ class LiteratureCodeMapTests(unittest.TestCase):
 
     def test_tool_source_has_no_network_imports(self):
         tree = ast.parse((ROOT / "tools" / "audit_literature_code_map.py").read_text(encoding="utf-8"))
-        banned = {"socket", "urllib", "http", "requests", "ftplib", "subprocess", "ssl"}
+        # subprocess is allowed only for `git ls-files` / `git rev-parse` (checked below).
+        banned = {"socket", "urllib", "http", "requests", "ftplib", "ssl"}
         imported = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -134,6 +137,86 @@ class LiteratureCodeMapTests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.add(node.module.split(".")[0])
         self.assertEqual(imported & banned, set())
+        git_calls = [n for n in ast.walk(tree) if isinstance(n, ast.List) and n.elts
+                     and isinstance(n.elts[0], ast.Constant) and n.elts[0].value == "git"]
+        self.assertTrue(git_calls)
+        for call in git_calls:
+            words = [e.value for e in call.elts if isinstance(e, ast.Constant)]
+            self.assertTrue({"ls-files", "rev-parse"} & set(words), words)
+
+    def test_check_accepts_crlf_checkout(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = make_fixture(name)
+            tool.write_outputs(root, "docs/validation")
+            for file_name in (tool.MD_NAME, tool.CSV_NAME):
+                path = root / "docs/validation" / file_name
+                path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+            self.assertEqual(tool.main(["--root", str(root), "--check"]), 0)
+
+    def test_gitattributes_pins_map_to_lf(self):
+        text = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn("docs/validation/LITERATURE_CODE_MAP.* text eol=lf", text)
+
+    @unittest.skipUnless(shutil.which("git"), "git not installed")
+    def test_scan_uses_git_tracked_files_only(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = make_fixture(name)
+            git = ["git", "-C", str(root)]
+            subprocess.run(git + ["init", "-q"], check=True)
+            subprocess.run(git + ["add", "-A"], check=True)
+            (root / "components" / "scratch.py").write_text("# [REF R03]\n", encoding="utf-8")
+            self.assertNotIn("components/scratch.py", tool.scan_files(root))
+            rows = {r["reference_id"]: r for r in tool.build_map(root)}
+            self.assertEqual(rows["R03"]["status"], "UNIMPLEMENTED")
+            tool.write_outputs(root, "docs/validation")
+            # untracked scratch file present: --check must still be current
+            self.assertEqual(tool.main(["--root", str(root), "--check"]), 0)
+
+    def test_scan_falls_back_to_filesystem_without_git_repo(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = make_fixture(name)
+            self.assertIn("components/wall.py", tool.scan_files(root))
+
+    def test_url_and_author_year_citations_detected(self):
+        register = REGISTER_TEXT + (
+            "| R04 | Stokley and Lowes (2024), PEER 2024/11, Layered Shell Model | [Source](https://peer.berkeley.edu/) | use | none |\n"
+            "| R05 | Cao et al. (2024), BRB eccentricity | [Source](https://example.org/papers/cao-2024) | use | none |\n"
+            "| R06 | Ji, Sun and Wang (2023), T walls | [Source](https://doi.org/10.1000/zzz.6) | use | none |\n")
+        with tempfile.TemporaryDirectory() as name:
+            root = make_fixture(name)
+            (root / "docs" / "00_RESEARCH_REFERENCES.md").write_text(register, encoding="utf-8")
+            (root / "components" / "val.py").write_text(
+                "S={'u':'https://example.org/papers/cao-2024','n':'Stokley and Lowes: flexure walls'}\n",
+                encoding="utf-8")
+            (root / "components" / "other.py").write_text(
+                "X='Ji alone, Sun elsewhere; Cao et al. 2019'\n", encoding="utf-8")
+            rows = {r["reference_id"]: r for r in tool.build_map(root)}
+        self.assertEqual(rows["R04"]["status"], "CITED_IN_CODE")
+        self.assertIn("AUTHOR-YEAR", rows["R04"]["match_kinds"])
+        self.assertEqual(rows["R05"]["status"], "CITED_IN_CODE")
+        self.assertIn("URL", rows["R05"]["match_kinds"])
+        self.assertEqual(rows["R06"]["status"], "UNIMPLEMENTED")  # near misses do not count
+
+    def test_exact_title_year_author_cross_link_between_series(self):
+        register = REGISTER_TEXT + (
+            "| R04 | Stokley and Lowes (2024), PEER 2024/11, Evaluation of a Layered Shell Model | [Source](https://peer.berkeley.edu/) | use | none |\n"
+            "| R05 | Stokley and Lowes (2023), Evaluation of a Layered Shell Model | [Source](https://peer.berkeley.edu/) | use | none |\n")
+        master = MASTER_TEXT + (
+            '"L003","c","Evaluation of a Layered Shell Model","Stokley; Lowes","j","2024",""\n'
+            '"L004","c","Something else entirely different","Stokley; Lowes","j","2024",""\n')
+        with tempfile.TemporaryDirectory() as name:
+            root = make_fixture(name)
+            (root / "docs" / "00_RESEARCH_REFERENCES.md").write_text(register, encoding="utf-8")
+            (root / "LITERATURE" / "MASTER_LITERATURE_INDEX.csv").write_text(master, encoding="utf-8")
+            (root / "components" / "val.py").write_text("# Stokley and Lowes layered shell\n", encoding="utf-8")
+            rows = {r["reference_id"]: r for r in tool.build_map(root)}
+        self.assertEqual(rows["L003"]["also_listed_as"], "R04")
+        self.assertEqual(rows["R04"]["also_listed_as"], "L003")
+        self.assertEqual(rows["L003"]["status"], "CITED_IN_CODE")
+        self.assertEqual(rows["L003"]["link_basis"], "TITLE_YEAR_AUTHOR")
+        self.assertEqual(rows["L004"]["link_basis"], "UNKNOWN")  # no exact title match
+        self.assertEqual(rows["L004"]["status"], "UNIMPLEMENTED")
+        self.assertEqual(rows["R05"]["also_listed_as"], "")  # year differs
 
 
 if __name__ == "__main__":

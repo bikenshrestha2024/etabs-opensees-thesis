@@ -201,3 +201,110 @@ def test_code_never_approves(tmp_path):
     data = {"approved_for_nltha": False, "checks": dict.fromkeys(READINESS_CHECK_KEYS, False)}
     record_binding(data, model)
     assert data["approved_for_nltha"] is False and not any(data["checks"].values())
+
+
+# ---------------------------------------------------------------------------
+# Fix wave: GUI-side reset helper, unreadable inputs (fail closed)
+# ---------------------------------------------------------------------------
+from components.model.readiness import (  # noqa: E402
+    BindingUnreadableError, binding_change_notice, binding_mismatches, rebind_if_binding_changed)
+
+
+def test_rebind_helper_unchanged_keeps_approval(tmp_path):
+    model = _project(tmp_path)
+    data = _manifest(model)
+    assert binding_mismatches(data, model) == []
+    assert rebind_if_binding_changed(data, model) == []
+    assert data["approved_for_nltha"] is True
+    assert all(v is True for v in data["checks"].values())
+
+
+def test_rebind_helper_resets_approval_after_config_change(tmp_path):
+    model = _project(tmp_path)
+    data = _manifest(model)
+    old_hash = data["model_config_sha256"]
+    (tmp_path / "mat.json").write_text('{"fc": 2}', encoding="utf-8")
+    cfg = json.loads((tmp_path / CFG).read_text())
+    cfg["nonlinear_wall_fsam_tags"] = {"P1": 9}
+    (tmp_path / CFG).write_text(json.dumps(cfg), encoding="utf-8")
+    codes = {b["code"] for b in binding_mismatches(data, model)}
+    assert codes == {"model_config_changed", "material_file_changed", "wall_fsam_tags_changed"}
+    mism = rebind_if_binding_changed(data, model)
+    assert {b["code"] for b in mism} == codes
+    assert data["approved_for_nltha"] is False
+    assert set(data["checks"]) >= set(READINESS_CHECK_KEYS)
+    assert not any(data["checks"].values())
+    assert data["model_config_sha256"] != old_hash
+    assert data["model_config_sha256"] == _sha(tmp_path / CFG)
+    # after the rebind nothing differs, so a second call is a no-op
+    assert binding_mismatches(data, model) == []
+
+
+def test_rebind_helper_never_sets_true(tmp_path):
+    model = _project(tmp_path)
+    data = _manifest(model, approved=False, checks=False)
+    (tmp_path / "mat.json").write_text("{}", encoding="utf-8")
+    rebind_if_binding_changed(data, model)
+    assert data["approved_for_nltha"] is False and not any(data["checks"].values())
+
+
+def test_rebind_helper_legacy_manifest_untouched(tmp_path):
+    model = _project(tmp_path)
+    data = _manifest(model, bind=False)
+    (tmp_path / "mat.json").write_text("{}", encoding="utf-8")
+    assert rebind_if_binding_changed(data, model) == []
+    assert data["approved_for_nltha"] is True
+    assert not any(f in data for f in FIELDS)
+
+
+def test_binding_change_notice_lists_codes(tmp_path):
+    model = _project(tmp_path)
+    data = _manifest(model)
+    (tmp_path / "mat.json").write_text("{}", encoding="utf-8")
+    text = binding_change_notice(binding_mismatches(data, model))
+    assert "material_file_changed" in text and "approval" in text.lower()
+    assert binding_change_notice([]) == ""
+
+
+def _locked(monkeypatch, name):
+    real = Path.read_bytes
+
+    def fake(self):
+        if self.name == name:
+            raise PermissionError("locked by another process")
+        return real(self)
+    monkeypatch.setattr(Path, "read_bytes", fake)
+
+
+def test_locked_material_file_is_blocker_in_diagnose(tmp_path, monkeypatch):
+    model = _project(tmp_path)
+    _manifest(model)
+    _locked(monkeypatch, "mat.json")
+    d = diagnose_nonlinear_readiness({"model_script": str(model)})
+    assert "binding_unreadable" in {b["code"] for b in d["blockers"]}
+    assert d["ready"] is False
+
+
+def test_locked_config_is_blocker_in_diagnose_and_gate(tmp_path, monkeypatch):
+    model = _project(tmp_path)
+    _manifest(model)
+    _locked(monkeypatch, CFG)
+    d = diagnose_nonlinear_readiness({"model_script": str(model)})
+    assert "binding_unreadable" in {b["code"] for b in d["blockers"]}
+    with pytest.raises(RuntimeError, match="binding_unreadable"):
+        _load_gate().gate({"model_script": str(model)})
+
+
+def test_locked_file_raises_clear_error_not_bare_oserror(tmp_path, monkeypatch):
+    model = _project(tmp_path)
+    _locked(monkeypatch, CFG)
+    with pytest.raises(BindingUnreadableError) as exc:
+        current_binding(model)
+    assert isinstance(exc.value, RuntimeError) and not isinstance(exc.value, OSError)
+    assert CFG in str(exc.value)
+    problems = approval_binding_problems(model)
+    assert any("unreadable" in p.lower() for p in problems)
+    template = tmp_path / "t.json"
+    template.write_text("{}", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="unreadable"):
+        bind_readiness_draft(template, model)

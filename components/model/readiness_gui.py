@@ -61,6 +61,11 @@ def launch(parent,model_script,readiness_variable):
     from tkinter import ttk,messagebox
     model=Path(model_script).resolve();path=prepare(model);data=json.loads(path.read_text(encoding='utf-8-sig'))
     if str(Path(data['model_script']).resolve())!=str(model):raise ValueError('Draft bound to another model; select the correct draft')
+    # prepare() keeps a draft whose model SHA is unchanged even if the config, material file or FSAM tags
+    # changed since approval: reset approval/checks (pure helper) and persist before showing the form.
+    from components.model.readiness import rebind_if_binding_changed,binding_change_notice
+    binding_mismatches=rebind_if_binding_changed(data,model)
+    if binding_mismatches:path.write_text(json.dumps(data,indent=2),encoding='utf-8')
     win=tk.Toplevel(parent);win.title('Nonlinear model readiness — evidence and model binding');win.geometry('1180x820');readiness_variable.set(str(path))
     ttk.Label(win,text='Selected nonlinear builder: '+str(model)+'\nChecklist: '+str(path)+'\nThis is a draft, not automatic approval. A source/material model must exist and checks require real evidence.',wraplength=1120).pack(anchor='w')
     cfg=model.with_name('OpenSees_Complete_Model_Config_V118.json')
@@ -69,6 +74,8 @@ def launch(parent,model_script,readiness_variable):
     from components.model.readiness import diagnose_nonlinear_readiness,material_prerequisite_notice
     notice=material_prerequisite_notice(diagnose_nonlinear_readiness({'model_script':str(model),'model_readiness_json':str(path)}))
     if notice:ttk.Label(win,text=notice,wraplength=1100,foreground='#9a3e1d').pack(anchor='w')
+    change_notice=binding_change_notice(binding_mismatches)
+    if change_notice:ttk.Label(win,text=change_notice,wraplength=1100,foreground='#b00020').pack(anchor='w')
     from components.model.readiness import runtime_copy_notice
     stale_notice=runtime_copy_notice(model)
     if stale_notice:ttk.Label(win,text=stale_notice,wraplength=1100,foreground='#b00020').pack(anchor='w')
@@ -109,6 +116,11 @@ def launch(parent,model_script,readiness_variable):
                 from components.model.readiness import approval_binding_problems
                 bp=approval_binding_problems(model)
                 if bp:raise ValueError('Approval cannot be bound: '+'; '.join(bp))
+            late=rebind_if_binding_changed(data,model)  # inputs changed while this window was open
+            if late:
+                for var in checks.values():var.set(False)
+                approved.set(False);path.write_text(json.dumps(data,indent=2),encoding='utf-8')
+                raise ValueError(binding_change_notice(late)+'\nNothing was approved; review and save again.')
             data.update(model_script=str(model),model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),approved_for_nltha=approved.get(),checks={k:v.get() for k,v in checks.items()},evidence={k:v.get().strip() for k,v in evidence.items()})
             from components.model.readiness import record_binding
             record_binding(data,model);path.write_text(json.dumps(data,indent=2),encoding='utf-8');readiness_variable.set(str(path));messagebox.showinfo('Readiness saved','Draft saved. Missing model/material prerequisites are not bypassed.',parent=win)

@@ -2,7 +2,7 @@
 
 **What/when:** unit tests for `tools/audit_literature_code_map.py`, run in the headless pytest suite and before documentation updates.
 
-**Why/how:** a temporary repo-shaped fixture checks ID, DOI and string-literal handling and the CSV order. Real-repository tests check that two runs produce identical text, that R01-R13 all appear, and that the committed `docs/validation/LITERATURE_CODE_MAP.*` is current. A guard test patches the network entry points and file opening to show no network call and no PDF read, and that an output directory outside the root is refused. A static test checks the tool imports no network modules.
+**Why/how:** a temporary repo-shaped fixture checks ID, DOI and string-literal handling and the CSV order. Real-repository tests check that two runs produce identical text, that R01-R13 all appear, and that the committed `docs/validation/LITERATURE_CODE_MAP.*` is current. A guard test patches the network entry points and file opening to show no network call and no PDF read, and that an output directory outside the root is refused. A static test checks the tool imports no network modules and calls only `git ls-files` / `git rev-parse` through subprocess. Further tests cover CRLF checkouts, git-tracked-only scanning, URL and author-year detection and the exact title-year-author R/L cross-link.
 
 **Where:** `tests/test_literature_code_map.py`, `tools/audit_literature_code_map.py`.
 
