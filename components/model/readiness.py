@@ -349,10 +349,11 @@ def bind_readiness_draft(template_path: Union[str, Path], model_script: Union[st
     ``UNAPPROVED DRAFT``. Nothing is ever set True. Default location is
     ``OpenSees_Model_Readiness_Draft_<model stem>_V134.json`` beside the model.
 
-    An existing file with ``approved_for_nltha`` True (or one that cannot be
-    read, so approval cannot be ruled out) raises ``RuntimeError`` and is left
-    untouched. An existing unapproved draft already bound to this model and
-    hash is returned unchanged (idempotent; human-saved evidence is kept). A
+    An existing file already bound to this model path and hash is returned
+    unchanged, approved or not (idempotent; human-saved evidence is kept). An
+    existing file that would otherwise be replaced raises ``RuntimeError`` and
+    is left untouched when it has ``approved_for_nltha`` True (stale hash or
+    other model) or cannot be read, so approval cannot be ruled out. A
     stale unapproved draft (other model or changed hash) is rebuilt all-False.
     """
     import hashlib
@@ -369,12 +370,12 @@ def bind_readiness_draft(template_path: Union[str, Path], model_script: Union[st
             raise RuntimeError(f"Existing readiness file is unreadable and was not overwritten: {out}") from exc
         if not isinstance(existing, dict):
             raise RuntimeError(f"Existing readiness file is not a JSON object and was not overwritten: {out}")
-        if existing.get("approved_for_nltha") is True:
-            raise RuntimeError(f"Refusing to overwrite an approved readiness file (approved_for_nltha is True): {out}")
         recorded = str(existing.get("model_script", "")).strip()
         if (recorded and Path(recorded).expanduser().resolve() == model
                 and existing.get("model_script_sha256") == digest):
-            return out
+            return out  # current for this model: returned unchanged, approved or not
+        if existing.get("approved_for_nltha") is True:
+            raise RuntimeError(f"Refusing to overwrite an approved readiness file (approved_for_nltha is True): {out}")
     data = json.loads(Path(template_path).read_text(encoding="utf-8-sig"))
     data["model_script"] = str(model)
     data["model_script_sha256"] = digest

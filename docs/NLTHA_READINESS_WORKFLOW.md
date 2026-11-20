@@ -78,13 +78,17 @@ Consequence for the checks: `wall_nonlinear_materials_and_reinforcement_cited_ca
 4. Complete each of the 16 reviews. Mark a check True only after its evidence exists.
 5. Set `approved_for_nltha` True yourself, last. Any later change to the model script invalidates it (SHA mismatch).
 
+Scope of the binding: approval is bound only to the model script path and its SHA-256. Edits made after approval to `OpenSees_Complete_Model_Config_V118.json`, to the file named by `nonlinear_materials_file`, or to the wall FSAM tags are NOT detected by the gate. `diagnose_nonlinear_readiness` may report material, FSAM or parameters-reviewed blockers while the gate passes; re-check those yourself before every run.
+
+Follow-up (not implemented): make the gate raise on the codes in `_NON_GATE_BLOCKER_CODES` (`components/model/readiness.py`), or record a SHA-256 of the model config and material file in the manifest and compare it at run time.
+
 ## 6. ETABS ingestion guards
 
 These apply when converting an ETABS model (`components/ui/application.py`, helpers in `components/validation/gravity_etabs_direct.py`, `components/model/assembly.py`):
 
 | Guard | What it refuses or records |
 |---|---|
-| Working copy | ETABS opens a temporary copy of the EDB; the source EDB is not opened or modified. The copy is removed after ETABS exits (best effort, logged warning on failure). |
+| Working copy | In the active `components/` code, ETABS opens a temporary copy of the EDB; the source EDB is not opened or modified. The copy is removed after ETABS exits (short bounded retry, then a logged warning; never raises). Runtime copies under saved projects are not covered; see section 8. |
 | Units read-back | After setting units, the present units are read back; a mismatch raises instead of continuing in the wrong units. |
 | Dropped points | Failed point-coordinate or point-diaphragm reads are collected and raise `DroppedPointsError`; no silent skipping. A nonzero trailing return code on a coordinate read now counts as dropped. |
 | `assembly_errors` | Unparseable or nonzero-return material rows are recorded in the report's `assembly_errors`, which is fatal in the worker via `validate_converter_report`. |
@@ -105,6 +109,7 @@ No solver PASS is engineering acceptance.
 
 - Native Windows and ETABS COM runs of the Task 3 ingestion guards (OpenFile on the copy, present-units read-back, side-file cleanup, linked-file paths from the copy location).
 - tkinter GUI behavior (readiness GUI prepare and launch notice); the sandbox has no tkinter.
+- Runtime copies under saved projects (for example `Saved_Project_V156/OpenSees_Runtime_V118/`, launched by `17_BUILDING_FULL_NONLINEAR.py`) keep the pre-branch readiness gate and ingestion until the runtime is refreshed; the `application.py` there still opens the original EDB in place. The statement that the source EDB is not opened applies to the active `components/` code only.
 - Full-model NLTHA on the project building.
 - Project reinforcement schedule and FVD/BRB calibration.
 - All 16 checks and `approved_for_nltha` remain False until you complete them.

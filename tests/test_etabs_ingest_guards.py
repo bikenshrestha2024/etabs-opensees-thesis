@@ -81,6 +81,36 @@ class TestWorkingCopy(unittest.TestCase):
             self.assertFalse(copy.parent.exists())
             self.assertTrue(src.exists())
 
+    def test_cleanup_retries_until_removed(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "m.edb"
+            src.write_bytes(b"x")
+            copy = guards.make_edb_working_copy(src, root=d)
+            real, calls, sleeps, logs = guards.shutil.rmtree, [], [], []
+
+            def flaky(path, ignore_errors=False):
+                calls.append(path)
+                if len(calls) > 1:
+                    real(path, ignore_errors=True)  # first attempt fails silently
+            with mock.patch.object(guards.shutil, "rmtree", flaky):
+                self.assertTrue(guards.cleanup_edb_working_copy(copy, log=logs.append, sleep=sleeps.append))
+            self.assertEqual((len(calls), len(sleeps)), (2, 1))
+            self.assertFalse(copy.parent.exists())
+            self.assertTrue(logs[-1].startswith("ETABS working copy removed"))
+
+    def test_cleanup_gives_up_with_warning_and_no_raise(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "m.edb"
+            src.write_bytes(b"x")
+            copy = guards.make_edb_working_copy(src, root=d)
+            logs, sleeps = [], []
+            with mock.patch.object(guards.shutil, "rmtree", lambda p, ignore_errors=False: None):
+                self.assertFalse(guards.cleanup_edb_working_copy(copy, log=logs.append, attempts=3, sleep=sleeps.append))
+            self.assertEqual(len(sleeps), 2)
+            self.assertTrue(logs[-1].startswith("WARNING"))
+
     def test_cleanup_refuses_foreign_directory(self):
         with tempfile.TemporaryDirectory() as d:
             keep = Path(d) / "user.edb"

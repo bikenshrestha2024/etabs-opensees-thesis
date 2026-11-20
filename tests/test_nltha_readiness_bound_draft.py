@@ -125,3 +125,27 @@ def test_material_notice_lists_non_gate_blockers():
     assert "material_file_missing" in text and "parameters_not_reviewed" in text
     assert "not_approved" not in text
     assert material_prerequisite_notice({"ready": True, "blockers": []}) == ""
+
+
+def test_approved_current_draft_is_returned_unchanged(tmp_path):
+    model = _model(tmp_path)
+    out = bind_readiness_draft(TEMPLATE, model)
+    data = _load(out)
+    data["approved_for_nltha"] = True  # human decision, simulated by the test
+    out.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    before = out.read_bytes()
+    assert bind_readiness_draft(TEMPLATE, model) == out
+    assert out.read_bytes() == before
+
+
+def test_approved_draft_with_changed_model_hash_still_refuses(tmp_path):
+    model = _model(tmp_path)
+    out = bind_readiness_draft(TEMPLATE, model)
+    data = _load(out)
+    data["approved_for_nltha"] = True
+    out.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    before = out.read_bytes()
+    model.write_text("# changed after approval\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="approved"):
+        bind_readiness_draft(TEMPLATE, model)
+    assert out.read_bytes() == before

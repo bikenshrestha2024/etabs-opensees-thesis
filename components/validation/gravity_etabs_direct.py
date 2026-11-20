@@ -809,15 +809,19 @@ def make_edb_working_copy(edb,root=None):
     return dest
 
 
-def cleanup_edb_working_copy(copy_path,log=None):
+def cleanup_edb_working_copy(copy_path,log=None,attempts=4,delay=0.5,sleep=time.sleep):
     """Delete the private working-copy folder (incl. ETABS side files).
 
-    Refuses folders not created by make_edb_working_copy. Returns True when removed.
+    Refuses folders not created by make_edb_working_copy. Bounded retry (ETABS can release files late); never raises. Returns True when removed.
     """
     folder=Path(copy_path).parent
     if not folder.name.startswith(_WORKING_COPY_PREFIX):return False
-    shutil.rmtree(folder,ignore_errors=True)
-    removed=not folder.exists()
+    removed=False
+    for attempt in range(max(1,int(attempts))):
+        shutil.rmtree(folder,ignore_errors=True)
+        removed=not folder.exists()
+        if removed:break
+        if attempt+1<attempts:sleep(delay)  # ETABS may still hold side files briefly
     if callable(log):
         log(("ETABS working copy removed: " if removed else "WARNING: ETABS working copy not fully removed: ")+str(folder))
     return removed
