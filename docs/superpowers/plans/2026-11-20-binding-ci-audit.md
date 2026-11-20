@@ -1,0 +1,22 @@
+# Follow-up slice — approval binding, runtime-copy guard, CI, literature audit
+
+Authority: AGENTS.md, engineering/rules/CORE_RULES.md, docs/00_RESEARCH_REFERENCES.md. Follows PR #124 (merged).
+
+## Global Constraints
+- Never set `approved_for_nltha` or any check True in code; never invent material, reinforcement or damper numbers.
+- Extend existing modules; no `*_latest/_fixed/_V###` files. New module only with a CANONICAL_MODULES.csv row and justification.
+- No top-level tkinter in non-GUI modules; Windows/Spyder compatible; kN-m-s.
+- Saved_Project_V156 is immutable historical evidence: do not rewrite its files.
+- Tests first, headless (`PYTHONPATH=$PWD python -m pytest`); report only tests actually run; native ETABS/Windows PENDING. Add `engineering/agent_edits/` note per task group.
+
+## Task 1: Bind approval to config, material file and FSAM tags
+Close the PR #124 follow-up: record SHA-256 of `OpenSees_Complete_Model_Config_V118.json` (beside the model script), the resolved `nonlinear_materials_file`, and a canonical hash of `nonlinear_wall_fsam_tags` in the readiness manifest when a draft is bound/saved (`bind_readiness_draft`, readiness_gui save/rebind). In `_require_nonlinear_readiness`, if the manifest records these hashes and any differs from the current file, raise with the specific blocker (back-compatible: older manifests without the fields still pass but `diagnose_nonlinear_readiness` reports `binding_not_recorded`). Also make the gate raise when the material file is missing/unconfigured or FSAM tags are empty ONLY when the manifest is approved (`approved_for_nltha` True) — an approved checklist with no material file is contradictory. Update docs/NLTHA_READINESS_WORKFLOW.md §5/§8 and the agent_edits note. Tests: change config → gate raises; change material file → raises; change FSAM tags → raises; unchanged → passes; legacy manifest → passes with diagnose warning.
+
+## Task 2: Stale runtime-copy guard
+`Saved_Project_V156/OpenSees_Runtime_V118/` is immutable evidence but still carries the old gate and in-place EDB open. Do NOT edit it. Instead: add `Saved_Project_V156/OpenSees_Runtime_V118/STALE_RUNTIME_DO_NOT_RUN.md` is forbidden (immutable) — so put the guard in active code: a function (extend an existing non-GUI module, e.g. components/model/readiness.py or components/validation/settings_audit.py) `detect_stale_runtime(path)` that flags any runtime folder whose gate source lacks the active gate fingerprint, used by the readiness GUI/preflight to warn loudly and by `diagnose_nonlinear_readiness` to add a blocker `stale_runtime_copy` when the selected model script lives inside a runtime copy that predates the gate. Document in the workflow doc. Tests with fixture folders.
+
+## Task 3: Repo/CI upgrade (minimal, safe)
+Add `pytest.ini` (testpaths=tests, `python_files = test_*.py verify_*.py`, pythonpath=.), `requirements-ci.txt` (numpy, openpyxl, pytest, openseespy, shapely; no versions invented beyond what workflows already pin — read .github/workflows to match), and make the main test workflow install them and run `pytest` (if one general workflow exists extend it; else add `.github/workflows/tests.yml`). Skip-not-fail markers for tests that need tkinter/plotly/ETABS (use `pytest.importorskip` in a conftest.py hook or per-file; do not weaken assertions). Do not rewrite the V### shims. Document in docs/00_REPOSITORY_ORGANIZATION.md. Verify locally: pytest collects verify_*.py, count passed/skipped/failed before vs after.
+
+## Task 4: Literature-to-code audit and damped-outrigger gap register
+Write `tools/audit_literature_code_map.py` (stdlib only) that reads LITERATURE/MASTER_LITERATURE_INDEX.csv, docs/00_RESEARCH_REFERENCES.md (R01–R13) and `rg`-style scans of components/ and src/ for R-IDs, DOIs and citation tags, and writes a deterministic Markdown/CSV map: each reference → implementing modules/tests, or UNIMPLEMENTED. Write the generated `docs/validation/LITERATURE_CODE_MAP.md` and a hand-reviewed `docs/validation/DAMPED_OUTRIGGER_NLTHA_GAP_REGISTER.md` listing, per component (FVD, BRB, SHS brace, walls/E-SFI, coupling beams, diaphragm, torsion/asymmetry, record pairs, drift/acceptance), what the code implements, which reference supports it, what project evidence is missing, and the evidence tier (FORMULATION/EXPERIMENT/NUMERICAL_REPRODUCTION/PROJECT_TRANSFER_ASSUMPTION/PROJECT_VERIFIED). No invented numbers; mark unknowns UNKNOWN. Test: tools output is deterministic and every R01–R13 appears.
