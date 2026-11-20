@@ -587,6 +587,12 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
             if not row.get('assigned_section'):
                 null_frames.append(obj); continue  # ETABS None section carries no stiffness or self-weight.
             prop=_frame_property(row,meta.get('frame_section_properties',{})); i,j=map(int,e['node_tags']); p,q=nodes[i],nodes[j]
+            if cfg.get('elastic_etabs_comparison'):
+                native=meta.get('frame_section_properties',{}).get(prop['section'],{})
+                for field in ('As2','As3'):
+                    value=row.get(field+'_m2',native.get(field))
+                    if value is not None:
+                        prop[field]=float(value)
             length=math.dist(p,q); x=_unit(_sub(q,p)); cuts={0.:i,1.:j}
             frame_meta=meta.get('frames',{}).get(obj,{})
             axes=frame_meta.get('GetLocalAxes',[]); angle=float(axes[0]) if isinstance(axes,list) and axes and axes[-1]==0 else 0.
@@ -637,6 +643,14 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
                     hinged_release_review[-1]["solver_element_tags"].append(
                         100000+len(frame_elements))
             segments[obj]=children
+        if 'elastic_etabs_comparison' in cfg:
+            from components.model.elastic_conversion_settings import compile_settings
+            if (cfg.get('elastic_etabs_comparison') and
+                    cfg.get('linear_shell_stiffness_policy','LEGACY_GROSS_SHELL')!='LEGACY_GROSS_SHELL'):
+                raise ValueError('Use one elastic shell comparison configuration at a time.')
+            elastic_comparison=compile_settings(cfg['elastic_etabs_comparison'],frame_elements,shells,meta)
+        else:
+            elastic_comparison={}
         emit(f"[ASSEMBLY PHASE OK] Frame segment connectivity | "
               f"seconds={time.perf_counter()-_phase_clock:.3f} | "
               f"frames={_frame_count} | segments={len(frame_elements)}")
@@ -979,6 +993,18 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
         payload['joint_volume_weight_audit']=report.get('joint_volume_weight_audit')
         payload['wall_base_restraint_policy']=cfg['wall_base_restraint_policy']
         payload['added_wall_mesh_support_tags']=extended_wall_supports
+        if elastic_comparison:
+            payload['elastic_etabs_comparison']=elastic_comparison
+            report['elastic_etabs_comparison']={
+                state:dict(frame_segments=len(plan['frame_segments']),
+                           shell_objects=len(plan['shell_objects']),
+                           shells_with_transverse_shear_approximation=sum(
+                               not shell['transverse_shear_exact'] for shell in plan['shell_objects'].values()),
+                           segments_with_offsets=sum(bool(any(r['joint_offsets_m'])) for r in plan['frame_segments']),
+                           shear_flexible_segments=sum(r['shear_flexible'] for r in plan['frame_segments']))
+                for state,plan in elastic_comparison.items()
+            }
+            report['warnings'].append('State-specific elastic ETABS comparison settings applied to the stiffness input only. Review joint reactions and modal results for this rebuilt model.')
         from OpenSees_Storey_Gravity_V131 import export_storey_gravity
         # The user-supplied 2026-11-16 worker log measured 1,614.536 s
         # inside storey gravity and its mesh-level Excel formula exporter.
@@ -1031,10 +1057,10 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
                 'ULS tabulated linear ShellMITC4/ElasticMembranePlateSection candidate selected; OpenSees transverse shear scales with plate bending and DOES NOT exactly equal ETABS source v13/v23. Run tests and separately verify object modifiers before ETABS equivalence.')
         else:
             report['warnings'].append(
-                'Elastic core walls use gross source E/thickness; establish rational cracked-wall stiffness before NBC design use.')
+                'Without explicit elastic shell comparison modifiers, core walls use gross source E/thickness; verify cracked-wall stiffness for NBC design use.')
         report['warnings'] += [
-            'Frame EI uses NBC ULS beam 0.35 and column 0.70; source orientation and diaphragm equivalence need ETABS response comparison.',
-            'Floor bending uses the configured IS 16700 slab factor; membrane EA is preserved by equivalent E/thickness. Physical thickness controls weight.',
+            'Standard elastic ULS frame EI uses beam 0.35 and column 0.70. Explicit elastic ETABS comparison factors take priority for their configured states.',
+            'Standard floor bending uses the project IS 16700 slab factor. Physical thickness controls weight, including in elastic comparison states.',
             'Joint-volume policy is recorded separately from geometric stiffness end offsets. AUDIT_ONLY preserves gross weight, VERIFIED_SINGLE_OWNER requires verified centroidal RCC solids and must be reconciled with ETABS.',
             'Only extracted distributed frame/area loads are assembled; point loads, temperature, prestress and link actions require explicit additional transfer if assigned.']
     except Exception as exc:
@@ -1260,6 +1286,14 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
     if mode not in ('elastic','nonlinear'): raise ValueError('Unknown model mode')
     if gravity_system not in ('UmfPack', 'SparseGeneral'):
         raise ValueError('gravity_system must be UmfPack or SparseGeneral')
+    comparison=data.get('elastic_etabs_comparison',{}).get(limit_state)
+    if comparison is None and limit_state in cfg.get('elastic_etabs_comparison',{}):
+        raise ValueError('Rebuild the configured ETABS comparison state with the current runtime.')
+    if comparison is not None and mode!='elastic':
+        raise ValueError('Use an elastic model for the configured ETABS comparison state.')
+    stiffness_basis=('ETABS_ELASTIC_COMPARISON' if comparison is not None
+                     else cfg.get('linear_shell_stiffness_policy','LEGACY_GROSS_SHELL'))
+    print('[ELASTIC STIFFNESS BASIS]',limit_state,stiffness_basis,flush=True)
     if mode=='nonlinear' and not research and not cfg.get('nonlinear_parameters_reviewed'):
         raise ValueError('Nonlinear model requires reviewed frame and wall constitutive inputs. Set nonlinear_materials_file and nonlinear_wall_fsam_tags in OpenSees_Complete_Model_Config_V118.json after calibration. The elastic assembled model is available for conversion/gravity checks.')
     from OpenSees_Mapping_Audit_V125 import read as read_mapping,OVERRIDES,add_device
@@ -1325,7 +1359,7 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             raise ValueError("ULS tabulated property modifiers cannot be silently applied to the SLS model. Supply a separately reviewed SLS property mapping.")
     shell_audit={}
     tag=100000; used_sections={}; element_map={}; element_labels={}
-    for e in data['frames']:
+    for index,e in enumerate(data['frames']):
         tag+=1; p=e['properties']
         element_labels[tag] = dict(
             source_object=str(e['object']), category=e['category'],
@@ -1335,7 +1369,10 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             if 'SOLVER:'+str(tag) not in overrides and sum(q['object']==e['object'] for q in data['frames'])!=1:
                 raise ValueError('Segmented brace: assign individual solver segments after reviewing intermediate connections.')
             add_device(ops,tag,e,selection);element_map.setdefault('FRAME:'+e['object'],[]).append(tag);continue
-        ops.geomTransf('PDelta',tag,*e['basis'][2])
+        override=comparison['frame_segments'][index] if comparison is not None else None
+        joint_offsets=override['joint_offsets_m'] if override else ()
+        transform_args=('-jntOffset',*joint_offsets) if any(joint_offsets) else ()
+        ops.geomTransf('PDelta',tag,*e['basis'][2],*transform_args)
         if mode=='elastic':
             factor=1. if p['E']>1e8 else (.9 if limit_state=='SLS' else .7) if e['category']=='COLUMN' else (.7 if limit_state=='SLS' else .35)
             # OpenSees release codes: 1=i, 2=j, 3=both. Condensed beam
@@ -1343,7 +1380,15 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             # means no torsion transfer through the member.
             # https://opensees.github.io/OpenSeesDocumentation/user/manual/model/elements/elasticBeamColumn.html
             rel=int(e.get('release_i',False))+2*int(e.get('release_j',False))
-            ops.element('elasticBeamColumn',tag,*e['nodes'],p['A'],p['E'],p['G'],0. if e.get('hinged_brace') else p['J'],p['Iy']*factor,p['Iz']*factor,tag,'-releasey',rel,'-releasez',rel)
+            if override and override['shear_flexible']:
+                q=override['properties']
+                ops.element('ElasticTimoshenkoBeam',tag,*e['nodes'],p['E'],p['G'],
+                            q['A'],q['J'],q['Iy'],q['Iz'],q['As2'],q['As3'],tag,'-geomNonlinear')
+            else:
+                q=override['properties'] if override else {**p,'Iy':p['Iy']*factor,'Iz':p['Iz']*factor}
+                ops.element('elasticBeamColumn',tag,*e['nodes'],q['A'],p['E'],p['G'],
+                            0. if e.get('hinged_brace') else q['J'],q['Iy'],q['Iz'],tag,
+                            '-releasey',rel,'-releasez',rel)
         else:
             if e.get('hinged_brace') and research:
                 # Explicit idealized axial brace; no buckling/fracture capability claimed.
@@ -1368,9 +1413,14 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             if fibers<2:raise ValueError('E_SFI wall needs separated axial macro-fibers; a single centered fiber does not supply in-plane flexural stiffness')
             ops.element('E_SFI_MVLEM_3D',tag,*e['nodes'],fibers,'-thick',*[p['thickness']]*fibers,'-width',*[width/fibers]*fibers,'-mat',*[fsam]*fibers,'-Density',0.)
         else:
-            if key not in used_sections:
-                sec=500000+len(used_sections); used_sections[key]=sec
-                if linear_shell_policy=="TABULATED_REVIEWED_THIN_SHELL":
+            shell_override=comparison['shell_objects'].get(str(e['object'])) if comparison is not None else None
+            section_key=(key,str(e['object'])) if shell_override else key
+            if section_key not in used_sections:
+                sec=500000+len(used_sections); used_sections[section_key]=sec
+                if shell_override:
+                    from components.model.linear_shell_stiffness import section_command
+                    section_command(ops,sec,shell_override)
+                elif linear_shell_policy=="TABULATED_REVIEWED_THIN_SHELL":
                     from components.model.linear_shell_stiffness import (
                         shell_section_parameters,section_command)
                     by_prop=cfg.get("linear_shell_modifiers_by_property",{})
@@ -1392,7 +1442,7 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
                     factor=float(cfg.get('slab_bending_factor_sls',.35) if limit_state=='SLS' else cfg['slab_bending_factor']) if e['category']=='FLOOR' else (.7 if limit_state=='SLS' else .5) if research_elastic_walls and e['category']=='SHEAR WALL' else 1.
                     root=math.sqrt(_positive(factor,'slab bending factor'))
                     ops.section('ElasticMembranePlateSection',sec,p['E']/root,p['nu'],p['thickness']*root,0.)
-            ops.element('ShellMITC4',tag,*e['nodes'],used_sections[key])
+            ops.element('ShellMITC4',tag,*e['nodes'],used_sections[section_key])
         element_map.setdefault('AREA:'+e['object'],[]).append(tag)
     if linear_shell_policy=="TABULATED_REVIEWED_THIN_SHELL":
         # Report is bound to the model's original config hash; the shell model
@@ -1452,6 +1502,8 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
                 gravity_base_support_tags=[int(n) for n,flags in data['supports'].items() if flags[2]],
                 gravity_support_strategy=requested_strategy,
                 gravity_added_support_nodes=added_gravity_supports,
+                stiffness_basis=stiffness_basis,
+                model_config_sha256=data.get('config_sha256'),
                 research_profile=research_profile,
                 scope='EXPLORATORY_ASSUMED_MATERIALS_NOT_DESIGN_ACCEPTANCE'
                 if research else 'REVIEWED_MODEL_INPUT_GATE')

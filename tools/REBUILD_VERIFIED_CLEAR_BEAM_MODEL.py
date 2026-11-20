@@ -143,11 +143,13 @@ def _resolve_inputs(argv=None):
     parser.add_argument("--source-dir",default=None)
     parser.add_argument("--assignment-workbook",default=None)
     parser.add_argument("--dest-dir",default=None)
+    parser.add_argument("--elastic-comparison-settings",type=Path,
+                        help="JSON containing the state-specific ETABS elastic comparison settings")
     args=parser.parse_args(argv)
     supplied=(args.source_dir,args.assignment_workbook,args.dest_dir)
     if all(supplied):
-        return supplied
-    if any(supplied):
+        return (*supplied,args.elastic_comparison_settings) if args.elastic_comparison_settings else supplied
+    if any(supplied) or args.elastic_comparison_settings:
         parser.error("Provide ALL three flags together; no mixing CLI and dialogs.")
     return _choose_in_spyder()
 
@@ -157,12 +159,13 @@ def main(argv=None):
     if selection is None:
         print("[CANCELLED] No files changed; no gravity model generated.",flush=True)
         return None
-    source,workbook,target=selection
+    source,workbook,target=selection[:3]
+    settings=selection[3] if len(selection)>3 else None
     print("[START] Source: "+str(Path(source).resolve()),flush=True)
     print("[START] Workbook: "+Path(workbook).name,flush=True)
     print("[START] New export: "+str(Path(target).resolve()),flush=True)
     try:
-        result=rebuild_verified_clear_beam(source,workbook,target)
+        result=rebuild_verified_clear_beam(source,workbook,target,elastic_settings_path=settings)
     except Exception as exc:
         print("[BLOCKED] "+type(exc).__name__+": "+str(exc),flush=True)
         print("Original ETABS model and source export remain unchanged.",flush=True)
@@ -178,9 +181,15 @@ def main(argv=None):
     return result
 
 
-def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destination_dir):
+def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destination_dir, *,
+                                elastic_settings_path=None):
     source,native,target=_verify_before_creating_output(
         source_dir,native_assignment_workbook,destination_dir)
+    elastic_settings=None
+    if elastic_settings_path is not None:
+        elastic_settings=json.loads(Path(elastic_settings_path).read_text(encoding="utf-8-sig"))
+        if not isinstance(elastic_settings,dict) or not elastic_settings:
+            raise ValueError("Elastic comparison settings must contain at least one stiffness state")
     print("[RUNNING] Preflight source JSON and native ETABS Excel tables verified.",
           flush=True)
     target.mkdir(parents=True,exist_ok=False)
@@ -217,6 +226,8 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         cfg["etabs_clear_beam_weight_confirmed"]=True
         cfg["joint_volume_weight_policy"]="AUDIT_ONLY"
         cfg["etabs_native_assignment_workbook_path"]=str(native)
+        if elastic_settings is not None:
+            cfg["elastic_etabs_comparison"]=elastic_settings
         (target/"OpenSees_Complete_Model_Config_V118.json").write_text(
             json.dumps(cfg,indent=2,default=str),encoding="utf-8")
         audit["status"]="ASSEMBLING_VERIFIED_CORRECTED_EXPORT"
@@ -248,6 +259,8 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         audit["result"]=str(result)
         audit["gravity_state"]="NOT_RUN"
         audit["individual_32_reactions"]="NOT_VALIDATED"
+        if report.get("elastic_etabs_comparison"):
+            audit["elastic_etabs_comparison"]=report["elastic_etabs_comparison"]
         write_status()
         return audit
     except Exception as exc:

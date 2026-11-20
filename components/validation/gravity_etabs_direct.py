@@ -359,6 +359,9 @@ def compare_existing(etabs,open_sees_result):
         percent_difference=percent,
         matched_edb_identity=etabs.get('matched_edb_identity',False),
         model_identity_status=etabs.get('model_identity_status','UNVERIFIED'),
+        opensees_support_strategy=open_sees_result.get('wall_support_strategy','UNRECORDED'),
+        opensees_stiffness_basis=r.get('stiffness_basis','UNRECORDED'),
+        opensees_model_config_sha256=r.get('model_config_sha256'),
         limitations=['Only global reaction totals compared; self-weight, slab forces and displacement equivalence remain to be checked.'])
 
 def export_direct(folder,etabs,comp):

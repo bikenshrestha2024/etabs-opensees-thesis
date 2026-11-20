@@ -45,11 +45,17 @@ class GravityDirectAPITests(unittest.TestCase):
         e={'case':'1. DL + LL','summary':{'base_reaction_FZ_kN':319000.0},
            'matched_edb_identity':True}
         o={'ok':True,'gravity_profile':'GRAVITY_1.0D_1.0L',
+           'wall_support_strategy':'ETABS_NONZERO_REACTION_DIAGNOSTIC',
            'report':{'applied_vertical_load_kN':320047.789,
-                     'support_vertical_reaction_kN':320047.789}}
+                     'support_vertical_reaction_kN':320047.789,
+                     'stiffness_basis':'ETABS_ELASTIC_COMPARISON',
+                     'model_config_sha256':'a'*64}}
         v=g.compare_existing(e,o)
         self.assertAlmostEqual(v['difference_kN'],-1047.789,3)
         self.assertAlmostEqual(v['percent_difference'],1047.789/320047.789*100,7)
+        self.assertEqual(v['opensees_support_strategy'],'ETABS_NONZERO_REACTION_DIAGNOSTIC')
+        self.assertEqual(v['opensees_stiffness_basis'],'ETABS_ELASTIC_COMPARISON')
+        self.assertEqual(v['opensees_model_config_sha256'],'a'*64)
         o['gravity_profile']='AS_CONFIGURED'
         with self.assertRaisesRegex(ValueError,'full 1.0D'):
             g.compare_existing(e,o)

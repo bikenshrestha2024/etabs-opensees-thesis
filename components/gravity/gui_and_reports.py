@@ -67,6 +67,8 @@ def _runner_source(model_script, result_path, support_nodes, applied_kN, nsteps,
         "        report = json.loads(report_file.read_text(encoding='utf-8-sig'))",
         "    else:",
         "        report = run_gravity_stage(ops, SUPPORT_NODES, APPLIED_VERTICAL_LOAD_KN, model_nodes=node_tags, nsteps=NSTEPS, freeze=True, system='UmfPack', response_output_dir=RESULT_PATH.parent / 'Gravity_Response')",
+        "    for key in ('stiffness_basis', 'model_config_sha256'):",
+        "        if model_report.get(key): report[key] = model_report[key]",
         "    ops.reactions()",
         "    nodes = []",
         "    for n in node_tags:",
@@ -425,7 +427,7 @@ class GravityAnalysisGUI:
         else:
             self.gravity_busy_bar.stop()
 
-    def _rebuild_verified_clear_beam(self, *, auto=False):
+    def _rebuild_verified_clear_beam(self, *, auto=False, elastic_comparison=False):
         """Recreate model in a new folder; never change original EDB/export.
 
         Auto mode is for the primary Run button only when a source has an
@@ -441,6 +443,13 @@ class GravityAnalysisGUI:
         if not model.is_file():
             messagebox.showerror("Select source model","Select the current exported model first.",parent=self.win)
             return
+        settings=None
+        if elastic_comparison:
+            settings=filedialog.askopenfilename(
+                parent=self.win,title="Select ETABS elastic comparison settings",
+                filetypes=[("Elastic stiffness settings","*.json")])
+            if not settings:
+                return
         native=self.etabs_native_assignment_var.get().strip()
         if not native:
             # The completed ETABS full-table workbook may also contain the
@@ -566,6 +575,8 @@ class GravityAnalysisGUI:
                     "--source-dir",str(source),
                     "--assignment-workbook",str(native),
                     "--dest-dir",str(new)]
+                if settings:
+                    command.extend(("--elastic-comparison-settings",settings))
                 proc=subprocess.run(command,cwd=str(current_root),
                     text=True,capture_output=True,errors="replace",encoding="utf-8")
                 logfile=new/"CLEAR_BEAM_REBUILD_GUI.log"
@@ -590,10 +601,11 @@ class GravityAnalysisGUI:
                                 "Source rebuilt; running with verified selected support scenario.")
                             self.run()
                             return
+                        stiffness_status=("Elastic stiffness comparison settings applied.\n"
+                                          if settings else "")
                         messagebox.showinfo("New corrected model",
-                            "Native ETABS beam evidence checked and new model generated.\n"
-                            "Old gravity results are unchanged.\n"
-                            "Now click Read BOTH support lists, then rerun gravity.\n"+
+                            "Native ETABS beam evidence checked.\n"+stiffness_status+
+                            "Run gravity on the newly selected model to compare support reactions.\n"+
                             str(new),parent=self.win)
                     else:
                         self._set_gravity_operation("BLOCKED",msg)
@@ -886,7 +898,9 @@ class GravityAnalysisGUI:
             except Exception as pack_exc:
                 self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
                     "ETABS direct extraction saved; automatic ZIP failed: "+str(pack_exc))
-            note=(f"ETABS FZ = {comp['etabs_base_FZ_kN']:.3f} kN\n"
+            note=(f"Support case: {comp['opensees_support_strategy']}\n"
+                  f"Stiffness basis: {comp['opensees_stiffness_basis']}\n"
+                  f"ETABS FZ = {comp['etabs_base_FZ_kN']:.3f} kN\n"
                   f"OpenSees RZ = {comp['opensees_support_FZ_kN']:.3f} kN\n"
                   f"Difference = {comp['difference_kN']:.3f} kN "
                   f"({comp['percent_difference']:.4f}%)\n\n"
@@ -895,7 +909,7 @@ class GravityAnalysisGUI:
                   "Model identity: "+str(comp.get('model_identity_status','UNVERIFIED')))
             ranked=comp.get('top_node_discrepancies',[])
             if ranked:
-                note+="\n\nLargest verified support discrepancies (ETABS - OpenSees):"
+                note+="\n\nLargest point differences at matched locations (ETABS - OpenSees):"
                 for row in ranked[:5]:
                     note+=f"\nETABS {row['etabs_point']} / OpenSees {row['opensees_node']}: "
                     note+=f"{row['delta_etabs_minus_opensees_kN']:+.3f} kN"
@@ -903,7 +917,7 @@ class GravityAnalysisGUI:
                 note+="\n\nNo one-to-one verified global-Z support pairs yet; review node audit."
             node_info=comp.get('node_comparison',{})
             if node_info:
-                note+=f"\nMatched verified pairs: {node_info.get('valid_one_to_one_global_z_count',0)}"
+                note+=f"\nMatched global-Z pairs: {node_info.get('valid_one_to_one_global_z_count',0)}"
                 note+=f" | Ambiguous: {node_info.get('ambiguous_count',0)}"
             messagebox.showinfo("Direct ETABS/OpenSees gravity comparison",note,parent=self.win)
         except Exception as exc:
@@ -1214,6 +1228,9 @@ class GravityAnalysisGUI:
         self.batch_run_button.pack(side="left",padx=5)
         ttk.Button(bar,text="REBUILD verified beam weight in NEW folder",
                    command=self._rebuild_verified_clear_beam).pack(side="left",padx=5)
+        ttk.Button(root,text="Rebuild with ETABS elastic settings",
+                   command=lambda:self._rebuild_verified_clear_beam(elastic_comparison=True)
+                   ).pack(anchor="w",pady=(0,7))
         ttk.Label(bar,text="Selected condition: ").pack(side="left",padx=(12,2))
         ttk.Label(bar,textvariable=self.gravity_profile_var).pack(side="left")
         ttk.Label(bar,textvariable=self.wall_support_strategy_var).pack(side="left",padx=8)
