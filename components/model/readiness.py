@@ -320,3 +320,70 @@ def format_readiness_blockers(diagnosis: Dict[str, Any]) -> str:
     lines = [f"  {i}. [{b['code']}] {b['message']} Fix: {b['fix']}"
              for i, b in enumerate(diagnosis.get("blockers", []), 1)]
     return "\n".join(lines)
+
+
+_NON_GATE_BLOCKER_CODES = ("material_file_missing", "material_file_not_found",
+                           "wall_fsam_tags_empty", "parameters_not_reviewed")
+
+
+def material_prerequisite_notice(diagnosis: Dict[str, Any]) -> str:
+    """Text for blockers the run gate does not itself enforce (materials, FSAM, review).
+
+    Empty string when none apply. Display only; never changes any approval state.
+    """
+    items = [b for b in diagnosis.get("blockers", []) if b.get("code") in _NON_GATE_BLOCKER_CODES]
+    if not items:
+        return ""
+    lines = ["Material/model prerequisites still open (reported by the diagnosis; the run gate "
+             "does not raise on these, so resolve them before relying on a gate pass):"]
+    lines += [f"  - [{b['code']}] {b['message']}" for b in items]
+    return "\n".join(lines)
+
+
+def bind_readiness_draft(template_path: Union[str, Path], model_script: Union[str, Path],
+                         out_path: Union[str, Path, None] = None) -> Path:
+    """Write (or keep) a model-bound UNAPPROVED readiness draft and return its path.
+
+    The draft copies the template, binds the absolute ``model_script`` and its
+    SHA-256, sets every check False, ``approved_for_nltha`` False and status
+    ``UNAPPROVED DRAFT``. Nothing is ever set True. Default location is
+    ``OpenSees_Model_Readiness_Draft_<model stem>_V134.json`` beside the model.
+
+    An existing file with ``approved_for_nltha`` True (or one that cannot be
+    read, so approval cannot be ruled out) raises ``RuntimeError`` and is left
+    untouched. An existing unapproved draft already bound to this model and
+    hash is returned unchanged (idempotent; human-saved evidence is kept). A
+    stale unapproved draft (other model or changed hash) is rebuilt all-False.
+    """
+    import hashlib
+    model = Path(model_script).expanduser().resolve()
+    if not model.is_file():
+        raise FileNotFoundError("Select an existing nonlinear model-builder script first")
+    digest = hashlib.sha256(model.read_bytes()).hexdigest()
+    out = (Path(out_path).expanduser() if out_path is not None
+           else model.with_name("OpenSees_Model_Readiness_Draft_" + model.stem + "_V134.json"))
+    if out.exists():
+        try:
+            existing = json.loads(out.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError) as exc:
+            raise RuntimeError(f"Existing readiness file is unreadable and was not overwritten: {out}") from exc
+        if not isinstance(existing, dict):
+            raise RuntimeError(f"Existing readiness file is not a JSON object and was not overwritten: {out}")
+        if existing.get("approved_for_nltha") is True:
+            raise RuntimeError(f"Refusing to overwrite an approved readiness file (approved_for_nltha is True): {out}")
+        recorded = str(existing.get("model_script", "")).strip()
+        if (recorded and Path(recorded).expanduser().resolve() == model
+                and existing.get("model_script_sha256") == digest):
+            return out
+    data = json.loads(Path(template_path).read_text(encoding="utf-8-sig"))
+    data["model_script"] = str(model)
+    data["model_script_sha256"] = digest
+    data["approved_for_nltha"] = False
+    data["status"] = "UNAPPROVED DRAFT"
+    data["checks"] = dict.fromkeys(READINESS_CHECK_KEYS, False)
+    data.setdefault("evidence", {})
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_name(out.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    tmp.replace(out)
+    return out

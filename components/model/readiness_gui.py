@@ -4,14 +4,16 @@ import json,hashlib
 
 
 def prepare(model_script,template=None):
+    """Create or reuse the model-bound UNAPPROVED draft (shared non-GUI implementation)."""
+    from components.model.readiness import bind_readiness_draft
     model=Path(model_script).resolve()
-    if not model.is_file():raise FileNotFoundError('Select an existing nonlinear model-builder script first')
-    from OpenSees_Nonlinear_Time_History_NBC105_V116 import _require_nonlinear_readiness
-    keys=next(c for c in _require_nonlinear_readiness.__code__.co_consts if isinstance(c,tuple) and c and c[0]=='etabs_topology_and_story_mapping_reviewed')
-    data=dict(schema='OpenSees_NLTHA_Readiness_V134',model_script=str(model),model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),approved_for_nltha=False,checks=dict.fromkeys(keys,False),evidence={})
-    path=model.with_name('OpenSees_Model_Readiness_Draft_'+model.stem+'_V134.json')
-    if not path.exists():path.write_text(json.dumps(data,indent=2),encoding='utf-8')
-    return path
+    if template is None:
+        import components.model.readiness as _r
+        for root in (Path(_r.__file__).resolve().parents[2],model.parent,Path.cwd()):
+            template=root/'OpenSees_Model_Readiness_Template_V116.json'
+            if template.is_file():break
+        else:raise FileNotFoundError('OpenSees_Model_Readiness_Template_V116.json not found')
+    return bind_readiness_draft(template,model)
 
 
 def available_evidence(model_script):
@@ -64,6 +66,9 @@ def launch(parent,model_script,readiness_variable):
     cfg=model.with_name('OpenSees_Complete_Model_Config_V118.json')
     if cfg.exists():
         config=json.loads(cfg.read_text(encoding='utf-8-sig'));ttk.Label(win,text='PRODUCTION MODEL: nonlinear_parameters_reviewed='+str(config.get('nonlinear_parameters_reviewed'))+'; approved model-bound materials file='+str(config.get('nonlinear_materials_file') or 'NOT CONFIGURED')+'; wall FSAM property mappings='+str(len(config.get('nonlinear_wall_fsam_tags',{})))+'. Exploratory PEER materials are assigned dynamically in a separate model and cannot be treated as approved source reinforcement.',wraplength=1100,foreground='#9a3e1d').pack(anchor='w')
+    from components.model.readiness import diagnose_nonlinear_readiness,material_prerequisite_notice
+    notice=material_prerequisite_notice(diagnose_nonlinear_readiness({'model_script':str(model),'model_readiness_json':str(path)}))
+    if notice:ttk.Label(win,text=notice,wraplength=1100,foreground='#9a3e1d').pack(anchor='w')
     from OpenSees_Research_UI_V123 import scrollable_form
     footer=ttk.Frame(win);footer.pack(side='bottom',fill='x',padx=8,pady=8)
     body=ttk.Frame(win);body.pack(fill='both',expand=True);form=scrollable_form(body,min_width=850);checks={};evidence={}
