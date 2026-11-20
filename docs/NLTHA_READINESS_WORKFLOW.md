@@ -37,7 +37,7 @@ Changing the checklist alone does not clear the material and FSAM part of the me
 
 ## 2. See every blocker at once
 
-`diagnose_nonlinear_readiness(config)` in `components/model/readiness.py` returns `{ready, blockers:[{code, message, fix}]}`. It is read-only. Codes: `model_script_missing`, `manifest_missing`, `manifest_unreadable`, `template_unbound`, `bound_to_other_model`, `model_sha_mismatch`, `not_approved`, `check_false:<key>` (one per false key), `material_file_missing`, `material_file_not_found`, `wall_fsam_tags_empty`, `parameters_not_reviewed`, `binding_not_recorded`, `model_config_changed`, `material_file_changed`, `wall_fsam_tags_changed`.
+`diagnose_nonlinear_readiness(config)` in `components/model/readiness.py` returns `{ready, blockers:[{code, message, fix}]}`. It is read-only. Codes: `model_script_missing`, `manifest_missing`, `manifest_unreadable`, `template_unbound`, `bound_to_other_model`, `model_sha_mismatch`, `not_approved`, `check_false:<key>` (one per false key), `material_file_missing`, `material_file_not_found`, `wall_fsam_tags_empty`, `parameters_not_reviewed`, `binding_not_recorded`, `model_config_changed`, `material_file_changed`, `wall_fsam_tags_changed`, `stale_runtime_copy`.
 
 The gate keeps its original exceptions and messages and now appends this blocker list to each `RuntimeError`. The material, FSAM and `parameters_not_reviewed` blockers are reported in the list; for an unapproved manifest they do not add a raise (the 16 checks and approval decide). For an approved manifest the gate also raises on the input-binding blockers in section 5.
 
@@ -96,6 +96,27 @@ Gate behavior, after the older checks have passed (so every older message is unc
 
 Limits that remain: `nonlinear_parameters_reviewed` is not part of the hash comparison except through the config file hash; files that the material file itself refers to are not hashed; and the hashes prove the files are unchanged since a human saved the checklist, not that their contents are correct.
 
+## 5a. Stale runtime copies (guard in active code)
+
+Saved projects can carry a frozen runtime copy such as `Saved_Project_V156/OpenSees_Runtime_V118/`. It is immutable evidence and is never edited or annotated. Its `runner_and_gui.py` still has the pre-gate readiness check (no blocker list, no input-hash binding) and its `application.py` opens the original EDB in place. The guard therefore lives only in active code: `detect_stale_runtime(path, include_children=False)` and `runtime_copy_notice(model_script)` in `components/model/readiness.py` (read-only; they work on paths that do not exist and write nothing).
+
+Rule. The runtime root for a path is the nearest folder, walking up from the path (or its parent, for a file), that is named `OpenSees_Runtime_V<digits>*` or contains `components/nonlinear_time_history/runner_and_gui.py`. The copy is stale if any of these is true:
+
+| Reason | Condition |
+|---|---|
+| `runner_source_missing` | `components/nonlinear_time_history/runner_and_gui.py` is absent |
+| `runner_lacks_active_gate` | the runner text lacks any of `diagnose_nonlinear_readiness`, `format_readiness_blockers`, `gate_binding_blockers` |
+| `readiness_module_missing` | `components/model/readiness.py` is absent |
+| `readiness_module_lacks_fingerprint` | that file lacks any of `READINESS_CHECK_KEYS`, `def diagnose_nonlinear_readiness`, `def gate_binding_blockers` |
+
+The markers are constants (`ACTIVE_GATE_RUNNER_MARKERS`, `ACTIVE_GATE_MODULE_MARKERS`); a test checks that the active tree passes its own fingerprint, so renaming one of them fails the test. A copy refreshed to the PR #124 gate but without the binding check is stale. This is a text fingerprint, not proof that two files are identical.
+
+Where it shows up:
+
+- `diagnose_nonlinear_readiness` adds the blocker `stale_runtime_copy` only when the selected model script lies inside such a runtime copy (ancestor folders only). It is reported, not raised by the gate: code running from the active tree is not the stale gate, and a model script that sits inside a stale copy is the case to fix by moving to active code.
+- The readiness GUI launch notice also checks the `OpenSees_Runtime_V*` folders directly beside the model script (`include_children=True`) and shows a red warning, because the real V156 model script sits next to its runtime copy, not inside it. This is a warning only.
+- Checked against the real `Saved_Project_V156/OpenSees_Runtime_V118/` as a read-only fixture: stale (`runner_lacks_active_gate`, `readiness_module_lacks_fingerprint`); the test also confirms no file there changed.
+
 ## 6. ETABS ingestion guards
 
 These apply when converting an ETABS model (`components/ui/application.py`, helpers in `components/validation/gravity_etabs_direct.py`, `components/model/assembly.py`):
@@ -122,10 +143,10 @@ No solver PASS is engineering acceptance.
 ## 8. PENDING (not run)
 
 - Native Windows and ETABS COM runs of the Task 3 ingestion guards (OpenFile on the copy, present-units read-back, side-file cleanup, linked-file paths from the copy location).
-- tkinter GUI behavior (readiness GUI prepare, launch notice, and the save/rebind code that records the binding hashes and refuses an unbindable approval); the sandbox has no tkinter. The shared helpers are tested headless.
-- Runtime copies under saved projects (for example `Saved_Project_V156/OpenSees_Runtime_V118/`, launched by `17_BUILDING_FULL_NONLINEAR.py`) keep the pre-branch readiness gate and ingestion until the runtime is refreshed; the `application.py` there still opens the original EDB in place. The statement that the source EDB is not opened applies to the active `components/` code only.
+- tkinter GUI behavior (readiness GUI prepare, launch notice including the stale-runtime warning, and the save/rebind code that records the binding hashes and refuses an unbindable approval); the sandbox has no tkinter. The shared helpers are tested headless.
+- Refreshing or retiring the runtime copies under saved projects (for example `Saved_Project_V156/OpenSees_Runtime_V118/`, launched by `17_BUILDING_FULL_NONLINEAR.py`). They are not edited; they keep the pre-branch readiness gate and in-place EDB open. Section 5a only detects and warns (diagnosis blocker `stale_runtime_copy`, GUI notice); it does not stop someone launching the copy directly. The statement that the source EDB is not opened applies to the active `components/` code only.
 - Full-model NLTHA on the project building.
 - Project reinforcement schedule and FVD/BRB calibration.
 - All 16 checks and `approved_for_nltha` remain False until you complete them.
 
-Evidence notes: `engineering/agent_edits/20261120_nltha_readiness_gate.md`, `engineering/agent_edits/20261120_etabs_ingest_guards.md`.
+Evidence notes: `engineering/agent_edits/20261120_nltha_readiness_gate.md`, `engineering/agent_edits/20261120_etabs_ingest_guards.md`, `engineering/agent_edits/20261120_nltha_binding_runtime_guard.md`.

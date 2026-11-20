@@ -338,6 +338,99 @@ def gate_binding_blockers(diagnosis: Dict[str, Any], data: Dict[str, Any]) -> Li
     return [b for b in diagnosis.get("blockers", []) if b.get("code") in codes]
 
 
+# ---------------------------------------------------------------------------
+# Stale runtime-copy detection (read-only). A "runtime copy" is a frozen copy of
+# the code tree (for example Saved_Project_V156/OpenSees_Runtime_V118/) that can
+# run the nonlinear workflow with an older readiness gate. This only reads files;
+# it never edits a runtime copy.
+#
+# Rule. The runtime root for a path is the nearest folder, starting at the path
+# (or its parent, for a file) and walking up, that is named ``OpenSees_Runtime_V<digits>*``
+# or contains ``components/nonlinear_time_history/runner_and_gui.py``. The copy is STALE
+# when any of these hold:
+#   runner_source_missing                runner_and_gui.py absent
+#   runner_lacks_active_gate             runner text lacks any ACTIVE_GATE_RUNNER_MARKERS
+#   readiness_module_missing             components/model/readiness.py absent
+#   readiness_module_lacks_fingerprint   that file lacks any ACTIVE_GATE_MODULE_MARKERS
+# The markers are the active gate's blocker-list call, binding check and key tuple, so a
+# copy that predates the gate (or the input-binding check) is stale. This is a text
+# fingerprint, not proof that two files are identical.
+# ---------------------------------------------------------------------------
+ACTIVE_GATE_RUNNER_MARKERS = ("diagnose_nonlinear_readiness", "format_readiness_blockers", "gate_binding_blockers")
+ACTIVE_GATE_MODULE_MARKERS = ("READINESS_CHECK_KEYS", "def diagnose_nonlinear_readiness", "def gate_binding_blockers")
+_RUNNER_REL = ("components", "nonlinear_time_history", "runner_and_gui.py")
+_READINESS_REL = ("components", "model", "readiness.py")
+
+
+def _is_runtime_dir_name(name: str) -> bool:
+    import re
+    return re.match(r"^OpenSees_Runtime_V\d+", name, re.IGNORECASE) is not None
+
+
+def _check_runtime_root(root: Path) -> Dict[str, Any]:
+    reasons: List[str] = []
+    runner = root.joinpath(*_RUNNER_REL)
+    mod = root.joinpath(*_READINESS_REL)
+
+    def _text(p: Path) -> Optional[str]:
+        try:
+            return p.read_text(encoding="utf-8-sig", errors="replace") if p.is_file() else None
+        except OSError:
+            return None
+    rtext, mtext = _text(runner), _text(mod)
+    if rtext is None:
+        reasons.append("runner_source_missing")
+    elif any(m not in rtext for m in ACTIVE_GATE_RUNNER_MARKERS):
+        reasons.append("runner_lacks_active_gate")
+    if mtext is None:
+        reasons.append("readiness_module_missing")
+    elif any(m not in mtext for m in ACTIVE_GATE_MODULE_MARKERS):
+        reasons.append("readiness_module_lacks_fingerprint")
+    return {"runtime_root": str(root), "stale": bool(reasons), "reasons": reasons}
+
+
+def detect_stale_runtime(path: Union[str, Path], include_children: bool = False) -> Dict[str, Any]:
+    """Report whether ``path`` (a file or folder) lives in a runtime copy that predates the active gate.
+
+    Returns ``{stale, runtime_root, reasons, copies}``. ``copies`` lists every runtime
+    root examined (``runtime_root``/``stale``/``reasons``); the top-level fields describe the
+    first stale copy, else the first copy, else ``None``/``[]``. With ``include_children`` the
+    ``OpenSees_Runtime_V*`` folders directly inside the path's own folder are also examined
+    (a project folder whose packaged runtime is old). Read-only; works for paths that do not exist.
+    """
+    p = Path(path).expanduser().resolve()
+    start = p if p.is_dir() else p.parent
+    copies: List[Dict[str, Any]] = []
+    for d in [start, *start.parents]:
+        if _is_runtime_dir_name(d.name) or d.joinpath(*_RUNNER_REL).is_file():
+            copies.append(_check_runtime_root(d))
+            break
+    if include_children and start.is_dir():
+        try:
+            kids = sorted(c for c in start.iterdir() if c.is_dir() and _is_runtime_dir_name(c.name))
+        except OSError:
+            kids = []
+        copies.extend(_check_runtime_root(c.resolve()) for c in kids)
+    chosen = next((c for c in copies if c["stale"]), copies[0] if copies else None)
+    return {"stale": any(c["stale"] for c in copies),
+            "runtime_root": chosen["runtime_root"] if chosen else None,
+            "reasons": list(chosen["reasons"]) if chosen else [],
+            "copies": copies}
+
+
+def runtime_copy_notice(model_script: Union[str, Path]) -> str:
+    """Loud warning text when the model sits in, or beside, a stale runtime copy; else ''. Display only."""
+    r = detect_stale_runtime(model_script, include_children=True)
+    stale = [c for c in r["copies"] if c["stale"]]
+    if not stale:
+        return ""
+    lines = ["WARNING: stale runtime copy. A runtime copy predates the active readiness gate; it may run an "
+             "older gate without the blocker list or input-hash binding, and may open the ETABS EDB in place. "
+             "Do not run it for NLTHA; use the active components/ code (the copy is immutable evidence and is not edited):"]
+    lines += [f"  - {c['runtime_root']} ({', '.join(c['reasons'])})" for c in stale]
+    return "\n".join(lines)
+
+
 def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
     """Return ``{ready, blockers:[{code,message,fix}]}`` for an NLTHA run config.
 
@@ -428,6 +521,14 @@ def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
             "Review reinforcement, confinement and cyclic parameters, then record the review in the model config."))
     if data is not None and bound_ok:
         blockers.extend(_binding_blockers(data, model, config))
+    stale = detect_stale_runtime(model)
+    if stale["stale"]:
+        blockers.append(_blocker(
+            "stale_runtime_copy",
+            f"The model script is inside a runtime copy that predates the active readiness gate: {stale['runtime_root']} "
+            f"({', '.join(stale['reasons'])}).",
+            "Do not run from this copy. Use the active components/ code and a model script outside the stale runtime; "
+            "the saved runtime is immutable evidence and is not edited."))
     return {"ready": not blockers, "blockers": blockers}
 
 

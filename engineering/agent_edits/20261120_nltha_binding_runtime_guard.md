@@ -13,3 +13,15 @@ Edited paths
 Tests run (headless, `cd /home/claude/etabs-opensees-thesis && PYTHONPATH=$PWD python -m pytest -q <files>`): see the commit report; exact commands and counts are in the task report.
 
 Scientific gates: code never sets `approved_for_nltha` or any check True. Hashes prove files are unchanged since a human saved the checklist, not that their contents are correct. No solver PASS is claimed as engineering acceptance.
+
+## Task 2: stale runtime-copy guard
+Nothing under `Saved_Project_V156/` was added or edited (immutable evidence); a test snapshots the real `OpenSees_Runtime_V118/` before and after and compares hashes.
+
+Edited paths
+- `components/model/readiness.py`: `detect_stale_runtime`, `runtime_copy_notice`, `ACTIVE_GATE_RUNNER_MARKERS`, `ACTIVE_GATE_MODULE_MARKERS`; `diagnose_nonlinear_readiness` adds blocker `stale_runtime_copy`.
+- `components/model/readiness_gui.py`: launch notice shows the stale-runtime warning.
+- `tests/test_nltha_stale_runtime.py` (new): synthetic fixtures plus the real `OpenSees_Runtime_V118` as read-only fixture.
+- `docs/NLTHA_READINESS_WORKFLOW.md` section 5a (exact rule) and the PENDING list.
+No new module and no CANONICAL_MODULES.csv change (existing module extended).
+
+PENDING: tkinter GUI behavior of the new warning (not run; sandbox has no tkinter); native Windows/ETABS runs; the saved runtime copy is detected and warned about, not refreshed, and can still be launched directly; full-model NLTHA, project reinforcement and FVD/BRB calibration.

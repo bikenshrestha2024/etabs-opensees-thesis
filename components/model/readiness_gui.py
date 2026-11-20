@@ -69,6 +69,9 @@ def launch(parent,model_script,readiness_variable):
     from components.model.readiness import diagnose_nonlinear_readiness,material_prerequisite_notice
     notice=material_prerequisite_notice(diagnose_nonlinear_readiness({'model_script':str(model),'model_readiness_json':str(path)}))
     if notice:ttk.Label(win,text=notice,wraplength=1100,foreground='#9a3e1d').pack(anchor='w')
+    from components.model.readiness import runtime_copy_notice
+    stale_notice=runtime_copy_notice(model)
+    if stale_notice:ttk.Label(win,text=stale_notice,wraplength=1100,foreground='#b00020').pack(anchor='w')
     from OpenSees_Research_UI_V123 import scrollable_form
     footer=ttk.Frame(win);footer.pack(side='bottom',fill='x',padx=8,pady=8)
     body=ttk.Frame(win);body.pack(fill='both',expand=True);form=scrollable_form(body,min_width=850);checks={};evidence={}
