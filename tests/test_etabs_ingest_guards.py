@@ -65,7 +65,8 @@ class TestWorkingCopy(unittest.TestCase):
             self.assertFalse(copy.parent.exists())
             self.assertEqual(hashlib.sha256(src.read_bytes()).hexdigest(), digest)
             self.assertEqual(src.stat().st_mtime_ns, mtime)
-            self.assertFalse(os.access(src, os.W_OK) and False)
+            self.assertEqual(stat.S_IMODE(src.stat().st_mode), stat.S_IREAD)  # mode untouched (root-safe)
+            self.assertEqual(src.read_bytes(), b"EDBDATA")
             os.chmod(src, stat.S_IWRITE | stat.S_IREAD)
 
     def test_cleanup_removes_etabs_side_files(self):
@@ -177,6 +178,157 @@ class TestNoTopLevelTkinter(unittest.TestCase):
         for line in src.splitlines():
             if line.startswith(("import ", "from ")):
                 self.assertNotIn("tkinter", line)
+
+
+def _load_application():
+    """Import components.ui.application with stub tkinter modules (tkinter is absent in CI)."""
+    import importlib
+    import types
+    from unittest import mock
+    stubs = {n: types.ModuleType(n) for n in ("tkinter", "tkinter.filedialog", "tkinter.messagebox", "tkinter.ttk")}
+    for n in ("filedialog", "messagebox", "ttk"):
+        setattr(stubs["tkinter"], n, stubs["tkinter." + n])
+    root = str(Path(__file__).resolve().parents[1])
+    with mock.patch.dict(sys.modules, stubs), mock.patch.object(sys, "path", [root] + sys.path):
+        sys.modules.pop("components.ui.application", None)
+        return importlib.import_module("components.ui.application")
+
+
+class FakeFile:
+    def __init__(self, owner):
+        self.owner = owner
+
+    def OpenFile(self, path):
+        self.owner.opened = path
+        return 0
+
+    def Close(self, save):
+        self.owner.events.append("file_close")
+        return 0
+
+
+class FakeEtabs:
+    def __init__(self, units_after=4):
+        self.events, self.opened, self.exit_calls = [], None, 0
+        self.exists_at_exit = None
+        self.units_after = units_after
+        self.SapModel = self
+        self.File = FakeFile(self)
+
+    def ApplicationStart(self):
+        return 0
+
+    def ApplicationExit(self, save):
+        self.exit_calls += 1
+        self.exists_at_exit = os.path.exists(self.opened) if self.opened else None
+        self.events.append("exit")
+        return 0
+
+    def SetPresentUnits(self, u):
+        return 0
+
+    def GetPresentUnits(self):
+        return self.units_after
+
+
+class FakeComtypes:
+    def __init__(self, etabs):
+        helper = type("H", (), {"CreateObjectProgID": lambda self_, progid: etabs,
+                                "QueryInterface": lambda self_, x: self_})()
+        self.client = type("C", (), {"CreateObject": staticmethod(lambda progid: helper)})()
+        self.gen = type("G", (), {})()
+
+
+class TestApplicationWiring(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _load_application()
+
+    def _edb(self, d):
+        edb = Path(d) / "orig.edb"
+        edb.write_bytes(b"EDB")
+        return edb
+
+    def test_connect_failure_closes_etabs_and_keeps_original_error(self):
+        from unittest import mock
+        etabs = FakeEtabs(units_after=4)
+        with tempfile.TemporaryDirectory() as d:
+            holder, logs = [], []
+            with mock.patch.object(self.app, "comtypes", FakeComtypes(etabs)):
+                with self.assertRaises(RuntimeError) as cm:
+                    self.app._connect_etabs(str(self._edb(d)), logs.append, copy_holder=holder)
+            self.assertIn("GetPresentUnits", str(cm.exception))
+            self.assertEqual(etabs.exit_calls, 1)
+            self.assertEqual(etabs.events[:2], ["file_close", "exit"])
+            self.assertEqual(Path(etabs.opened).resolve(), holder[0].resolve())
+            self.assertNotEqual(Path(etabs.opened).resolve(), (Path(d) / "orig.edb").resolve())
+            guards.cleanup_edb_working_copy(holder[0])
+
+    def test_convert_model_exits_etabs_before_removing_copy(self):
+        from unittest import mock
+        etabs = FakeEtabs(units_after=4)
+        with tempfile.TemporaryDirectory() as d:
+            edb, out = self._edb(d), Path(d) / "out"
+            with mock.patch.object(self.app, "comtypes", FakeComtypes(etabs)), \
+                 mock.patch.object(self.app, "ops", object()):
+                with self.assertRaises(RuntimeError):
+                    self.app.convert_model(str(edb), str(out), lambda *a, **k: None)
+            self.assertEqual(etabs.exit_calls, 1)
+            self.assertTrue(etabs.exists_at_exit)           # copy still present when ETABS closed
+            self.assertFalse(Path(etabs.opened).parent.exists())  # then removed in finally
+            self.assertEqual(edb.read_bytes(), b"EDB")
+
+    def test_diaphragm_read_failure_raises_with_point_names(self):
+        class Pt:
+            def GetDiaphragm(self, name):
+                if name == "7":
+                    raise OSError("COM")
+                return ("None", 0, 0)
+        sap = type("S", (), {"PointObj": Pt()})()
+        with self.assertRaises(guards.DroppedPointsError) as cm:
+            self.app._extract_point_diaphragm_assignments(sap, ["6", "7"], lambda *a: None)
+        self.assertEqual(cm.exception.names, ["7"])
+
+
+class TestAssemblyErrorsAreFatal(unittest.TestCase):
+    def test_bad_material_row_reaches_report_and_worker_rejects_it(self):
+        from tools.etabs_conversion_worker import validate_converter_report
+        from tests.test_area_folder_and_hinged_brace_review import BraceReviewContractTests  # noqa: F401
+        with tempfile.TemporaryDirectory() as td:
+            folder = Path(td)
+            runtime = folder / "runtime_source"
+            runtime.mkdir()
+            nodes = {1: [0., 0., 0.], 2: [3., 0., 3.], 4: [0., 0., 3.], 5: [3., 3., 3.], 6: [0., 3., 3.]}
+            sources = {
+                "OpenSees_Element_Connectivity.json": dict(
+                    node_map=[dict(etabs_point_name=str(n), opensees_node_tag=n, coordinates_m=xyz)
+                              for n, xyz in nodes.items()],
+                    elements=[dict(etabs_object="A", category="FLOOR", dimension="area_polygon",
+                                   node_tags=[4, 2, 5, 6])],
+                    rigid_diaphragm_groups=[dict(storey_number=1, master_xyz=[3., 0., 3.], slave_node_tags=[2])]),
+                "OpenSees_Section_Assignment_Audit.json": dict(
+                    frame_assignments=[],
+                    area_assignments=[dict(etabs_area_object="A", assigned_property="Slab", property_type="slab",
+                                           material_name="Concrete", thickness_m=.15,
+                                           material_values=dict(E=3e7, poisson_ratio=.2, weight_per_volume=25))],
+                    frame_distributed_load_assignments=[]),
+                "OpenSees_Load_Conversion_Audit.json": dict(
+                    applied_area_loads=[], base_supports=dict(node_tags=[1]),
+                    etabs_load_pattern_self_weight_multipliers=[dict(pattern="Self Weight", multiplier=1)]),
+                "OpenSees_Source_Model_Metadata_V118.json": dict(present_units=6, pattern_types={}, frames={}),
+            }
+            for name, value in sources.items():
+                (folder / name).write_text(json.dumps(value), encoding="utf-8")
+            with (folder / "ETABS_Materials.csv").open("w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=["name", "isotropic", "weight_mass"])
+                w.writeheader()
+                w.writerow(dict(name="BROKEN", isotropic="(((", weight_mass="(1.0, 1.0, 0)"))
+            _manifest, report = assembly.prepare_complete_export(folder, runtime_dir=runtime)
+            self.assertTrue(any("BROKEN" in e for e in report["assembly_errors"]), report["assembly_errors"])
+            report_file = folder / "OpenSees_Complete_Export_Report_V118.json"
+            self.assertTrue(report_file.is_file())
+            with self.assertRaisesRegex(RuntimeError, "assembly"):
+                validate_converter_report(report_file)
 
 
 if __name__ == "__main__":

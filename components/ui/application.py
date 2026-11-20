@@ -150,6 +150,7 @@ def _connect_etabs(edb, log, copy_holder=None):
     except Exception: pass
     errors=[]
     for progid in ("CSI.ETABS.API.ETABSObject",):
+        etabs = sap = None
         try:
             log("[ETABS COM START] CreateObjectProgID " + progid)
             _api_clock=time.perf_counter()
@@ -171,7 +172,15 @@ def _connect_etabs(edb, log, copy_holder=None):
             require_present_units(sap, 6)  # kN, m, C; raises on failure or read-back mismatch
             log("Connected to ETABS; present units verified by GetPresentUnits = kN-m-C (API enum 6).")
             return etabs, sap
-        except Exception as e: errors.append(repr(e))
+        except Exception as e:
+            errors.append(repr(e))
+            # Never leak a started ETABS instance holding the working copy; the original error stays primary.
+            if sap is not None:
+                try: sap.File.Close(False)
+                except Exception as close_exc: log("WARNING: ETABS model close failed after connect error: " + repr(close_exc))
+            if etabs is not None:
+                try: etabs.ApplicationExit(False)
+                except Exception as exit_exc: log("WARNING: ETABS ApplicationExit failed after connect error: " + repr(exit_exc))
     raise RuntimeError("Could not open ETABS model: " + " | ".join(errors))
 
 
