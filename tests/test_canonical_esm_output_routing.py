@@ -25,12 +25,12 @@ class StageOwnedESMTests(unittest.TestCase):
             old=analysis_output_folder(root,"ULS")
             new=analysis_output_folder(root,"ULS",stage="ESM")
             self.assertEqual(old.parent,root/"OpenSees_Analysis_Results")
-            self.assertEqual(new.parent,root/"03_ESM"/"RUNS")
+            self.assertEqual(new.parent,root/"03_ESM"/"RUNS"/"ULS")
             self.assertEqual(old.name,new.name)
             self.assertEqual(canonical_stage_folder("ESM"),"03_ESM")
             self.assertEqual(analysis_output_folder(root,"ULS",stage="LEGACY"),old)
             self.assertEqual(analysis_output_folder(root,"Both",stage="ESM").parent,
-                             root/"03_ESM"/"RUNS")
+                             root/"03_ESM"/"RUNS"/"ULS_SLS")
             with self.assertRaisesRegex(ValueError,"stage"):
                 analysis_output_folder(root,"ULS",stage="UNKNOWN")
 
