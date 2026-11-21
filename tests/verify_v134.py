@@ -26,7 +26,25 @@ class V134Checks(unittest.TestCase):
         from OpenSees_Readiness_GUI_V134 import prepare
         from OpenSees_Nonlinear_Time_History_NBC105_V116 import _require_nonlinear_readiness
         with tempfile.TemporaryDirectory(dir=ROOT/'tests') as t:
-            f=Path(t);model=f/'model.py';model.write_text('# fixture',encoding='utf-8');path=prepare(model);d=json.loads(path.read_text());self.assertFalse(d['approved_for_nltha']);self.assertTrue(all(v is False for v in d['checks'].values()));d.update(model_script='model.py',approved_for_nltha=True,checks=dict.fromkeys(d['checks'],True));path.write_text(json.dumps(d));r=_require_nonlinear_readiness(dict(model_script=str(model),model_readiness_json=str(path)));self.assertEqual(r['model_script'],str(model.resolve()))
+            f = Path(t)
+            model = f / 'model.py'
+            model.write_text('# fixture', encoding='utf-8')
+            (f / 'materials.py').write_text('# fixture materials', encoding='utf-8')
+            model_config = dict(nonlinear_materials_file='materials.py',
+                                nonlinear_wall_fsam_tags={'wall': 1},
+                                nonlinear_parameters_reviewed=True)
+            (f / 'OpenSees_Complete_Model_Config_V118.json').write_text(
+                json.dumps(model_config), encoding='utf-8')
+            path = prepare(model)
+            data = json.loads(path.read_text(encoding='utf-8'))
+            self.assertFalse(data['approved_for_nltha'])
+            self.assertTrue(all(value is False for value in data['checks'].values()))
+            data.update(model_script='model.py', approved_for_nltha=True,
+                        checks=dict.fromkeys(data['checks'], True))
+            path.write_text(json.dumps(data), encoding='utf-8')
+            result = _require_nonlinear_readiness(
+                dict(model_script=str(model), model_readiness_json=str(path)))
+            self.assertEqual(result['model_script'], str(model.resolve()))
     def test_nonlinear_trial_duration_is_capped_and_labeled(self):
         from OpenSees_Nonlinear_Time_History_NBC105_V116 import _analysis_duration_s
         motion={"x":[0.0]*101,"dt_x":0.01,"y":[0.0]*81,"dt_y":0.01}

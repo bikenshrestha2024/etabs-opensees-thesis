@@ -95,6 +95,20 @@ class RebuildEntryTests(unittest.TestCase):
         self.assertEqual(before,self.config.read_bytes())
         self.assertFalse(self.destination.exists())
 
+    def test_changed_edb_blocks_rebuild_before_creating_destination(self):
+        edb=self.root/"Selected.EDB"
+        edb.write_bytes(b"edited after conversion")
+        (self.source/"OpenSees_Element_Connectivity.json").write_text(
+            json.dumps({"source_edb":str(edb)}),encoding="utf-8")
+        context=self.source/"00_SOURCE_MANIFEST"
+        context.mkdir()
+        (context/"PROJECT_CONTEXT.json").write_text(json.dumps(
+            {"source_edb":str(edb),"source_edb_sha256":"0"*64}),encoding="utf-8")
+        with patch("openpyxl.load_workbook",return_value=FakeBook(build.REQUIRED_SHEETS)):
+            with self.assertRaisesRegex(ValueError,"changed since export"):
+                build.rebuild_verified_clear_beam(self.source,self.book,self.destination)
+        self.assertFalse(self.destination.exists())
+
     def test_no_nested_or_existing_output(self):
         for bad in (self.source/"nested",self.source):
             with self.assertRaises((ValueError,FileExistsError)):

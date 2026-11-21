@@ -985,6 +985,7 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                 notes.append('Live wall Aw reconstruction unavailable; imported workbook Aw remains a review input: '+str(exc))
     from components.modal.rayleigh import (
         RAYLEIGH_DISPLACEMENT_BASIS, RAYLEIGH_METHOD_VERSION, rayleigh_result_prefix,
+        verify_empirical_esm_reference,
     )
     from components.modal.rayleigh_ledger_audit import verify_saved_rayleigh_axis
     ray_folder=analysis_output_folder(folder,state)
@@ -994,6 +995,9 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
         if any((directory/old_name).is_file() for directory in
                (ray_folder,folder/'OpenSees_Analysis_Results')):
             notes.append(f'Archived {state} Rayleigh report used retained-node displacements. Rerun the preliminary analysis to refresh the periods.')
+        legacy_name='NBC105_Rayleigh_Preliminary_V126'+('_SLS' if state=='SLS' else '')+'.json'
+        if (ray_folder/legacy_name).is_file():
+            notes.append(f'Archived {state} Rayleigh uses the legacy 1% load reference. Rerun to generate the amplified empirical ESM seed.')
     data=folder/'OpenSees_Complete_Model_Data_V118.json'
     if ray.is_file() and data.is_file():
         import hashlib
@@ -1009,6 +1013,9 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                and ledger.is_file()
                and result.get('story_weights_sha256')==hashlib.sha256(ledger.read_bytes()).hexdigest())
         if valid:
+            import csv
+            with ledger.open(encoding='utf-8-sig', newline='') as stream:
+                source_rows=list(csv.DictReader(stream))
             for axis in ('X','Y'):
                 axis_result=result.get(axis,{})
                 period=axis_result.get('period_s')
@@ -1025,6 +1032,7 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                     # The status string alone is not proof. Reconstruct the
                     # period, force work, floor-translation and reaction audit.
                     proof=verify_saved_rayleigh_axis(axis_result)
+                    verify_empirical_esm_reference(result,axis,source_rows=source_rows)
                     if not math.isclose(proof['period_s'],period,rel_tol=1e-8):
                         valid=False
                 except (ValueError,TypeError,KeyError,OverflowError):
@@ -1033,13 +1041,22 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
                     break
             if valid:
                 for axis in ('X','Y'):put('rayleigh_t'+axis.lower(),result[axis]['period_s'],ray,axis,'period_s')
+                values['rayleigh_empirical_reference'] = {
+                    'settings':result['empirical_esm_settings'],
+                    'story_weights_sha256':result['story_weights_sha256'],
+                    **{axis:{
+                        **result[axis]['empirical_esm_reference'],
+                        'Aw_m2':result[axis]['Aw_m2'],
+                        'rayleigh_period_s':result[axis]['period_s'],
+                    } for axis in ('X','Y')},
+                }
         if not valid:
             notes.append(f'Saved {state} Rayleigh results are stale, incomplete, or inconsistent with the current model, seismic weights, or wall Aw; rerun the preliminary analysis.')
             saved_g=result.get('gravity_acceleration_m_s2')
             from components.nbc105.constants import GRAVITY_M_S2,SUPERSEDED_GRAVITY_M_S2
             if (isinstance(saved_g,(int,float)) and not isinstance(saved_g,bool) and math.isfinite(saved_g)
                     and not math.isclose(saved_g,GRAVITY_M_S2,rel_tol=1e-8)):
-                notes.append(f'Saved {state} Rayleigh results were recorded with g={saved_g:g} m/s^2; this release uses g={GRAVITY_M_S2:g} m/s^2 (NBC 105:2025 printed p. 7; the superseded 2026-11-21 value was {SUPERSEDED_GRAVITY_M_S2:g}), so results saved with any other g are rejected on import and the Rayleigh analysis must be re-run. Until then the ESM period falls back to 1.25 x empirical.')
+                notes.append(f'Saved {state} Rayleigh results were recorded with g={saved_g:g} m/s^2; this release uses g={GRAVITY_M_S2:g} m/s^2 (NBC 105:2025 printed p. 7; the superseded 2026-11-21 value was {SUPERSEDED_GRAVITY_M_S2:g}), so results saved with any other g are rejected on import and the Rayleigh analysis must be re-run.')
     notes.append('Regularity is not inferred from Excel or model symmetry. Confirm NBC §5.4 for the asymmetric building.')
     return dict(values=values,audit=audit,notes=notes)
 

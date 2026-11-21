@@ -2730,11 +2730,19 @@ class App:
             messagebox.showerror("Gravity GUI missing",f"Keep OpenSees_Gravity_GUI_V110.py beside this program.\n\n{gui_path}")
             return
         try:
+            from components.inputs.project_workbooks import _source_edb_path
+            selected=self.edb.get().strip()
+            exported=_source_edb_path(self.out.get())
+            if selected and (not exported or Path(selected).resolve()!=Path(exported).resolve()):
+                raise ValueError("The selected EDB does not match this OpenSees export. "
+                                 "Run ETABS import for the selected EDB before opening Gravity.")
             spec=importlib.util.spec_from_file_location("opensees_gravity_gui",gui_path)
             module=importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             from OpenSees_Complete_Export_V118 import autoselect_inputs
-            autoselect_inputs(module.launch(self.root), self.out.get(), 'gravity_model_script')
+            gui=module.launch(self.root)
+            gui.etabs_edb_path.set(selected or exported)
+            autoselect_inputs(gui,self.out.get(),'gravity_model_script')
         except Exception as exc:
             messagebox.showerror("Could not open gravity GUI",str(exc),parent=self.root)
 

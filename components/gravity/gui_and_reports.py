@@ -863,7 +863,7 @@ class GravityAnalysisGUI:
                     "If the selected ETABS EDB lacks gravity results, the program will "
                     "make a SHA256-verified working COPY of that EDB, then run ETABS "
                     "analysis on the copy.\n\n"
-                    "ETABS may run ALL currently enabled cases, including time histories. "
+                    "The private working copy is configured for the required gravity cases. "
                     "The original source EDB will not be saved or analyzed. "
                     "The working EDB and its analysis files remain in the output folder.\n\n"
                     "Proceed?",parent=self.win):
@@ -907,6 +907,12 @@ class GravityAnalysisGUI:
                   "This is a global reaction check, not engineering acceptance.\n"
                   "Review partial support data and component loads.\n"
                   "Model identity: "+str(comp.get('model_identity_status','UNVERIFIED')))
+            note+=f"\nETABS source: {comp['selected_etabs_edb']}\n"
+            note+=f"SHA-256: {comp['selected_etabs_edb_sha256'][:16]}…"
+            if comp['opensees_stiffness_basis']=='LEGACY_GROSS_SHELL':
+                note+=("\n\nThis result uses gross OpenSees shell stiffness. "
+                       "For the native stiffness comparison, rebuild with ETABS elastic settings "
+                       "and solve gravity on that rebuilt export.")
             ranked=comp.get('top_node_discrepancies',[])
             if ranked:
                 note+="\n\nLargest point differences at matched locations (ETABS - OpenSees):"

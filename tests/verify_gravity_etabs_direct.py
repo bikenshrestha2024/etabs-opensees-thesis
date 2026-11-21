@@ -3,6 +3,45 @@ import unittest
 from components.validation import gravity_etabs_direct as g
 
 class GravityDirectAPITests(unittest.TestCase):
+    def test_stale_export_source_hash_stops_before_etabs(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            source=root/'selected.EDB'
+            source.write_bytes(b'changed after export')
+            context=root/'00_SOURCE_MANIFEST'
+            context.mkdir()
+            (context/'PROJECT_CONTEXT.json').write_text(json.dumps(
+                {'source_edb':str(source),'source_edb_sha256':'0'*64}),encoding='utf-8')
+            with (patch('components.inputs.project_workbooks._source_edb_path',return_value=str(source)),
+                  patch.object(g,'_new_etabs_instance') as launch):
+                with self.assertRaisesRegex(ValueError,'SHA-256 differs'):
+                    g.connect_and_compare(root,root/'gravity.json',launch_new_etabs=True)
+                launch.assert_not_called()
+
+    def test_attached_instance_must_have_the_explicitly_selected_edb(self):
+        import tempfile
+        from pathlib import Path
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            source=root/'source.EDB'
+            selected=root/'selected.EDB'
+            gravity=root/'gravity.json'
+            for path in (source,selected,gravity):
+                path.touch()
+            app=SimpleNamespace(SapModel=SimpleNamespace(GetModelFilename=lambda: str(source)))
+            with (patch('components.inputs.project_workbooks._source_edb_path',return_value=str(source)),
+                  patch('OpenSees_Project_Inputs_V123.connect_etabs',return_value=app),
+                  patch.object(g,'extract_from_sap') as extract):
+                with self.assertRaisesRegex(ValueError,'this comparison requires'):
+                    g.connect_and_compare(root,gravity,etabs_edb_path=selected,allow_alternate_edb=True)
+                extract.assert_not_called()
+
     def test_export_direct_serializes_etabs_local_axis_list_in_excel(self):
         import json
         import tempfile
@@ -220,6 +259,7 @@ class GravityDirectAPITests(unittest.TestCase):
             App.SapModel=Sap()
             def fake_open(edb_path,exe_path=None):
                 calls.append(('open',Path(edb_path)))
+                App.SapModel.GetModelFilename=lambda: str(edb_path)
                 return App()
             def fake_extract(sap,case,source_edb,allow_alternate_edb,log):
                 calls.append(('extract',Path(source_edb)))

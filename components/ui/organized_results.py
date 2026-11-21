@@ -43,6 +43,43 @@ METHOD_MARKERS = {
     "Comparisons": ("etabs_comparison", "etabs_opensees_equivalence",
                     "case_comparison", "equivalence", "comparison"),
 }
+_MRSM_CASE = re.compile(r"(?:^|_)(ULS|SLS)_([XY])_(E0|Eplus|Eminus)(?=[_.]|$)",
+                       re.IGNORECASE)
+
+
+def _mrsm_review_path(relative, module):
+    """Map one saved MRSM run to review paths, preserving case and file identity."""
+    rel = Path(relative)
+    if module == "Comparisons":
+        return module, Path(module) / rel
+    if rel.parts[0].casefold() == "00_processing_metadata":
+        return "MRSM", Path("MRSM", "06_REVIEW", "Processing", *rel.parts[1:])
+    if len(rel.parts) == 1:
+        case = _MRSM_CASE.search(rel.name)
+        if case:
+            state, axis, ecc = case.groups()
+            eccentricity = {"e0": "E0", "eplus": "Eplus", "eminus": "Eminus"}[ecc.lower()]
+            return "MRSM", Path("MRSM", "02_RESULTS", state.upper(), axis.upper(),
+                                eccentricity, rel.name)
+        if module not in ("Modal", "Gravity"):
+            section = {".xlsx": "03_EXCEL", ".png": "04_FIGURES",
+                       ".pdf": "04_FIGURES"}.get(rel.suffix.lower(), "02_RESULTS")
+            return "MRSM", Path("MRSM", section, rel.name)
+    return module, Path(module) / rel
+
+
+def publish_mrsm_review(results_root, *, destination_parent=None):
+    """Publish one organized, locally saved review bundle for a selected MRSM run.
+
+    [REF docs/source/components/ui/organized_results.py.md]
+    """
+    root = _refuse_linked_chain(results_root).resolve()
+    if not (root / "MRSM_Results_V132.json").is_file():
+        raise FileNotFoundError("No saved MRSM_Results_V132.json in " + str(root))
+    if destination_parent is None and root.name == "02_RESULTS" and (root.parent / "06_REVIEW").is_dir():
+        destination_parent = root.parent / "06_REVIEW" / "Organized_Results"
+    return publish_organized_results(root, destination_parent=destination_parent,
+                                     bundle_name="MRSM_RUN", mrsm_case_layout=True)
 
 
 def _refuse_linked_chain(path):
@@ -144,7 +181,8 @@ def _walk(root, *, destination, excluded_roots=()):
 
 def publish_organized_results(results_root, *, gravity_root=None,
                               include_unclassified=True, destination_parent=None,
-                              selected_modules=None, bundle_name="ALL_MODULES"):
+                              selected_modules=None, bundle_name="ALL_MODULES",
+                              mrsm_case_layout=False):
     """[REF docs/source/components/ui/organized_results.py.md] Create dated folder and ZIPs.
 
     results_root is the existing source/model/state output folder (e.g. ULS...).
@@ -189,12 +227,17 @@ def publish_organized_results(results_root, *, gravity_root=None,
     # First enumerate evidence and hash all source files, then copy. Never
     # use fuzzy model-state matching or edit active result files.
     listed = []
+    planned = set()
     for source_label, source_root in roots:
         for path, rel in _walk(source_root, destination=destination,
                                excluded_roots=(parent,) if parent != root else ()):
             module = classify(path, rel)
             if source_label == "GravityGUI" and module == "Unclassified":
                 module = "Gravity"
+            if mrsm_case_layout and source_label == "Analysis":
+                module, snapshot = _mrsm_review_path(rel, module)
+            else:
+                snapshot = Path(module, source_label) / rel
             if allowed is not None and module not in allowed:
                 manifest["skipped"].append({"source": str(path), "reason": "MODULE_NOT_SELECTED", "module": module})
                 continue
@@ -202,18 +245,22 @@ def publish_organized_results(results_root, *, gravity_root=None,
                 manifest["skipped"].append({
                     "source": str(path), "reason": "UNCLASSIFIED_NOT_INCLUDED"})
                 continue
-            listed.append((source_label, source_root, path, rel, module))
+            key = snapshot.as_posix().casefold()
+            if key in planned:
+                raise ValueError("Organized review destinations collide: " + str(snapshot))
+            planned.add(key)
+            listed.append((source_root, path, snapshot, module))
     if not listed:
         raise ValueError("No classifiable saved results. No ZIPs generated; check module output roots.")
     # Prehash the *original selected sources* before creating any review
     # output. A later mutation must not be mistaken for a verified snapshot.
     expected_hashes={}
-    for _source_label, _source_root, original, _rel, _module in listed:
+    for _source_root, original, _snapshot, _module in listed:
         _refuse_linked_chain(original)
         expected_hashes[original]=sha256(original)
     destination.mkdir(parents=True, exist_ok=False)
-    for source_label, source_root, original, rel, module in listed:
-        dest = destination / module / source_label / rel
+    for source_root, original, snapshot, module in listed:
+        dest = destination / snapshot
         dest.parent.mkdir(parents=True, exist_ok=True)
         _refuse_linked_chain(original)
         shutil.copy2(original, dest)
@@ -237,9 +284,14 @@ def publish_organized_results(results_root, *, gravity_root=None,
     readme = destination / "README_FIRST.txt"
     readme.write_text(
         "THESIS ANALYSIS OUTPUT SNAPSHOT\n"
-        "Folders: Model, Gravity, ESM, Modal, MRSM, LinearTH, NonlinearTH, Comparisons, Unclassified.\n"
+        + ("MRSM case files: MRSM/02_RESULTS/<state>/<axis>/<eccentricity>.\n"
+           "Workbooks: MRSM/03_EXCEL. Figures: MRSM/04_FIGURES.\n"
+           "Modal evidence, gravity inputs and ETABS comparisons have dedicated folders.\n"
+           if mrsm_case_layout else
+           "Folders: Model, Gravity, ESM, Modal, MRSM, LinearTH, NonlinearTH, Comparisons, Unclassified.\n")
+        +
         "Original solver output files are UNCHANGED. These are verified copies.\n"
-        "Cases are grouped by original relative path; no cross-source equivalence is inferred.\n"
+        "The manifest links each review file to its original run path.\n"
         "Missing SLS/native ETABS output stays missing, not zero.\n"
         "Review EVIDENCE_MANIFEST.json for source path and SHA256 of every copy.\n"
         "The ZIPs are meant for sharing and debugging. They do not establish code compliance.\n",
@@ -289,10 +341,11 @@ def publish_organized_results(results_root, *, gravity_root=None,
                 path = destination / entry["snapshot"]
                 z.write(path, entry["snapshot"])
         archives[name] = str(target)
-    for module in MODULES:
-        subset = [e for e in manifest["entries"] if e["module"] == module]
-        if subset:
-            archive(module, subset)
+    if not mrsm_case_layout:
+        for module in MODULES:
+            subset = [e for e in manifest["entries"] if e["module"] == module]
+            if subset:
+                archive(module, subset)
     archive(bundle_name, manifest["entries"])
     latest = parent / "LATEST_ORGANIZED_RESULT.txt"
     latest.write_text(

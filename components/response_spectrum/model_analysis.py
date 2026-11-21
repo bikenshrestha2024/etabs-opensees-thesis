@@ -596,16 +596,16 @@ def launch(parent,folder):
         """[REF docs/source/components/ui/organized_results.py.md] Keep legacy MRSM paths."""
         def worker():
             try:
-                from components.ui.organized_results import publish_organized_results
+                from components.ui.organized_results import publish_mrsm_review
                 selected=latest_result.get('folder') or output
-                result=publish_organized_results(selected)
-                append('[ORGANIZED_ALL_MODULE_ZIP] '+
-                       result['zip_files']['ALL_MODULES']+'\\n')
-                append('[ORGANIZED_MANIFEST] '+result['manifest']+'\\n')
+                result=publish_mrsm_review(selected)
+                append('[ORGANIZED_MRSM_RUN_ZIP] '+
+                       result['zip_files']['MRSM_RUN']+'\n')
+                append('[ORGANIZED_MANIFEST] '+result['manifest']+'\n')
             except Exception as exc:
-                append('[ORGANIZED_EXPORT_FAILED] '+str(exc)+'\\n')
+                append('[ORGANIZED_EXPORT_FAILED] '+str(exc)+'\n')
         threading.Thread(target=worker,daemon=True).start()
-    ttk.Button(actions,text='Export organized module ZIPs',
+    ttk.Button(actions,text='Export organized run ZIP',
                command=export_organized_zip).pack(side='left',padx=4)
 
     # [REF components/ui/output_folder.py] shared output-folder action.

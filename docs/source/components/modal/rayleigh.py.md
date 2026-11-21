@@ -22,6 +22,12 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
 
+## Empirical ESM reference before Rayleigh
+
+The current ESM GUI supplies the selected soil, hazard and structural-system factors with the source-matched storey ledger. The runner computes the amplified empirical period and uses the usual NBC equivalent-static coefficient and height distribution before each directional solve. The centered floor force and incremental translation arrays are saved with the model, configuration and ledger fingerprints. Each final sign and eccentricity combination uses the applicable axis and stiffness state's adopted period.
+
+The importer reconstructs every reference force using the original storey ledger and checks the Rayleigh quotient independently. Changing the source ledger, effective wall area, hazard or system factors requires a matching new preliminary result for automatic use. Legacy small-reference and manual period inputs remain available for diagnostic comparison. A centered OpenSees run does not establish native ETABS P-Delta case equivalence. [NBC 105:2025, §§5.1 and 6.3](https://www.dudbc.gov.np/pages/building-code/)
+
 ## November 11, 2026: all-storey and source-model safeguards
 
 The preliminary X/Y Rayleigh runner now calls the all-storey audit helper

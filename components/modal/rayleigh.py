@@ -1,8 +1,8 @@
 """NBC 105:2025 §5.1.1 force/displacement Rayleigh estimate.
 
 Reference: https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf
-The small reference lateral forces determine a displacement shape. Their
-amplitude cancels in the Rayleigh quotient for a fixed linear stiffness.
+The centered reference vector uses the amplified empirical ESM period.
+An explicit legacy CLI or API call uses the historical small perturbation.
 This is a period-estimation diagnostic, not a ULS ESM eligibility override,
 nor evidence that IS 16700 initial combination cases have been completed.
 """
@@ -19,9 +19,9 @@ from components.nbc105.clause_05_dynamic_characteristics import amplified_period
 from components.nbc105.constants import GRAVITY_M_S2
 
 
-RAYLEIGH_METHOD_VERSION = 126
+RAYLEIGH_METHOD_VERSION = 127
 RAYLEIGH_DISPLACEMENT_BASIS = 'TORSION_SUPPRESSED_CONSTRAINED_FLOOR_NODES'
-RAYLEIGH_PREFIX = 'NBC105_Rayleigh_Preliminary_V126'
+RAYLEIGH_PREFIX = 'NBC105_Rayleigh_Preliminary_V127'
 
 
 def rayleigh_result_prefix(state):
@@ -30,6 +30,63 @@ def rayleigh_result_prefix(state):
     [REF docs/validation/20261118_RAYLEIGH_RETAINED_DOF_CORRECTION.md]
     """
     return RAYLEIGH_PREFIX + ('' if state == 'ULS' else '_' + state)
+
+
+def empirical_esm_reference(rows, *, height_m, aw_m2, state, settings):
+    """Build the centered floor-load vector at the amplified empirical period.
+
+    [REF NBC105-2025 §§5.1.2–5.1.3 and 6.3]
+    """
+    from components.equivalent_static.code_basis import calculate_esm
+
+    aw = float(aw_m2)
+    if not math.isfinite(aw) or aw <= 0:
+        raise ValueError("Directional Aw must be finite and positive.")
+    empirical = empirical_period_s(height_m, "concrete shear-wall", aw)
+    seed = calculate_esm(rows, period_s=amplified_period_s(empirical), limit_state=state,
+                         diagnostic_reference=True, **settings)
+    proof = {key: seed[key] for key in (
+        "period_s", "period_exponent_k", "base_shear_kN", "design_coefficient_Cd",
+        "code_eligible", "site_subsoil_status",
+    )}
+    return empirical, proof, [row["lateral_force_kN"] for row in seed["stories"]]
+
+
+def verify_empirical_esm_reference(result, axis, *, source_rows=None):
+    """Rebuild the saved empirical ESM seed and match every applied floor force.
+
+    [REF docs/source/components/modal/rayleigh.py.md]
+    """
+    record = result[axis]
+    if source_rows is None:
+        rows = [{"height_m": row["height_m"], "dead_load_kN": row["weight_kN"]}
+                for row in record["rows"]]
+    else:
+        rows = sorted(source_rows, key=lambda row: float(row["height_m"]))
+        if len(rows) != len(record["rows"]) or not math.isclose(
+                result["height_m"], float(rows[-1]["height_m"]), abs_tol=1e-7):
+            raise ValueError(f"{axis}: empirical ESM seed has different source story coverage.")
+        for source, row in zip(rows, record["rows"]):
+            weight = (float(source["dead_load_kN"]) + .6*float(source["storage_live_load_kN"])
+                      + .3*float(source["other_live_load_kN"]))
+            if (int(source["master_node_tag"]) != row["master_node"]
+                    or not math.isclose(float(source["height_m"]), row["height_m"], abs_tol=1e-7)
+                    or not math.isclose(weight, row["weight_kN"], rel_tol=1e-9)):
+                raise ValueError(f"{axis}: empirical ESM seed differs from the source story ledger.")
+    empirical, proof, forces = empirical_esm_reference(
+        rows, height_m=result["height_m"], aw_m2=record["Aw_m2"],
+        state=result["limit_state"], settings=result["empirical_esm_settings"])
+    checks = (
+        (record["empirical_period_s"], empirical),
+        (record["amplified_empirical_s"], proof["period_s"]),
+        (record["reference_force_exponent_k"], proof["period_exponent_k"]),
+        (record["reference_force_total_kN"], proof["base_shear_kN"]),
+        (record["adopted_period_s"], min(record["period_s"], proof["period_s"])),
+        *((row["force_kN"], force) for row, force in zip(record["rows"], forces)),
+    )
+    if record.get("empirical_esm_reference") != proof or any(
+            not math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-8) for a, b in checks):
+        raise ValueError(f"{axis}: saved Rayleigh forces do not match the empirical ESM seed.")
 
 
 def _diaphragm_translation(ops, master, members, dof):
@@ -55,7 +112,7 @@ def _diaphragm_translation(ops, master, members, dof):
 
 @timed_outputs('Preliminary Rayleigh X-Y analysis','folder')
 def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
-        output_dir=None):
+        output_dir=None, *, empirical_settings=None):
     import openseespy.opensees as ops
     from OpenSees_Complete_Export_V118 import build_complete_model
     from OpenSees_Analysis_Stack_V110 import configure_nonlinear_static
@@ -132,7 +189,11 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     result={'story_weights_sha256':hashlib.sha256((folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').read_bytes()).hexdigest(),'standard':'NBC 105:2025 §5.1.1-§5.1.3','model_sha256':hashlib.sha256(model.read_bytes()).hexdigest(),'gravity_state':'assembled sustained gravity','limit_state':state,'height_m':H,'height_basis':'story-ledger elevations from seismic base; confirm qualifying basements are excluded per §5.1.2','gravity_acceleration_m_s2':GRAVITY_M_S2,'rayleigh_equation':'T1 = 2*pi*sqrt(sum(Wi*di^2)/(g*sum(Fi*di)))','torsion':'diaphragm rotations restrained during reference lateral perturbation','diagnostic_only':True}
     result['model_config_sha256']=hashlib.sha256(config_file.read_bytes()).hexdigest()
     result['mass_elevation_audit']=mass_elevation_audit
-    prefix=rayleigh_result_prefix(state)
+    if empirical_settings is None:
+        prefix = 'NBC105_Rayleigh_Preliminary_V126_' + state + '_Legacy_Reference'
+    else:
+        prefix=rayleigh_result_prefix(state)
+        result['empirical_esm_settings'] = dict(empirical_settings)
     members_by_master={int(d['master_tag']): d['slave_node_tags'] for d in model_data['diaphragms']}
     supports=tuple(map(int, model_data['supports']))
     if not supports:
@@ -143,9 +204,16 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         aw=float(aw)
         if not math.isfinite(aw) or aw<=0:raise ValueError('Directional Aw must be finite, positive, and reviewed against first-story walls/openings.')
         empirical=empirical_period_s(H,'concrete shear-wall',aw)  # [REF NBC105-2025 §5.1.2, printed p. 29]
-        k=1. if empirical<=.5 else 2. if empirical>=2.5 else 1.+(empirical-.5)/2.
-        shape=[w*float(r['height_m'])**k for w,r in zip(weights,rows)]
-        forces=[reference_fraction*sum(weights)*s/sum(shape) for s in shape]
+        if empirical_settings is None:
+            seed = None
+            k=1. if empirical<=.5 else 2. if empirical>=2.5 else 1.+(empirical-.5)/2.
+            shape=[w*h**k for w,h in zip(weights,heights)]
+            forces=[reference_fraction*sum(weights)*s/sum(shape) for s in shape]
+        else:
+            empirical, seed, forces = empirical_esm_reference(
+                rows, height_m=H, aw_m2=aw, state=state, settings=empirical_settings)
+            k = seed['period_exponent_k']
+            print(f'[EMPIRICAL ESM SEED] {state} {axis} {json.dumps(seed)}', flush=True)
         build_complete_model(folder,mode='elastic',preload=True,limit_state=state)
         dof=1 if axis=='X' else 2
         masters=[int(r['master_node_tag']) for r in rows]
@@ -197,6 +265,8 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         if not math.isfinite(period) or period<=0:raise ValueError(f'{axis} Rayleigh period is nonpositive or non-finite.')
         result[axis]=dict(Aw_m2=aw,empirical_period_s=empirical,amplified_empirical_s=amplified_period_s(empirical),period_s=period,adopted_period_s=min(period,amplified_period_s(empirical)),reference_force_exponent_k=k,reference_force_total_kN=sum(forces),rayleigh_numerator_kN_m2=numerator,rayleigh_denominator_gFiDi_kN_m2_s2=denominator,storey_audit=audit,rows=[dict(story=r['story_name'],height_m=float(r['height_m']),master_node=n,weight_kN=w,force_kN=f,displacement_m=d) for r,n,w,f,d in zip(rows,masters,weights,forces,u)])
         result[axis]['kinematic_audit']=kinematic_audit
+        if seed is not None:
+            result[axis]['empirical_esm_reference'] = seed
         for record,raw in zip(result[axis]['rows'],retained):
             record['retained_node_displacement_diagnostic_m']=raw
             record['constrained_floor_node_count']=len(members_by_master[record['master_node']])
@@ -217,10 +287,14 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         sheet.append(['SOLVER/PYTHON T_R (s)',period])
         sheet.append(['EXCEL - PYTHON T_R (s)',
                       f'=IF(B{period_row}="","",B{period_row}-B{period_row+1})'])
-        sheet.append(['Reference lateral load scale',reference_fraction])
+        if seed is None:
+            sheet.append(['Legacy reference lateral load scale',reference_fraction])
+        else:
+            sheet.append(['Empirical ESM seed period (s)',seed['period_s']])
+            sheet.append(['Empirical ESM seed coefficient',seed['design_coefficient_Cd']])
         sheet.append(['Reference Fi total (kN)',sum(forces)])
         sheet.append(['Reference Fi shape exponent k',k])
-        sheet.append(['k basis','preliminary EMPIRICAL period; not iterative adopted k'])
+        sheet.append(['k basis','amplified empirical period' if seed else 'legacy unamplified empirical period'])
         sheet.append(['Source model SHA256',result['model_sha256']])
         sheet.append(['Source weight ledger SHA256',result['story_weights_sha256']])
         sheet.append(['Limit state',state])
@@ -242,10 +316,10 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     for ext in ('png','pdf'):fig.savefig(out/(prefix+'.'+ext),dpi=300)
     for sheet in wb:sheet.freeze_panes='A2';sheet.auto_filter.ref=sheet.dimensions
     wb.save(out/(prefix+'.xlsx'))
-    result['method_version']=RAYLEIGH_METHOD_VERSION
+    result['method_version']=RAYLEIGH_METHOD_VERSION if empirical_settings is not None else 126
     result['displacement_basis']=RAYLEIGH_DISPLACEMENT_BASIS
     result['opensees_version']=ops.version()
-    result['reference_fraction']=reference_fraction
+    result['reference_fraction']=reference_fraction if empirical_settings is None else None
     result['baseline_method']='Equilibrate torsion-suppressed gravity before applying reference forces; use incremental translation.'
     (out/(prefix+'.json')).write_text(json.dumps(result,indent=2),encoding='utf-8')
     return result
@@ -255,4 +329,5 @@ if __name__=='__main__':
     import sys
     print(json.dumps(run(sys.argv[1],float(sys.argv[2]),float(sys.argv[3]),
                          reference_fraction=float(sys.argv[4]) if len(sys.argv)>4 else .01,
-                         limit_state=sys.argv[5] if len(sys.argv)>5 else 'ULS'),indent=2))
+                         limit_state=sys.argv[5] if len(sys.argv)>5 else 'ULS',
+                         empirical_settings=json.loads(sys.argv[6]) if len(sys.argv)>6 else None),indent=2))

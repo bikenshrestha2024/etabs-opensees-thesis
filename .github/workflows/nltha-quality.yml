@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
     paths:
+      - 'components/model/readiness.py'
+      - 'tests/test_nltha_readiness_diagnosis.py'
+      - 'tests/test_nltha_readiness_bound_draft.py'
+      - 'tests/test_etabs_ingest_guards.py'
       - 'components/model/readiness_dashboard.py'
       - 'components/model/readiness_dashboard_gui.py'
       - 'components/ui/application.py'
@@ -324,6 +328,12 @@ on:
       - 'docs/source/components/nonlinear_time_history/one_storey_wall_probe.py.md'
   pull_request:
     paths:
+      - 'components/model/readiness.py'
+      - 'components/model/readiness_gui.py'
+      - 'components/nonlinear_time_history/runner_and_gui.py'
+      - 'tests/test_nltha_readiness_diagnosis.py'
+      - 'tests/test_nltha_readiness_bound_draft.py'
+      - 'tests/test_etabs_ingest_guards.py'
       - 'components/inputs/output_contract.py'
       - 'components/inputs/output_layout.py'
       - 'components/inputs/project_output_layout.py'
@@ -580,6 +590,7 @@ jobs:
           python tests/verify_nbc105_dual_target.py
           python tests/verify_expanded_workbench_tabs.py
           python tests/verify_readiness_dashboard.py
+          python -m pytest -q tests/test_nltha_readiness_diagnosis.py tests/test_nltha_readiness_bound_draft.py tests/test_etabs_ingest_guards.py
           python -m pytest tests/test_project_source_reuse.py tests/test_excel_publication.py -q
 
       - name: Archive non-native quality failure log

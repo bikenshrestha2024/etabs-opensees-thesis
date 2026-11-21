@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest import mock
 
 from components.equivalent_static.etabs_linked_excel import (
-    check_excel_wall_thickness, direct_wall_thickness_inventory)
+    _read_reviewed_first_storey, check_excel_wall_thickness, direct_wall_thickness_inventory)
 from components.inputs import aw_sources
 from components.ui.output_folder import resolve_folder
 
@@ -67,6 +67,31 @@ class DirectThickness(unittest.TestCase):
             self.assertIn('G11=250', rep['mismatches'][0])
             self.assertEqual(check_excel_wall_thickness(ok, rows, {'properties': {}})['status'],
                              'UNAVAILABLE')
+
+
+class LinkedFirstStorey(unittest.TestCase):
+    def test_lintel_is_only_excluded_if_its_vertices_clear_the_door_head(self):
+        engine = mock.Mock()
+        sap = object()
+        stories = [{'name': 'Storey 1', 'height': 3.8, 'elevation': 3.8}]
+        engine.audit_open_sap.return_value = {'reference_story': 'Storey 1'}
+        engine.geometry_bays_from_direct_preflight.return_value = (
+            [{'wall_y_m': 6., 'opening_intervals_m': [(8., 10.)]}], [])
+        engine.area_points.return_value = [1, 2, 3, 4]
+        with tempfile.TemporaryDirectory() as tmp:
+            audit_dir = Path(tmp)
+            (audit_dir / 'wall_panels.json').write_text(
+                json.dumps({'spandrel_areas': [{'area': 'shell over the door'}]}))
+            points = {1: (8, 6, 2.3), 2: (10, 6, 2.3),
+                      3: (10, 6, 3.8), 4: (8, 6, 3.8)}
+            engine.point_xyz.side_effect = lambda _sap, tag: points[tag]
+            _, _, _, proof = _read_reviewed_first_storey(
+                engine, sap, stories, audit_dir, lambda _msg: None)
+            self.assertEqual(proof['checked_lintel_shells'][0]['bottom_m'], 2.3)
+            engine.read_etabs_walls.assert_not_called()
+            points[1] = (8, 6, 2.1)
+            with self.assertRaisesRegex(ValueError, 'crosses a door below its head'):
+                _read_reviewed_first_storey(engine, sap, stories, audit_dir, lambda _msg: None)
 
 
 def audit(edb='D:/Etabs/ULTIMATE LOAD - Copy.EDB', condition='Ultimate', thickness='MATCHED'):
