@@ -84,7 +84,7 @@ class AnnexBLinkTests(unittest.TestCase):
     def test_not_a_general_outrigger_damper_rotation_rule(self):
         with self.assertRaises(ValueError):
             seismic_link_rotation_limit_rad(
-                link_length_m=2,mp_kNm=100,vp_kN=100,orientation="fvd")
+                link_length_m=2,mp_kNm=100,vp_kN=100,orientation="fvd",section_type="I")
     def test_shs_cannot_be_treated_as_annex_b_seismic_i_link(self):
         with self.assertRaises(ValueError):
             seismic_link_rotation_limit_rad(
