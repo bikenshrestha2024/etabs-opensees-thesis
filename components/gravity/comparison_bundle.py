@@ -305,7 +305,10 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         # Gravity_Reaction_Diagnostic folder. Preserve that solved case under
         # its own archive namespace; never substitute its reactions for the
         # 76-source or 97-continuous results.
-        diag_base=comparison_root/"Gravity_Reaction_Diagnostic"
+        from components.gravity.output_ownership import section
+        diag_base=section(comparison_root,"SOLVER")/"ETABS_NONZERO_REACTION_DIAGNOSTIC"/"GRAVITY_1.0D_1.0L"
+        if not diag_base.is_dir():
+            diag_base=comparison_root/"Gravity_Reaction_Diagnostic"
         if diag_base.is_dir():
             candidates=[]
             for candidate in diag_base.iterdir():
@@ -335,8 +338,10 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                     if (latest/name).is_file():
                         add(latest/name,"primary_32_diagnostic/"+name)
         if comparison_root != gravity_dir:
-            add(comparison_root/"Gravity_GUI_Actions.log",
-                "gravity_workflow/Gravity_GUI_Actions.log")
+            root_gui_log=section(comparison_root,"LOGS")/"Gravity_GUI_Actions.log"
+            if not root_gui_log.is_file():
+                root_gui_log=comparison_root/"Gravity_GUI_Actions.log"
+            add(root_gui_log,"gravity_workflow/Gravity_GUI_Actions.log")
             # Keep a separately executed single gravity run for provenance
             # rather than replacing it with a newer dual-support run.
             for name in EXTRA:

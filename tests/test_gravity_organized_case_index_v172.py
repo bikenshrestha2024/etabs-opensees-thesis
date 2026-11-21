@@ -34,15 +34,17 @@ class OrganizedGravityCaseTests(unittest.TestCase):
                     "equilibrium_error_percent": 0.0,
                 }
                 published = publish_gravity_case_index(results, record)
-                summary = json.loads((published / "CASE_SUMMARY.json").read_text())
+                summary = json.loads(published.read_text())
                 self.assertEqual(summary["support_count"], count)
                 self.assertEqual(summary["support_strategy"], strategy)
                 self.assertEqual(Path(summary["result_path"]), native_result)
-                self.assertTrue((published / "OPEN_FULL_LEGACY_RUN.url").is_file())
-                self.assertEqual((published / "Gravity_Reactions_V123.png").read_bytes(), b"plot-unchanged")
+                self.assertEqual(published.parent.name,strategy)
+                self.assertEqual(published.parent.parent.name,"CASES")
+                self.assertFalse((published.parent / "Gravity_Reactions_V123.png").exists())
+                self.assertEqual((native / "Gravity_Reactions_V123.png").read_bytes(), b"plot-unchanged")
                 self.assertEqual(native_result.read_text(), '{"ok":true}')
             for strategy in strategies:
-                self.assertTrue((selection / "02_GRAVITY" / strategy).is_dir())
+                self.assertTrue((selection / "02_GRAVITY" / "00_INDEXES" / "CASES" / strategy).is_dir())
 
     def test_canonical_gravity_run_does_not_create_nested_stage(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -63,8 +65,8 @@ class OrganizedGravityCaseTests(unittest.TestCase):
                 "equilibrium_error_percent": 0.0,
             }
             published = publish_gravity_case_index(canonical, record)
-            self.assertEqual(published.parent.parent, selection / "02_GRAVITY")
-            self.assertTrue((selection / "02_GRAVITY" / "LATEST_GRAVITY_CASES.json").exists())
+            self.assertEqual(published.parent.parent.parent.parent, selection / "02_GRAVITY")
+            self.assertTrue((selection / "02_GRAVITY" / "00_INDEXES" / "LATEST_GRAVITY_CASES.json").exists())
             self.assertFalse((canonical / "02_GRAVITY").exists())
             self.assertEqual(result.read_text(), '{"ok":true}')
 
