@@ -58,3 +58,11 @@ Clauses 2, 3, 6–10 are source-grounded pure Python reference implementations w
 ## Page-offset method
 
 Printed page N is PDF page N + 21 for the body up to printed p. 26 (printed p. 1 is PDF page 22; the contents list is on PDF pages 15-21, roman-numbered xiv to xx). From printed p. 27 on the offset is 23 (printed p. 27 is PDF 50, printed p. 29 is PDF 52). The offset for p. <= 26 is recorded as `PRINTED_PAGE_OFFSET = 21` in `components/nbc105/constants.py`. Verify the offset on every page you read by checking the number printed at the page foot, and record any page where it differs (the clause 4 audit found two tables printed on a page numbered 26, and the Figure 4-3 page numbered 25).
+
+## Single rule owner and production caller integration
+
+Each of the ten numbered main clauses is a **separate Python module** under `components/nbc105/clause_NN_*.py`. `dispatch.py` and `python -m components.nbc105` expose operations without duplicating rules. Use `python -m components.nbc105 --list` to enumerate allowed operations. The existing settings viewer now exposes a local **NBC clauses 1–10** calculator dialog. Any calculation returns a non-certification status.
+
+**Migrated active call paths:** `components/equivalent_static/code_basis.py` delegates §3.2.1 method eligibility and §3.4 cracked stiffness to Clause 3 and §6 base shear, coefficient, storey force and `k` to Clause 6. `components/response_spectrum/model_analysis.py` delegates modal design coefficients and force-only scalar scaling to Clause 7. `components/linear_time_history/runner_and_gui.py` uses Clause 8 for response aggregation. `components/nonlinear_time_history/nbc105_2025_audit.py` delegates pair scaling/period window/time-step to Clause 9 and record count rule to Clause 8. `components/validation/response_checks.py` delegates design drift limits to Clause 5. All remaining complex case integrations and native engineering evidence are separate acceptance gates.
+
+The local evidence checker `python -m components.nbc105.acceptance /path/to/V107_ACCEPTANCE.json` independently recomputes the X/Y RS shear matching and reports **full acceptance blocked** for absent Rayleigh, mass, drift, support, soil and nonlinear evidence. It neither uploads private ETABS data nor accepts a user-provided `PASS` label.
