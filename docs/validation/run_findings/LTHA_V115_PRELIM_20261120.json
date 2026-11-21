@@ -15,6 +15,7 @@
           "native_transient_solve": 176.9256594999897,
           "transient_with_recording": 182.6274826000008
         },
+        "status": "completed",
         "steps": 100,
         "truncated_diagnostic": true
       },
@@ -32,6 +33,7 @@
           "native_transient_solve": 180.42199340010848,
           "transient_with_recording": 186.16130509999493
         },
+        "status": "completed",
         "steps": 100,
         "truncated_diagnostic": true
       },
@@ -49,6 +51,7 @@
           "native_transient_solve": 183.0952169000011,
           "transient_with_recording": 188.94926799999666
         },
+        "status": "completed",
         "steps": 100,
         "truncated_diagnostic": true
       },
@@ -66,6 +69,7 @@
           "native_transient_solve": 200.5499414000151,
           "transient_with_recording": 207.0872814999966
         },
+        "status": "completed",
         "steps": 100,
         "truncated_diagnostic": true
       },
@@ -83,6 +87,7 @@
           "native_transient_solve": 198.27313189998677,
           "transient_with_recording": 204.84637510000175
         },
+        "status": "completed",
         "steps": 100,
         "truncated_diagnostic": true
       },
@@ -100,6 +105,7 @@
           "native_transient_solve": 209.78888590000133,
           "transient_with_recording": 216.48995559999457
         },
+        "status": "completed",
         "steps": 100,
         "truncated_diagnostic": true
       },
@@ -117,6 +123,7 @@
           "native_transient_solve": 102.24080239998875,
           "transient_with_recording": 105.53670299999794
         },
+        "status": "completed",
         "steps": 50,
         "truncated_diagnostic": true
       },
@@ -134,6 +141,7 @@
           "native_transient_solve": 102.4233529000121,
           "transient_with_recording": 105.70023579999543
         },
+        "status": "completed",
         "steps": 50,
         "truncated_diagnostic": true
       },
@@ -151,6 +159,7 @@
           "native_transient_solve": 96.57594749997952,
           "transient_with_recording": 99.681651100007
         },
+        "status": "completed",
         "steps": 50,
         "truncated_diagnostic": true
       },
@@ -168,6 +177,7 @@
           "native_transient_solve": 104.04842590000044,
           "transient_with_recording": 107.36741930000426
         },
+        "status": "completed",
         "steps": 50,
         "truncated_diagnostic": true
       },
@@ -185,6 +195,7 @@
           "native_transient_solve": 210.87329250004404,
           "transient_with_recording": 217.72257730000274
         },
+        "status": "completed",
         "steps": 100,
         "truncated_diagnostic": true
       },
@@ -202,17 +213,22 @@
           "native_transient_solve": 261.6721736000036,
           "transient_with_recording": 270.293316700001
         },
+        "status": "completed",
         "steps": 100,
         "truncated_diagnostic": true
       }
     ],
     "diagnostic_only": true,
     "eigen_max_residual": 5.36e-07,
+    "failed_cases": [],
     "scope": "PRELIMINARY setup check | pairs: RSN1505_CHICHI_TCU068-E, KATNP.HNE.NQ.01_a_EW_PEER_Gorkha, RSN879_LANDERS_LCN260, RSN1086_NORTHR_SYL090, RSN1120_KOBE_TAK000, RSN1165_KOCAELI_IZT090, RSN1787_HECTOR, RSN767_LOMAP | each pair runs XY and YX",
     "solver_baseline_cases": 12,
     "solver_experimental_cases": 0,
     "started_unfinished": [
       "RSN1787_HECTOR_XY"
+    ],
+    "truncated_analyzed_s": [
+      0.5
     ],
     "workload": {
       "cases": 16,
@@ -221,6 +237,8 @@
   },
   "projection": {
     "basis": "native_transient_solve seconds per step measured on the 0.5 s truncated diagnostic (linear baseline, no factor reuse, lower bound for nonlinear)",
+    "cases_not_projected": 4,
+    "declared_case_count": 16,
     "measured_native_s_per_step": 2.026888823800131,
     "per_case": [
       {
@@ -308,6 +326,7 @@
         "steps": 5998
       }
     ],
+    "projected_case_count": 12,
     "total_projected_hours": 119.69566739082362
   },
   "source": "ltha_v115_prelim_log_excerpt.txt",

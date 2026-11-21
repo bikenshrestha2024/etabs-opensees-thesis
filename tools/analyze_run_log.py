@@ -13,19 +13,38 @@ import sys
 from pathlib import Path
 
 STATUS = 'SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE'
-BASIS = ('native_transient_solve seconds per step measured on the 0.5 s truncated diagnostic '
-         '(linear baseline, no factor reuse, lower bound for nonlinear)')
+_BASIS_TAIL = '(linear baseline, no factor reuse, lower bound for nonlinear)'
+BASIS = 'native_transient_solve seconds per step measured on the analyzed portion of each record ' + _BASIS_TAIL
 DIAG_TAG = 'TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE'
 
 _WORKLOAD = re.compile(r'^\[WORKLOAD\]\s+(\d+)\s+cases\s*\|\s*(\d+)\s+requested steps')
 _SCOPE = re.compile(r'^\[SCOPE\]\s*(.*)$')
 _START = re.compile(r'^\[START\]\s+(\S+?):')
-_TRIAL = re.compile(r'^\[LINEAR TRIAL\]\s+(\S+?):.*?full_record=([0-9.]+)s')
-_TIMING = re.compile(r'^\[CASE TIMING\]\s+(\S+)\s*\|[^|]*\|\s*elapsed=([0-9.]+)s\s*\|\s*stages=(\{.*\})')
+_TRIAL = re.compile(r'^\[LINEAR TRIAL\]\s+(\S+?):(?:.*?analyzed=([0-9.]+)s)?.*?full_record=([0-9.]+)s')
+_TIMING = re.compile(r'^\[CASE TIMING\]\s+(\S+)\s*\|\s*([^|]*?)\s*\|\s*elapsed=([0-9.]+)s\s*\|\s*stages=(\{.*\})')
 _OK = re.compile(r'^\[OK\]\s+(\S+?):\s*steps=(\d+),\s*dt=([0-9.eE+-]+)s,\s*peak drifts X/Y=([0-9.eE+-]+)/([0-9.eE+-]+)')
 _BASE = re.compile(r'^\[SOLVER BASELINE\]\s+(\S+?):')
 _EXP = re.compile(r'^\[SOLVER EXPERIMENTAL\]\s+(\S+?):')
 _EIGEN = re.compile(r'^\[EIGEN COMPLETE\].*max relative residual=([0-9.eE+-]+)')
+
+
+def _stages(raw):
+    """Return numeric stage timings from the JSON text; non-numeric values are skipped."""
+    try:
+        loaded = json.loads(raw)
+    except ValueError:
+        return {}
+    if not isinstance(loaded, dict):
+        return {}
+    stages = {}
+    for key, value in loaded.items():
+        if isinstance(value, bool):
+            continue
+        try:
+            stages[key] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return stages
 
 
 def parse_run_log(text):
@@ -54,15 +73,12 @@ def parse_run_log(text):
             continue
         m = _TRIAL.match(line)
         if m:
-            trials[m.group(1)] = (float(m.group(2)), DIAG_TAG in line)
+            analyzed = float(m.group(2)) if m.group(2) else None
+            trials[m.group(1)] = (float(m.group(3)), DIAG_TAG in line, analyzed)
             continue
         m = _TIMING.match(line)
         if m:
-            try:
-                stages = {k: float(v) for k, v in json.loads(m.group(3)).items()}
-            except ValueError:
-                stages = {}
-            timings.append((m.group(1), float(m.group(2)), stages))
+            timings.append((m.group(1), m.group(2).lower(), float(m.group(3)), _stages(m.group(4))))
             continue
         m = _OK.match(line)
         if m:
@@ -80,19 +96,24 @@ def parse_run_log(text):
         if m:
             value = float(m.group(1))
             eigen = value if eigen is None else max(eigen, value)
-    cases = []
-    for name, elapsed, stages in timings:
+    cases, failed = [], []
+    for name, status, elapsed, stages in timings:
+        if status != 'completed':
+            failed.append({'name': name, 'status': status, 'elapsed_s': elapsed, 'stages': stages})
+            continue
         steps, dt, dx, dy = oks.get(name, (None, None, None, None))
-        full, trunc = trials.get(name, (None, False))
-        cases.append({'name': name, 'elapsed_s': elapsed, 'stages': stages, 'steps': steps,
-                      'dt_s': dt, 'peak_drift_x': dx, 'peak_drift_y': dy,
+        full, trunc, _analyzed = trials.get(name, (None, False, None))
+        cases.append({'name': name, 'status': status, 'elapsed_s': elapsed, 'stages': stages,
+                      'steps': steps, 'dt_s': dt, 'peak_drift_x': dx, 'peak_drift_y': dy,
                       'full_record_s': full, 'truncated_diagnostic': trunc})
-    done = {c['name'] for c in cases}
+    finished = {c['name'] for c in cases} | {c['name'] for c in failed}
     unfinished = []
     for name in starts:
-        if name not in done and name not in unfinished:
+        if name not in finished and name not in unfinished:
             unfinished.append(name)
-    return {'workload': workload, 'scope': scope, 'cases': cases,
+    analyzed_s = sorted({t[2] for t in trials.values() if t[1] and t[2] is not None})
+    return {'workload': workload, 'scope': scope, 'cases': cases, 'failed_cases': failed,
+            'truncated_analyzed_s': analyzed_s,
             'started_unfinished': unfinished, 'solver_baseline_cases': len(baseline),
             'solver_experimental_cases': len(experimental), 'eigen_max_residual': eigen,
             'diagnostic_only': diag}
@@ -119,8 +140,30 @@ def project_full_run(parsed, *, dt_by_case=None):
         total += hours
         per_case.append({'name': c['name'], 'full_record_s': full, 'dt_s': dt, 'steps': n,
                          'projected_hours': hours})
+    w = parsed.get('workload')
+    declared = w['cases'] if w else None
+    excluded = None if declared is None else max(declared - len(per_case), 0)
     return {'measured_native_s_per_step': rate, 'per_case': per_case,
-            'total_projected_hours': total, 'basis': BASIS}
+            'total_projected_hours': total, 'basis': _basis(parsed),
+            'projected_case_count': len(per_case), 'declared_case_count': declared,
+            'cases_not_projected': excluded}
+
+
+def _truncation_phrase(parsed):
+    """Describe the analyzed window only when the log says the trials were truncated."""
+    secs = parsed.get('truncated_analyzed_s') or []
+    if secs:
+        return 'the %s s truncated diagnostic' % ', '.join(format(v, 'g') for v in secs)
+    if parsed.get('diagnostic_only'):
+        return 'the truncated diagnostic'
+    return None
+
+
+def _basis(parsed):
+    phrase = _truncation_phrase(parsed)
+    if phrase is None:
+        return BASIS
+    return 'native_transient_solve seconds per step measured on %s %s' % (phrase, _BASIS_TAIL)
 
 
 def _f(value, fmt):
@@ -140,6 +183,9 @@ def render_markdown(parsed, projection, source_name):
     if w:
         out.append('- Workload declared: %d cases, %d requested steps.' % (w['cases'], w['requested_steps']))
     out.append('- Completed cases in log: %d.' % n_done)
+    failed = parsed.get('failed_cases', [])
+    out.append('- Failed or non-completed cases in log: %s.' % (
+        ', '.join('%s (%s)' % (c['name'], c['status']) for c in failed) or 'none'))
     out.append('- Started but unfinished: %s.' % (', '.join(parsed['started_unfinished']) or 'none'))
     out.append('- Linear baseline solver cases: %d; experimental solver cases: %d.'
                % (parsed['solver_baseline_cases'], parsed['solver_experimental_cases']))
@@ -166,10 +212,27 @@ def render_markdown(parsed, projection, source_name):
             p['name'], p['full_record_s'], p['dt_s'], p['steps'], p['projected_hours']))
     out += ['', 'Total projected solve time for %d completed cases: %.1f hours (%.1f days).'
             % (len(projection['per_case']), projection['total_projected_hours'],
-               projection['total_projected_hours'] / 24.0),
-            '', '## Not evidence of', '',
+               projection['total_projected_hours'] / 24.0)]
+    if projection.get('declared_case_count') is not None:
+        out.append('The projection covers only the %d completed cases with a full-record duration; '
+                   '%d of %d declared cases were not run to completion and are excluded from this total.'
+                   % (projection['projected_case_count'], projection['cases_not_projected'],
+                      projection['declared_case_count']))
+    else:
+        out.append('The projection covers only the %d completed cases; the log declares no workload, '
+                   'so cases not run cannot be counted.' % projection['projected_case_count'])
+    phrase = _truncation_phrase(parsed)
+    secs = parsed.get('truncated_analyzed_s') or []
+    if secs:
+        drift_line = ('- Drift performance: peak drifts come from only %s s of each record.'
+                      % ', '.join(format(v, 'g') for v in secs))
+    elif phrase:
+        drift_line = '- Drift performance: peak drifts come from a truncated part of each record.'
+    else:
+        drift_line = '- Drift performance: this tool does not assess drift acceptance.'
+    out += ['', '## Not evidence of', '',
             '- Engineering acceptance of any model, check or result.',
-            '- Drift performance: peak drifts come from only 0.5 s of each record.',
+            drift_line,
             '- Nonlinear cost: nonlinear steps need re-factorisation and iteration, so cost is higher.',
             '']
     return '\n'.join(out)

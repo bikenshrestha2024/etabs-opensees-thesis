@@ -33,6 +33,8 @@ The run id is `YYYYmmddTHHMMSS_ffffffZ_<8 hex>` (UTC stamp plus a random hash); 
 
 ## Producer status
 
+The subfolder roles in the run tree are the target convention, and the audit checks only the top-level layout and the manifest, not which files sit in which subfolder.
+
 Only the four modules below were identified as writing ad hoc folders (they call `mkdir` on a caller-supplied output path and do not use `create_case_run`). They are listed here and are **not migrated** by this change. This is not an exhaustive audit of all producers: other modules import `output_contract` and are not listed.
 
 | Module | Output layout |
@@ -41,5 +43,7 @@ Only the four modules below were identified as writing ad hoc folders (they call
 | `components/nonlinear_time_history/literature_demo.py` | ad hoc |
 | `components/nonlinear_time_history/full_record_gate.py` | ad hoc |
 | `components/nonlinear_time_history/energy_balance.py` | ad hoc |
+
+Two further LTHA runner behaviours the audit cannot detect (verified in `components/linear_time_history/runner_and_gui.py`): outside contract mode it writes an ad hoc `LTH_<limit state>_<scope>_<stamp>` folder under the chosen output directory; in contract mode it writes its `.xlsx` and `.png` files into `02_RESULTS`, and only for a run whose completion gate passes does it copy `.xlsx`, `.png` and `.pdf` files of 25 MB or less into `03_EXCEL` / `04_FIGURES`.
 
 Old outputs stay where they are; the audit tool reports them as non-conforming rather than moving them.

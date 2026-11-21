@@ -131,6 +131,8 @@ All **90 active Python modules** have individual source guides (with source blob
 | [components/model/section_tags.py](../../components/model/section_tags.py) | [Guide](components/model/section_tags.py.md) | 01 Import/geometry (2026-11-07) | P1 |
 | [tools/plot_results.py](../../tools/plot_results.py) | [Guide](tools/plot_results.py.md) | 09 Interpretation (2026-11-07) | P1 |
 | [tools/export_dashboard.py](../../tools/export_dashboard.py) | [Guide](tools/export_dashboard.py.md) | 09 Interpretation (2026-11-07) | P1 |
+| [tools/analyze_run_log.py](../../tools/analyze_run_log.py) | [Guide](tools/analyze_run_log.py.md) | Run-log findings, linear LTHA preliminary (2026-11-21) | P1 |
+| [tools/audit_output_layout.py](../../tools/audit_output_layout.py) | [Guide](tools/audit_output_layout.py.md) | Output-folder layout audit (2026-11-21) | P1 |
 | [components/inputs/aw_sources.py](../../components/inputs/aw_sources.py) | [Guide](components/inputs/aw_sources.py.md) | 01 Import/geometry → 04 Modal / ESM period (2026-11-07) | P1 |
 | [components/ui/output_folder.py](../../components/ui/output_folder.py) | [Guide](components/ui/output_folder.py.md) | All analysis windows (2026-11-07) | P1 |
 | [components/ui/exploratory_options.py](../../components/ui/exploratory_options.py) | [Guide](components/ui/exploratory_options.py.md) | 06 Isolated nonlinear probes (2026-11-07) | P1 |
