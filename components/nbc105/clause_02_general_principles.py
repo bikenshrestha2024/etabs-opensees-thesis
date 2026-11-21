@@ -11,7 +11,8 @@ RETURN_PERIOD_YEARS={"ULS":475,"SLS":20}
 
 def verification_check(*,uls:bool,sls:bool,overturning:bool,sliding:bool,
                        foundation:bool,evacuation_components:bool)->dict:
-    """§2.1.1–2.1.3, printed pp.10–11: mandatory verification declarations."""
+    """§2.1.1–2.1.3, printed pp.10–11: mandatory verification declarations.
+[REF NBC105-2025 §2, printed pp. 10–16]"""
     flags=locals()
     if any(type(v) is not bool for v in flags.values()):
         raise ValueError("NBC §2 inputs must be explicit boolean declarations")
