@@ -191,7 +191,7 @@ def analysis_output_folder(export_dir,limit_state='ULS', *, stage=None):
     """Resolve a source-identifiable case output folder.
 
     Legacy callers still resolve OpenSees_Analysis_Results. New ESM producers
-    explicitly request stage='ESM' and write beneath 03_ESM/RUNS.
+    explicitly request stage='ESM' and write beneath 03_ESM/RUNS/<state>/<case>.
     Stage selection does not migrate or delete historical result files.
     """
     folder=Path(export_dir)
@@ -208,7 +208,7 @@ def analysis_output_folder(export_dir,limit_state='ULS', *, stage=None):
         return folder/'OpenSees_Analysis_Results'/case
     if str(stage).strip().upper() == 'ESM':
         from components.inputs.output_layout import canonical_stage_folder
-        return folder/canonical_stage_folder('ESM')/'RUNS'/case
+        return folder/canonical_stage_folder('ESM')/'RUNS'/state/case
     raise ValueError('analysis_output_folder stage must be ESM or LEGACY')
 
 
