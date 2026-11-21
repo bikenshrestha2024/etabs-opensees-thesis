@@ -1,7 +1,7 @@
 """Case-labelled deformation viewer with actual response readout and common cameras."""
 from pathlib import Path
 import json,math
-import numpy as np
+
 
 
 def find_deformation_cases(folder):
@@ -28,6 +28,7 @@ def find_deformation_cases(folder):
 
 
 def launch(parent,folder):
+    import numpy as np
     import tkinter as tk
     from tkinter import ttk
     from matplotlib.figure import Figure
