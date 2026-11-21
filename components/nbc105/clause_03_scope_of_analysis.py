@@ -24,7 +24,8 @@ def _positive(v,name):
     return z
 
 def esm_applicability(*,height_m,period_s,irregular,limit_state):
-    """§3.2.1 p.17: ESM all SLS, ULS if H<=15, T<0.5 or regular H<40."""
+    """[REF NBC105-2025 §3, printed pp. 17–21]
+§3.2.1 p.17: ESM all SLS, ULS if H<=15, T<0.5 or regular H<40."""
     h=_positive(height_m,"height_m"); t=_positive(period_s,"period_s")
     if type(irregular) is not bool:raise ValueError("irregular must be bool")
     state=str(limit_state).upper()
