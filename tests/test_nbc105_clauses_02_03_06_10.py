@@ -104,7 +104,7 @@ class Clause08(unittest.TestCase):
 
 class Clause09(unittest.TestCase):
     def test_ground_motion_bounds_and_steps(self):
-        self.assertEqual(motion_scale_factor(2,.5),.5)
+        self.assertEqual(motion_scale_factor(1,2),.5)
         with self.assertRaises(ValueError):
             motion_scale_factor(2,.2)
         self.assertAlmostEqual(history_time_step_limit_s(.8,.02,.025),.008)
