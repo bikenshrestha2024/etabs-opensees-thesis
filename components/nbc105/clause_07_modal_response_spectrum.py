@@ -49,7 +49,10 @@ def srss(modal_effects):
 def modal_mass_coverage(modal_mass_ratios_percent):
     """§7.3: returns accumulated participation percentage, not an acceptance token.
 [REF NBC105-2025 §7, printed pp. 40–41]"""
-    a=[float(x) for x in modal_mass_ratios_percent]
+    raw=list(modal_mass_ratios_percent)
+    if any(isinstance(x,bool) for x in raw):
+        raise ValueError("boolean modal participation is invalid")
+    a=[float(x) for x in raw]
     if not a or any(not math.isfinite(x) or x<0 or x>100 for x in a):
         raise ValueError("invalid modal participation")
     s=math.fsum(a)
