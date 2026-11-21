@@ -1,10 +1,36 @@
 """Case-labelled deformation viewer with actual response readout and common cameras."""
 from pathlib import Path
 import json,math
-import numpy as np
+
+
+
+def find_deformation_cases(folder):
+    """[REF docs/source/components/ui/response_viewer.py.md]
+    Discover historical AND stage-owned responses without modifying files.
+    """
+    from components.inputs.output_layout import result_roots,export_root_for
+    supplied=Path(folder).expanduser().resolve()
+    root=export_root_for(supplied)
+    sources=result_roots(root,stages=("ESM","MODAL","MRSM","LTHA","NLTHA"),
+                         include_legacy=True)
+    if supplied.is_dir() and supplied!=root and supplied not in sources:
+        sources=(*sources,supplied)
+    seen=set()
+    paths=[]
+    for source in sources:
+        if source.is_symlink():
+            continue
+        for candidate in source.rglob("Deformation_*V132.json"):
+            if candidate.is_file() and not candidate.is_symlink():
+                actual=candidate.resolve()
+                if actual not in seen:
+                    seen.add(actual)
+                    paths.append(candidate)
+    return sorted(paths)
 
 
 def launch(parent,folder):
+    import numpy as np
     import tkinter as tk
     from tkinter import ttk
     from matplotlib.figure import Figure
@@ -14,7 +40,7 @@ def launch(parent,folder):
         camera_controls,apply_view,node_readout,resolve_node_tag,
         center_camera_on_node,node_selection_artists,remove_selection_artists)
     win=tk.Toplevel(parent);win.title('SLS / ULS deformation — case and node response');win.geometry('1250x850')
-    paths=sorted(Path(folder).rglob('Deformation_*V132.json'));selected=tk.StringVar();top=ttk.Frame(win);top.pack(fill='x')
+    paths=find_deformation_cases(folder);selected=tk.StringVar();top=ttk.Frame(win);top.pack(fill='x')
     box=ttk.Combobox(top,textvariable=selected,values=[str(p) for p in paths],state='readonly',width=110);box.pack(fill='x',expand=True)
     note=tk.StringVar();note_label=ttk.Label(win,textvariable=note,wraplength=1180,justify='left');note_label.pack(anchor='w')
     controls=ttk.Frame(win);controls.pack(fill='x');actions=ttk.Frame(win);actions.pack(fill='x');kind=tk.StringVar(value='OpenSees node');ident=tk.StringVar();scale=tk.DoubleVar(value=100.)

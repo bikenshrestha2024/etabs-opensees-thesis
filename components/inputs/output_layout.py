@@ -121,6 +121,42 @@ def result_roots(source_path, *, stages=None, include_legacy=True):
     return tuple(found)
 
 
+
+def owned_run_destination(export_dir, stage, case_id, *, selected=None):
+    """Resolve a stage-owned output destination without creating directories.
+
+    When a GUI selects the export root, a legacy shared results directory,
+    or a *different* stage within the SAME export, do not write new solver
+    results there. Resolve to <export>/<stage>/RUNS/<case-id>.
+    A user-chosen external directory remains an explicit custom override.
+    Existing paths already beneath the correct stage are preserved.
+    [REF docs/source/components/inputs/output_layout.py.md]
+    """
+    from components.inputs.output_contract import safe_component
+    source = Path(export_dir).expanduser()
+    if any(x.is_symlink() for x in (source, *source.parents)):
+        raise ValueError("Refusing linked source/export location")
+    root = export_root_for(source).resolve()
+    folder = canonical_stage_folder(stage)
+    label = safe_component(case_id)
+    destination = root / folder / "RUNS" / label
+    selected_path = root if selected is None or not str(selected).strip() else (
+        Path(selected).expanduser())
+    if any(x.is_symlink() for x in (selected_path, *selected_path.parents)):
+        raise ValueError("Refusing linked selected output location")
+    target = selected_path.resolve()
+    if target != root and root not in target.parents:
+        # Explicit outside-folder override: never silently replace it.
+        return target
+    stage_root = root / folder
+    if target != stage_root and stage_root in target.parents:
+        return target
+    if any(x.is_symlink() for x in (destination, *destination.parents)
+           if x == root or root in x.parents):
+        raise ValueError("Refusing linked output stage destination")
+    return destination
+
+
 def review_snapshots_for(source_path, stage):
     """[REF docs/source/components/inputs/output_layout.py.md]\n    Return the single canonical copy-only review parent for a known stage."""
     key = str(stage).upper()

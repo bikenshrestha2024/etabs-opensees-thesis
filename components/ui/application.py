@@ -2518,7 +2518,7 @@ class App:
         action(group_3_0,text="OpenSees modal analysis + NBC checks",command=self._open_modal_audit)
         action(group_3_1,text="Site / record spectra and matching diagnostics",command=self._open_spectrum_diagnostics)
         action(group_3_1,text="Model response spectrum (CQC) - SLS / ULS",command=lambda:__import__('OpenSees_Model_Response_Spectrum_V132').launch(self.root,self.out.get()))
-        action(group_6_1,text="Lateral deformation / drift outputs",command=lambda:__import__('OpenSees_Response_Checks_V132').launch_response_viewer(self.root,Path(self.out.get())/'OpenSees_Analysis_Results'))
+        action(group_6_1,text="Lateral deformation / drift outputs",command=lambda:__import__('OpenSees_Response_Checks_V132').launch_response_viewer(self.root,Path(self.out.get())))
         action(group_6_1,text="NBC 5.4 irregularity review",command=lambda:__import__('OpenSees_Response_Checks_V132').launch_irregularity(self.root,self.out.get()))
         action(group_3_1,text="OpenSees linear time history — paired NBC records",command=self._open_linear_time_history)
         action(group_4_0,text="OpenSees nonlinear paired time history — V116 gate",command=self._open_nonlinear_time_history)

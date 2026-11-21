@@ -30,7 +30,7 @@ def launch(parent,model_folder,output_folder=None):
     import tkinter as tk
     from tkinter import ttk,filedialog,messagebox
     from OpenSees_Input_Records_V130 import LTH_DEFAULT_PEER_PAIRS
-    from components.inputs.project_workbooks import analysis_output_folder
+    from components.inputs.output_layout import owned_run_destination
     # [REF components/ui/plot_utilities.py scrollable_form] the window was
     # taller than a laptop screen; scroll instead of clipping the controls.
     top=tk.Toplevel(parent);top.title('Building nonlinear research history - frames / FSAM walls')
@@ -41,7 +41,7 @@ def launch(parent,model_folder,output_folder=None):
     form=ttk.Frame(win,padding=8);form.pack(fill='x');form.columnconfigure(1,weight=1)
     source_folder=Path(model_folder)
     if output_folder is None or Path(output_folder).name=='OpenSees_Analysis_Results':
-        initial_output=analysis_output_folder(source_folder,'ULS')
+        initial_output=owned_run_destination(source_folder,"NLTHA","EXPLORATORY_ULS")
     else:
         initial_output=Path(output_folder)
     folder=tk.StringVar(value=str(source_folder));out=tk.StringVar(value=str(initial_output));x=tk.StringVar();y=tk.StringVar();pair=tk.StringVar(value='RSN1120_KOBE_TAK000');dt=tk.StringVar(value='.005');duration=tk.StringVar(value='0');orientation=tk.StringVar(value='XY + YX');ls=tk.StringVar(value='ULS');scale=tk.StringVar(value='1.0')
@@ -86,7 +86,8 @@ def launch(parent,model_folder,output_folder=None):
     ttk.Label(win,text=source_description,wraplength=1100,foreground='#9a3412',justify='left').pack(anchor='w',padx=8,pady=4)
     def state_changed(*_):
         if output_is_automatic:
-            out.set(str(analysis_output_folder(source_folder,ls.get())))
+            out.set(str(owned_run_destination(
+            Path(folder.get()),"NLTHA","EXPLORATORY_"+ls.get())))
     ls.trace_add('write',state_changed)
     settings=ttk.LabelFrame(win,text='Analysis settings');settings.pack(fill='x',padx=8,pady=(4,0))
     for label,var in [('dt (s)',dt),('Trial duration (s); 0=full record',duration),('Motion scale (units handled separately)',scale)]:ttk.Label(settings,text=label).pack(side='left');ttk.Entry(settings,textvariable=var,width=8).pack(side='left')
@@ -297,7 +298,10 @@ def launch(parent,model_folder,output_folder=None):
             runner=resolve_runner()
             source=Path(folder.get()).resolve()
             if not (source/'OpenSees_Complete_Model_Data_V118.json').is_file():raise ValueError('Select an assembled export folder')
-            dest=Path(out.get())/('EXPLORATORY_FRAME_NL_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S'));dest.mkdir(parents=True,exist_ok=False)
+            base=owned_run_destination(
+                source,"NLTHA","EXPLORATORY_"+ls.get(),selected=out.get())
+            dest=base/('EXPLORATORY_FRAME_NL_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+            dest.mkdir(parents=True,exist_ok=False)
             extra_tags=[int(value.strip()) for value in tracked_members.get().split(',') if value.strip()]
             config=dict(model_folder=str(source),output_dir=str(dest),x_path=x.get(),y_path=y.get(),dt_s=float(dt.get()),duration_s=float(duration.get()) or None,scale=float(scale.get()),orientations=['XY','YX'] if orientation.get()=='XY + YX' else [orientation.get()],limit_state=ls.get(),tracked_frame_tag=int(tracked.get()),tracked_element_tags=extra_tags,nonlinear_walls=full.get(),material_basis=basis.get(),steelmpf_transition=steel_transition.get(),gravity_system=gravity_system.get(),transient_system=transient_system.get(),material_overrides={'brace.fy_mpa':float(brace_fy.get()),'brace.b':float(brace_b.get())})
             options=build_options(excitation=excitation.get(),damping_mode=damping_mode.get(),
