@@ -5,7 +5,9 @@ import json,math
 
 
 def find_deformation_cases(folder):
-    """Discover historical AND stage-owned responses without modifying files."""
+    """[REF docs/source/components/ui/response_viewer.py.md]
+    Discover historical AND stage-owned responses without modifying files.
+    """
     from components.inputs.output_layout import result_roots,export_root_for
     supplied=Path(folder).expanduser().resolve()
     root=export_root_for(supplied)
