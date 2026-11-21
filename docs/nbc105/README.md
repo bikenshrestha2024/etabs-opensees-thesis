@@ -19,25 +19,29 @@ Related: [project declarations](PROJECT_DECLARATIONS.md) (g = 9.81 per printed p
 
 ## Clause register (titles and printed pages from the PDF contents list, printed pp. xiv-xx)
 
-Status: `CLAUSE_1`, `CLAUSE_4` and `CLAUSE_5` indicate published modules, matrices and tests. Clause 5 coverage here is §§5.1–5.2. Refer to the matrices for caller responsibilities and remaining implementation work. `NOT_STARTED` describes the dedicated clause audit, including where earlier analysis code exists.
+Status: all ten main clauses now have dedicated module files. Clauses 1, 4 and 5 have earlier active integration; new modules for 2, 3, 6–10 are initially **reference-layer only** and cannot be labelled full implementation or native compliance. Source-linked tests and matrices enumerate remaining obligations. Clause 5 coverage here is §§5.1–5.2. Refer to the matrices for caller responsibilities and remaining implementation work. `NOT_STARTED` describes the dedicated clause audit, including where earlier analysis code exists.
 
 | Clause | Title | Printed page | Status | Module | Matrix |
 |---|---|---|---|---|---|
 | 1 | Title, Scope, Definitions and Notations | 1 | CLAUSE_1 | [clause_01_scope_definitions.py](../../components/nbc105/clause_01_scope_definitions.py) | [matrix](clause_01_scope_definitions_matrix.md) |
-| 2 | General Principles | 10 | NOT_STARTED | | |
-| 3 | Scope of Analysis | 17 | NOT_STARTED | | |
+| 2 | General Principles | 10 | REFERENCE_MODULE_CALLERS_OPEN | [clause_02_general_principles.py](../../components/nbc105/clause_02_general_principles.py) | [matrix](clause_02_general_principles_matrix.md) |
+| 3 | Scope of Analysis | 17 | REFERENCE_MODULE_CALLERS_OPEN | [clause_03_scope_of_analysis.py](../../components/nbc105/clause_03_scope_of_analysis.py) | [matrix](clause_03_scope_of_analysis_matrix.md) |
 | 4 | Seismic Hazard | 21 | CLAUSE_4 | [clause_04_seismic_hazard.py](../../components/nbc105/clause_04_seismic_hazard.py) | [matrix](clause_04_seismic_hazard_matrix.md) |
 | 5 | Dynamic Characteristics of Structures | 28 | CLAUSE_5 | [clause_05_dynamic_characteristics.py](../../components/nbc105/clause_05_dynamic_characteristics.py) | [matrix](clause_05_dynamic_characteristics_matrix.md) |
-| 6 | Equivalent Static Method | 38 | NOT_STARTED | | |
-| 7 | Modal Response Spectrum Method | 40 | NOT_STARTED | | |
-| 8 | Elastic Time History Analysis | 42 | NOT_STARTED | | |
-| 9 | Non-linear Static and Dynamic Analysis | 44 | NOT_STARTED | | |
-| 10 | Parts and Components | 49 | NOT_STARTED | | |
+| 6 | Equivalent Static Method | 38 | REFERENCE_MODULE_CALLERS_OPEN | [clause_06_equivalent_static.py](../../components/nbc105/clause_06_equivalent_static.py) | [matrix](clause_06_equivalent_static_matrix.md) |
+| 7 | Modal Response Spectrum Method | 40 | REFERENCE_MODULE_CALLERS_OPEN | [clause_07_modal_response_spectrum.py](../../components/nbc105/clause_07_modal_response_spectrum.py) | [matrix](clause_07_modal_response_spectrum_matrix.md) |
+| 8 | Elastic Time History Analysis | 42 | REFERENCE_MODULE_CALLERS_OPEN | [clause_08_elastic_time_history.py](../../components/nbc105/clause_08_elastic_time_history.py) | [matrix](clause_08_elastic_time_history_matrix.md) |
+| 9 | Non-linear Static and Dynamic Analysis | 44 | REFERENCE_MODULE_CALLERS_OPEN | [clause_09_nonlinear_analysis.py](../../components/nbc105/clause_09_nonlinear_analysis.py) | [matrix](clause_09_nonlinear_analysis_matrix.md) |
+| 10 | Parts and Components | 49 | REFERENCE_MODULE_CALLERS_OPEN | [clause_10_parts_and_components.py](../../components/nbc105/clause_10_parts_and_components.py) | [matrix](clause_10_parts_and_components_matrix.md) |
 | Annex A | Design and Detailing of Reinforced Concrete Structures for Earthquake Loads | 53 | NOT_STARTED | | |
 | Annex B | Design and Detailing of Steel Structures for Earthquake Loads | 81 | NOT_STARTED | | |
 | Annex C | Seismic Zoning Factor for Cities/Municipalities | 100 | NOT_STARTED | | |
 
 Sub-clause titles recorded where they matter to the two active clauses (contents list): 3.6 Load Combinations for Limit State Method (p. 19); 3.7 Load Combinations for Working Stress Method (p. 21); 3.8 Increase in Allowable Bearing Pressure (p. 21); 4.1 Elastic Site Spectra for Horizontal Loading (p. 21) with 4.1.1 to 4.1.5 (pp. 21, 22, 24, 26, 26); 4.2 Elastic Site Spectra for Serviceability Limit State (p. 27); 4.3 Elastic Site Spectra for Vertical Loading (p. 27); 5.1 Periods of Vibration (p. 28); 5.2 Seismic Weight (p. 30); 5.3 Selection of Structural System (p. 30). Existing code that already touches other clauses (for example the nonlinear time-history audit for clause 9.3) is not part of this register until it is audited line by line against the printed pages and given a matrix.
+
+## November 2026 source-module checkpoint
+
+Clauses 2, 3, 6–10 are source-grounded pure Python reference implementations with numerical and fail-closed checks, not finished solver/GUI refactoring. Clause 7 still lacks a full missing-mass solver and close-frequency grouping; Clause 9 still lacks validated nonlinear histories and wall convergence. Table 10-1 is implemented as 2.5 at equal periods, linearly reducing to 1.0 at a 0.5 s absolute difference; the printed equality at 0.5 s is unstated and the continuous limit was selected with an explicit engineering note. All original physical-model acceptance gates remain OPEN.
 
 ## Procedure to add a clause
 
