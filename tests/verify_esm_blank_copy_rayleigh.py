@@ -14,6 +14,7 @@ from components.inputs.project_workbooks import (
     _same_edb_file_content,source_workbooks,import_project_inputs,
 )
 from components.equivalent_static.calculation_and_gui import ESMGui
+from components.modal.rayleigh import RAYLEIGH_PREFIX
 
 
 class Var:
@@ -65,19 +66,24 @@ class ESMBlankRegression(unittest.TestCase):
         gui=object.__new__(ESMGui)
         gui.awx=Var('3.6779');gui.awy=Var('0.8019')
         gui.state=Var('Both')
+        for name,value in dict(soil='C',Z='.35',I='1',rmu='4',omegau='1.5',
+                               omegas='1.25',vs30='300',n_spt='',period_factor='1.25').items():
+            setattr(gui,name,Var(value))
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp)
             gui.outdir=Var(str(folder));gui.export_dir=folder
             (folder/'OpenSees_Complete_Model_Data_V118.json').write_text('{}')
-            (folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').write_text(
+            ledger=folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv'
+            ledger.write_text(
                 'story_number,story_name,height_m,dead_load_kN,storage_live_load_kN,other_live_load_kN\\n'
                 '1,Story1,3,100,0,0\\n')
             gui.python_exe=Var('python')
+            gui.path=Var(str(ledger))
             gui.status=Var('')
             gui.root=types.SimpleNamespace(after=lambda _ms,func:func())
             invoked=[]
             def run(command,**kw):
-                invoked.append(command[-1])
+                invoked.append((command[-2],json.loads(command[-1])))
                 return types.SimpleNamespace(returncode=0,stdout='ok',stderr='')
             root=Path(__import__('components.equivalent_static.calculation_and_gui',
                                   fromlist=['HERE']).HERE)
@@ -85,15 +91,18 @@ class ESMBlankRegression(unittest.TestCase):
             with patch('components.equivalent_static.calculation_and_gui.subprocess.run',side_effect=run),\
                  patch('components.equivalent_static.calculation_and_gui.threading.Thread') as thread,\
                  patch('components.equivalent_static.calculation_and_gui.HERE',root),\
-                 patch.object(gui,'_load_project_inputs',return_value=None):
+                 patch.object(gui,'_load_project_inputs',return_value=None),\
+                 patch.object(gui,'_show_empirical',return_value=None):
                 def start():
                     worker=thread.call_args.kwargs['target']
                     worker()
                 thread.return_value.start.side_effect=start
                 gui._run_rayleigh()
-            self.assertEqual(invoked,['ULS','SLS'])
-            self.assertTrue((folder/'NBC105_Rayleigh_Preliminary_V126_ULS.log').is_file())
-            self.assertTrue((folder/'NBC105_Rayleigh_Preliminary_V126_SLS.log').is_file())
+            self.assertEqual([state for state,_ in invoked],['ULS','SLS'])
+            self.assertTrue(all(settings['soil_type']=='C' and settings['zoning_factor_z']==.35
+                                for _,settings in invoked))
+            self.assertTrue((folder/(RAYLEIGH_PREFIX+'_ULS.log')).is_file())
+            self.assertTrue((folder/(RAYLEIGH_PREFIX+'_SLS.log')).is_file())
 
 
 if __name__=='__main__':
