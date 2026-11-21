@@ -1,4 +1,4 @@
-"""Call-site routing through components/modal/nbc105_clause5.py.
+"""Call-site routing through components/nbc105/clause_05_dynamic_characteristics.py.
 
 [REF NBC105-2025 §5, printed pp. 28-30] Unit tests only; no ETABS/OpenSees/tkinter.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from components.modal import nbc105_clause5 as c5
+from components.nbc105 import clause_05_dynamic_characteristics as c5
 from components.modal.analysis import nbc105_period_estimate
 
 ROOT = Path(__file__).resolve().parents[1]

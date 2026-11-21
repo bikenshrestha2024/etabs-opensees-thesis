@@ -15,7 +15,8 @@ import csv
 import json
 import math
 import hashlib
-from components.modal.nbc105_clause5 import amplified_period_s, empirical_period_s
+from components.nbc105.clause_05_dynamic_characteristics import amplified_period_s, empirical_period_s
+from components.nbc105.constants import GRAVITY_M_S2
 
 
 RAYLEIGH_METHOD_VERSION = 126
@@ -89,7 +90,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
                 len({tag for _,tag in actual})!=len(actual) or set(expected)!=set(actual)):
                 raise ValueError('Incomplete or duplicated Rayleigh diaphragm master ledger')
             return len(actual)
-        def verify_rayleigh_sum(story_rows, *, g=9.81):
+        def verify_rayleigh_sum(story_rows, *, g=GRAVITY_M_S2):
             vals=[(float(r['weight_kN']),float(r['force_kN']),float(r['displacement_m'])) for r in story_rows]
             if not vals or any(not all(math.isfinite(t) for t in row) or row[0]<=0 or row[1]<=0 for row in vals):
                 raise ValueError('Invalid Rayleigh storey terms')
@@ -128,7 +129,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         raise ValueError('Story heights must be finite, positive, and strictly increasing from the seismic base.')
     if any(not math.isfinite(w) or w<=0 for w in weights):raise ValueError('Positive finite reconciled seismic story weights are required.')
     H=heights[-1]
-    result={'story_weights_sha256':hashlib.sha256((folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').read_bytes()).hexdigest(),'standard':'NBC 105:2025 §5.1.1-§5.1.3','model_sha256':hashlib.sha256(model.read_bytes()).hexdigest(),'gravity_state':'assembled sustained gravity','limit_state':state,'height_m':H,'height_basis':'story-ledger elevations from seismic base; confirm qualifying basements are excluded per §5.1.2','gravity_acceleration_m_s2':9.81,'rayleigh_equation':'T1 = 2*pi*sqrt(sum(Wi*di^2)/(g*sum(Fi*di)))','torsion':'diaphragm rotations restrained during reference lateral perturbation','diagnostic_only':True}
+    result={'story_weights_sha256':hashlib.sha256((folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').read_bytes()).hexdigest(),'standard':'NBC 105:2025 §5.1.1-§5.1.3','model_sha256':hashlib.sha256(model.read_bytes()).hexdigest(),'gravity_state':'assembled sustained gravity','limit_state':state,'height_m':H,'height_basis':'story-ledger elevations from seismic base; confirm qualifying basements are excluded per §5.1.2','gravity_acceleration_m_s2':GRAVITY_M_S2,'rayleigh_equation':'T1 = 2*pi*sqrt(sum(Wi*di^2)/(g*sum(Fi*di)))','torsion':'diaphragm rotations restrained during reference lateral perturbation','diagnostic_only':True}
     result['model_config_sha256']=hashlib.sha256(config_file.read_bytes()).hexdigest()
     result['mass_elevation_audit']=mass_elevation_audit
     prefix=rayleigh_result_prefix(state)
@@ -185,7 +186,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
             incremental_base_reaction_kN=base_increment, relative_reaction_error=reaction_error,
             max_floor_translation_spread_m=max(spread for _,spread in samples),
             max_retained_translation_difference_m=max(abs(a-b) for a,b in zip(u,retained)))
-        denominator=9.81*sum(f*d for f,d in zip(forces,u))
+        denominator=GRAVITY_M_S2*sum(f*d for f,d in zip(forces,u))
         numerator=sum(w*d*d for w,d in zip(weights,u))
         if not math.isfinite(denominator) or denominator<=0:raise ValueError(f'{axis} Rayleigh denominator is nonpositive or non-finite; inspect displacement signs and constraints.')
         if not math.isfinite(numerator) or numerator<=0:raise ValueError(f'{axis} Rayleigh numerator is nonpositive or non-finite; inspect seismic weights and displacements.')
@@ -212,7 +213,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
                       f'=SUM(G2:G{end_row})',f'=SUM(H2:H{end_row})'])
         period_row=sum_row+1
         sheet.append(['INDEPENDENT EXCEL T_R (s)',
-                      f'=IF(H{sum_row}>0,2*PI()*SQRT(G{sum_row}/(9.81*H{sum_row})),"")'])
+                      f'=IF(H{sum_row}>0,2*PI()*SQRT(G{sum_row}/({GRAVITY_M_S2!r}*H{sum_row})),"")'])
         sheet.append(['SOLVER/PYTHON T_R (s)',period])
         sheet.append(['EXCEL - PYTHON T_R (s)',
                       f'=IF(B{period_row}="","",B{period_row}-B{period_row+1})'])

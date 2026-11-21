@@ -10,6 +10,7 @@ def _runtime_repo_root():
     """
     return Path(globals().get("_component_source", __file__)).resolve().parents[2]
 import json,csv,math,hashlib,time
+from components.nbc105.constants import GRAVITY_M_S2
 from OpenSees_Timing_V130 import timed_outputs
 
 
@@ -78,7 +79,7 @@ def run_model_review(folder,output_dir,states=('SLS','ULS'),review_file=None):
                 low=groups[i-1]['master_xyz'][2] if i else data['base_z_m'];members=[(data['nodes'][str(n)],float(m)) for n,m in data['nodal_mass'].items() if low+1e-7<data['nodes'][str(n)][2]<=g['master_xyz'][2]+1e-7];mass=sum(m for p,m in members)
                 if mass<=0:raise ValueError('Nonpositive effective floor mass at '+str(g['storey_number']))
                 masses.append(mass);centers.append([sum(p[j]*m for p,m in members)/mass for j in (0,1)]);heights.append(g['master_xyz'][2]-data['base_z_m'])
-            values=import_project_inputs(_runtime_repo_root(),folder,state)['values'];period=values.get('workbook_adopted_t'+axis.lower());k=1. if period is None else max(1.,min(2.,1.+(float(period)-.5)/2.));shape=[m*h**k for m,h in zip(masses,heights)];base_force=.01*sum(masses)*9.80665;forces=[base_force*v/sum(shape) for v in shape]
+            values=import_project_inputs(_runtime_repo_root(),folder,state)['values'];period=values.get('workbook_adopted_t'+axis.lower());k=1. if period is None else max(1.,min(2.,1.+(float(period)-.5)/2.));shape=[m*h**k for m,h in zip(masses,heights)];base_force=.01*sum(masses)*GRAVITY_M_S2;forces=[base_force*v/sum(shape) for v in shape]
             ops.timeSeries('Linear',880001);ops.pattern('Plain',880001,880001)
             for g,cm,force in zip(groups,centers,forces):
                 f=[0.]*6;f[dof]=force;f[5]=-(cm[1]-g['master_xyz'][1])*force if axis=='X' else (cm[0]-g['master_xyz'][0])*force;ops.load(g['master_tag'],*f)

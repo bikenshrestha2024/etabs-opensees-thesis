@@ -74,7 +74,7 @@ Do not treat the damping calibration as evidence that materials or the
 nonlinear model are calibrated.
 
 Rule-by-rule implementation and test status for clause 5 (printed pp. 28-30):
-[NBC 105:2025 clause 5 compliance matrix](validation/NBC105_CLAUSE5_COMPLIANCE_MATRIX.md).
+[NBC 105:2025 clause 5 compliance matrix](nbc105/clause_05_dynamic_characteristics_matrix.md).
 A period is a design-input calculation, not engineering acceptance of the building.
 
 ## Material provenance and transfer limits

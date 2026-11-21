@@ -5,6 +5,7 @@ records; geometry and weights must come from the matching source model.
 """
 from __future__ import annotations
 import math
+from components.nbc105.constants import GRAVITY_M_S2
 
 
 def verify_storey_coverage(model_diaphragms, ledger_rows):
@@ -27,7 +28,7 @@ def verify_storey_coverage(model_diaphragms, ledger_rows):
     return len(actual)
 
 
-def verify_rayleigh_sum(rows, *, g=9.81):
+def verify_rayleigh_sum(rows, *, g=GRAVITY_M_S2):
     """[REF docs/source/components/modal/rayleigh_ledger_audit.py.md]
 
     Recalculate Rayleigh T from all participating storeys in SI units.

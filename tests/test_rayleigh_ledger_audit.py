@@ -1,6 +1,7 @@
 """Regression tests for all-storey NBC Rayleigh ledger audit (no OpenSees required)."""
 import math
 import unittest
+from components.nbc105.constants import GRAVITY_M_S2
 from components.modal.rayleigh_ledger_audit import verify_storey_coverage, verify_rayleigh_sum, verify_storey_elevations
 
 
@@ -48,7 +49,7 @@ class TestRayleighLedgerAudit(unittest.TestCase):
                    {"weight_kN": 200., "force_kN": 20., "displacement_m": 0.01}]
         answer = verify_rayleigh_sum(records)
         self.assertEqual(answer["storey_count"], 2)
-        self.assertAlmostEqual(answer["period_s"], 2 * math.pi * math.sqrt(0.03 / (9.81 * 0.3)))
+        self.assertAlmostEqual(answer["period_s"], 2 * math.pi * math.sqrt(0.03 / (GRAVITY_M_S2 * 0.3)))
         self.assertEqual(answer["status"], "NUMERICAL_RECONSTRUCTION_ONLY")
 
     def test_missing_or_invalid_values_rejected(self):

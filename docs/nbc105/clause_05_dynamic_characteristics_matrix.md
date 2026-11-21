@@ -1,17 +1,17 @@
 # NBC 105:2025 clause 5 compliance matrix (printed pp. 28-30)
 
-Date 2026-11-21. Code: [`components/modal/nbc105_clause5.py`](../../components/modal/nbc105_clause5.py) ([guide](../source/components/modal/nbc105_clause5.py.md)). Clause text, including Eq. 5.1(1), the shear-wall kt equation and the Figure 5-1 height rule, was verified against the printed pages 28-30 of NBC 105:2025 (user-supplied PDF).
+Date 2026-11-21. Code: [`components/nbc105/clause_05_dynamic_characteristics.py`](../../components/nbc105/clause_05_dynamic_characteristics.py) ([guide](../source/components/nbc105/clause_05_dynamic_characteristics.py.md); moved from `components/modal/nbc105_clause5.py`, now a re-export shim). Clause text, including Eq. 5.1(1), the shear-wall kt equation and the Figure 5-1 height rule, was verified against the printed pages 28-30 of NBC 105:2025 (user-supplied PDF).
 
 Status values: `IMPLEMENTED_AND_TESTED` (code and unit test exist, clause text checked against the printed page); `CALLER_RESPONSIBILITY` (the module cannot judge it; the caller or the ETABS/assembly ledger must supply it correctly).
 
 **Limits.** This matrix records software conformance of the period arithmetic only. It is not design acceptance of any building, not an ETABS or OpenSees run, and a unit-test pass is not engineering acceptance. Native ETABS/OpenSees runs are PENDING.
 
-Tests: `T5` = `tests/test_nbc105_clause5.py`, `TC` = `tests/test_nbc105_clause5_callsites.py`.
+Tests: `T5` = `tests/test_nbc105_clause5.py`, `TC` = `tests/test_nbc105_clause5_callsites.py`, `TK` = `tests/test_nbc105_constants.py`.
 
 | # | Clause | Printed page | Requirement | Code location | Test | Status |
 |---|---|---|---|---|---|---|
 | 1 | §5.1 | 28 | Adopted period is the lesser of Rayleigh and the amplified empirical period; missing Rayleigh gives no adopted period | `adopted_period_s` (reference implementation; call sites apply min() inline) | `T5::test_adopted_is_lesser_of_rayleigh_and_amplified`, `T5::test_adopted_none_without_rayleigh`, `TC::test_estimate_matches_clause5_module` | IMPLEMENTED_AND_TESTED (reference) |
-| 2 | §5.1.1 Eq. 5.1(1) | 28 | T = 2 pi sqrt(sum(Wi di^2) / (g sum(Fi di))) | `rayleigh_period_s` (reference implementation, no production caller); `components/modal/rayleigh.py` evaluates Eq. 5.1(1) itself, independently of the module | `T5::test_rayleigh_single_dof_equals_2pi_sqrt_m_over_k` | IMPLEMENTED_AND_TESTED (module is a reference; production Rayleigh is the rayleigh.py code) |
+| 2 | §5.1.1 Eq. 5.1(1) | 28 | T = 2 pi sqrt(sum(Wi di^2) / (g sum(Fi di))); g printed as 9.81 m/s^2 (notation list, p. 7), project value `GRAVITY_M_S2` = 9.80665 (USER_DECISION, USER_DECLARED 2026-11-21, deviation 0.0341 %; Rayleigh T about 0.017 % longer) | `rayleigh_period_s` (reference implementation, no production caller); `components/modal/rayleigh.py` evaluates Eq. 5.1(1) itself, independently of the module, with the same `components.nbc105.constants.GRAVITY_M_S2` | `T5::test_rayleigh_single_dof_equals_2pi_sqrt_m_over_k`, `TK::test_gravity_literals_only_in_constants` | IMPLEMENTED_AND_TESTED (module is a reference; production Rayleigh is the rayleigh.py code) |
 | 3 | §5.1.2 Eq. 5.1(2) | 29 | Temp = kt H^0.75 | `empirical_period_s` | `T5::test_empirical_concrete_mrf` | IMPLEMENTED_AND_TESTED |
 | 4 | §5.1.2 kt list | 29 | 0.075 concrete MRF; 0.085 steel MRF; 0.075 steel EBF; 0.05 other | `KT_BY_SYSTEM` | `T5::test_kt_table` | IMPLEMENTED_AND_TESTED |
 | 5 | §5.1.2 shear-wall kt | 29 | kt = 0.075/sqrt(Aw), Aw = sum_{i=1..Nw}[Awi{0.2+(Lwi/H)^2}] | `effective_wall_area_m2`, `empirical_period_s` | `T5::test_empirical_shear_wall_uses_aw`, `TC::test_estimate_matches_clause5_module` | IMPLEMENTED_AND_TESTED |
@@ -36,5 +36,5 @@ Production-routed: `empirical_period_s`, `amplified_period_s`, `period_factor_de
 
 ## Open items
 
-- `components/model/assembly.py` (~line 945) converts weight to mass with 9.80665 m/s^2, while §5.1.1 (notation list) specifies g = 9.81 m/s^2 (used by `rayleigh.py` and the module). Pre-existing and not changed by this branch; effect on mass is about 0.03% (9.81/9.80665 = 1.000342). Decision on aligning the value is left to the user.
+- g: resolved as a USER_DECISION on 2026-11-21 (recorded as USER_DECLARED, not verified by the agent). NBC 105:2025 notation list (printed p. 7) says g = 9.81 m/s^2; the project uses `components.nbc105.constants.GRAVITY_M_S2` = 9.80665 m/s^2 everywhere weight and mass are converted (Eq. 5.1(1) in `rayleigh.py` and `rayleigh_period_s`, `assembly.py`, and the audit and review helpers listed in the [constants guide](../source/components/nbc105/constants.py.md)). Difference 0.0341 % (9.81/9.80665 = 1.000342); Rayleigh T changes by about +0.017 % (sqrt of the ratio); the assembly weight/mass conversion already used 9.80665 and is numerically unchanged. `NBC_NOTATION_GRAVITY_M_S2` = 9.81 is kept as a reference value only.
 - Floating-point: at factor 1.25 the module's operation order differs from the previous inline `.075*H**.75/sqrt(Aw)` by up to 1 ulp.

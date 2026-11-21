@@ -19,7 +19,7 @@ from tkinter import ttk, filedialog, messagebox
 
 HERE=Path(__file__).resolve().parent
 from components.inputs.project_workbooks import analysis_output_folder
-from components.modal.nbc105_clause5 import amplified_period_s, empirical_period_s, period_factor_deviation
+from components.nbc105.clause_05_dynamic_characteristics import amplified_period_s, empirical_period_s, period_factor_deviation
 try:
     from NBC105_Analysis_Settings_V109 import (
         NBC105_ESM_SYSTEM_FACTORS, calculate_esm,

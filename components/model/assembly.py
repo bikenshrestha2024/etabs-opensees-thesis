@@ -35,6 +35,7 @@ import os
 import shutil
 import hashlib
 import time
+from components.nbc105.constants import GRAVITY_M_S2
 
 MANIFEST = 'OpenSees_Export_Manifest_V118.json'
 
@@ -942,7 +943,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
             gravity[pat]={}
             for n,vec in values.items():
                 gravity[pat][n]=[v*gf for v in vec]; ledger[pat]-=vec[2]*gf
-                nodal_mass[int(n)]+=-vec[2]*mf/9.80665
+                nodal_mass[int(n)]+=-vec[2]*mf/GRAVITY_M_S2
             total+=ledger[pat]
         if any(m<-1e-8 for m in nodal_mass.values()): raise ValueError('Negative nodal seismic mass; reconcile upward loads')
         if total<=0: raise ValueError('Complete gravity load total is not positive')
@@ -1042,8 +1043,8 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
         report.update(frame_objects=len(segments),frame_segments=len(frame_elements),area_objects=len(area_children),
                       shell_mesh_cells=len(shells),source_nodes=len(source_nodes),mesh_nodes=len(nodes),
                       excluded_none_section_frame_objects=null_frames,total_downward_load_kN=total,
-                      total_seismic_weight_including_fixed_nodes_kN=sum(nodal_mass.values())*9.80665,
-                      active_horizontal_seismic_weight_kN=sum(m for n,m in nodal_mass.items() if not all(supports.get(str(n),[0]*6)[:2]))*9.80665,gravity_by_pattern_kN=ledger,
+                      total_seismic_weight_including_fixed_nodes_kN=sum(nodal_mass.values())*GRAVITY_M_S2,
+                      active_horizontal_seismic_weight_kN=sum(m for n,m in nodal_mass.items() if not all(supports.get(str(n),[0]*6)[:2]))*GRAVITY_M_S2,gravity_by_pattern_kN=ledger,
                       elastic_assembled=True)
         for member in hinged_release_review:
             member['elastic_status']='ASSEMBLED_SOURCE_END_RELEASES'
@@ -1118,7 +1119,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
         # storeys; nodes below the first floor stay with floor 1 so the total
         # is preserved. Fixed-base masses are excluded consistently with the
         # horizontal eigenproblem.
-        from components.modal.nbc105_clause5 import storey_index_for_elevation
+        from components.nbc105.clause_05_dynamic_characteristics import storey_index_for_elevation
         groups=sorted(payload['diaphragms'],key=lambda g:g['master_xyz'][2])
         story_rows=[]
         for g in groups:

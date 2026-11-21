@@ -58,7 +58,7 @@ def nbc105_period_estimate(*, height_m, system_type, wall_aw_x_m2=None,
     system_type = str(system_type).strip().lower()
     # [REF NBC105-2025 §5.1.2, printed p. 29] kt and Eq. 5.1(2) live in the
     # shared clause 5 module; this function only routes to it.
-    from components.modal.nbc105_clause5 import (
+    from components.nbc105.clause_05_dynamic_characteristics import (
         amplified_period_s, empirical_period_s)
     empirical = {}
     for axis, aw in (("X", aw_x), ("Y", aw_y)):

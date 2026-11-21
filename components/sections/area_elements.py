@@ -38,6 +38,8 @@ import math
 from pathlib import Path
 from typing import Any
 
+from components.nbc105.constants import GRAVITY_M_S2
+
 AREA_BUILDER_EXECUTION_DEFAULT = False
 E_SFI_REFERENCE = "Kolozvari, Lopez & Massone (2023), Eng. Struct. 294, 116700, doi:10.1016/j.engstruct.2023.116700"
 
@@ -232,7 +234,7 @@ def instantiate_area_elements(ops, *, topology_json: str | Path,
 def calculate_area_seismic_mass_contribution(*, load_assignment_csv: str | Path,
                                               topology_json: str | Path,
                                               pattern_factors: dict[str, float],
-                                              gravity_m_s2: float = 9.80665,
+                                              gravity_m_s2: float = GRAVITY_M_S2,
                                               raw_force_to_kN: float = 1.0) -> dict[int, float]:
     """Compute area-load-derived nodal translational mass in kN*s²/m.
 
