@@ -5,7 +5,7 @@ Ground motion selection/scaling/time-step rules are delegated to clause 9.3.2.
 from __future__ import annotations
 import math
 __all__=["elastic_model_prerequisites","record_response_aggregate",
-         "elastic_member_action_for_design"]
+         "elastic_member_action_for_design","record_response_rule"]
 
 def elastic_model_prerequisites(*,is_3d,gravity,p_delta,torsion,damping_ratio):
     """§8.1.1 p.42: 3D; gravity; P-Delta; inherent torsion; damping<=5%.
@@ -20,15 +20,27 @@ def elastic_model_prerequisites(*,is_3d,gravity,p_delta,torsion,damping_ratio):
     return {"status":"PASS" if not missing else "BLOCKED",
             "missing":missing,"basis":"INPUT_DECLARATIONS_NOT_NATIVE_MODEL_PROOF"}
 
+def record_response_rule(number_of_records):
+    """§8.1.3 and §9.3.3: <7 MAX, >7 AVERAGE; exactly seven review.
+
+    [REF NBC105-2025 §8.1.3 p.42; §9.3.3 p.47]
+    """
+    if isinstance(number_of_records,bool) or not isinstance(number_of_records,int) or number_of_records<1:
+        raise ValueError("record count must be positive integer")
+    if number_of_records==7:
+        return "REVIEW_REQUIRED_EXACTLY_SEVEN_NOT_DEFINED_IN_2025_TEXT"
+    return "MAXIMUM" if number_of_records<7 else "AVERAGE"
+
 def record_response_aggregate(responses):
     """§8.1.3 p.42: <7 max; >7 mean; exactly 7 unspecified -> fail closed.
 [REF NBC105-2025 §8, printed pp. 42–43]"""
     x=[float(v) for v in responses]
     if not x or any(not math.isfinite(v) for v in x):
         raise ValueError("nonfinite/empty time-history responses")
-    if len(x)==7:
+    rule=record_response_rule(len(x))
+    if rule.startswith("REVIEW_REQUIRED"):
         raise ValueError("NBC §8.1.3 does not specify exactly seven records")
-    return max(x) if len(x)<7 else math.fsum(x)/len(x)
+    return max(x) if rule=="MAXIMUM" else math.fsum(x)/len(x)
 
 def elastic_member_action_for_design(action,uls_ductility):
     """§8.1.3.2 p.43: divide elastic member action by ULS ductility factor.
