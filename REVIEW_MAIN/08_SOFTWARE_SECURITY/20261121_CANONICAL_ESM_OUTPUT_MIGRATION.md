@@ -24,3 +24,8 @@ These screenshot observations do not prove file validity, content completeness, 
 - Use `tools/audit_live_output_writers.py` and `components.inputs.folder_audit` to resolve remaining root writers stage by stage, without guessing from file names.
 - **Do not delete** root JSON/CSV/XLSX/PY files or historical analysis results until every source consumer and saved-run manifest reference is resolved.
 - Do not merge as a fully validated comprehensive cleanup while native Windows acceptance remains missing. Directory routing fixes cannot certify NBC 105 physical compliance.
+
+
+## Versioned root mirror reconciliation
+
+Repeated conversion may change root source files after their `01_ETABS_EXPORT` copies were created. A changed source is copied into `01_ETABS_EXPORT/09_REVIEW/ROOT_SOURCE_REVISIONS/<SHA256>.<extension>`, leaving the original categorized copy intact. `root_mirror_status` and `root_mirror_conflicts` identify every stale primary copy. This is provenance preservation rather than a silent overwrite or model validation. Do not delete either representation until source consumers and run identities are reconciled.
