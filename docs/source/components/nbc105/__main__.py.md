@@ -12,4 +12,4 @@
 
 ## Local Annex A/B CLI
 
-`python -m components.nbc105 --annex B --operation seismic_link_rotation_limit_rad --json '{"link_length_m":1.6,"mp_kNm":100,"vp_kN":100,"orientation":"horizontal"}'` evaluates the scoped seismic I-link reference limit. `--annex A --operation rc_wall_detailing_minima` requires all RC wall geometry and reinforcement inputs in mm, MPa and fractional ratios. `--audit` still exits 2 while source/annex/native compliance remains incomplete. No native model is modified.
+`python -m components.nbc105 --annex B --operation seismic_link_rotation_limit_rad --json '{"link_length_m":1.6,"mp_kNm":100,"vp_kN":100,"orientation":"horizontal","section_type":"I"}'` evaluates the scoped seismic I-link reference limit. `--annex A --operation rc_wall_detailing_minima` requires all RC wall geometry and reinforcement inputs in mm, MPa and fractional ratios. `--audit` still exits 2 while source/annex/native compliance remains incomplete. No native model is modified.
