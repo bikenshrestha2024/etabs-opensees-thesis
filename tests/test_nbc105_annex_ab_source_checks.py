@@ -72,15 +72,15 @@ class AnnexBLinkTests(unittest.TestCase):
         self.assertAlmostEqual(seismic_link_rotation_limit_rad(
             link_length_m=1.6,mp_kNm=100,vp_kN=100,orientation="horizontal",section_type="I"),.08)
         self.assertAlmostEqual(seismic_link_rotation_limit_rad(
-            link_length_m=3,mp_kNm=100,vp_kN=100,orientation="horizontal"),.02)
+            link_length_m=3,mp_kNm=100,vp_kN=100,orientation="horizontal",section_type="I"),.02)
         self.assertAlmostEqual(seismic_link_rotation_limit_rad(
-            link_length_m=2.3,mp_kNm=100,vp_kN=100,orientation="horizontal"),.05)
+            link_length_m=2.3,mp_kNm=100,vp_kN=100,orientation="horizontal",section_type="I"),.05)
     def test_vertical_link_rotation_interpolates_with_moment_ratio(self):
         # alpha=0.5 => short/long e=1.2/2.25 m at Mp/Vp=1m
         self.assertAlmostEqual(seismic_link_rotation_limit_rad(
             link_length_m=1.2,mp_kNm=100,vp_kN=100,orientation="vertical",alpha=.5,section_type="I"),.08)
         self.assertAlmostEqual(seismic_link_rotation_limit_rad(
-            link_length_m=2.25,mp_kNm=100,vp_kN=100,orientation="vertical",alpha=.5),.02)
+            link_length_m=2.25,mp_kNm=100,vp_kN=100,orientation="vertical",alpha=.5,section_type="I"),.02)
     def test_not_a_general_outrigger_damper_rotation_rule(self):
         with self.assertRaises(ValueError):
             seismic_link_rotation_limit_rad(
