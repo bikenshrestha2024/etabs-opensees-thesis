@@ -49,6 +49,22 @@ class StageOwnershipTests(unittest.TestCase):
                              root/"02_GRAVITY"/"RUNS"/"Case")
             self.assertFalse((root/"02_GRAVITY").exists())
 
+    def test_exploratory_and_material_paths_do_not_regress(self):
+        repo=Path(__file__).resolve().parents[1]
+        targets={
+            "components/ui/building_exploratory_gui.py":"NLTHA",
+            "components/model/readiness_gui.py":"SOFTWARE_DIAGNOSTICS",
+            "components/validation/irregularity_review.py":"SOFTWARE_DIAGNOSTICS",
+        }
+        for filename,stage in targets.items():
+            text=(repo/filename).read_text(encoding="utf-8-sig")
+            tree=ast.parse(text)
+            calls=[n for n in ast.walk(tree) if isinstance(n,ast.Call)
+                   and isinstance(n.func,ast.Name)
+                   and n.func.id=="owned_run_destination"]
+            self.assertTrue(any(any(isinstance(a,ast.Constant)
+                and a.value==stage for a in c.args) for c in calls), filename)
+
     def test_diagnostic_writers_have_canonical_run_owner(self):
         repo=Path(__file__).resolve().parents[1]
         p=repo/"components/model/readiness_dashboard_gui.py"
