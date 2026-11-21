@@ -1534,11 +1534,13 @@ class GravityAnalysisGUI:
             str(section(out,"LOGS")/"Gravity_GUI_Actions.log"))
         self.log.insert("end",f"Support tags: {supports}\n")
         self.win.update_idletasks()
-        if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
-            from components.gravity.output_ownership import case_directory
-            out=case_directory(out,self._selected_wall_support_strategy(),
-                self.gravity_profile_var.get(),datetime.now().strftime("%Y%m%d_%H%M%S_%f"),create=True)
-            self._gravity_action_log("ETABS_REACTION_DIAGNOSTIC_OUTPUT",str(out))
+        from components.gravity.output_ownership import case_directory
+        # Fresh, collision-safe folder for EVERY independent 32/76/97 run.
+        # No new files go at workspace root or overwrite another strategy.
+        out=case_directory(out,self._selected_wall_support_strategy(),
+            self.gravity_profile_var.get(),
+            datetime.now().strftime("%Y%m%d_%H%M%S_%f"),create=True)
+        self._gravity_action_log("GRAVITY_IMMUTABLE_SOLVER_CASE",str(out))
         self._gravity_action_log("GRAVITY_CASE_OUTPUT",str(out))
         result_path = out / "Gravity_Result_V110.json"
         runner_path = out / "Gravity_Run_V110.py"
