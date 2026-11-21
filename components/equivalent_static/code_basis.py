@@ -265,13 +265,9 @@ def esm_spectral_shape_factor(period_s, soil_type):
 
 
 def esm_period_exponent(period_s):
-    """NBC 105 §6.3 k: 1 for T<=0.5, 2 for T>=2.5, linear between."""
-    T = float(period_s)
-    if T <= 0.5:
-        return 1.0
-    if T >= 2.5:
-        return 2.0
-    return 1.0 + (T - 0.5) / 2.0
+    """Compatibility shim: single NBC §6.3 owner is Clause 6."""
+    from components.nbc105.clause_06_equivalent_static import distribution_exponent
+    return distribution_exponent(period_s)
 
 
 def soil_type_from_vs30(vs30_m_s):
@@ -403,22 +399,27 @@ def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
         raise ValueError(eligibility_note)
     Ch=esm_spectral_shape_factor(T,soil_type)
     elastic_spectrum=Ch*Z*I
+    # Clauses 6.1–6.3 are owned by one source-verified implementation.
+    # This keeps the established ESM results/report fields intact.
+    from components.nbc105.clause_06_equivalent_static import (
+        base_shear_coefficient, base_shear, distribute_forces)
     if state == "ULS":
-        if float(r_mu)<=0 or float(omega_u)<=0: raise ValueError("Rmu and Omega_u must be positive.")
-        Cd=elastic_spectrum/(float(r_mu)*float(omega_u))
+        Cd=base_shear_coefficient(elastic_spectrum,overstrength=omega_u,
+                                  ductility=r_mu,limit_state="ULS")
         divisor=f"R_mu*Omega_u={float(r_mu):g}*{float(omega_u):g}"
     else:
-        if float(omega_s)<=0: raise ValueError("Omega_s must be positive.")
         # NBC §4.2: Cs(T)=0.20*C(T); §6.1.2: Cd=Cs/Omega_s.
-        Cd=0.20*elastic_spectrum/float(omega_s)
+        Cd=base_shear_coefficient(.20*elastic_spectrum,overstrength=omega_s,
+                                  limit_state="SLS")
         divisor=f"Omega_s={float(omega_s):g}; SLS spectrum=0.20*C(T)"
     W=sum(r["seismic_weight_kN"] for r in normalized)
-    V=Cd*W
+    V=base_shear(Cd,W)
     k=esm_period_exponent(T)
-    denom=sum(r["seismic_weight_kN"]*(r["height_m"]**k) for r in normalized)
-    for row in normalized:
+    forces=distribute_forces(V,[r["seismic_weight_kN"] for r in normalized],
+                            [r["height_m"] for r in normalized],k)
+    for row,force in zip(normalized,forces):
         row["distribution_exponent_k"]=k
-        row["lateral_force_kN"]=(row["seismic_weight_kN"]*row["height_m"]**k/denom)*V
+        row["lateral_force_kN"]=force
     return {
         "standard":"NBC 105:2025", "clauses":"§§3.2.1, 4.1.1-4.1.5, 4.2, 5.1-5.2, 6.1-6.4",
         "limit_state":state,"soil_type":str(soil_type).upper(),"period_s":T,
@@ -433,7 +434,7 @@ def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
         "coefficient_divisor":divisor,"period_exponent_k":k,
         "ductility_factor_R_mu":float(r_mu),"overstrength_factor_Omega_u":float(omega_u),
         "overstrength_factor_Omega_s":float(omega_s),
-        "deflection_scale_factor_kd":({1:1.0,2:0.97,3:0.94,4:0.91,5:0.88}.get(len(normalized),0.85)),
+        "deflection_scale_factor_kd":__import__("components.nbc105.clause_06_equivalent_static",fromlist=["esm_deflection_factor"]).esm_deflection_factor(len(normalized)),
         # NBC 105:2025 §5.5.3: design inter-storey drift limits.
         "drift_limit_ratio":(0.025 if state=="ULS" else 0.006),
         "uls_drift_amplification":(float(r_mu) if state=="ULS" else 1.0),
