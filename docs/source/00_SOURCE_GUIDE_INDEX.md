@@ -140,6 +140,7 @@ All **90 active Python modules** have individual source guides (with source blob
 | [components/nonlinear_time_history/material_source_sets.py](../../components/nonlinear_time_history/material_source_sets.py) | [Guide](components/nonlinear_time_history/material_source_sets.py.md) | 02 Materials single-source sets (2026-11-07) | P1 |
 | [components/nbc105/__init__.py](../../components/nbc105/__init__.py) | [Guide](components/nbc105/__init__.py.md) | NBC 105:2025 clause modules (2026-11-21) | P1 |
 | [components/nbc105/constants.py](../../components/nbc105/constants.py) | [Guide](components/nbc105/constants.py.md) | NBC 105:2025 clause modules (2026-11-21) | P1 |
+| [components/nbc105/clause_04_seismic_hazard.py](../../components/nbc105/clause_04_seismic_hazard.py) | [Guide](components/nbc105/clause_04_seismic_hazard.py.md) | NBC 105:2025 clause modules (2026-11-21) | P1 |
 | [components/nbc105/clause_05_dynamic_characteristics.py](../../components/nbc105/clause_05_dynamic_characteristics.py) | [Guide](components/nbc105/clause_05_dynamic_characteristics.py.md) | NBC 105:2025 clause modules (2026-11-21) | P1 |
 
 NBC 105:2025 clause 5 rule-by-rule status: [clause 5 compliance matrix](../nbc105/clause_05_dynamic_characteristics_matrix.md).

@@ -17,3 +17,13 @@ Numeric changes (before -> after)
 - Tests that pinned 9.81 for the default Rayleigh g (`tests/test_rayleigh_ledger_audit.py`, `tests/verify_nbc105_periods.py` synthetic evidence) now use `GRAVITY_M_S2`.
 
 Verification: `python -m pytest -q`, `python tests/verify_ref_tags.py`, `py_compile` of edited tkinter files. Unit tests only; no native ETABS/OpenSees; not engineering acceptance.
+
+## Task 2: clause 4 module
+
+Changed
+- New `components/nbc105/clause_04_seismic_hazard.py`, `tests/test_nbc105_clause04.py`, guide `docs/source/components/nbc105/clause_04_seismic_hazard.py.md`, CANONICAL_MODULES.csv row `nbc105_clause4_seismic_hazard`, source-guide index row. No existing file's behaviour changed.
+- Tables 4-1, 4-2, 4-3 and 4-4, Eq. 4.1(2), 4.2(1), 4.3(1) and the Vs,30 formula were transcribed by viewing the printed page images (PDF pages 43-50), not from memory. Table 4-3 has 21 rows (10 Kathmandu, 7 Lalitpur, 4 Bhaktapur); the transcription test pins row counts, the KMC, Lalitpur MC, Tokha and Tarakeswor ward sets.
+- Printed-page notes: Table 4-3 and Table 4-4 are both on a page numbered 26; the Figure 4-3 page is numbered 25; the last sentence of 4.1.4 says "Figure 4-4" (Figure 4-3 intended); KMC wards print "...,30,32,32" (kept as 32, possible misprint).
+- `zoning_factor_from_table` not created (Annex C Table C-1 and Figure 4-3 interpolation not transcribed).
+
+Verification: `python -m pytest -q`, `python tests/verify_ref_tags.py`. Unit tests only; no native ETABS/OpenSees; not engineering acceptance.
