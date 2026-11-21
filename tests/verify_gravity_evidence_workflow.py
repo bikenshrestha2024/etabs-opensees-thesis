@@ -21,6 +21,7 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
         self.gravity=self.root/"gravity";self.gravity.mkdir()
         self.sample={
             "ok":True,
+            "model_script":str(self.script.resolve()),
             "nodes":[{"tag":1,"x_m":0.0,"y_m":0.0,"z_m":0.0,
                       "ux_m":0.0,"uy_m":0.0,"uz_m":0.0,
                       "rx_rad":0.0,"ry_rad":0.0,"rz_rad":0.0}],
@@ -95,6 +96,17 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
                 "single_run_root/Gravity_Result_V110.json",
             ):
                 self.assertTrue(any(x.endswith(tail) for x in names),tail)
+
+    def test_different_model_run_is_not_automatically_packaged(self):
+        alien=self.gravity/"02_RESULTS"/"ETABS_SOURCE_SUPPORTS"/"GRAVITY_1.0D_1.0L"/"alien"
+        alien.mkdir(parents=True)
+        wrong={**self.sample,"model_script":str(self.root/"another_model.py")}
+        (alien/"Gravity_Result_V110.json").write_text(
+            json.dumps(wrong),encoding="utf-8")
+        single=__import__("components.gravity.evidence_workflow",
+            fromlist=["latest_single_run"]).latest_single_run(
+                self.gravity,model_script=self.script)
+        self.assertEqual(single,self.gravity)
 
     def test_canonical_support_cases_and_upload_owner(self):
         from components.gravity.output_ownership import case_directory,dual_runs_parent
