@@ -800,8 +800,20 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
             if (cfg.get('elastic_etabs_comparison') and
                     cfg.get('linear_shell_stiffness_policy','LEGACY_GROSS_SHELL')!='LEGACY_GROSS_SHELL'):
                 raise ValueError('Use one elastic shell comparison configuration at a time.')
-            elastic_comparison=compile_settings(cfg['elastic_etabs_comparison'],frame_elements,shells,meta)
+            elastic_settings=cfg['elastic_etabs_comparison']
+            if cfg.get('rigid_end_zones') is not None:
+                # Opt-in ETABS rigid end zones; absent or disabled = unchanged.
+                from components.model.rigid_end_zones import resolve_end_offsets, inject_end_offsets
+                rigid_offsets,rigid_audit=resolve_end_offsets(
+                    cfg['rigid_end_zones'],frame_elements,metadata=meta,
+                    default_workbook=cfg.get('etabs_native_assignment_workbook_path'),base_dir=folder)
+                if rigid_audit is not None:
+                    elastic_settings=inject_end_offsets(elastic_settings,rigid_offsets)
+                    report['rigid_end_zones']=rigid_audit
+            elastic_comparison=compile_settings(elastic_settings,frame_elements,shells,meta)
         else:
+            if (cfg.get('rigid_end_zones') or {}).get('enabled'):
+                raise ValueError('rigid_end_zones needs elastic_etabs_comparison (elastic comparison stiffness path)')
             elastic_comparison={}
         emit(f"[ASSEMBLY PHASE OK] Frame segment connectivity | "
               f"seconds={time.perf_counter()-_phase_clock:.3f} | "

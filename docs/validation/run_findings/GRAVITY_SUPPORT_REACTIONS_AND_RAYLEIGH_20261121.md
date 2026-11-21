@@ -316,3 +316,80 @@ The export report records `wall_max_cell_size_m` and `shell_mesh_quality_audit`.
 6. Run gravity `1.0D + 1.0L` on both exports with the 76 ETABS source supports and with the 32-point diagnostic. Write `export_gravity_beam_actions`.
 7. Run `tools/gravity_reaction_attribution.py` on each comparison and report the change in the core and perimeter group reactions between the two exports.
 
+
+## 8. Solved ablation: support reactions with ETABS settings switched on one at a time (2026-11-21)
+
+Status: `SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE`. Native OpenSeesPy 3.8.0 on Linux, no ETABS run. Numbers: [GRAVITY_REACTION_ABLATION_MESH04_20261121.json](GRAVITY_REACTION_ABLATION_MESH04_20261121.json). Driver: `tools/etabs_comparison_ablation.py` ([guide](../../source/tools/etabs_comparison_ablation.py.md)).
+
+**Set-up.** The user's MESH_04 export was rebuilt as a verified clear-beam export with `tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py` and the assignment workbook (SHA-256 8b3a6b33…). Each step copies it, sets config keys, reassembles with `prepare_complete_export` and runs the gravity GUI runner (`GRAVITY_1.0D_1.0L`, `ETABS_NONZERO_REACTION_DIAGNOSTIC`, 32 supports) in a child process. ETABS reference: `Gravity_All_Support_Nodes.csv` (32 matched reactions; core 109,278.24 kN, perimeter 202,089.07 kN; ETABS 263/264 14,748.5 kN). Core = plan box 6 ≤ x ≤ 18, 6 ≤ y ≤ 12 m. Every step solved with total reaction 311,367.3139 kN (equilibrium error ≤ 2e-14 %).
+
+**Pipeline check.** S0 reproduces the user's Windows run exactly: max 3,041.266 kN at 263/264, core 127,926.75 kN, roof Uz identical.
+
+### 8.1 Main sequence (each step adds one item that an ETABS table supports)
+
+| Step | Added | Max \|OS − ETABS\| (kN), at | RMS (kN) | Core OS (kN) | Perimeter OS (kN) | 263/264 OS (kN) |
+|---|---|---|---|---|---|---|
+| S0 | legacy (gross shell, centreline frames, beam J gross) | 3,041.3, 263/264 | 1,322.7 | 127,926.8 | 183,440.6 | 17,789.8 |
+| S1 | native `Wall 600` f 0.5 / m 0.1, frame I 0.35/0.7, beam J kept gross | 838.9, 261/262 | 427.3 | 104,256.4 | 207,111.0 | 14,545.8 |
+| X2 | + beam J 0.01 (native) | 775.2, 261/262 | 409.5 | 104,846.8 | 206,520.5 | 14,626.2 |
+| X3 | + rigid end zones (table, factor 1) | 1,122.7, 261/262 | 567.4 | 101,651.5 | 209,715.9 | 14,194.1 |
+| **X8** | + wall-base edge kinematics (see 8.3), reactions lumped to ETABS corners | **911.4**, 705 (8, 12) and by symmetry 627/702/706 | **502.1** | **105,622.8** | **205,744.5** | 15,450.4 |
+
+ETABS: core 109,278.2, perimeter 202,089.1, 263/264 14,748.5 kN.
+
+The 3,041 kN gap at 263/264 is closed by the wall stiffness modifiers (S1: 263 moves from +3,041 to −203 kN). Beam J adds 64 kN of improvement on the maximum. Rigid end zones worsen the core sum by 3.2 MN at the historical base (X3). The wall-base step recovers 4.0 MN of core load.
+
+### 8.2 Steps that do not belong in the preset
+
+| Step | Change | Max (kN) | RMS (kN) | Core OS (kN) | Reading |
+|---|---|---|---|---|---|
+| X1 | S1 with J 0.01 + Timoshenko frames (origin/main ULS JSON) | 768.0 | 408.7 | 104,912.7 | repository record 768.045 kN reproduced; shear flexibility of frames is worth 7 kN against X2 |
+| S2 | S1 + `wall_max_cell_size_m` 1.0 | 2,102.1 | 936.2 | 100,236.1 | core −4.0 MN |
+| S3 | S2 + rigid end zones | 2,386.5 | 1,080.5 | 97,396.9 | |
+| S4 | S3 + beam J 0.01 | 2,371.3 | 1,074.9 | 97,554.7 | the first "preset" of this session; rejected (8.3) |
+| X11 | X8 + wall mesh 1 m | 955.0 | 501.2 | 104,011.6 | with the wall-base kinematics fixed, the mesh changes RMS by < 1 kN |
+| X10 | X8 without rigid end zones | 1,130.1 | 560.5 | 108,661.1 | best core sum, worse max and RMS |
+| X9 | legacy + wall-base kinematics | 4,303.7 | 1,860.8 | 130,656.1 | the base fix is not a substitute for the wall modifiers |
+
+### 8.3 Root cause of "more ETABS settings, larger gap"
+
+1. **What ETABS does with the walls.** `Wall Property Def - Specified`: `Wall 600` is Shell-Thin. `Area Assigns - Wall Auto Mesh`: `Default` × 375. CSI help (Assign > Shell > Wall Auto Mesh Options): with `Default`, "the selected object will not be meshed if the wall is straight". The 1 m `Analysis - Wall Mesh Settings` value applies only to walls that use auto rectangular meshing (Analyze > Automatic Rectangular Mesh Settings for Walls). Every wall here is straight, so ETABS models each wall object (for example a 2 × 3.8 m pier) as one shell. The earlier reading "ETABS meshes walls at 1 m" (§7.3 #9, D6) is wrong, and `wall_max_cell_size_m` is not an ETABS setting for this model.
+2. **Where the OpenSees core is too flexible.** Storey-1 core shortening at (6, 6): ETABS −1.078 mm, X2 −1.876, X3 −1.815, S2 −2.308 mm. From storey 1 to the roof the core shortening agrees within 1 % (ETABS 12.398 mm, X3 12.297 mm). The whole excess sits in the base storey of the core. Columns do not show it (6, 0): ETABS −0.940, X3 −0.988 mm.
+3. **Why.** In the 32-support set the core wall bases are held only at the 14 ETABS corner joints. The OpenSees wall mesh has free base nodes between them, so each wall hangs between point supports, and the local flexibility grows as the mesh gets finer (S2). In ETABS the unmeshed shell's bottom edge runs between its two restrained corners, so it cannot deform between them. The 44 restrained ETABS base points that lie inside those edges report FZ = 0 (`ETABS_Nonzero_Reaction_Support_Audit.json`). That is consistent with their not being connected to the unmeshed walls.
+4. **Fix tested (X8).** Fix every wall-base mesh node on a source wall edge whose two ends are supports (existing gravity strategy `CONTINUOUS_WALL_BASE_FIXED`, 97 restraints), then lump each intermediate reaction onto the two adjacent ETABS corner supports with the linear edge weights (1 − t, t) (`lump_to_reference_supports`; 65 nodes, 84,886 kN lumped). Prediction: the storey-1 core shortening returns to ETABS. Result: (6, 6) −1.119 mm against ETABS −1.078 mm (X3: −1.815). Roof: core −13.799 against −13.476 mm, column (6, 0) −12.668 against −12.383 mm.
+5. **Rigid end zones are applied correctly.** On the solved X3 model, beam rigid ends sit only at column nodes (0.55 m × 800 ends, 0.625 m × 450 ends), never at wall nodes, and column rigid ends sit only at the top (0.8 m × 450). Workbook and EDB metadata agree for all 1,312 assembled frames. I is reduced once (0.35 beams, 0.7 columns). A and J keep their full-length values (CSI: rigid zones never affect axial and torsional deformation). Rigid zones stiffen the beams that carry load from the core to the columns. That is why the core loses load when they are switched on. They stay in the preset because the table assigns them. Figure: run folder `04_FIGURES/per_support_delta.png`.
+
+### 8.4 Hypotheses tested and rejected as the residual
+
+All are on the X3 configuration (or S4 where stated), and are sensitivities only, not settings.
+
+| Step | Change | Core change (kN) | Verdict |
+|---|---|---|---|
+| X4 (on S4) | slab plate modifier 0.25 → 0.01 | −128 | slab flexural coupling is negligible |
+| X6 | wall m = 1 (10 × out-of-plane bending and transverse shear) | +190 | the Shell-Thin against MITC4 transverse-shear approximation is not the cause |
+| X7 | `floor_subdivisions` 2 instead of 4 (coarser floors and wall widths) | +1,356 | same direction as the base-mesh effect |
+| X5 (on S4) | brace A × 0.001 (outrigger and belt truss practically removed) | +5,256 | the outrigger moves about 5 MN from core to perimeter in OpenSees; ETABS brace forces are not exported, so the difference between programs cannot be measured |
+
+### 8.5 Residual with the preset and comparison procedure (X8)
+
+- Maximum 911.4 kN at the opening-jamb supports 627/705 and 702/706 (x = 8 and 16 m; ETABS 4,000 kN, OpenSees 3,089 kN). RMS 502.1 kN. 263/264: 15,450.4 against 14,748.5 kN (+701.9).
+- Core 105,622.8 kN, which is 3,655 kN (3.3 %) below ETABS. The perimeter columns carry +82 to +325 kN each.
+- Above storey 1 the OpenSees core is still about 5 % more flexible relative to the columns than in ETABS: core roof shortening +2.4 % with 3.3 % less load, columns +2.3 % with 2.5 % more load.
+- **Not explained by:** wall stiffness modifiers, beam J, rigid zones, frame shear deformation (7 kN), slab plate coupling (−128 kN), wall transverse shear (+190 kN), wall mesh size with the base fixed (RMS change < 1 kN), total load, or symmetry.
+- **Remaining candidates, not separable with the exported tables:** (a) ETABS single-element Shell-Thin walls and spandrels (incompatible-mode membrane, auto edge constraints) are stiffer than a conforming MITC4 mesh, and the jamb split of a 2 m pier is set by that one element; (b) outrigger and belt-truss transfer (about 5 MN in OpenSees), for which ETABS brace axial forces are needed.
+- The gap is **not closed**. It is reduced from 3,041 to 911 kN maximum and from 1,323 to 502 kN RMS.
+
+### 8.6 Preset and defaults
+
+`ETABS_ELASTIC_GRAVITY_COMPARISON` ([guide](../../source/components/model/etabs_comparison_preset.py.md)) = X8 configuration: native shell and frame modifiers (including beam J 0.01), shell transverse-shear approximation, `rigid_end_zones` from the workbook, prerequisite verified clear-beam weight. Comparison procedure: `CONTINUOUS_WALL_BASE_FIXED` plus linear-edge lumping. `wall_max_cell_size_m` and Timoshenko frames are excluded. All opt-in. No production default changed: absent keys give byte-identical exports.
+
+### 8.7 Corrections to earlier sections
+
+- §7.3 #9 and D6 said "ETABS 1 m wall mesh". Correct reading: `Default` leaves straight walls unmeshed. The 1 m value is used only by auto rectangular meshing.
+- §7.7 "Re-run recipe" step 2 (`wall_max_cell_size_m` 1.0) tests a non-ETABS setting. Use §8.8 instead.
+
+### 8.8 What the user must still run on Windows
+
+1. `python tools\REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py --source-dir <export> --assignment-workbook <Assignment_Export xlsx> --dest-dir <new> --comparison-preset ETABS_ELASTIC_GRAVITY_COMPARISON`
+2. `python tools\etabs_comparison_ablation.py --base-export <verified clear-beam export> --etabs-support-csv <Gravity_All_Support_Nodes.csv> --etabs-reaction-table <Joint Reactions xlsx/csv> --out-dir <run>\02_RESULTS\ablation`. The default steps are S0, S1, X2, X3 and X8. Confirm that the Linux numbers above are reproduced.
+3. ETABS exports that would split the remaining 3.7 MN: brace axial forces and wall pier P at storey 1 and at the outrigger storeys for `1. DL + LL`; ideally an ETABS run with walls set to Auto Rectangular Mesh at 1 m, to measure the ETABS-side mesh effect directly.

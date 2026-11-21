@@ -1027,5 +1027,65 @@
    "gravity 1.0D+1.0L with 76 source supports and 32-point diagnostic; export_gravity_beam_actions",
    "tools/gravity_reaction_attribution.py on both; report core/perimeter change"
   ]
+ },
+ "solved_ablation_20261121": {
+  "status": "SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE",
+  "report_section": "§8",
+  "numbers": "GRAVITY_REACTION_ABLATION_MESH04_20261121.json",
+  "etabs_reference_kN": {
+   "core": 109278.24,
+   "perimeter": 202089.07,
+   "point_263_264": 14748.5
+  },
+  "main_sequence": [
+   {
+    "step": "S0 legacy",
+    "max_kN": 3041.266,
+    "rms_kN": 1322.667,
+    "core_kN": 127926.755,
+    "perimeter_kN": 183440.559
+   },
+   {
+    "step": "S1 native wall/frame modifiers, beam J gross",
+    "max_kN": 838.861,
+    "rms_kN": 427.311,
+    "core_kN": 104256.361,
+    "perimeter_kN": 207110.953
+   },
+   {
+    "step": "X2 + beam J 0.01",
+    "max_kN": 775.205,
+    "rms_kN": 409.546,
+    "core_kN": 104846.834,
+    "perimeter_kN": 206520.48
+   },
+   {
+    "step": "X3 + rigid end zones",
+    "max_kN": 1122.718,
+    "rms_kN": 567.412,
+    "core_kN": 101651.453,
+    "perimeter_kN": 209715.861
+   },
+   {
+    "step": "X8 + wall-base edge kinematics, lumped",
+    "max_kN": 911.411,
+    "rms_kN": 502.07,
+    "core_kN": 105622.805,
+    "perimeter_kN": 205744.509
+   }
+  ],
+  "root_cause": "ETABS Wall Auto Mesh Default leaves straight walls unmeshed; OpenSees wall bases between the 14 core corner supports were free, adding storey-1 core shortening (ETABS -1.078 mm, X3 -1.815 mm, X8 -1.119 mm at (6,6))",
+  "wall_max_cell_size_m_1_is_not_an_etabs_setting_here": true,
+  "residual_X8": {
+   "max_kN": 911.411,
+   "rms_kN": 502.07,
+   "core_shortfall_kN": 3655.4,
+   "open_candidates": [
+    "ETABS single-element Shell-Thin walls/spandrels stiffer than conforming MITC4 mesh",
+    "outrigger/belt-truss transfer (OpenSees sensitivity about 5.3 MN)"
+   ]
+  },
+  "gap_closed": false,
+  "production_defaults_changed": false
  }
 }

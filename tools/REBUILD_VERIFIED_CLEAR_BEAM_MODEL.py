@@ -145,11 +145,18 @@ def _resolve_inputs(argv=None):
     parser.add_argument("--dest-dir",default=None)
     parser.add_argument("--elastic-comparison-settings",type=Path,
                         help="JSON containing the state-specific ETABS elastic comparison settings")
+    parser.add_argument("--comparison-preset",default=None,
+                        help="Named opt-in preset, e.g. ETABS_ELASTIC_GRAVITY_COMPARISON "
+                        "(components/model/etabs_comparison_preset.py)")
     args=parser.parse_args(argv)
     supplied=(args.source_dir,args.assignment_workbook,args.dest_dir)
+    if args.elastic_comparison_settings and args.comparison_preset:
+        parser.error("Use either --elastic-comparison-settings or --comparison-preset, not both.")
     if all(supplied):
+        if args.comparison_preset:
+            return (*supplied,None,args.comparison_preset)
         return (*supplied,args.elastic_comparison_settings) if args.elastic_comparison_settings else supplied
-    if any(supplied) or args.elastic_comparison_settings:
+    if any(supplied) or args.elastic_comparison_settings or args.comparison_preset:
         parser.error("Provide ALL three flags together; no mixing CLI and dialogs.")
     return _choose_in_spyder()
 
@@ -161,11 +168,13 @@ def main(argv=None):
         return None
     source,workbook,target=selection[:3]
     settings=selection[3] if len(selection)>3 else None
+    preset=selection[4] if len(selection)>4 else None
     print("[START] Source: "+str(Path(source).resolve()),flush=True)
     print("[START] Workbook: "+Path(workbook).name,flush=True)
     print("[START] New export: "+str(Path(target).resolve()),flush=True)
     try:
-        result=rebuild_verified_clear_beam(source,workbook,target,elastic_settings_path=settings)
+        result=rebuild_verified_clear_beam(source,workbook,target,elastic_settings_path=settings,
+                                           comparison_preset=preset)
     except Exception as exc:
         print("[BLOCKED] "+type(exc).__name__+": "+str(exc),flush=True)
         print("Original ETABS model and source export remain unchanged.",flush=True)
@@ -182,7 +191,12 @@ def main(argv=None):
 
 
 def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destination_dir, *,
-                                elastic_settings_path=None):
+                                elastic_settings_path=None, comparison_preset=None):
+    if elastic_settings_path is not None and comparison_preset is not None:
+        raise ValueError("Use either elastic settings or a comparison preset, not both")
+    if comparison_preset is not None:
+        from components.model.etabs_comparison_preset import preset_settings
+        preset_settings(comparison_preset)  # fail before creating output
     source,native,target=_verify_before_creating_output(
         source_dir,native_assignment_workbook,destination_dir)
     context_file=source/"00_SOURCE_MANIFEST"/"PROJECT_CONTEXT.json"
@@ -245,6 +259,10 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         cfg["etabs_native_assignment_workbook_path"]=str(native)
         if elastic_settings is not None:
             cfg["elastic_etabs_comparison"]=elastic_settings
+        if comparison_preset is not None:
+            from components.model.etabs_comparison_preset import apply_preset
+            cfg=apply_preset(cfg,comparison_preset)
+            audit["comparison_preset"]=comparison_preset
         (target/"OpenSees_Complete_Model_Config_V118.json").write_text(
             json.dumps(cfg,indent=2,default=str),encoding="utf-8")
         audit["status"]="ASSEMBLING_VERIFIED_CORRECTED_EXPORT"
@@ -278,6 +296,8 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         audit["individual_32_reactions"]="NOT_VALIDATED"
         if report.get("elastic_etabs_comparison"):
             audit["elastic_etabs_comparison"]=report["elastic_etabs_comparison"]
+        if report.get("rigid_end_zones"):
+            audit["rigid_end_zones"]=report["rigid_end_zones"]
         write_status()
         return audit
     except Exception as exc:

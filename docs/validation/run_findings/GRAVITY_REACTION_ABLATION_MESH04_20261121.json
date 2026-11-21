@@ -1,0 +1,1538 @@
+{
+ "status": "SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE",
+ "schema": "GRAVITY_REACTION_ABLATION_V1",
+ "date": "2026-11-21",
+ "solver": "OpenSeesPy 3.8.0, Linux container; no ETABS run",
+ "load_case": "GRAVITY_1.0D_1.0L vs ETABS \"1. DL + LL\"; applied 311,367.3139 kN",
+ "model": "MESH_04 export rebuilt as verified clear-beam (tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py); every step reassembled with prepare_complete_export and solved with the gravity GUI runner",
+ "inputs": {
+  "mesh04_zip_sha256_16": "b8c3199f5ab8a2c5",
+  "assignment_workbook_sha256_16": "8b3a6b3373381c60",
+  "etabs_support_reactions_csv": "33e14fbd808c9d7c",
+  "etabs_support_audit_json": "a408e6af7f69e49f"
+ },
+ "etabs_reference": {
+  "core_kN": 109278.24,
+  "perimeter_kN": 202089.07,
+  "point_263_kN": 14748.5,
+  "point_264_kN": 14748.5
+ },
+ "core_box_m": "6<=x<=18, 6<=y<=12",
+ "baseline_reproduces_windows_run": {
+  "max_abs_diff_kN": 3041.266,
+  "core_kN": 127926.75,
+  "note": "identical to the user Windows run Gravity_Reaction_Diagnostic/20261121_110905_845717"
+ },
+ "steps": [
+  {
+   "step": "S0_BASELINE_LEGACY",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {},
+   "max_abs_diff_kN": 3041.266,
+   "max_at_etabs_point": "263",
+   "rms_diff_kN": 1322.667,
+   "sum_abs_diff_kN": 37297.027,
+   "core_opensees_kN": 127926.755,
+   "perimeter_opensees_kN": 183440.559,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 17789.788,
+   "point_264_opensees_kN": 17789.788,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 125.2
+  },
+  {
+   "step": "S1_NATIVE_WALL_FRAME_MODIFIERS_BEAM_J_GROSS",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true,
+      "frame_sections": {
+       "Beam 600*800": {
+        "J": 1.0
+       }
+      }
+     }
+    }
+   },
+   "max_abs_diff_kN": 838.861,
+   "max_at_etabs_point": "262",
+   "rms_diff_kN": 427.311,
+   "sum_abs_diff_kN": 10394.266,
+   "core_opensees_kN": 104256.361,
+   "perimeter_opensees_kN": 207110.953,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 14545.783,
+   "point_264_opensees_kN": 14545.783,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 125.6
+  },
+  {
+   "step": "X1_ULS_JSON_NATIVE_SHEAR_FLEX",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true,
+      "shear_flexible_sections": [
+       "Beam 600*800",
+       "Col 1100*1100",
+       "Col 1250*1250"
+      ]
+     }
+    }
+   },
+   "max_abs_diff_kN": 768.045,
+   "max_at_etabs_point": "262",
+   "rms_diff_kN": 408.712,
+   "sum_abs_diff_kN": 10072.106,
+   "core_opensees_kN": 104912.742,
+   "perimeter_opensees_kN": 206454.572,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 14635.127,
+   "point_264_opensees_kN": 14635.127,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 126.2
+  },
+  {
+   "step": "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true
+     }
+    }
+   },
+   "max_abs_diff_kN": 775.205,
+   "max_at_etabs_point": "262",
+   "rms_diff_kN": 409.546,
+   "sum_abs_diff_kN": 10066.537,
+   "core_opensees_kN": 104846.834,
+   "perimeter_opensees_kN": 206520.48,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 14626.205,
+   "point_264_opensees_kN": 14626.205,
+   "equilibrium_error_percent": 3.738842088992339e-14,
+   "solver_seconds": 126.9
+  },
+  {
+   "step": "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true
+     }
+    },
+    "rigid_end_zones": {
+     "enabled": true,
+     "source": "ASSIGNMENT_WORKBOOK",
+     "factor": "SOURCE"
+    }
+   },
+   "max_abs_diff_kN": 1122.718,
+   "max_at_etabs_point": "262",
+   "rms_diff_kN": 567.412,
+   "sum_abs_diff_kN": 15253.576,
+   "core_opensees_kN": 101651.453,
+   "perimeter_opensees_kN": 209715.861,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 14194.129,
+   "point_264_opensees_kN": 14194.129,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 176.4
+  },
+  {
+   "step": "X8_PRESET_WALL_BASE_EDGE_LUMPED",
+   "support_strategy": "CONTINUOUS_WALL_BASE_FIXED",
+   "lumped_wall_base_reaction_kN": 84886.06561528688,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true
+     }
+    },
+    "rigid_end_zones": {
+     "enabled": true,
+     "source": "ASSIGNMENT_WORKBOOK",
+     "factor": "SOURCE"
+    }
+   },
+   "max_abs_diff_kN": 911.411,
+   "max_at_etabs_point": "705",
+   "rms_diff_kN": 502.07,
+   "sum_abs_diff_kN": 13233.509,
+   "core_opensees_kN": 105622.805,
+   "perimeter_opensees_kN": 205744.509,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 15450.441,
+   "point_264_opensees_kN": 15450.441,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 193.1
+  },
+  {
+   "step": "X10_NATIVE_NO_RIGID_WALL_BASE_EDGE_LUMPED",
+   "support_strategy": "CONTINUOUS_WALL_BASE_FIXED",
+   "lumped_wall_base_reaction_kN": 87328.81427340151,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true
+     }
+    }
+   },
+   "max_abs_diff_kN": 1130.116,
+   "max_at_etabs_point": "263",
+   "rms_diff_kN": 560.543,
+   "sum_abs_diff_kN": 14279.388,
+   "core_opensees_kN": 108661.104,
+   "perimeter_opensees_kN": 202706.21,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 15878.638,
+   "point_264_opensees_kN": 15878.638,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 186.5
+  },
+  {
+   "step": "X9_LEGACY_WALL_BASE_EDGE_LUMPED",
+   "support_strategy": "CONTINUOUS_WALL_BASE_FIXED",
+   "lumped_wall_base_reaction_kN": 104985.7867814258,
+   "config_updates": {},
+   "max_abs_diff_kN": 4303.677,
+   "max_at_etabs_point": "263",
+   "rms_diff_kN": 1860.818,
+   "sum_abs_diff_kN": 44133.2,
+   "core_opensees_kN": 130656.131,
+   "perimeter_opensees_kN": 180711.183,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 19052.199,
+   "point_264_opensees_kN": 19052.199,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 176.6
+  },
+  {
+   "step": "S2_PLUS_WALL_MESH_1M",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true,
+      "frame_sections": {
+       "Beam 600*800": {
+        "J": 1.0
+       }
+      }
+     }
+    },
+    "wall_max_cell_size_m": 1.0
+   },
+   "max_abs_diff_kN": 2102.137,
+   "max_at_etabs_point": "8",
+   "rms_diff_kN": 936.238,
+   "sum_abs_diff_kN": 21555.711,
+   "core_opensees_kN": 100236.138,
+   "perimeter_opensees_kN": 211131.176,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 13563.869,
+   "point_264_opensees_kN": 13563.869,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 379.9
+  },
+  {
+   "step": "S3_PLUS_RIGID_END_ZONES",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true,
+      "frame_sections": {
+       "Beam 600*800": {
+        "J": 1.0
+       }
+      }
+     }
+    },
+    "wall_max_cell_size_m": 1.0,
+    "rigid_end_zones": {
+     "enabled": true,
+     "source": "ASSIGNMENT_WORKBOOK",
+     "factor": "SOURCE"
+    }
+   },
+   "max_abs_diff_kN": 2386.489,
+   "max_at_etabs_point": "262",
+   "rms_diff_kN": 1080.457,
+   "sum_abs_diff_kN": 25319.004,
+   "core_opensees_kN": 97396.943,
+   "perimeter_opensees_kN": 213970.371,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 13191.75,
+   "point_264_opensees_kN": 13191.75,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 396.6
+  },
+  {
+   "step": "S4_PLUS_BEAM_J_ETABS_PRESET",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true
+     }
+    },
+    "wall_max_cell_size_m": 1.0,
+    "rigid_end_zones": {
+     "enabled": true,
+     "source": "ASSIGNMENT_WORKBOOK",
+     "factor": "SOURCE"
+    }
+   },
+   "max_abs_diff_kN": 2371.261,
+   "max_at_etabs_point": "262",
+   "rms_diff_kN": 1074.942,
+   "sum_abs_diff_kN": 25113.054,
+   "core_opensees_kN": 97554.671,
+   "perimeter_opensees_kN": 213812.643,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 13212.781,
+   "point_264_opensees_kN": 13212.781,
+   "equilibrium_error_percent": 3.738842088992339e-14,
+   "solver_seconds": 412.0
+  },
+  {
+   "step": "X11_PRESET_MESH1M_WALL_BASE_EDGE_LUMPED",
+   "support_strategy": "CONTINUOUS_WALL_BASE_FIXED",
+   "lumped_wall_base_reaction_kN": 86760.81644951788,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true
+     }
+    },
+    "rigid_end_zones": {
+     "enabled": true,
+     "source": "ASSIGNMENT_WORKBOOK",
+     "factor": "SOURCE"
+    },
+    "wall_max_cell_size_m": 1.0
+   },
+   "max_abs_diff_kN": 955.006,
+   "max_at_etabs_point": "705",
+   "rms_diff_kN": 501.25,
+   "sum_abs_diff_kN": 13329.395,
+   "core_opensees_kN": 104011.566,
+   "perimeter_opensees_kN": 207355.747,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 15192.613,
+   "point_264_opensees_kN": 15192.613,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 527.0
+  },
+  {
+   "step": "X4_PRESET_SLAB_PLATE_0p01_HYPOTHESIS",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true,
+      "shell_sections": {
+       "Slab 150": {
+        "m11": 0.01,
+        "m22": 0.01,
+        "m12": 0.01
+       }
+      }
+     }
+    },
+    "wall_max_cell_size_m": 1.0,
+    "rigid_end_zones": {
+     "enabled": true,
+     "source": "ASSIGNMENT_WORKBOOK",
+     "factor": "SOURCE"
+    }
+   },
+   "max_abs_diff_kN": 2383.439,
+   "max_at_etabs_point": "262",
+   "rms_diff_kN": 1078.924,
+   "sum_abs_diff_kN": 25278.89,
+   "core_opensees_kN": 97427.088,
+   "perimeter_opensees_kN": 213940.226,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 13195.677,
+   "point_264_opensees_kN": 13195.677,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 506.9
+  },
+  {
+   "step": "X5_PRESET_BRACE_A_0p001_HYPOTHESIS",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true,
+      "frame_sections": {
+       "350*350*16 SHS": {
+        "A": 0.001
+       }
+      }
+     }
+    },
+    "wall_max_cell_size_m": 1.0,
+    "rigid_end_zones": {
+     "enabled": true,
+     "source": "ASSIGNMENT_WORKBOOK",
+     "factor": "SOURCE"
+    }
+   },
+   "max_abs_diff_kN": 1832.922,
+   "max_at_etabs_point": "8",
+   "rms_diff_kN": 822.959,
+   "sum_abs_diff_kN": 19580.535,
+   "core_opensees_kN": 102810.208,
+   "perimeter_opensees_kN": 208557.106,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 13887.546,
+   "point_264_opensees_kN": 13887.546,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 432.5
+  },
+  {
+   "step": "X6_X3_WALL_PLATE_M1_SHEAR_STIFFER_HYPOTHESIS",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true,
+      "shell_sections": {
+       "Wall 600": {
+        "m11": 1.0,
+        "m22": 1.0,
+        "m12": 1.0
+       }
+      }
+     }
+    },
+    "rigid_end_zones": {
+     "enabled": true,
+     "source": "ASSIGNMENT_WORKBOOK",
+     "factor": "SOURCE"
+    }
+   },
+   "max_abs_diff_kN": 1104.54,
+   "max_at_etabs_point": "262",
+   "rms_diff_kN": 556.466,
+   "sum_abs_diff_kN": 14874.067,
+   "core_opensees_kN": 101841.207,
+   "perimeter_opensees_kN": 209526.107,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 14221.607,
+   "point_264_opensees_kN": 14221.607,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 176.7
+  },
+  {
+   "step": "X7_X3_FLOOR_SUBDIV_2_HYPOTHESIS",
+   "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+   "lumped_wall_base_reaction_kN": null,
+   "config_updates": {
+    "elastic_etabs_comparison": {
+     "ULS": {
+      "use_native_frame_modifiers": true,
+      "use_native_shell_modifiers": true,
+      "allow_shell_shear_approximation": true
+     }
+    },
+    "rigid_end_zones": {
+     "enabled": true,
+     "source": "ASSIGNMENT_WORKBOOK",
+     "factor": "SOURCE"
+    },
+    "floor_subdivisions": 2
+   },
+   "max_abs_diff_kN": 969.593,
+   "max_at_etabs_point": "262",
+   "rms_diff_kN": 474.434,
+   "sum_abs_diff_kN": 12540.769,
+   "core_opensees_kN": 103007.856,
+   "perimeter_opensees_kN": 208359.457,
+   "total_opensees_kN": 311367.3139,
+   "point_263_opensees_kN": 14353.506,
+   "point_264_opensees_kN": 14353.506,
+   "equilibrium_error_percent": 1.8694210444961695e-14,
+   "solver_seconds": 60.0
+  }
+ ],
+ "uz_profile_mm": [
+  {
+   "x": 6,
+   "y": 6,
+   "z": 3.8,
+   "etabs_mm": -1.078,
+   "S0_BASELINE_LEGACY": -1.145,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -1.876,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -1.815,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -1.119
+  },
+  {
+   "x": 6,
+   "y": 6,
+   "z": 7.6,
+   "etabs_mm": -2.108,
+   "S0_BASELINE_LEGACY": -1.759,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -2.859,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -2.77,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -2.181
+  },
+  {
+   "x": 6,
+   "y": 6,
+   "z": 49.4,
+   "etabs_mm": -10.448,
+   "S0_BASELINE_LEGACY": -7.119,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -11.474,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -11.137,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -10.728
+  },
+  {
+   "x": 6,
+   "y": 6,
+   "z": 95.0,
+   "etabs_mm": -13.476,
+   "S0_BASELINE_LEGACY": -9.466,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -14.432,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -14.112,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -13.799
+  },
+  {
+   "x": 12,
+   "y": 6,
+   "z": 3.8,
+   "etabs_mm": -1.059,
+   "S0_BASELINE_LEGACY": -1.071,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -1.762,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -1.709,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -1.11
+  },
+  {
+   "x": 12,
+   "y": 6,
+   "z": 7.6,
+   "etabs_mm": -2.077,
+   "S0_BASELINE_LEGACY": -1.714,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -2.808,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -2.724,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -2.163
+  },
+  {
+   "x": 12,
+   "y": 6,
+   "z": 49.4,
+   "etabs_mm": -10.414,
+   "S0_BASELINE_LEGACY": -7.101,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -11.454,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -11.125,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -10.713
+  },
+  {
+   "x": 12,
+   "y": 6,
+   "z": 95.0,
+   "etabs_mm": -13.454,
+   "S0_BASELINE_LEGACY": -9.354,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -14.444,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -14.117,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -13.791
+  },
+  {
+   "x": 6,
+   "y": 0,
+   "z": 3.8,
+   "etabs_mm": -0.94,
+   "S0_BASELINE_LEGACY": -0.831,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -0.968,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -0.988,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -0.963
+  },
+  {
+   "x": 6,
+   "y": 0,
+   "z": 7.6,
+   "etabs_mm": -1.844,
+   "S0_BASELINE_LEGACY": -1.628,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -1.9,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -1.939,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -1.889
+  },
+  {
+   "x": 6,
+   "y": 0,
+   "z": 49.4,
+   "etabs_mm": -9.291,
+   "S0_BASELINE_LEGACY": -8.046,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -9.478,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -9.656,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -9.513
+  },
+  {
+   "x": 6,
+   "y": 0,
+   "z": 95.0,
+   "etabs_mm": -12.383,
+   "S0_BASELINE_LEGACY": -10.415,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -12.695,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -12.854,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -12.668
+  },
+  {
+   "x": 0,
+   "y": 6,
+   "z": 3.8,
+   "etabs_mm": -1.098,
+   "S0_BASELINE_LEGACY": -1.022,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -1.161,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -1.148,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -1.122
+  },
+  {
+   "x": 0,
+   "y": 6,
+   "z": 7.6,
+   "etabs_mm": -2.141,
+   "S0_BASELINE_LEGACY": -1.988,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -2.265,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -2.239,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -2.188
+  },
+  {
+   "x": 0,
+   "y": 6,
+   "z": 49.4,
+   "etabs_mm": -10.541,
+   "S0_BASELINE_LEGACY": -9.661,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -11.074,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -10.888,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -10.759
+  },
+  {
+   "x": 0,
+   "y": 6,
+   "z": 95.0,
+   "etabs_mm": -13.3,
+   "S0_BASELINE_LEGACY": -11.699,
+   "X2_NATIVE_BEAM_J_ETABS_NO_MESH_NO_RIGID": -13.843,
+   "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": -13.725,
+   "X8_PRESET_WALL_BASE_EDGE_LUMPED": -13.561
+  }
+ ],
+ "per_support_kN": {
+  "S0_BASELINE_LEGACY": [
+   {
+    "etabs_point": "593",
+    "opensees_node": 1,
+    "x_m": -6.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 8821.51
+   },
+   {
+    "etabs_point": "594",
+    "opensees_node": 2,
+    "x_m": -6.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 8821.51
+   },
+   {
+    "etabs_point": "560",
+    "opensees_node": 3,
+    "x_m": 0.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 8772.572
+   },
+   {
+    "etabs_point": "1",
+    "opensees_node": 4,
+    "x_m": 0.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 10969.417
+   },
+   {
+    "etabs_point": "2",
+    "opensees_node": 5,
+    "x_m": 0.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 10969.417
+   },
+   {
+    "etabs_point": "559",
+    "opensees_node": 6,
+    "x_m": 0.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 8772.572
+   },
+   {
+    "etabs_point": "3",
+    "opensees_node": 7,
+    "x_m": 6.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 11540.296
+   },
+   {
+    "etabs_point": "261",
+    "opensees_node": 8,
+    "x_m": 6.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 13714.047
+   },
+   {
+    "etabs_point": "262",
+    "opensees_node": 13,
+    "x_m": 6.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 13714.047
+   },
+   {
+    "etabs_point": "4",
+    "opensees_node": 14,
+    "x_m": 6.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 11540.296
+   },
+   {
+    "etabs_point": "627",
+    "opensees_node": 23,
+    "x_m": 8.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 4745.261
+   },
+   {
+    "etabs_point": "705",
+    "opensees_node": 24,
+    "x_m": 8.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 4745.261
+   },
+   {
+    "etabs_point": "701",
+    "opensees_node": 25,
+    "x_m": 10.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 4627.487
+   },
+   {
+    "etabs_point": "704",
+    "opensees_node": 26,
+    "x_m": 10.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 4627.487
+   },
+   {
+    "etabs_point": "5",
+    "opensees_node": 35,
+    "x_m": 12.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13096.411,
+    "opensees_kN": 11512.689
+   },
+   {
+    "etabs_point": "263",
+    "opensees_node": 36,
+    "x_m": 12.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 14748.522,
+    "opensees_kN": 17789.788
+   },
+   {
+    "etabs_point": "264",
+    "opensees_node": 41,
+    "x_m": 12.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 14748.522,
+    "opensees_kN": 17789.788
+   },
+   {
+    "etabs_point": "6",
+    "opensees_node": 42,
+    "x_m": 12.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13096.411,
+    "opensees_kN": 11512.689
+   },
+   {
+    "etabs_point": "703",
+    "opensees_node": 51,
+    "x_m": 14.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 4627.487
+   },
+   {
+    "etabs_point": "707",
+    "opensees_node": 52,
+    "x_m": 14.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 4627.487
+   },
+   {
+    "etabs_point": "702",
+    "opensees_node": 53,
+    "x_m": 16.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 4745.261
+   },
+   {
+    "etabs_point": "706",
+    "opensees_node": 54,
+    "x_m": 16.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 4745.261
+   },
+   {
+    "etabs_point": "265",
+    "opensees_node": 63,
+    "x_m": 18.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 11540.296
+   },
+   {
+    "etabs_point": "7",
+    "opensees_node": 64,
+    "x_m": 18.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 13714.047
+   },
+   {
+    "etabs_point": "8",
+    "opensees_node": 69,
+    "x_m": 18.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 13714.047
+   },
+   {
+    "etabs_point": "266",
+    "opensees_node": 70,
+    "x_m": 18.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 11540.296
+   },
+   {
+    "etabs_point": "558",
+    "opensees_node": 71,
+    "x_m": 24.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 8772.572
+   },
+   {
+    "etabs_point": "9",
+    "opensees_node": 72,
+    "x_m": 24.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 10969.417
+   },
+   {
+    "etabs_point": "10",
+    "opensees_node": 73,
+    "x_m": 24.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 10969.417
+   },
+   {
+    "etabs_point": "557",
+    "opensees_node": 74,
+    "x_m": 24.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 8772.572
+   },
+   {
+    "etabs_point": "561",
+    "opensees_node": 75,
+    "x_m": 30.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 8821.51
+   },
+   {
+    "etabs_point": "562",
+    "opensees_node": 76,
+    "x_m": 30.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 8821.51
+   }
+  ],
+  "X3_NATIVE_RIGID_BEAM_J_ETABS_NO_MESH": [
+   {
+    "etabs_point": "593",
+    "opensees_node": 1,
+    "x_m": -6.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 9666.518
+   },
+   {
+    "etabs_point": "594",
+    "opensees_node": 2,
+    "x_m": -6.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 9666.518
+   },
+   {
+    "etabs_point": "560",
+    "opensees_node": 3,
+    "x_m": 0.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 9850.367
+   },
+   {
+    "etabs_point": "1",
+    "opensees_node": 4,
+    "x_m": 0.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 12323.086
+   },
+   {
+    "etabs_point": "2",
+    "opensees_node": 5,
+    "x_m": 0.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 12323.086
+   },
+   {
+    "etabs_point": "559",
+    "opensees_node": 6,
+    "x_m": 0.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 9850.367
+   },
+   {
+    "etabs_point": "3",
+    "opensees_node": 7,
+    "x_m": 6.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 13698.896
+   },
+   {
+    "etabs_point": "261",
+    "opensees_node": 8,
+    "x_m": 6.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 10866.155
+   },
+   {
+    "etabs_point": "262",
+    "opensees_node": 13,
+    "x_m": 6.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 10866.155
+   },
+   {
+    "etabs_point": "4",
+    "opensees_node": 14,
+    "x_m": 6.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 13698.896
+   },
+   {
+    "etabs_point": "627",
+    "opensees_node": 23,
+    "x_m": 8.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 3760.181
+   },
+   {
+    "etabs_point": "705",
+    "opensees_node": 24,
+    "x_m": 8.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 3760.181
+   },
+   {
+    "etabs_point": "701",
+    "opensees_node": 25,
+    "x_m": 10.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 3689.462
+   },
+   {
+    "etabs_point": "704",
+    "opensees_node": 26,
+    "x_m": 10.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 3689.462
+   },
+   {
+    "etabs_point": "5",
+    "opensees_node": 35,
+    "x_m": 12.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13096.411,
+    "opensees_kN": 13780.196
+   },
+   {
+    "etabs_point": "263",
+    "opensees_node": 36,
+    "x_m": 12.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 14748.522,
+    "opensees_kN": 14194.129
+   },
+   {
+    "etabs_point": "264",
+    "opensees_node": 41,
+    "x_m": 12.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 14748.522,
+    "opensees_kN": 14194.129
+   },
+   {
+    "etabs_point": "6",
+    "opensees_node": 42,
+    "x_m": 12.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13096.411,
+    "opensees_kN": 13780.196
+   },
+   {
+    "etabs_point": "703",
+    "opensees_node": 51,
+    "x_m": 14.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 3689.462
+   },
+   {
+    "etabs_point": "707",
+    "opensees_node": 52,
+    "x_m": 14.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 3689.462
+   },
+   {
+    "etabs_point": "702",
+    "opensees_node": 53,
+    "x_m": 16.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 3760.181
+   },
+   {
+    "etabs_point": "706",
+    "opensees_node": 54,
+    "x_m": 16.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 3760.181
+   },
+   {
+    "etabs_point": "265",
+    "opensees_node": 63,
+    "x_m": 18.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 13698.896
+   },
+   {
+    "etabs_point": "7",
+    "opensees_node": 64,
+    "x_m": 18.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 10866.155
+   },
+   {
+    "etabs_point": "8",
+    "opensees_node": 69,
+    "x_m": 18.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 10866.155
+   },
+   {
+    "etabs_point": "266",
+    "opensees_node": 70,
+    "x_m": 18.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 13698.896
+   },
+   {
+    "etabs_point": "558",
+    "opensees_node": 71,
+    "x_m": 24.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 9850.367
+   },
+   {
+    "etabs_point": "9",
+    "opensees_node": 72,
+    "x_m": 24.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 12323.086
+   },
+   {
+    "etabs_point": "10",
+    "opensees_node": 73,
+    "x_m": 24.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 12323.086
+   },
+   {
+    "etabs_point": "557",
+    "opensees_node": 74,
+    "x_m": 24.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 9850.367
+   },
+   {
+    "etabs_point": "561",
+    "opensees_node": 75,
+    "x_m": 30.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 9666.518
+   },
+   {
+    "etabs_point": "562",
+    "opensees_node": 76,
+    "x_m": 30.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 9666.518
+   }
+  ],
+  "X8_PRESET_WALL_BASE_EDGE_LUMPED": [
+   {
+    "etabs_point": "593",
+    "opensees_node": 1,
+    "x_m": -6.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 9590.758
+   },
+   {
+    "etabs_point": "594",
+    "opensees_node": 2,
+    "x_m": -6.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 9590.758
+   },
+   {
+    "etabs_point": "560",
+    "opensees_node": 3,
+    "x_m": 0.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 9740.105
+   },
+   {
+    "etabs_point": "1",
+    "opensees_node": 4,
+    "x_m": 0.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 12041.935
+   },
+   {
+    "etabs_point": "2",
+    "opensees_node": 5,
+    "x_m": 0.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 12041.935
+   },
+   {
+    "etabs_point": "559",
+    "opensees_node": 6,
+    "x_m": 0.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 9740.105
+   },
+   {
+    "etabs_point": "3",
+    "opensees_node": 7,
+    "x_m": 6.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 13352.767
+   },
+   {
+    "etabs_point": "261",
+    "opensees_node": 8,
+    "x_m": 6.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 12378.243
+   },
+   {
+    "etabs_point": "262",
+    "opensees_node": 13,
+    "x_m": 6.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 12378.243
+   },
+   {
+    "etabs_point": "4",
+    "opensees_node": 14,
+    "x_m": 6.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 13352.767
+   },
+   {
+    "etabs_point": "627",
+    "opensees_node": 23,
+    "x_m": 8.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 3088.819
+   },
+   {
+    "etabs_point": "705",
+    "opensees_node": 24,
+    "x_m": 8.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 3088.819
+   },
+   {
+    "etabs_point": "701",
+    "opensees_node": 25,
+    "x_m": 10.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 3213.418
+   },
+   {
+    "etabs_point": "704",
+    "opensees_node": 26,
+    "x_m": 10.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 3213.418
+   },
+   {
+    "etabs_point": "5",
+    "opensees_node": 35,
+    "x_m": 12.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13096.411,
+    "opensees_kN": 13421.126
+   },
+   {
+    "etabs_point": "263",
+    "opensees_node": 36,
+    "x_m": 12.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 14748.522,
+    "opensees_kN": 15450.441
+   },
+   {
+    "etabs_point": "264",
+    "opensees_node": 41,
+    "x_m": 12.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 14748.522,
+    "opensees_kN": 15450.441
+   },
+   {
+    "etabs_point": "6",
+    "opensees_node": 42,
+    "x_m": 12.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13096.411,
+    "opensees_kN": 13421.126
+   },
+   {
+    "etabs_point": "703",
+    "opensees_node": 51,
+    "x_m": 14.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 3213.418
+   },
+   {
+    "etabs_point": "707",
+    "opensees_node": 52,
+    "x_m": 14.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 3956.196,
+    "opensees_kN": 3213.418
+   },
+   {
+    "etabs_point": "702",
+    "opensees_node": 53,
+    "x_m": 16.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 3088.819
+   },
+   {
+    "etabs_point": "706",
+    "opensees_node": 54,
+    "x_m": 16.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 4000.23,
+    "opensees_kN": 3088.819
+   },
+   {
+    "etabs_point": "265",
+    "opensees_node": 63,
+    "x_m": 18.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 13352.767
+   },
+   {
+    "etabs_point": "7",
+    "opensees_node": 64,
+    "x_m": 18.0,
+    "y_m": 6.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 12378.243
+   },
+   {
+    "etabs_point": "8",
+    "opensees_node": 69,
+    "x_m": 18.0,
+    "y_m": 12.0,
+    "group": "CORE",
+    "etabs_kN": 11988.873,
+    "opensees_kN": 12378.243
+   },
+   {
+    "etabs_point": "266",
+    "opensees_node": 70,
+    "x_m": 18.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 13036.011,
+    "opensees_kN": 13352.767
+   },
+   {
+    "etabs_point": "558",
+    "opensees_node": 71,
+    "x_m": 24.0,
+    "y_m": 0.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 9740.105
+   },
+   {
+    "etabs_point": "9",
+    "opensees_node": 72,
+    "x_m": 24.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 12041.935
+   },
+   {
+    "etabs_point": "10",
+    "opensees_node": 73,
+    "x_m": 24.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 11781.138,
+    "opensees_kN": 12041.935
+   },
+   {
+    "etabs_point": "557",
+    "opensees_node": 74,
+    "x_m": 24.0,
+    "y_m": 18.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9647.893,
+    "opensees_kN": 9740.105
+   },
+   {
+    "etabs_point": "561",
+    "opensees_node": 75,
+    "x_m": 30.0,
+    "y_m": 6.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 9590.758
+   },
+   {
+    "etabs_point": "562",
+    "opensees_node": 76,
+    "x_m": 30.0,
+    "y_m": 12.0,
+    "group": "PERIMETER",
+    "etabs_kN": 9509.021,
+    "opensees_kN": 9590.758
+   }
+  ]
+ },
+ "run_folder": "/home/claude/out/MESH_04_ETABS_ELASTIC_COMPARISON_20261121/02_GRAVITY/RUNS/ETABS_ELASTIC_GRAVITY_COMPARISON/ABLATION_1D1L_PRIMARY32/20261121T112829_748142Z_bdb3465a (not committed)"
+}
