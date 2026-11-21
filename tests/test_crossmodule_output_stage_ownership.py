@@ -49,6 +49,23 @@ class StageOwnershipTests(unittest.TestCase):
                              root/"02_GRAVITY"/"RUNS"/"Case")
             self.assertFalse((root/"02_GRAVITY").exists())
 
+    def test_readiness_discovers_new_stage_outputs_and_historical_sources(self):
+        from components.model.readiness_dashboard import _candidates
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            stage=(root/"09_SOFTWARE_DIAGNOSTICS"/"RUNS"/"READINESS_AUDIT")
+            stage.mkdir(parents=True)
+            current=stage/"Nonlinear_Readiness_Audit.json"
+            current.write_text('{"status":"evidence"}',encoding="utf-8")
+            historic=root/"OpenSees_Analysis_Results"
+            historic.mkdir()
+            old=historic/"Nonlinear_Readiness_Audit.json"
+            old.write_text('{"status":"legacy"}',encoding="utf-8")
+            results=_candidates(root,"Nonlinear_Readiness_Audit.json")
+            self.assertIn(current,results)
+            self.assertIn(old,results)
+            self.assertEqual(len(results),2)
+
     def test_exploratory_and_material_paths_do_not_regress(self):
         repo=Path(__file__).resolve().parents[1]
         targets={
