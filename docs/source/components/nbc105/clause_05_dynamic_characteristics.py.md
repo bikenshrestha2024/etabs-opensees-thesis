@@ -22,3 +22,9 @@ NBC 105:2025 clause 5. See [period and material provenance](../../../NBC105_PERI
 `python -m pytest tests/test_nbc105_clause5.py -q` (hand-computed expected values) and `python tests/verify_ref_tags.py`. Unit tests only; no native ETABS/OpenSees run. See [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+## 2026-11-21 extension — Clause 5 beyond §5.2
+
+The canonical module now also includes **all 21 rows of Table 5-2** (source printed p. 32) with row-numbered Rμ, Ωu and Ωs; §5.4.1 weak/soft-storey checks; §5.4.2 torsional and re-entrant thresholds; §5.5 ULS horizontal deflection multiplier, SRSS building separation and drift limits; and §5.6 ±5% accidental eccentricity.
+
+New regression file: `tests/test_nbc105_clause5_remaining.py`. Conditions at 80%, 70%, 1.5 and 2.5 equality are explicitly tested to avoid treating strict inequalities as inclusive. **Scope caution:** a source table lookup does not verify that this thesis model qualifies for the selected structural system and its ductile detailing. The actual ETABS drift/irregularity reports and 25-storey system identification remain native-project evidence gates. The printed table of contents gives §§5.3–5.6 on pp. 30–37; older references to §5.7 for accidental torsion are not the physical §5.6 heading. Certain internal cross-references in the printed code are inconsistent and are preserved in the audit rather than silently corrected.
