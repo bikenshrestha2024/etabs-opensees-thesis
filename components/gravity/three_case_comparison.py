@@ -159,8 +159,13 @@ def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L")
     Write comparisons and plots from real registered solver responses only."""
     available, missing = collect_cases(output_root, model_path, profile)
     from components.gravity.output_ownership import section
-    root = section(output_root,"COMPARISONS",create=True) / "Gravity_Case_Comparison"
-    root.mkdir(parents=True, exist_ok=True)
+    from datetime import datetime,timezone
+    from uuid import uuid4
+    root = (section(output_root,"COMPARISONS",create=True) /
+            "Gravity_Case_Comparison" /
+            (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")+
+             "_"+uuid4().hex[:8]))
+    root.mkdir(parents=True, exist_ok=False)
     summary = []
     nodes_by_case = {}
     reactions_by_case = {}
