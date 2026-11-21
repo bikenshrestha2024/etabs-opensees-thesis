@@ -49,6 +49,20 @@ class StageOwnershipTests(unittest.TestCase):
                              root/"02_GRAVITY"/"RUNS"/"Case")
             self.assertFalse((root/"02_GRAVITY").exists())
 
+    def test_model_readiness_discovery_reads_canonical_modal_case(self):
+        from components.model.readiness_gui import available_evidence
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            builder=root/"OpenSees_Complete_Nonlinear_Model.py"
+            builder.write_text("# synthetic builder",encoding="utf-8")
+            result=root/"04_MODAL"/"RUNS"/"ULS"/"case"/"run"/"02_RESULTS"/"NBC105_Modal_V111.json"
+            result.parent.mkdir(parents=True)
+            result.write_text('{"status":"NOT_ENGINEERING_ACCEPTANCE"}',encoding="utf-8")
+            evidence=available_evidence(builder)
+            key="modal_periods_modes_and_mass_participation_reviewed"
+            self.assertIn(key,evidence)
+            self.assertIn(str(result),evidence[key])
+
     def test_deformation_viewer_discovers_esm_mrsm_nltha_and_legacy(self):
         from components.ui.response_viewer import find_deformation_cases
         with tempfile.TemporaryDirectory() as td:
