@@ -2563,11 +2563,12 @@
       "title": "Openings in walls",
       "source_edition": "NBC 105:2025 Second Revision (printed pagination)",
       "source_review": "HEADING_INDEXED_REQUIREMENT_TEXT_NOT_EXHAUSTIVELY_VERIFIED",
-      "test_ref": null,
+      "test_ref": "tests/test_nbc105_annex_ab_source_checks.py",
       "canonical_module": null,
       "evidence_required": "Native RC element design, anchorage, shear, confinement and reinforcement schedule reviewed against Annex A",
       "approval": "OPEN",
-      "kind": "section"
+      "kind": "section",
+      "reference_helper": "components/nbc105/annex_a_rc_detailing.py"
     },
     {
       "id": "A.5.7",
