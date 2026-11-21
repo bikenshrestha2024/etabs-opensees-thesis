@@ -95,7 +95,7 @@ class AnnexBLinkTests(unittest.TestCase):
         for length in (0,-1,float("inf"),float("nan")):
             with self.assertRaises(ValueError):
                 seismic_link_rotation_limit_rad(
-                    link_length_m=length,mp_kNm=100,vp_kN=100,orientation="horizontal")
+                    link_length_m=length,mp_kNm=100,vp_kN=100,orientation="horizontal",section_type="I")
 
 if __name__=="__main__":
     unittest.main()
