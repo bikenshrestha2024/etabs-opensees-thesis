@@ -35,3 +35,19 @@ Modified (docs and registry only)
 Audit of existing code against the printed notation (details in the matrix): no production code changed and no before/after numbers, because no existing value is proved wrong by the printed text. Findings: T1 naming (adopted design period vs printed approximate period), Aw printed as "Area of Web" on p. 6 but an effective wall area in printed §5.1.2 (code follows 5.1.2), kN/MPa/tonne unit convention vs clause 1.5 SI, symbol clashes (damper alpha, Cd, E), Tn90 not a printed symbol, Rs has no repo variable (SLS coefficient divides by Omega_s only; deferred to the clause 6 audit), notation list omits Ta, Td, kt. Soft-story and g parity PASS.
 
 Not touched: source EDBs, `Saved_Project_V156/`, solver, material and damping numerics. Evidence: unit tests only (`python -m pytest -q`, `python tests/verify_ref_tags.py`); no native ETABS or OpenSees run. PASS here is not engineering acceptance.
+
+## Task 7: NBC 105 documentation consistency audit
+
+Editor Claude Code, model UNKNOWN. Scope: only what exists today (clauses 1, 4, 5, constants, PROJECT_DECLARATIONS, WALL_GROUPING_AW_METHOD, matrices, module guides, registry rows). Clauses 2 and 3, Annex C and the UBC/SEAOC sources are deferred; the test accepts `NOT_STARTED` register rows without a module or matrix.
+
+Added
+- `tests/test_nbc105_docs_consistency.py` (18 tests, written first, run before any doc edit): register rows other than `NOT_STARTED` link an existing module and matrix; one register status vocabulary (`NOT_STARTED` or `CLAUSE_<n>` for the row's own clause); g appears as 9.81 and any 9.80665 or 9806.65 value sits only in a paragraph marked superseded, withdrawn or history; page-offset statements agree (21 up to printed p. 26, 23 from p. 27) with `PRINTED_PAGE_OFFSET = 21`; every matrix row has a code location or an explicit `DEFINITION_ONLY`, `NOT_APPLICABLE`, `PRINCIPLE_ONLY`, `NOT_TRANSCRIBED`, `USER_RESPONSIBILITY` or `CALLER_RESPONSIBILITY` status from one matrix vocabulary; the clause 1 row-count statement equals the table; every module under `components/nbc105/` has a guide and (except `__init__.py`) a `CANONICAL_MODULES.csv` row; every relative link in `docs/nbc105/*.md` and the module guides resolves.
+
+First run: 17 passed, 1 failed (g history outside a superseded marker). Offsets, statuses, links, guides and registry rows were already consistent.
+
+Modified (docs only, no production code, no numeric value changed)
+- `docs/nbc105/PROJECT_DECLARATIONS.md`: section 3 numeric-effect list now labelled superseded history and named as the single source of the 0.0341 % and related percentages; scan-test sentence names the superseded value.
+- `docs/source/components/nbc105/constants.py.md`: removed the repeated 0.0341 % statement and linked to PROJECT_DECLARATIONS section 3; scan-test sentence marks the value superseded and links.
+- `docs/nbc105/clause_01_scope_definitions_matrix.md` (F10) and `docs/nbc105/clause_05_dynamic_characteristics_matrix.md` (open item): 9.80665 mentions now say superseded.
+
+Line endings unchanged (all touched files are LF). Evidence: unit tests only (`python -m pytest -q`, `python tests/verify_ref_tags.py`); no native ETABS or OpenSees run. PASS here is not engineering acceptance.

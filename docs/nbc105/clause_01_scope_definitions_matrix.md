@@ -148,7 +148,7 @@ Method: for every symbol of the printed list the repository (`components/`, `too
 | F7 | Symbols used by the repo and printed in clause 4/5 tables but absent from the notation list: Ta, Td (Table 4-1), kt (§5.1.2), Aw/Awi/Lwi/Nw detail, soil Vs,30 and N_SPT. The notation list is therefore not exhaustive. | `components/nbc105/clause_04_seismic_hazard.py`, `clause_05_dynamic_characteristics.py` | `notation("Ta")` raises KeyError by design (tested). | PRINTED_OMISSION, no change |
 | F8 | Soft story: production check implements the printed 70 percent (adjacent above) and 80 percent (three above, mean) tests with strict `<`, labelled clause 5.4.1.2; parity run on 33 stiffness combinations including the boundaries 70, 80, 88 and 1e-6 around them. | `components/validation/response_checks.py::irregularity` | PASS. | PASS |
 | F9 | No production implementation of the dual-system 25 percent rule, the flexible-diaphragm 2 times rule, or the 2/3 MCE definition exists (repo-wide search, guarded by `TP::DefinitionThresholdProductionAbsence` for the first two). | whole repository | The clause module is a reference only for these. | REFERENCE_ONLY |
-| F10 | g: the single constant `GRAVITY_M_S2` equals the printed 9.81 (p. 7); `reconcile.G`, `assembly.py` and `rayleigh.py` route through it and carry no 9.80665 literal. | `components/nbc105/constants.py` | PASS (Task 1). | PASS |
+| F10 | g: the single constant `GRAVITY_M_S2` equals the printed 9.81 (p. 7); `reconcile.G`, `assembly.py` and `rayleigh.py` route through it and carry no literal of the superseded 9.80665. | `components/nbc105/constants.py` | PASS (Task 1). | PASS |
 
 ## Printed-page notes
 
