@@ -27,7 +27,8 @@ def _positive(v,name):
     return x
 
 def component_amplification_factor(building_period_s,component_period_s):
-    """§10.3.1 Table 10-1 p.50: 2.5 at ΔT=0; 1 at ΔT>=0.5s."""
+    """[REF NBC105-2025 §10, printed pp. 49–52]
+§10.3.1 Table 10-1 p.50: 2.5 at ΔT=0; 1 at ΔT>=0.5s."""
     t1=_positive(building_period_s,"T1")
     tp=_positive(component_period_s,"Tp")
     delta=abs(t1-tp)
