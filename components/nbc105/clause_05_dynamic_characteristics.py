@@ -249,7 +249,8 @@ def _strictly_above(a,b):
     return a > b and not math.isclose(a,b,rel_tol=1e-12,abs_tol=1e-12)
 
 def weak_story(story_strength,above_strength):
-    """§5.4.1.1 p.33: story lateral strength strictly <80% of above."""
+    """[REF NBC105-2025 §5, printed pp. 28–37]
+§5.4.1.1 p.33: story lateral strength strictly <80% of above."""
     return _strictly_below(_positive(story_strength,"strength"),
                            .8*_positive(above_strength,"above strength"))
 
