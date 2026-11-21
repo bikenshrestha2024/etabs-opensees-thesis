@@ -4,6 +4,8 @@ Date 2026-11-21. Authority: NBC 105:2025 Seismic Design of Buildings in Nepal (D
 
 Related: [project declarations](PROJECT_DECLARATIONS.md) (g = 9.81 per printed p. 7, superseding the 9.80665 decision; Vs,30 optional with the clause 4.1.3 requirement documented), [wall grouping (Aw) method](WALL_GROUPING_AW_METHOD.md), [constants guide](../source/components/nbc105/constants.py.md).
 
+[Independent 21 November review](INDEPENDENT_REVIEW_20261121.md) records the reviewed GitHub commit, reproduced integration gaps and Windows test results.
+
 ## Naming convention
 
 | Artifact | Path pattern |
@@ -17,7 +19,7 @@ Related: [project declarations](PROJECT_DECLARATIONS.md) (g = 9.81 per printed p
 
 ## Clause register (titles and printed pages from the PDF contents list, printed pp. xiv-xx)
 
-Status: `CLAUSE_1`, `CLAUSE_4` and `CLAUSE_5` mean module + matrix + tests (the number is the clause). All others are `NOT_STARTED`.
+Status: `CLAUSE_1`, `CLAUSE_4` and `CLAUSE_5` indicate published modules, matrices and tests. Clause 5 coverage here is §§5.1–5.2. Refer to the matrices for caller responsibilities and remaining implementation work. `NOT_STARTED` describes the dedicated clause audit, including where earlier analysis code exists.
 
 | Clause | Title | Printed page | Status | Module | Matrix |
 |---|---|---|---|---|---|

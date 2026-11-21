@@ -11,16 +11,17 @@ from __future__ import annotations
 import math
 
 from components.nbc105.constants import GRAVITY_M_S2
+from components.nbc105.clause_05_dynamic_characteristics import storey_index_for_elevation
 
 
 def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=GRAVITY_M_S2,
                                    tolerance_kN=0.01, z_tolerance_m=1e-7):
-    """Reconcile source nodal seismic weight and quantify upward floor lumping.
+    """Reconcile source nodal seismic weight and quantify floor lumping.
 
     [REF docs/validation/20261118_RAYLEIGH_RETAINED_DOF_CORRECTION.md]
 
-    The current converter assigns every non-base horizontal-active mesh node
-    to the next diaphragm at or above it. This preserves total weight but
+    The converter assigns horizontal-active nodes by consecutive floor
+    midpoints. This preserves total weight but
     does not preserve mass moments or eigenvector-weighted kinetic energy.
     """
     if not isinstance(model, dict) or not story_rows:
@@ -48,6 +49,7 @@ def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=GRAVITY_M_S2,
     moved_weight = 0.0
     first_moment_shift = 0.0
     max_lift = 0.0
+    max_drop = 0.0
     intermediate_nodes = 0
     active_nodes = 0
     mixed_xy_restraint_nodes = 0
@@ -78,21 +80,19 @@ def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=GRAVITY_M_S2,
             raise ValueError("Nonfinite nodal mass elevation")
         if z < base-z_tolerance_m:
             raise ValueError("Seismic mass below assembled seismic base")
-        floor_index = next((i for i, h in enumerate(heights) if h >= z-z_tolerance_m),
-                           len(heights)-1)
         if z > heights[-1]+z_tolerance_m:
-            above_roof_nodes += 1
-        lift = heights[floor_index]-z
-        if lift < -z_tolerance_m:
             raise ValueError("Mass node located above uppermost diaphragm")
+        floor_index = storey_index_for_elevation(z, heights)
+        lift = heights[floor_index]-z
         w = mass*g_mass
         mass_by_floor[floor_index] += w
         active_nodes += 1
-        if lift > z_tolerance_m:
+        if abs(lift) > z_tolerance_m:
             intermediate_nodes += 1
             moved_weight += w
             first_moment_shift += w*lift
             max_lift = max(max_lift, lift)
+            max_drop = max(max_drop, -lift)
     expected_by_floor = []
     for row, group in zip(story_rows, groups):
         if int(row["master_node_tag"]) != int(group["master_tag"]):
@@ -117,6 +117,7 @@ def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=GRAVITY_M_S2,
         "vertical_first_moment_shift_kN_m": first_moment_shift,
         "vertical_shift_weighted_mean_m": first_moment_shift/total if total else 0,
         "maximum_upward_lump_m": max_lift,
+        "maximum_downward_lump_m": max_drop,
         "mixed_XY_support_node_count": mixed_xy_restraint_nodes,
         "mass_nodes_above_roof": above_roof_nodes,
         "maximum_floor_weight_discrepancy_kN": max(map(abs, differences), default=0),

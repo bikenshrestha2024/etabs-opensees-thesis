@@ -7,10 +7,46 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from components.ui.organized_results import classify, publish_organized_results, sha256
+from components.ui.organized_results import classify, publish_mrsm_review, publish_organized_results, sha256
 
 
 class OrganizedReviewTests(unittest.TestCase):
+    def test_mrsm_review_groups_each_case_and_publishes_one_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp) / "run"
+            raw = run / "02_RESULTS"
+            raw.mkdir(parents=True)
+            (run / "06_REVIEW").mkdir()
+            destinations = {
+                "MRSM_Results_V132.json": "MRSM/02_RESULTS/MRSM_Results_V132.json",
+                "ULS_X_E0_Drift_V132.csv": "MRSM/02_RESULTS/ULS/X/E0/ULS_X_E0_Drift_V132.csv",
+                "ULS_X_E0_Modal_Force_Equilibrium_V132.csv":
+                    "MRSM/02_RESULTS/ULS/X/E0/ULS_X_E0_Modal_Force_Equilibrium_V132.csv",
+                "ULS_X_E0_Support_Reactions_V132.csv":
+                    "MRSM/02_RESULTS/ULS/X/E0/ULS_X_E0_Support_Reactions_V132.csv",
+                "Response_Recorder_Index_ULS_Y_Eminus.json":
+                    "MRSM/02_RESULTS/ULS/Y/Eminus/Response_Recorder_Index_ULS_Y_Eminus.json",
+                "MRSM_Results_V134.xlsx": "MRSM/03_EXCEL/MRSM_Results_V134.xlsx",
+                "MRSM_Profiles_V132.png": "MRSM/04_FIGURES/MRSM_Profiles_V132.png",
+                "Modal_X/Modal_Output.json": "Modal/Modal_X/Modal_Output.json",
+                "ETABS_Comparison_V148/Comparison.csv": "Comparisons/ETABS_Comparison_V148/Comparison.csv",
+                "00_PROCESSING_METADATA/Processing_Timings_V130.jsonl":
+                    "MRSM/06_REVIEW/Processing/Processing_Timings_V130.jsonl",
+            }
+            for relative in destinations:
+                source = raw / relative
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text(relative, encoding="utf-8")
+            report = publish_mrsm_review(raw)
+            self.assertEqual(set(report["zip_files"]), {"MRSM_RUN"})
+            self.assertEqual(report["module_counts"]["Unclassified"], 0)
+            self.assertEqual(Path(report["folder"]).parent, run / "06_REVIEW" / "Organized_Results")
+            with zipfile.ZipFile(report["zip_files"]["MRSM_RUN"]) as archive:
+                self.assertEqual(set(archive.namelist()), set(destinations.values())
+                                 | {"README_FIRST.txt", "EVIDENCE_MANIFEST.json"})
+                for relative, snapshot in destinations.items():
+                    self.assertEqual(archive.read(snapshot), (raw / relative).read_bytes())
+
     def test_classification(self):
         self.assertEqual(classify("MRSM_Results_V134.xlsx"), "MRSM")
         self.assertEqual(classify("NBC105_ESM_Force_Profile_ULS_X.png"), "ESM")

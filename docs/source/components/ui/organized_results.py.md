@@ -104,3 +104,15 @@ The snapshot generator now inventories and SHA256-fingerprints **all eligible so
 
 
 Combined bundle names must differ from module names, including case variants on Windows. Each upload ZIP reports module counts for the files it actually contains. The local manifest continues to report counts for the complete snapshot.
+
+## MRSM run review
+
+**Export organized run ZIP** publishes one archive under the selected run's
+`06_REVIEW/Organized_Results` when the canonical run folders exist. The review
+tree groups drift, forces, deformation and recorder indexes under
+`MRSM/02_RESULTS/<ULS or SLS>/<X or Y>/<E0, Eplus or Eminus>`.
+Excel and figures use `MRSM/03_EXCEL` and `MRSM/04_FIGURES`.
+Processing logs use `MRSM/06_REVIEW/Processing`. Modal dependencies, gravity
+evidence and saved comparison files have separate folders within the review.
+The manifest retains the original source for each file. Native comparison
+status follows the saved comparison, including missing ETABS values.

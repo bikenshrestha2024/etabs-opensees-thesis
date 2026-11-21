@@ -18,6 +18,7 @@ from components.inputs.project_workbooks import (
 )
 from components.modal.analysis import nbc105_period_estimate
 from components.nbc105.constants import GRAVITY_M_S2
+from components.modal.rayleigh import RAYLEIGH_METHOD_VERSION, empirical_esm_reference
 
 
 class NBC105PeriodTests(unittest.TestCase):
@@ -168,19 +169,33 @@ class NBC105PeriodTests(unittest.TestCase):
             model=folder/'OpenSees_Complete_Model_Data_V118.json'
             model.write_text('{"model":"fixture"}',encoding='utf-8')
             ledger=folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv'
-            ledger.write_text('story,height_m\\n1,3\\n',encoding='utf-8')
+            ledger.write_text(
+                'story,height_m,master_node_tag,dead_load_kN,storage_live_load_kN,other_live_load_kN\n'
+                '1,3,101,100,0,0\n',encoding='utf-8')
             config=folder/'OpenSees_Complete_Model_Config_V118.json'
             config.write_text('{"synthetic":true}',encoding='utf-8')
             config_hash=hashlib.sha256(config.read_bytes()).hexdigest()
             model_hash=hashlib.sha256(model.read_bytes()).hexdigest()
             ledger_hash=hashlib.sha256(ledger.read_bytes()).hexdigest()
-            def save(state,period,aw_x=2.,aw_y=3.,version=126):
+            settings=dict(soil_type='C',zoning_factor_z=.35,importance_factor_i=1.)
+            def save(state,period,aw_x=2.,aw_y=3.,version=RAYLEIGH_METHOD_VERSION,
+                     tamper_force=False):
                 def evidence(target,aw):
-                    w,f=100.,10.
+                    w=100.
+                    empirical, seed, (f,)=empirical_esm_reference(
+                        [{'height_m':3.,'dead_load_kN':w}],height_m=3.,aw_m2=aw,
+                        state=state,settings=settings)
+                    if tamper_force:
+                        f *= 1.01
                     d=(target/(2*math.pi))**2 * GRAVITY_M_S2*f/w
-                    rows=[{'master_node':101,'constrained_floor_node_count':3,
+                    rows=[{'master_node':101,'height_m':3.,'constrained_floor_node_count':3,
                            'weight_kN':w,'force_kN':f,'displacement_m':d}]
                     return {'period_s':target,'Aw_m2':aw,'rows':rows,
+                            'empirical_period_s':empirical,
+                            'amplified_empirical_s':seed['period_s'],
+                            'adopted_period_s':min(target,seed['period_s']),
+                            'reference_force_exponent_k':seed['period_exponent_k'],
+                            'empirical_esm_reference':seed,
                             'rayleigh_numerator_kN_m2':w*d*d,
                             'rayleigh_denominator_gFiDi_kN_m2_s2':GRAVITY_M_S2*f*d,
                             'reference_force_total_kN':f,
@@ -195,6 +210,7 @@ class NBC105PeriodTests(unittest.TestCase):
                     'displacement_basis':'TORSION_SUPPRESSED_CONSTRAINED_FLOOR_NODES',
                     'model_sha256':model_hash,'story_weights_sha256':ledger_hash,
                     'model_config_sha256':config_hash,
+                    'height_m':3.,'empirical_esm_settings':settings,
                     'X':evidence(period,aw_x),
                     'Y':evidence(period+1.,aw_y),
                 }
@@ -212,6 +228,11 @@ class NBC105PeriodTests(unittest.TestCase):
             sls=import_project_inputs(ROOT,folder,'SLS')
             self.assertAlmostEqual(uls['values']['rayleigh_tx'],1.1)
             self.assertAlmostEqual(sls['values']['rayleigh_tx'],2.2)
+            self.assertIn('rayleigh_empirical_reference',uls['values'])
+
+            save('ULS',1.1,tamper_force=True)
+            tampered=import_project_inputs(ROOT,folder,'ULS')
+            self.assertNotIn('rayleigh_tx',tampered['values'])
 
             save('SLS',2.2,aw_x=2.1)
             stale=import_project_inputs(ROOT,folder,'SLS')

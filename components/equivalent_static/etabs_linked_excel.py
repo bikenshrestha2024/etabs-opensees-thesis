@@ -142,7 +142,7 @@ def check_excel_wall_thickness(workbook_path, excel_rows, inventory, *, toleranc
 
 
 def apply_reviewed_grouped_walls(workbook, policy):
-    """Apply the source-verified two-wall interpretation to the generated copy.
+    """Check the reviewed height and select static spectra in the generated copy.
 
     [REF docs/validation/20261118_RAYLEIGH_RETAINED_DOF_CORRECTION.md]
     [REF docs/source/components/equivalent_static/etabs_linked_excel.py.md]
@@ -156,15 +156,6 @@ def apply_reviewed_grouped_walls(workbook, policy):
         aw=2*0.6*(12-2*2)*(0.2+min(12/height,0.9)**2)
         if not math.isclose(aw,float(policy["X"]),rel_tol=1e-9):
             raise ValueError("Reviewed 12 m wall geometry and linked workbook height/Aw differ")
-        # The two remaining template rows keep their subtotal formulas.
-        for row, grid in ((24,"B"),(25,"D")):
-            for column,value in enumerate(("X",grid,row-23,row-23,12000,12000,600,2000,2300,2),1):
-                sheet.cell(row,column).value=value
-        for row in (26,27):
-            for column in range(1,11):
-                sheet.cell(row,column).value=None
-            for column in range(11,15):
-                sheet.cell(row,column).value=None
         # This copy is specifically the equivalent-static route. Legacy input
         # templates can have the Modal X/Y spectrum selectors preselected.
         sheet["N3"]="Static"
@@ -172,6 +163,48 @@ def apply_reviewed_grouped_walls(workbook, policy):
         book.save(workbook)
     finally:
         book.close()
+
+
+def _read_reviewed_first_storey(eng, sap, stories, audit_dir, log):
+    """Read checked native wall rows without projecting upper shells into doors."""
+    required = ('audit_open_sap', 'read_grid_reference',
+                'geometry_bays_from_direct_preflight', 'area_points', 'point_xyz')
+    missing = [name for name in required if not callable(getattr(eng, name, None))]
+    if missing:
+        raise ValueError("The reviewed 12 m route needs an ETABS engine with first-storey evidence: "
+                         + ", ".join(missing))
+    preflight = eng.audit_open_sap(sap, eng, audit_dir, log=log)
+    grid = eng.read_grid_reference(sap, log=log)
+    xb, yb = eng.geometry_bays_from_direct_preflight(preflight, grid, log=log)
+
+    # The legacy audit excludes labelled spandrel shells before fitting plan
+    # intervals. Verify elevations of the excluded shells across the doors.
+    first = next(row for row in stories if row['name'] == preflight['reference_story'])
+    door_head = float(first['elevation']) - float(first['height']) + 2.3
+    panels = json.loads((audit_dir / 'wall_panels.json').read_text(encoding='utf-8-sig'))
+    lintels = []
+    for panel in panels['spandrel_areas']:
+        area = panel['area']
+        points = [eng.point_xyz(sap, tag) for tag in eng.area_points(sap, area)]
+        if len(points) < 3:
+            raise ValueError(f"ETABS spandrel shell {area} has incomplete native vertices")
+        xmin, xmax = min(p[0] for p in points), max(p[0] for p in points)
+        for wall in xb:
+            plane = float(wall['wall_y_m'])
+            if not all(abs(p[1] - plane) <= .01 for p in points):
+                continue
+            if not any(min(right, xmax) - max(left, xmin) > .01
+                       for left, right in wall['opening_intervals_m']):
+                continue
+            bottom = min(p[2] for p in points)
+            if bottom < door_head - .01:
+                raise ValueError(f"ETABS spandrel shell {area} crosses a door below its head "
+                                 f"(shell bottom {bottom:.3f} m, door head {door_head:.3f} m)")
+            lintels.append({'area':area, 'wall_y_m':plane, 'bottom_m':bottom})
+    evidence = {'method':'NATIVE_FIRST_STOREY_PREFLIGHT', 'first_storey':first['name'],
+                'door_head_m':door_head, 'checked_lintel_shells':lintels,
+                'geometry_report':str(audit_dir / 'wall_lines.json')}
+    return xb, yb, grid, evidence
 
 
 def run_etabs_excel(edb,workbook,engine_path,output_dir,log=print,*,wall_policy=None):
@@ -211,7 +244,12 @@ def run_etabs_excel(edb,workbook,engine_path,output_dir,log=print,*,wall_policy=
         if isinstance(code,int) and code!=0:
             raise RuntimeError("ETABS kN-m-C unit assignment failed: "+str(code))
         stories=eng.get_stories(sap)
-        xb,yb,grid=eng.read_etabs_walls(sap,stories,log=log)
+        geometry_evidence=None
+        if grouped:
+            xb,yb,grid,geometry_evidence=_read_reviewed_first_storey(
+                eng,sap,stories,target.with_suffix('.wall_geometry'),log)
+        else:
+            xb,yb,grid=eng.read_etabs_walls(sap,stories,log=log)
         # [REF CSI OAPI PropArea.GetWall] numeric thickness, independent of
         # the engine's section-name handling.
         try:
@@ -293,6 +331,7 @@ def run_etabs_excel(edb,workbook,engine_path,output_dir,log=print,*,wall_policy=
                "etabs_read_only":True,"response_spectrum_scale_factors_changed":False,
                "stories":len(stories),"X_walls":len(x["records"]),"Y_walls":len(y["records"]),
                "wall_basis":wall_policy["method"] if grouped else "ORIGINAL_EXCEL_WALL_ROWS",
+               "native_wall_geometry":geometry_evidence,
                "assembled_model_sha256":wall_policy.get("assembled_model_sha256") if grouped else None,
                "coefficients":summary}
         audit_path=target.with_suffix(".provenance.json")

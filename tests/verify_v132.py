@@ -61,9 +61,9 @@ class V132Checks(unittest.TestCase):
         class V:
             def __init__(self,value):self.value=value
             def get(self):return self.value
-        g=SimpleNamespace(awx=V('1.958293628808864'),awy=V('2.203080332409972'),period_factor=V('1.25'),rayleigh_tx=V(''),rayleigh_ty=V(''),excel_tx=V('2.0385674 s - source cell'),excel_ty=V('1.9219798 s - source cell'),use_workbook_periods=V(True),period_sources={},project_input_audit={'values':{'workbook_adopted_tx':2.03856740011866}})
+        g=SimpleNamespace(awx=V('1.958293628808864'),awy=V('2.203080332409972'),period_factor=V('1.25'),rayleigh_tx=V(''),rayleigh_ty=V(''),excel_tx=V('2.0385674 s - source cell'),excel_ty=V('1.9219798 s - source cell'),use_workbook_periods=V(True),period_sources={},project_input_audit={'values':{'awx':1.958293628808864,'workbook_adopted_tx':2.03856740011866}})
         self.assertAlmostEqual(ESMGui._adopted_axis_period(g,'X',95.),2.03856740011866)
-        self.assertIn('Imported',g.period_sources['X'])
+        self.assertIn('EXPLICIT workbook adopted-period reference',g.period_sources['X'])
     def test_service_workbook_is_case_specific(self):
         from OpenSees_Project_Inputs_V123 import source_workbooks,SERVICE_SCALING
         paths=source_workbooks(ROOT,ROOT/'tests','SLS');self.assertIn(SERVICE_SCALING,[p.name for p in paths if p])

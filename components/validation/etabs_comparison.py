@@ -269,6 +269,35 @@ def find_verified_etabs_csv(source_folder, results_root):
         return None,'ETABS source evidence failed verification: '+str(exc)
 
 
+def find_native_reference_csv(source_folder, results_root):
+    """Find source-bound native reference data without approving case equivalence.
+
+    [REF docs/source/components/validation/etabs_comparison.py.md]
+    """
+    from components.inputs.project_workbooks import _source_edb_path
+    from components.validation.etabs_direct_api import fingerprint
+    root=Path(results_root)
+    if root.name!='02_RESULTS':
+        return None
+    directory=root.parent/'05_COMPARISONS'/'ETABS_NATIVE_REFERENCE'
+    csv_path=directory/'ETABS_Native_Reference.csv'
+    provenance=directory/'ETABS_Native_Reference_Provenance.json'
+    if not (csv_path.is_file() and provenance.is_file()):
+        return None
+    try:
+        evidence=json.loads(provenance.read_text(encoding='utf-8-sig'))
+        edb=_source_edb_path(source_folder)
+        if (isinstance(evidence,dict) and edb and
+            evidence.get('run_id')==root.parent.name and
+            Path(evidence['source_edb']).resolve()==Path(edb).resolve() and
+            evidence.get('source_edb_sha256')==fingerprint(edb) and
+            evidence.get('csv_sha256')==fingerprint(csv_path)):
+            return csv_path
+    except (OSError,ValueError,TypeError,KeyError):
+        pass
+    return None
+
+
 def launch(parent,folder,results_root=None):
  import tkinter as tk
  from tkinter import ttk,filedialog,messagebox
@@ -282,12 +311,16 @@ def launch(parent,folder,results_root=None):
  actions=ttk.Frame(bar);actions.pack(fill='x')
  def browse():
   p=filedialog.askopenfilename(parent=win,title='Normalized ETABS CSV',filetypes=[('CSV','*.csv')])
-  if p:path.set(p)
- ttk.Button(actions,text='Manual ETABS CSV (advanced)',command=browse).pack(side='left')
+  if p:
+   path.set(p)
+   refresh()
+ ttk.Button(actions,text='Load native ETABS CSV',command=browse).pack(side='left')
  comparison_root=(Path(results_root).expanduser().resolve() if results_root is not None
                   else Path(folder)/'OpenSees_Analysis_Results')
  auto_file,auto_note=find_verified_etabs_csv(folder,comparison_root)
+ native_file=None if auto_file else find_native_reference_csv(folder,comparison_root)
  if auto_file:path.set(str(auto_file))
+ elif native_file:path.set(str(native_file))
  status.set('SOURCE: '+auto_note)
  def template_for_current_edb():
   """Create discoverable INCOMPLETE source-bound mapping, never a verified file."""
@@ -394,8 +427,7 @@ def launch(parent,folder,results_root=None):
     finally:comtypes.CoUninitialize()
     def done():
      latest.update(rows=compared,out=out,etabs_rows=extracted,policy=mapping)
-     tree.delete(*tree.get_children())
-     for row in compared:tree.insert('','end',values=[row.get(c,'') for c in cols])
+     show_rows(compared)
      counts={k:sum(row.get('status')==k for row in compared) for k in ('PASS','FAIL','NOT_COMPARABLE','MISSING_ETABS','MISSING_OPENSEES')}
      status.set('Direct ETABS API complete. '+str(counts)+' | Excel/chart: '+str(out/'ETABS_OpenSees_Equivalence.xlsx'))
     win.after(0,done)
@@ -407,14 +439,17 @@ def launch(parent,folder,results_root=None):
  ttk.Label(win,text=GUIDE,wraplength=1150).pack(fill='x');ttk.Label(win,textvariable=status).pack(fill='x')
  frame=ttk.Frame(win);frame.pack(fill='both',expand=True);cols=FIELDS+['value','etabs_value','percent_difference','status'];tree=ttk.Treeview(frame,columns=cols,show='headings');sy=ttk.Scrollbar(frame,command=tree.yview);sx=ttk.Scrollbar(frame,orient='horizontal',command=tree.xview);tree.configure(yscrollcommand=sy.set,xscrollcommand=sx.set);tree.grid(row=0,column=0,sticky='nsew');sy.grid(row=0,column=1,sticky='ns');sx.grid(row=1,column=0,sticky='ew');frame.rowconfigure(0,weight=1);frame.columnconfigure(0,weight=1)
  for c in cols:tree.heading(c,text=c);tree.column(c,width=150,stretch=False)
+ def show_rows(rows):
+  tree.delete(*tree.get_children())
+  for row in sorted(rows,key=lambda r:r.get('etabs_value') is None):
+   tree.insert('','end',values=[row.get(c,'') for c in cols])
  def refresh():
   try:
    rows,out=(save(folder,path.get(),results_root=results_root) if path.get() else
              (save(folder,etabs_rows=latest['etabs_rows'],policy=latest['policy'],
                    results_root=results_root) if latest['etabs_rows'] is not None
               else save(folder,results_root=results_root)))
-   tree.delete(*tree.get_children())
-   for r in rows:tree.insert('','end',values=[r.get(c,'') for c in cols])
+   show_rows(rows)
    if not rows:
     audit=out/'Comparison_Source_Exclusions.json'
     reasons=json.loads(audit.read_text(encoding='utf-8')) if audit.is_file() else []
@@ -426,7 +461,8 @@ def launch(parent,folder,results_root=None):
         'Check excluded files in Comparison_Source_Exclusions.json.\\n'
         'Reasons: '+json.dumps(reasons,indent=2),encoding='utf-8')
    else:
-    status.set(str(len(rows))+' saved quantities. Template and report: '+str(out))
+    native_count=sum(r.get('etabs_value') is not None for r in rows)
+    status.set(f'{native_count} ETABS values shown | {len(rows)} total rows | Report: {out}')
   except Exception as e:messagebox.showerror('Comparison inputs',str(e),parent=win)
  def plot():
   selected=tree.selection()
@@ -457,8 +493,11 @@ def launch(parent,folder,results_root=None):
    status.set('AUTO-SELECTION NOT AVAILABLE: '+note)
  ttk.Button(bar,text='Auto-select verified ETABS CSV',command=retry_auto).pack(side='left')
  refresh()
- if not auto_file:
+ if native_file:
+  status.set('Native ETABS reference loaded | Case equivalence unverified | '+str(native_file))
+ elif not auto_file:
   status.set('SOURCE: '+auto_note+
              ' | Do not select OpenSees normalized CSV as native ETABS evidence')
- win.after(400,lambda:direct_api(auto=True))
+ if not native_file:
+  win.after(400,lambda:direct_api(auto=True))
  return win

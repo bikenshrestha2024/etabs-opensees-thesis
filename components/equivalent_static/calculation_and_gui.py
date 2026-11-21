@@ -1620,6 +1620,17 @@ class ESMGui:
                                        explanation,parent=self.root)
                 return
             awx=areas['X'];awy=areas['Y']
+            if not math.isclose(float(self.period_factor.get()),1.25,abs_tol=1e-12,rel_tol=0):
+                raise ValueError('The NBC empirical reference requires the §5.1.3 multiplier 1.25.')
+            reference_settings=self._empirical_esm_settings()
+            import hashlib
+            ledger=Path(self.export_dir)/'NBC105_ESM_Story_Weights_Assembled_V118.csv'
+            selected_ledger=Path(self.path.get())
+            if (not selected_ledger.is_file()
+                    or hashlib.sha256(selected_ledger.read_bytes()).digest()
+                    != hashlib.sha256(ledger.read_bytes()).digest()):
+                raise ValueError('Select the current model-linked assembled story-weight ledger '
+                                 'before generating the empirical Rayleigh reference.')
             # Works through both the root compatibility launcher and direct
             # components.equivalent_static imports (e.g. tests / Spyder).
             script=HERE/'OpenSees_Rayleigh_Preliminary_V123.py'
@@ -1629,15 +1640,17 @@ class ESMGui:
             states=['ULS','SLS'] if self.state.get()=='Both' else [self.state.get()]
             if any(state not in ('ULS','SLS') for state in states):
                 raise ValueError('Select ULS, SLS or Both.')
+            frozen_inputs={name:getattr(self,name).get() for name in (
+                'awx','awy','soil','Z','I','rmu','omegau','omegas','vs30','n_spt','period_factor','path')}
             out=Path(self.outdir.get());out.mkdir(parents=True,exist_ok=True)
-            self.status.set('Running separate '+', '.join(states)+' X/Y Rayleigh reference analyses…')
+            self.status.set('Running empirical ESM first, followed by centered Rayleigh for '+', '.join(states)+' X/Y…')
             def worker():
                 import os
                 from components.modal.rayleigh import RAYLEIGH_PREFIX
                 completed=[]
                 for state in states:
                     command=[self.python_exe.get(),str(script),str(self.export_dir),
-                             str(awx),str(awy),'.01',state]
+                             str(awx),str(awy),'.01',state,json.dumps(reference_settings)]
                     try:
                         proc=subprocess.run(command,capture_output=True,text=True,
                             errors='replace',encoding='utf-8',
@@ -1657,14 +1670,45 @@ class ESMGui:
                             'Rayleigh run stopped: '+reason+
                             ' | No periods fabricated for uncompleted states.'))
                         return
-                self.root.after(0,self._load_project_inputs)
-                self.root.after(0,lambda:self.status.set(
-                    'State-specific '+', '.join(states)+
-                    ' X/Y Rayleigh analyses completed; inspect the per-state JSON, Excel and plots.'))
+                def refresh_periods():
+                    current_states=['ULS','SLS'] if self.state.get()=='Both' else [self.state.get()]
+                    if (current_states!=states or any(getattr(self,name).get()!=value
+                            for name,value in frozen_inputs.items())):
+                        self.status.set('Rayleigh results saved. Inputs changed during the run; '
+                                        'refresh or rerun for the current selections.')
+                        return
+                    self._load_project_inputs()
+                    for name,value in frozen_inputs.items():
+                        getattr(self,name).set(value)
+                    self._show_empirical()
+                    self.status.set('Empirical ESM and centered Rayleigh completed for '
+                                    +', '.join(states)+' X/Y. Review the saved reference cases.')
+                self.root.after(0,refresh_periods)
             threading.Thread(target=worker,daemon=True).start()
         except Exception as exc:
             self.status.set('Rayleigh setup error: '+str(exc))
             messagebox.showerror('Rayleigh setup',str(exc),parent=self.root)
+
+    def _empirical_esm_settings(self):
+        return dict(soil_type=self.soil.get(),zoning_factor_z=float(self.Z.get()),
+                    importance_factor_i=float(self.I.get()),r_mu=float(self.rmu.get()),
+                    omega_u=float(self.omegau.get()),omega_s=float(self.omegas.get()),
+                    vs30_m_s=self.vs30.get(),n_spt_blow_30cm=self.n_spt.get())
+
+    def _checked_empirical_reference(self, values, axis, rayleigh, aw):
+        """Check the imported empirical seed against the current ESM inputs."""
+        reference=values.get('rayleigh_empirical_reference')
+        if reference is None or not math.isclose(
+                float(rayleigh),reference[axis]['rayleigh_period_s'],rel_tol=1e-10):
+            return None
+        import hashlib
+        current_sha=hashlib.sha256(Path(self.path.get()).read_bytes()).hexdigest()
+        if (current_sha!=reference['story_weights_sha256']
+                or reference['settings']!=self._empirical_esm_settings()
+                or not math.isclose(reference[axis]['Aw_m2'],aw,rel_tol=1e-8)
+                or not math.isclose(float(self.period_factor.get()),1.25,abs_tol=1e-12,rel_tol=0)):
+            raise ValueError(axis+': empirical Rayleigh reference inputs changed. Rerun Preliminary Rayleigh.')
+        return reference[axis]
 
     def _apply_system_factors(self,_event=None):
         factors=NBC105_ESM_SYSTEM_FACTORS.get(self.system.get())
@@ -1705,7 +1749,11 @@ class ESMGui:
             ray_value=float(ray)
             if not math.isfinite(ray_value) or ray_value<=0:
                 raise ValueError(axis+": Rayleigh period must be finite positive.")
-            self.period_sources[axis]='Calculated directional Rayleigh and amplified empirical minimum'
+            seed=self._checked_empirical_reference(
+                getattr(self,'project_input_audit',{}).get('values',{}),axis,ray_value,aw)
+            self.period_sources[axis]=(
+                'Empirical ESM followed by centered Rayleigh' if seed else
+                'Manual Rayleigh period input; empirical solve provenance unverified')
             return min(empirical,ray_value)
         if self.use_workbook_periods.get() and getattr(self,'excel_direct_reference',None):
             r=self.excel_direct_reference
@@ -1946,6 +1994,19 @@ class ESMGui:
                         state,self.direction.get(),
                         {"X":self.rayleigh_tx.get(),"Y":self.rayleigh_ty.get()},
                         {"X":sls_values.get("rayleigh_tx"),"Y":sls_values.get("rayleigh_ty")} if state_periods and state=="SLS" else None)
+                    axis=self.direction.get()
+                    ray_period=period_evidence['Rayleigh_T1_'+axis+'_s']
+                    evidence_values=(sls_values if state_periods and state=='SLS' else
+                                     getattr(self,'project_input_audit',{}).get('values',{}))
+                    if ray_period:
+                        seed=self._checked_empirical_reference(
+                            evidence_values,axis,ray_period,float((self.awx if axis=='X' else self.awy).get()))
+                        period_evidence['empirical_esm_reference']=seed
+                        if seed is None:
+                            result['period_source']='Manual Rayleigh input with unverified empirical seed'
+                            result['diagnostic_only']=True
+                        else:
+                            result['period_source']='Empirical ESM followed by centered Rayleigh'
                     result["period_selection"]={"direction":self.direction.get(),"empirical_Aw_X_m2":self.awx.get() or None,"empirical_Aw_Y_m2":self.awy.get() or None,"empirical_multiplier":self.period_factor.get(),**period_evidence,"ETABS_or_Excel_reference_T1_X_s":self.etabs_tx.get() or None,"ETABS_or_Excel_reference_T1_Y_s":self.etabs_ty.get() or None,"ETABS_modal_metadata":self.etabs_modal_metadata,"selected_period_s":result["period_s"],"selection_rule":"NBC §5.1: adopt the lesser of 1.25 times the empirical period and the directional Rayleigh period. ETABS eigenperiod is a comparison only."}
                     for polarity in polarities:
                         for ecc_sign in ecc_signs:
