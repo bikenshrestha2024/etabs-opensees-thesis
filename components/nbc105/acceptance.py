@@ -16,7 +16,10 @@ MANDATORY_GATES=(
     "source_identity","code_period","rayleigh_period","rs_base_shear",
     "soil_vs30","modal_mass_and_missing_mass","drift_and_torsion",
     "wall_grouping_and_stiffness","etabs_opensees","nltha_wall",
-    "nltha_224","parts_and_components","all_clause_callers"
+    "nltha_224","parts_and_components","all_clause_callers",
+    "full_nbc_source_requirement_audit","annex_a_rc_detailing",
+    "annex_b_steel_detailing","annex_c_municipality_z_factor",
+    "independent_professional_signoff"
 )
 _DIGEST=re.compile(r"^[a-fA-F0-9]{64}$")
 
@@ -85,6 +88,8 @@ def evaluate_project_evidence(evidence,*,rs_tolerance_fraction=.001):
         period_valid=all(_positive(periods.get(axis),f"T_{axis}")>0 for axis in ("X","Y"))
     except ValueError:
         pass
+    from components.nbc105.compliance_coverage import read_source_index, audit_source_index
+    inventory=audit_source_index(read_source_index())
     gates={
         "source_identity":_gate("PARTIAL_PROVENANCE",
             "Source EDB SHA declared; saved EDB SHA, exact native model/analysis state and matching OpenSees source must be compared",
@@ -113,11 +118,24 @@ def evaluate_project_evidence(evidence,*,rs_tolerance_fraction=.001):
         "parts_and_components":_gate("OPEN",
             "Component inventory, Table 10-1 period checks, connection capacities, service cutoffs and anchor detailing unverified"),
         "all_clause_callers":_gate("CODE_REVIEW_REQUIRED",
-            "All ten reference modules are available; active caller tests and complete source semantic review must pass on same commit")
+            "All ten reference modules are available; active caller tests and complete source semantic review must pass on same commit"),
+        "full_nbc_source_requirement_audit":_gate("OPEN",
+            "The 235 indexed main-clause/annex headings are NOT a full sentence-by-sentence mandatory-provision, equation, figure, exception and footnote audit",
+            indexed_section_headings=inventory["total_indexed_sections"]),
+        "annex_a_rc_detailing":_gate("OPEN",
+            "RC Annex A beams, columns, joints, wall coupling/openings, boundary reinforcement, anchorage and detailing need independent member-level capacity checks"),
+        "annex_b_steel_detailing":_gate("OPEN",
+            "Steel Annex B brace/link rotation, outriggers, section qualifications, splice/column-base and connection demands have not been checked against the model"),
+        "annex_c_municipality_z_factor":_gate("OPEN",
+            "Official Annex C all-municipality zoning factors and precise source municipality selection are not exhaustively transcribed/checked"),
+        "independent_professional_signoff":_gate("OPEN",
+            "No qualified engineer-signed review of full building, component and RC/steel annex design has been submitted")
     }
     return {"standard":"NBC 105:2025",
             "overall":"BLOCKED_NOT_FULL_ENGINEERING_ACCEPTANCE",
             "source_sha256":digest.lower(),
+            "source_inventory_sections":inventory["total_indexed_sections"],
+            "source_inventory_scope":inventory["index_scope"],
             "gates":gates,
             "unverified_gates":[k for k,v in gates.items()
                                 if v["status"] not in ("NUMERIC_MATCH_REPRODUCED",)],
