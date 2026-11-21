@@ -1,0 +1,39 @@
+{
+  "standard": "NBC 105:2025",
+  "pdf_sha256": "9136fd6ca119f3536a4843c02516e791b1098e0275fa4c853c495c684c21ea1e",
+  "extractor_note": "pdftotext -layout; hashes may drift with a different poppler version",
+  "poppler": "pdftotext version 24.02.0",
+  "rows": 1385,
+  "by_clause": {
+    "1": 128,
+    "2": 88,
+    "3": 83,
+    "4": 99,
+    "5": 133,
+    "6": 38,
+    "7": 21,
+    "8": 25,
+    "9": 71,
+    "10": 50,
+    "A": 362,
+    "B": 286,
+    "C": 1
+  },
+  "by_kind": {
+    "CLAUSE": 229,
+    "DEFINITION": 235,
+    "EQUATION": 83,
+    "FIGURE": 22,
+    "FOOTNOTE": 1,
+    "LIMIT": 21,
+    "MAY": 31,
+    "SHALL": 329,
+    "SHOULD": 36,
+    "STATEMENT": 293,
+    "TABLE": 13,
+    "TABLE_ROW": 92
+  },
+  "footer_page_mismatches": 0,
+  "tables": 13,
+  "figures": 22
+}
