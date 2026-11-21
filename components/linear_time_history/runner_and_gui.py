@@ -415,16 +415,24 @@ def _run_analysis(config):
         pair_demands.append(demand)
 
     def _aggregate_pair_set(selected, label):
+        from components.nbc105.clause_08_elastic_time_history import (
+            record_response_rule, record_response_aggregate)
         n_pairs = len(selected)
-        if n_pairs == 7:
+        rule = record_response_rule(n_pairs) if n_pairs else "EMPTY"
+        if rule.startswith("REVIEW_REQUIRED"):
             method = "REVIEW_REQUIRED: NBC §8.1.3 wording does not specify exactly seven"
             aggregate = {key: None for key in pair_peak_keys}
-        elif n_pairs < 7:
+        elif rule == "MAXIMUM":
             method = "maximum of pair-level orientation envelopes (fewer than 7 pairs)"
-            aggregate = {key: max(d[key] for d in selected) for key in pair_peak_keys} if selected else {}
-        else:
+            aggregate = {key: record_response_aggregate([d[key] for d in selected])
+                         for key in pair_peak_keys}
+        elif rule == "AVERAGE":
             method = "arithmetic mean of pair-level orientation envelopes (more than 7 pairs)"
-            aggregate = {key: sum(d[key] for d in selected) / n_pairs for key in pair_peak_keys} if selected else {}
+            aggregate = {key: record_response_aggregate([d[key] for d in selected])
+                         for key in pair_peak_keys}
+        else:
+            method = "NO_RECORDS"
+            aggregate = {}
         for axis in ("X", "Y"):
             key = f"peak_story_drift_{axis}"
             if aggregate.get(key) is not None:
