@@ -383,7 +383,8 @@ class GravityAnalysisGUI:
                 raise FileNotFoundError("Select the original assembled OpenSees gravity model")
             root=Path(self.output_var.get()).expanduser().resolve()
             stamp=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            output=root/"Gravity_Native_Equivalence_Preflight"/stamp
+            from components.gravity.output_ownership import section
+            output=section(root,"REVIEWS",create=True)/"Gravity_Native_Equivalence_Preflight"/stamp
             # Matching original source metadata must be in the selected model
             # export folder.  Do NOT select arbitrary previous reactions by glob.
             report=export(model.parent,output)
@@ -679,7 +680,7 @@ class GravityAnalysisGUI:
         if record is None:
             raise ValueError("No current completed gravity result for the selected model, "
                 "load profile and support condition. Run that condition first. Index: "+
-                str(Path(self.output_var.get())/"Gravity_Case_Reaction_Index.json"))
+                str(__import__("components.gravity.output_ownership",fromlist=["index_path"]).index_path(self.output_var.get(),"Gravity_Case_Reaction_Index.json")))
         return Path(record["result_path"])
 
     def _export_all_pages(self):
@@ -743,9 +744,11 @@ class GravityAnalysisGUI:
         self.log.insert("end",line+"\n")
         self.log.see("end")
         try:
+            from components.gravity.output_ownership import section
             target=Path(self.output_var.get()).expanduser().resolve()
             if target.is_dir():
-                with (target/"Gravity_GUI_Actions.log").open("a",encoding="utf-8") as file:
+                log_folder=section(target,"LOGS",create=True)
+                with (log_folder/"Gravity_GUI_Actions.log").open("a",encoding="utf-8") as file:
                     file.write(line+"\n")
         except OSError:
             pass  # Logging must not interrupt the solver or output exports.
@@ -764,7 +767,10 @@ class GravityAnalysisGUI:
             mapping=export_folder/'OpenSees_Element_Connectivity.json'
             if not mapping.is_file():
                 raise FileNotFoundError('Missing source ETABS point mapping: '+str(mapping))
-            main=Path(self.output_var.get()).expanduser().resolve()/'Gravity_Wall_Base_Comparison'
+            from components.gravity.output_ownership import dual_runs_parent
+            main=dual_runs_parent(self.output_var.get())
+            if not main.is_dir():
+                main=Path(self.output_var.get()).expanduser().resolve()/'Gravity_Wall_Base_Comparison'
             runs=sorted((x for x in main.glob('*') if
                          (x/'ETABS_SOURCE_SUPPORTS'/'Gravity_Result_V110.json').is_file()),
                         reverse=True)
@@ -796,7 +802,8 @@ class GravityAnalysisGUI:
             # Keep the original root-level 76/97 workbook for compatibility.
             report=compare_etabs_export(source,mapping,a,b,case=current_case)
             export_offline_comparison(report,dst)
-            registry=Path(self.output_var.get()).expanduser().resolve()/"Gravity_Case_Reaction_Index.json"
+            from components.gravity.output_ownership import existing_index
+            registry=existing_index(self.output_var.get(),"Gravity_Case_Reaction_Index.json")
             if registry.is_file():
                 from components.validation.gravity_etabs_latest import run as run_current
                 run_current(source,mapping,registry,dst)
@@ -1519,16 +1526,18 @@ class GravityAnalysisGUI:
         self._gravity_action_log("GRAVITY_SUPPORTS","Wall base strategy="+self._selected_wall_support_strategy())
         self._gravity_action_log("GRAVITY_SETTINGS",f"Profile={self.gravity_profile_var.get()} | "
             f"Downward load={total:.6f} kN | supports={len(supports)} | steps={steps}")
-        self._gravity_action_log("GRAVITY_OUTPUT","Common output root: "+str(out)+" | case index: "+str(out/"Gravity_Output_Index.txt"))
+        from components.gravity.output_ownership import index_path, uploads_parent, section
+        self._gravity_action_log("GRAVITY_OUTPUT","Common output root: "+str(out)+" | case index: "+str(index_path(out,"Gravity_Output_Index.txt")))
         self._gravity_action_log("GRAVITY_UPLOAD_DESTINATION",
-            str(out/"Gravity_Evidence_Upload"))
+            str(uploads_parent(out)))
         self._gravity_action_log("GRAVITY_GUI_LOG",
-            str(out/"Gravity_GUI_Actions.log"))
+            str(section(out,"LOGS")/"Gravity_GUI_Actions.log"))
         self.log.insert("end",f"Support tags: {supports}\n")
         self.win.update_idletasks()
         if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
-            out=out/"Gravity_Reaction_Diagnostic"/datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            out.mkdir(parents=True,exist_ok=False)
+            from components.gravity.output_ownership import case_directory
+            out=case_directory(out,self._selected_wall_support_strategy(),
+                self.gravity_profile_var.get(),datetime.now().strftime("%Y%m%d_%H%M%S_%f"),create=True)
             self._gravity_action_log("ETABS_REACTION_DIAGNOSTIC_OUTPUT",str(out))
         self._gravity_action_log("GRAVITY_CASE_OUTPUT",str(out))
         result_path = out / "Gravity_Result_V110.json"
@@ -1582,7 +1591,8 @@ class GravityAnalysisGUI:
                  "not overwritten.",parent=self.win):
                 return
             stamp=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            root=out/"Gravity_Wall_Base_Comparison"/stamp
+            from components.gravity.output_ownership import dual_runs_parent
+            root=dual_runs_parent(out)/stamp
             if root.exists():raise FileExistsError(str(root))
             root.mkdir(parents=True)
             scenarios=("ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED")
@@ -1694,7 +1704,7 @@ class GravityAnalysisGUI:
                 info=records[mode]
                 case_path=Path(info["out"])/"Gravity_Result_V110.json"
                 try:
-                    verified=register_case(root.parents[1],case_path,
+                    verified=register_case(self.output_var.get(),case_path,
                         info["payload"]["model_script"],scenario=mode,
                         profile="GRAVITY_1.0D_1.0L")
                     self._gravity_action_log("SOLVED_CASE_REACTION",
@@ -1728,7 +1738,7 @@ class GravityAnalysisGUI:
                 "GRAVITY_1.0D_1.0L | 76 + 97 supports completed | source audit="+
                 ("RECONCILED" if source_evidence_ok else "BLOCKED")+
                 " | ETABS validation not established | comparison="+str(root)+
-                " | common index="+str(root.parents[1]/"Gravity_Output_Index.txt"))
+                " | common index="+str(__import__("components.gravity.output_ownership",fromlist=["index_path"]).index_path(self.output_var.get(),"Gravity_Output_Index.txt")))
             self.status_var.set(("Two solvers PASS; source ledgers reconciled" if source_evidence_ok
                 else "Two solvers PASS; at least one source ledger BLOCKED")
                 +"; comparison: "+str(root))
@@ -1946,7 +1956,7 @@ class GravityAnalysisGUI:
         self._gravity_action_log("GRAVITY_CASE_COMPLETED",
             f"{payload.get('wall_support_strategy')} | {payload.get('gravity_profile')} | solver converged | "
             f"source audit={'RECONCILED' if source_audit_ok else 'BLOCKED'} | ETABS validation not established | result={out} | "
-            f"common index={Path(self.output_var.get())/'Gravity_Output_Index.txt'}")
+            f"common index={__import__('components.gravity.output_ownership',fromlist=['index_path']).index_path(self.output_var.get(),'Gravity_Output_Index.txt')}")
         messagebox.showinfo("Gravity analysis complete",
             "Gravity solver converged; equilibrium check passed; gravity frozen at time zero.\n\n"
             +("Source gravity ledger reconciled to solver input. ETABS equivalence NOT VALIDATED."
