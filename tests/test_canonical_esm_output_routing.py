@@ -102,5 +102,29 @@ class StageOwnedESMTests(unittest.TestCase):
                         if kw.arg=="stage" and isinstance(kw.value,ast.Constant)]
                 self.assertEqual(stages,["ESM"],module + " must write stage-owned ESM outputs")
 
+
+    def test_root_mirror_drift_keeps_old_and_new_source_versions(self):
+        tool=_load_tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            source=root/"Gravity_Storey_Load_Breakdown_V131.json"
+            source.write_text('{"version":1}',encoding="utf-8")
+            first=tool.repair_layout(root,apply=True)
+            primary=root/"01_ETABS_EXPORT"/"03_LOADS"/source.name
+            self.assertTrue(primary.exists())
+            self.assertEqual(primary.read_bytes(),source.read_bytes())
+            source.write_text('{"version":2}',encoding="utf-8")
+            second=tool.repair_layout(root,apply=True)
+            self.assertEqual(second["root_mirror_status"],
+                "STALE_PRIMARY_COPIES_PRESERVED_REVISION_SNAPSHOTS_CREATED")
+            self.assertEqual(len(second["root_mirror_conflicts"]),1)
+            self.assertEqual(primary.read_text(encoding="utf-8"),'{"version":1}')
+            self.assertEqual(source.read_text(encoding="utf-8"),'{"version":2}')
+            rev=root/second["root_mirror_conflicts"][0]["immutable_revision"]
+            self.assertEqual(rev.read_bytes(),source.read_bytes())
+            third=tool.repair_layout(root,apply=True)
+            self.assertEqual(third["root_mirror_conflicts"],second["root_mirror_conflicts"])
+            self.assertEqual(rev.read_bytes(),source.read_bytes())
+
 if __name__=="__main__":
     unittest.main()
