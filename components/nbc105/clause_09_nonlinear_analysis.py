@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 __all__=["history_time_step_limit_s","required_component_runs",
          "motion_scale_factor","nonlinear_model_prerequisites",
-         "target_spectrum_period_range","pushover_signs"]
+         "target_spectrum_period_range","pushover_signs","pair_scale_factor"]
 
 def _pos(v,name):
     if isinstance(v,bool):raise ValueError(name+" must be positive")
@@ -54,6 +54,18 @@ def required_component_runs(number_of_pairs,*,is_3d):
     if isinstance(number_of_pairs,bool) or not isinstance(number_of_pairs,int) or number_of_pairs<3:
         raise ValueError("minimum three input records or pairs required")
     return 2*number_of_pairs if is_3d else number_of_pairs
+
+def pair_scale_factor(factor_x, factor_y):
+    """§9.3.2.2(c,d) p.46: independently fit XY, use lower factor for both.
+
+    [REF NBC105-2025 §9.3.2.2(c,d), printed pp.46–47]
+    Both independent factors must be within 0.33–3 BEFORE selection.
+    """
+    x=_pos(factor_x,"X component scale")
+    y=_pos(factor_y,"Y component scale")
+    if not (.33<=x<=3 and .33<=y<=3):
+        raise ValueError("NBC 9.3.2.2: independent pair factors outside 0.33..3; replace record")
+    return min(x,y)
 
 def pushover_signs():
     """§9.2.1 p.44: maximum effects of positive and negative directions.
