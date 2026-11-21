@@ -45,6 +45,9 @@ REQUIRED_GUARDS={
     "components/linear_time_history/runner_and_gui.py":"LTHA",
     "components/nonlinear_time_history/runner_and_gui.py":"NLTHA",
     "components/model/readiness_dashboard_gui.py":"SOFTWARE_DIAGNOSTICS",
+    "components/model/readiness_gui.py":"SOFTWARE_DIAGNOSTICS",
+    "components/validation/irregularity_review.py":"SOFTWARE_DIAGNOSTICS",
+    "components/ui/building_exploratory_gui.py":"NLTHA",
 }
 REQUIRED_ESM={
     "components/equivalent_static/calculation_and_gui.py",
