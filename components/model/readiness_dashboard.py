@@ -90,7 +90,31 @@ def _candidates(root, name):
             base.append(item)
         for item in sorted(results.glob("*/" + name))[:25]:
             base.append(item)
-    return [p for p in base if p.is_file()]
+    # The source-identified stage owners are canonical after output migration.
+    # Read both legacy and new paths; never treat file presence as sign-off.
+    from components.inputs.output_layout import ALL_STAGE_FOLDERS
+    patterns=(
+        name,
+        "RUNS/*/"+name,
+        "RUNS/*/*/"+name,
+        "RUNS/*/*/02_RESULTS/"+name,
+        "RUNS/*/*/*/02_RESULTS/"+name,
+        "RUNS/*/*/*/03_EXCEL/"+name,
+        "REVIEW_SNAPSHOTS/*/"+name,
+    )
+    for stage in ALL_STAGE_FOLDERS.values():
+        root_stage=root/stage
+        if not root_stage.is_dir() or root_stage.is_symlink():
+            continue
+        for pattern in patterns:
+            base.extend(list(root_stage.glob(pattern))[:25])
+    seen=set()
+    found=[]
+    for p in base:
+        if p.is_file() and not p.is_symlink() and p not in seen:
+            seen.add(p)
+            found.append(p)
+    return found
 
 
 def discover_project_model(folder):
