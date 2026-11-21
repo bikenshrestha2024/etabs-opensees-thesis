@@ -35,7 +35,8 @@ def _unlinked(path):
 
 
 def section(root, kind, *, create=False):
-    """Stage-local section path; no mkdir unless explicitly requested."""
+    """[REF docs/source/components/gravity/output_ownership.py.md]
+    Stage-local section path; no mkdir unless explicitly requested."""
     path=_unlinked(root)
     if kind not in SECTIONS:
         raise ValueError("Unknown gravity output class: "+str(kind))
@@ -46,7 +47,8 @@ def section(root, kind, *, create=False):
 
 
 def case_directory(root, scenario, profile, token, *, create=False):
-    """Return an immutable run folder; never overwrite a previous run."""
+    """[REF docs/source/components/gravity/output_ownership.py.md]
+    Return an immutable run folder; never overwrite a previous run."""
     from components.inputs.output_contract import safe_component
     if scenario not in SCENARIOS:
         raise ValueError("Invalid gravity support strategy")
@@ -59,25 +61,33 @@ def case_directory(root, scenario, profile, token, *, create=False):
 
 
 def index_path(root, name, *, create=False):
-    """Index lives with indexes, not mixed with solver workbooks/plots."""
+    """[REF docs/source/components/gravity/output_ownership.py.md]
+    Index lives with indexes, not mixed with solver workbooks/plots."""
     if not re.fullmatch(r"[A-Za-z0-9_.-]+",str(name)):
         raise ValueError("Unsafe gravity index filename")
     return section(root,"INDEXES",create=create)/name
 
 
 def existing_index(root, name):
-    """Read canonical first; preserve historical flat-index compatibility."""
+    """[REF docs/source/components/gravity/output_ownership.py.md]
+    Read canonical first; preserve historical flat-index compatibility."""
     canonical=index_path(root,name)
     return canonical if canonical.is_file() else _unlinked(root)/name
 
 
 def dual_runs_parent(root, *, create=False):
+    """[REF docs/source/components/gravity/output_ownership.py.md]
+    Canonical owner for a gravity artifact family."""
     return section(root,"COMPARISONS",create=create)/"Gravity_Wall_Base_Comparison"
 
 
 def diagnostic_parent(root, *, create=False):
+    """[REF docs/source/components/gravity/output_ownership.py.md]
+    Canonical owner for a gravity artifact family."""
     return section(root,"REVIEWS",create=create)/"Gravity_Reaction_Diagnostic"
 
 
 def uploads_parent(root, *, create=False):
+    """[REF docs/source/components/gravity/output_ownership.py.md]
+    Canonical owner for a gravity artifact family."""
     return section(root,"UPLOADS",create=create)/"Gravity_Evidence_Upload"
