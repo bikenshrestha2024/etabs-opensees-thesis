@@ -300,7 +300,7 @@ def publish_organized_results(results_root, *, gravity_root=None,
         ("Original solver output files are UNCHANGED. Only ZIP+manifest saved; "
          "no extracted duplicate evidence tree.\n" if archive_only else
          "Original solver output files are UNCHANGED. These are verified copies.\n")
-        "The manifest links each review file to its original run path.\n"
+        + "The manifest links each review file to its original run path.\n"
         "Missing SLS/native ETABS output stays missing, not zero.\n"
         "Review EVIDENCE_MANIFEST.json for source path and SHA256 of every copy.\n"
         "The ZIPs are meant for sharing and debugging. They do not establish code compliance.\n",
