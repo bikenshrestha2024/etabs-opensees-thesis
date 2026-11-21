@@ -545,6 +545,77 @@ def launch(parent,export_dir):
             win.clipboard_clear()
             win.clipboard_append(txt)
 
+    def open_clause_calculator():
+        """Open local, isolated NBC clauses 1–10 calculation interface."""
+        from components.nbc105.dispatch import available_operations,run_operation
+        all_ops=available_operations()
+        dialog=tk.Toplevel(win)
+        dialog.title("NBC 105:2025 | clauses 1–10 reference calculator")
+        dialog.geometry("840x610")
+        dialog.transient(win)
+        box=ttk.Frame(dialog,padding=12)
+        box.pack(fill="both",expand=True)
+        ttk.Label(box,text="NBC clauses 1–10 | reference rules, NOT engineering acceptance",
+                  font=("Segoe UI",12,"bold")).pack(anchor="w",pady=(0,8))
+        ttk.Label(box,text=("Select a clause and exported operation, enter JSON named parameters, "
+                           "and evaluate a code calculation. This tool never changes ETABS/OpenSees "
+                           "or marks structural compliance as passed."),
+                  wraplength=790).pack(anchor="w")
+        picker=ttk.Frame(box)
+        picker.pack(fill="x",pady=9)
+        ttk.Label(picker,text="Clause").pack(side="left")
+        clause_var=tk.StringVar(value="10")
+        clause_box=ttk.Combobox(picker,textvariable=clause_var,
+                                 values=[str(i) for i in sorted(all_ops)],
+                                 state="readonly",width=6)
+        clause_box.pack(side="left",padx=(6,20))
+        ttk.Label(picker,text="Operation").pack(side="left")
+        operation_var=tk.StringVar()
+        op_box=ttk.Combobox(picker,textvariable=operation_var,
+                            state="readonly",width=53)
+        op_box.pack(side="left",fill="x",expand=True,padx=(6,0))
+        ttk.Label(box,text="Input JSON (named parameters)").pack(anchor="w")
+        payload=ScrolledText(box,height=7,wrap="none",font=("Consolas",10))
+        payload.pack(fill="x",pady=(3,8))
+        ttk.Label(box,text="Result (local calculation only)").pack(anchor="w")
+        output=ScrolledText(box,height=13,wrap="word",font=("Consolas",10))
+        output.pack(fill="both",expand=True,pady=(3,8))
+        output.configure(state="disabled")
+        status_var=tk.StringVar(value="Code calculation only; native ETABS acceptance remains open.")
+        ttk.Label(box,textvariable=status_var,wraplength=790).pack(anchor="w")
+        controls=ttk.Frame(box)
+        controls.pack(fill="x",pady=8)
+        def refresh_operations(*unused):
+            names=all_ops.get(int(clause_var.get()),[])
+            op_box.configure(values=names)
+            operation_var.set("component_amplification_factor"
+                if "component_amplification_factor" in names else
+                names[0] if names else "")
+            payload.delete("1.0","end")
+            if operation_var.get()=="component_amplification_factor":
+                payload.insert("1.0",json.dumps(
+                    {"building_period_s":1.0,"component_period_s":1.25},indent=2))
+            else:
+                payload.insert("1.0","{}")
+        def evaluate():
+            try:
+                arguments=json.loads(payload.get("1.0","end").strip())
+                result=run_operation(int(clause_var.get()),operation_var.get(),arguments)
+                text=json.dumps(result,indent=2,allow_nan=False)
+                status_var.set(result["status"])
+            except Exception as exc:
+                text="BLOCKED: "+str(exc)
+                status_var.set("Invalid/incomplete input; no result approved.")
+            output.configure(state="normal")
+            output.delete("1.0","end")
+            output.insert("1.0",text)
+            output.configure(state="disabled")
+        ttk.Button(controls,text="Calculate reference rule",command=evaluate).pack(side="left")
+        ttk.Button(controls,text="Close",command=dialog.destroy).pack(side="right")
+        clause_box.bind("<<ComboboxSelected>>",refresh_operations)
+        refresh_operations()
+
+    ttk.Button(toolrow,text="NBC clauses 1–10",command=open_clause_calculator).pack(side="left",padx=8)
     ttk.Button(toolrow,text="Refresh source and paths",command=refresh).pack(side="left")
     ttk.Button(toolrow,text="Export JSON + formatted Excel",command=export).pack(side="left",padx=8)
     ttk.Button(toolrow,text="Copy selected reference",command=copy_selected).pack(side="left")
