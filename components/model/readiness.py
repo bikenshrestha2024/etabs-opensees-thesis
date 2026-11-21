@@ -218,7 +218,8 @@ BINDING_FIELDS = ("model_config_sha256", "nonlinear_materials_file_sha256",
 # Blocker codes the run gate raises on when a recorded binding no longer matches.
 BINDING_MISMATCH_CODES = ("model_config_changed", "material_file_changed", "wall_fsam_tags_changed")
 # Contradictions the run gate raises on only for an approved manifest.
-APPROVED_CONTRADICTION_CODES = ("material_file_missing", "material_file_not_found", "wall_fsam_tags_empty")
+APPROVED_CONTRADICTION_CODES = ("material_file_missing", "material_file_not_found", "wall_fsam_tags_empty",
+                                "parameters_not_reviewed")
 
 
 class BindingUnreadableError(RuntimeError):
@@ -403,8 +404,9 @@ def binding_change_notice(mismatches: List[Dict[str, str]]) -> str:
 def gate_binding_blockers(diagnosis: Dict[str, Any], data: Dict[str, Any]) -> List[Dict[str, str]]:
     """Subset of a diagnosis the run gate raises on, for a manifest that passed every older gate check.
 
-    Recorded-hash mismatches always count; missing material file / empty FSAM tags
-    count only when ``data['approved_for_nltha']`` is True (contradictory approval).
+    Recorded-hash mismatches always count; missing material file / empty FSAM tags /
+    ``nonlinear_parameters_reviewed`` not True count only when ``data['approved_for_nltha']``
+    is True (contradictory approval). For an unapproved manifest they stay advisory.
     ``binding_not_recorded`` (legacy manifest) never raises.
 
     [REF docs/NLTHA_READINESS_WORKFLOW.md section 5 (gate behavior)]
