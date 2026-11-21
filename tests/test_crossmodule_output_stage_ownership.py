@@ -49,6 +49,27 @@ class StageOwnershipTests(unittest.TestCase):
                              root/"02_GRAVITY"/"RUNS"/"Case")
             self.assertFalse((root/"02_GRAVITY").exists())
 
+    def test_diagnostic_writers_have_canonical_run_owner(self):
+        repo=Path(__file__).resolve().parents[1]
+        p=repo/"components/model/readiness_dashboard_gui.py"
+        source=p.read_text(encoding="utf-8-sig")
+        self.assertNotIn('"OpenSees_Analysis_Results"',source)
+        tree=ast.parse(source)
+        calls=[n for n in ast.walk(tree) if isinstance(n,ast.Call)
+               and isinstance(n.func,ast.Name)
+               and n.func.id=="owned_run_destination"]
+        self.assertGreaterEqual(len(calls),4)
+        for call in calls:
+            self.assertTrue(any(isinstance(arg,ast.Constant)
+                and arg.value=="SOFTWARE_DIAGNOSTICS" for arg in call.args))
+        response=ast.parse((repo/"components/validation/response_checks.py")
+                           .read_text(encoding="utf-8-sig"))
+        self.assertTrue(any(isinstance(n,ast.Call)
+            and isinstance(n.func,ast.Name) and n.func.id=="create_case_run"
+            and any(isinstance(arg,ast.Constant)
+                    and arg.value=="SOFTWARE_DIAGNOSTICS" for arg in n.args)
+            for n in ast.walk(response)))
+
     def test_reject_traversal_and_links(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
