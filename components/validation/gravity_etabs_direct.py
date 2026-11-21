@@ -548,18 +548,31 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
     try:
         source=_source_edb_path(folder)
         if not source:raise ValueError('Export lacks source EDB identity; re-export rather than guessing')
-        report('SOURCE_EDB','Read original EDB from OpenSees export',path=str(source))
-        if not Path(source).is_file():
+        source=Path(source).resolve()
+        if not source.is_file():
             raise FileNotFoundError('ETABS source EDB inaccessible: '+str(source))
+        source_hash=_file_hash(source)
+        context_file=folder/'00_SOURCE_MANIFEST'/'PROJECT_CONTEXT.json'
+        if context_file.is_file():
+            context=json.loads(context_file.read_text(encoding='utf-8-sig'))
+            if (not context.get('source_edb')
+                    or Path(context['source_edb']).resolve()!=source
+                    or context.get('source_edb_sha256')!=source_hash):
+                raise ValueError('ETABS source path or SHA-256 differs from the export project context. '
+                                 'Re-export the selected EDB before comparing gravity.')
+        report('SOURCE_EDB','Read original EDB from OpenSees export',
+               path=str(source),sha256=source_hash,export_context_verified=context_file.is_file())
         if not gravity.is_file():
             raise FileNotFoundError('OpenSees gravity JSON missing: '+str(gravity))
+        selected=Path(etabs_edb_path).expanduser().resolve() if etabs_edb_path else source
+        if not selected.is_file():
+            raise FileNotFoundError('Selected gravity EDB missing: '+str(selected))
+        if selected!=source and not allow_alternate_edb:
+            raise ValueError('Selected ETABS EDB differs from the source of this export. '
+                             'Re-export the selected model or explicitly enable alternate diagnostic comparison.')
+        original_hash=source_hash if selected==source else _file_hash(selected)
+        report('SELECTED_EDB','Pinned EDB for this comparison',path=str(selected),sha256=original_hash)
         if launch_new_etabs:
-            selected=Path(etabs_edb_path).expanduser().resolve() if etabs_edb_path else Path(source).resolve()
-            if not selected.is_file():
-                raise FileNotFoundError('Selected gravity EDB missing: '+str(selected))
-            if selected!=Path(source).resolve() and not allow_alternate_edb:
-                raise ValueError('Different gravity-copy EDB requires explicit diagnostic approval')
-            original_hash=_file_hash(selected)
             if run_if_missing:
                 # ETABS RunAnalysis can write model/result sidecars; all such
                 # writes are confined to this private working directory.
@@ -578,6 +591,11 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             report('ETABS_ATTACH','Connecting to already-open ETABS session')
             app=connect_etabs()
             report('ETABS_ATTACH','Connected; this ETABS instance will not be closed')
+        expected_open=working_copy or selected
+        active=Path(str(app.SapModel.GetModelFilename())).resolve()
+        if active!=expected_open:
+            raise ValueError(f'ETABS has {active} open; this comparison requires {expected_open}. '
+                             'Open the selected EDB in ETABS or choose a private instance.')
         if run_if_missing and not owned:
             raise ValueError('Automatic analysis requires a privately launched ETABS instance')
         try:
@@ -633,6 +651,8 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             data['matched_edb_identity']=False
         if original_hash and _file_hash(selected)!=original_hash:
             raise RuntimeError('Original EDB hash changed unexpectedly during comparison; STOP and audit')
+        data.update(selected_etabs_edb=str(selected),selected_etabs_edb_sha256=original_hash,
+                    export_context_verified=context_file.is_file())
         if working_copy is not None:
             data['analysis_working_copy']=str(working_copy)
             data['original_source_edb_sha256_before']=original_hash
@@ -700,6 +720,9 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
         report('OPENSEES_RESULT','Loaded OpenSees gravity results',
                profile=result.get('gravity_profile'),ok=result.get('ok'))
         comp=compare_existing(data,result)
+        for key in ('selected_etabs_edb','selected_etabs_edb_sha256','export_context_verified'):
+            comp[key]=data[key]
+        comp['opensees_gravity_result']=str(gravity.resolve())
         from components.validation.gravity_node_comparison import compare_support_nodes,write_node_comparison
         try:
             node_audit=compare_support_nodes(data,result,tolerance_m=0.01)

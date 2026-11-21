@@ -1,0 +1,12 @@
+{
+  "ULS": {
+    "use_native_frame_modifiers": true,
+    "use_native_shell_modifiers": true,
+    "allow_shell_shear_approximation": true,
+    "shear_flexible_sections": [
+      "Beam 600*800",
+      "Col 1100*1100",
+      "Col 1250*1250"
+    ]
+  }
+}

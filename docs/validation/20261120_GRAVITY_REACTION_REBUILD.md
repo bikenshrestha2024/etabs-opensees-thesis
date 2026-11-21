@@ -25,7 +25,7 @@ The 8,024.059 kN difference between native wall-corner support reactions and the
 
 ## Reproduce the reviewed rebuild
 
-Use **Rebuild with ETABS elastic settings** in the updated gravity GUI. Select the reviewed assignment workbook, the JSON below, and a new output location. The CLI tool `tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py` accepts the same JSON via `--elastic-comparison-settings` together with `--source-dir`, `--assignment-workbook` and `--dest-dir`.
+Use **Rebuild with ETABS elastic settings** in the updated gravity GUI. Select the reviewed assignment workbook, the [project ULS settings JSON](20261121_native_gravity_uls.json), and a new output location. The CLI tool `tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py` accepts the same JSON via `--elastic-comparison-settings` together with `--source-dir`, `--assignment-workbook` and `--dest-dir`. If the source export has a project context, the rebuild checks its EDB fingerprint and creates a source-bound context for the new export.
 
 ```json
 {
@@ -43,3 +43,11 @@ Run the rebuilt gravity model with the 32-point diagnostic, the original ETABS a
 ## Remaining validation
 
 The current OpenSees elastic shell section couples its transverse shear modifier to plate bending. The comparison JSON opts into that approximation. Earlier independently resolved shear and plate-bending probes produced a similar residual. The reviewed configuration retains centerline stiffness geometry and uses the verified clear beam length for weight. The previously tested eight-subdivision variant had a larger maximum error. These findings support a native analytical-mesh comparison with explicit edge transfers, matched insertion and end-zone settings, separate dead-load patterns, base wall section cuts, and beam support-face forces. Pointwise foundation reaction equivalence remains open. [OpenSees elastic shell section source](https://github.com/OpenSees/OpenSees/blob/master/SRC/material/section/ElasticMembranePlateSection.cpp) · [CSI end offsets](https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Frame/End_Length_Offset.htm)
+
+## November 21 source and reaction recheck
+
+The current export reproduced the legacy gross-shell result. A fresh native ETABS Dead and Live solve on a verified private copy agreed with all 32 earlier matched support reactions within 0.000001 kN. A ten-step OpenSees replay starting from the current clear-beam export and applying the reviewed elastic settings reproduced the two +113.395 kN residuals and the maximum residual of +768.045 kN at ETABS joint 262. That replay uses the 32-point diagnostic support set. The remaining force distribution discrepancy requires further model reconciliation.
+
+Direct gravity comparison now pins the requested EDB, checks the recorded source path and hash when the export has a project context, and verifies the actual EDB in the ETABS session before extraction. The comparison shows the selected EDB and its fingerprint, and calls out gross shell stiffness when it appears in the result. A changed source file requires a fresh export.
+
+The standard Gravity runner was also exercised with the original ETABS support-reaction workbook, the matching 32-node diagnostic selection, and ten load increments. Its saved result records `ETABS_ELASTIC_COMPARISON`, agrees with the independent replay within 0.01 kN at every selected support, and can be reopened through the ordinary gravity case index.

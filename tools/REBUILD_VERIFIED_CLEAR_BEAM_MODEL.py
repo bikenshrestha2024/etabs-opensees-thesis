@@ -185,6 +185,16 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
                                 elastic_settings_path=None):
     source,native,target=_verify_before_creating_output(
         source_dir,native_assignment_workbook,destination_dir)
+    context_file=source/"00_SOURCE_MANIFEST"/"PROJECT_CONTEXT.json"
+    context=None
+    if context_file.is_file():
+        from components.inputs.project_workbooks import _source_edb_path
+        context=json.loads(context_file.read_text(encoding="utf-8-sig"))
+        source_edb=_source_edb_path(source)
+        if (not source_edb or not Path(source_edb).is_file()
+                or Path(context["source_edb"]).resolve()!=Path(source_edb).resolve()
+                or context["source_edb_sha256"]!=digest(source_edb)):
+            raise ValueError("Source EDB changed since export. Re-export the selected EDB before rebuilding.")
     elastic_settings=None
     if elastic_settings_path is not None:
         elastic_settings=json.loads(Path(elastic_settings_path).read_text(encoding="utf-8-sig"))
@@ -205,6 +215,13 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         statusfile.write_text(json.dumps(audit,indent=2,default=str),encoding="utf-8")
     write_status()
     try:
+        if context is not None:
+            from components.inputs.project_output_layout import create_project_layout
+            rebuilt_context=create_project_layout(context["source_edb"],target,
+                                                  create_analysis_directories=False)
+            if rebuilt_context["source_edb_sha256"]!=context["source_edb_sha256"]:
+                raise RuntimeError("Source EDB changed during rebuild setup.")
+            audit["source_edb_sha256"]=rebuilt_context["source_edb_sha256"]
         # Only top-level source evidence, not stale model/solver outputs.
         ignored=("OpenSees_Complete_Model_Data_V118.json",
                  "OpenSees_Complete_Export_Report_V118.json",
