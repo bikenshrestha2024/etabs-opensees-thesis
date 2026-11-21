@@ -5,9 +5,9 @@
 §5.1.3 amplification and §5.2 seismic weight. A period computed here is a
 design-input calculation, never engineering acceptance of the building.
 
-Equation images 5.1(1), the shear-wall kt equation and Figure 5-1 were not
-readable from the PDF text (UNVERIFIED_IMAGE_ONLY); the forms used are the
-standard ones recorded in the task brief.
+Eq. 5.1(1), the shear-wall kt equation, the Aw summation and the Figure 5-1
+height rule are verified against the printed pages 28-30 of NBC 105:2025
+(user-supplied PDF).
 """
 from __future__ import annotations
 
@@ -37,7 +37,8 @@ def building_height_m(top_z_m, base_z_m, *, basement_height_m=0.0,
                       basement_excluded=False):
     """Return H = top - base.
 
-    [REF NBC105-2025 §5.1.2 and Figure 5-1, printed p. 29]
+    [REF NBC105-2025 §5.1.2, printed p. 29]
+    H definition and Figure 5-1.
     The basement is excluded only when the caller declares the Figure 5-1
     condition true (``basement_excluded=True``); the default includes it.
     When excluded, ``basement_height_m`` is subtracted from H.
@@ -53,7 +54,10 @@ def building_height_m(top_z_m, base_z_m, *, basement_height_m=0.0,
 def effective_wall_area_m2(walls: Iterable[tuple[float, float]], height_m):
     """Return Aw = sum(Awi*(0.2+min(Lwi/H, 0.9)**2)) for (Awi, Lwi) walls.
 
-    [REF NBC105-2025 §5.1.2, printed p. 29]
+    [REF NBC105-2025 §5.1.2, printed pp. 29-30]
+    Aw summation p. 29; Awi (first-storey effective wall area), Lwi
+    (first-storey wall length in the considered direction, Lwi/H <= 0.9) and
+    Nw (walls in the considered direction) are defined on p. 30.
     """
     h = _positive(height_m, "height_m")
     total = 0.0
@@ -72,6 +76,7 @@ def empirical_period_s(height_m, system_type, aw_m2=None):
     """Return the empirical period kt*H**0.75 (shear walls: kt=0.075/sqrt(Aw)).
 
     [REF NBC105-2025 §5.1.2, printed p. 29]
+    Eq. 5.1(2) and the kt list.
     """
     h = _positive(height_m, "height_m")
     system = str(system_type).strip().lower()

@@ -56,31 +56,24 @@ def nbc105_period_estimate(*, height_m, system_type, wall_aw_x_m2=None,
     rayleigh_x=positive_optional(rayleigh_x_s,'rayleigh_x_s')
     rayleigh_y=positive_optional(rayleigh_y_s,'rayleigh_y_s')
     system_type = str(system_type).strip().lower()
-    fixed_kt = {
-        "concrete moment-resisting frame": 0.075,
-        "steel moment-resisting frame": 0.085,
-        "steel eccentrically braced frame": 0.075,
-        "other structural system": 0.05,
-    }
+    # [REF NBC105-2025 §5.1.2, printed p. 29] kt and Eq. 5.1(2) live in the
+    # shared clause 5 module; this function only routes to it.
+    from components.modal.nbc105_clause5 import (
+        amplified_period_s, empirical_period_s)
     empirical = {}
     for axis, aw in (("X", aw_x), ("Y", aw_y)):
-        if "concrete shear-wall" in system_type:
-            if aw is None:
-                empirical[axis] = None
-            else:
-                empirical[axis] = 0.075 * h ** 0.75 / math.sqrt(aw)
+        if "concrete shear-wall" in system_type and aw is None:
+            empirical[axis] = None
         else:
-            if system_type not in fixed_kt:
-                raise ValueError(f"Unsupported NBC empirical period system: {system_type}")
-            empirical[axis] = fixed_kt[system_type] * h ** 0.75
+            empirical[axis] = empirical_period_s(h, system_type, aw)
     out = {"height_m": h, "system_type": system_type,
            "wall_Aw_X_m2": aw_x,
            "wall_Aw_Y_m2": aw_y,
            "rayleigh_X_s": rayleigh_x,
            "rayleigh_Y_s": rayleigh_y,
            "empirical_X_s": empirical["X"], "empirical_Y_s": empirical["Y"],
-           "amplified_empirical_X_s": None if empirical["X"] is None else 1.25 * empirical["X"],
-           "amplified_empirical_Y_s": None if empirical["Y"] is None else 1.25 * empirical["Y"]}
+           "amplified_empirical_X_s": None if empirical["X"] is None else amplified_period_s(empirical["X"]),
+           "amplified_empirical_Y_s": None if empirical["Y"] is None else amplified_period_s(empirical["Y"])}
     for axis in ("X", "Y"):
         tr = out[f"rayleigh_{axis}_s"]
         te = out[f"amplified_empirical_{axis}_s"]

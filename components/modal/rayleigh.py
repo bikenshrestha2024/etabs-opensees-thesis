@@ -15,6 +15,7 @@ import csv
 import json
 import math
 import hashlib
+from components.modal.nbc105_clause5 import amplified_period_s, empirical_period_s
 
 
 RAYLEIGH_METHOD_VERSION = 126
@@ -140,7 +141,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     for axis,aw in [('X',awx),('Y',awy)]:
         aw=float(aw)
         if not math.isfinite(aw) or aw<=0:raise ValueError('Directional Aw must be finite, positive, and reviewed against first-story walls/openings.')
-        empirical=.075/math.sqrt(aw)*H**.75
+        empirical=empirical_period_s(H,'concrete shear-wall',aw)  # [REF NBC105-2025 §5.1.2, printed p. 29]
         k=1. if empirical<=.5 else 2. if empirical>=2.5 else 1.+(empirical-.5)/2.
         shape=[w*float(r['height_m'])**k for w,r in zip(weights,rows)]
         forces=[reference_fraction*sum(weights)*s/sum(shape) for s in shape]
@@ -193,7 +194,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         if audit['storey_count'] != covered_storeys or not math.isclose(period,audit['period_s'],rel_tol=1e-10):
             raise RuntimeError(f'{axis}: incomplete or inconsistent all-storey Rayleigh reconstruction')
         if not math.isfinite(period) or period<=0:raise ValueError(f'{axis} Rayleigh period is nonpositive or non-finite.')
-        result[axis]=dict(Aw_m2=aw,empirical_period_s=empirical,amplified_empirical_s=1.25*empirical,period_s=period,adopted_period_s=min(period,1.25*empirical),reference_force_exponent_k=k,reference_force_total_kN=sum(forces),rayleigh_numerator_kN_m2=numerator,rayleigh_denominator_gFiDi_kN_m2_s2=denominator,storey_audit=audit,rows=[dict(story=r['story_name'],height_m=float(r['height_m']),master_node=n,weight_kN=w,force_kN=f,displacement_m=d) for r,n,w,f,d in zip(rows,masters,weights,forces,u)])
+        result[axis]=dict(Aw_m2=aw,empirical_period_s=empirical,amplified_empirical_s=amplified_period_s(empirical),period_s=period,adopted_period_s=min(period,amplified_period_s(empirical)),reference_force_exponent_k=k,reference_force_total_kN=sum(forces),rayleigh_numerator_kN_m2=numerator,rayleigh_denominator_gFiDi_kN_m2_s2=denominator,storey_audit=audit,rows=[dict(story=r['story_name'],height_m=float(r['height_m']),master_node=n,weight_kN=w,force_kN=f,displacement_m=d) for r,n,w,f,d in zip(rows,masters,weights,forces,u)])
         result[axis]['kinematic_audit']=kinematic_audit
         for record,raw in zip(result[axis]['rows'],retained):
             record['retained_node_displacement_diagnostic_m']=raw
@@ -229,7 +230,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         for col,width in (('A',38),('B',21),('C',17),('D',20),
                           ('E',20),('F',20),('G',24),('H',20)):
             sheet.column_dimensions[col].width=width
-        summary.append([axis,aw,empirical,1.25*empirical,period,min(period,1.25*empirical)])
+        summary.append([axis,aw,empirical,amplified_period_s(empirical),period,min(period,amplified_period_s(empirical))])
         heights=[float(r['height_m']) for r in rows]
         axes[0].plot([v*1000 for v in u],heights,label=f'{axis}: T_R={period:.3f} s')
         axes[1].plot(forces,heights,label=axis)

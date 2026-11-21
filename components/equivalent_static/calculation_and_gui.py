@@ -19,6 +19,7 @@ from tkinter import ttk, filedialog, messagebox
 
 HERE=Path(__file__).resolve().parent
 from components.inputs.project_workbooks import analysis_output_folder
+from components.modal.nbc105_clause5 import amplified_period_s, empirical_period_s
 try:
     from NBC105_Analysis_Settings_V109 import (
         NBC105_ESM_SYSTEM_FACTORS, calculate_esm,
@@ -57,7 +58,7 @@ def resolve_esm_state_periods(*, height_m, aw_by_axis, factor, states,
             ray=float(raw)
             if not math.isfinite(ray) or ray<=0:
                 raise ValueError(f"{state} {axis}: Rayleigh period must be finite positive.")
-            empirical=fac*.075*h**.75/math.sqrt(area)
+            empirical=amplified_period_s(empirical_period_s(h,'concrete shear-wall',area),fac)
             results[state][axis]=min(empirical,ray)
     return results
 
@@ -1252,8 +1253,8 @@ class ESMGui:
                 factor=float(self.period_factor.get())
                 if not (math.isfinite(aw) and aw>0 and math.isfinite(factor) and factor>0):
                     raise ValueError('nonpositive/nonfinite input')
-                empirical=.075*H**.75/math.sqrt(aw)
-                amplified=factor*empirical
+                empirical=empirical_period_s(H,'concrete shear-wall',aw)
+                amplified=amplified_period_s(empirical,factor)
                 ray=(self.rayleigh_tx if axis=='X' else self.rayleigh_ty).get().strip()
                 if ray:
                     ray_value=float(ray)
@@ -1695,7 +1696,7 @@ class ESMGui:
         H=float(height)
         if not all(math.isfinite(v) and v>0 for v in (aw,factor,H)):
             raise ValueError(axis+": Aw, height and factor must be finite positive.")
-        empirical=factor*.075*H**.75/math.sqrt(aw)
+        empirical=amplified_period_s(empirical_period_s(H,'concrete shear-wall',aw),factor)
         ray=(self.rayleigh_tx if axis=='X' else self.rayleigh_ty).get().strip()
         if ray:
             ray_value=float(ray)
@@ -1751,7 +1752,7 @@ class ESMGui:
             H=max(float(r["height_m"]) for r in rows); d=self.direction.get().upper()
             aw=float((self.awx if d=="X" else self.awy).get()); factor=float(self.period_factor.get())
             if aw<=0 or H<=0 or factor<=0: raise ValueError("Enter positive directional Aw and verify the ETABS story heights.")
-            empirical=0.075/math.sqrt(aw)*H**0.75; amplified=factor*empirical
+            empirical=empirical_period_s(H,'concrete shear-wall',aw); amplified=amplified_period_s(empirical,factor)
             rayleigh=(self.rayleigh_tx if d=="X" else self.rayleigh_ty).get().strip()
             if not rayleigh:
                 adopted=self._adopted_axis_period(d,H);self.T.set(f'{adopted:.9g}');self.period_note.set(d+': adopted T1='+str(adopted)+' s | '+self.period_sources[d]);return
