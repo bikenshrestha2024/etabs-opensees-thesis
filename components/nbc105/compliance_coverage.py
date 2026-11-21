@@ -117,6 +117,13 @@ def audit_source_index(records):
                 raise ValueError(f"clause module not present: {expected}")
         elif row["canonical_module"] is not None:
             raise ValueError(f"Annex {group} cannot falsely claim clause module ownership")
+        annex_helper=row.get("reference_helper")
+        if annex_helper is not None:
+            if (group not in ("A","B") or not isinstance(annex_helper,str)
+                or not annex_helper.startswith("components/nbc105/annex_")
+                or ".." in Path(annex_helper).parts
+                or not (REPO_ROOT/annex_helper).is_file()):
+                raise ValueError(f"invalid or missing annex helper for {code}")
         if row["test_ref"] is not None:
             test=row["test_ref"]
             if (not isinstance(test,str) or not test.startswith("tests/")
