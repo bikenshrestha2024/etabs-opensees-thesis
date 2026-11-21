@@ -47,3 +47,7 @@ The first command deliberately exits 2 and reports all open source/engineering g
 ## Definition of 'exhaustive acceptance'
 
 Only after **every normative sentence** of Clauses 1–10 and Annexes A/B/C has a verified source/evidence row, relevant canonical production code/units have passed independent parity tests, and the native complete model and member/detailing calculations have been verified and signed off, can a reviewer consider a full engineering approval. This current register does not make that claim.
+
+## Local Annex reference calculations
+
+Independent Annex A and Annex B Python modules have now been wired to the same local dispatcher, CLI and NBC settings GUI as Clauses 1–10 without merging their authority into a different clause. They evaluate specifically source-derived RC shear-wall minima/boundary triggers/coupling-beam diagonal requirements and steel eccentric-brace I-section seismic-link rotational limits. They **do not** certify full Annex detailing, steel outriggers/FVD compatibility, full wall design or any structural member capacity. Annex C full zoning dataset remains open. See `tests/test_nbc105_annex_dispatch.py` and `tests/test_nbc105_annex_ab_source_checks.py`.
