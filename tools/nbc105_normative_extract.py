@@ -86,7 +86,7 @@ _LISTMARK = re.compile(
     r"^\s*(\(?[a-z]\)|\([a-z]\)|\([ivx]{1,4}\)|[ivx]{1,4}\)|\(\d{1,2}\)|\d{1,2}\)|"
     r"[a-z]\.|[ivx]{1,4}\.|[•·▪–—-])\s+\S")
 _PAGE_NO = re.compile(r"^\s*\d{1,3}\s*$")
-_EQ_LABEL = re.compile(r"(?:Eq\.?\s*)?\(?(?<![\d.])(\d{1,2}(?:\.\d{1,2}){0,3}\s*\(\d{1,2}[a-z]?\))")
+_EQ_LABEL = re.compile(r"(?:Eq\.?\s*)?\(?(?<!\d)(\d{1,2}(?:\.\d{1,2}){0,3}\s*\(\d{1,2}[a-z]?\))")
 _SPLIT = re.compile(r"(?<=[.;?!])\s+(?=[A-Z(•\"'])")
 _ABBREV = ("e.g.", "i.e.", "etc.", "Fig.", "fig.", "No.", "no.", "Sec.", "Cl.",
            "cl.", "Eq.", "eq.", "viz.", "vs.", "Ref.", "Art.", "approx.", "Max.",
@@ -188,6 +188,7 @@ class _Builder:
         self.lead_kind = None
         self.warnings = []
         self.expect_note = False
+        self.last_note = None
         self.after_table = False
         self.table_sub = "1"
 
@@ -210,12 +211,35 @@ def _flush_paragraph(b, lines, page):
     """Turn a prose paragraph (list of raw lines) into register rows."""
     if not lines:
         return
+    segs = []                       # split prose from equation (glyph-garbled) runs
+    for ln in lines:
+        g = _garble_count(ln) >= 2
+        if segs and segs[-1][0] == g:
+            segs[-1][1].append(ln)
+        else:
+            segs.append((g, [ln]))
+    if len(segs) > 1:
+        for g, ls in segs:
+            if g:
+                b.after_table = False
+                _equation(b, normalise_text(" ".join(ls)), page)
+            else:
+                _flush_paragraph(b, ls, page)
+        return
     joined = normalise_text(" ".join(x.strip() for x in lines))
     if b.expect_note or (b.after_table and re.match(r"^(Notes?\b|[*\u2020]|\d\s)", joined)):
         kind = "TABLE_NOTE" if re.match(r"^Notes?\b", joined) else "FOOTNOTE"
         b.add(kind, joined, page, sub=b.table_sub)
+        b.last_note = (kind, joined, page)
         b.expect_note = False
         return
+    if b.after_table and b.last_note and joined[:1].islower():
+        kind, prev, pg = b.last_note          # footnote text continued after a blank line
+        b.rows.pop(); b.counters[b.group] -= 1
+        b.add(kind, prev + " " + joined, pg, sub=b.table_sub)
+        b.last_note = (kind, prev + " " + joined, pg)
+        return
+    b.last_note = None
     b.after_table = False
     if b.section_kind == "DEFINITIONS":
         b.add("DEFINITION", joined, page)
@@ -242,6 +266,9 @@ def _flush_paragraph(b, lines, page):
             if _garble_count(sent) >= 3:
                 _equation(b, sent, page)
                 continue
+            if re.search(r"[\u2026.]{4,}\s*\d{1,2}(?:\.\d{1,2})*\s*\(\d+\)", sent):
+                _equation(b, sent, page)
+                continue
             kind = _classify(sent)
             inherited = "N"
             if kind is None and is_item and b.lead_kind:
@@ -259,7 +286,8 @@ def _flush_paragraph(b, lines, page):
 
 
 def _equation(b, text, page):
-    label = _EQ_LABEL.search(text)
+    found = _EQ_LABEL.findall(text)
+    label = re.match(r'(.*)', found[-1]) if found else None
     loc = (f"Equation {re.sub(r'\\s+', '', label.group(1))}" if label
            else f"Equation block near {b.sub}")
     b.add("EQUATION", re.sub(r"\s+", "", text), page, locator=loc)
@@ -474,21 +502,26 @@ def _table_continues(table, ln):
 
 
 def _split_table_tail(table):
-    """Remove and return note lines after the last blank gap of a table body.
+    """Remove and return note lines at the end of a table body.
 
-    A note block starts with a lone footnote marker (digit, * or dagger) or the
-    word Note(s). [REF NBC105-2025 table notes]"""
+    A note block starts with a lone footnote marker (digit, * or dagger) on its
+    own line, or the word Note(s), and contains no multi-column lines.
+    [REF NBC105-2025 table notes]"""
     lines = table["lines"]
     while lines and not lines[-1].strip():
         lines.pop()
-    i = len(lines)
-    while i > 0 and lines[i - 1].strip() != "":
-        i -= 1
-    tail = [x.strip() for x in lines[i:]]
-    if tail and re.match(r"^([\d*\u2020]\s*$|[\d*\u2020]\s+\S|Notes?\b)", tail[0]) \
-            and (i > 0):
-        del lines[i:]
-        return tail
+    for i in range(len(lines) - 1, 0, -1):
+        s = lines[i].strip()
+        if not s:
+            continue
+        if re.search(r"\S\s{2,}\S", lines[i]) and not re.match(r"^Notes?\b", s):
+            break
+        if re.match(r"^([\d*\u2020]|Notes?\b.*)$", s) or re.match(r"^[\d*\u2020]\s+[A-Za-z]", s):
+            tail = [x.strip() for x in lines[i:] if x.strip()]
+            if all(not re.search(r"\S\s{2,}\S", x) for x in lines[i + 1:] if x.strip()):
+                del lines[i:]
+                return tail
+            break
     return []
 
 
@@ -553,12 +586,17 @@ def _rule_matches(sel, row):
     if kind == "sub":
         rs, vs = _sub_key(row["subclause"]), _sub_key(val)
         return rs[:len(vs)] == vs
+    if kind == "loc":      # loc:<clause>|<locator prefix>  (stable against re-numbering of ids)
+        clause, _, prefix = val.partition("|")
+        return row["clause"] == clause and row["locator"].startswith(prefix)
+    if kind == "kind":     # kind:CLAUSE  (all rows of a kind)
+        return row["kind"] == val
     return False
 
 
 def _specificity(sel, rule):
     kind, _, val = sel.partition(":")
-    base = {"id": 3000, "table": 2000, "sub": 1000}[kind]
+    base = {"id": 4000, "kind": 3500, "loc": 3000, "table": 2000, "sub": 1000}[kind]
     if kind == "sub":
         base += len(_sub_key(val)) * 10
     if kind == "id" and ".." in val:
