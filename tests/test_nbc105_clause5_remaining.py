@@ -28,7 +28,10 @@ class FullClause5(unittest.TestCase):
         self.assertTrue(soft_story(79.999,100,[100,100,100]))
         self.assertTrue(soft_story(69.9,100,[100,100,100]))
         self.assertTrue(soft_story(79,140,[100,100,100]))
-        self.assertEqual(torsion_irregularity(1.5,.999999999999), "REGULAR")
+        self.assertEqual(torsion_irregularity(1.5,1.), "REGULAR")
+        # With a slightly smaller minimum end displacement the strict 1.5
+        # threshold IS exceeded; the former tolerance-based PASS was unsafe.
+        self.assertEqual(torsion_irregularity(1.5,.999999999999), "TORSION_IRREGULAR")
         self.assertEqual(torsion_irregularity(1.5001,1),"TORSION_IRREGULAR")
         self.assertEqual(torsion_irregularity(2.501,1),"EXTREME_TORSION_PROHIBITED")
         self.assertFalse(reentrant_corner_irregularity(1.5,10))

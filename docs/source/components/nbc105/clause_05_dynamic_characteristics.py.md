@@ -28,3 +28,9 @@ NBC 105:2025 clause 5. See [period and material provenance](../../../NBC105_PERI
 The canonical module now also includes **all 21 rows of Table 5-2** (source printed p. 32) with row-numbered Rμ, Ωu and Ωs; §5.4.1 weak/soft-storey checks; §5.4.2 torsional and re-entrant thresholds; §5.5 ULS horizontal deflection multiplier, SRSS building separation and drift limits; and §5.6 ±5% accidental eccentricity.
 
 New regression file: `tests/test_nbc105_clause5_remaining.py`. Conditions at 80%, 70%, 1.5 and 2.5 equality are explicitly tested to avoid treating strict inequalities as inclusive. **Scope caution:** a source table lookup does not verify that this thesis model qualifies for the selected structural system and its ductile detailing. The actual ETABS drift/irregularity reports and 25-storey system identification remain native-project evidence gates. The printed table of contents gives §§5.3–5.6 on pp. 30–37; older references to §5.7 for accidental torsion are not the physical §5.6 heading. Certain internal cross-references in the printed code are inconsistent and are preserved in the audit rather than silently corrected.
+
+## Strict numerical acceptance (2026-11-21)
+
+Strict NBC §5.4 / §5.5 predicates are not tolerance-relaxed. `math.nextafter` threshold regressions prevent future accidental acceptance of slightly excess drift or torsion ratio. §5.1 Rayleigh summations reject nonfinite numerical inputs and negative seismic weights; §5.2 rejects nonfinite or negative load magnitudes before seismic live factors are applied. These are input-integrity controls, not a physical validation of displacement COM or ETABS mass models.
+
+Tests: `tests/test_nbc105_source_numerical_integrity_v2.py`, `tests/test_nbc105_clause5_remaining.py`.

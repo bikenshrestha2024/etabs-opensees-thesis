@@ -11,3 +11,9 @@
 **Example:** `component_amplification_factor(1.0,1.25)`
 
 **Tests:** `tests/test_nbc105_clauses_02_03_06_10.py` includes numerical and rejection tests. Actual ETABS and OpenSees analyses are outside this reference-only run; full module-to-GUI call-site migration remains open.
+
+## §10.4(d) hanging/swinging light safety cables
+
+The uploaded 2025 code (printed p.51; PDF p.73 in the 137-page edition) requires safety cables fixed to the structure and fixture to resist a **lateral load equal to four times the hanging or swinging light's weight**. The canonical `light_safety_cable_design_capacity(component_weight_kN)` returns `4Wp` in kN and rejects zero, negative or nonfinite weights. Tested in `tests/test_nbc105_printed_table_verification_2025.py`. This checks the demand only; real cable/anchor capacity, connection detailing and installation remain engineering evidence requirements.
+
+The same test independently checks Tables 3-1, 4-1, all 21 rows of 5-2, 6-1 and 10-1/2/3 against source-transcribed values rather than importing implementation constants.

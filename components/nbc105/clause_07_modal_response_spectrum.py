@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 __all__=["modal_effective_weight","modal_story_forces","force_only_scale",
          "modal_mass_coverage","srss","modal_combination_readiness",
-         "modal_design_coefficient","force_scale_factor"]
+         "modal_design_coefficient","force_scale_factor","cqc_correlation_matrix"]
 
 def _pos(value,name):
     if isinstance(value,bool):raise ValueError(name+" must be finite positive")
@@ -90,6 +90,38 @@ def force_only_scale(*,esm_shear,mrsm_shear,member_forces,story_shears,
       "base_reactions":[scale*z for z in finite_list(base_reactions)],
       "drifts":finite_list(drifts),"displacements":finite_list(displacements),
       "status":"FORCE_SCALING_ONLY_NOT_MISSING_MASS_VALIDATION"}
+
+def cqc_correlation_matrix(omega_rad_s, damping_ratio=.05):
+    """Established CQC modal correlation kernel for NBC §7.4.
+
+    [REF NBC105-2025 §7.4, printed p.41]
+    NBC allows CQC, but does not prescribe the CQC correlation equation.
+    This uses the pre-existing production implementation for equal modal
+    damping and maintains the exact ratio-based formula. Modal frequencies
+    must be positive rad/s; damping is limited to the active MRSM <=5% policy.
+    """
+    modes=list(omega_rad_s)
+    if not modes:
+        raise ValueError("at least one modal circular frequency is required")
+    w=[_pos(x,"modal circular frequency") for x in modes]
+    damping=_pos(damping_ratio,"damping ratio")
+    if damping>.05:
+        raise ValueError("active MRSM damping must be <=0.05")
+    result=[]
+    for wi in w:
+        row=[]
+        for wj in w:
+            beta=wj/wi
+            numerator=8*damping*damping*(1+beta)*beta**1.5
+            denominator=(1-beta*beta)**2+4*damping*damping*beta*(1+beta)**2
+            value=numerator/denominator
+            if not math.isfinite(value):
+                raise ValueError("invalid CQC frequency/damping correlation")
+            row.append(value)
+        result.append(row)
+    for k in range(len(result)):
+        result[k][k]=1.
+    return result
 
 def modal_combination_readiness(*,mass_percent,highest_frequency_hz,
                                 missing_mass_procedure_verified=False):

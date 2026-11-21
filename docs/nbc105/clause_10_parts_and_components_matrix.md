@@ -13,3 +13,9 @@ Source: user-uploaded official Second Revision, printed pp. 49–52. Scope: cano
 **Open / do not claim fully implemented:** Table 10-1 omits an explicit equality at ΔT=0.5s; take continuous endpoint ap=1.0 and report it. Research-supported μp up to 3.5 is NOT automatically approved. Attachment/anchor design, safety cables and equipment serviceability require additional evidence.
 
 This matrix must be extended with one row per subclause, exact table footnotes, ETABS native evidence, explicit test identifiers and source hash before the overall Clause 10 gate can pass.
+
+## §10.4(d) hanging/swinging light safety cables
+
+The uploaded 2025 code (printed p.51; PDF p.73 in the 137-page edition) requires safety cables fixed to the structure and fixture to resist a **lateral load equal to four times the hanging or swinging light's weight**. The canonical `light_safety_cable_design_capacity(component_weight_kN)` returns `4Wp` in kN and rejects zero, negative or nonfinite weights. Tested in `tests/test_nbc105_printed_table_verification_2025.py`. This checks the demand only; real cable/anchor capacity, connection detailing and installation remain engineering evidence requirements.
+
+The same test independently checks Tables 3-1, 4-1, all 21 rows of 5-2, 6-1 and 10-1/2/3 against source-transcribed values rather than importing implementation constants.
