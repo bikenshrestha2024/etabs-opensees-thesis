@@ -17,7 +17,7 @@ import math
 from collections import Counter
 from pathlib import Path
 
-__all__=["read_source_index","audit_source_index","source_index_path","MANDATORY_GATES"]
+__all__=["read_source_index","audit_source_index","source_index_path","MANDATORY_GATES","full_audit"]
 
 REPO_ROOT=Path(__file__).resolve().parents[2]
 SOURCE_INDEX=REPO_ROOT/"docs"/"nbc105"/"source_coverage_register.json"
@@ -156,3 +156,16 @@ def audit_source_index(records):
             "No automatic code/building approval is permitted."
         ),
     }
+
+
+def full_audit(records=None):
+    """Heading index audit plus the sentence-level normative register gate.
+
+    [REF NBC105-2025 normative register, docs/nbc105/NORMATIVE_REGISTER_GUIDE.md]
+    Reuses audit_source_index and adds the key "normative_register". The
+    approval stays NOT_CERTIFIED in every case.
+    """
+    from components.nbc105.normative_register import normative_register_gate
+    result=audit_source_index(read_source_index() if records is None else records)
+    result["normative_register"]=normative_register_gate()
+    return result

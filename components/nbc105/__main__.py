@@ -23,8 +23,8 @@ def main(argv=None):
     args=parser.parse_args(argv)
     try:
         if args.audit:
-            from components.nbc105.compliance_coverage import read_source_index,audit_source_index
-            result=audit_source_index(read_source_index())
+            from components.nbc105.compliance_coverage import full_audit
+            result=full_audit()
             print(json.dumps(result,indent=2,sort_keys=True,allow_nan=False))
             return 2  # Deliberately blocked until exhaustive source and native review.
         if args.list:

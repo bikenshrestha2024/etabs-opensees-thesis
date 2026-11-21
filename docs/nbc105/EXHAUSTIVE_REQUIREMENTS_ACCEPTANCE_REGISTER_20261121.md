@@ -11,6 +11,10 @@
 5. **Native engineering verified:** The exact 95 m asymmetric EDB and matched OpenSees/XARA model are run with logged mass, constraints, stiffness, P-Delta, modal data, Rayleigh force/displacement, RC/steel detailing and all motion case results. This evidence is not supplied or validated on the current public repository.
 6. **Professional design acceptance:** An appropriately qualified structural engineer verifies, signs and records all design checks, selected system applicability, dual-system 25% requirement where applicable, component/connection detailing and deviations. This cannot be conferred by a chat response or a green GitHub Action.
 
+## Sentence-level register (added 2026-11-21)
+
+The [normative register](NORMATIVE_REGISTER_GUIDE.md) now enumerates 1417 normative units (Clauses 1-10, Annexes A-C) with one disposition each: 353 IMPLEMENTED_AND_TESTED, 7 IMPLEMENTED_UNTESTED, 307 MANUAL_PROJECT_CHECK, 180 PROJECT_NOT_APPLICABLE, 559 DEFINITION_ONLY, 11 EXTERNAL_DATA_REQUIRED, 0 UNVERIFIED_GAP, 0 unreviewed. Its gate (`python -m components.nbc105 --audit`) reports REGISTER_REVIEWED_EXTERNAL_GATES_OPEN and never certifies. The standard is **not certified**. External gates that remain open: independent human sign-off, native ETABS/OpenSees evidence, project wall and connection designs (Annex A RC detailing, Annex C Table C-1 transcription).
+
 ## Mandatory gap groups
 
 | Group | Mandatory remaining review |

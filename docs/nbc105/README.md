@@ -2,6 +2,8 @@
 
 Date 2026-11-21. Authority: NBC 105:2025 Seismic Design of Buildings in Nepal (DUDBC), user-supplied PDF. This index tracks which main clauses have a code module, a compliance matrix and tests. It is a software-conformance register, not design acceptance of any building. A unit-test pass is not engineering acceptance, and no native ETABS or OpenSees run is implied.
 
+Sentence-level audit: [normative register guide](NORMATIVE_REGISTER_GUIDE.md) (1417 rows, every row dispositioned, NOT certified; independent sign-off, native evidence and project designs remain external gates).
+
 Related: [project declarations](PROJECT_DECLARATIONS.md) (g = 9.81 per printed p. 7, superseding the 9.80665 decision; Vs,30 optional with the clause 4.1.3 requirement documented), [wall grouping (Aw) method](WALL_GROUPING_AW_METHOD.md), [constants guide](../source/components/nbc105/constants.py.md).
 
 [Independent 21 November review](INDEPENDENT_REVIEW_20261121.md) records the reviewed GitHub commit, reproduced integration gaps and Windows test results.

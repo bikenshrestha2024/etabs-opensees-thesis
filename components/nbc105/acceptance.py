@@ -88,8 +88,9 @@ def evaluate_project_evidence(evidence,*,rs_tolerance_fraction=.001):
         period_valid=all(_positive(periods.get(axis),f"T_{axis}")>0 for axis in ("X","Y"))
     except ValueError:
         pass
-    from components.nbc105.compliance_coverage import read_source_index, audit_source_index
-    inventory=audit_source_index(read_source_index())
+    from components.nbc105.compliance_coverage import full_audit
+    inventory=full_audit()
+    register=inventory["normative_register"]
     gates={
         "source_identity":_gate("PARTIAL_PROVENANCE",
             "Source EDB SHA declared; saved EDB SHA, exact native model/analysis state and matching OpenSees source must be compared",
@@ -120,8 +121,13 @@ def evaluate_project_evidence(evidence,*,rs_tolerance_fraction=.001):
         "all_clause_callers":_gate("CODE_REVIEW_REQUIRED",
             "All ten reference modules are available; active caller tests and complete source semantic review must pass on same commit"),
         "full_nbc_source_requirement_audit":_gate("OPEN",
-            "The 235 indexed main-clause/annex headings are NOT a full sentence-by-sentence mandatory-provision, equation, figure, exception and footnote audit",
-            indexed_section_headings=inventory["total_indexed_sections"]),
+            "The 235 indexed headings are NOT a sentence audit; the sentence-level register (docs/nbc105/normative_register) lists every unit with one disposition, but manual-check and external-data rows, native evidence and independent human sign-off remain open",
+            indexed_section_headings=inventory["total_indexed_sections"],
+            normative_register_status=register["status"],
+            normative_register_rows=register["rows"],
+            normative_register_unreviewed=register["unreviewed_rows"],
+            normative_register_unverified_gap=register["unverified_gap_rows"],
+            normative_register_open_external=register["open_external_rows"]),
         "annex_a_rc_detailing":_gate("OPEN",
             "RC Annex A beams, columns, joints, wall coupling/openings, boundary reinforcement, anchorage and detailing need independent member-level capacity checks"),
         "annex_b_steel_detailing":_gate("OPEN",
@@ -136,6 +142,7 @@ def evaluate_project_evidence(evidence,*,rs_tolerance_fraction=.001):
             "source_sha256":digest.lower(),
             "source_inventory_sections":inventory["total_indexed_sections"],
             "source_inventory_scope":inventory["index_scope"],
+            "normative_register":{k:register[k] for k in ("status","certified","rows","unreviewed_rows","unverified_gap_rows","open_external_rows")},
             "gates":gates,
             "unverified_gates":[k for k,v in gates.items()
                                 if v["status"] not in ("NUMERIC_MATCH_REPRODUCED",)],
