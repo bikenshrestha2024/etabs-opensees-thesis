@@ -9,7 +9,7 @@ from pathlib import Path
 from components.gravity.comparison_bundle import export_bundle
 
 
-def latest_dual_run(gravity_root):
+def latest_dual_run(gravity_root, *, model_script=None):
     """Find the most recent two-case result without substituting absent data.
 
     [REF components/gravity/support_scenarios.py]
@@ -25,6 +25,24 @@ def latest_dual_run(gravity_root):
         and (p/"ETABS_SOURCE_SUPPORTS"/"Gravity_Result_V110.json").is_file()
         and (p/"CONTINUOUS_WALL_BASE_FIXED"/"Gravity_Result_V110.json").is_file()),
         reverse=True)
+    if model_script is not None:
+        # A filename and timestamp cannot establish model identity.
+        import json
+        model=Path(model_script).expanduser().resolve()
+        validated=[]
+        for run in matches:
+            paths=(run/"ETABS_SOURCE_SUPPORTS"/"Gravity_Result_V110.json",
+                   run/"CONTINUOUS_WALL_BASE_FIXED"/"Gravity_Result_V110.json")
+            try:
+                docs=[json.loads(p.read_text(encoding="utf-8-sig")) for p in paths]
+                if all(d.get("ok") is True and
+                       d.get("model_script") and
+                       Path(d["model_script"]).expanduser().resolve()==model
+                       for d in docs):
+                    validated.append(run)
+            except (OSError,ValueError,TypeError,KeyError):
+                continue
+        matches=validated
     return matches[0] if matches else None
 
 
@@ -64,9 +82,9 @@ def latest_single_run(gravity_root, *, model_script=None):
             if payload.get("ok") is not True:
                 continue
             source=payload.get("model_script")
-            if model_script is not None and source and (
-                    Path(source).expanduser().resolve()!=Path(model_script).expanduser().resolve()):
-                continue
+            if model_script is not None:
+                if not source or Path(source).expanduser().resolve()!=Path(model_script).expanduser().resolve():
+                    continue
             eligible.append((path.stat().st_mtime_ns,str(path),directory))
         except (OSError,ValueError,TypeError):
             continue
@@ -84,7 +102,8 @@ def package_gravity_review(model_script, gravity_root, *,
     root=Path(gravity_root).expanduser().resolve()
     if not model.is_file():
         raise FileNotFoundError("Generated gravity model script missing: "+str(model))
-    dual=Path(dual_run).resolve() if dual_run is not None else latest_dual_run(root)
+    dual=Path(dual_run).resolve() if dual_run is not None else latest_dual_run(
+        root,model_script=model)
     gravity=(Path(single_run).resolve() if single_run is not None else
              latest_single_run(root,model_script=model))
     if gravity is None:
