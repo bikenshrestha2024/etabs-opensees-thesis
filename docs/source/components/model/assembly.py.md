@@ -82,3 +82,26 @@ manifest or a native equivalence result.
 ## 2026-11-21 story-weight ledger follows the §5.2 mid-height rule
 
 The story ledger (`NBC105_ESM_Story_Weights_Assembled_V118.csv`) now assigns each active node's weight with `storey_index_for_elevation` ([clause 5 module](../nbc105/clause_05_dynamic_characteristics.py.md)): weight below the mid-height between adjacent floors goes to the lower floor, otherwise to the upper floor. Nodes at or below the first floor stay with floor 1; nodes at or above the roof go to the roof. Total weight is unchanged; per-storey Wi change, so exports must be re-assembled. Weight-to-mass conversion and its inverse use the shared `GRAVITY_M_S2` (9.81 m/s^2, USER_DECISION 2026-11-21; NBC 105:2025 prints 9.81, see the [constants guide](../nbc105/constants.py.md) and the [compliance matrix](../../../nbc105/clause_05_dynamic_characteristics_matrix.md)); the numeric value is unchanged.
+
+
+## 2026-11-21: opt-in wall mesh limit `wall_max_cell_size_m` and shell mesh audit
+
+**Finding.** `_mesh_areas` refines floors with `floor_subdivisions`. Walls only receive the coplanar coordinate lines: horizontal lines come from slab subdivision points on the wall plane, and vertical (height) lines come only from storey and opening levels. Wall cell heights are therefore 1.5, 2.3 or 3.8 m in MESH_04, MESH_08 and MESH_16 alike. ETABS meshes the walls at 1 m (`Analysis - Wall Mesh Settings`).
+
+**Option.** `OpenSees_Complete_Model_Config_V118.json` key `wall_max_cell_size_m`. Absent or `None` gives the historical mesh. The key is never written as a default, so existing configs, their SHA and the model data stay identical. Checked: on the user's MESH_04/08/16 topology the default mesh digest is identical before and after this change. A positive float, for example `1.0`, runs `_seed_wall_refinement_lines` before meshing:
+
+- **Height:** one global set of wall elevations (all wall horizontal lines, each gap split uniformly to the limit or less) is applied to any wall that has a taller cell. The points go on both vertical panel edges, so walls meeting at a corner share every level. As a side effect, the historical 2.3 m corner T-junctions are removed.
+- **Width:** wall intervals longer than the limit are split uniformly. The points go on the top and bottom edges of every coplanar wall panel at every storey, so the floor planes receive the same lines. New floor-edge grid points are fed back so that walls on other slab edges share them. The loop stops when no new point appears.
+- **Safeguards:** a limit larger than every wall cell is a no-op. Node tags are allocated by the unchanged mesher. Frame segments are cut at the new wall nodes by the existing exact cut (`1e-7` m). Under `EDGE_PROPAGATE_CONFIRMED`, every new base node on a source wall edge is restrained. `SOURCE_ONLY` still adds none. Cell areas are exact sub-areas, so self-weight, the area-load ledger, the slab and joint-volume audits, the mass ledger and the §5.2 mid-height ledger keep their totals. `active_horizontal_seismic_weight_kN` excludes fixed-node mass and therefore changes slightly when base cells become shorter.
+
+**Audit.** `shell_mesh_quality_audit` (see [shell_mesh_quality.py](shell_mesh_quality.py.md)) is always written to the export report and `MESH_BUILD_STATUS.json`. It is a diagnostic only.
+
+**Measured on the user's topology, mesher only (no solver).** With `wall_max_cell_size_m=1.0`:
+
+- MESH_04: wall cells 3,400 → 10,650, wall edges ≤ 1.0 m, max wall aspect 23 → 7.7.
+- MESH_08: max wall aspect 46 → 15.3.
+- MESH_16: max wall aspect 92 → 30.7.
+
+The remaining high ratios come from historical narrow widths (0.1/0.05/0.025 m), not from height. Hanging nodes fall from 1,250 to 1,100. The 1,100 are pre-existing wall nodes (opening lines) on slab edges that the slabs do not share; the option does not change them. A MESH_04 full `prepare_complete_export` run gives the same totals with and without the option: total downward load 286,419.7582 kN in both, and total seismic weight 286,419.7582 kN in both. Frame segments go from 3,862 to 4,062. Base supports stay at 76 (`SOURCE_ONLY`).
+
+**GUI.** No GUI widget exists for comparable config keys (`wall_base_restraint_policy` and others are edited in the config JSON). Set the key in the JSON of a copied export root. Tests: `tests/test_wall_mesh_refinement_option.py`. Native OpenSees gravity/modal comparison with ETABS is PENDING.

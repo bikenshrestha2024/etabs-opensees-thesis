@@ -889,7 +889,143 @@
    "OpenSees gravity rebuild with elastic comparison settings + end_offsets_m, writing export_gravity_beam_actions",
    "ETABS pier base forces, slab/shell corner forces, brace axial forces (Dead, Live)",
    "optional ETABS joint-mass check of the linear lumping rule",
-   "Rayleigh/ESM re-run on clear-beam export if the ETABS base/roof convention is adopted"
+   "Rayleigh/ESM re-run on clear-beam export if the ETABS base/roof convention is adopted",
+   "OpenSees gravity with wall_max_cell_size_m = 1.0 and ETABS wall modifiers vs control export (wall_mesh_refinement_20261121)"
+  ]
+ },
+ "wall_mesh_refinement_20261121": {
+  "status": "DIAGNOSTIC_MESH_GEOMETRY_ONLY_NOT_ACCEPTANCE",
+  "hypothesis": "wall meshing (open item 2 #9, D6)",
+  "verdict": "STILL_OPEN_SECONDARY_PENDING_USER_RERUN",
+  "value_label": "H (computed from file values with components/model/shell_mesh_quality.py)",
+  "evidence_sha256_prefix": {
+   "MESH_04/OpenSees_Complete_Model_Data_V118.json": "8cb0cafa659c51fe",
+   "MESH_08/OpenSees_Complete_Model_Data_V118.json": "2c7e4f966afeb945",
+   "MESH_16/OpenSees_Complete_Model_Data_V118.json": "04756d89c2dbd310"
+  },
+  "etabs_F": {
+   "wall_auto_mesh": "Default x375",
+   "wall_mesh_settings_max_m": 1.0,
+   "wall_property": "Wall 600 f11=f22=f12=0.5"
+  },
+  "measured_default": {
+   "MESH_04": {
+    "floor_cells": 7000,
+    "floor_edge_m": [
+     0.5,
+     1.5
+    ],
+    "wall_cells": 3400,
+    "wall_width_m": [
+     0.1,
+     1.2
+    ],
+    "wall_vertical_extent_m": [
+     1.5,
+     2.3,
+     3.8
+    ],
+    "max_wall_aspect": 23.0,
+    "wall_aspect_gt_4_10_50": [
+     2350,
+     750,
+     0
+    ],
+    "hanging_nodes": 1250
+   },
+   "MESH_08": {
+    "floor_cells": 28400,
+    "floor_edge_m": [
+     0.25,
+     0.75
+    ],
+    "wall_cells": 4700,
+    "wall_width_m": [
+     0.05,
+     0.75
+    ],
+    "wall_vertical_extent_m": [
+     1.5,
+     2.3,
+     3.8
+    ],
+    "max_wall_aspect": 46.0,
+    "wall_aspect_gt_4_10_50": [
+     4000,
+     1500,
+     0
+    ],
+    "hanging_nodes": 1250
+   },
+   "MESH_16": {
+    "floor_cells": 111200,
+    "floor_edge_m": [
+     0.125,
+     0.375
+    ],
+    "wall_cells": 7500,
+    "wall_width_m": [
+     0.025,
+     0.375
+    ],
+    "wall_vertical_extent_m": [
+     1.5,
+     2.3,
+     3.8
+    ],
+    "max_wall_aspect": 92.0,
+    "wall_aspect_gt_4_10_50": [
+     7400,
+     5100,
+     550
+    ],
+    "hanging_nodes": 1250
+   }
+  },
+  "mesher_only_with_wall_max_cell_size_m_1": {
+   "MESH_04": {
+    "wall_cells": 10650,
+    "floor_cells": 8300,
+    "max_wall_edge_m": 1.0,
+    "max_wall_aspect": 7.667,
+    "hanging_nodes": 1100
+   },
+   "MESH_08": {
+    "wall_cells": 13700,
+    "floor_cells": 28400,
+    "max_wall_edge_m": 0.767,
+    "max_wall_aspect": 15.333,
+    "hanging_nodes": 1100
+   },
+   "MESH_16": {
+    "wall_cells": 22000,
+    "floor_cells": 111200,
+    "max_wall_edge_m": 0.767,
+    "max_wall_aspect": 30.667,
+    "hanging_nodes": 1100
+   },
+   "MESH_04_export_totals_kN": {
+    "total_downward_default": 286419.7582311328,
+    "total_downward_refined": 286419.7582311046,
+    "frame_segments": [
+     3862,
+     4062
+    ],
+    "support_count": [
+     76,
+     76
+    ]
+   }
+  },
+  "note": "1,100 remaining hanging nodes are pre-existing wall opening/core lines on slab edges, unchanged by the option; no OpenSees solve run.",
+  "rerun_recipe": [
+   "copy the MESH_04 clear-beam export root; keep original read-only",
+   "add \"wall_max_cell_size_m\": 1.0 to OpenSees_Complete_Model_Config_V118.json (floor_subdivisions 4, wall_base_restraint_policy SOURCE_ONLY)",
+   "tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py --elastic-comparison-settings docs/validation/20261121_native_gravity_uls.json (origin/main)",
+   "build a control export without the key",
+   "check report wall_max_cell_size_m, shell_mesh_quality_audit SHEAR WALL max_edge_m <= 1.0, equal total_downward_load_kN",
+   "gravity 1.0D+1.0L with 76 source supports and 32-point diagnostic; export_gravity_beam_actions",
+   "tools/gravity_reaction_attribution.py on both; report core/perimeter change"
   ]
  }
 }

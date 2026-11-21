@@ -388,7 +388,9 @@ def build_case(folder, subdivisions, *, runtime_dir=None, progress=None):
                 "support_count": report.get("wall_base_support_count"),
                 "applied_gravity_kN": report.get("total_downward_load_kN"),
                 "active_horizontal_seismic_weight_kN": report.get("active_horizontal_seismic_weight_kN"),
+                "wall_max_cell_size_m": report.get("wall_max_cell_size_m"),
             },
+            shell_mesh_quality_audit=report.get("shell_mesh_quality_audit"),
             note="No OpenSees gravity cases have been solved; reaction, drift, and load-path equivalence remain unverified.",
         )
         emit(f'MESH_{n:02d}: complete in {perf_counter()-started:.1f}s')

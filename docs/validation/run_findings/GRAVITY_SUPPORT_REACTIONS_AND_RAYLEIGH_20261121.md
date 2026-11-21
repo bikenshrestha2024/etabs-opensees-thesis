@@ -205,7 +205,7 @@ Comparison with the OpenSees ledger (V131 W = dead + 0.3 live, gross beams). All
 | 6 | Pier/spandrel stiffness | `Pier Section Properties` rows 4–78 and `Spandrel Section Properties` rows 4–103 contain geometry only (no modifier columns). Pier "thickness" 1000/1400 mm is an equivalent design value: P1 = 0.6 × (6 + 2 + 2)/6 = 1.0 m and P2 = 0.6 × (6 + 4 × 2)/6 = 1.4 m [H]. Spandrels are 2000 × 1500 × 600 mm. Analysis stiffness comes from `Wall 600`. | **REJECTED** as a separate source. The 0.5 finding is confirmed through `Wall 600`. |
 | 7 | Frame modifiers, BE columns | `Frame Sec Def - Conc Rect` row 11, `Beam 600*800`: A 1, J 0.01, I22 = I33 = 0.35. Rows 14 and 21, `Col 1100*1100` and `Col 1250*1250`: A 1, J 1, I 0.7. `Frame Assigns - Sect Prop` rows 4–1370: only Beam 600*800 × 750, Col 1100 × 300, Col 1250 × 150, SHS × 112, None × 55; the BE columns (rows 24 and 26) are unassigned. OpenSees LEGACY applies I × 0.35/0.7 with gross A (`assembly.py`, elastic branch). | **REJECTED** for the split (axial terms equal). Beam J differs (table 7.5). |
 | 8 | Insertion point | `Frame Assigns - Insertion Point` rows 4–1370: beams cardinal 8 (Top Center) × 750, No Transform Stiffness = Yes × 1367. `Area Assigns - Insertion Point`: floors Top, walls Middle, Transform No. | **REJECTED** (no stiffness eccentricity in ETABS) |
-| 9 | Wall meshing | `Area Assigns - Wall Auto Mesh` rows 4–378: Default × 375. `Analysis - Wall Mesh Settings` row 4: 1 m maximum. OpenSees wall cells (hand count from the exports): MESH_04 0.2–1.0 m wide × 1.5/2.3 m tall; MESH_08/16 up to 3.8 m tall, minimum width 0.1 m (aspect ratio up to 23 at 0.1 × 2.3 m). | **STILL OPEN, secondary** (affects the shell membrane response of the core). |
+| 9 | Wall meshing | `Area Assigns - Wall Auto Mesh` rows 4–378: Default × 375. `Analysis - Wall Mesh Settings` row 4: 1 m maximum. OpenSees wall cells (hand count from the exports): MESH_04 0.2–1.0 m wide × 1.5/2.3 m tall; MESH_08/16 up to 3.8 m tall, minimum width 0.1 m (aspect ratio up to 23 at 0.1 × 2.3 m). | **STILL OPEN, secondary** (affects the shell membrane response of the core). Re-measured in §7.7. |
 | 10 | Gravity-case stiffness | `Load Cases - Linear Static` rows 4–7 and 14: Dead (Self Weight, Floor Finish, Wall, Partition) and Live use Stiffness Type `P-Delta`. No P-Delta preset table is in the export. | **NOT DECIDABLE**, expected minor |
 
 ### 7.4 Open item 3: floor load path from the Dead and Live beam forces
@@ -239,7 +239,7 @@ OpenSees side: MESH_04 `OpenSees_Complete_Model_Data_V118.json` and `..._Config_
 | D3 | Beam self weight | `Material List by Story`: 1,813.2644 kN/storey (clear length) | `etabs_beam_weight_policy = GROSS_SECTION_LENGTH`, 2,159.36 kN/storey | MISMATCH (+346.098 kN/storey; known, §3) |
 | D4 | Rigid end zones | `End Len Offsets`: Auto, RZ 1, 0.55/0.625/0.8 m | centreline; ULS settings set no `end_offsets_m` | MISMATCH (open, §7.3 #3) |
 | D5 | Floor meshing | `Floor Auto Mesh`: No Auto Mesh × 350 | `floor_subdivisions` 4 (MESH_04), 8, 16 | MISMATCH (load path, §7.4) |
-| D6 | Wall meshing | Default, 1 m maximum | cells up to 3.8 m tall, 0.1 m wide | MISMATCH (open) |
+| D6 | Wall meshing | Default, 1 m maximum | cells up to 3.8 m tall, down to 0.1/0.05/0.025 m wide (§7.7) | MISMATCH (open; opt-in `wall_max_cell_size_m`) |
 | D7 | Intermediate-joint mass lumping | linear split to adjacent levels (inferred, Lump Mass Yes) | V131 upward, V127 mid-height (same result) | MISMATCH (roof +215.463 / base −215.463 kN) |
 | D8 | z = 0 free-node mass | Base row, outside W | V127 puts 195.243 kN in floor 1 | MISMATCH (convention; T −0.116 % together with D7) |
 | D9 | g for mass ↔ weight | 9.80665 (UnitMass × g = UnitWeight) | 9.81 (`components/nbc105/constants.py`) | MISMATCH (0.0342 %; 3.78 kN per floor when converting ETABS masses) |
@@ -264,3 +264,55 @@ Headline: **9 mismatches** (D1–D9), 11 matches, 1 unverified. D1 is the primar
 2. ETABS: wall pier forces at the base (P per pier), shell or slab corner forces, and brace axial forces for Dead and Live. These would split the −3,257 kN residual into slab and outrigger terms.
 3. Optional ETABS check of the lumping rule: move the spandrel soffit joints, or report joint masses, to confirm the linear split behind the ±215.463 kN.
 4. Rayleigh/ESM re-run on the clear-beam export, if the user adopts the ETABS base and roof convention (expected effect about −0.12 % on T).
+
+### 7.7 Wall meshing (§7.3 #9, D6), re-measured 2026-11-21
+
+**What the mesher does.** In `components/model/assembly.py`, `_mesh_areas` uses `floor_subdivisions` (default 4; the user ran 4, 8 and 16) only to refine FLOOR panels, giving slab cell edges of 1.5 / 0.75 / 0.375 m. SHEAR WALL panels get only the coplanar coordinate lines:
+
+- horizontal lines come from the slab subdivision points that lie on the wall plane;
+- vertical lines come only from storey and opening levels.
+
+So wall cell heights are never refined, while wall widths shrink with the slab mesh. ETABS meshes all 375 wall objects (`Wall 600`, f11 = f22 = f12 = 0.5) with `Wall Auto Mesh` = Default and `Analysis - Wall Mesh Settings` = 1 m maximum.
+
+**Measured [H] from `OpenSees_Complete_Model_Data_V118.json`** in the user's MESH_04/08/16 runs (SHA-256 prefixes 8cb0cafa659c51fe, 2c7e4f966afeb945, 04756d89c2dbd310), using `components/model/shell_mesh_quality.py`:
+
+| Mesh | Floor cells, edge (m) | Wall cells | Wall width (m) | Wall vertical extent (m) | Max wall aspect | Wall cells with aspect > 4 / > 10 / > 50 | Hanging nodes |
+|---|---|---|---|---|---|---|---|
+| MESH_04 | 7,000; 0.5–1.5 | 3,400 | 0.1–1.2 | 1.5, 2.3, 3.8 only | 23 | 2,350 / 750 / 0 | 1,250 |
+| MESH_08 | 28,400; 0.25–0.75 | 4,700 | 0.05–0.75 | 1.5, 2.3, 3.8 only | 46 | 4,000 / 1,500 / 0 | 1,250 |
+| MESH_16 | 111,200; 0.125–0.375 | 7,500 | 0.025–0.375 | 1.5, 2.3, 3.8 only | 92 | 7,400 / 5,100 / 550 | 1,250 |
+
+- **Corrections to earlier figures.** The row 9 figures in §7.3 are corrected: the MESH_04 minimum width is 0.1 m, not 0.2 m. The largest aspect ratio is 92 (0.025 × 2.3 m), not about 150, because no 0.025 m cell is 3.8 m tall.
+- **Hanging nodes.** These are wall nodes that lie inside a neighbouring cell edge.
+  - 1,100 of them sit on slab edges at floor levels. They are opening and core-wall lines that the slabs do not share.
+  - 150 sit at the 2.3 m level on core corner lines.
+- **Load totals.** All three meshes have the same total downward load, 286,419.758 kN.
+
+**Option added (diagnostic and opt-in).** Config key `wall_max_cell_size_m` (absent = historical mesh). With 1.0, every wall cell edge is ≤ 1.0 m and the mesh stays conforming. These figures come from the mesher on the same topology, without any solve:
+
+- **Wall cells:** 10,650 / 13,700 / 22,000.
+- **Max wall aspect:** 7.7 / 15.3 / 30.7. The remaining ratios come from the historical narrow widths.
+- **Hanging nodes:** 1,100. The 150 corner junctions are removed, and no new hanging node is created.
+- **MESH_04 export totals:** total downward load and total seismic weight are unchanged to about 1e-13 relative.
+
+The export report records `wall_max_cell_size_m` and `shell_mesh_quality_audit`.
+
+**Verdict: STILL OPEN, secondary.** Mesh geometry alone does not decide the support-reaction split. OpenSees is installed in the agent environment, but no OpenSees solve was run for this change. The hypothesis stays open until the user runs the re-run recipe below.
+
+**Re-run recipe (Windows, conda, Spyder or a terminal at the repository root).**
+
+1. Copy the clear-beam export root that was used for the MESH_04 gravity comparison into a new folder. Keep the original read-only.
+2. In the copy, add `"wall_max_cell_size_m": 1.0` to `OpenSees_Complete_Model_Config_V118.json`. Leave `floor_subdivisions` at 4 and `wall_base_restraint_policy` at `SOURCE_ONLY`.
+3. Rebuild with the ETABS wall modifiers:
+   ```
+   python tools\REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py --source-dir <copy> --assignment-workbook <Assignment_Export_ULS xlsx> --dest-dir <new folder> --elastic-comparison-settings docs\validation\20261121_native_gravity_uls.json
+   ```
+   The settings file is on origin/main. It applies the native `Wall 600` f = 0.5 / m = 0.1 shell modifiers and the frame modifiers.
+4. Build a control export in the same way, without the key, so the two exports differ only in `wall_max_cell_size_m`.
+5. In each `OpenSees_Complete_Export_Report_V118.json`, check that:
+   - `wall_max_cell_size_m` is 1.0 or null;
+   - `shell_mesh_quality_audit.categories["SHEAR WALL"].max_edge_m` is ≤ 1.0 in the refined export;
+   - `total_downward_load_kN` is equal in both exports.
+6. Run gravity `1.0D + 1.0L` on both exports with the 76 ETABS source supports and with the 32-point diagnostic. Write `export_gravity_beam_actions`.
+7. Run `tools/gravity_reaction_attribution.py` on each comparison and report the change in the core and perimeter group reactions between the two exports.
+
