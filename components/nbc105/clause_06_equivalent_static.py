@@ -22,16 +22,19 @@ def base_shear_coefficient(spectrum,*,overstrength,limit_state,ductility=None):
     raise ValueError("limit state must be ULS/SLS")
 
 def base_shear(coefficient,seismic_weight):
-    """§6.2(1) p.38: V=Cd(T1)*W."""
+    """§6.2(1) p.38: V=Cd(T1)*W.
+[REF NBC105-2025 §6, printed pp. 38–39]"""
     return _positive(coefficient,"coefficient")*_positive(seismic_weight,"seismic_weight")
 
 def distribution_exponent(period_s):
-    """§6.3 p.39: k=1 for T<=0.5, k=2 for T>=2.5; interpolate."""
+    """§6.3 p.39: k=1 for T<=0.5, k=2 for T>=2.5; interpolate.
+[REF NBC105-2025 §6, printed pp. 38–39]"""
     t=_positive(period_s,"period")
     return 1. if t<=.5 else 2. if t>=2.5 else 1.+(t-.5)/2.
 
 def distribute_forces(shear_kN,weights_kN,heights_m,exponent):
-    """§6.3(1) p.39: Fi=V Wi hi^k / sum(Wj hj^k)."""
+    """§6.3(1) p.39: Fi=V Wi hi^k / sum(Wj hj^k).
+[REF NBC105-2025 §6, printed pp. 38–39]"""
     v=_positive(shear_kN,"base shear");k=_positive(exponent,"k")
     w=list(weights_kN);h=list(heights_m)
     if not w or len(w)!=len(h):raise ValueError("weights and heights mismatched")
@@ -40,7 +43,8 @@ def distribute_forces(shear_kN,weights_kN,heights_m,exponent):
     return [v*t/denom for t in terms]
 
 def esm_deflection_factor(storeys):
-    """§6.5 Table 6-1 p.39, applies only to ESM deflections."""
+    """§6.5 Table 6-1 p.39, applies only to ESM deflections.
+[REF NBC105-2025 §6, printed pp. 38–39]"""
     if isinstance(storeys,bool) or not isinstance(storeys,int) or storeys<1:
         raise ValueError("storeys must be a positive integer")
     return {1:1.,2:.97,3:.94,4:.91,5:.88}.get(storeys,.85)
