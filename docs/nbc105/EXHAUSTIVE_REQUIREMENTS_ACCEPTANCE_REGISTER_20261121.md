@@ -51,3 +51,7 @@ Only after **every normative sentence** of Clauses 1–10 and Annexes A/B/C has 
 ## Local Annex reference calculations
 
 Independent Annex A and Annex B Python modules have now been wired to the same local dispatcher, CLI and NBC settings GUI as Clauses 1–10 without merging their authority into a different clause. They evaluate specifically source-derived RC shear-wall minima/boundary triggers/coupling-beam diagonal requirements and steel eccentric-brace I-section seismic-link rotational limits. They **do not** certify full Annex detailing, steel outriggers/FVD compatibility, full wall design or any structural member capacity. Annex C full zoning dataset remains open. See `tests/test_nbc105_annex_dispatch.py` and `tests/test_nbc105_annex_ab_source_checks.py`.
+
+## New focused source detail evidence
+
+Annex A §5.6 now includes explicit opening replacement-reinforcement and critical-shear-plane checklist logic; this particularly matters for the project’s 12 m gross X-wall envelopes with two voids. Annex B §7.1.1 now requires an **explicit I-section seismic-link designation** before the §7.1.4 rotation limit can be calculated, preventing false application to SHS outriggers/FVD links. Source-based checks still require independent ETABS demand/capacity and actual reinforcement or connection drawings before approval.
