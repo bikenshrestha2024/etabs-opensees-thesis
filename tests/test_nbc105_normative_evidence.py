@@ -5,6 +5,7 @@ value (read from the user's PDF page images, printed page cited) and compares
 it with the reference module. These are unit tests of code-versus-print
 transcription. They are not engineering acceptance of any building.
 """
+import math
 import unittest
 
 from components.nbc105.clause_02_general_principles import RETURN_PERIOD_YEARS
@@ -189,6 +190,110 @@ class Clause10Pins(unittest.TestCase):
         z, hp, H, ap, mu, ip, wp = 0.35, 20.0, 95.0, 1.0, 1.5, 1.0, 10.0
         expected = z * (1 + hp / H) * (ap / mu) * ip * wp
         self.assertAlmostEqual(component_design_force(z=z, hp=hp, H=H, ap=ap, mu_p=mu, Ip=ip, Wp=wp), expected)
+
+
+class AnnexAWallPins(unittest.TestCase):
+    """Printed Annex A 5.1 (p.76), 5.3 and 5.5.2(a) (p.78) boundaries, one limit at a time."""
+
+    def _minima(self, **kw):
+        from components.nbc105.annex_a_rc_detailing import rc_wall_detailing_minima
+        base = dict(thickness_mm=300.0, wall_length_mm=6000.0, coupled=False, fck_mpa=30.0,
+                    shear_stress_mpa=0.5, horizontal_ratio=0.0025, vertical_ratio=0.0025,
+                    bar_diameter_mm=20.0, bar_spacing_mm=200.0, reinforcement_curtains=2)
+        base.update(kw)
+        return rc_wall_detailing_minima(**base)["violations"]
+
+    def test_minimum_thickness_150_special_and_300_coupled(self):
+        # A.5.1 item 2
+        self.assertEqual(self._minima(thickness_mm=150.0, bar_diameter_mm=12.0, reinforcement_curtains=1), [])
+        self.assertIn("THICKNESS_LT_SPECIAL_MINIMUM",
+                      self._minima(thickness_mm=149.9, bar_diameter_mm=12.0, reinforcement_curtains=1))
+        self.assertEqual(self._minima(coupled=True), [])
+        self.assertIn("THICKNESS_LT_COUPLED_MINIMUM", self._minima(coupled=True, thickness_mm=299.9))
+
+    def test_length_to_thickness_at_least_4(self):
+        # A.5.1 item 3
+        self.assertEqual(self._minima(wall_length_mm=1200.0, bar_spacing_mm=240.0), [])
+        self.assertIn("WALL_LENGTH_TO_THICKNESS_LT_4", self._minima(wall_length_mm=1199.0, bar_spacing_mm=200.0))
+
+    def test_reinforcement_ratio_0_0025_each_direction(self):
+        # A.5.1 item 4
+        self.assertIn("HORIZONTAL_REBAR_RATIO_LT_0_0025", self._minima(horizontal_ratio=0.00249))
+        self.assertIn("VERTICAL_REBAR_RATIO_LT_0_0025", self._minima(vertical_ratio=0.00249))
+        self.assertEqual(self._minima(horizontal_ratio=0.0025, vertical_ratio=0.0025), [])
+
+    def test_two_curtains_when_200_mm_or_stress_above_quarter_root_fck(self):
+        # A.5.1 items 5-7: thickness of 200 mm or higher, or tau > 0.25 sqrt(fck)
+        self.assertIn("TWO_REINFORCEMENT_CURTAINS_REQUIRED",
+                      self._minima(thickness_mm=200.0, reinforcement_curtains=1, bar_diameter_mm=20.0))
+        self.assertEqual(self._minima(thickness_mm=199.9, reinforcement_curtains=1, bar_diameter_mm=19.0), [])
+        limit = 0.25 * math.sqrt(30.0)
+        self.assertEqual(self._minima(thickness_mm=199.9, reinforcement_curtains=1, bar_diameter_mm=19.0,
+                                      shear_stress_mpa=limit), [])
+        self.assertIn("TWO_REINFORCEMENT_CURTAINS_REQUIRED",
+                      self._minima(thickness_mm=199.9, reinforcement_curtains=1, bar_diameter_mm=19.0,
+                                   shear_stress_mpa=limit + 1e-6))
+
+    def test_bar_diameter_one_tenth_of_thickness_and_spacing_cap(self):
+        # A.5.1 items 8-9: db <= t/10; spacing <= min(lw/5, 3 tw, 450 mm)
+        self.assertEqual(self._minima(bar_diameter_mm=30.0), [])
+        self.assertIn("LONGITUDINAL_BAR_DIAMETER_TOO_LARGE", self._minima(bar_diameter_mm=30.1))
+        self.assertEqual(self._minima(bar_spacing_mm=450.0), [])
+        self.assertIn("BAR_SPACING_TOO_LARGE", self._minima(bar_spacing_mm=450.1))
+        self.assertEqual(self._minima(wall_length_mm=1200.0, bar_spacing_mm=240.0), [])
+        self.assertIn("BAR_SPACING_TOO_LARGE", self._minima(wall_length_mm=1200.0, bar_spacing_mm=241.0))
+
+    def test_boundary_element_trigger_length_and_steel_band(self):
+        # A.5.3 items 1, 2, 4: 0.2 fck trigger (strict), 0.2 lw each side, 0.8 to 6 percent steel
+        from components.nbc105.annex_a_rc_detailing import rc_wall_boundary_element_requirement as f
+        mk = lambda stress, ratio: f(fck_mpa=25.0, extreme_compression_mpa=stress,
+                                     wall_length_mm=5000.0, longitudinal_ratio=ratio)
+        self.assertFalse(mk(5.0, 0.008)["boundary_required"])
+        self.assertTrue(mk(5.0001, 0.008)["boundary_required"])
+        self.assertAlmostEqual(mk(6.0, 0.008)["boundary_length_each_end_mm"], 1000.0)
+        self.assertAlmostEqual(mk(6.0, 0.008)["discontinuation_stress_below_mpa"], 3.75)
+        self.assertTrue(mk(6.0, 0.008)["ratio_pass"])
+        self.assertTrue(mk(6.0, 0.06)["ratio_pass"])
+        self.assertFalse(mk(6.0, 0.00799)["ratio_pass"])
+        self.assertFalse(mk(6.0, 0.0601)["ratio_pass"])
+
+    def test_coupling_beam_diagonal_trigger_is_strict(self):
+        # A.5.5 item 2, Eq. 5.5.2(a): tau_ve > 0.1 sqrt(fck) Ls/D
+        from components.nbc105.annex_a_rc_detailing import coupling_beam_diagonal_required as f
+        kw = dict(fck_mpa=25.0, clear_span_mm=2000.0, depth_mm=1000.0)
+        self.assertFalse(f(shear_stress_mpa=1.0, **kw))
+        self.assertTrue(f(shear_stress_mpa=1.0001, **kw))
+
+
+class AnnexBLinkPins(unittest.TestCase):
+    """Printed Annex B 7.1.2 to 7.1.4 (pp.96-97)."""
+
+    def _theta(self, e, orientation="vertical", alpha=0.5):
+        from components.nbc105.annex_b_steel_detailing import seismic_link_rotation_limit_rad as f
+        return f(link_length_m=e, mp_kNm=100.0, vp_kN=100.0, orientation=orientation,
+                 section_type="I", alpha=alpha if orientation == "vertical" else None)
+
+    def test_vertical_link_midpoint_interpolates_between_0_08_and_0_02(self):
+        # alpha = 0.5, Mp/Vp = 1 m: short e <= 1.2 m, long e >= 2.25 m
+        self.assertAlmostEqual(self._theta(1.2), 0.08)
+        self.assertAlmostEqual(self._theta(1.725), 0.05)
+        self.assertAlmostEqual(self._theta(2.25), 0.02)
+        self.assertAlmostEqual(self._theta(0.5), 0.08)
+        self.assertAlmostEqual(self._theta(5.0), 0.02)
+
+    def test_horizontal_link_limits_do_not_use_alpha(self):
+        self.assertAlmostEqual(self._theta(1.6, "horizontal"), 0.08)
+        self.assertAlmostEqual(self._theta(2.3, "horizontal"), 0.05)
+        self.assertAlmostEqual(self._theta(3.0, "horizontal"), 0.02)
+
+    def test_alpha_is_a_ratio_between_zero_and_one(self):
+        from components.nbc105.annex_b_steel_detailing import seismic_link_rotation_limit_rad as f
+        for bad in (-0.1, 1.1, float("nan")):
+            with self.assertRaises(ValueError):
+                f(link_length_m=1.0, mp_kNm=100.0, vp_kN=100.0, orientation="vertical",
+                  section_type="I", alpha=bad)
+        with self.assertRaises(ValueError):
+            f(link_length_m=1.0, mp_kNm=100.0, vp_kN=100.0, orientation="vertical", section_type="I")
 
 
 if __name__ == "__main__":
