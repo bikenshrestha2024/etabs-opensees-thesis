@@ -37,7 +37,8 @@ def esm_applicability(*,height_m,period_s,irregular,limit_state):
             "scope":"ESM_METHOD_ELIGIBILITY_NOT_DESIGN_COMPLIANCE"}
 
 def cracked_flexural_factor(component,limit_state):
-    """§3.4 Table 3-1 p.19, absence of rational cracked-section assessment."""
+    """§3.4 Table 3-1 p.19, absence of rational cracked-section assessment.
+[REF NBC105-2025 §3, printed pp. 17–21]"""
     state=str(limit_state).upper()
     if state not in ("ULS","SLS"):raise ValueError("limit state must be ULS or SLS")
     key=str(component).strip().lower()
@@ -45,7 +46,8 @@ def cracked_flexural_factor(component,limit_state):
     return CRACKED_FLEXURAL_FACTORS[key][0 if state=="ULS" else 1]
 
 def bearing_pressure_limit(allowable_pressure,*,earthquake):
-    """§3.8 p.21: upper permissible 50% increase, not automatic approval."""
+    """§3.8 p.21: upper permissible 50% increase, not automatic approval.
+[REF NBC105-2025 §3, printed pp. 17–21]"""
     p=_positive(allowable_pressure,"allowable_pressure")
     if type(earthquake) is not bool:raise ValueError("earthquake must be bool")
     return p*(1.5 if earthquake else 1.0)
