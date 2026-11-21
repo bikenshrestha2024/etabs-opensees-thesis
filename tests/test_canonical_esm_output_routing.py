@@ -84,5 +84,23 @@ class StageOwnedESMTests(unittest.TestCase):
             self.assertEqual(target.read_text(encoding="utf-8"),'{"a":9}')
 
 
+
+    def test_new_esm_and_rayleigh_producers_choose_stage_owner(self):
+        import ast
+        repo=Path(__file__).resolve().parents[1]
+        for module in ("components/equivalent_static/calculation_and_gui.py",
+                       "components/modal/rayleigh.py",
+                       "components/inputs/opensees_nbc_sync.py"):
+            tree=ast.parse((repo/module).read_text(encoding="utf-8-sig"))
+            calls=[n for n in ast.walk(tree)
+                   if isinstance(n,ast.Call)
+                   and isinstance(n.func,ast.Name)
+                   and n.func.id=="analysis_output_folder"]
+            self.assertTrue(calls, module)
+            for call in calls:
+                stages=[kw.value.value for kw in call.keywords
+                        if kw.arg=="stage" and isinstance(kw.value,ast.Constant)]
+                self.assertEqual(stages,["ESM"],module + " must write stage-owned ESM outputs")
+
 if __name__=="__main__":
     unittest.main()
