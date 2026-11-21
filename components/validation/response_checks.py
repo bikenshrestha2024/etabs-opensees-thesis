@@ -10,8 +10,16 @@ def write_csv(path,rows):
             w=csv.DictWriter(stream,fieldnames=list(dict.fromkeys(k for row in rows for k in row)));w.writeheader();w.writerows(rows)
 
 def drift_check(rows,limit_state):
-    limit={'ULS':.025,'SLS':.006}[limit_state]
-    return [dict(**r,limit_state=limit_state,limit_ratio=limit,clause='NBC 105:2025 5.5.3',status='PASS' if abs(float(r['design_drift_ratio']))<=limit else 'EXCEEDS') for r in rows]
+    """Report §5.5.3 using one canonical Clause 5 limit, with unchanged schema."""
+    from components.nbc105.clause_05_dynamic_characteristics import interstory_drift_check
+    result=[]
+    for row in rows:
+        # Input is already a design drift RATIO; pass unit storey height.
+        decision=interstory_drift_check(row["design_drift_ratio"],1.0,limit_state)
+        result.append(dict(**row,limit_state=limit_state,limit_ratio=decision["limit"],
+                           clause='NBC 105:2025 5.5.3',
+                           status='PASS' if decision["pass"] else 'EXCEEDS'))
+    return result
 
 def irregularity(data,story_rows=None,capacity_rows=None):
     groups=sorted(data.get('diaphragms',[]),key=lambda g:g['master_xyz'][2]);nodes=data['nodes'];checks=[]

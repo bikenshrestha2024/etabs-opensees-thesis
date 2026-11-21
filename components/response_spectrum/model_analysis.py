@@ -29,8 +29,13 @@ def combine(values,rho):
     return np.sqrt(np.maximum(0.,np.einsum('i...,ij,j...->...',a,rho,a)))
 
 def design_cd(T,cfg):
+    """Use the canonical Clause 7 modal ordinate (Clause 6 shared divisor)."""
+    from components.nbc105.clause_07_modal_response_spectrum import modal_design_coefficient
     elastic=spectral_shape_ch(T,cfg['soil'],'dynamic')*float(cfg['Z'])*float(cfg['I'])
-    return elastic/(float(cfg['rmu'])*float(cfg['omegau'])) if cfg['limit_state']=='ULS' else .2*elastic/float(cfg['omegas'])
+    return modal_design_coefficient(elastic if cfg['limit_state']=='ULS' else .2*elastic,
+            ductility=float(cfg['rmu']) if cfg['limit_state']=='ULS' else None,
+            overstrength=float(cfg['omegau']) if cfg['limit_state']=='ULS' else float(cfg['omegas']),
+            limit_state=cfg['limit_state'])
 
 @timed_outputs('Model modal response spectrum analysis','output_dir')
 def run_model_spectrum(folder,config,output_dir):
@@ -140,7 +145,8 @@ def run_model_spectrum(folder,config,output_dir):
                 force_checks.append(dict(mode=row['mode'],modal_inertia_base_shear_kN=expected,modal_support_reaction_kN=reaction,error_kN=reaction+expected,error_percent=100*abs(reaction+expected)/max(1.,abs(expected))))
             rho=cqc_matrix([r['omega_rad_s'] for r in rows],float(config.get('damping',.05)))
             raw_V=float(combine(modal_V,rho));reference=calculate_esm(stories,period_s=float(config['T1_'+axis]),soil_type=config['soil'],zoning_factor_z=float(config['Z']),importance_factor_i=float(config['I']),limit_state=state,r_mu=float(config['rmu']),omega_u=float(config['omegau']),omega_s=float(config['omegas']),irregular=True,diagnostic_reference=True)
-            scale=max(1.,reference['base_shear_kN']/raw_V);u=combine(modal_u,rho);d=combine(modal_d,rho);shear=combine(modal_shear,rho)*scale;f=combine(modal_f,rho)*scale
+            from components.nbc105.clause_07_modal_response_spectrum import force_scale_factor
+            scale=force_scale_factor(reference['base_shear_kN'],raw_V);u=combine(modal_u,rho);d=combine(modal_d,rho);shear=combine(modal_shear,rho)*scale;f=combine(modal_f,rho)*scale
             amp=float(config['rmu']) if state=='ULS' else 1.
             edge_d=combine(modal_edge,rho)*amp
             # NBC force scale is deliberately not applied to displacement/drift; ESM kd is not an MRSM factor.

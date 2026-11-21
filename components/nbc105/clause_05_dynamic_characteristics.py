@@ -205,3 +205,123 @@ def period_factor_deviation(factor):
         return None
     return (f"DEVIATION: period amplification factor {factor} differs from the "
             f"NBC 105:2025 §5.1.3 value {AMPLIFICATION_FACTOR}")
+
+# [REF NBC105-2025 §5.3 Table 5-2, printed p.32].
+# (name, Rmu, Omega_u, Omega_s) keyed by unique printed row; wall and dual
+# system share labels but NOT the same coefficients.
+_TABLE_5_2 = {
+ 1:("Steel Moment Resisting Frame",4.,1.5,1.25),
+ 2:("Reinforced Concrete Moment Resisting Frame",4.,1.5,1.25),
+ 3:("Steel + RC Composite Moment Resisting Frame",4.,1.5,1.25),
+ 4:("Steel Eccentrically Braced Frame",4.,1.5,1.25),
+ 5:("Steel + RC Composite Eccentrically Braced Frame",4.,1.5,1.25),
+ 6:("Steel Concentric Braced Frame",3.,1.3,1.15),
+ 7:("Steel + RC Composite Concentric Braced Frame",3.,1.3,1.15),
+ 8:("Steel Buckling Restraint Braces",4.,1.5,1.25),
+ 9:("RC Shear wall",3.,1.3,1.15),
+ 10:("Steel + RC Composite Shear Wall",3.,1.3,1.15),
+ 11:("Reinforced Masonry Shear wall",2.5,1.2,1.1),
+ 12:("Confined Masonry wall",2.5,1.2,1.1),
+ 13:("Unreinforced Masonry wall with horizontal bands and vertical reinforcement bars",2.,1.2,1.1),
+ 14:("Dual Steel Eccentrically Braced Frame",4.,1.5,1.25),
+ 15:("Dual Steel + RC Composite Eccentrically Braced Frame",4.,1.5,1.25),
+ 16:("Dual Steel Concentric Braced Frame",3.5,1.4,1.2),
+ 17:("Dual Steel + RC Composite Concentric Braced Frame",3.5,1.4,1.2),
+ 18:("Dual Steel Buckling Restraint Braces",4.,1.5,1.25),
+ 19:("Dual RC Shear wall",3.5,1.4,1.2),
+ 20:("Dual Steel + RC Composite Shear Wall",3.5,1.4,1.2),
+ 21:("Dual Reinforced Masonry Shear wall",2.5,1.2,1.1),
+}
+
+def table_5_2_system_factors(row):
+    """§5.3.1–5.3.4 p.32: exact Table 5-2 row selection (1..21).
+[REF NBC105-2025 §5, printed pp. 28–37]"""
+    if isinstance(row,bool) or not isinstance(row,int) or row not in _TABLE_5_2:
+        raise ValueError("NBC Table 5-2 requires one of 21 exact row numbers")
+    name,rm,ou,os=_TABLE_5_2[row]
+    return {"row":row,"system":name,"Rmu":rm,"Omega_u":ou,"Omega_s":os,
+            "Rs":1.0,"status":"TABLE_VALUE_ONLY_DETAILING_QUALIFICATION_OPEN"}
+
+def _strictly_below(a,b):
+    return a < b and not math.isclose(a,b,rel_tol=1e-12,abs_tol=1e-12)
+
+def _strictly_above(a,b):
+    return a > b and not math.isclose(a,b,rel_tol=1e-12,abs_tol=1e-12)
+
+def weak_story(story_strength,above_strength):
+    """[REF NBC105-2025 §5, printed pp. 28–37]
+§5.4.1.1 p.33: story lateral strength strictly <80% of above."""
+    return _strictly_below(_positive(story_strength,"strength"),
+                           .8*_positive(above_strength,"above strength"))
+
+def soft_story(story_stiffness,above_stiffness,three_above=None):
+    """§5.4.1.2 p.33: <70% above OR <80% three-above mean.
+    The three-storey criterion is evaluated only if all three values supplied.
+    
+[REF NBC105-2025 §5, printed pp. 28–37]"""
+    current=_positive(story_stiffness,"stiffness")
+    above=_positive(above_stiffness,"above stiffness")
+    flagged=_strictly_below(current,.7*above)
+    if three_above is not None:
+        vals=list(three_above)
+        if len(vals)!=3:raise ValueError("three_above must have exactly three story stiffnesses")
+        mean=math.fsum(_positive(x,"above stiffness") for x in vals)/3.
+        flagged=flagged or _strictly_below(current,.8*mean)
+    return flagged
+
+def torsion_irregularity(max_displacement,min_displacement):
+    """§5.4.2.1–2 p.34: >1.5 torsion, >2.5 extreme (prohibited).
+[REF NBC105-2025 §5, printed pp. 28–37]"""
+    maxv=_positive(max_displacement,"maximum end displacement")
+    minv=_positive(min_displacement,"minimum end displacement")
+    if _strictly_above(maxv,2.5*minv):
+        return "EXTREME_TORSION_PROHIBITED"
+    if _strictly_above(maxv,1.5*minv):
+        return "TORSION_IRREGULAR"
+    return "REGULAR"
+
+def reentrant_corner_irregularity(projection_m,overall_dimension_m):
+    """§5.4.2.3 p.34: projection strictly >15% overall dimension.
+[REF NBC105-2025 §5, printed pp. 28–37]"""
+    return _strictly_above(_positive(projection_m,"projection"),
+                           .15*_positive(overall_dimension_m,"dimension"))
+
+def interstory_drift_check(relative_deflection_m,storey_height_m,limit_state):
+    """§5.5.3 p.37: <=0.025 ULS, <=0.006 SLS (design-level drift).
+[REF NBC105-2025 §5, printed pp. 28–37]"""
+    drift=float(relative_deflection_m)
+    if not math.isfinite(drift):raise ValueError("nonfinite inter-storey drift")
+    h=_positive(storey_height_m,"storey height")
+    state=str(limit_state).upper()
+    if state not in ("ULS","SLS"):raise ValueError("limit_state must be ULS/SLS")
+    ratio=abs(drift)/h
+    limit=.025 if state=="ULS" else .006
+    return {"pass":ratio<=limit or math.isclose(ratio,limit,rel_tol=1e-12),
+            "ratio":ratio,"limit":limit,
+            "basis":"DESIGN_DRIFT_INPUT_ONLY_NBC_3_4_STIFFNESS_MUST_BE_VERIFIED"}
+
+def uls_design_deflection(linear_deflection_m,ductility_factor):
+    """§5.5.1.1 p.36: multiply elastic ESM/MRSM horizontal deflection by Rmu.
+[REF NBC105-2025 §5, printed pp. 28–37]"""
+    d=float(linear_deflection_m)
+    if not math.isfinite(d):raise ValueError("nonfinite elastic displacement")
+    return d*_positive(ductility_factor,"Rmu")
+
+def separation_gap_m(building1_design_deflection_m,building2_design_deflection_m):
+    """§5.5.2 p.36: SRSS of design horizontal deflections.
+[REF NBC105-2025 §5, printed pp. 28–37]"""
+    a=float(building1_design_deflection_m);z=float(building2_design_deflection_m)
+    if not math.isfinite(a) or not math.isfinite(z):raise ValueError("nonfinite displacement")
+    return math.hypot(a,z)
+
+def accidental_eccentricities_m(building_width_m):
+    """§5.6 p.37: ±0.05b, distinct from inherent CM–CR eccentricity.
+[REF NBC105-2025 §5, printed pp. 28–37]"""
+    e=.05*_positive(building_width_m,"b")
+    return (-e,e)
+
+__all__ += [
+    "table_5_2_system_factors","weak_story","soft_story","torsion_irregularity",
+    "reentrant_corner_irregularity","interstory_drift_check",
+    "uls_design_deflection","separation_gap_m","accidental_eccentricities_m",
+]

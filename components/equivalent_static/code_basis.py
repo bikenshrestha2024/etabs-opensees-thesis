@@ -162,27 +162,23 @@ def live_load_factor(occupancy):
 
 
 def flexural_stiffness_modifier(component, stage="ultimate"):
-    """Return Table 3-1 factor for the selected component and design stage."""
+    """Legacy compatible Table 3-1 adapter; Clause 3 owns coefficients."""
+    from components.nbc105.clause_03_scope_of_analysis import cracked_flexural_factor
     key = str(component).strip().lower().replace(" ", "_")
-    stage_key = str(stage).strip().lower()
-    if stage_key not in {"ultimate", "serviceability"}:
+    st = str(stage).strip().lower()
+    if st not in ("ultimate","serviceability"):
         raise ValueError("stage must be 'ultimate' or 'serviceability'")
-    if key in {"beam", "rc_beam"}:
-        return CRACKED_STIFFNESS_MODIFIERS["beam"][stage_key]
-    if key in {"column", "rc_column"}:
-        return CRACKED_STIFFNESS_MODIFIERS["column"][stage_key]
-    if key in {"wall", "wall_cracked", "cracked_wall"}:
-        return CRACKED_STIFFNESS_MODIFIERS["wall_cracked"][stage_key]
-    if key in {"wall_uncracked", "uncracked_wall"}:
-        return CRACKED_STIFFNESS_MODIFIERS["wall_uncracked"][stage_key]
-    if key in {"masonry", "masonry_wall"}:
-        return CRACKED_STIFFNESS_MODIFIERS["masonry_wall"][stage_key]
-    if key == "flat_slab":
-        return CRACKED_STIFFNESS_MODIFIERS["flat_slab"][stage_key]
+    canonical = {
+        "beam":"beam","rc_beam":"beam","column":"column",
+        "rc_column":"column","wall":"cracked wall","wall_cracked":"cracked wall",
+        "cracked_wall":"cracked wall","wall_uncracked":"uncracked wall",
+        "uncracked_wall":"uncracked wall","masonry":"masonry wall",
+        "masonry_wall":"masonry wall","flat_slab":"flat slab"}
     if key in {"slab", "conventional_slab", "floor_slab"}:
         raise ValueError("NBC 105:2025 Table 3-1 has a tabulated stiffness factor only for flat slabs. For a conventional slab, provide documented rational cracked stiffness or verified ETABS effective stiffness.")
-    return 1.0  # Unknown/steel component: do not invent a reduction.
-
+    if key in canonical:
+        return cracked_flexural_factor(canonical[key], "ULS" if st=="ultimate" else "SLS")
+    return 1.0  # Steel/unknown: existing gross stiffness fallback; review separately.
 
 def mass_source_factor(pattern_name, is_roof_live=False):
     """Return seismic mass factor; roof-live assignments always receive zero.
@@ -265,13 +261,9 @@ def esm_spectral_shape_factor(period_s, soil_type):
 
 
 def esm_period_exponent(period_s):
-    """NBC 105 §6.3 k: 1 for T<=0.5, 2 for T>=2.5, linear between."""
-    T = float(period_s)
-    if T <= 0.5:
-        return 1.0
-    if T >= 2.5:
-        return 2.0
-    return 1.0 + (T - 0.5) / 2.0
+    """Compatibility shim: single NBC §6.3 owner is Clause 6."""
+    from components.nbc105.clause_06_equivalent_static import distribution_exponent
+    return distribution_exponent(period_s)
 
 
 def soil_type_from_vs30(vs30_m_s):
@@ -301,35 +293,28 @@ def soil_type_from_n_spt(n_spt_blow_30cm):
 
 
 def esm_eligibility(height_m, period_s, limit_state, irregular=None):
-    """Return (permitted, explanation) under NBC 105:2025 §3.2.1.
-
-    ESM is permitted for all SLS. For ULS at least one test is required:
-    H<=15m; T1<0.5s; or regular structure with H<40m. ``irregular`` must
-    be explicitly True/False to evaluate the third criterion.
-    """
+    """§3.2.1 compatibility tuple; method eligibility owned by Clause 3."""
+    from components.nbc105.clause_03_scope_of_analysis import esm_applicability
     H, T = float(height_m), float(period_s)
     state = str(limit_state).strip().upper()
-    if state == "SLS":
+    # Unknown irregularity can never satisfy the regular H<40 branch.
+    result=esm_applicability(height_m=H,period_s=T,
+            irregular=(irregular is not False),limit_state=state)
+    if state=="SLS":
         return True, "NBC 105:2025 §3.2.1 permits ESM for all SLS calculations."
-    if state != "ULS":
-        raise ValueError("limit_state must be ULS or SLS")
-    checks=[]
-    if H <= 15.0:
-        checks.append("height <= 15 m")
-    if T < 0.5:
-        checks.append("fundamental period < 0.5 s")
-    if H < 40.0 and irregular is False:
-        checks.append("regular configuration and height < 40 m")
-    if checks:
-        return True, "ULS ESM criterion satisfied: " + "; ".join(checks) + "."
-    if irregular is None and H < 40.0:
+    details=[]
+    if "H_LE_15M" in result["basis"]:details.append("height <= 15 m")
+    if "T_LT_0_5S" in result["basis"]:details.append("fundamental period < 0.5 s")
+    if "REGULAR_H_LT_40M" in result["basis"]:details.append("regular configuration and height < 40 m")
+    if details:
+        return True, "ULS ESM criterion satisfied: " + "; ".join(details) + "."
+    if irregular is None and H < 40:
         return False, "ULS ESM eligibility needs explicit regularity confirmation under §5.4; otherwise use MRSM."
     return False, (
         "ULS ESM is not permitted by the supplied data under §3.2.1: requires "
         "H<=15 m, or T1<0.5 s, or a regular structure with H<40 m. "
         "Use MRSM or nonlinear analysis as applicable."
     )
-
 
 def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
                   importance_factor_i, limit_state="ULS", r_mu=4.0,
@@ -403,22 +388,27 @@ def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
         raise ValueError(eligibility_note)
     Ch=esm_spectral_shape_factor(T,soil_type)
     elastic_spectrum=Ch*Z*I
+    # Clauses 6.1–6.3 are owned by one source-verified implementation.
+    # This keeps the established ESM results/report fields intact.
+    from components.nbc105.clause_06_equivalent_static import (
+        base_shear_coefficient, base_shear, distribute_forces, esm_deflection_factor)
     if state == "ULS":
-        if float(r_mu)<=0 or float(omega_u)<=0: raise ValueError("Rmu and Omega_u must be positive.")
-        Cd=elastic_spectrum/(float(r_mu)*float(omega_u))
+        Cd=base_shear_coefficient(elastic_spectrum,overstrength=omega_u,
+                                  ductility=r_mu,limit_state="ULS")
         divisor=f"R_mu*Omega_u={float(r_mu):g}*{float(omega_u):g}"
     else:
-        if float(omega_s)<=0: raise ValueError("Omega_s must be positive.")
         # NBC §4.2: Cs(T)=0.20*C(T); §6.1.2: Cd=Cs/Omega_s.
-        Cd=0.20*elastic_spectrum/float(omega_s)
+        Cd=base_shear_coefficient(.20*elastic_spectrum,overstrength=omega_s,
+                                  limit_state="SLS")
         divisor=f"Omega_s={float(omega_s):g}; SLS spectrum=0.20*C(T)"
     W=sum(r["seismic_weight_kN"] for r in normalized)
-    V=Cd*W
+    V=base_shear(Cd,W)
     k=esm_period_exponent(T)
-    denom=sum(r["seismic_weight_kN"]*(r["height_m"]**k) for r in normalized)
-    for row in normalized:
+    forces=distribute_forces(V,[r["seismic_weight_kN"] for r in normalized],
+                            [r["height_m"] for r in normalized],k)
+    for row,force in zip(normalized,forces):
         row["distribution_exponent_k"]=k
-        row["lateral_force_kN"]=(row["seismic_weight_kN"]*row["height_m"]**k/denom)*V
+        row["lateral_force_kN"]=force
     return {
         "standard":"NBC 105:2025", "clauses":"§§3.2.1, 4.1.1-4.1.5, 4.2, 5.1-5.2, 6.1-6.4",
         "limit_state":state,"soil_type":str(soil_type).upper(),"period_s":T,
@@ -433,7 +423,7 @@ def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
         "coefficient_divisor":divisor,"period_exponent_k":k,
         "ductility_factor_R_mu":float(r_mu),"overstrength_factor_Omega_u":float(omega_u),
         "overstrength_factor_Omega_s":float(omega_s),
-        "deflection_scale_factor_kd":({1:1.0,2:0.97,3:0.94,4:0.91,5:0.88}.get(len(normalized),0.85)),
+        "deflection_scale_factor_kd":esm_deflection_factor(len(normalized)),
         # NBC 105:2025 §5.5.3: design inter-storey drift limits.
         "drift_limit_ratio":(0.025 if state=="ULS" else 0.006),
         "uls_drift_amplification":(float(r_mu) if state=="ULS" else 1.0),
