@@ -11,3 +11,9 @@
 **Example:** `force_only_scale(esm_shear=100,mrsm_shear=50,member_forces=[10],story_shears=[30],base_reactions=[-50],drifts=[.003],displacements=[.2])`
 
 **Tests:** `tests/test_nbc105_clauses_02_03_06_10.py` includes numerical and rejection tests. Actual ETABS and OpenSees analyses are outside this reference-only run; full module-to-GUI call-site migration remains open.
+
+## Canonical CQC kernel integrated with native MRSM (2026-11-21)
+
+`cqc_correlation_matrix(omega_rad_s,damping_ratio=0.05)` is pure Python and implements the former MRSM kernel's equal-modal-damping correlation expression for `§7.4`. All `omega_rad_s` are positive finite rad/s, ratio is positive finite and damping is positive and not greater than 5% under the active elastic MRSM settings. `components.response_spectrum.model_analysis.cqc_matrix` now delegates and returns the same NumPy matrix. Existing `combine(values,rho)` remains in the solver package, so vectorized envelope operations are unchanged.
+
+Numerical test: `tests/test_nbc105_source_numerical_integrity_v2.py`. No native nonlinear time history or ETABS equivalence inference.
