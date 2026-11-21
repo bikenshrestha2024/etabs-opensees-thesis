@@ -6,8 +6,8 @@ Default mode is read-only. --apply creates hash-verified categorized copies:
 It NEVER moves/deletes the originals, alters solver JSON, changes supports,
 or silently treats a mirrored folder as an analyzed/approved case.
 
-python tools/repair_project_output_layout.py "D:\\Thesis Opensees\\ETABS 11-21-2026\\1"
-python tools/repair_project_output_layout.py "D:\\Thesis Opensees\\ETABS 11-21-2026\\1" --apply
+python tools/repair_project_output_layout.py "D:\\PROJECT\\EXPORT_CASE"
+python tools/repair_project_output_layout.py "D:\\PROJECT\\EXPORT_CASE" --apply
 """
 from __future__ import annotations
 
