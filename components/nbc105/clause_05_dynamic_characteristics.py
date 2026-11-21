@@ -50,6 +50,22 @@ def _positive(value, name):
     return number
 
 
+def _finite(value, name):
+    if isinstance(value,bool):
+        raise ValueError(f"{name} must be finite")
+    try: number=float(value)
+    except (TypeError,ValueError,OverflowError) as exc:
+        raise ValueError(f"{name} must be finite") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{name} must be finite")
+    return number
+
+def _nonnegative(value, name):
+    number=_finite(value,name)
+    if number<0:raise ValueError(f"{name} must be nonnegative")
+    return number
+
+
 def building_height_m(top_z_m, base_z_m, *, basement_height_m=0.0,
                       basement_excluded=False):
     """Return H = top - base.
@@ -140,14 +156,20 @@ def rayleigh_period_s(weights_kN, displacements_m, forces_kN, g=GRAVITY_M_S2):
 
     [REF NBC105-2025 §5.1.1, printed p. 28] ``g`` defaults to the shared
     GRAVITY_M_S2 (9.81, NBC 105:2025 notation list, printed p. 7).
+    Wi must be a positive seismic weight; signed Fi and di are permitted,
+    but every input must be finite and the sums must be physically positive.
     """
     w, d, f = list(weights_kN), list(displacements_m), list(forces_kN)
     if not (len(w) == len(d) == len(f)) or not w:
         raise ValueError("weights, displacements and forces must be non-empty and equal length")
-    numerator = sum(wi * di ** 2 for wi, di in zip(w, d))
-    denominator = _positive(g, "g") * sum(fi * di for fi, di in zip(f, d))
-    if not (numerator > 0 and denominator > 0):
-        raise ValueError("Rayleigh sums must be positive")
+    w=[_positive(v, "Wi") for v in w]
+    d=[_finite(v, "di") for v in d]
+    f=[_finite(v, "Fi") for v in f]
+    numerator = math.fsum(wi * di ** 2 for wi, di in zip(w, d))
+    denominator = _positive(g, "g") * math.fsum(fi * di for fi, di in zip(f, d))
+    if not (math.isfinite(numerator) and math.isfinite(denominator)
+            and numerator > 0 and denominator > 0):
+        raise ValueError("Rayleigh sums must be finite and positive")
     return 2.0 * math.pi * math.sqrt(numerator / denominator)
 
 
@@ -189,11 +211,14 @@ def seismic_weight_kN(dead_kN, storage_live_kN=0.0, other_live_kN=0.0,
     """Return dead + 0.6 storage + 0.3 other + 0 roof live load.
 
     [REF NBC105-2025 §5.2 Table 5-1, printed p. 30]
-    ``roof_live_kN`` is accepted but always contributes zero.
+    ``roof_live_kN`` is accepted but always contributes zero. All supplied
+    load magnitudes must be finite nonnegative gravity-load contributions.
     """
-    return (float(dead_kN) + LIVE_LOAD_FACTORS["storage"] * float(storage_live_kN)
-            + LIVE_LOAD_FACTORS["other"] * float(other_live_kN)
-            + LIVE_LOAD_FACTORS["roof"] * float(roof_live_kN))
+    inputs=[_nonnegative(v,n) for v,n in (
+        (dead_kN,"dead_kN"),(storage_live_kN,"storage_live_kN"),
+        (other_live_kN,"other_live_kN"),(roof_live_kN,"roof_live_kN"))]
+    return (inputs[0]+LIVE_LOAD_FACTORS["storage"]*inputs[1]
+            +LIVE_LOAD_FACTORS["other"]*inputs[2])
 
 
 def period_factor_deviation(factor):
@@ -243,10 +268,12 @@ def table_5_2_system_factors(row):
             "Rs":1.0,"status":"TABLE_VALUE_ONLY_DETAILING_QUALIFICATION_OPEN"}
 
 def _strictly_below(a,b):
-    return a < b and not math.isclose(a,b,rel_tol=1e-12,abs_tol=1e-12)
+    # NBC writes a strict '<'; an engineering tolerance would weaken it.
+    return a < b
 
 def _strictly_above(a,b):
-    return a > b and not math.isclose(a,b,rel_tol=1e-12,abs_tol=1e-12)
+    # NBC writes a strict '>'; do not exempt tiny true exceedances.
+    return a > b
 
 def weak_story(story_strength,above_strength):
     """[REF NBC105-2025 §5, printed pp. 28–37]
@@ -296,7 +323,7 @@ def interstory_drift_check(relative_deflection_m,storey_height_m,limit_state):
     if state not in ("ULS","SLS"):raise ValueError("limit_state must be ULS/SLS")
     ratio=abs(drift)/h
     limit=.025 if state=="ULS" else .006
-    return {"pass":ratio<=limit or math.isclose(ratio,limit,rel_tol=1e-12),
+    return {"pass":ratio<=limit,
             "ratio":ratio,"limit":limit,
             "basis":"DESIGN_DRIFT_INPUT_ONLY_NBC_3_4_STIFFNESS_MUST_BE_VERIFIED"}
 
