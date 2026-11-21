@@ -13,7 +13,9 @@ python tools/repair_project_output_layout.py "D:\PROJECT\EXPORT_CASE"
 python tools/repair_project_output_layout.py "D:\PROJECT\EXPORT_CASE" --apply
 ```
 
-The first command only reports counts. `--apply` copies existing recognized ESM/Rayleigh case files into a clearly identified historical **review** snapshot. Neither mode executes the solver or certifies code compliance. Original files remain in the legacy tree because old runner paths and referenced manifests can depend on them. No automatic removal is safe before a full writer/reader/native Windows regression.
+The first command only reports counts. `--apply` copies existing recognized ESM/Rayleigh case files into a clearly identified historical **review** snapshot. Neither mode executes the solver or certifies code compliance. Original files remain in the legacy tree because old runner paths and referenced manifests can depend on them.
+
+If a current root source has changed after its earlier categorized copy was created, the tool preserves the old copy and stores the new SHA256-identified bytes under `01_ETABS_EXPORT/09_REVIEW/ROOT_SOURCE_REVISIONS`. The report explicitly marks the primary categorized mirror as stale; it does not overwrite historical evidence or mark it current. No automatic removal is safe before a full writer/reader/native Windows regression.
 
 ## Source identity and safety
 
