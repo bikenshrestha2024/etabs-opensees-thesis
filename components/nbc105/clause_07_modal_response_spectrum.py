@@ -6,7 +6,8 @@ from __future__ import annotations
 import math
 __all__=["modal_effective_weight","modal_story_forces","force_only_scale",
          "modal_mass_coverage","srss","modal_combination_readiness",
-         "modal_design_coefficient","force_scale_factor","cqc_correlation_matrix"]
+         "modal_design_coefficient","force_scale_factor","cqc_correlation_matrix",
+         "modal_participation_profile"]
 
 def _pos(value,name):
     if isinstance(value,bool):raise ValueError(name+" must be finite positive")
@@ -54,6 +55,39 @@ def modal_mass_coverage(modal_mass_ratios_percent):
     s=math.fsum(a)
     if s>100+1e-6:raise ValueError("modal mass ratios exceed 100%")
     return s
+
+def modal_participation_profile(modal_mass_ratios_percent, *, direction):
+    """Cumulative directional effective mass with 90% and 100% guideposts.
+
+    [REF NBC105-2025 §7.3, printed p.41]
+    90% is the printed minimum; 100% is a visualization target, not an
+    automatically achievable finite-mode count or substitute for missing-mass
+    treatment. Input ratios are percentages in the considered direction.
+    """
+    axis=str(direction).strip().upper()
+    if axis not in ("X","Y"):
+        raise ValueError("direction must be X or Y")
+    ratios=list(modal_mass_ratios_percent)
+    # Reuse the canonical percent range, finiteness, and 100% sum guard.
+    total=modal_mass_coverage(ratios)
+    running=0.0
+    points=[]
+    first_90=None
+    for index, raw in enumerate(ratios, 1):
+        value=float(raw)
+        running=math.fsum((running,value))
+        if first_90 is None and running>=90.0:
+            first_90=index
+        points.append({"mode":index,"incremental_percent":value,
+                       "cumulative_percent":min(100.0,running),
+                       "at_least_90_percent":running>=90.0})
+    return {"direction":axis,"modes":points,"total_percent":total,
+            "minimum_required_percent":90.0,"visual_target_percent":100.0,
+            "first_mode_meeting_90_percent":first_90,
+            "minimum_90_percent_met":total>=90.0,
+            "exact_100_percent_observed":math.isclose(total,100.0,rel_tol=0,abs_tol=1e-9),
+            "status":"MASS_PARTICIPATION_ONLY_NOT_MODAL_OR_NATIVE_ACCEPTANCE"}
+
 
 def modal_design_coefficient(elastic_spectrum, *, ductility=None, overstrength,
                              limit_state):
