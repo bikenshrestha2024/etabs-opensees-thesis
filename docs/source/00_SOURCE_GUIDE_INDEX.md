@@ -144,3 +144,5 @@ All **90 active Python modules** have individual source guides (with source blob
 | [components/nbc105/clause_05_dynamic_characteristics.py](../../components/nbc105/clause_05_dynamic_characteristics.py) | [Guide](components/nbc105/clause_05_dynamic_characteristics.py.md) | NBC 105:2025 clause modules (2026-11-21) | P1 |
 
 NBC 105:2025 clause 5 rule-by-rule status: [clause 5 compliance matrix](../nbc105/clause_05_dynamic_characteristics_matrix.md).
+
+NBC 105:2025 clause register: [docs/nbc105/README.md](../nbc105/README.md); [project declarations](../nbc105/PROJECT_DECLARATIONS.md); [wall grouping (Aw) method](../nbc105/WALL_GROUPING_AW_METHOD.md).

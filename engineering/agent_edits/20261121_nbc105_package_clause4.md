@@ -42,3 +42,16 @@ Numeric changes (before -> after)
 Not changed: other implementations (spectral_shape_ch, elastic_site_spectrum_g, ch_modal_nltha, target_nltha_g, reconcile soil C helpers, Table 4-2 classifiers) matched the clause module; no production code applies the vertical 2/3 Z; importance factor is a user input.
 
 Verification: `python -m pytest -q` (1315 passed, 34 skipped), `python tests/verify_ref_tags.py`. No tkinter file edited. Unit tests only; no native ETABS/OpenSees; not engineering acceptance.
+
+## Task 4: index, project declarations, wall grouping documentation
+
+Editor Claude Code, model UNKNOWN. Documentation only; no code, test or numeric change.
+
+Changed
+- New `docs/nbc105/README.md` (naming convention, clause register 1-10 and Annex A-C with titles and printed pages read from the PDF contents list on PDF pages 15-21, procedure to add a clause, printed-page offset method), `docs/nbc105/PROJECT_DECLARATIONS.md` (USER_DECLARED 2026-11-21: no basement, wall grouping validated against UBC/SEAOC with details pending, g = 9.80665 with deviation 0.0341 % of 9.81, Rayleigh T +0.0171 %, revert method, affected-files table), `docs/nbc105/WALL_GROUPING_AW_METHOD.md` (what `grouped_wall_aw.py` and `aw_sources.py` do, worked example 6 x (0.2 + (3/95)^2) = 1.2059834 m^2 confirmed by running `effective_wall_area_m2`, references the repository already records).
+- Clause 5 matrix: open items for basement and wall grouping now USER_DECLARED, g USER_DECISION; rows 14 and 15 annotated. Links added in `README.md`, `docs/00_REPOSITORY_ORGANIZATION.md`, `docs/NBC105_PERIODS_AND_MATERIAL_PROVENANCE.md`, `docs/source/00_SOURCE_GUIDE_INDEX.md`.
+- Page 8-14 of the PDF are front matter (acknowledgements, preface, committees); the contents list is PDF pages 15-21 (roman xiv-xx). Clause registers use printed page numbers from the contents list.
+
+Not verified: the user's declarations (no basement, wall grouping validation, g choice) are recorded as stated; the UBC/SEAOC documents were not available to the agent, so only the repository's own records of them are cited. `REFERENCE DETAILS PENDING FROM USER` for the edition and section the user validated against.
+
+Verification: `python -m pytest -q`, `python tests/verify_ref_tags.py`. Unit tests only; no native ETABS/OpenSees; not engineering acceptance.
