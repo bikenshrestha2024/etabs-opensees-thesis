@@ -37,3 +37,9 @@
 - Full headless, native benchmark, source reference and integrated CI green on exact merge SHA.
 
 Until all gates pass, record status as `REFERENCE_MODULES_PRESENT_PRODUCTION_ENGINEERING_VALIDATION_OPEN`, not 'NBC 105 fully implemented/approved'.
+
+## Production routing update (PR #130)
+
+**Source-integrated active numeric adapters:** ESM §3/§6, MRSM §7, linear history §8, nonlinear seismic input §9 and design drift §5. **User-facing operations:** all Clause 1–10 exported functions are accessible through `components.nbc105.dispatch`, local CLI and the existing settings GUI's isolated calculator.
+
+**Acceptance status:** local source-level numerical regression may pass while native engineering acceptance remains blocked. The latest available V10.7 JSON reads `AMPLIFIED_EMPIRICAL_ONLY__NO_ANALYTICAL_PERIOD_CHECK` and `NOT_TESTED__REQUIRES_REACTION_MASS_MODAL_DRIFT_TORSION_COMPARISON`; it cannot certify the code-required lesser-of periods or physical ETABS–OpenSees equivalence. `components.nbc105.acceptance` explicitly rejects the leap from RS target equality to full NBC compliance. First-step X-wall failure, missing 224 full histories and project-wide semantic audit remain open.
