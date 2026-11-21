@@ -51,3 +51,9 @@ Modified (docs only, no production code, no numeric value changed)
 - `docs/nbc105/clause_01_scope_definitions_matrix.md` (F10) and `docs/nbc105/clause_05_dynamic_characteristics_matrix.md` (open item): 9.80665 mentions now say superseded.
 
 Line endings unchanged (all touched files are LF). Evidence: unit tests only (`python -m pytest -q`, `python tests/verify_ref_tags.py`); no native ETABS or OpenSees run. PASS here is not engineering acceptance.
+
+## Follow-up: record-pair review checklist text (g = 9.81)
+
+- `OpenSees_Workflow_V144.py` line 25: the `how_to_obtain_missing_values.record_pair_units_scales_and_nbc_limits_reviewed` guidance said "g-to-m/s2 factor is 9.80665 once". Changed to 9.81 once (NBC 105:2025 printed p. 7; `components/nbc105/constants.py`), separate from the motion scale. Text only; no numerics changed.
+- Not changed: generated evidence `Verification_V144/Available_Inputs_Inventory.json` (an earlier run's output still carries the old text; regenerate by re-running the workflow).
+- Record audit not run: no accelerogram files were supplied in this session. Required inputs for `components/response_spectrum/nbc_pair_spectrum_audit.py::pair_spectrum_audit`: X and Y original record files, soil type, Z, I, omega_u, R_mu, T1_x/T1_y, Tn90_x/Tn90_y. Model label UNKNOWN.
