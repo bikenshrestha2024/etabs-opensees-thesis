@@ -27,8 +27,8 @@ def fixture():
         x = float(i%8)
         xyz = [x, float(i//8), 0.]
         reaction = [1.,2.,100.,3.,4.,5.]
-        e.append({"id":f"E{i}", "xyz_m":xyz,"reaction":reaction[:]})
-        o.append({"id":f"O{i}", "xyz_m":xyz,"reaction":reaction[:]})
+        e.append({"id":f"E{i}", "xyz_m":xyz[:],"reaction":reaction[:]})
+        o.append({"id":f"O{i}", "xyz_m":xyz[:],"reaction":reaction[:]})
         mapping.append({"etabs":f"E{i}","opensees":f"O{i}","group":group})
     return {"source":source,"origin_m":[0.,0.,0.],
             "etabs":e,"opensees":o,"map":mapping}
