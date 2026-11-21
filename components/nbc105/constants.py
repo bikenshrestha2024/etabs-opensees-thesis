@@ -12,6 +12,9 @@ from __future__ import annotations
 
 GRAVITY_M_S2: float = 9.80665
 NBC_NOTATION_GRAVITY_M_S2: float = 9.81  # printed p. 7; reference only, not used in calculations
-PRINTED_PAGE_OFFSET: int = 21  # PDF page = printed page + 21 for the body of NBC 105:2025
+# PDF page = printed page + 21 up to printed p. 26; + 23 from printed p. 27 on
+# (the Figure 4-3 page and a duplicate page numbered 26 shift it). Verify the
+# foot number of every page read. The constant is the offset for p. <= 26 only.
+PRINTED_PAGE_OFFSET: int = 21
 
 __all__ = ["GRAVITY_M_S2", "NBC_NOTATION_GRAVITY_M_S2", "PRINTED_PAGE_OFFSET"]

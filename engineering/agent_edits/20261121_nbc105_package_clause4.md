@@ -55,3 +55,14 @@ Changed
 Not verified: the user's declarations (no basement, wall grouping validation, g choice) are recorded as stated; the UBC/SEAOC documents were not available to the agent, so only the repository's own records of them are cited. `REFERENCE DETAILS PENDING FROM USER` for the edition and section the user validated against.
 
 Verification: `python -m pytest -q`, `python tests/verify_ref_tags.py`. Unit tests only; no native ETABS/OpenSees; not engineering acceptance.
+
+## Fix wave after whole-branch review (I1, I2, M1-M6)
+
+Editor Claude Code, model UNKNOWN.
+
+- I1: saved Rayleigh results made with g = 9.81 are rejected by `verify_saved_rayleigh_axis` (period rebuilt with 9.80665 differs by 1.7e-4; tolerance rel 1e-8 NOT loosened; solver numerics and `RAYLEIGH_METHOD_VERSION` unchanged). `import_project_inputs` (`components/inputs/project_workbooks.py`, CRLF kept) now appends a note when the saved `gravity_acceleration_m_s2` differs from `GRAVITY_M_S2`: g changed 9.81 -> 9.80665 in this release, those periods are rejected on import and the Rayleigh analysis must be re-run; the ESM period falls back to 1.25 x empirical until then (which can be longer than min(empirical, Rayleigh), so the ESM base-shear reference changes until the rerun). The existing "stale, incomplete, or inconsistent" note is kept. Documented in `docs/nbc105/PROJECT_DECLARATIONS.md` §3. Test: `tests/test_rayleigh_saved_g_note.py`.
+- I2: `default_soil_type_d` ignores case and whitespace and accepts the printed municipality name without its generic suffix ("Municipality", "Metropolitan City", "Rural Municipality"; Table 4-3, PDF p. 47 text, e.g. "Kirtipur"), only when the stem is unique within the district. No other alias. Unknown names still return False. Tests added, including ('Kathmandu','Kirtipur',10).
+- M1: `PRINTED_PAGE_OFFSET` comment/guide/README/matrix header qualified (21 up to printed p. 26, 23 from p. 27). Value unchanged.
+- M2: Table 4-1 pinned literally for A-D. M3: 2/3 Z scan regex widened. M4: revert note now names `tools/etabs_period_review/reconcile.py` `G` (value unchanged). M5: `select_soil_type` rejects height_m <= 0 (importance_factor asymmetry left). M6: module docstring and guide say PDF pages 42-50; Figure 4-1(a) docstring wording left (matrix F2).
+
+Verification: `python -m pytest -q`, `python tests/verify_ref_tags.py`. Unit tests only; no native ETABS/OpenSees; not engineering acceptance.

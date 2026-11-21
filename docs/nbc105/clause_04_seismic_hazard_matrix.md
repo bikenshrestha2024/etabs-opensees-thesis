@@ -1,6 +1,6 @@
 # NBC 105:2025 clause 4 compliance matrix (printed pp. 21-27)
 
-Date 2026-11-21. Reference module: [`components/nbc105/clause_04_seismic_hazard.py`](../../components/nbc105/clause_04_seismic_hazard.py) ([guide](../source/components/nbc105/clause_04_seismic_hazard.py.md)). Clause text and tables were read from the printed pages of the user-supplied PDF (printed page N = PDF page N+21; Figure 4-3 page is PDF 48).
+Date 2026-11-21. Reference module: [`components/nbc105/clause_04_seismic_hazard.py`](../../components/nbc105/clause_04_seismic_hazard.py) ([guide](../source/components/nbc105/clause_04_seismic_hazard.py.md)). Clause text and tables were read from the printed pages of the user-supplied PDF (printed page N = PDF page N+21 up to printed p. 26 and N+23 from printed p. 27 on; Figure 4-3 page is PDF 48).
 
 Status values: `IMPLEMENTED_AND_TESTED` (code and unit test exist, text checked against the printed page); `REFERENCE_ONLY` (the clause module implements and tests the rule, but production code does not call it; production code carries its own copy, see Findings); `USER_RESPONSIBILITY` (site data the software cannot supply); `NOT_TRANSCRIBED` (printed source not transcribed into code).
 

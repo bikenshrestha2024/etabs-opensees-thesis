@@ -31,7 +31,9 @@ Size of the deviation: (9.81 - 9.80665) / 9.81 = 0.0341 % of the printed value (
 
 `NBC_NOTATION_GRAVITY_M_S2 = 9.81` is kept in `components/nbc105/constants.py` as a reference value only and is not used in any calculation.
 
-How to revert: change the single constant `GRAVITY_M_S2` in `components/nbc105/constants.py` to 9.81, update the value pins in `tests/test_nbc105_constants.py`, and re-run `python -m pytest -q`. Reverting also changes the weight-to-mass conversions that already used 9.80665 (mass from a given weight becomes about 0.0341 % smaller), so previously exported model data would need re-assembly.
+Consequence for saved evidence: a saved Rayleigh result (`NBC105_Rayleigh_Preliminary_*.json`) made with g = 9.81 no longer passes `verify_saved_rayleigh_axis` (period rebuilt with 9.80665 differs by 1.7e-4, tolerance rel 1e-8, deliberately not loosened; `RAYLEIGH_METHOD_VERSION` is not bumped). `import_project_inputs` drops such periods (`rayleigh_tx/ty` not filled) and its notes now state that the saved result was recorded with a different g and must be re-run. The Rayleigh analysis must be re-run for every existing export folder; until then the ESM adopted period falls back to 1.25 x empirical, which can be longer than min(empirical, Rayleigh), so the ESM base-shear reference changes until the rerun. Pinned by `tests/test_rayleigh_saved_g_note.py`.
+
+How to revert: change the single constant `GRAVITY_M_S2` in `components/nbc105/constants.py` to 9.81, change `G = 9.80665` in `tools/etabs_period_review/reconcile.py` (a separate definition, not routed through the constant; its value is unchanged here), update the value pins in `tests/test_nbc105_constants.py`, and re-run `python -m pytest -q`. Reverting also changes the weight-to-mass conversions that already used 9.80665 (mass from a given weight becomes about 0.0341 % smaller), so previously exported model data would need re-assembly.
 
 | File | Use of g |
 |---|---|

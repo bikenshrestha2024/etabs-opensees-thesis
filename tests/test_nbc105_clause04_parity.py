@@ -273,7 +273,11 @@ class ConstantScanTests(unittest.TestCase):
                 yield path
 
     def test_no_production_code_applies_vertical_two_thirds_z(self):
-        pattern = re.compile(r"(2\.?0?\s*/\s*3\.?0?|0\.66+7?)\s*\*\s*\(?\s*(z|zoning)",
+        pattern = re.compile(r"(\(?\s*2\.?0?\s*/\s*3\.?0?\s*\)?\s*\*\s*\(?\s*(z|zoning)"
+            r"|\b(z|zoning\w*)\s*\*\s*\(?\s*2\.?0?\s*/\s*3\.?0?"
+            r"|\b2\.?0?\s*\*\s*(z|zoning\w*)\s*/\s*3"
+            r"|\b(z|zoning\w*)\s*/\s*1\.5\b"
+            r"|0\.66+7?\s*\*\s*\(?\s*(z|zoning))",
                              re.IGNORECASE)
         hits = [str(p.relative_to(ROOT)) for p in self._python_files()
                 if pattern.search(p.read_text(encoding="utf-8", errors="replace"))]

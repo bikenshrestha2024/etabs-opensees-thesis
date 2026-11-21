@@ -8,7 +8,7 @@ serviceability spectrum (Eq. 4.2(1)) and vertical spectrum coefficient
 (Eq. 4.3(1)). The functions are design-input calculations, never engineering
 acceptance of a building or site.
 
-Transcribed from the user-supplied printed pages (PDF pages 43-50) by viewing
+Transcribed from the user-supplied printed pages (PDF pages 42-50) by viewing
 the page images. Printed page numbers in the source PDF: Table 4-3 and
 Table 4-4 are both on a page numbered 26; the Figure 4-3 page is numbered 25.
 The Z value is NOT tabulated here: Table C-1 of Annex C (listed
@@ -280,6 +280,8 @@ def select_soil_type(*, height_m, vs30=None, n_spt=None):
     §4.1.3.3; see ``default_soil_type_d``.
     """
     h = _finite(height_m, "height_m")
+    if h <= 0:
+        raise ValueError("height_m must be positive")
     issues = []
     if vs30 is not None:
         soil = soil_type_from_vs30(vs30)
@@ -297,21 +299,55 @@ def select_soil_type(*, height_m, vs30=None, n_spt=None):
     return {"soil": None, "basis": None, "issues": issues}
 
 
+_NAME_SUFFIXES = (" rural municipality", " metropolitan city", " municipality")
+
+
+def _norm_name(text):
+    return " ".join(str(text).split()).lower()
+
+
+def _name_stem(norm):
+    for suffix in _NAME_SUFFIXES:
+        if norm.endswith(suffix):
+            return norm[: -len(suffix)]
+    return norm
+
+
+def _find_table_4_3_entry(district, municipality):
+    """Look up a Table 4-3 row, ignoring case and extra whitespace.
+
+    A name matches if it equals the printed name (for example "Kirtipur
+    Municipality") or the printed name without its generic suffix
+    ("Municipality", "Metropolitan City", "Rural Municipality"; for example
+    "Kirtipur"). A stem shared by two rows of one district would be ambiguous
+    and is not matched. No other alias is used.
+    """
+    dist, name = _norm_name(district), _norm_name(municipality)
+    rows = [(_norm_name(m), w) for (d, m), w in KATHMANDU_VALLEY_SOIL_D_SITES.items()
+            if _norm_name(d) == dist]
+    for full, wards in rows:
+        if full == name:
+            return wards
+    stems = [(_name_stem(full), wards) for full, wards in rows]
+    matches = [wards for stem, wards in stems if stem == name]
+    if len(matches) == 1 and sum(1 for stem, _ in stems if stem == name) == 1:
+        return matches[0]
+    return None
+
+
 def default_soil_type_d(district, municipality, ward=None):
     """Return True if Table 4-3 assigns Soil Type D by default to the site.
 
     [REF NBC105-2025 §4.1.3.3, printed p. 26]
-    The default holds unless tests to 30 m demonstrate another class. A
-    municipality or ward not in the table returns False (not listed, which
-    is not a finding of any soil type). A partially listed municipality needs
-    ``ward``; omitting it raises ValueError.
+    The default holds unless tests to 30 m demonstrate another class. Names
+    are matched ignoring case and surrounding whitespace, and the generic
+    suffix of the printed municipality name may be omitted ("Kirtipur" for
+    "Kirtipur Municipality"). A municipality or ward not in the table
+    returns False (not listed, which is not a finding of any soil type). A
+    partially listed municipality needs ``ward``; omitting it raises
+    ValueError.
     """
-    key = (str(district).strip().title(), str(municipality).strip().lower())
-    entry = None
-    for (d, m), wards in KATHMANDU_VALLEY_SOIL_D_SITES.items():
-        if (d, m.lower()) == key:
-            entry = wards
-            break
+    entry = _find_table_4_3_entry(district, municipality)
     if entry is None:
         return False
     if entry == _ALL:

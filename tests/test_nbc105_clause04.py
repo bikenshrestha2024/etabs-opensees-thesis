@@ -11,10 +11,14 @@ class SpectralShapeTests(unittest.TestCase):
     def test_table_4_1_transcription(self):
         # Read from the printed page 24 image.
         self.assertEqual(set(c4.TABLE_4_1), {"A", "B", "C", "D"})
-        self.assertEqual(c4.TABLE_4_1["D"],
-                         {"Ta": 0.5, "Tc": 2.0, "Td": 5.0, "alpha": 2.25})
-        self.assertEqual(c4.TABLE_4_1["B"],
-                         {"Ta": 0.1, "Tc": 0.7, "Td": 4.0, "alpha": 2.5})
+        # Full table literally as printed (p. 24): Ta, Tc, Td, alpha.
+        printed = {
+            "A": {"Ta": 0.1, "Tc": 0.5, "Td": 4.0, "alpha": 2.5},
+            "B": {"Ta": 0.1, "Tc": 0.7, "Td": 4.0, "alpha": 2.5},
+            "C": {"Ta": 0.1, "Tc": 1.0, "Td": 4.0, "alpha": 2.5},
+            "D": {"Ta": 0.5, "Tc": 2.0, "Td": 5.0, "alpha": 2.25},
+        }
+        self.assertEqual(c4.TABLE_4_1, printed)
         self.assertEqual([c4.TABLE_4_1[s]["Tc"] for s in "ABCD"],
                          [0.5, 0.7, 1.0, 2.0])
         self.assertEqual(c4.T_MAX_S, 6.0)
@@ -192,6 +196,35 @@ class KathmanduTable43Tests(unittest.TestCase):
         self.assertFalse(f("Pokhara", "Pokhara Metropolitan City", 1))
         with self.assertRaises(ValueError):
             f("Kathmandu", "Kirtipur Municipality")
+
+    def test_select_soil_type_rejects_nonpositive_height(self):
+        for h in (0.0, -5.0):
+            with self.assertRaises(ValueError):
+                c4.select_soil_type(height_m=h, vs30=300)
+
+    def test_short_names_case_and_whitespace(self):
+        f = c4.default_soil_type_d
+        self.assertTrue(f("Kathmandu", "Kirtipur", 10))
+        self.assertFalse(f("Kathmandu", "Kirtipur", 9))
+        self.assertTrue(f("  KATHMANDU ", "  kirtipur   municipality ", 10))
+        self.assertTrue(f("Bhaktapur", "Madhyapur Thimi", 3))
+        self.assertTrue(f("Bhaktapur", "bhaktapur"))
+        self.assertTrue(f("Lalitpur", "Lalitpur", 1))
+        self.assertFalse(f("Lalitpur", "Lalitpur", 5))
+        self.assertTrue(f("Kathmandu", "Kathmandu", 32))
+        self.assertTrue(f("Lalitpur", "Mahalaxmi", 7))
+        self.assertFalse(f("Lalitpur", "Godawari", 1))
+        with self.assertRaises(ValueError):
+            f("Kathmandu", "Kirtipur")
+
+    def test_unknown_names_still_false(self):
+        f = c4.default_soil_type_d
+        self.assertFalse(f("Kathmandu", "Kirtipurr", 10))
+        self.assertFalse(f("Kathmandu", "Thimi", 1))
+        self.assertFalse(f("Kathmandu", "", 10))
+        self.assertFalse(f("Kathmandu", "Madhyapur Thimi", 1))  # wrong district
+        self.assertFalse(f("Bhaktapur", "Kirtipur", 10))
+        self.assertFalse(f("Pokhara", "Pokhara", 1))
 
 
 if __name__ == "__main__":
