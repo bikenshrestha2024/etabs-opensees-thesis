@@ -1,6 +1,6 @@
 """NBC 105:2025 clause 5 period and seismic-weight helpers (pure Python).
 
-[REF NBC105-2025 §5, printed pp. 28-30] Single source of truth for the
+[REF NBC105-2025 §5, printed pp. 28-30] Shared implementation of the
 §5.1 lesser-of rule, §5.1.1 Rayleigh period, §5.1.2 empirical period,
 §5.1.3 amplification and §5.2 seismic weight. A period computed here is a
 design-input calculation, never engineering acceptance of the building.
@@ -8,6 +8,13 @@ design-input calculation, never engineering acceptance of the building.
 Eq. 5.1(1), the shear-wall kt equation, the Aw summation and the Figure 5-1
 height rule are verified against the printed pages 28-30 of NBC 105:2025
 (user-supplied PDF).
+
+Production-routed helpers: empirical_period_s, amplified_period_s,
+period_factor_deviation, effective_wall_area_m2 (grouped_wall_aw only) and
+storey_index_for_elevation. adopted_period_s, rayleigh_period_s,
+building_height_m and seismic_weight_kN are reference implementations
+exercised by tests; their rules are applied inline elsewhere. See
+docs/validation/NBC105_CLAUSE5_COMPLIANCE_MATRIX.md.
 """
 from __future__ import annotations
 
@@ -152,6 +159,8 @@ def storey_index_for_elevation(z_m: float, floor_elevations_m: Sequence[float]) 
     if any(b <= a for a, b in zip(e, e[1:])):
         raise ValueError("floor_elevations_m must be strictly ascending")
     z = float(z_m)
+    if not math.isfinite(z):
+        raise ValueError("z_m must be finite")
     if z <= e[0] + 1e-7:
         return 0
     if z >= e[-1] - 1e-7:

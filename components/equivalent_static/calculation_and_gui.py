@@ -19,7 +19,7 @@ from tkinter import ttk, filedialog, messagebox
 
 HERE=Path(__file__).resolve().parent
 from components.inputs.project_workbooks import analysis_output_folder
-from components.modal.nbc105_clause5 import amplified_period_s, empirical_period_s
+from components.modal.nbc105_clause5 import amplified_period_s, empirical_period_s, period_factor_deviation
 try:
     from NBC105_Analysis_Settings_V109 import (
         NBC105_ESM_SYSTEM_FACTORS, calculate_esm,
@@ -1276,7 +1276,10 @@ class ESMGui:
                 adopted_field=getattr(self,'adopted_t'+axis.lower(),None)
                 if adopted_field is not None:adopted_field.set('')
                 target.set('')
-                values.append(f'{axis}: needs reviewed wall Aw, period factor and Rayleigh input')
+                try:deviation=period_factor_deviation(float(self.period_factor.get()))
+                except (TypeError,ValueError):deviation=None
+                if deviation:values.append(f'{axis}: {deviation} Adopted period left unset.')
+                else:values.append(f'{axis}: needs reviewed wall Aw, period factor and Rayleigh input')
         self.period_note.set(' | '.join(values)+' | Rayleigh and ETABS modal are separate analysis results.')
 
     def _direction_changed(self):

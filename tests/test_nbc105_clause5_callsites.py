@@ -74,15 +74,21 @@ class AutofillDeviation(unittest.TestCase):
                 json.dumps({"nodes": {"1": [0, 0, 0], "2": [0, 0, 60]}, "base_z_m": 0}),
                 encoding="utf-8")
             imported = {"values": {"awx": 12.0, "awy": 12.0, "rayleigh_tx": 0.5,
-                                   "rayleigh_ty": 0.5, "period_factor": 1.5},
+                                   "rayleigh_ty": 0.5, "period_factor": 1.5,
+                                   "workbook_adopted_tx": 0.77, "workbook_adopted_ty": 0.88},
                         "notes": []}
-            with patch("OpenSees_Project_Inputs_V123.import_project_inputs", return_value=imported):
-                try:
+            sentinel = RuntimeError("stop after the period block")
+            with patch("OpenSees_Project_Inputs_V123.import_project_inputs", return_value=imported), \
+                 patch("components.inputs.analysis_autofill.matching_modal_reference", side_effect=sentinel):
+                with self.assertRaises(RuntimeError) as ctx:
                     populate_linear(gui, folder)
-                except Exception:
-                    pass  # later blocks need unrelated fixtures; notes are filled first
-        text = " ".join(imported["notes"])
-        self.assertIn("DEVIATION", text)
+            self.assertIs(ctx.exception, sentinel)
+        self.assertEqual(gui.t1x.get(), "")
+        self.assertEqual(gui.t1y.get(), "")
+        notes = imported["notes"]
+        self.assertTrue(any("T1 imported as workbook adopted" in n for n in notes))
+        self.assertTrue(any(n.startswith("X DEVIATION") for n in notes))
+        self.assertTrue(any(n.startswith("Y DEVIATION") for n in notes))
 
 
 class NoLiteralFormulaLeft(unittest.TestCase):

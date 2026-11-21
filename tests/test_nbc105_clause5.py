@@ -140,6 +140,11 @@ class StoreyIndexTests(unittest.TestCase):
         self.assertAlmostEqual(sum(buckets), sum(w), places=12)
         self.assertEqual(buckets[0], sum(wi for z, wi in zip(zs, w) if z < 4.5))
 
+    def test_nan_and_infinite_elevation_rejected(self):
+        for bad in (float('nan'), float('inf'), -float('inf')):
+            with self.assertRaises(ValueError):
+                c5.storey_index_for_elevation(bad, self.E)
+
     def test_invalid_floors(self):
         for bad in ([], [3.0, 3.0], [6.0, 3.0]):
             with self.assertRaises(ValueError):

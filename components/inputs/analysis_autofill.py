@@ -88,7 +88,9 @@ def populate_linear(gui, folder):
         for axis in ('x','y'):
             if 'aw'+axis in v and 'rayleigh_t'+axis in v:
                 period,deviation=workbook_adopted_period(H,v['aw'+axis],v['rayleigh_t'+axis],v.get('period_factor',1.25))
-                if deviation:inputs['notes'].append(axis.upper()+' '+deviation)
+                if deviation:
+                    getattr(gui,'t1'+axis).set('')
+                    inputs['notes'].append(axis.upper()+' '+deviation)
                 else:getattr(gui,'t1'+axis).set(f'{period:.9g}')
     model_sha=hashlib.sha256(datafile.read_bytes()).hexdigest() if datafile.is_file() else None
     modal=matching_modal_reference(folder,gui.ls.get(),model_sha)
