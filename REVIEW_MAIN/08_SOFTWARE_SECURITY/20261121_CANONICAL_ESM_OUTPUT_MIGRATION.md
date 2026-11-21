@@ -2,7 +2,7 @@
 
 ## Screenshot observations
 
-For selected `D:\Thesis Opensees\ETABS 11-21-2026\1`, `03_ESM` is empty while ESM `NBC105_ESM_Calculation_*.json` and `.xlsx` files appear in `OpenSees_Analysis_Results\ULS_Floor_3_...`. Root files include model JSON, complete export audit/workbooks, conversion files and other generated artifacts. The structure already contains `01_ETABS_EXPORT`, `02_GRAVITY`, `02_MODEL`, `03_ESM`, `04_MODAL`, `05_MRSM`, `06_LINEAR_TIME_HISTORY`, `07_NONLINEAR_TIME_HISTORY`, `08_ETABS_COMPARISONS`, `09_SOFTWARE_DIAGNOSTICS`, `90_UPLOAD_PACKAGES`, plus historical `OpenSees_Analysis_Results` and `OpenSees_Runtime_V118`.
+For selected `D:\PROJECT\EXPORT_CASE`, `03_ESM` is empty while ESM `NBC105_ESM_Calculation_*.json` and `.xlsx` files appear in `OpenSees_Analysis_Results\ULS_Floor_3_...`. Root files include model JSON, complete export audit/workbooks, conversion files and other generated artifacts. The structure already contains `01_ETABS_EXPORT`, `02_GRAVITY`, `02_MODEL`, `03_ESM`, `04_MODAL`, `05_MRSM`, `06_LINEAR_TIME_HISTORY`, `07_NONLINEAR_TIME_HISTORY`, `08_ETABS_COMPARISONS`, `09_SOFTWARE_DIAGNOSTICS`, `90_UPLOAD_PACKAGES`, plus historical `OpenSees_Analysis_Results` and `OpenSees_Runtime_V118`.
 
 These screenshot observations do not prove file validity, content completeness, or the physical correctness of ETABS/OpenSees calculations. The selected Windows directory was not mounted into the GitHub editing environment.
 
