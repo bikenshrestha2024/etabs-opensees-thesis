@@ -1016,7 +1016,8 @@ class GravityAnalysisGUI:
                 root, gravity_root=optional,
                 destination_parent=destination_parent,
                 selected_modules=('Gravity', 'Comparisons'),
-                bundle_name='GRAVITY_REVIEW')
+                bundle_name='GRAVITY_REVIEW',
+                archive_only=True)
             self._gravity_action_log('ORGANIZED_GRAVITY_ZIP',
                                      report['zip_files']['GRAVITY_REVIEW'])
             self.status_var.set('Gravity review ZIP: '+report['zip_files']['GRAVITY_REVIEW'])
