@@ -154,10 +154,13 @@ def repair_layout(export_dir, *, apply=False):
                  " remain valid. Review root duplicates separately before deletion."
     }
     if apply:
-        # All snapshot conflicts preflighted first. Existing export_mirror
-        # additionally rejects conflicting root mirrors before it copies.
-        from components.inputs.export_mirror import EXTS, PRIVATE_NAMES, classification, _digest
-        for f in root.iterdir():
+        # A flat root file can be regenerated AFTER the earlier 01_ETABS_EXPORT
+        # source mirror was created. Never overwrite that older, immutable
+        # proof of an earlier model conversion; retain BOTH SHA identities.
+        from components.inputs.export_mirror import EXTS, PRIVATE_NAMES, classification
+        staged_root=[]
+        changed_root=[]
+        for f in sorted(root.iterdir(),key=lambda p:p.name.casefold()):
             if not f.is_file() or f.is_symlink():
                 continue
             lower=f.name.casefold()
@@ -165,9 +168,37 @@ def repair_layout(export_dir, *, apply=False):
                 continue
             dest=root/"01_ETABS_EXPORT"/classification(f.name)/f.name
             _safe_path(dest,root)
-            if dest.exists() and (not dest.is_file() or _digest(dest)!=_digest(f)):
-                raise ValueError("Existing categorized root mirror conflict: "+str(dest))
-        report["root_mirror_manifest"] = str(export_mirror(root).relative_to(root))
+            if dest.is_symlink() or (dest.exists() and not dest.is_file()):
+                raise ValueError("Unsafe categorized root mirror: "+str(dest))
+            source_sha=_sha(f)
+            if dest.is_file() and _sha(dest)!=source_sha:
+                # Versioned review copy, not a silent overwrite of 01_ETABS_EXPORT.
+                revision=(root/"01_ETABS_EXPORT"/"09_REVIEW"/"ROOT_SOURCE_REVISIONS"/
+                          (source_sha+f.suffix.lower()))
+                _safe_path(revision,root)
+                if revision.is_symlink() or (
+                        revision.exists() and (not revision.is_file()
+                        or _sha(revision)!=source_sha)):
+                    raise ValueError("Conflicting root source revision: "+str(revision))
+                changed_root.append({"source":str(f.relative_to(root)),
+                    "stale_mirror":str(dest.relative_to(root)),
+                    "current_sha256":source_sha,
+                    "historical_sha256":_sha(dest),
+                    "immutable_revision":str(revision.relative_to(root))})
+                staged_root.append((f,revision,source_sha))
+            else:
+                staged_root.append((f,dest,source_sha))
+        report["root_mirror_conflicts"]=changed_root
+        report["root_mirror_status"]=(
+            "STALE_PRIMARY_COPIES_PRESERVED_REVISION_SNAPSHOTS_CREATED"
+            if changed_root else "SOURCE_MIRRORS_CURRENT")
+        for source,dest,digest in staged_root:
+            _safe_path(dest,root)
+            _copy_verified(source,dest,digest)
+        report["root_mirror_manifest"]=str(
+            (root/"03_ESM"/"REVIEW_SNAPSHOTS"/"LAYOUT_REPAIR_MANIFEST.json").relative_to(root))
+        if changed_root:
+            report["status"]="APPLIED_COPIES_WITH_STALE_PRIMARY_MIRROR_REVIEW_REQUIRED"
         for item in records:
             _safe_path(item["dest"],root)
             _safe_path(item["source"],root)
