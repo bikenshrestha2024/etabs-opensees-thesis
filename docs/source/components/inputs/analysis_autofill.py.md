@@ -40,3 +40,7 @@ Separately, workbook adopted empirical/Rayleigh T1 values remain NBC-design-peri
 ## 2026-11-15 exec-facade source root consistency
 
 The historical `OpenSees_Linear_Autofill_V124.py` root launcher executes this component through `exec(compile(...), globals(), globals())`: `__file__` then refers to the root facade, not to `components/inputs/analysis_autofill.py`. Previous `Path(__file__).resolve().parents[2]` arguments could resolve above the actual repository and hide original source-verified Aw/T1 workbook values. `_runtime_repo_root()` now prefers the facade's actual `_component_source` and otherwise uses the module's own `__file__`. The same root is used for workbook location, compatibility JSON and implementation fingerprint searches, with no hard-coded numerical value. Source-only tests cover direct imports, root facades and exported runtimes; actual ETABS/Excel period identity remains a separate gate.
+
+## 2026-11-21 clause 5 period routing and DEVIATION
+
+`workbook_adopted_period(height_m, aw_m2, rayleigh_s, factor)` applies the NBC 105:2025 §5.1 lesser-of rule through the [clause 5 module](../modal/nbc105_clause5.py.md). When the workbook `period_factor` is not 1.25 it returns no period and a DEVIATION note, and `populate_linear` clears the T1 field (including any value pre-filled from `workbook_adopted_t*`) instead of adopting a non-NBC period. Test: `tests/test_nbc105_clause5_callsites.py`.

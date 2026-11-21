@@ -51,3 +51,7 @@ Review: [20261112_RAYLEIGH_PERIOD_AND_NBC_SECTION6_FULL_AUDIT.md](../../../../RE
 ## V126 retained-DOF correction
 
 The preceding V123 workflow and values are historical. OpenSees 3.8.0 can accumulate the retained diaphragm translation when RZ is fixed and the reference load advances through multiple steps. The V126 runner uses one lateral Newton step and reads the shared translation from the constrained floor nodes. It verifies rotation, within-floor translation agreement, load factor, signed reaction equilibrium, and all-storey coverage. The JSON preserves master translation as a diagnostic and labels the verified displacement basis. See [native replays, NBC period calculation and literature](../../../validation/20261118_RAYLEIGH_RETAINED_DOF_CORRECTION.md).
+
+## 2026-11-21 clause 5 routing and ledger convention
+
+Empirical and amplified periods come from `empirical_period_s` / `amplified_period_s` in the [clause 5 module](nbc105_clause5.py.md) (same operation order as before). Eq. 5.1(1) is still evaluated in this file, not by the module. The story weights `Wi` it consumes come from the assembly ledger, which now follows the NBC 105:2025 §5.2 mid-height rule (re-assemble exports; saved ledgers carry the old next-floor-above assignment).

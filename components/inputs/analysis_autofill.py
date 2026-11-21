@@ -19,6 +19,22 @@ def _runtime_repo_root():
 
 
 
+def workbook_adopted_period(height_m, aw_m2, rayleigh_s, factor=1.25):
+    """[REF NBC105-2025 §5.1, printed p. 28]
+    Return ``(period_s, note)``: lesser of Rayleigh and 1.25 x empirical.
+
+    A workbook factor other than the fixed NBC 105:2025 §5.1.3 value of 1.25
+    is not applied: the period is None and the note is a DEVIATION message.
+    """
+    from components.modal.nbc105_clause5 import (
+        amplified_period_s, empirical_period_s, period_factor_deviation)
+    deviation = period_factor_deviation(factor)
+    if deviation:
+        return None, deviation + '; period field left unset'
+    empirical = empirical_period_s(height_m, 'concrete shear-wall', aw_m2)
+    return min(amplified_period_s(empirical), float(rayleigh_s)), None
+
+
 def matching_modal_reference(folder, state, model_sha):
     """[REF docs/source/components/inputs/analysis_autofill.py.md]
     Read only a saved canonical/legacy modal result for the same model state.
@@ -71,8 +87,11 @@ def populate_linear(gui, folder):
         H=max(p[2] for p in data['nodes'].values())-data['base_z_m']
         for axis in ('x','y'):
             if 'aw'+axis in v and 'rayleigh_t'+axis in v:
-                period=min(v.get('period_factor',1.25)*.075*H**.75/math.sqrt(v['aw'+axis]),v['rayleigh_t'+axis])
-                getattr(gui,'t1'+axis).set(f'{period:.9g}')
+                period,deviation=workbook_adopted_period(H,v['aw'+axis],v['rayleigh_t'+axis],v.get('period_factor',1.25))
+                if deviation:
+                    getattr(gui,'t1'+axis).set('')
+                    inputs['notes'].append(axis.upper()+' '+deviation)
+                else:getattr(gui,'t1'+axis).set(f'{period:.9g}')
     model_sha=hashlib.sha256(datafile.read_bytes()).hexdigest() if datafile.is_file() else None
     modal=matching_modal_reference(folder,gui.ls.get(),model_sha)
     if modal is None:

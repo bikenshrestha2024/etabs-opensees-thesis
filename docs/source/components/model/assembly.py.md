@@ -78,3 +78,7 @@ check a restrained floor edge receives no added nodes, while a confirmed vertica
 wall edge still does. Exact ETABS analysis-node restraints and source hashes must
 be verified independently; a screenshot of a setting is not a per-object source
 manifest or a native equivalence result.
+
+## 2026-11-21 story-weight ledger follows the §5.2 mid-height rule
+
+The story ledger (`NBC105_ESM_Story_Weights_Assembled_V118.csv`) now assigns each active node's weight with `storey_index_for_elevation` ([clause 5 module](../modal/nbc105_clause5.py.md)): weight below the mid-height between adjacent floors goes to the lower floor, otherwise to the upper floor. Nodes at or below the first floor stay with floor 1; nodes at or above the roof go to the roof. Total weight is unchanged; per-storey Wi change, so exports must be re-assembled. Note: weight-to-mass conversion here uses 9.80665 m/s^2 while NBC 105:2025 §5.1.1 specifies 9.81 (open item in the [compliance matrix](../../../validation/NBC105_CLAUSE5_COMPLIANCE_MATRIX.md)).

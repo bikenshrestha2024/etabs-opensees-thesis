@@ -20,6 +20,7 @@ All **90 active Python modules** have individual source guides (with source blob
 | [components/linear_time_history/runner_and_gui.py](../../components/linear_time_history/runner_and_gui.py) | [Guide](components/linear_time_history/runner_and_gui.py.md) | Linear transient response | P1 |
 | [components/modal/analysis.py](../../components/modal/analysis.py) | [Guide](components/modal/analysis.py.md) | Modal analysis and numerical damping | P1 |
 | [components/modal/gui_and_reports.py](../../components/modal/gui_and_reports.py) | [Guide](components/modal/gui_and_reports.py.md) | Modal analysis and numerical damping | P1 |
+| [components/modal/nbc105_clause5.py](../../components/modal/nbc105_clause5.py) | [Guide](components/modal/nbc105_clause5.py.md) | Modal analysis and numerical damping | P1 |
 | [components/modal/rayleigh.py](../../components/modal/rayleigh.py) | [Guide](components/modal/rayleigh.py.md) | Modal analysis and numerical damping | P1 |
 | [components/model/analysis_basis.py](../../components/model/analysis_basis.py) | [Guide](components/model/analysis_basis.py.md) | ETABS geometry/mass/constraint and model assembly | P1 |
 | [components/model/assembly.py](../../components/model/assembly.py) | [Guide](components/model/assembly.py.md) | ETABS geometry/mass/constraint and model assembly | P0 |
@@ -137,3 +138,5 @@ All **90 active Python modules** have individual source guides (with source blob
 | [components/ui/output_folder.py](../../components/ui/output_folder.py) | [Guide](components/ui/output_folder.py.md) | All analysis windows (2026-11-07) | P1 |
 | [components/ui/exploratory_options.py](../../components/ui/exploratory_options.py) | [Guide](components/ui/exploratory_options.py.md) | 06 Isolated nonlinear probes (2026-11-07) | P1 |
 | [components/nonlinear_time_history/material_source_sets.py](../../components/nonlinear_time_history/material_source_sets.py) | [Guide](components/nonlinear_time_history/material_source_sets.py.md) | 02 Materials single-source sets (2026-11-07) | P1 |
+
+NBC 105:2025 clause 5 rule-by-rule status: [clause 5 compliance matrix](../validation/NBC105_CLAUSE5_COMPLIANCE_MATRIX.md).
