@@ -44,6 +44,7 @@ REQUIRED_GUARDS={
     "components/gravity/gui_and_reports.py":"GRAVITY",
     "components/linear_time_history/runner_and_gui.py":"LTHA",
     "components/nonlinear_time_history/runner_and_gui.py":"NLTHA",
+    "components/model/readiness_dashboard_gui.py":"SOFTWARE_DIAGNOSTICS",
 }
 REQUIRED_ESM={
     "components/equivalent_static/calculation_and_gui.py",
@@ -98,6 +99,20 @@ def audit(repo=ROOT):
         if not any(fn=="owned_run_destination" and stage in positional
                    for _,fn,_,positional in calls):
             violations.append({"path":p,"reason":"NO_CANONICAL_USER_OUTPUT_GUARD"})
+    checks="components/validation/response_checks.py"
+    if (repo/checks).is_file():
+        tree=ast.parse((repo/checks).read_text(encoding="utf-8-sig"))
+        if not any(isinstance(node,ast.Call)
+                   and isinstance(node.func,ast.Name)
+                   and node.func.id=="create_case_run"
+                   and any(isinstance(arg,ast.Constant)
+                           and arg.value=="SOFTWARE_DIAGNOSTICS"
+                           for arg in node.args)
+                   for node in ast.walk(tree)):
+            violations.append({"path":checks,
+                               "reason":"IRREGULARITY_REVIEW_NOT_STAGE_SCOPED"})
+    else:
+        violations.append({"path":checks,"reason":"IRREGULARITY_REVIEW_MISSING"})
     for p in REQUIRED_ESM:
         if not (repo/p).is_file():
             violations.append({"path":p,"reason":"REQUIRED_ESM_PRODUCER_MISSING"})
