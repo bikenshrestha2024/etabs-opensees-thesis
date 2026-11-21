@@ -705,7 +705,7 @@ def synchronize(export_dir,state='ULS',template=None,output_dir=None,etabs_fallb
             report['geometry_crosscheck']={
                 'status':'NOT_AVAILABLE','reason':str(exc)}
     if output_dir is None:
-        output_dir=analysis_output_folder(export_dir,state)/'NBC105_Input_Sync'
+        output_dir=analysis_output_folder(export_dir,state,stage='ESM')/'NBC105_Input_Sync'
     paths=export_sync_report(report,output_dir,template=template)
     write_local_aw_review(report,Path(output_dir)/"REVIEW_MAIN"/"02_ESM"/"Aw_Validation")
     return report,paths
