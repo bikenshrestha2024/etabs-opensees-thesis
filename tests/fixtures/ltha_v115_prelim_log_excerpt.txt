@@ -1,0 +1,246 @@
+[INFO] Configuration saved: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\00_INPUT_SOURCE\NBC105_Linear_Time_History_RunConfig_V115.json
+[INFO] Input mode: PAIRED_3D
+[INFO] Starting OpenSeesPy process…
+[WORKLOAD] 16 cases | 237646 requested steps | integration bounds retained
+[UNITS] Source accelerations are converted once to m/s2; g=9.80665 m/s2. Motion scale is separate. See Input_Record_Audit total Path factors.
+[SCOPE] PRELIMINARY setup check | pairs: RSN1505_CHICHI_TCU068-E, KATNP.HNE.NQ.01_a_EW_PEER_Gorkha, RSN879_LANDERS_LCN260, RSN1086_NORTHR_SYL090, RSN1120_KOBE_TAK000, RSN1165_KOCAELI_IZT090, RSN1787_HECTOR, RSN767_LOMAP | each pair runs XY and YX
+[START] RSN1505_CHICHI_TCU068-E_XY: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=81.269 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=81.888 s | start=2026-11-20T22:32:55.874+05:45 | finish=2026-11-20T22:34:17.760+05:45
+[RECORDER MODE] RSN1505_CHICHI_TCU068-E_XY: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=2.335s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=19.455s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=20.864s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T22:34:40.395+05:45 | finish=2026-11-20T22:34:40.395+05:45
+[LINEAR TRIAL] RSN1505_CHICHI_TCU068-E_XY: analyzed=0.5s; full_record=89.99s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN1505_CHICHI_TCU068-E_XY: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN1505_CHICHI_TCU068-E_XY | completed | elapsed=288.696s | stages={"model_and_gravity": 83.37876329999563, "damping_eigenanalysis": 21.040363799998886, "native_transient_solve": 176.9256594999897, "transient_with_recording": 182.6274826000008, "case_exports_and_drift": 0.9951233999963733}
+[CASE SUMMARY] RSN1505_CHICHI_TCU068-E_XY: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN1505_CHICHI_TCU068-E_XY_Case_Summary.json
+[OK] RSN1505_CHICHI_TCU068-E_XY: steps=100, dt=0.005s, peak drifts X/Y=8.22881e-07/4.8602e-05
+[START] RSN1505_CHICHI_TCU068-E_YX: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=87.364 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=87.942 s | start=2026-11-20T22:37:44.586+05:45 | finish=2026-11-20T22:39:12.528+05:45
+[RECORDER MODE] RSN1505_CHICHI_TCU068-E_YX: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=2.357s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=20.010s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=21.444s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T22:39:35.192+05:45 | finish=2026-11-20T22:39:35.192+05:45
+[LINEAR TRIAL] RSN1505_CHICHI_TCU068-E_YX: analyzed=0.5s; full_record=89.99s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN1505_CHICHI_TCU068-E_YX: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN1505_CHICHI_TCU068-E_YX | completed | elapsed=297.914s | stages={"model_and_gravity": 88.94728589999431, "damping_eigenanalysis": 21.443977000002633, "native_transient_solve": 180.42199340010848, "transient_with_recording": 186.16130509999493, "case_exports_and_drift": 0.6188589000012144}
+[CASE SUMMARY] RSN1505_CHICHI_TCU068-E_YX: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN1505_CHICHI_TCU068-E_YX_Case_Summary.json
+[OK] RSN1505_CHICHI_TCU068-E_YX: steps=100, dt=0.005s, peak drifts X/Y=3.94415e-05/1.01526e-06
+[START] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=85.824 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=86.419 s | start=2026-11-20T22:42:42.534+05:45 | finish=2026-11-20T22:44:08.954+05:45
+[RECORDER MODE] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=2.549s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=21.038s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=22.533s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T22:44:32.886+05:45 | finish=2026-11-20T22:44:32.886+05:45
+[LINEAR TRIAL] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY: analyzed=0.5s; full_record=322.94s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY: UmfPack Linear (no factor reuse)
+[CASE TIMING] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY | completed | elapsed=300.487s | stages={"model_and_gravity": 87.45980589999817, "damping_eigenanalysis": 22.533264199999394, "native_transient_solve": 183.0952169000011, "transient_with_recording": 188.94926799999666, "case_exports_and_drift": 0.6628711000012117}
+[CASE SUMMARY] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY_Case_Summary.json
+[OK] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY: steps=100, dt=0.005s, peak drifts X/Y=1.10303e-06/3.58707e-06
+[START] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=93.754 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=94.356 s | start=2026-11-20T22:47:43.060+05:45 | finish=2026-11-20T22:49:17.414+05:45
+[RECORDER MODE] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=3.443s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=24.283s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=26.358s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T22:49:45.221+05:45 | finish=2026-11-20T22:49:45.221+05:45
+[LINEAR TRIAL] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX: analyzed=0.5s; full_record=322.94s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX: UmfPack Linear (no factor reuse)
+[CASE TIMING] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX | completed | elapsed=330.419s | stages={"model_and_gravity": 95.41995360000146, "damping_eigenanalysis": 26.35837440000614, "native_transient_solve": 200.5499414000151, "transient_with_recording": 207.0872814999966, "case_exports_and_drift": 0.6372925999967265}
+[CASE SUMMARY] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX_Case_Summary.json
+[OK] KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX: steps=100, dt=0.005s, peak drifts X/Y=2.98735e-06/1.35647e-06
+[START] RSN879_LANDERS_LCN260_XY: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=91.519 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=92.077 s | start=2026-11-20T22:53:13.512+05:45 | finish=2026-11-20T22:54:45.585+05:45
+[RECORDER MODE] RSN879_LANDERS_LCN260_XY: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=2.754s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=24.091s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=25.682s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T22:55:12.729+05:45 | finish=2026-11-20T22:55:12.729+05:45
+[LINEAR TRIAL] RSN879_LANDERS_LCN260_XY: analyzed=0.5s; full_record=48.115s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN879_LANDERS_LCN260_XY: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN879_LANDERS_LCN260_XY | completed | elapsed=325.212s | stages={"model_and_gravity": 93.18637949999538, "damping_eigenanalysis": 25.682279000000563, "native_transient_solve": 198.27313189998677, "transient_with_recording": 204.84637510000175, "case_exports_and_drift": 0.6232330999991973}
+[CASE SUMMARY] RSN879_LANDERS_LCN260_XY: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN879_LANDERS_LCN260_XY_Case_Summary.json
+[OK] RSN879_LANDERS_LCN260_XY: steps=100, dt=0.005s, peak drifts X/Y=3.28648e-05/2.07655e-05
+[START] RSN879_LANDERS_LCN260_YX: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=95.818 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=96.393 s | start=2026-11-20T22:58:38.887+05:45 | finish=2026-11-20T23:00:15.279+05:45
+[RECORDER MODE] RSN879_LANDERS_LCN260_YX: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=2.826s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=24.088s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=25.946s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T23:00:42.568+05:45 | finish=2026-11-20T23:00:42.568+05:45
+[LINEAR TRIAL] RSN879_LANDERS_LCN260_YX: analyzed=0.5s; full_record=48.115s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN879_LANDERS_LCN260_YX: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN879_LANDERS_LCN260_YX | completed | elapsed=341.511s | stages={"model_and_gravity": 97.60898190000444, "damping_eigenanalysis": 25.94653290000133, "native_transient_solve": 209.78888590000133, "transient_with_recording": 216.48995559999457, "case_exports_and_drift": 0.6873752000028617}
+[CASE SUMMARY] RSN879_LANDERS_LCN260_YX: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN879_LANDERS_LCN260_YX_Case_Summary.json
+[OK] RSN879_LANDERS_LCN260_YX: steps=100, dt=0.005s, peak drifts X/Y=1.75366e-05/4.14419e-05
+[START] RSN1086_NORTHR_SYL090_XY: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=93.295 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=93.852 s | start=2026-11-20T23:04:20.344+05:45 | finish=2026-11-20T23:05:54.196+05:45
+[RECORDER MODE] RSN1086_NORTHR_SYL090_XY: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=2.938s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=24.071s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=25.705s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T23:06:21.308+05:45 | finish=2026-11-20T23:06:21.308+05:45
+[LINEAR TRIAL] RSN1086_NORTHR_SYL090_XY: analyzed=0.5s; full_record=39.96s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN1086_NORTHR_SYL090_XY: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN1086_NORTHR_SYL090_XY | completed | elapsed=227.792s | stages={"model_and_gravity": 95.00729529999808, "damping_eigenanalysis": 25.705060899999808, "native_transient_solve": 102.24080239998875, "transient_with_recording": 105.53670299999794, "case_exports_and_drift": 0.7422464999981457}
+[CASE SUMMARY] RSN1086_NORTHR_SYL090_XY: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN1086_NORTHR_SYL090_XY_Case_Summary.json
+[OK] RSN1086_NORTHR_SYL090_XY: steps=50, dt=0.01s, peak drifts X/Y=1.71481e-05/0.000272058
+[START] RSN1086_NORTHR_SYL090_YX: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=93.909 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=94.443 s | start=2026-11-20T23:08:08.158+05:45 | finish=2026-11-20T23:09:42.604+05:45
+[RECORDER MODE] RSN1086_NORTHR_SYL090_YX: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=3.257s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=25.885s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=27.507s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T23:10:11.497+05:45 | finish=2026-11-20T23:10:11.497+05:45
+[LINEAR TRIAL] RSN1086_NORTHR_SYL090_YX: analyzed=0.5s; full_record=39.96s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN1086_NORTHR_SYL090_YX: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN1086_NORTHR_SYL090_YX | completed | elapsed=230.289s | stages={"model_and_gravity": 95.55544139999984, "damping_eigenanalysis": 27.50731519999681, "native_transient_solve": 102.4233529000121, "transient_with_recording": 105.70023579999543, "case_exports_and_drift": 0.7021649000016623}
+[CASE SUMMARY] RSN1086_NORTHR_SYL090_YX: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN1086_NORTHR_SYL090_YX_Case_Summary.json
+[OK] RSN1086_NORTHR_SYL090_YX: steps=50, dt=0.01s, peak drifts X/Y=0.000228869/2.37569e-05
+[START] RSN1120_KOBE_TAK000_XY: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=94.292 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=94.834 s | start=2026-11-20T23:11:58.562+05:45 | finish=2026-11-20T23:13:33.397+05:45
+[RECORDER MODE] RSN1120_KOBE_TAK000_XY: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=3.031s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=25.028s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=26.850s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T23:14:01.620+05:45 | finish=2026-11-20T23:14:01.620+05:45
+[LINEAR TRIAL] RSN1120_KOBE_TAK000_XY: analyzed=0.5s; full_record=40.94s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN1120_KOBE_TAK000_XY: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN1120_KOBE_TAK000_XY | completed | elapsed=224.021s | stages={"model_and_gravity": 96.0105998999934, "damping_eigenanalysis": 26.850394599998253, "native_transient_solve": 96.57594749997952, "transient_with_recording": 99.681651100007, "case_exports_and_drift": 0.6624898000009125}
+[CASE SUMMARY] RSN1120_KOBE_TAK000_XY: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN1120_KOBE_TAK000_XY_Case_Summary.json
+[OK] RSN1120_KOBE_TAK000_XY: steps=50, dt=0.01s, peak drifts X/Y=7.85909e-05/3.85623e-05
+[START] RSN1120_KOBE_TAK000_YX: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=94.477 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=95.010 s | start=2026-11-20T23:15:42.564+05:45 | finish=2026-11-20T23:17:17.578+05:45
+[RECORDER MODE] RSN1120_KOBE_TAK000_YX: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=3.070s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=24.630s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=26.652s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T23:17:45.647+05:45 | finish=2026-11-20T23:17:45.647+05:45
+[LINEAR TRIAL] RSN1120_KOBE_TAK000_YX: analyzed=0.5s; full_record=40.94s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN1120_KOBE_TAK000_YX: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN1120_KOBE_TAK000_YX | completed | elapsed=231.706s | stages={"model_and_gravity": 96.16822349999711, "damping_eigenanalysis": 26.651774199999636, "native_transient_solve": 104.04842590000044, "transient_with_recording": 107.36741930000426, "case_exports_and_drift": 0.6836892999999691}
+[CASE SUMMARY] RSN1120_KOBE_TAK000_YX: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN1120_KOBE_TAK000_YX_Case_Summary.json
+[OK] RSN1120_KOBE_TAK000_YX: steps=50, dt=0.01s, peak drifts X/Y=2.89664e-05/0.000101617
+[START] RSN1165_KOCAELI_IZT090_XY: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=97.049 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=97.614 s | start=2026-11-20T23:19:34.303+05:45 | finish=2026-11-20T23:21:11.919+05:45
+[RECORDER MODE] RSN1165_KOCAELI_IZT090_XY: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=2.710s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=23.452s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=25.614s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T23:21:38.998+05:45 | finish=2026-11-20T23:21:38.998+05:45
+[LINEAR TRIAL] RSN1165_KOCAELI_IZT090_XY: analyzed=0.5s; full_record=29.99s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN1165_KOCAELI_IZT090_XY: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN1165_KOCAELI_IZT090_XY | completed | elapsed=343.640s | stages={"model_and_gravity": 98.76754199999414, "damping_eigenanalysis": 25.61418319999939, "native_transient_solve": 210.87329250004404, "transient_with_recording": 217.72257730000274, "case_exports_and_drift": 0.6732403999994858}
+[CASE SUMMARY] RSN1165_KOCAELI_IZT090_XY: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN1165_KOCAELI_IZT090_XY_Case_Summary.json
+[OK] RSN1165_KOCAELI_IZT090_XY: steps=100, dt=0.005s, peak drifts X/Y=7.47494e-05/0.0002385
+[START] RSN1165_KOCAELI_IZT090_YX: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+[GRAVITY] PASS | steps=20 | applied=286419.758231 kN | support reactions=286419.758231 kN | equilibrium error=5.83256e-12% | max downward Uz=-0.016837405079608143 m | frozen=True | elapsed=108.988 s
+[TIMING] Model construction and optional gravity preload | completed | elapsed=109.715 s | start=2026-11-20T23:25:17.999+05:45 | finish=2026-11-20T23:27:07.713+05:45
+[RECORDER MODE] RSN1165_KOCAELI_IZT090_YX: baseline scalar DOF queries
+[EIGEN START] solver=PythonSparse modes=20 nodes=11097 elements=14262
+[EIGEN SPARSE] equations=37776 nonzeros=1772172 modes=20; sparse shift-invert factorization
+[EIGEN FACTORIZED] elapsed=3.475s; solving 20 modes
+[EIGEN COMPLETE] sparse solve=30.342s max relative residual=5.36e-07
+[EIGEN RETURN] elapsed=32.392s modes=20
+[TIMING] Linear time history | completed | elapsed=0.000 s | start=2026-11-20T23:27:41.805+05:45 | finish=2026-11-20T23:27:41.805+05:45
+[LINEAR TRIAL] RSN1165_KOCAELI_IZT090_YX: analyzed=0.5s; full_record=29.99s; TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE
+[SOLVER BASELINE] RSN1165_KOCAELI_IZT090_YX: UmfPack Linear (no factor reuse)
+[CASE TIMING] RSN1165_KOCAELI_IZT090_YX | completed | elapsed=415.507s | stages={"model_and_gravity": 111.01411650000227, "damping_eigenanalysis": 32.392484000003606, "native_transient_solve": 261.6721736000036, "transient_with_recording": 270.293316700001, "case_exports_and_drift": 0.8289861000012024}
+[CASE SUMMARY] RSN1165_KOCAELI_IZT090_YX: D:\Thesis Opensees\ETABS 11-20-2026\06_LINEAR_TIME_HISTORY\RUNS\ULS\LTHA_Trial_OpenSees_Complete_Linear_Model\20261120T164753_676396Z_80b118d1\02_RESULTS\NBC105_LTH_RSN1165_KOCAELI_IZT090_YX_Case_Summary.json
+[OK] RSN1165_KOCAELI_IZT090_YX: steps=100, dt=0.005s, peak drifts X/Y=0.000204495/8.96663e-05
+[START] RSN1787_HECTOR_XY: rebuilding model and preparing linear transient analysis
+[LOAD CASE PURPOSE] {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "issue_count": 0, "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "seismic_mass_factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "rule": "5.2 / Table 5-1, printed p. 30"}
+[GRAVITY WALL SUPPORT STRATEGY] {"strategy": "ETABS_SOURCE_SUPPORTS", "added_mesh_fixed_nodes": [], "support_count": 76}
+[GRAVITY PROFILE] {"profile": "AS_CONFIGURED", "factors": {"Self Weight": 1.0, "Dead": 1.0, "DL": 1.0, "Super Dead": 1.0, "SDead": 1.0, "Floor Finish": 1.0, "Wall": 1.0, "Partition": 1.0, "Live": 0.3, "Roof Live": 0.0}, "load_case_purpose_audit": {"profile": "AS_CONFIGURED", "purpose": "SEISMIC_PRELOAD_CONFIGURED_REVIEW_REQUIRED", "status": "MATCHES_DECLARED_PURPOSE_FOR_CLASSIFIED_PATTERNS", "citation": "5.2 / Table 5-1, printed p. 30", "source_url": "https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf", "rows": [{"pattern": "Floor Finish", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Live", "category": "OTHER_LIVE", "gravity_factor": 0.3, "seismic_mass_factor": 0.3, "expected_gravity_factor": 0.3, "expected_seismic_mass_factor": 0.3, "issues": []}, {"pattern": "Partition", "category": "DEAD", "gravity_factor": 1.0, "seismic_mass_factor": 1.0, "expected_gravity_factor": 1.0, "expected_seismic_mass_factor": 1.0, "issues": []}, {"pattern": "Self Weight", "category": "DEAD", "gravity_factor": 1.0, "seismic
+[GRAVITY SOLVER] UmfPack options=() | adaptive=False
+
+[PERFORMANCE] RSN1505_CHICHI_TCU068-E_XY: 5/100 | 0.55 requested steps/s | elapsed=9.0s | case ETA=171.2s
+[PERFORMANCE] RSN1505_CHICHI_TCU068-E_XY: 10/100 | 0.56 requested steps/s | elapsed=17.9s | case ETA=160.7s
+[PERFORMANCE] RSN1505_CHICHI_TCU068-E_XY: 15/100 | 0.56 requested steps/s | elapsed=26.6s | case ETA=150.5s
+[PERFORMANCE] RSN1505_CHICHI_TCU068-E_XY: 20/100 | 0.57 requested steps/s | elapsed=35.3s | case ETA=141.3s
+[PERFORMANCE] RSN1505_CHICHI_TCU068-E_XY: 25/100 | 0.57 requested steps/s | elapsed=44.1s | case ETA=132.4s
+[PERFORMANCE] RSN1505_CHICHI_TCU068-E_XY: 30/100 | 0.57 requested steps/s | elapsed=52.9s | case ETA=123.5s
