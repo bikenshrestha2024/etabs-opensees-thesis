@@ -5,7 +5,8 @@ No full modal model or missing-mass solution is inferred from these helpers.
 from __future__ import annotations
 import math
 __all__=["modal_effective_weight","modal_story_forces","force_only_scale",
-         "modal_mass_coverage","srss","modal_combination_readiness"]
+         "modal_mass_coverage","srss","modal_combination_readiness",
+         "modal_design_coefficient","force_scale_factor"]
 
 def _pos(value,name):
     if isinstance(value,bool):raise ValueError(name+" must be finite positive")
@@ -54,12 +55,31 @@ def modal_mass_coverage(modal_mass_ratios_percent):
     if s>100+1e-6:raise ValueError("modal mass ratios exceed 100%")
     return s
 
+def modal_design_coefficient(elastic_spectrum, *, ductility=None, overstrength,
+                             limit_state):
+    """§7.1 p.40; delegate the shared ULS/SLS denominator to Clause 6.
+
+    [REF NBC105-2025 §7.1, printed p.40]
+    elastic_spectrum is C(Ti) for ULS or Cs(Ti) for SLS, not Ch(T).
+    """
+    from components.nbc105.clause_06_equivalent_static import base_shear_coefficient
+    return base_shear_coefficient(elastic_spectrum,ductility=ductility,
+                                   overstrength=overstrength,limit_state=limit_state)
+
+def force_scale_factor(esm_shear, mrsm_shear):
+    """§7.5 p.41 scalar only; DO NOT scale displacement or drift.
+
+    [REF NBC105-2025 §7.5, printed p.41]
+    """
+    v=_pos(esm_shear,"ESM V"); vr=_pos(mrsm_shear,"MRSM VR")
+    return max(1.,v/vr)
+
 def force_only_scale(*,esm_shear,mrsm_shear,member_forces,story_shears,
                      base_reactions,drifts,displacements):
     """§7.5 p.41: scale ONLY member forces, story shears, base reactions.
 [REF NBC105-2025 §7, printed pp. 40–41]"""
     v=_pos(esm_shear,"ESM V");vr=_pos(mrsm_shear,"MRSM VR")
-    scale=max(1.,v/vr)
+    scale=force_scale_factor(v,vr)
     def finite_list(seq):
         x=[float(z) for z in seq]
         if any(not math.isfinite(z) for z in x):raise ValueError("nonfinite response")
