@@ -57,6 +57,18 @@ class NBC105FullSourceGate(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit_source_index(broken)
 
+    def test_annex_helpers_have_existing_sources_and_are_not_clauses(self):
+        original=read_source_index()
+        for section in ("A.5.1","A.5.3","A.5.5","B.7.1.4"):
+            row=next(x for x in original if x["id"]==section)
+            self.assertTrue(row["reference_helper"].startswith("components/nbc105/annex_"))
+            self.assertTrue(row["test_ref"])
+        broken=[dict(x) for x in original]
+        item=next(x for x in broken if x["id"]=="A.5.1")
+        item["reference_helper"]="components/nbc105/annex_a_nonexistent.py"
+        with self.assertRaisesRegex(ValueError,"annex helper"):
+            audit_source_index(broken)
+
     def test_source_index_does_not_confuse_module_with_certification(self):
         report=audit_source_index(read_source_index())
         self.assertGreater(report["open_requirements"],0)
