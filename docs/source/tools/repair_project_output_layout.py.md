@@ -9,8 +9,8 @@ Provides an explicit **dry run by default** and a deliberate `--apply` option to
 Run from your checked-out repository on the same Windows machine as the local export:
 
 ```powershell
-python tools/repair_project_output_layout.py "D:\Thesis Opensees\ETABS 11-21-2026\1"
-python tools/repair_project_output_layout.py "D:\Thesis Opensees\ETABS 11-21-2026\1" --apply
+python tools/repair_project_output_layout.py "D:\PROJECT\EXPORT_CASE"
+python tools/repair_project_output_layout.py "D:\PROJECT\EXPORT_CASE" --apply
 ```
 
 The first command only reports counts. `--apply` copies existing recognized ESM/Rayleigh case files into a clearly identified historical **review** snapshot. Neither mode executes the solver or certifies code compliance. Original files remain in the legacy tree because old runner paths and referenced manifests can depend on them. No automatic removal is safe before a full writer/reader/native Windows regression.
