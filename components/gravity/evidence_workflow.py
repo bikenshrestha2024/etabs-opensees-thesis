@@ -14,7 +14,10 @@ def latest_dual_run(gravity_root):
 
     [REF components/gravity/support_scenarios.py]
     """
-    base=Path(gravity_root)/"Gravity_Wall_Base_Comparison"
+    from components.gravity.output_ownership import dual_runs_parent
+    base=dual_runs_parent(gravity_root)
+    if not base.is_dir():
+        base=Path(gravity_root)/"Gravity_Wall_Base_Comparison"
     if not base.is_dir():
         return None
     matches=sorted((p for p in base.iterdir()
@@ -33,10 +36,21 @@ def latest_single_run(gravity_root, *, model_script=None):
     """
     import json
     root=Path(gravity_root).expanduser().resolve()
+    from components.gravity.output_ownership import section
     diagnostic=root/"Gravity_Reaction_Diagnostic"
     directories=[root]
     if diagnostic.is_dir():
         directories.extend(p for p in diagnostic.iterdir() if p.is_dir())
+    # New canonical case paths have support strategy/profile/run identity.
+    cases=section(root,"SOLVER")
+    if cases.is_dir():
+        for mode in ("ETABS_NONZERO_REACTION_DIAGNOSTIC",
+                     "ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED"):
+            by_mode=cases/mode
+            if by_mode.is_dir():
+                directories.extend(p for profile in by_mode.iterdir()
+                                   if profile.is_dir() for p in profile.iterdir()
+                                   if p.is_dir())
     dual=latest_dual_run(root)
     if dual is not None:
         directories.append(dual/"ETABS_SOURCE_SUPPORTS")
@@ -80,7 +94,8 @@ def package_gravity_review(model_script, gravity_root, *,
     result=gravity/"Gravity_Result_V110.json"
     if not result.is_file():
         raise FileNotFoundError("Required OpenSees gravity result missing: "+str(result))
-    output=root/"Gravity_Evidence_Upload"
+    from components.gravity.output_ownership import uploads_parent, index_path, section
+    output=uploads_parent(root,create=True)
     source_etabs=None
     if etabs_json:
         path=Path(etabs_json).expanduser().resolve()
@@ -94,7 +109,7 @@ def package_gravity_review(model_script, gravity_root, *,
         max_file_mb=max_file_mb)
     folder=Path(report["output_folder"])
     paths={
-        "latest_upload_pointer":str(root/"LATEST_GRAVITY_UPLOAD.txt"),
+        "latest_upload_pointer":str(index_path(root,"LATEST_GRAVITY_UPLOAD.txt",create=True)),
         "source_export":str(model.parent),
         "gravity_root":str(root),
         "selected_gravity_run":str(gravity),
@@ -104,12 +119,12 @@ def package_gravity_review(model_script, gravity_root, *,
         "extracted_evidence_folder":str(folder),
         "evidence_manifest":str(folder/"EVIDENCE_MANIFEST.json"),
         "exact_file_paths":str(folder/"EVIDENCE_FILE_PATHS.txt"),
-        "gui_action_log":str(root/"Gravity_GUI_Actions.log"),
+        "gui_action_log":str(section(root,"LOGS")/"Gravity_GUI_Actions.log"),
         "missing_file_count":len(report["missing"]),
         "oversized_file_count":len(report["oversize_skipped"]),
         "engineering_acceptance":"NOT_ESTABLISHED_BY_PACKAGING"
     }
-    pointer=root/"LATEST_GRAVITY_UPLOAD.txt"
+    pointer=index_path(root,"LATEST_GRAVITY_UPLOAD.txt",create=True)
     lines=["LATEST GRAVITY REVIEW PACKAGE",
            "This file references outputs on your own computer.",
            "Packaging is NOT a structural validation or ETABS acceptance.",
