@@ -29,7 +29,8 @@ def collect(folder, issues=None, *, results_root=None):
     # Search the selected output root and the canonical source-bound root.
     # Existing strict model hash/limit-state gates still reject stale evidence.
     scan_roots = [root]
-    for candidate in (analysis_output_folder(folder, selected_state),
+    for candidate in (analysis_output_folder(folder, selected_state, stage='ESM'),
+                      analysis_output_folder(folder, selected_state),
                       folder / 'OpenSees_Analysis_Results'):
         candidate = Path(candidate).resolve()
         if candidate.is_dir() and candidate not in scan_roots:

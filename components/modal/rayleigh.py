@@ -130,7 +130,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         out=Path(output_dir)
     else:
         from components.inputs.project_workbooks import analysis_output_folder
-        out=analysis_output_folder(folder,state)
+        out=analysis_output_folder(folder,state,stage='ESM')
     out.mkdir(parents=True,exist_ok=True)
     reference_fraction=float(reference_fraction)
     if not math.isfinite(reference_fraction) or reference_fraction<=0:raise ValueError('Reference fraction must be finite and positive.')

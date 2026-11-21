@@ -560,7 +560,7 @@ class ESMGui:
         story_csv,story_source_note=recommended_story_weight_input(export_dir)
         self.path=tk.StringVar(value=str(story_csv) if story_csv and story_csv.is_file() else "")
         self.story_source_note=story_source_note
-        self.outdir=tk.StringVar(value=str(analysis_output_folder(export_dir,initial_state)))
+        self.outdir=tk.StringVar(value=str(analysis_output_folder(export_dir,initial_state,stage='ESM')))
         self._output_is_automatic=True
         self.state=tk.StringVar(value=initial_state); self.soil=tk.StringVar(value="C")
         self.T=tk.StringVar(value=""); self.Z=tk.StringVar(value="")
@@ -1111,7 +1111,7 @@ class ESMGui:
             self.state.set(actual)
             return
         if self._output_is_automatic:
-            self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get())))
+            self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get(),stage='ESM')))
         self._load_project_inputs()
 
     def _apply_reviewed_wall_policy(self, result=None):
@@ -1163,7 +1163,7 @@ class ESMGui:
             selected_state=self.state.get().strip().upper()
             if selected_state not in ('BOTH','ULS','SLS'):
                 raise ValueError('ESM state must be Both, ULS or SLS')
-            out=analysis_output_folder(self.export_dir,selected_state) if self._output_is_automatic else Path(self.outdir.get())
+            out=analysis_output_folder(self.export_dir,selected_state,stage='ESM') if self._output_is_automatic else Path(self.outdir.get())
             out.mkdir(exist_ok=True,parents=True)
             (out/'NBC105_Input_Provenance_V123.json').write_text(json.dumps(data,indent=2),encoding='utf-8')
             wb=Workbook();ws=wb.active;ws.title='Imported inputs';ws.append(['Field','Value','Workbook/result file','Sheet','Cell'])
@@ -1719,7 +1719,7 @@ class ESMGui:
         p=filedialog.askopenfilename(title="Select a verified NBC 105 story-weight CSV",initialdir=self.outdir.get(),filetypes=[("CSV","*.csv"),("All files","*.*")])
         if p:
             self.path.set(p);self._output_is_automatic=True
-            self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get())))
+            self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get(),stage='ESM')))
             self._load_story_metadata(p)
     def _browse_out(self):
         p=filedialog.askdirectory(title="Select output folder",initialdir=self.outdir.get())
@@ -2020,7 +2020,7 @@ class ESMGui:
                     for polarity in polarities:
                         for ecc_sign in ecc_signs:
                             breadth=(bdim,ecc_sign)
-                            state_outdir=analysis_output_folder(self.export_dir,state) if self._output_is_automatic else Path(self.outdir.get())
+                            state_outdir=analysis_output_folder(self.export_dir,state,stage='ESM') if self._output_is_automatic else Path(self.outdir.get())
                             output_paths=write_outputs(self.path.get(),rows,result,self.direction.get(),polarity,self.include_torsion.get(),breadth,state_outdir,self.model_script.get())
                             made.extend(output_paths); self.last_runners.append(str(output_paths[2]))
                             summaries.append(f"{state} {self.direction.get()}{'+' if polarity>0 else '-'} E{('+' if ecc_sign>0 else '-') if self.include_torsion.get() and ecc_sign else '0'}: V={result['base_shear_kN']:.3f} kN, k={result['period_exponent_k']:.4f}")
@@ -2028,7 +2028,10 @@ class ESMGui:
                     failures.append(f"{state}: {state_exc}")
             if not made: raise ValueError("No case was calculated. " + " | ".join(failures))
             elapsed=time.perf_counter()-started
-            files=f"{len(made)} artifacts; saved under "+str(Path(self.outdir.get()))+"; use Export combined Excel + ZIP for a categorized index"
+            saved_folders=sorted({str(Path(p).parent) for p in made})
+            files=(f"{len(made)} artifacts across {len(saved_folders)} actual output folder(s): "
+                   + " | ".join(saved_folders)
+                   + "; Export combined Excel + ZIP for a categorized index")
             note=("\nBlocked cases: " + " | ".join(failures)) if failures else ""
             self._set_esm_operation("FINISHED",
                 str(len(self.last_runners))+" ESM case scripts generated | "+
