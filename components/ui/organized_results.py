@@ -182,7 +182,7 @@ def _walk(root, *, destination, excluded_roots=()):
 def publish_organized_results(results_root, *, gravity_root=None,
                               include_unclassified=True, destination_parent=None,
                               selected_modules=None, bundle_name="ALL_MODULES",
-                              mrsm_case_layout=False):
+                              mrsm_case_layout=False, archive_only=False):
     """[REF docs/source/components/ui/organized_results.py.md] Create dated folder and ZIPs.
 
     results_root is the existing source/model/state output folder (e.g. ULS...).
@@ -222,6 +222,7 @@ def publish_organized_results(results_root, *, gravity_root=None,
         "original_results_root": str(root),
         "gravity_output_root": str(roots[1][1]) if len(roots) > 1 else None,
         "status": "OUTPUT_INDEX_NOT_ENGINEERING_ACCEPTANCE",
+        "archive_only_no_extracted_copies": bool(archive_only),
         "entries": [], "skipped": [], "modules": {}, "source_sha256": {},
     }
     # First enumerate evidence and hash all source files, then copy. Never
@@ -261,15 +262,21 @@ def publish_organized_results(results_root, *, gravity_root=None,
     destination.mkdir(parents=True, exist_ok=False)
     for source_root, original, snapshot, module in listed:
         dest = destination / snapshot
-        dest.parent.mkdir(parents=True, exist_ok=True)
         _refuse_linked_chain(original)
-        shutil.copy2(original, dest)
         digest = expected_hashes[original]
-        if sha256(dest) != digest or sha256(original) != digest:
-            raise IOError("Source or snapshot changed during copy: " + str(original))
+        if archive_only:
+            # Snapshot data exists only in the compressed archive. Avoid
+            # extracted duplicate trees and per-module duplicate ZIPs.
+            if sha256(original) != digest:
+                raise IOError("Source changed during archive planning: " + str(original))
+        else:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(original, dest)
+            if sha256(dest) != digest or sha256(original) != digest:
+                raise IOError("Source or snapshot changed during copy: " + str(original))
         manifest["entries"].append({
             "module": module, "source": str(original),
-            "snapshot": dest.relative_to(destination).as_posix(),
+            "snapshot": snapshot.as_posix(),
             "bytes": original.stat().st_size, "sha256": digest,
             "source_root": str(source_root),
         })
@@ -290,7 +297,9 @@ def publish_organized_results(results_root, *, gravity_root=None,
            if mrsm_case_layout else
            "Folders: Model, Gravity, ESM, Modal, MRSM, LinearTH, NonlinearTH, Comparisons, Unclassified.\n")
         +
-        "Original solver output files are UNCHANGED. These are verified copies.\n"
+        ("Original solver output files are UNCHANGED. Only ZIP+manifest saved; "
+         "no extracted duplicate evidence tree.\n" if archive_only else
+         "Original solver output files are UNCHANGED. These are verified copies.\n")
         "The manifest links each review file to its original run path.\n"
         "Missing SLS/native ETABS output stays missing, not zero.\n"
         "Review EVIDENCE_MANIFEST.json for source path and SHA256 of every copy.\n"
@@ -338,10 +347,15 @@ def publish_organized_results(results_root, *, gravity_root=None,
                        json.dumps(limited, indent=2, ensure_ascii=False))
             z.write(readme, "README_FIRST.txt")
             for entry in entries:
-                path = destination / entry["snapshot"]
+                path = (Path(entry["source"]) if archive_only else
+                        destination / entry["snapshot"])
+                if archive_only and sha256(path) != entry["sha256"]:
+                    raise IOError("Source mutated before ZIP: " + str(path))
                 z.write(path, entry["snapshot"])
+                if archive_only and sha256(path) != entry["sha256"]:
+                    raise IOError("Source mutated during ZIP: " + str(path))
         archives[name] = str(target)
-    if not mrsm_case_layout:
+    if not mrsm_case_layout and not archive_only:
         for module in MODULES:
             subset = [e for e in manifest["entries"] if e["module"] == module]
             if subset:
