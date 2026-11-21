@@ -139,7 +139,7 @@ def rayleigh_period_s(weights_kN, displacements_m, forces_kN, g=GRAVITY_M_S2):
     """Return T = 2*pi*sqrt(sum(W d^2)/(g sum(F d))).
 
     [REF NBC105-2025 §5.1.1, printed p. 28] ``g`` defaults to the shared
-    GRAVITY_M_S2 (9.80665, USER_DECISION; the printed value is 9.81).
+    GRAVITY_M_S2 (9.81, NBC 105:2025 notation list, printed p. 7).
     """
     w, d, f = list(weights_kN), list(displacements_m), list(forces_kN)
     if not (len(w) == len(d) == len(f)) or not w:

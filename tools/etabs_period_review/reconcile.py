@@ -6,8 +6,15 @@ import json
 import math
 from pathlib import Path
 import re
+import sys
 
-G = 9.80665
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from components.nbc105.constants import GRAVITY_M_S2  # noqa: E402
+
+G = GRAVITY_M_S2
 HEIGHT_M = 95.0
 Z, IMPORTANCE, R_MU, OMEGA_U, OMEGA_S = 0.35, 1.0, 3.5, 1.4, 1.2
 WALL_GROUPS = {

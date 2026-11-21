@@ -5,7 +5,7 @@ or native ETABS comparison. B12 is analytical-only. All stress values use kN/m²
 """
 import math
 
-G=9.80665
+G=9.81  # standalone copy of components.nbc105.constants.GRAVITY_M_S2
 
 
 def metric(name, actual, expected, tol, unit='', source='ANALYTICAL', note='', abs_tol=1e-8):

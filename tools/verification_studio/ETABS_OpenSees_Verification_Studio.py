@@ -25,7 +25,7 @@ import traceback
 import uuid
 
 APP_VERSION = '2.0.1'
-GRAVITY = 9.80665
+GRAVITY = 9.81  # NBC 105:2025 p. 7; standalone copy of components.nbc105.constants.GRAVITY_M_S2
 CASES = [
  ('B01', 'CSI Example 01, Case II — propped beam', 'STATIC FRAME', 'Published CSI reaction and moment (component benchmark)'),
  ('B02', 'Beam subdivision invariance — 1/2/4/8 segments', 'FEM CONNECTIVITY', 'Derived Euler-Bernoulli analytic benchmark'),

@@ -153,7 +153,7 @@ def write_target_spectra(folder, *, zoning_Z, importance_I,
           "Do not mix Soil C and D targets or assume both match the same record.",
           "Soil category requires Vs30/geotechnical justification for >40m buildings.",
           "No unreviewed extrapolation beyond 6 seconds.",
-          "Already matched Acc(g) source Path factor remains 9.80665 for kN-m-s."
+          "Already matched Acc(g) source Path factor remains 9.81 for kN-m-s."
         ])
     filename=root/"NBC105_2025_RC_DUAL_C_D_Target_Metadata.json"
     filename.write_text(json.dumps(metadata,indent=2,allow_nan=False),encoding="utf-8")

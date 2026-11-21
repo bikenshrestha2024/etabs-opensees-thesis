@@ -13,6 +13,7 @@ from __future__ import annotations
 
 __release__ = '134'
 
+from components.nbc105.constants import GRAVITY_M_S2
 import csv
 import math
 from pathlib import Path
@@ -77,7 +78,7 @@ def _read_record(path):
     values, dt, units = _read_peer_text_record(path)
     a = np.asarray(values, dtype=float)
     if units == "m/s2":
-        a = a / 9.80665
+        a = a / GRAVITY_M_S2
     return a, float(dt)
 
 
@@ -94,7 +95,7 @@ def response_spectrum_5pct(accel_g, dt_s, periods_s, damping_ratio=0.05):
     # Append free-vibration decay so the response peak after the last record
     # sample is not omitted from the pseudo-acceleration ordinate.
     tail_n = int(math.ceil(5.0 * float(np.max(periods)) / dt))
-    ag = np.concatenate((a_g * 9.80665, np.zeros(tail_n, dtype=float)))
+    ag = np.concatenate((a_g * GRAVITY_M_S2, np.zeros(tail_n, dtype=float)))
     out = []
     for T in periods:
         omega = 2.0 * math.pi / T
@@ -110,7 +111,7 @@ def response_spectrum_5pct(accel_g, dt_s, periods_s, damping_ratio=0.05):
             v = v_predict + gamma * dt * acc_new
             acc = acc_new
             peak = max(peak, abs(k * u))
-        out.append(peak / 9.80665)
+        out.append(peak / GRAVITY_M_S2)
     return np.asarray(out)
 
 
@@ -224,7 +225,7 @@ class SpectrumScalingGUI:
                     else:ax.text(.1,.5,'Enter positive Z, I, Rmu, Omega-u and Omega-s to plot design spectra.',transform=ax.transAxes,wrap=True)
                     ax.set(title=state+' / '+('ESM' if method=='esm' else 'MRSM and history target basis'),xlabel='Period T (s)',ylabel='Cd(T), acceleration coefficient in g');ax.grid(alpha=.25)
             win=tk.Toplevel(self.win);win.title('NBC Ch(T) and SLS / ULS design spectra');win.geometry('1180x850');embed_figures(win,[('Ch(T): A-D shape',fig),('SLS / ULS: selected soil '+self.soil.get(),design)]);self._spectrum_win=win
-            self.status.set('Ch(T) is a dimensionless shape. Cd(T) includes site/state factors. Multiply a g acceleration ordinate by 9.80665 for an m-s model; do not apply that unit conversion twice.')
+            self.status.set('Ch(T) is a dimensionless shape. Cd(T) includes site/state factors. Multiply a g acceleration ordinate by g (9.81) for an m-s model; do not apply that unit conversion twice.')
         except Exception as exc:messagebox.showerror('Spectrum plot',str(exc),parent=self.win)
 
     def _scale(self):

@@ -23,29 +23,38 @@ Affects: `components/inputs/grouped_wall_aw.py`, `components/inputs/aw_sources.p
 
 Revert / change: `aw_sources.resolve_aw` prefers the reviewed-geometry candidate only when the exported first-storey geometry passes its checks; otherwise it falls back to the ETABS-linked original Excel value (`ORIGINAL_EXCEL_METHOD_ETABS_LINKED`) or the OpenSees geometry candidate. See the method note.
 
-## 3. Gravity constant: g = 9.80665 m/s^2 (USER_DECISION)
+## 3. Gravity constant: g = 9.81 m/s^2 (per NBC 105:2025 printed p. 7)
 
-USER_DECLARED: use the higher-precision standard gravity `GRAVITY_M_S2 = 9.80665` m/s^2 where weight and mass are converted, by the user's instruction. NBC 105:2025 notation list (printed p. 7) says "g: acceleration due to gravity, to be taken as 9.81 m/s^2". This is a recorded deviation from the printed value.
+USER_DECLARED 2026-11-21: `GRAVITY_M_S2 = 9.81` m/s^2, the value printed in the NBC 105:2025 notation list (printed p. 7, "g: acceleration due to gravity, to be taken as 9.81 m/s^2"). `NBC_NOTATION_GRAVITY_M_S2` equals it. Single source: `components/nbc105/constants.py`.
 
-Size of the deviation: (9.81 - 9.80665) / 9.81 = 0.0341 % of the printed value (ratio 9.81 / 9.80665 = 1.000342). Rayleigh period (Eq. 5.1(1), T proportional to 1/sqrt(g)) is longer by sqrt(1.000342) - 1 = +0.0171 % compared with 9.81. Earlier text in this repository that says 0.0306 % or 0.03 % is superseded by these figures. The weight-to-mass conversion in `assembly.py` and four other modules already used 9.80665 before this change, so those numbers did not move.
+SUPERSEDED (same day): the earlier USER_DECISION to use the higher-precision standard gravity 9.80665 m/s^2 is withdrawn. Its record, kept as history: it deviated from the printed value by (9.81 - 9.80665) / 9.81 = 0.0341 %; the Rayleigh period (Eq. 5.1(1), T proportional to 1/sqrt(g)) was longer by +0.0171 % than with 9.81.
 
-`NBC_NOTATION_GRAVITY_M_S2 = 9.81` is kept in `components/nbc105/constants.py` as a reference value only and is not used in any calculation.
+Numeric effect of restoring 9.81 relative to 9.80665 (computed):
+- Weight to mass, mass = W / g: mass is lower by 0.0341 % (ratio 9.80665 / 9.81 = 0.999659). Mass to weight is higher by 0.0342 %.
+- Rayleigh period, T proportional to 1/sqrt(g): shorter by 0.0171 %.
+- Acc(g) record conversion to m/s^2 (Path factor 9.81 instead of 9.80665): ground acceleration is higher by 0.0342 % (ratio 9.81 / 9.80665 = 1.000342). Earlier records of "0.0306 % or 0.03 %" in this repository are superseded by these figures.
 
-Consequence for saved evidence: a saved Rayleigh result (`NBC105_Rayleigh_Preliminary_*.json`) made with g = 9.81 no longer passes `verify_saved_rayleigh_axis` (period rebuilt with 9.80665 differs by 1.7e-4, tolerance rel 1e-8, deliberately not loosened; `RAYLEIGH_METHOD_VERSION` is not bumped). `import_project_inputs` drops such periods (`rayleigh_tx/ty` not filled) and its notes now state that the saved result was recorded with a different g and must be re-run. The Rayleigh analysis must be re-run for every existing export folder; until then the ESM adopted period falls back to 1.25 x empirical, which can be longer than min(empirical, Rayleigh), so the ESM base-shear reference changes until the rerun. Pinned by `tests/test_rayleigh_saved_g_note.py`.
+Consequence for saved evidence: a saved Rayleigh result (`NBC105_Rayleigh_Preliminary_*.json`) made with g = 9.80665 no longer passes `verify_saved_rayleigh_axis` (period rebuilt with 9.81 differs by 1.7e-4, tolerance rel 1e-8, deliberately not loosened; `RAYLEIGH_METHOD_VERSION` is not bumped). Results saved with 9.80665 are rejected on import and must be re-run: `import_project_inputs` drops such periods (`rayleigh_tx/ty` not filled) and its notes state the recorded g, the g of this release and the superseded value, and that the Rayleigh analysis must be re-run. Until then the ESM adopted period falls back to 1.25 x empirical. Saved model exports and NLTHA/RS result folders made with 9.80665 (mass from `assembly.py`, Path factor 9.80665 in the Input Record Audit) are history and are not rewritten; re-assemble and re-run to obtain 9.81 results. Pinned by `tests/test_rayleigh_saved_g_note.py`.
 
-How to revert: change the single constant `GRAVITY_M_S2` in `components/nbc105/constants.py` to 9.81, change `G = 9.80665` in `tools/etabs_period_review/reconcile.py` (a separate definition, not routed through the constant; its value is unchanged here), update the value pins in `tests/test_nbc105_constants.py`, and re-run `python -m pytest -q`. Reverting also changes the weight-to-mass conversions that already used 9.80665 (mass from a given weight becomes about 0.0341 % smaller), so previously exported model data would need re-assembly.
+`SUPERSEDED_GRAVITY_M_S2 = 9.80665` is kept in `components/nbc105/constants.py` only so that old results can be recognised and rejected; no calculation uses it. A scan test (`tests/test_nbc105_constants.py`) fails if a 9.80665 or 9806.65 literal appears in any `.py` file under `components/` or `tools/` other than `constants.py`.
 
-| File | Use of g |
+| File group | Use of g |
 |---|---|
-| `components/nbc105/constants.py` | single definition |
-| `components/nbc105/clause_05_dynamic_characteristics.py` | `rayleigh_period_s` default g |
-| `components/modal/rayleigh.py` | Eq. 5.1(1) denominator, audit JSON, `verify_rayleigh_sum` default, workbook formula |
-| `components/modal/rayleigh_ledger_audit.py` | Rayleigh ledger audit |
-| `components/modal/rayleigh_mass_audit.py` | mass audit (already 9.80665) |
-| `components/model/assembly.py` | weight to mass, 3 sites (already 9.80665) |
-| `components/sections/area_elements.py` | weight/mass conversion (already 9.80665) |
-| `components/gravity/load_path_formulas.py` | gravity load path (already 9.80665) |
-| `components/validation/irregularity_review.py` | review helper (already 9.80665) |
-| `tests/test_nbc105_constants.py`, `tests/test_rayleigh_ledger_audit.py`, `tests/verify_nbc105_periods.py` | pin or use `GRAVITY_M_S2` |
+| `components/nbc105/constants.py` | single definition (and the superseded value, history only) |
+| `components/nbc105/clause_05_dynamic_characteristics.py`, `components/modal/rayleigh.py`, `rayleigh_ledger_audit.py`, `rayleigh_mass_audit.py` | Eq. 5.1(1), audits |
+| `components/model/assembly.py`, `components/sections/area_elements.py`, `components/gravity/load_path_formulas.py`, `components/validation/irregularity_review.py` | weight/mass conversion |
+| `components/shared/transient_runtime.py`, `components/nonlinear_time_history/*`, `components/linear_time_history/runner_and_gui.py`, `components/response_spectrum/*`, `components/ui/history_inspection.py` | Acc(g) to m/s^2 record conversion and Cd(T) x g |
+| `tools/etabs_period_review/reconcile.py`, `tools/plot_results.py`, `tools/verify_matched_waveforms.py` | import the constant |
+| `tools/verification_studio/*` (three single-file tools) | standalone literal 9.81, pinned equal to the constant by test |
 
-Acc(g) record conversions in the time-history and response-spectrum code were left unchanged. Details: [constants guide](../source/components/nbc105/constants.py.md) and [clause 5 matrix](clause_05_dynamic_characteristics_matrix.md) (open items).
+Details: [constants guide](../source/components/nbc105/constants.py.md) and [clause 5 matrix](clause_05_dynamic_characteristics_matrix.md).
+
+## 4. Vs,30 is optional for this thesis; the clause 4.1.3 requirement stays documented
+
+USER_DECLARED 2026-11-21: Vs,30 testing is optional for this thesis. The NBC 105:2025 requirement is unchanged and is recorded here by paraphrase (the agent did not verify it against a second source):
+- Clause 4.1.3.1 (printed p. 24): the subsoil class is taken from Vs,30 where available, otherwise from N_SPT (Table 4-2), and Vs,30 is required for buildings higher than 40 m.
+- Clause 4.1.3.3 with Table 4-3 (printed pp. 25-26): for listed Kathmandu Valley sites Soil Type D is the default unless tests to 30 m show another class.
+
+Code behaviour (`components/nbc105/clause_04_seismic_hazard.py` `select_soil_type`): for height above 40 m without Vs,30 it does not raise. It returns an `issues` entry that begins with the code `VS30_REQUIRED_ABOVE_40M_NOT_SUPPLIED`, cites clause 4.1.3.1 and the text "optional for this thesis, USER_DECLARED 2026-11-21". `soil` comes from N_SPT when N_SPT is given (basis `N_SPT`) and is None otherwise. With Vs,30 supplied the result is the same as before and carries no such issue. The production `code_basis.calculate_esm` is unchanged and still reports `site_subsoil_status` NOT VERIFIED above 40 m without Vs,30.
+
+Consequence: a soil class for a building above 40 m that rests on N_SPT is not code-compliant under clause 4.1.3.1 as printed; the project accepts that as a declared deviation, visible as the issue code in every such result. No engineering acceptance is implied.

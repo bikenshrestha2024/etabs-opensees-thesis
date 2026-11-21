@@ -24,10 +24,10 @@ class EarthquakeInputTests(unittest.TestCase):
     self.assertEqual(component_direction_mapping("YX"),(("B",1),("A",2)))
     with self.assertRaises(ValueError):component_direction_mapping("XZ")
  def test_conversion_exactly_once(self):
-    self.assertAlmostEqual(unit_and_scale("g",1.45),9.80665*1.45)
+    self.assertAlmostEqual(unit_and_scale("g",1.45),9.81*1.45)
     self.assertAlmostEqual(unit_and_scale("m/s2",1.45),1.45)
     with self.assertRaisesRegex(ValueError,"must be 1.0"):unit_and_scale("g",1.45,already_scaled=True)
-    self.assertAlmostEqual(unit_and_scale("g",1.0,already_scaled=True),9.80665)
+    self.assertAlmostEqual(unit_and_scale("g",1.0,already_scaled=True),9.81)
     with self.assertRaisesRegex(ValueError, "factor must be finite"):
         unit_and_scale("g", 1e308)
  def test_two_horizontal_and_same_scale(self):

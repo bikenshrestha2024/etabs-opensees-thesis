@@ -8,8 +8,8 @@ from OpenSees_Irregularity_Review_V134 import plan_checks
 
 class V134Checks(unittest.TestCase):
     def test_separate_scale_and_units(self):
-        self.assertAlmostEqual(acceleration_conversion('g','m',1.)['total_path_factor'],9.80665)
-        self.assertAlmostEqual(acceleration_conversion('g','mm',2.)['total_path_factor'],19613.3)
+        self.assertAlmostEqual(acceleration_conversion('g','m',1.)['total_path_factor'],9.81)
+        self.assertAlmostEqual(acceleration_conversion('g','mm',2.)['total_path_factor'],19620.0)
         self.assertAlmostEqual(acceleration_conversion('m/s2','m',1.)['total_path_factor'],1.)
     def test_case_meaning(self):
         self.assertEqual(label_case('SLS_X+_E-_V111'),('SLS','+X','eccentricity -5% b'))

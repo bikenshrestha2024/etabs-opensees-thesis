@@ -42,7 +42,7 @@ For an original unscaled horizontal acceleration record pair A and B:
 4. Per §9.3.2.2(d): `f_pair = min(f_A, f_B)`; apply the SAME `f_pair` to **both** A and B in the XY and YX analyses. A and B are not fitted independently in the final excitation.
 5. Convert the raw source **acceleration units** into model acceleration in m/s² exactly once:
 
-   - Original source acceleration in `g`: `OpenSees -factor = 9.80665 * f_pair`.
+   - Original source acceleration in `g`: `OpenSees -factor = 9.81 * f_pair`.
    - Original source acceleration in `m/s2`: `OpenSees -factor = f_pair`.
    - Original source acceleration in `cm/s2`: currently UNSUPPORTED by this strict runner; convert the actual record with a documented traceable transform first.
    - Original record already scaled/matched: DO NOT multiply by the spectral factor a second time; supply independently confirmed original values or a separately reviewed provenance-aware workflow.
@@ -63,7 +63,7 @@ import openseespy.opensees as ops
 # ... actual nonlinear wall/frame elements, mass, constraints, gravity, P-Delta
 dt_record = 0.005
 sf_pair = 1.45  # ILLUSTRATIVE; not your record's fitted scale
-accel_factor = 9.80665 * sf_pair
+accel_factor = 9.81 * sf_pair
 
 # XY CASE: A -> global X (DOF1), B -> global Y (DOF2).
 ops.timeSeries("Path", 900001, "-dt", dt_record,

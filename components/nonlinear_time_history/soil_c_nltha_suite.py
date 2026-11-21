@@ -7,9 +7,10 @@ original SeismoMatch factor range, simultaneous pairing, or the building model.
 
 This pure-stdlib module never edits, trims, interpolates, pads or re-scales
 record samples. Matched accelerations are in g; OpenSees additional spectrum
-scale = 1, unit-conversion factor = 9.80665 for the kN-m-s model.
+scale = 1, unit-conversion factor = 9.81 for the kN-m-s model.
 """
 from __future__ import annotations
+from components.nbc105.constants import GRAVITY_M_S2
 import csv
 import hashlib
 import json
@@ -29,7 +30,7 @@ I = 1.0
 R_MU = 3.5
 OMEGA_U = 1.4
 MATCHED_INTERVAL_S = (.05, 6.0)
-UNIT_FACTOR_M_S2 = 9.80665
+UNIT_FACTOR_M_S2 = GRAVITY_M_S2
 FIELD_TYPE = {
     "Gorkha": "Near-field", "Landers": "Near-field",
     "Northridge": "Near-field", "Kobe": "Near-field",
@@ -244,7 +245,7 @@ def verify_runner_pair(x_path, y_path, *, registered_event=None,
     return {
         "event":event, "target_soil":"C", "source_sha256_A":sha[0],
         "source_sha256_B":sha[1], "additional_spectral_scale":1.,
-        "acceleration_source_units":"g", "opensees_path_unit_factor":9.80665,
+        "acceleration_source_units":"g", "opensees_path_unit_factor":GRAVITY_M_S2,
         "orientations_required":["XY","YX"],
         "gorkha_provenance_reviewed":event=="Gorkha" and bool(gorkha_processing_approved),
         "loma_end_policy":loma_end_policy if event=="Loma Prieta" else "as_recorded",

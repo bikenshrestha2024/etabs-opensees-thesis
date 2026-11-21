@@ -6,7 +6,7 @@ from components.modal.rayleigh_mass_audit import audit_rayleigh_mass_elevations
 
 
 def sample():
-    g = 9.80665
+    g = 9.81
     model = {
         "base_z_m": 0.0,
         "diaphragms": [

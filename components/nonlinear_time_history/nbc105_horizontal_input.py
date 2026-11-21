@@ -9,12 +9,13 @@ The absence of cantilever projection ALONE does not waive NBC §4.3:
 columns and base isolation must be independently checked.
 """
 from __future__ import annotations
+from components.nbc105.constants import GRAVITY_M_S2
 import json
 import math
 from pathlib import Path
 
 HORIZONTAL_AXES={"X":1,"Y":2}
-UNITS_TO_M_S2={"g":9.80665,"m/s2":1.0}
+UNITS_TO_M_S2={"g":GRAVITY_M_S2,"m/s2":1.0}
 TRIGGERS=(
     ("unsupported_horizontal_span_ge_20m","Horizontal or nearly horizontal structural member spans >=20 m"),
     ("horizontal_cantilever_gt_5m","Horizontal cantilever longer than 5 m"),

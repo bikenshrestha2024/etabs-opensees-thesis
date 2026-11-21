@@ -16,7 +16,7 @@ def launch(parent):
     from tkinter import ttk,filedialog,messagebox
     root=_runtime_repo_root();win=tk.Toplevel(parent);win.title('Literature nonlinear direct integration - isolated RC portal');win.geometry('1120x780')
     ttk.Label(win,text='PUBLISHED TEACHING MODEL - separate from your ETABS building',font=('Segoe UI',13,'bold')).pack(anchor='w',padx=10,pady=8)
-    ttk.Label(win,text='Concrete01 core/cover + Steel01 bars, forceBeamColumn columns, P-Delta, elastic beam, gravity preload, Newmark 0.5/0.25 and Newton iterations. Motion g is converted once by 9.80665. No building-readiness approval or design PASS is created.',wraplength=1050).pack(anchor='w',padx=10)
+    ttk.Label(win,text='Concrete01 core/cover + Steel01 bars, forceBeamColumn columns, P-Delta, elastic beam, gravity preload, Newmark 0.5/0.25 and Newton iterations. Motion g is converted once by g = 9.81 m/s2 (NBC 105:2025 p. 7). No building-readiness approval or design PASS is created.',wraplength=1050).pack(anchor='w',padx=10)
     record=tk.StringVar(value=str(root/'benchmarks/elCentro.at2'));out=tk.StringVar(value=str(root/'Literature_Demo_Results'));dt=tk.StringVar(value='.0025');factor=tk.StringVar(value='1.0')
     inputs=ttk.Frame(win,padding=10);inputs.pack(fill='x');inputs.columnconfigure(1,weight=1)
     for i,(label,var,mode) in enumerate([('Recorded AT2 motion',record,'file'),('Demo output folder',out,'dir')]):

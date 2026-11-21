@@ -48,7 +48,7 @@
 }
 ```
 
-The `model_folder` and `output_dir` fields are mandatory runtime paths omitted from the illustrative fragment above. The `earthquake_event` is bound to actual A/B matched source SHA256 rather than accepted solely by name. `scale=1.0` is the **additional OpenSees spectral multiplier**, not the independent original SeismoMatch matching factor. If actual source ordinates are `Acc(g)`, the OpenSees Path factor is **9.80665** m/s² per g.
+The `model_folder` and `output_dir` fields are mandatory runtime paths omitted from the illustrative fragment above. The `earthquake_event` is bound to actual A/B matched source SHA256 rather than accepted solely by name. `scale=1.0` is the **additional OpenSees spectral multiplier**, not the independent original SeismoMatch matching factor. If actual source ordinates are `Acc(g)`, the OpenSees Path factor is **9.81** m/s² per g.
 
 ## 02. Critical `nbc105_2025_design_evidence` fields
 
@@ -84,7 +84,7 @@ For the Gorkha original 120s versus matched 322.94s, `gorkha_processing_reviewed
 
 ```text
 Source matched accelerogram: Acc(g).
-ops.timeSeries Path -factor = 9.80665 (kN-m-s).
+ops.timeSeries Path -factor = 9.81 (kN-m-s).
 ops.pattern UniformExcitation(DoF 1 = global X, DoF 2 = global Y).
 Absolute floor acceleration X = relative floor X + support ground acceleration X.
 Absolute floor acceleration Y = relative floor Y + support ground acceleration Y.

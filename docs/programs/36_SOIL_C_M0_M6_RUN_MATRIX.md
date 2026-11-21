@@ -48,7 +48,7 @@ Example per-case invocation must use the project's existing runner/launcher; thi
 ## 4. Engineering guards
 
 - Do not silently overwrite existing config or run-matrix files.
-- Do not change `scale=1.0`: already matched `Acc(g)` requires only `ops.timeSeries('Path',...,'-factor',9.80665)` for a kN–m–s model.
+- Do not change `scale=1.0`: already matched `Acc(g)` requires only `ops.timeSeries('Path',...,'-factor',9.81)` for a kN–m–s model.
 - The `--dt 0.005` default is a **proposal**, NOT an NBC §9.3.2.4 pass; current verified modal `T1_X,T1_Y,Tn90_X,Tn90_Y` may dictate smaller dt.
 - Review the actual seismic selection and fit period interval `[Tn90,sqrt(R_mu)*T1]`.
 - The runner rejects unreviewed Gorkha's 322.94-s matched duration and unmatched Loma Prieta 0.005-s end-time difference. Use a named reviewer and documented source policy; do not edit registered source files to silence the errors.

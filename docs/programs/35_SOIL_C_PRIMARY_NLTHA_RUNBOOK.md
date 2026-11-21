@@ -48,8 +48,8 @@ See [all 16 exact source filenames, hashes, PGA and spectral diagnostics](../gro
 ```text
 Matched export is already SeismoMatch-processed, units Acc(g).
 Additional spectral scale in OpenSees = 1.0 (dimensionless).
-g-to-m/s² unit conversion = 9.80665.
-Total ops.timeSeries Path -factor = 9.80665 * 1.0 = 9.80665.
+g-to-m/s² unit conversion = 9.81.
+Total ops.timeSeries Path -factor = 9.81 * 1.0 = 9.81.
 X and Y receive the SAME unit conversion, not independent multipliers.
 ```
 
@@ -148,9 +148,9 @@ ops.model("basic","-ndm",3,"-ndf",6)  # 3D; 6 DOF/node for frame model
 
 # X (A) + Y (B), source ordinates in g, already spectrum-matched to Soil C:
 ops.timeSeries("Path",900001,"-dt",dt_record,
-               "-values",*matched_A_in_g,"-factor",9.80665)
+               "-values",*matched_A_in_g,"-factor",9.81)
 ops.timeSeries("Path",900002,"-dt",dt_record,
-               "-values",*matched_B_in_g,"-factor",9.80665)
+               "-values",*matched_B_in_g,"-factor",9.81)
 ops.pattern("UniformExcitation",900001,1,"-accel",900001)  # X DOF 1
 ops.pattern("UniformExcitation",900002,2,"-accel",900002)  # Y DOF 2
 # YX is a SEPARATE model construction, swapping B -> DOF 1, A -> DOF 2.

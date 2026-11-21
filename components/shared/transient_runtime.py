@@ -1,4 +1,5 @@
 """Transient workload and measured timings; never change integration bounds to save time."""
+from components.nbc105.constants import GRAVITY_M_S2
 from pathlib import Path
 import json,math,time
 from OpenSees_Timing_V130 import stamp
@@ -66,5 +67,5 @@ def acceleration_conversion(units,model_length_unit,scale):
     if model_length_unit not in ('m','mm') or units not in ('g','m/s2'):raise ValueError('Explicit g or m/s2 input and m or mm model length are required')
     scale=float(scale)
     if not math.isfinite(scale) or scale<=0:raise ValueError('Motion scale must be finite and positive')
-    unit=(9.80665 if units=='g' else 1.)*(1000. if model_length_unit=='mm' else 1.)
+    unit=(GRAVITY_M_S2 if units=='g' else 1.)*(1000. if model_length_unit=='mm' else 1.)
     return dict(source_units=units,model_acceleration_units=model_length_unit+'/s2',record_scale_factor=scale,unit_conversion=unit,total_path_factor=unit*scale)

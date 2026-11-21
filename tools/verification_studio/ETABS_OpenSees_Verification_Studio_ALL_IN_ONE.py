@@ -24,7 +24,7 @@ import traceback
 import uuid
 
 APP_VERSION = '2.1.0-single-file'
-GRAVITY = 9.80665
+GRAVITY = 9.81  # NBC 105:2025 p. 7; standalone copy of components.nbc105.constants.GRAVITY_M_S2
 CASES = [
  ('B01', 'CSI Example 01, Case II — propped beam', 'STATIC FRAME', 'Published CSI reaction and moment (component benchmark)'),
  ('B02', 'Beam subdivision invariance — 1/2/4/8 segments', 'FEM CONNECTIVITY', 'Derived Euler-Bernoulli analytic benchmark'),
@@ -171,7 +171,7 @@ or native ETABS comparison. B12 is analytical-only. All stress values use kN/m²
 """
 import math
 
-G=9.80665
+G=9.81  # standalone copy of components.nbc105.constants.GRAVITY_M_S2
 
 
 def _exp_metric(name, actual, expected, tol, unit='', source='ANALYTICAL', note='', abs_tol=1e-8):

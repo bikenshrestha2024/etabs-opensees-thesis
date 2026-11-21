@@ -6,6 +6,7 @@
 """Own building geometry with explicitly assumed research constitutive models.
 This does not approve or modify the calibrated production-model workflow.
 """
+from components.nbc105.constants import GRAVITY_M_S2
 from pathlib import Path
 import json,math,time,csv,shutil,hashlib,datetime
 import traceback
@@ -405,7 +406,7 @@ def _run(config):
     for name in ('OpenSees_Element_Overrides_V125.json',
                  'OpenSees_Complete_Element_Map_V118.json'):
         if (source/name).is_file():shutil.copy2(source/name,model/name)
-    data=json.loads((model/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding='utf-8-sig'));start=time.perf_counter();unit_factor={'g':9.80665,'m/s2':1.};records=[]
+    data=json.loads((model/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding='utf-8-sig'));start=time.perf_counter();unit_factor={'g':GRAVITY_M_S2,'m/s2':1.};records=[]
     # Stage 01: audit source wall geometry before expensive gravity and transient solves.
     from components.nonlinear_time_history.wall_diagnostics import write_wall_audit
     write_wall_audit(data, out/'NLTHA_Wall_Geometry_Preflight.json')

@@ -8,6 +8,7 @@ Mandatory source: docs/ground_motions/seismomatch_20261104/
 The source files are private and must NOT be copied into GitHub.
 """
 from __future__ import annotations
+from components.nbc105.constants import GRAVITY_M_S2
 import argparse
 import csv
 import hashlib
@@ -180,7 +181,7 @@ def create_configs(*,models_json,matched_dir,output_dir,dt_s=.005,
         "earthquakes":list(EVENT_ORDER), "configs_generated":len(configurations),
         "orientations_per_config":["XY","YX"],"intended_total_analyses":len(configurations)*2,
         "matched_input_additional_scale":1.,
-        "path_factor_for_g_input_m_s2":9.80665,
+        "path_factor_for_g_input_m_s2":GRAVITY_M_S2,
         "record_original_scale_factor_logs_verified":False,
         "target_workbook_sha256":"fe513b2dc8ad33dda870a2eeefba07f3c6ae8dc8ff92f332b20a323a9d9c63a8",
         "target":"NBC_105_2025_SOIL_C_ULS_RC_DUAL",

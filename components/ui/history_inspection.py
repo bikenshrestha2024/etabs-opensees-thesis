@@ -1,4 +1,5 @@
 """Complete history inspection, with paged data and coherent rigid-floor playback."""
+from components.nbc105.constants import GRAVITY_M_S2
 from pathlib import Path
 import csv,json,math,time
 import numpy as np
@@ -297,7 +298,7 @@ def launch(parent,folder):
         try:
             from NBC105_Spectrum_Scaling_V115 import response_spectrum_5pct
             from OpenSees_Input_Records_V130 import _read_peer_text_record
-            values,dt,units=_read_peer_text_record(item['source_path']);acc=np.asarray(values,float)*(1. if units=='g' else 1./9.80665)*float(item['scale_factor'])
+            values,dt,units=_read_peer_text_record(item['source_path']);acc=np.asarray(values,float)*(1. if units=='g' else 1./GRAVITY_M_S2)*float(item['scale_factor'])
             periods=np.geomspace(.05,6.,80);sa=response_spectrum_5pct(acc,dt,periods)
             ax.clear();ax.plot(periods,sa,label='Applied component');ax.set(xlabel='Period (s)',ylabel='5% damped pseudo-acceleration Sa (g)',title='Input spectrum diagnostic; no automatic record matching');ax.grid(alpha=.25);ax.legend();chart.draw_idle();tabs.select(plot)
         except Exception as e:messagebox.showerror('Spectrum',str(e),parent=win)

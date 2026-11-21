@@ -27,7 +27,7 @@ do not change physical model values solely to make numerical solvers converge.
    a replacement for the matched Soil C sources.
 4. Prevent reapplying SeismoMatch amplitude scales to already-matched
    `Acc(g)` exports: applied **additional** spectral multiplier is 1.0;
-   `Path -factor` is **9.80665** for kN–m–s. Never infer source initial
+   `Path -factor` is **9.81** for kN–m–s. Never infer source initial
    matching factors from a PGA ratio. Verify original scale logs and
    common lower-of-two pair factor independently (NBC §9.3.2.2).
 5. Use independent reviewed T1X, T1Y and Tn90X, Tn90Y to check fit

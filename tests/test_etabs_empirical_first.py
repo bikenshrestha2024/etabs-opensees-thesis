@@ -12,7 +12,7 @@ from reconcile import (
 
 def test_rayleigh_uses_paired_signed_floors():
     result=rayleigh([{'story':'Story1','weight_kN':981.,'force_kN':10.,'displacement_m':.2,'rotation_rad':0.,'torsion_kNm':0.}])
-    assert math.isclose(result['period_s'],2*math.pi*math.sqrt(981*.04/(9.80665*2.)))
+    assert math.isclose(result['period_s'],2*math.pi*math.sqrt(981*.04/(9.81*2.)))
 
 def test_force_scale_is_floor_and_keeps_displacement_unscaled():
     assert force_scale(120,100)=={'force':1.0,'displacement':1.0}

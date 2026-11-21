@@ -32,6 +32,6 @@ body:
     attributes:
       label: CONSTRAINTS
       description: List physical, file-integrity, unit and NBC restrictions.
-      value: "Soil C matched Acc(g): additional scale 1.0; Path factor 9.80665; no invented material data; maintain XY/YX; preserve old versions and input hashes."
+      value: "Soil C matched Acc(g): additional scale 1.0; Path factor 9.81; no invented material data; maintain XY/YX; preserve old versions and input hashes."
     validations:
       required: true

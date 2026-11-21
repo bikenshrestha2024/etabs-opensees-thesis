@@ -1036,10 +1036,10 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
         if not valid:
             notes.append(f'Saved {state} Rayleigh results are stale, incomplete, or inconsistent with the current model, seismic weights, or wall Aw; rerun the preliminary analysis.')
             saved_g=result.get('gravity_acceleration_m_s2')
-            from components.nbc105.constants import GRAVITY_M_S2
+            from components.nbc105.constants import GRAVITY_M_S2,SUPERSEDED_GRAVITY_M_S2
             if (isinstance(saved_g,(int,float)) and not isinstance(saved_g,bool) and math.isfinite(saved_g)
                     and not math.isclose(saved_g,GRAVITY_M_S2,rel_tol=1e-8)):
-                notes.append(f'Saved {state} Rayleigh results were recorded with g={saved_g:g} m/s^2; this release uses g={GRAVITY_M_S2:g} m/s^2 (NBC 105:2025 printed g=9.81), so those periods are rejected on import and the Rayleigh analysis must be re-run. Until then the ESM period falls back to 1.25 x empirical.')
+                notes.append(f'Saved {state} Rayleigh results were recorded with g={saved_g:g} m/s^2; this release uses g={GRAVITY_M_S2:g} m/s^2 (NBC 105:2025 printed p. 7; the superseded 2026-11-21 value was {SUPERSEDED_GRAVITY_M_S2:g}), so results saved with any other g are rejected on import and the Rayleigh analysis must be re-run. Until then the ESM period falls back to 1.25 x empirical.')
     notes.append('Regularity is not inferred from Excel or model symmetry. Confirm NBC §5.4 for the asymmetric building.')
     return dict(values=values,audit=audit,notes=notes)
 

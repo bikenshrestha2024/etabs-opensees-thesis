@@ -35,6 +35,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from components.nbc105.constants import GRAVITY_M_S2  # noqa: E402
+
 VARIANTS = ('M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6')
 ACCEPTED_GATE = 'FULL_DURATION_NUMERIC_SCREEN'
 # [REF R10 NBC105-2025 §5.5.3] drift screens; §9.3.3.1 cross-reference
@@ -443,7 +445,7 @@ def plot_spectra(cases, out_dir, *, soil='C', zone_Z=None, importance_I=None, ta
                 ax.text(.02, .9, f'{label}: {exc}', transform=ax.transAxes, fontsize=7)
                 continue
             if str(units).lower() not in ('g', 'acc(g)'):
-                values = [v / 9.80665 for v in values]
+                values = [v / GRAVITY_M_S2 for v in values]
             sa = response_spectrum_5pct(values, dt, periods)
             ax.loglog(periods, sa, lw=1, label=label)
         if target:
@@ -469,7 +471,7 @@ WORKFLOW = [
     ('04 Modal / dt', 'T1, Tn90 X/Y, damping modes,\ndt ≤ min(rec dt, T1/100, 0.01)', '11_, 32_'),
     ('05 Damping', 'Region Rayleigh 2.5% on frame/\ncore/slab; devices excluded', 'damping_regions'),
     ('06 Recorders', 'Rel. + abs. accel, drift, devices,\nenergy balance', 'energy_balance'),
-    ('07 Excitation', 'UniformExcitation XY & YX,\nPath factor 9.80665, scale 1.0', '17_, 36_'),
+    ('07 Excitation', 'UniformExcitation XY & YX,\nPath factor 9.81, scale 1.0', '17_, 36_'),
     ('08 Transient', 'Newmark avg. accel., Newton →\nKrylov fallbacks, dt bisection', '15_, 21_'),
     ('09 Post-process', 'Energy closure → §9.3.3 mean →\n§5.5.3 drift, devices, M0–M6', '18_, 27_, tools/'),
 ]

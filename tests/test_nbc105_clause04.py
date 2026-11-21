@@ -146,11 +146,21 @@ class SoilTests(unittest.TestCase):
         self.assertEqual((r["soil"], r["basis"], r["issues"]), ("D", "N_SPT", []))
         r = c4.select_soil_type(height_m=40, n_spt=5)  # 40 m is not "more than 40"
         self.assertEqual(r["soil"], "D")
-        r = c4.select_soil_type(height_m=95, n_spt=5)
+        # Above 40 m Vs,30 is optional for this thesis (USER_DECLARED 2026-11-21)
+        # but the clause 4.1.3.1 requirement is reported, never raised.
+        r = c4.select_soil_type(height_m=95, vs30=None, n_spt=20)
+        self.assertEqual((r["soil"], r["basis"]), ("C", "N_SPT"))
+        self.assertEqual(len(r["issues"]), 1)
+        self.assertIn("VS30_REQUIRED_ABOVE_40M_NOT_SUPPLIED", r["issues"][0])
+        self.assertIn("4.1.3.1", r["issues"][0])
+        self.assertIn("optional for this thesis, USER_DECLARED 2026-11-21", r["issues"][0])
+        self.assertEqual(c4.VS30_REQUIRED_ISSUE_CODE, "VS30_REQUIRED_ABOVE_40M_NOT_SUPPLIED")
+        r = c4.select_soil_type(height_m=95)  # no basis at all: soil None plus both issues
         self.assertIsNone(r["soil"])
-        self.assertEqual(r["issues"],
-                         ["Vs,30 is mandatory for buildings taller than 40 m (clause 4.1.3.1)"])
-        self.assertEqual(c4.select_soil_type(height_m=95, vs30=300)["soil"], "C")
+        self.assertEqual(r["issues"], [c4.VS30_REQUIRED_ISSUE, "neither Vs,30 nor N_SPT was provided"])
+        r = c4.select_soil_type(height_m=95, vs30=300)
+        self.assertEqual((r["soil"], r["basis"], r["issues"]), ("C", "Vs30", []))
+        self.assertEqual(c4.select_soil_type(height_m=40, n_spt=20)["issues"], [])  # 40 m is not above 40
         self.assertIsNone(c4.select_soil_type(height_m=20)["soil"])
 
 

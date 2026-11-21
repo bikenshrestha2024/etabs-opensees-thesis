@@ -15,6 +15,7 @@ Execution is OFF by default and requires a reviewed readiness manifest.
 from __future__ import annotations
 
 __release__ = '134'
+from components.nbc105.constants import GRAVITY_M_S2
 from OpenSees_Timing_V130 import timed_outputs
 from OpenSees_Transient_Runtime_V133 import CaseProfiler,save_workload,history_metadata,HistoryStream,acceleration_conversion
 
@@ -247,7 +248,7 @@ def _run_analysis(config):
         raise ValueError("model_length_unit must be 'm' or 'mm'.")
     model_length_to_m = 1.0 if model_length_unit == "m" else 0.001
     model_acceleration_unit = "m/s2" if model_length_unit == "m" else "mm/s2"
-    g_in_model_units = 9.80665 / model_length_to_m
+    g_in_model_units = GRAVITY_M_S2 / model_length_to_m
     audit_rows = []
     for motion in motions:
         for component in (("X", motion["x"], motion["dt_x"]),) if motion.get("mode") == "X_ONLY" else (("X", motion["x"], motion["dt_x"]), ("Y", motion["y"], motion["dt_y"])):
@@ -261,7 +262,7 @@ def _run_analysis(config):
                 "scale_factor": motion["scale"], "field_type": motion.get("field_type", "Near-field" if motion.get("mode") == "X_ONLY" else "Custom")})
     with (out / "NBC105_Nonlinear_Time_History_Input_Record_Audit_V116.csv").open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=list(audit_rows[0])); writer.writeheader(); writer.writerows(audit_rows)
-    print('[UNITS] Source accelerations are converted once to '+model_acceleration_unit+'; g=9.80665 m/s2. Motion scale is separate. See Input_Record_Audit total Path factors.',flush=True)
+    print('[UNITS] Source accelerations are converted once to '+model_acceleration_unit+'; g=%g m/s2. Motion scale is separate. See Input_Record_Audit total Path factors.'%GRAVITY_M_S2,flush=True)
     print('[SCOPE] '+('PRELIMINARY setup check' if config.get('preliminary_selection') else 'Selected suite')+' | pairs: '+', '.join(m['pair_id'] for m in motions)+' | each pair runs XY and YX',flush=True)
     records = []
     for pair_index, motion in enumerate(motions, 1):
@@ -402,7 +403,7 @@ def _run_analysis(config):
                 # The record scale factor is already verified to satisfy NBC's
                 # 0.33–3 bound; g-valued records are converted to m/s².
                 # Convert source acceleration into the model's length/time unit.
-                # g is 9.80665 m/s²: use 9.80665 for m-s and 9806.65 for mm-s.
+                # g is 9.81 m/s²: use 9.81 for m-s and 9810 for mm-s.
                 accel_factor = acceleration_conversion(motion["units"],model_length_unit,motion["scale"])["total_path_factor"]
                 record_dir = out / "record_inputs"; record_dir.mkdir(exist_ok=True)
                 # SECTION 18.3 — Apply either the X-only screening record or

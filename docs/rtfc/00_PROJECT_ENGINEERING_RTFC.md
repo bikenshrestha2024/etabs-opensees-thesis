@@ -26,7 +26,7 @@ For a change to JSON I/O, document schema, field type, units, default, source, e
 
 ## CONSTRAINTS
 - Primary thesis motions are **8 paired Soil C matched events** (16 horizontal components): Gorkha, Landers, Northridge, Kobe, Kocaeli, Chi-Chi, Hector Mine, Loma Prieta. Field labels (six near/two far) require seismological provenance checks.
-- Their SeismoMatch-matched `Acc(g)` histories already contain the spectral matching adjustment. OpenSees *additional spectral scale* is **1.0**; unit-conversion `Path -factor` for kN–m–s is **9.80665**. Never multiply original 0.33–3 match factors again.
+- Their SeismoMatch-matched `Acc(g)` histories already contain the spectral matching adjustment. OpenSees *additional spectral scale* is **1.0**; unit-conversion `Path -factor` for kN–m–s is **9.81**. Never multiply original 0.33–3 match factors again.
 - Each event requires **simultaneous two-component XY and YX** in fresh model domains. Do not substitute separate X/Y runs for paired analyses, and do not add Z without §4.3 justification.
 - Verify real `T1_X,T1_Y,Tn90_X,Tn90_Y`, matching interval `[Tn90,sqrt(3.5)*T1]` and the code-based analysis timestep. No automatic acceptance from 0.05–6s alone.
 - Review original Gorkha 120s vs matched 322.94s processing; Loma Prieta matched components have one-sample duration difference. Never silently trim, pad or resample files.

@@ -15,7 +15,7 @@ This report supersedes the earlier [six-X-file preliminary audit](../../00_SEISM
 - Independent 5%-damped pseudo acceleration spectra were computed using Newmark average-acceleration (`gamma=0.5, beta=0.25`) on 120 log-distributed periods from **0.05–6.0 seconds**, no posthoc baseline alteration.
 - **Conditional soil-C target only:** `Ta=0.1s, Tc=1.0s, Td=4.0s, alpha=2.5`, with **0.625g assumed plateau**. This is consistent with `Z*I/Omega_u=0.25`; the actual model's complete target normalization was **not independently established**. The computed residuals are not an NBC acceptance tolerance.
 - Mean across the 16 individual component mean absolute relative pseudo-spectral errors = **3.06%**; component means range **2.05%–4.75%**. Worst individual period residual was **56.96%**, Gorkha component B. A low mean is not a uniform-frequency tolerance guarantee.
-- Any acceleration files sent to OpenSees are already matched: import raw recorded **`g`** values using `ops.timeSeries("Path", ..., "-factor", 9.80665)` in a kN–m–s model, with `scale=1.0` additional spectral multiplier. Execute each pair in BOTH **XY and YX** simultaneously bidirectional support-motion cases.
+- Any acceleration files sent to OpenSees are already matched: import raw recorded **`g`** values using `ops.timeSeries("Path", ..., "-factor", 9.81)` in a kN–m–s model, with `scale=1.0` additional spectral multiplier. Execute each pair in BOTH **XY and YX** simultaneously bidirectional support-motion cases.
 
 ## Reproduced per-event result
 

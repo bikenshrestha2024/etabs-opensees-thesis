@@ -1,7 +1,8 @@
-"""Saved Rayleigh results made with g = 9.81 are rejected with a stated cause.
+"""Saved Rayleigh results made with a g that differs from the constant are rejected with a stated cause.
 
-NBC 105 gravity constant changed 9.81 -> 9.80665 in this release; unit tests
-only, no ETABS/OpenSees. Tolerance and solver numerics are unchanged.
+NBC 105 gravity is 9.81 (printed p. 7); the superseded 9.80665 is recognised
+only to reject old results. Unit tests only, no ETABS/OpenSees. Tolerance and
+solver numerics are unchanged.
 """
 import hashlib
 import json
@@ -10,6 +11,7 @@ import unittest
 from pathlib import Path
 
 from components.inputs.project_workbooks import import_project_inputs
+from components.nbc105.constants import GRAVITY_M_S2, SUPERSEDED_GRAVITY_M_S2
 from components.modal.rayleigh import (
     RAYLEIGH_DISPLACEMENT_BASIS, RAYLEIGH_METHOD_VERSION, rayleigh_result_prefix,
 )
@@ -34,11 +36,11 @@ def _axis_with_g(g):
 
 
 class SavedRayleighGravityTests(unittest.TestCase):
-    def test_axis_recorded_with_9_81_is_rejected(self):
+    def test_axis_recorded_with_superseded_g_is_rejected(self):
         with self.assertRaises(ValueError) as ctx:
-            verify_saved_rayleigh_axis(_axis_with_g(9.81))
+            verify_saved_rayleigh_axis(_axis_with_g(SUPERSEDED_GRAVITY_M_S2))
         self.assertIn("mismatch", str(ctx.exception))
-        verify_saved_rayleigh_axis(_axis_with_g(9.80665))  # current g accepted
+        verify_saved_rayleigh_axis(_axis_with_g(GRAVITY_M_S2))  # current g accepted
 
     def _import(self, g):
         tmp = tempfile.TemporaryDirectory()
@@ -65,20 +67,21 @@ class SavedRayleighGravityTests(unittest.TestCase):
         return import_project_inputs(folder, folder, "ULS")
 
     def test_import_states_gravity_cause_and_drops_periods(self):
-        data = self._import(9.81)
+        data = self._import(SUPERSEDED_GRAVITY_M_S2)
         self.assertNotIn("rayleigh_tx", data["values"])
         text = " ".join(data["notes"])
         self.assertIn("stale, incomplete, or inconsistent", text)
-        self.assertIn("g=9.81", text)
-        self.assertIn("9.80665", text)
+        self.assertIn("g=9.80665", text)  # the recorded value
+        self.assertIn("this release uses g=9.81", text)
+        self.assertIn("printed p. 7", text)
         self.assertIn("re-run", text)
         self.assertIn("1.25 x empirical", text)
 
     def test_import_with_current_g_has_no_gravity_note(self):
-        data = self._import(9.80665)
+        data = self._import(GRAVITY_M_S2)
         self.assertNotIn("were recorded with g=", " ".join(data["notes"]))
         self.assertAlmostEqual(float(data["values"]["rayleigh_tx"]),
-                               _axis_with_g(9.80665)["period_s"])
+                               _axis_with_g(GRAVITY_M_S2)["period_s"])
 
 
 if __name__ == "__main__":

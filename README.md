@@ -69,7 +69,7 @@ NBC 105:2025 clause modules, matrices and project declarations: [clause register
 **Bidirectional earthquake setup:** [NBC 105:2025 XY/YX, vertical-action scope and exact OpenSees acceleration scaling](docs/programs/33_NBC105_XY_YX_VERTICAL_AND_SCALE_GUIDE.md). Horizontal XY/YX inputs remain 3D structural NLTHA; §4.3 vertical triggers require separate documented review.
 
 
-**Matched SeismoMatch waveform import:** already matched Acc(g) records use `scale=1.0` in OpenSees, with Path unit conversion `9.80665`. The source-header and source-hash audit prevents a second spectrum multiplier. This is NOT independent confirmation of original SeismoMatch component scale factors: see [input provenance guide](docs/source/components/nonlinear_time_history/seismomatch_audit.py.md).
+**Matched SeismoMatch waveform import:** already matched Acc(g) records use `scale=1.0` in OpenSees, with Path unit conversion `9.81`. The source-header and source-hash audit prevents a second spectrum multiplier. This is NOT independent confirmation of original SeismoMatch component scale factors: see [input provenance guide](docs/source/components/nonlinear_time_history/seismomatch_audit.py.md).
 
 
 [2026-11-04 SeismoMatch numeric source double-verification](docs/00_SEISMOMATCH_MATCHED_RECORDS_AUDIT_20261104.md): six original Library matched X records checked against thesis PGAs, one unresolved Gorkha mismatch, scale1.0 import and missing original component scaling logs documented.
@@ -79,7 +79,7 @@ NBC 105:2025 clause modules, matrices and project declarations: [clause register
 
 The latest [16-component, eight-pair SeismoMatch record audit](docs/ground_motions/seismomatch_20261104/README.md) supersedes the preliminary six-X-component document. It includes matched sample intervals, PGAs, source SHA256 fingerprints, conditional 5%-damped response-spectrum discrepancy statistics, source processing anomalies, and NBC 105:2025 clause checks. See the [16-file register](docs/ground_motions/seismomatch_20261104/matched_component_register.csv) and [offline reproducible source verifier](tools/verify_matched_waveforms.py).
 
-**No original or matched earthquake waveforms are committed.** The original SeismoMatch initial component scaling-factor logs remain unavailable. Matched files already in `Acc(g)` are imported with `scale=1.0` and a unit-conversion Path factor of `9.80665`, not a second spectral scale.
+**No original or matched earthquake waveforms are committed.** The original SeismoMatch initial component scaling-factor logs remain unavailable. Matched files already in `Acc(g)` are imported with `scale=1.0` and a unit-conversion Path factor of `9.81`, not a second spectral scale.
 
 
 [Complete eight-pair SeismoMatch source verification runbook](docs/ground_motions/seismomatch_20261104/RUNBOOK.md) now covers both original PEER AT2 and matched SeismoMatch source fingerprints, safe parsing, explicit pair synchronization, output schema, OpenSees scaling and NBC 105 evidence gates.
@@ -92,7 +92,7 @@ Do not treat conditional Soil-C-only SeismoMatch PSA residuals as Soil-D validat
 
 ## Soil C primary full NLTHA research workflow (2026-11-04)
 
-**Start with the [Stage 35 complete NBC 105:2025 Soil C source and analysis runbook](docs/programs/35_SOIL_C_PRIMARY_NLTHA_RUNBOOK.md)**. All eight actual matched A/B earthquake pairs in Soil C are tracked by original uploaded SHA256 in [source register](docs/ground_motions/seismomatch_20261104/matched_component_register.csv); matches are **already spectral-matched Acc(g)**. Extra OpenSees spectrum scale is **1.0**, acceleration unit Path factor **9.80665** for kN-m-s. Run **both simultaneous XY and YX orientations** per pair, with full 3D model and a separate gravity/preload state. Six near-field and two far-field classifications follow study grouping and still need seismological source-distance evidence.
+**Start with the [Stage 35 complete NBC 105:2025 Soil C source and analysis runbook](docs/programs/35_SOIL_C_PRIMARY_NLTHA_RUNBOOK.md)**. All eight actual matched A/B earthquake pairs in Soil C are tracked by original uploaded SHA256 in [source register](docs/ground_motions/seismomatch_20261104/matched_component_register.csv); matches are **already spectral-matched Acc(g)**. Extra OpenSees spectrum scale is **1.0**, acceleration unit Path factor **9.81** for kN-m-s. Run **both simultaneous XY and YX orientations** per pair, with full 3D model and a separate gravity/preload state. Six near-field and two far-field classifications follow study grouping and still need seismological source-distance evidence.
 
 Use [Stage 35 preflight](35_SOIL_C_NLTHA_PREFLIGHT.py) to audit all 16 source hashes and modal input limits. Use [Stage 36 run-matrix generator](36_SOIL_C_NLTHA_RUN_MATRIX.py) to **plan**, not execute, 112 research configs (M0–M6 × ULS/SLS × eight earthquakes), 224 intended XY/YX transient analyses. [Stage 36 instructions](docs/programs/36_SOIL_C_M0_M6_RUN_MATRIX.md) and [absolute vs relative acceleration recorder documentation](docs/source/components/nonlinear_time_history/ground_acceleration.py.md) describe corresponding code and output schemas.
 

@@ -6,7 +6,7 @@
 
 **Entry point:** `audit_rayleigh_mass_elevations(model,story_rows)` is pure Python. The active Rayleigh runner calls it immediately after loading its matching assembled model and seismic story-weight ledger.
 
-**Inputs:** `OpenSees_Complete_Model_Data_V118.json` provides the exported model's nodes, `nodal_mass` (kN·s²/m), `supports`, diaphragms and seismic base elevation. The matching story ledger provides `dead_load_kN`, `storage_live_load_kN`, `other_live_load_kN` and master tags. It uses `g_mass=9.80665 m/s²`, matching the existing assembly's mass conversion.
+**Inputs:** `OpenSees_Complete_Model_Data_V118.json` provides the exported model's nodes, `nodal_mass` (kN·s²/m), `supports`, diaphragms and seismic base elevation. The matching story ledger provides `dead_load_kN`, `storage_live_load_kN`, `other_live_load_kN` and master tags. It uses `g_mass=9.81 m/s²`, matching the existing assembly's mass conversion.
 
 **Contract:** It maps every active horizontal mass to the first diaphragm at or above the physical node elevation, exactly as the existing source ledger does. It checks all floor weights and reports total active weight, intermediate-elevation node count, upward-relocated mass fraction, first-moment shift, maximum vertical lift, out-of-roof geometry and mixed-XY-support nodes.
 

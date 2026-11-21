@@ -26,7 +26,8 @@ __all__ = [
     "importance_factor", "elastic_site_spectrum", "serviceability_spectrum",
     "vertical_spectrum_coefficient", "vs30_from_layers",
     "soil_type_from_vs30", "soil_type_from_n_spt", "soil_type_from_cu",
-    "select_soil_type", "default_soil_type_d", "validate_zoning_factor",
+    "select_soil_type", "VS30_REQUIRED_ISSUE_CODE", "VS30_REQUIRED_ISSUE",
+    "default_soil_type_d", "validate_zoning_factor",
 ]
 
 # [REF NBC105-2025 §4.1.2, printed p. 24] Table 4-1.
@@ -270,14 +271,24 @@ def soil_type_from_cu(cu_kpa):
     return "D"
 
 
+VS30_REQUIRED_ISSUE_CODE = "VS30_REQUIRED_ABOVE_40M_NOT_SUPPLIED"
+VS30_REQUIRED_ISSUE = (
+    VS30_REQUIRED_ISSUE_CODE + ": clause 4.1.3.1 (printed p. 24) requires Vs,30 for "
+    "buildings higher than 40 m; Vs,30 is optional for this thesis, "
+    "USER_DECLARED 2026-11-21")
+
+
 def select_soil_type(*, height_m, vs30=None, n_spt=None):
     """Return ``{soil, basis, issues}`` for the Table 4-2 classification.
 
     [REF NBC105-2025 §4.1.3.1, printed p. 24]
     Vs,30 is preferred; N_SPT is used only when Vs,30 is absent. For
-    ``height_m > 40`` Vs,30 is mandatory: without it ``soil`` is None and an
-    issue is reported. Does not apply the Kathmandu Valley default of
-    §4.1.3.3; see ``default_soil_type_d``.
+    ``height_m > 40`` clause 4.1.3.1 requires Vs,30. That requirement is
+    optional for this thesis (USER_DECLARED 2026-11-21) but stays documented:
+    without Vs,30 the result carries the issue ``VS30_REQUIRED_ABOVE_40M_NOT_SUPPLIED``
+    (``VS30_REQUIRED_ISSUE``) and nothing is raised. ``soil`` is then taken from
+    N_SPT when it is given and is None otherwise. Does not apply the Kathmandu
+    Valley default of §4.1.3.3; see ``default_soil_type_d``.
     """
     h = _finite(height_m, "height_m")
     if h <= 0:
@@ -289,9 +300,7 @@ def select_soil_type(*, height_m, vs30=None, n_spt=None):
             issues.append("N_SPT class differs from the Vs,30 class; Vs,30 governs")
         return {"soil": soil, "basis": "Vs30", "issues": issues}
     if h > MANDATORY_VS30_HEIGHT_M:
-        issues.append(
-            "Vs,30 is mandatory for buildings taller than 40 m (clause 4.1.3.1)")
-        return {"soil": None, "basis": None, "issues": issues}
+        issues.append(VS30_REQUIRED_ISSUE)
     if n_spt is not None:
         return {"soil": soil_type_from_n_spt(n_spt), "basis": "N_SPT",
                 "issues": issues}

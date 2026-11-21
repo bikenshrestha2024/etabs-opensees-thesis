@@ -13,7 +13,7 @@ def cfg():
 
 class Tests(unittest.TestCase):
     def test_immutable_soil_c_input(self):
-        self.assertEqual(audit_soil_c_analysis_config(cfg())["applied_path_acceleration_factor"],9.80665)
+        self.assertEqual(audit_soil_c_analysis_config(cfg())["applied_path_acceleration_factor"],9.81)
         d=cfg();d["scale"]=1.4
         with self.assertRaisesRegex(ValueError,"scale"):audit_soil_c_analysis_config(d)
         d=cfg();d["soil_type"]="D"

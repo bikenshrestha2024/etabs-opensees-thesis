@@ -58,7 +58,7 @@ The generator refuses extrapolation outside the Figure 4-2 0–6 s published dom
 1. For EACH SeismoMatch project/session, store source target-curve file with SHA256, declared `soil_type`, `Z`, `I`, `Omega_u`, and matching period interval.
 2. Explicitly label eight ground-motion pairs as belonging to the Soil C suite or Soil D suite. The same input records *could* be independently processed against both targets, but that requires independently saved, separately hashed matched output histories. **One file is not by itself proof of two target matches.**
 3. Compare matched 5%-damped PSA against the **corresponding** C or D target on an identical period grid. Store actual error norms, maximum deviation, matching criteria and source hashes separately.
-4. Verify original SeismoMatch component scale factors 0.33–3.0 and lower-of-pair rule (§9.3.2.2), then import *already-matched* Acc(g) at additional OpenSees `scale=1.0` and unit conversion factor 9.80665 m/s² per g.
+4. Verify original SeismoMatch component scale factors 0.33–3.0 and lower-of-pair rule (§9.3.2.2), then import *already-matched* Acc(g) at additional OpenSees `scale=1.0` and unit conversion factor 9.81 m/s² per g.
 5. Check source waveforms for Gorkha duration and Loma Prieta one-sample mismatch, and review actual current T1X/T1Y/Tn90X/Tn90Y.
 6. Structural-system status and geotechnical soil type must be independently verified. Passing a target-generation unit test is not NBC compliance.
 

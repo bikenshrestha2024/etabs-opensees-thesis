@@ -52,7 +52,7 @@ class ReviewFixes(unittest.TestCase):
 
     def test_global_z_and_gravity_seismic_mass(self):
         m=calculate_area_seismic_mass_contribution(load_assignment_csv=self.loads,topology_json=self.topology,pattern_factors={'Dead':1,'Live':.3})
-        self.assertAlmostEqual(sum(m.values())*9.80665,22.4)
+        self.assertAlmostEqual(sum(m.values())*9.81,22.4)
 
     def test_legacy_sign_error_rejected_before_patterns(self):
         self.write_loads(legacy_error=True)
@@ -66,8 +66,8 @@ class ReviewFixes(unittest.TestCase):
         ops.timeSeries('Linear',1); ops.pattern('Plain',1,1)
         # Force a time-series-only collision on a build without enumeration.
         ops.timeSeries('Linear',910000)
-        a=add_path_excitation(ops,direction=1,dt=.01,file_path=record,factor=9.80665)
-        b=add_path_excitation(ops,direction=2,dt=.01,file_path=record,factor=9.80665)
+        a=add_path_excitation(ops,direction=1,dt=.01,file_path=record,factor=9.81)
+        b=add_path_excitation(ops,direction=2,dt=.01,file_path=record,factor=9.81)
         self.assertNotEqual(a[0],910000); self.assertNotEqual(a,b)
         self.assertIn(1,ops.getPatterns())
         self.assertIn(a[1],ops.getPatterns()); self.assertIn(b[1],ops.getPatterns())

@@ -10,6 +10,7 @@ This pure Python module does not solve or approve any structural model.
 """
 from __future__ import annotations
 
+from components.nbc105.constants import GRAVITY_M_S2
 import math
 
 from components.nonlinear_time_history.nbc105_2025_audit import (
@@ -31,7 +32,7 @@ SOIL_C_INPUT_BASIS = {
         "fe513b2dc8ad33dda870a2eeefba07f3c6ae8dc8ff92f332b20a323a9d9c63a8",
     "source_units": "g",
     "extra_spectral_multiplier": 1.0,
-    "path_factor_m_s2_per_g": 9.80665,
+    "path_factor_m_s2_per_g": GRAVITY_M_S2,
 }
 
 def _positive(raw, name):
@@ -100,7 +101,7 @@ def audit_soil_c_analysis_config(config):
         limit_state=state,
         target_is_uls_spectrum=True,
         sls_source_application_review_required=(state=="SLS"),
-        applied_path_acceleration_factor=9.80665,
+        applied_path_acceleration_factor=GRAVITY_M_S2,
         seismomatch_independent_scale_factors_verified=False,
         current_modal_periods_verified=False,
         material_and_wall_model_approved=False,

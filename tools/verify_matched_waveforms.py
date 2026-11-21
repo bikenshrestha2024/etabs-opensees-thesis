@@ -12,11 +12,17 @@ import hashlib
 import json
 import math
 import re
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from components.nbc105.constants import GRAVITY_M_S2  # noqa: E402
+
 REGISTER = (ROOT / "docs" / "ground_motions" / "seismomatch_20261104"
             / "matched_component_register.csv")
 
@@ -193,7 +199,7 @@ def audit(matched_dir, register=REGISTER):
         "independent_target_spectrum_pass": False,
         "units_in_opensees_kNmS": {
             "additional_matched_waveform_scale": 1.0,
-            "g_to_m_per_s2": 9.80665},
+            "g_to_m_per_s2": GRAVITY_M_S2},
         "warnings": [
             "Matched PGA ratio is not original SeismoMatch scaling factor.",
             "Inspect Gorkha matching source: 322.94 s vs original 120 s.",
@@ -247,7 +253,7 @@ def markdown_report(report):
         "- Loma Prieta A/B 0.005s mismatch requires documented synchronization/end-time policy.",
         "- Source waveform provenance is separate from gravity, wall, FVD, BRB and full-duration NLTHA approval.",
         "", "## Import rules", "",
-        "- Already matched Acc(g): additional spectral scale 1.0; convert g to m/s2 with Path factor 9.80665.",
+        "- Already matched Acc(g): additional spectral scale 1.0; convert g to m/s2 with Path factor 9.81.",
         "- Two horizontal components simultaneously in both XY and YX, in fresh model domains.",
         "- Never silently trim, pad, resample, interpolate or spectrum-rematch a registered file.",
         "", "## Sources", "",

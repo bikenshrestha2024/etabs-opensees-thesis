@@ -258,8 +258,11 @@ class SoilClassifierParity(unittest.TestCase):
             importance_factor_i=1.0, diagnostic_reference=True, n_spt_blow_30cm=30)
         self.assertFalse(result["site_subsoil_verified"])
         self.assertIn("4.1.3.1", result["site_subsoil_status"])
-        issues = c4.select_soil_type(height_m=45.0, n_spt=30)
-        self.assertIsNone(issues["soil"])
+        # production calculate_esm still withholds site_subsoil_verified; the clause 4
+        # module classifies from N_SPT and reports the documented Vs,30 requirement.
+        r = c4.select_soil_type(height_m=45.0, n_spt=30)
+        self.assertEqual(r["soil"], "C")
+        self.assertIn(c4.VS30_REQUIRED_ISSUE_CODE, r["issues"][0])
 
 
 class ConstantScanTests(unittest.TestCase):

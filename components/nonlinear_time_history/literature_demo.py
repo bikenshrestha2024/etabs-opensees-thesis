@@ -2,10 +2,11 @@
 Source: OpenSees Example 3.1 + OpenSeesPy RCFrameEarthquake.
 Not the selected ETABS building and not an NBC design acceptance analysis.
 """
+from components.nbc105.constants import GRAVITY_M_S2
 from pathlib import Path
 import json,csv,math,time,re,datetime
 import numpy as np
-KIP=4.4482216152605;INCH=.0254;KSI=KIP/INCH**2;G=9.80665
+KIP=4.4482216152605;INCH=.0254;KSI=KIP/INCH**2;G=GRAVITY_M_S2
 SOURCES=[
  'https://github.com/OpenSees/OpenSees/blob/master/EXAMPLES/ExamplePython/Example3.1.py',
  'https://openseespydoc.readthedocs.io/en/latest/src/RCFrameEarthquake.html',

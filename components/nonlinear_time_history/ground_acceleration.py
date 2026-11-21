@@ -14,9 +14,10 @@ including additional spectral factor =1 for already matched sources.
 Nonuniform/multi-support excitation needs a DIFFERENT algorithm.
 """
 from __future__ import annotations
+from components.nbc105.constants import GRAVITY_M_S2
 import math
 
-CONVERSION={"g":9.80665,"m/s2":1.0}
+CONVERSION={"g":GRAVITY_M_S2,"m/s2":1.0}
 
 def _sample_path(values,dt,time_s):
     """Uniformly sampled Path at analysis time, zero outside record duration."""

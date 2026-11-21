@@ -10,13 +10,13 @@ class GroundAccelerationTests(unittest.TestCase):
 
  def test_xy_interpolation_and_unit_conversion(self):
     ax,ay=applied_ground_acceleration(self.records,time_s=.015,orientation="XY")
-    self.assertAlmostEqual(ax,.15*9.80665)
-    self.assertAlmostEqual(ay,-.2*9.80665)
+    self.assertAlmostEqual(ax,.15*9.81)
+    self.assertAlmostEqual(ay,-.2*9.81)
 
  def test_yx_swaps_only_axis_not_factor(self):
     ax,ay=applied_ground_acceleration(self.records,time_s=.015,orientation="YX")
-    self.assertAlmostEqual(ax,-.2*9.80665)
-    self.assertAlmostEqual(ay,.15*9.80665)
+    self.assertAlmostEqual(ax,-.2*9.81)
+    self.assertAlmostEqual(ay,.15*9.81)
 
  def test_diagnostics_zero_and_end(self):
     self.assertEqual(applied_ground_acceleration(self.records,time_s=.005,
@@ -25,7 +25,7 @@ class GroundAccelerationTests(unittest.TestCase):
                             orientation="XY"),(0.,0.))
     ax,ay=applied_ground_acceleration(self.records,time_s=.01,orientation="XY",
                               excitation="X")
-    self.assertAlmostEqual(ax,.1*9.80665)
+    self.assertAlmostEqual(ax,.1*9.81)
     self.assertEqual(ay,0)
 
  def test_relative_absolute_distinction(self):

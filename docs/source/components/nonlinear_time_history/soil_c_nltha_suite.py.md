@@ -6,7 +6,7 @@
 
 **Inputs:** Local matched-source directory, registered 16 source filenames + exact SHA-256, dt, PGA and end time in `matched_component_register.csv`. Optional current independently validated modal periods `t1_x_s,t1_y_s,tn90_x_s,tn90_y_s` and proposed analysis dt. `verify_runner_pair` binds a particular X/Y pair to the source register and requires explicit Gorkha/Loma review flags.
 
-**Parameters:** Soil `C`, RC dual wall system `R_mu=3.5,Omega_u=1.4,Z=.35,I=1.0` from the user workbook/code target. Soil C `Ta=.1,Tc=1,Td=4,alpha=2.5`, fitting period `[.05,6]s`, input unit `g`, additional spectral factor `1.0`, conversion to `m/s²` `9.80665`.
+**Parameters:** Soil `C`, RC dual wall system `R_mu=3.5,Omega_u=1.4,Z=.35,I=1.0` from the user workbook/code target. Soil C `Ta=.1,Tc=1,Td=4,alpha=2.5`, fitting period `[.05,6]s`, input unit `g`, additional spectral factor `1.0`, conversion to `m/s²` `9.81`.
 
 **Functions:**
 - `register_rows`: exact sixteen manifest rows; unique A/B keys; path and digest restrictions.

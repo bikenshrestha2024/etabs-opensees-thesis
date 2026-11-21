@@ -75,7 +75,7 @@ For raw `Acc(g)` ordinates from **already matched** files and a **kN–m–s** n
 from openseespy import opensees as ops
 assert source_records_already_scaled is True
 additional_spectral_scale = 1.0
-unit_conversion = 9.80665  # g -> m/s^2, not a new spectrum scale
+unit_conversion = 9.81  # g -> m/s^2, not a new spectrum scale
 
 ops.timeSeries("Path", tsA, "-dt", dtA, "-values", *values_A_in_g,
                "-factor", unit_conversion)

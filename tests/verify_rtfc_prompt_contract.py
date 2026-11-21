@@ -27,7 +27,7 @@ class RTFCContractTests(unittest.TestCase):
                     self.assertGreater(len(data.split("## "+section,1)[-1].split("## ",1)[0].strip()),70)
     def test_context_invariants(self):
         text=(PROMPTS/"00_PROJECT_ENGINEERING_RTFC.md").read_text(encoding="utf-8")
-        for literal in ("0.05","9.80665","1.0","XY","YX","Gorkha","Loma","Tn90"):
+        for literal in ("0.05","9.81","1.0","XY","YX","Gorkha","Loma","Tn90"):
             self.assertIn(literal,text)
     def test_issue_template_and_agents(self):
         y=(ROOT/".github/ISSUE_TEMPLATE/engineering_rtfc.yml").read_text(encoding="utf-8")
