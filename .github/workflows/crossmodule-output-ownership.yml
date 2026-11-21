@@ -6,6 +6,9 @@ on:
       - 'components/gravity/gui_and_reports.py'
       - 'components/model/readiness_dashboard_gui.py'
       - 'components/model/readiness_gui.py'
+      - 'components/model/readiness_dashboard.py'
+      - 'components/ui/response_viewer.py'
+      - 'components/ui/application.py'
       - 'components/validation/irregularity_review.py'
       - 'components/validation/response_checks.py'
       - 'components/ui/building_exploratory_gui.py'
@@ -25,6 +28,9 @@ on:
       - 'components/gravity/gui_and_reports.py'
       - 'components/model/readiness_dashboard_gui.py'
       - 'components/model/readiness_gui.py'
+      - 'components/model/readiness_dashboard.py'
+      - 'components/ui/response_viewer.py'
+      - 'components/ui/application.py'
       - 'components/validation/irregularity_review.py'
       - 'components/validation/response_checks.py'
       - 'components/ui/building_exploratory_gui.py'
@@ -48,7 +54,7 @@ jobs:
           python-version: '3.12'
       - name: Compile amended modules
         run: |
-          python -m py_compile components/inputs/output_layout.py components/gravity/gui_and_reports.py components/model/readiness_dashboard_gui.py components/model/readiness_gui.py components/validation/irregularity_review.py components/validation/response_checks.py components/ui/building_exploratory_gui.py components/linear_time_history/runner_and_gui.py components/nonlinear_time_history/runner_and_gui.py tools/audit_output_stage_ownership.py tests/test_crossmodule_output_stage_ownership.py
+          python -m py_compile components/inputs/output_layout.py components/gravity/gui_and_reports.py components/model/readiness_dashboard_gui.py components/model/readiness_gui.py components/model/readiness_dashboard.py components/ui/response_viewer.py components/ui/application.py components/validation/irregularity_review.py components/validation/response_checks.py components/ui/building_exploratory_gui.py components/linear_time_history/runner_and_gui.py components/nonlinear_time_history/runner_and_gui.py tools/audit_output_stage_ownership.py tests/test_crossmodule_output_stage_ownership.py
       - name: Scan all active Python output writers and enforce known owner guards
         run: python tools/audit_output_stage_ownership.py --strict --report-dir audit/output-ownership
       - name: Test real-path routing decisions with synthetic sources
