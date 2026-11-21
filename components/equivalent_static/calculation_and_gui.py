@@ -2028,7 +2028,10 @@ class ESMGui:
                     failures.append(f"{state}: {state_exc}")
             if not made: raise ValueError("No case was calculated. " + " | ".join(failures))
             elapsed=time.perf_counter()-started
-            files=f"{len(made)} artifacts; saved under "+str(Path(self.outdir.get()))+"; use Export combined Excel + ZIP for a categorized index"
+            saved_folders=sorted({str(Path(p).parent) for p in made})
+            files=(f"{len(made)} artifacts across {len(saved_folders)} actual output folder(s): "
+                   + " | ".join(saved_folders)
+                   + "; Export combined Excel + ZIP for a categorized index")
             note=("\nBlocked cases: " + " | ".join(failures)) if failures else ""
             self._set_esm_operation("FINISHED",
                 str(len(self.last_runners))+" ESM case scripts generated | "+
