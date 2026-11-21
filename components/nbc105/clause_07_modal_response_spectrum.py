@@ -30,19 +30,22 @@ def modal_effective_weight(weights,shapes):
     return num*num/math.fsum(x*y*y for x,y in zip(w,phi))
 
 def modal_story_forces(weights,shapes,modal_base_shear):
-    """§7.2 Eq.7.1(3) p.40, signed participation may yield signed story forces."""
+    """§7.2 Eq.7.1(3) p.40, signed participation may yield signed story forces.
+[REF NBC105-2025 §7, printed pp. 40–41]"""
     w,p,d=_weights_modes(weights,shapes);v=_pos(modal_base_shear,"Vi")
     return [v*wi*pi/d for wi,pi in zip(w,p)]
 
 def srss(modal_effects):
-    """§7.4 p.41: independent-mode SRSS; close-mode treatment still required."""
+    """§7.4 p.41: independent-mode SRSS; close-mode treatment still required.
+[REF NBC105-2025 §7, printed pp. 40–41]"""
     a=[float(x) for x in modal_effects]
     if not a or any(not math.isfinite(x) for x in a):
         raise ValueError("nonfinite/empty modal effects")
     return math.sqrt(math.fsum(x*x for x in a))
 
 def modal_mass_coverage(modal_mass_ratios_percent):
-    """§7.3: returns accumulated participation percentage, not an acceptance token."""
+    """§7.3: returns accumulated participation percentage, not an acceptance token.
+[REF NBC105-2025 §7, printed pp. 40–41]"""
     a=[float(x) for x in modal_mass_ratios_percent]
     if not a or any(not math.isfinite(x) or x<0 or x>100 for x in a):
         raise ValueError("invalid modal participation")
@@ -52,7 +55,8 @@ def modal_mass_coverage(modal_mass_ratios_percent):
 
 def force_only_scale(*,esm_shear,mrsm_shear,member_forces,story_shears,
                      base_reactions,drifts,displacements):
-    """§7.5 p.41: scale ONLY member forces, story shears, base reactions."""
+    """§7.5 p.41: scale ONLY member forces, story shears, base reactions.
+[REF NBC105-2025 §7, printed pp. 40–41]"""
     v=_pos(esm_shear,"ESM V");vr=_pos(mrsm_shear,"MRSM VR")
     scale=max(1.,v/vr)
     def finite_list(seq):
@@ -68,7 +72,8 @@ def force_only_scale(*,esm_shear,mrsm_shear,member_forces,story_shears,
 
 def modal_combination_readiness(*,mass_percent,highest_frequency_hz,
                                 missing_mass_procedure_verified=False):
-    """§7.3–7.4: 90% participation; modes >=33Hz need separate missing-mass work."""
+    """§7.3–7.4: 90% participation; modes >=33Hz need separate missing-mass work.
+[REF NBC105-2025 §7, printed pp. 40–41]"""
     m=float(mass_percent);f=float(highest_frequency_hz)
     if not math.isfinite(m) or not 0<=m<=100 or not math.isfinite(f) or f<0:
         raise ValueError("invalid modal evidence")
