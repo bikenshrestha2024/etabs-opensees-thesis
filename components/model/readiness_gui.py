@@ -135,7 +135,9 @@ def launch(parent,model_script,readiness_variable):
         from tkinter import messagebox
         from components.nonlinear_time_history.material_draft import prepare as create_draft
         folder=model.parent
-        destination=folder/'OpenSees_Analysis_Results'/(
+        from components.inputs.output_layout import owned_run_destination
+        destination=owned_run_destination(
+            folder,"SOFTWARE_DIAGNOSTICS","PEER_RESEARCH_MATERIAL_DRAFT")/(
             'PEER_2015_12_RESEARCH_MATERIAL_DRAFT_'+datetime.now().strftime('%Y%m%d_%H%M%S'))
         try:
             card=create_draft(folder,destination,
