@@ -10,18 +10,18 @@ Related: [project declarations](PROJECT_DECLARATIONS.md) (g = 9.81 per printed p
 |---|---|
 | Clause module | `components/nbc105/clause_NN_<slug>.py` |
 | Compliance matrix | `docs/nbc105/clause_NN_<slug>_matrix.md` |
-| Tests | `tests/test_nbc105_clauseNN.py` (clause 4 is `tests/test_nbc105_clause04.py`; clause 5 predates the convention and uses `tests/test_nbc105_clause5.py`) |
+| Tests | `tests/test_nbc105_clauseNN.py` (clause 1 is `tests/test_nbc105_clause01.py`, clause 4 is `tests/test_nbc105_clause04.py`; clause 5 predates the convention and uses `tests/test_nbc105_clause5.py`) |
 | Module guide | `docs/source/components/nbc105/clause_NN_<slug>.py.md` |
 
 `NN` is the two-digit main clause number. Shared constants live in `components/nbc105/constants.py`.
 
 ## Clause register (titles and printed pages from the PDF contents list, printed pp. xiv-xx)
 
-Status: `CLAUSE_4` and `CLAUSE_5` mean module + matrix + tests. All others are `NOT_STARTED`.
+Status: `CLAUSE_1`, `CLAUSE_4` and `CLAUSE_5` mean module + matrix + tests (the number is the clause). All others are `NOT_STARTED`.
 
 | Clause | Title | Printed page | Status | Module | Matrix |
 |---|---|---|---|---|---|
-| 1 | Title, Scope, Definitions and Notations | 1 | NOT_STARTED | | |
+| 1 | Title, Scope, Definitions and Notations | 1 | CLAUSE_1 | [clause_01_scope_definitions.py](../../components/nbc105/clause_01_scope_definitions.py) | [matrix](clause_01_scope_definitions_matrix.md) |
 | 2 | General Principles | 10 | NOT_STARTED | | |
 | 3 | Scope of Analysis | 17 | NOT_STARTED | | |
 | 4 | Seismic Hazard | 21 | CLAUSE_4 | [clause_04_seismic_hazard.py](../../components/nbc105/clause_04_seismic_hazard.py) | [matrix](clause_04_seismic_hazard_matrix.md) |

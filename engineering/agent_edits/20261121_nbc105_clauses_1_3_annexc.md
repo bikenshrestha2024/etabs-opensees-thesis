@@ -19,3 +19,19 @@ Numeric effect (computed): restoring 9.81 relative to 9.80665 changes mass = W/g
 Not touched: source EDBs, `Saved_Project_V156/`, solver, material and damping numerics. Saved Rayleigh results recorded with 9.80665 are rejected on import and must be re-run.
 
 Evidence: unit tests only (`python -m pytest -q`, `python tests/verify_ref_tags.py`); no native ETABS or OpenSees run. PASS here is not engineering acceptance.
+
+## Task 2: clause 1 title, scope, definitions and notations (printed pp. 1-9)
+
+Editor Claude Code, model UNKNOWN. Source: printed pp. 1-9 read from the page images of the user-supplied PDF (PDF pages 22-30; foot numbers 1 to 9 checked on every page, offset 21 holds). Authority for g = 9.81 is the notation row on printed p. 7.
+
+Added
+- `components/nbc105/clause_01_scope_definitions.py`: scope applicability (`SCOPE_MATERIALS`, `SPECIALIST_LITERATURE_SYSTEMS`, `SCOPE_HEIGHT_LIMIT_M` = None, `scope_check`), the 68-row printed notation table (`NOTATIONS`, `notation`, per page 19 + 22 + 21 + 6; unit basis PRINTED only for g and H, SI_DERIVED from clause 1.5 elsewhere, NOT_STATED for loads), `printed_gravity_m_s2()` (literal 9.81 as printed, not imported from the constants), the definition thresholds (dual system 25 percent, soft story 70/80 percent, flexible diaphragm 2 times, design basis earthquake 2/3 MCE, 5 percent commonly taken damping) with `is_soft_story`, `is_flexible_diaphragm`, `dual_system_frame_share(_ok)`, `design_basis_earthquake_from_mce`, `ductility_factor`, `overstrength_factor`, `eccentricity_m`, `pdf_page_for_printed`.
+- `tests/test_nbc105_clause01.py` (23 tests, written first and seen failing on the missing module) and `tests/test_nbc105_clause01_parity.py` (6 tests: g single source and `reconcile.G`, no 9.80665 literal in `assembly.py` and `rayleigh.py`, soft-story parity of `components/validation/response_checks.py::irregularity` on 33 stiffness combinations incl. boundaries, repo-wide absence of production dual-share/flexible-diaphragm checks).
+- `docs/nbc105/clause_01_scope_definitions_matrix.md` (118 rows: 81 IMPLEMENTED_AND_TESTED, 37 DEFINITION_ONLY; findings F1 to F10), `docs/source/components/nbc105/clause_01_scope_definitions.py.md`.
+
+Modified (docs and registry only)
+- `engineering/registry/CANONICAL_MODULES.csv` (row `nbc105_clause1_scope_definitions`, NEW_WITH_JUSTIFICATION), `docs/nbc105/README.md` (register row 1 status CLAUSE_1, status legend, test naming), `docs/source/00_SOURCE_GUIDE_INDEX.md` (module row and matrix link).
+
+Audit of existing code against the printed notation (details in the matrix): no production code changed and no before/after numbers, because no existing value is proved wrong by the printed text. Findings: T1 naming (adopted design period vs printed approximate period), Aw printed as "Area of Web" on p. 6 but an effective wall area in printed §5.1.2 (code follows 5.1.2), kN/MPa/tonne unit convention vs clause 1.5 SI, symbol clashes (damper alpha, Cd, E), Tn90 not a printed symbol, Rs has no repo variable (SLS coefficient divides by Omega_s only; deferred to the clause 6 audit), notation list omits Ta, Td, kt. Soft-story and g parity PASS.
+
+Not touched: source EDBs, `Saved_Project_V156/`, solver, material and damping numerics. Evidence: unit tests only (`python -m pytest -q`, `python tests/verify_ref_tags.py`); no native ETABS or OpenSees run. PASS here is not engineering acceptance.
