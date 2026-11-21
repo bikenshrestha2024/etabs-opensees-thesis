@@ -10,7 +10,7 @@ import unittest
 from pathlib import Path
 
 from components.validation.reaction_common_cut import (
-    compare_common_cut, export_report
+    compare_common_cut, compare_ablation, export_report
 )
 
 
@@ -101,6 +101,46 @@ class CommonCutTests(unittest.TestCase):
                 result["groups"]["PRIMARY_32"]["difference"][5],-2.5)
             self.assertTrue((Path(tmp)/"out"/"Reaction_Six_DOF_Common_Cut.csv").is_file())
             self.assertEqual(len(result["input_sha256"]),64)
+
+
+
+    def test_four_case_ablation_reports_worsening_without_picking_winner(self):
+        scenarios={}
+        for name,hash_char,error in (
+            ("baseline","b",10),
+            ("wall_mesh_only","c",15),
+            ("end_zones_only","d",18),
+            ("combined","e",25)):
+            d=fixture()
+            d["source"]["model_sha256"]=hash_char*64
+            d["opensees"][0]["reaction"][2]+=error
+            scenarios[name]=d
+        r=compare_ablation(scenarios)
+        self.assertEqual(r["scenarios"]["baseline"]["l1_primary_FZ_kN"],10)
+        self.assertEqual(r["scenarios"]["combined"]["l1_primary_FZ_kN"],25)
+        self.assertTrue(r["scenarios"]["wall_mesh_only"]["worsens_primary_l1"])
+        self.assertTrue(r["scenarios"]["end_zones_only"]["worsens_primary_l1"])
+        self.assertIn("PHYSICAL_CAUSE_UNVERIFIED",r["status"])
+
+    def test_four_case_requires_distinct_model_and_identical_reference(self):
+        scenarios={}
+        for name,index in zip(
+            ("baseline","wall_mesh_only","end_zones_only","combined"),"bcde"):
+            d=fixture()
+            d["source"]["model_sha256"]=index*64
+            scenarios[name]=d
+        invalid=copy.deepcopy(scenarios)
+        invalid["combined"]["source"]["model_sha256"]="b"*64
+        with self.assertRaisesRegex(ValueError,"reuse assembled-model"):
+            compare_ablation(invalid)
+        invalid=copy.deepcopy(scenarios)
+        invalid["combined"]["etabs"][0]["reaction"][2]+=1
+        with self.assertRaisesRegex(ValueError,"identical ETABS reference"):
+            compare_ablation(invalid)
+        invalid=copy.deepcopy(scenarios)
+        invalid.pop("wall_mesh_only")
+        with self.assertRaisesRegex(ValueError,"four explicit"):
+            compare_ablation(invalid)
 
 
 if __name__=="__main__":
