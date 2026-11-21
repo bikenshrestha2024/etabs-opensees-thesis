@@ -40,7 +40,7 @@ def wall_aw_example(*, height_m=95.0, thickness_m=0.6,
         raise ValueError("Opening width must be >=0 and smaller than wall length")
     if not isinstance(x_walls, int) or not isinstance(y_walls, int) or x_walls < 0 or y_walls < 0:
         raise ValueError("Wall counts must be nonnegative integers")
-    from components.modal.nbc105_clause5 import effective_wall_area_m2
+    from components.nbc105.clause_05_dynamic_characteristics import effective_wall_area_m2
     # [REF NBC105-2025 §5.1.2, printed pp. 29-30] shared 0.2+(Lwi/H)^2 factor
     factor = effective_wall_area_m2([(1.0, width)], h)
     return {

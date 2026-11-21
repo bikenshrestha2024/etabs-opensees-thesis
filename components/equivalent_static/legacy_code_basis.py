@@ -248,8 +248,11 @@ def esm_spectral_shape_factor(period_s, soil_type):
     """
     T = float(period_s)
     soil = str(soil_type).strip().upper()
-    if T < 0.0:
-        raise ValueError("Period T1 must be nonnegative.")
+    if not math.isfinite(T) or T < 0.0:
+        raise ValueError("Period T1 must be finite and nonnegative.")
+    if T > 6.0:
+        # [REF NBC105-2025 §4.1.2, printed p. 23] Eq. 4.1(2) is defined for T <= 6 s.
+        raise ValueError("NBC 105:2025 Eq. 4.1(2) is defined only for T <= 6 s; no extrapolation.")
     if soil not in NBC105_ESM_SOIL_PARAMETERS:
         raise ValueError("soil_type must be A, B, C, or D.")
     p = NBC105_ESM_SOIL_PARAMETERS[soil]

@@ -43,4 +43,4 @@ The historical `OpenSees_Linear_Autofill_V124.py` root launcher executes this co
 
 ## 2026-11-21 clause 5 period routing and DEVIATION
 
-`workbook_adopted_period(height_m, aw_m2, rayleigh_s, factor)` applies the NBC 105:2025 §5.1 lesser-of rule through the [clause 5 module](../modal/nbc105_clause5.py.md). When the workbook `period_factor` is not 1.25 it returns no period and a DEVIATION note, and `populate_linear` clears the T1 field (including any value pre-filled from `workbook_adopted_t*`) instead of adopting a non-NBC period. Test: `tests/test_nbc105_clause5_callsites.py`.
+`workbook_adopted_period(height_m, aw_m2, rayleigh_s, factor)` applies the NBC 105:2025 §5.1 lesser-of rule through the [clause 5 module](../nbc105/clause_05_dynamic_characteristics.py.md). When the workbook `period_factor` is not 1.25 it returns no period and a DEVIATION note, and `populate_linear` clears the T1 field (including any value pre-filled from `workbook_adopted_t*`) instead of adopting a non-NBC period. Test: `tests/test_nbc105_clause5_callsites.py`.

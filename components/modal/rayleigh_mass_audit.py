@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import math
 
+from components.nbc105.constants import GRAVITY_M_S2
 
-def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=9.80665,
+
+def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=GRAVITY_M_S2,
                                    tolerance_kN=0.01, z_tolerance_m=1e-7):
     """Reconcile source nodal seismic weight and quantify upward floor lumping.
 

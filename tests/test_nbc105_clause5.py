@@ -1,12 +1,12 @@
-"""Tests for components/modal/nbc105_clause5.py. [REF NBC105-2025 §5, printed pp. 28-30]"""
+"""Tests for components/nbc105/clause_05_dynamic_characteristics.py. [REF NBC105-2025 §5, printed pp. 28-30]"""
 import math
 import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'components' / 'modal'))
-import nbc105_clause5 as c5  # noqa: E402
+sys.path.insert(0, str(ROOT))
+from components.nbc105 import clause_05_dynamic_characteristics as c5  # noqa: E402
 
 
 class Clause5Tests(unittest.TestCase):

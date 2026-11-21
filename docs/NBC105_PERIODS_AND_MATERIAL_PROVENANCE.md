@@ -74,8 +74,9 @@ Do not treat the damping calibration as evidence that materials or the
 nonlinear model are calibrated.
 
 Rule-by-rule implementation and test status for clause 5 (printed pp. 28-30):
-[NBC 105:2025 clause 5 compliance matrix](validation/NBC105_CLAUSE5_COMPLIANCE_MATRIX.md).
+[NBC 105:2025 clause 5 compliance matrix](nbc105/clause_05_dynamic_characteristics_matrix.md).
 A period is a design-input calculation, not engineering acceptance of the building.
+Clause register: [NBC 105:2025 clause register](nbc105/README.md). Project declarations (no basement, wall grouping, gravity constant): [PROJECT_DECLARATIONS.md](nbc105/PROJECT_DECLARATIONS.md); Aw grouping: [WALL_GROUPING_AW_METHOD.md](nbc105/WALL_GROUPING_AW_METHOD.md).
 
 ## Material provenance and transfer limits
 

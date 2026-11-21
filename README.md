@@ -57,6 +57,8 @@ The main ETABS workflow **OpenSees nonlinear readiness / calibration status** bu
 
 Step-by-step for the "uncompleted readiness TEMPLATE" dialog: [NLTHA readiness workflow](docs/NLTHA_READINESS_WORKFLOW.md).
 
+NBC 105:2025 clause modules, matrices and project declarations: [clause register](docs/nbc105/README.md), [project declarations](docs/nbc105/PROJECT_DECLARATIONS.md), [wall grouping (Aw) method](docs/nbc105/WALL_GROUPING_AW_METHOD.md).
+
 
 **2026-11 research update:** [Verified NBC 105:2025 NLTHA clauses, OpenSees implementation and recent research evidence](docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md). The new optional strict metadata precheck does not approve real model behavior or a completed earthquake analysis.
 

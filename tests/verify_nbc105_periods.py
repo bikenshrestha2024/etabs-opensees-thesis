@@ -17,6 +17,7 @@ from components.inputs.project_workbooks import (
     _wall_aw_from_lines, analysis_output_folder, import_project_inputs, populate,
 )
 from components.modal.analysis import nbc105_period_estimate
+from components.nbc105.constants import GRAVITY_M_S2
 
 
 class NBC105PeriodTests(unittest.TestCase):
@@ -176,12 +177,12 @@ class NBC105PeriodTests(unittest.TestCase):
             def save(state,period,aw_x=2.,aw_y=3.,version=126):
                 def evidence(target,aw):
                     w,f=100.,10.
-                    d=(target/(2*math.pi))**2 * 9.81*f/w
+                    d=(target/(2*math.pi))**2 * GRAVITY_M_S2*f/w
                     rows=[{'master_node':101,'constrained_floor_node_count':3,
                            'weight_kN':w,'force_kN':f,'displacement_m':d}]
                     return {'period_s':target,'Aw_m2':aw,'rows':rows,
                             'rayleigh_numerator_kN_m2':w*d*d,
-                            'rayleigh_denominator_gFiDi_kN_m2_s2':9.81*f*d,
+                            'rayleigh_denominator_gFiDi_kN_m2_s2':GRAVITY_M_S2*f*d,
                             'reference_force_total_kN':f,
                             'kinematic_audit':{
                                 'status':'VERIFIED_FLOOR_TRANSLATIONS',

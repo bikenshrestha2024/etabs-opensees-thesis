@@ -26,7 +26,7 @@ def workbook_adopted_period(height_m, aw_m2, rayleigh_s, factor=1.25):
     A workbook factor other than the fixed NBC 105:2025 §5.1.3 value of 1.25
     is not applied: the period is None and the note is a DEVIATION message.
     """
-    from components.modal.nbc105_clause5 import (
+    from components.nbc105.clause_05_dynamic_characteristics import (
         amplified_period_s, empirical_period_s, period_factor_deviation)
     deviation = period_factor_deviation(factor)
     if deviation:
