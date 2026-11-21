@@ -99,5 +99,12 @@ class NoLiteralFormulaLeft(unittest.TestCase):
             self.assertNotRegex(text, r"1\.25\s*\*\s*empirical")
 
 
+class AssemblyUsesMidHeightRule(unittest.TestCase):
+    def test_story_ledger_uses_helper_not_first_floor_above(self):
+        text = (ROOT / "components/model/assembly.py").read_text(encoding="utf-8")
+        self.assertIn("storey_index_for_elevation", text)
+        self.assertNotRegex(text, r"g\['master_xyz'\]\[2\]>=z-1e-7")
+
+
 if __name__ == "__main__":
     unittest.main()

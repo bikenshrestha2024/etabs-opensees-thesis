@@ -1113,13 +1113,16 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
     if payload:
         # Include wall/column mesh masses between floors. The old ledger only
         # summed diaphragm slaves and silently omitted these source weights.
-        # Tributary convention: assign each active node's vertical load/mass
-        # to the first floor at or above its elevation. Fixed-base masses are
-        # excluded consistently with the horizontal eigenproblem.
+        # Tributary convention [REF NBC105-2025 §5.2, printed p. 30]: Wi is
+        # the dead plus factored live load between the mid-heights of adjacent
+        # storeys; nodes below the first floor stay with floor 1 so the total
+        # is preserved. Fixed-base masses are excluded consistently with the
+        # horizontal eigenproblem.
+        from components.modal.nbc105_clause5 import storey_index_for_elevation
         groups=sorted(payload['diaphragms'],key=lambda g:g['master_xyz'][2])
         story_rows=[]
         for g in groups:
-            story_rows.append(dict(story_number=g['storey_number'],story_name=f"Storey_{g['storey_number']}",height_m=g['master_xyz'][2]-payload['base_z_m'],master_node_tag=g['master_tag'],dead_load_kN=0.,storage_live_load_kN=0.,other_live_load_kN=0.,roof_live_load_kN_ignored=0.,input_note='All active nodal source weights included; inter-floor mesh weights assigned to next floor above; fixed-base masses excluded. Compare with ETABS tributary conventions.'))
+            story_rows.append(dict(story_number=g['storey_number'],story_name=f"Storey_{g['storey_number']}",height_m=g['master_xyz'][2]-payload['base_z_m'],master_node_tag=g['master_tag'],dead_load_kN=0.,storage_live_load_kN=0.,other_live_load_kN=0.,roof_live_load_kN_ignored=0.,input_note='All active nodal source weights included; inter-floor weights assigned by NBC 105:2025 5.2 mid-height rule; fixed-base masses excluded. Compare with ETABS tributary conventions.'))
         for pat,values in patterns.items():
             factor=float(cfg['mass_factors'][pat])
             if factor not in (0.,.3,.6,1.):raise ValueError(f'Unsupported story mass factor {factor} for {pat}')
@@ -1128,7 +1131,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
             for node,vec in values.items():
                 if all(payload['supports'].get(str(node),[0]*6)[:2]):continue
                 z=payload['nodes'][int(node)][2] if int(node) in payload['nodes'] else payload['nodes'][str(node)][2]
-                index=next((i for i,g in enumerate(groups) if g['master_xyz'][2]>=z-1e-7),len(groups)-1)
+                index=storey_index_for_elevation(z,[g['master_xyz'][2] for g in groups])
                 story_rows[index][key]-=float(vec[2])
         represented=sum(r['dead_load_kN']+.6*r['storage_live_load_kN']+.3*r['other_live_load_kN'] for r in story_rows)
         report['story_ledger_active_weight_kN']=represented

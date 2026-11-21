@@ -95,5 +95,56 @@ class Clause5Tests(unittest.TestCase):
         self.assertIn("1.25", msg)
 
 
+class StoreyIndexTests(unittest.TestCase):
+    """[REF NBC105-2025 §5.2, printed p. 30] mid-height tributary rule."""
+    E = [3.0, 6.0, 9.0]
+
+    def test_below_first_and_on_floors(self):
+        self.assertEqual(c5.storey_index_for_elevation(0.0, self.E), 0)
+        self.assertEqual(c5.storey_index_for_elevation(1.5, self.E), 0)
+        for i, z in enumerate(self.E):
+            self.assertEqual(c5.storey_index_for_elevation(z, self.E), i)
+            self.assertEqual(c5.storey_index_for_elevation(z + 5e-8, self.E), i)
+            self.assertEqual(c5.storey_index_for_elevation(z - 5e-8, self.E), i)
+
+    def test_midpoint_boundaries(self):
+        # midpoint of 3 and 6 is 4.5
+        self.assertEqual(c5.storey_index_for_elevation(4.4, self.E), 0)
+        self.assertEqual(c5.storey_index_for_elevation(4.5 - 1e-6, self.E), 0)
+        self.assertEqual(c5.storey_index_for_elevation(4.5, self.E), 1)
+        self.assertEqual(c5.storey_index_for_elevation(4.6, self.E), 1)
+        self.assertEqual(c5.storey_index_for_elevation(7.4, self.E), 1)
+        self.assertEqual(c5.storey_index_for_elevation(7.5, self.E), 2)
+
+    def test_above_roof(self):
+        self.assertEqual(c5.storey_index_for_elevation(9.0, self.E), 2)
+        self.assertEqual(c5.storey_index_for_elevation(12.0, self.E), 2)
+
+    def test_two_floor_and_uneven(self):
+        self.assertEqual(c5.storey_index_for_elevation(3.9, [3.0, 4.0]), 1)
+        self.assertEqual(c5.storey_index_for_elevation(3.4, [3.0, 4.0]), 0)
+        # uneven: floors 4, 7, 15 -> mids 5.5 and 11
+        e = [4.0, 7.0, 15.0]
+        self.assertEqual(c5.storey_index_for_elevation(5.4, e), 0)
+        self.assertEqual(c5.storey_index_for_elevation(5.5, e), 1)
+        self.assertEqual(c5.storey_index_for_elevation(10.9, e), 1)
+        self.assertEqual(c5.storey_index_for_elevation(11.0, e), 2)
+        self.assertEqual(c5.storey_index_for_elevation(1.0, [5.0]), 0)
+
+    def test_total_weight_preserved(self):
+        zs = [0.0, 1.0, 3.0, 4.4, 4.5, 5.9, 6.0, 7.49, 7.5, 8.9, 9.0, 10.0]
+        w = [1.0 + 0.5 * k for k in range(len(zs))]
+        buckets = [0.0] * len(self.E)
+        for z, wi in zip(zs, w):
+            buckets[c5.storey_index_for_elevation(z, self.E)] += wi
+        self.assertAlmostEqual(sum(buckets), sum(w), places=12)
+        self.assertEqual(buckets[0], sum(wi for z, wi in zip(zs, w) if z < 4.5))
+
+    def test_invalid_floors(self):
+        for bad in ([], [3.0, 3.0], [6.0, 3.0]):
+            with self.assertRaises(ValueError):
+                c5.storey_index_for_elevation(1.0, bad)
+
+
 if __name__ == '__main__':
     unittest.main()
