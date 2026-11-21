@@ -10,7 +10,7 @@ import math
 
 __all__=[
     "rc_wall_detailing_minima","rc_wall_boundary_element_requirement",
-    "coupling_beam_diagonal_required",
+    "coupling_beam_diagonal_required","rc_wall_opening_rebar_review",
 ]
 
 def _positive(value,name):
@@ -122,3 +122,51 @@ def coupling_beam_diagonal_required(*,shear_stress_mpa,fck_mpa,
     span=_positive(clear_span_mm,"clear_span_mm")
     depth=_positive(depth_mm,"depth_mm")
     return stress>.1*math.sqrt(strength)*span/depth
+
+def rc_wall_opening_rebar_review(*,interrupted_vertical_mm2,
+                                 interrupted_horizontal_mm2,
+                                 additional_vertical_each_side_mm2,
+                                 additional_horizontal_each_side_mm2,
+                                 vertical_bars_full_storey,
+                                 horizontal_bars_development_length,
+                                 critical_opening_plane_shear_checked):
+    """Annex A §5.6 p.79: replace interrupted steel at opening edges.
+
+    [REF NBC105-2025 Annex A §5.6, printed p.79]
+    Area of additional vertical/horizontal bars must match respective
+    interrupted bars and be split at least half each side. Vertical
+    extension for complete storey; horizontal development length beyond
+    opening edge; critical wall horizontal-plane shear must be reviewed.
+    This is a detailing checklist, NOT a reinforcement design or wall check.
+    """
+    inter_v=_nonnegative(interrupted_vertical_mm2,"interrupted_vertical_mm2")
+    inter_h=_nonnegative(interrupted_horizontal_mm2,"interrupted_horizontal_mm2")
+    add_v=_nonnegative(additional_vertical_each_side_mm2,
+                       "additional_vertical_each_side_mm2")
+    add_h=_nonnegative(additional_horizontal_each_side_mm2,
+                       "additional_horizontal_each_side_mm2")
+    flags={
+        "vertical_bars_full_storey":vertical_bars_full_storey,
+        "horizontal_bars_development_length":horizontal_bars_development_length,
+        "critical_opening_plane_shear_checked":critical_opening_plane_shear_checked,
+    }
+    if any(type(v) is not bool for v in flags.values()):
+        raise ValueError("opening installation and shear checks must be explicit booleans")
+    missing=[]
+    if add_v<inter_v/2.:
+        missing.append("VERTICAL_ADDITIONAL_BAR_AREA_EACH_SIDE_INSUFFICIENT")
+    if add_h<inter_h/2.:
+        missing.append("HORIZONTAL_ADDITIONAL_BAR_AREA_EACH_SIDE_INSUFFICIENT")
+    if not vertical_bars_full_storey:
+        missing.append("VERTICAL_BARS_NOT_FULL_STOREY")
+    if not horizontal_bars_development_length:
+        missing.append("HORIZONTAL_TENSION_DEVELOPMENT_NOT_VERIFIED")
+    if not critical_opening_plane_shear_checked:
+        missing.append("CRITICAL_PLANE_SHEAR_NOT_CHECKED")
+    return {
+        "checklist_pass":not missing,
+        "missing":missing,
+        "required_vertical_each_side_mm2":inter_v/2.,
+        "required_horizontal_each_side_mm2":inter_h/2.,
+        "scope":"OPENING_DETAIL_CHECKLIST_NOT_COUPLED_WALL_DESIGN_CERTIFICATE",
+    }
