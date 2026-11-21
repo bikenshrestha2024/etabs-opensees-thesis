@@ -162,27 +162,23 @@ def live_load_factor(occupancy):
 
 
 def flexural_stiffness_modifier(component, stage="ultimate"):
-    """Return Table 3-1 factor for the selected component and design stage."""
+    """Legacy compatible Table 3-1 adapter; Clause 3 owns coefficients."""
+    from components.nbc105.clause_03_scope_of_analysis import cracked_flexural_factor
     key = str(component).strip().lower().replace(" ", "_")
-    stage_key = str(stage).strip().lower()
-    if stage_key not in {"ultimate", "serviceability"}:
+    st = str(stage).strip().lower()
+    if st not in ("ultimate","serviceability"):
         raise ValueError("stage must be 'ultimate' or 'serviceability'")
-    if key in {"beam", "rc_beam"}:
-        return CRACKED_STIFFNESS_MODIFIERS["beam"][stage_key]
-    if key in {"column", "rc_column"}:
-        return CRACKED_STIFFNESS_MODIFIERS["column"][stage_key]
-    if key in {"wall", "wall_cracked", "cracked_wall"}:
-        return CRACKED_STIFFNESS_MODIFIERS["wall_cracked"][stage_key]
-    if key in {"wall_uncracked", "uncracked_wall"}:
-        return CRACKED_STIFFNESS_MODIFIERS["wall_uncracked"][stage_key]
-    if key in {"masonry", "masonry_wall"}:
-        return CRACKED_STIFFNESS_MODIFIERS["masonry_wall"][stage_key]
-    if key == "flat_slab":
-        return CRACKED_STIFFNESS_MODIFIERS["flat_slab"][stage_key]
+    canonical = {
+        "beam":"beam","rc_beam":"beam","column":"column",
+        "rc_column":"column","wall":"cracked wall","wall_cracked":"cracked wall",
+        "cracked_wall":"cracked wall","wall_uncracked":"uncracked wall",
+        "uncracked_wall":"uncracked wall","masonry":"masonry wall",
+        "masonry_wall":"masonry wall","flat_slab":"flat slab"}
     if key in {"slab", "conventional_slab", "floor_slab"}:
         raise ValueError("NBC 105:2025 Table 3-1 has a tabulated stiffness factor only for flat slabs. For a conventional slab, provide documented rational cracked stiffness or verified ETABS effective stiffness.")
-    return 1.0  # Unknown/steel component: do not invent a reduction.
-
+    if key in canonical:
+        return cracked_flexural_factor(canonical[key], "ULS" if st=="ultimate" else "SLS")
+    return 1.0  # Steel/unknown: existing gross stiffness fallback; review separately.
 
 def mass_source_factor(pattern_name, is_roof_live=False):
     """Return seismic mass factor; roof-live assignments always receive zero.
@@ -297,35 +293,28 @@ def soil_type_from_n_spt(n_spt_blow_30cm):
 
 
 def esm_eligibility(height_m, period_s, limit_state, irregular=None):
-    """Return (permitted, explanation) under NBC 105:2025 §3.2.1.
-
-    ESM is permitted for all SLS. For ULS at least one test is required:
-    H<=15m; T1<0.5s; or regular structure with H<40m. ``irregular`` must
-    be explicitly True/False to evaluate the third criterion.
-    """
+    """§3.2.1 compatibility tuple; method eligibility owned by Clause 3."""
+    from components.nbc105.clause_03_scope_of_analysis import esm_applicability
     H, T = float(height_m), float(period_s)
     state = str(limit_state).strip().upper()
-    if state == "SLS":
+    # Unknown irregularity can never satisfy the regular H<40 branch.
+    result=esm_applicability(height_m=H,period_s=T,
+            irregular=(irregular is not False),limit_state=state)
+    if state=="SLS":
         return True, "NBC 105:2025 §3.2.1 permits ESM for all SLS calculations."
-    if state != "ULS":
-        raise ValueError("limit_state must be ULS or SLS")
-    checks=[]
-    if H <= 15.0:
-        checks.append("height <= 15 m")
-    if T < 0.5:
-        checks.append("fundamental period < 0.5 s")
-    if H < 40.0 and irregular is False:
-        checks.append("regular configuration and height < 40 m")
-    if checks:
-        return True, "ULS ESM criterion satisfied: " + "; ".join(checks) + "."
-    if irregular is None and H < 40.0:
+    details=[]
+    if "H_LE_15M" in result["basis"]:details.append("height <= 15 m")
+    if "T_LT_0_5S" in result["basis"]:details.append("fundamental period < 0.5 s")
+    if "REGULAR_H_LT_40M" in result["basis"]:details.append("regular configuration and height < 40 m")
+    if details:
+        return True, "ULS ESM criterion satisfied: " + "; ".join(details) + "."
+    if irregular is None and H < 40:
         return False, "ULS ESM eligibility needs explicit regularity confirmation under §5.4; otherwise use MRSM."
     return False, (
         "ULS ESM is not permitted by the supplied data under §3.2.1: requires "
         "H<=15 m, or T1<0.5 s, or a regular structure with H<40 m. "
         "Use MRSM or nonlinear analysis as applicable."
     )
-
 
 def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
                   importance_factor_i, limit_state="ULS", r_mu=4.0,
