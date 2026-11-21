@@ -1,0 +1,626 @@
+{
+ "status": "SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE",
+ "date": "2026-11-21",
+ "g_m_s2": 9.81,
+ "evidence_sha256_prefix": {
+  "GRAV_DIRECT/Direct_Gravity_Comparison.json": "7655678481da299f",
+  "GRAV_DIRECT/Gravity_All_Support_Nodes.csv": "33e14fbd808c9d7c",
+  "GRAV_DIRECT/Gravity_All_Model_Nodes.csv": "06be3788e614daab",
+  "GRAV_DIRECT/ETABS_Fixed_Support_Reactions.csv": "20471e4e8976ad61",
+  "GRAV_DIRECT/OpenSees_Applied_Nodal_Gravity_By_Pattern.csv": "2eb3c89364e30f5e",
+  "GRAV_DIRECT/OpenSees_Applied_Nodal_Gravity_Summary.json": "acd685727cdf335d",
+  "GRAV_DIRECT/Gravity_Top_Node_Discrepancies.csv": "0e7e1864503d1464",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_960ec61b7e20c23d.csv": "33da61ed7c62e9b0",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_95526b0bc1af4636.csv": "204e8e4e98c8ff92",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_2e6b12ebf681a176.csv": "468b4d06893ce7c6",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_58451a4200c00d44.csv": "2e2e3d34ae9f8f1c",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_7adf2cc6c2af137f.csv": "abbfc38b003a553a",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_2fde14d5545fe8ea.csv": "ca186ef5858d10dc",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_ff0fe2ed05651a2e.csv": "ab698c7b0c8367d3",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_da60e80c69278cbf.csv": "d517679578071d51",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_a18e5c9f4b4e0b56.csv": "3f1c11a9f6a89d56",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_072de811bf9b19b9.csv": "b149bd45dd6c7c7b",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_70b73049efcc094b.csv": "bc6fcb3c63bca229",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_8f4cb3cb84084c6d.csv": "a06991ccf5fd5360",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_5e26941f713b29df.csv": "884273cf107a93dc",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_fe62985f97f0505f.csv": "3604dbfbb3f71d9b",
+  "GRAV_DIRECT/ETABS_Native_Quantity_Tables/etabs_table_af5a3c13053a3ba6.csv": "d62965c35ad4015b",
+  "Grav/Gravity/Analysis/Gravity_Native_Equivalence_Preflight/20261121_112628_414365/GRAVITY_NATIVE_EQUIVALENCE_PREFLIGHT.json": "ca413fb661e8222b",
+  "Grav/Gravity/Analysis/Gravity_Native_Equivalence_Preflight/20261121_112628_414365/ETABS_END_ZONE_STIFFNESS_REVIEW.csv": "e74cc0017ec6df29",
+  "Comp/Comparisons/Analysis/Gravity_Case_Comparison/ETABS_OpenSees_All_76_Source_Support_Reactions.csv": "a57993a8c2a50f83",
+  "Comp/Comparisons/Analysis/Gravity_Wall_Base_Comparison/20261121_112114_513335/Gravity_Wall_Base_Nodal_Reaction_Differences.csv": "fba8efe87c27a4dc",
+  "ESM/OpenSees_Direct/NBC105_Rayleigh_Preliminary_V127.json": "3a30b1eeb4ad0753",
+  "ESM/OpenSees_Direct/NBC105_Rayleigh_Preliminary_V127_ULS.log": "9266ada05726011e",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/OpenSees_Complete_Model_Data_V118.json": "8cb0cafa659c51fe",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/NBC105_ESM_Story_Weights_Assembled_V118.csv": "da89db0861422d0c",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/Gravity_Storey_Load_Breakdown_V131.json": "cf0322f6b1438aa4",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/ETABS_OpenSees_Beam_Weight_Reconciliation.csv": "edbb1f6ab5fcd37a",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/ETABS_OpenSees_Beam_Weight_Reconciliation.json": "cca6c891d9aa77da",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/OpenSees_Joint_Volume_Ownership_Audit.json": "5110958a876c5768",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/OpenSees_Complete_Export_Report_V118.json": "be1e03b506649c5d",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/OpenSees_Runtime_V118/components/model/assembly.py": "1fa009c5252356e5",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/OpenSees_Runtime_V118/components/modal/rayleigh.py": "fe54e0b391546986",
+  "MESH_04/.../RUN_20261121_105741_5b380a16/OpenSees_Runtime_V118/components/modal/rayleigh_mass_audit.py": "a975367b454c8666"
+ },
+ "task_a": {
+  "case": "1. DL + LL / GRAVITY_1.0D_1.0L",
+  "support_strategy": "ETABS_NONZERO_REACTION_DIAGNOSTIC (32)",
+  "stiffness_basis": "LEGACY_GROSS_SHELL",
+  "totals_kN": {
+   "etabs_base": 311367.31387954147,
+   "opensees_applied": 311367.3138795495
+  },
+  "group_totals_kN": {
+   "core": {
+    "etabs_kN": 109278.24091754066,
+    "opensees_kN": 127926.75455554467
+   },
+   "perimeter": {
+    "etabs_kN": 202089.07296200076,
+    "opensees_kN": 183440.5593240048
+   }
+  },
+  "group_ratios": {
+   "core": 1.1706516638758473,
+   "perimeter": 0.9077213163251905
+  },
+  "tributary_by_group_kN": {
+   "core": 120181.308759837,
+   "perimeter": 191186.0051197134
+  },
+  "core_total_76_support_run_kN": 130603.409,
+  "sum_abs_delta_kN": 37297.02727599995,
+  "sum_abs_residual_after_group_scaling_kN": 6439.65978878345,
+  "explained_fraction": 0.8273412049402857,
+  "max_residual_after_group_scaling_kN": 524.41,
+  "symmetry": {
+   "max_asymmetry_kN": 1.5825207810848951e-10,
+   "pairs_checked": 64
+  },
+  "axial_stiffness_indicator": {
+   "z_95_0": {
+    "core": {
+     "axial_stiffness_ratio": 1.676630497563884,
+     "displacement_points": 14,
+     "displacement_ratio": 0.6982168495543797,
+     "force_ratio": 1.170651663875847
+    },
+    "perimeter": {
+     "axial_stiffness_ratio": 1.0409918679563814,
+     "displacement_points": 18,
+     "displacement_ratio": 0.8719773364869599,
+     "force_ratio": 0.9077213163251905
+    }
+   },
+   "z_49_4": {
+    "core": {
+     "axial_stiffness_ratio": 1.7211653555394484,
+     "displacement_points": 14,
+     "displacement_ratio": 0.6801506084863885,
+     "force_ratio": 1.170651663875847
+    },
+    "perimeter": {
+     "axial_stiffness_ratio": 1.0150910753913742,
+     "displacement_points": 18,
+     "displacement_ratio": 0.8942264771416824,
+     "force_ratio": 0.9077213163251905
+    }
+   }
+  },
+  "roof_uz_mm": {
+   "core_6_6": {
+    "opensees": -9.466,
+    "etabs": -13.476
+   },
+   "column_6_0": {
+    "opensees": -10.415,
+    "etabs": -12.383
+   },
+   "column_0_6": {
+    "opensees": -11.699,
+    "etabs": -13.3
+   }
+  },
+  "etabs_wall_modifiers": {
+   "f11": 0.5,
+   "f22": 0.5,
+   "f12": 0.5,
+   "m11": 0.1,
+   "m22": 0.1,
+   "m12": 0.1,
+   "v13": 1,
+   "v23": 1,
+   "applies_to": "Wall 300..Wall 610, Outrigger Wall 250; Outrigger Wall 650 all 1.0"
+  },
+  "etabs_slab_modifiers": {
+   "f": 1.0,
+   "m": 0.25
+  },
+  "etabs_column_AMod": 1.0,
+  "etabs_column_I": 0.7,
+  "etabs_beam_I": 0.35,
+  "etabs_rigid_zone_factor": 1.0,
+  "etabs_end_offsets_m": {
+   "columns_top": 0.8,
+   "beams": [
+    0.55,
+    0.625
+   ]
+  },
+  "etabs_floor_mesh": "No Auto Mesh (350 floor objects)",
+  "etabs_wall_mesh": "Default, restraints No",
+  "etabs_dead_case": "Linear Static (StiffType P-Delta), not staged construction",
+  "prior_repo_evidence": "docs/validation/20261120_GRAVITY_REACTION_REBUILD.md: native modifiers reduced max |delta| 3041.266 -> 768.045 kN and sum 37297.027 -> 10072.106 kN (not re-run here)",
+  "supports": [
+   {
+    "label": "1",
+    "x_m": 0.0,
+    "y_m": 6.0,
+    "group": "perimeter",
+    "etabs_kN": 11781.137814761069,
+    "opensees_kN": 10969.417282155997,
+    "delta_os_minus_etabs_kN": -811.7205326050716,
+    "tributary_kN": 14786.14794295534,
+    "residual_after_group_scaling_kN": 275.4273571326012,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "2",
+    "x_m": 0.0,
+    "y_m": 12.0,
+    "group": "perimeter",
+    "etabs_kN": 11781.137814760972,
+    "opensees_kN": 10969.417282155997,
+    "delta_os_minus_etabs_kN": -811.7205326049752,
+    "tributary_kN": 14786.14794295534,
+    "residual_after_group_scaling_kN": 275.4273571326885,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "3",
+    "x_m": 6.0,
+    "y_m": 0.0,
+    "group": "perimeter",
+    "etabs_kN": 13036.011175183367,
+    "opensees_kN": 11540.29595058056,
+    "delta_os_minus_etabs_kN": -1495.7152246028072,
+    "tributary_kN": 11648.855432149125,
+    "residual_after_group_scaling_kN": -292.76927298677947,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "4",
+    "x_m": 6.0,
+    "y_m": 18.0,
+    "group": "perimeter",
+    "etabs_kN": 13036.011175183408,
+    "opensees_kN": 11540.29595058056,
+    "delta_os_minus_etabs_kN": -1495.715224602849,
+    "tributary_kN": 11648.855432149125,
+    "residual_after_group_scaling_kN": -292.76927298681767,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "5",
+    "x_m": 12.0,
+    "y_m": 0.0,
+    "group": "perimeter",
+    "etabs_kN": 13096.410574668025,
+    "opensees_kN": 11512.688988186894,
+    "delta_os_minus_etabs_kN": -1583.7215864811315,
+    "tributary_kN": 11296.157390833527,
+    "residual_after_group_scaling_kN": -375.20205778591117,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "6",
+    "x_m": 12.0,
+    "y_m": 18.0,
+    "group": "perimeter",
+    "etabs_kN": 13096.410574668185,
+    "opensees_kN": 11512.688988186896,
+    "delta_os_minus_etabs_kN": -1583.7215864812897,
+    "tributary_kN": 11296.157390833527,
+    "residual_after_group_scaling_kN": -375.20205778605305,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "7",
+    "x_m": 18.0,
+    "y_m": 6.0,
+    "group": "core",
+    "etabs_kN": 11988.87310130501,
+    "opensees_kN": 13714.047379840335,
+    "delta_os_minus_etabs_kN": 1725.1742785353254,
+    "tributary_kN": 13585.153699078597,
+    "residual_after_group_scaling_kN": -320.74686419876343,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "8",
+    "x_m": 18.0,
+    "y_m": 12.0,
+    "group": "core",
+    "etabs_kN": 11988.873101305113,
+    "opensees_kN": 13714.047379840329,
+    "delta_os_minus_etabs_kN": 1725.1742785352162,
+    "tributary_kN": 13585.153699078595,
+    "residual_after_group_scaling_kN": -320.74686419889076,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "9",
+    "x_m": 24.0,
+    "y_m": 6.0,
+    "group": "perimeter",
+    "etabs_kN": 11781.137814760988,
+    "opensees_kN": 10969.417282155997,
+    "delta_os_minus_etabs_kN": -811.7205326049916,
+    "tributary_kN": 14786.14794295534,
+    "residual_after_group_scaling_kN": 275.42735713267393,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "10",
+    "x_m": 24.0,
+    "y_m": 12.0,
+    "group": "perimeter",
+    "etabs_kN": 11781.137814760976,
+    "opensees_kN": 10969.417282155997,
+    "delta_os_minus_etabs_kN": -811.7205326049789,
+    "tributary_kN": 14786.14794295534,
+    "residual_after_group_scaling_kN": 275.42735713268667,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "261",
+    "x_m": 6.0,
+    "y_m": 6.0,
+    "group": "core",
+    "etabs_kN": 11988.873101305026,
+    "opensees_kN": 13714.047379840322,
+    "delta_os_minus_etabs_kN": 1725.1742785352963,
+    "tributary_kN": 13585.153699078597,
+    "residual_after_group_scaling_kN": -320.7468641987962,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "262",
+    "x_m": 6.0,
+    "y_m": 12.0,
+    "group": "core",
+    "etabs_kN": 11988.873101305122,
+    "opensees_kN": 13714.047379840322,
+    "delta_os_minus_etabs_kN": 1725.1742785351998,
+    "tributary_kN": 13585.153699078595,
+    "residual_after_group_scaling_kN": -320.74686419890895,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "263",
+    "x_m": 12.0,
+    "y_m": 6.0,
+    "group": "core",
+    "etabs_kN": 14748.522205506248,
+    "opensees_kN": 17789.787978010492,
+    "delta_os_minus_etabs_kN": 3041.2657725042445,
+    "tributary_kN": 11217.470832745366,
+    "residual_after_group_scaling_kN": 524.4059184247235,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "264",
+    "x_m": 12.0,
+    "y_m": 12.0,
+    "group": "core",
+    "etabs_kN": 14748.522205506388,
+    "opensees_kN": 17789.787978010492,
+    "delta_os_minus_etabs_kN": 3041.2657725041045,
+    "tributary_kN": 11217.470832745366,
+    "residual_after_group_scaling_kN": 524.4059184245598,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "265",
+    "x_m": 18.0,
+    "y_m": 0.0,
+    "group": "perimeter",
+    "etabs_kN": 13036.011175183521,
+    "opensees_kN": 11540.29595058056,
+    "delta_os_minus_etabs_kN": -1495.7152246029618,
+    "tributary_kN": 11648.855432149125,
+    "residual_after_group_scaling_kN": -292.76927298691953,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "266",
+    "x_m": 18.0,
+    "y_m": 18.0,
+    "group": "perimeter",
+    "etabs_kN": 13036.011175183401,
+    "opensees_kN": 11540.295950580561,
+    "delta_os_minus_etabs_kN": -1495.71522460284,
+    "tributary_kN": 11648.855432149125,
+    "residual_after_group_scaling_kN": -292.7692729868086,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "557",
+    "x_m": 24.0,
+    "y_m": 18.0,
+    "group": "perimeter",
+    "etabs_kN": 9647.89264721283,
+    "opensees_kN": 8772.572163127787,
+    "delta_os_minus_etabs_kN": -875.3204840850431,
+    "tributary_kN": 7856.709604703555,
+    "residual_after_group_scaling_kN": 14.974349635629551,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "558",
+    "x_m": 24.0,
+    "y_m": 0.0,
+    "group": "perimeter",
+    "etabs_kN": 9647.892647212986,
+    "opensees_kN": 8772.572163127787,
+    "delta_os_minus_etabs_kN": -875.3204840851995,
+    "tributary_kN": 7856.709604703556,
+    "residual_after_group_scaling_kN": 14.97434963548767,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "559",
+    "x_m": 0.0,
+    "y_m": 18.0,
+    "group": "perimeter",
+    "etabs_kN": 9647.892647212888,
+    "opensees_kN": 8772.572163127788,
+    "delta_os_minus_etabs_kN": -875.3204840850995,
+    "tributary_kN": 7856.709604703555,
+    "residual_after_group_scaling_kN": 14.97434963557862,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "560",
+    "x_m": 0.0,
+    "y_m": 0.0,
+    "group": "perimeter",
+    "etabs_kN": 9647.892647212864,
+    "opensees_kN": 8772.572163127785,
+    "delta_os_minus_etabs_kN": -875.3204840850794,
+    "tributary_kN": 7856.709604703556,
+    "residual_after_group_scaling_kN": 14.974349635596809,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "561",
+    "x_m": 30.0,
+    "y_m": 6.0,
+    "group": "perimeter",
+    "etabs_kN": 9509.021316008779,
+    "opensees_kN": 8821.509941043409,
+    "delta_os_minus_etabs_kN": -687.5113749653701,
+    "tributary_kN": 7856.7096047035575,
+    "residual_after_group_scaling_kN": 189.96859511162438,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "562",
+    "x_m": 30.0,
+    "y_m": 12.0,
+    "group": "perimeter",
+    "etabs_kN": 9509.021316008819,
+    "opensees_kN": 8821.509941043409,
+    "delta_os_minus_etabs_kN": -687.5113749654101,
+    "tributary_kN": 7856.7096047035575,
+    "residual_after_group_scaling_kN": 189.968595111588,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "593",
+    "x_m": -6.0,
+    "y_m": 6.0,
+    "group": "perimeter",
+    "etabs_kN": 9509.021316008855,
+    "opensees_kN": 8821.509941043407,
+    "delta_os_minus_etabs_kN": -687.5113749654483,
+    "tributary_kN": 7856.7096047035575,
+    "residual_after_group_scaling_kN": 189.96859511155344,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "594",
+    "x_m": -6.0,
+    "y_m": 12.0,
+    "group": "perimeter",
+    "etabs_kN": 9509.021316008824,
+    "opensees_kN": 8821.509941043409,
+    "delta_os_minus_etabs_kN": -687.5113749654156,
+    "tributary_kN": 7856.7096047035575,
+    "residual_after_group_scaling_kN": 189.96859511158436,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "627",
+    "x_m": 8.0,
+    "y_m": 6.0,
+    "group": "core",
+    "etabs_kN": 4000.230441846519,
+    "opensees_kN": 4745.260635140258,
+    "delta_os_minus_etabs_kN": 745.0301932937391,
+    "tributary_kN": 5060.424637406296,
+    "residual_after_group_scaling_kN": 62.3842125058145,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "701",
+    "x_m": 10.0,
+    "y_m": 6.0,
+    "group": "core",
+    "etabs_kN": 3956.195583480363,
+    "opensees_kN": 4627.486634900329,
+    "delta_os_minus_etabs_kN": 671.2910514199657,
+    "tributary_kN": 5791.013437101673,
+    "residual_after_group_scaling_kN": -3.840307519236376,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "702",
+    "x_m": 16.0,
+    "y_m": 6.0,
+    "group": "core",
+    "etabs_kN": 4000.2304418465073,
+    "opensees_kN": 4745.260635140258,
+    "delta_os_minus_etabs_kN": 745.0301932937509,
+    "tributary_kN": 5060.424637406296,
+    "residual_after_group_scaling_kN": 62.384212505829055,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "703",
+    "x_m": 14.0,
+    "y_m": 6.0,
+    "group": "core",
+    "etabs_kN": 3956.1955834803666,
+    "opensees_kN": 4627.486634900329,
+    "delta_os_minus_etabs_kN": 671.2910514199621,
+    "tributary_kN": 5791.013437101675,
+    "residual_after_group_scaling_kN": -3.8403075192409233,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "704",
+    "x_m": 10.0,
+    "y_m": 12.0,
+    "group": "core",
+    "etabs_kN": 3956.195583480419,
+    "opensees_kN": 4627.48663490033,
+    "delta_os_minus_etabs_kN": 671.2910514199107,
+    "tributary_kN": 5791.013437101676,
+    "residual_after_group_scaling_kN": -3.84030751930095,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "705",
+    "x_m": 8.0,
+    "y_m": 12.0,
+    "group": "core",
+    "etabs_kN": 4000.2304418465787,
+    "opensees_kN": 4745.260635140259,
+    "delta_os_minus_etabs_kN": 745.0301932936804,
+    "tributary_kN": 5060.424637406298,
+    "residual_after_group_scaling_kN": 62.38421250574629,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "706",
+    "x_m": 16.0,
+    "y_m": 12.0,
+    "group": "core",
+    "etabs_kN": 4000.230441846571,
+    "opensees_kN": 4745.260635140258,
+    "delta_os_minus_etabs_kN": 745.0301932936873,
+    "tributary_kN": 5060.424637406298,
+    "residual_after_group_scaling_kN": 62.384212505754476,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   },
+   {
+    "label": "707",
+    "x_m": 14.0,
+    "y_m": 12.0,
+    "group": "core",
+    "etabs_kN": 3956.19558348042,
+    "opensees_kN": 4627.4866349003305,
+    "delta_os_minus_etabs_kN": 671.2910514199107,
+    "tributary_kN": 5791.013437101675,
+    "residual_after_group_scaling_kN": -3.8403075193018594,
+    "consistent_with": "GROUP_AXIAL_STIFFNESS_SPLIT"
+   }
+  ],
+  "verdict": "MODELLING_ASSUMPTION_DIFFERENCE_NOT_CODE_DEFECT: LEGACY_GROSS_SHELL wall membrane stiffness vs ETABS f11/f22/f12=0.5",
+  "core_total_97_support_run_kN": 130656.131
+ },
+ "task_b": {
+  "file": {
+   "H_m": 95.0,
+   "Aw_m2": {
+    "X": 2.07317451524,
+    "Y": 2.20308033241
+   }
+  },
+  "recomputed": {
+   "X": {
+    "file_T": 1.6619659288392785,
+    "recomputed_T": 1.6619659288392785,
+    "file_k": 1.74064044251196,
+    "k_from_unamplified_empirical": 1.5425123540095678,
+    "k_from_amplified_empirical": 1.74064044251196,
+    "T_clear_beam_weights_estimate": 1.6361981053764887,
+    "T_strict_base_exclusion_estimate": 1.6619658183362012,
+    "T_distributed_intermediate_mass_estimate": 1.65998885781563,
+    "T_upward_vs_midheight_delta": 0.0
+   },
+   "Y": {
+    "file_T": 2.3833406104118273,
+    "recomputed_T": 2.3833406104118273,
+    "file_k": 1.7109898883531498,
+    "k_from_unamplified_empirical": 1.5187919106825198,
+    "k_from_amplified_empirical": 1.7109898883531498,
+    "T_clear_beam_weights_estimate": 2.346387250415657,
+    "T_strict_base_exclusion_estimate": 2.3833405324086203,
+    "T_distributed_intermediate_mass_estimate": 2.38050357166333,
+    "T_upward_vs_midheight_delta": 0.0
+   }
+  },
+  "empirical": {
+   "X": {
+    "T": 1.585024708019136,
+    "Tamp": 1.9812808850239199,
+    "adopted": 1.6619659288392785
+   },
+   "Y": {
+    "T": 1.5375838213650401,
+    "Tamp": 1.9219797767063,
+    "adopted": 1.9219797767063
+   }
+  },
+  "seismic_weight_kN": {
+   "file": 284691.5561853353,
+   "breakdown_recomputed_excl_base": 284496.31385351287,
+   "free_base_nodes_in_floor1": 195.243241823,
+   "fixed_base_node_share": 1728.2020458084298,
+   "preload_applied": 286419.75823114376,
+   "D_gross": 272019.75823114987,
+   "live": 48000.0,
+   "beam_clear_length_deduction": 8652.444351599994,
+   "per_storey_beam_deduction": 346.0977740639998,
+   "W_clear_beam_estimate": 276039.1118337353,
+   "etabs_mass_t": 28106.2755,
+   "etabs_W_g981": 275722.56265499996,
+   "etabs_WeightUsed_EQX": 275628.4068,
+   "W_file_minus_etabs": 8968.99353033537,
+   "W_clear_minus_etabs": 316.54917873535305
+  },
+  "mass_lumping": {
+   "intermediate_nodes": 1571,
+   "intermediate_weight_kN": 13841.211759823362,
+   "intermediate_elevation_above_floor_m": 2.3,
+   "midheight_m": 1.9,
+   "base_level_free_nodes": 21,
+   "base_level_weight_kN": 195.24,
+   "upward_vs_midheight_floor_weight_difference_kN": 0.0,
+   "v127_runtime_audit_sha256_prefix": "a975367b454c8666 (= origin/main 891843e)",
+   "v127_rayleigh_sha256_prefix": "fe54e0b391546986 (= origin/main)"
+  }
+ },
+ "defects_fixed": [
+  {
+   "path": "components/modal/rayleigh_mass_audit.py",
+   "defect": "upward-only floor allocation inconsistent with the mid-height assembly ledger on this branch; a node below a storey mid-height made the Rayleigh run raise 'Mass audit floor weights fail source seismic ledger reconciliation'",
+   "before": "ValueError for the 2-floor test model with a node at 4.0 m between floors at 3.0 and 6.0 m",
+   "after": "floor weights [120, 80] kN, first-moment shift -20 kN m, max downward lump 1.0 m",
+   "real_model": "identical result on the Nov-21 export: 284691.556 kN, 1571 nodes, 13841.212 kN, max discrepancy 3.1e-11 kN (old and new)",
+   "source": "ported verbatim from origin/main 891843e"
+  }
+ ]
+}

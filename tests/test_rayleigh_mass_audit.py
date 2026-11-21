@@ -32,6 +32,15 @@ def sample():
 
 
 class RayleighMassElevationTests(unittest.TestCase):
+    def test_reconciles_lower_half_between_diaphragms_to_lower_floor(self):
+        model, rows = sample()
+        model["nodes"]["3"][2] = 4.0
+        rows[0]["dead_load_kN"], rows[1]["dead_load_kN"] = 120., 80.
+        result = audit_rayleigh_mass_elevations(model, rows)
+        self.assertEqual(result["floor_weights_from_nodal_mass_kN"], [120., 80.])
+        self.assertEqual(result["vertical_first_moment_shift_kN_m"], -20.)
+        self.assertEqual(result["maximum_downward_lump_m"], 1.)
+
     def test_reconciles_total_but_exposes_elevation_shift(self):
         model, rows = sample()
         result = audit_rayleigh_mass_elevations(model, rows)
