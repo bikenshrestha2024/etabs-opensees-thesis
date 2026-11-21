@@ -14,3 +14,7 @@
 **Scope:** These are rule lookup/threshold calculations. They do not prove full member shear/flexure capacity, confinement, diagonal reinforcement bar area, bar anchorage, wall openings §5.6 or structural coupling. A 12 m gross envelope with openings cannot be marked fully code-compliant using these helpers alone.
 
 **Tests:** `tests/test_nbc105_annex_ab_source_checks.py`. No native RC rebar or ETABS file uploaded.
+
+## §5.6 opening reinforcement checklist (source printed p.79)
+
+`rc_wall_opening_rebar_review` compares each side's additional vertical/horizontal reinforcement to at least half the respective interrupted steel area; it checks explicit confirmations that vertical bars extend full storey, horizontal bars receive development length beyond the opening and shear strength is checked at critical horizontal planes through openings. **Boolean declarations are not proof that construction or reinforcement drawing has been verified.** The function makes no combined shell/pier coupling or member-capacity acceptance claim.
