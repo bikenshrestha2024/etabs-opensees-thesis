@@ -27,3 +27,18 @@ Changed
 - `zoning_factor_from_table` not created (Annex C Table C-1 and Figure 4-3 interpolation not transcribed).
 
 Verification: `python -m pytest -q`, `python tests/verify_ref_tags.py`. Unit tests only; no native ETABS/OpenSees; not engineering acceptance.
+
+## Task 3: clause 4 parity audit and matrix
+
+Changed
+- New `tests/test_nbc105_clause04_parity.py` (compares `esm_spectral_shape_factor` in `code_basis.py` and `legacy_code_basis.py`, `spectral_shape_ch`, `elastic_site_spectrum_g`, `ch_modal_nltha`, `target_nltha_g`, `reconcile.soil_c_*`/`static_parameters`, `soil_type_from_vs30`/`soil_type_from_n_spt`, `calculate_esm` ULS/SLS coefficients against the clause module on a dense T grid; scans for 0.20 and 2/3 Z use; `site_spectrum_and_scaling` is imported with an inert tkinter stand-in). New `docs/nbc105/clause_04_seismic_hazard_matrix.md` with a Findings section.
+- Code fix (only proven mismatch, F1): `components/equivalent_static/code_basis.py` and `legacy_code_basis.py`, `esm_spectral_shape_factor` now rejects non-finite T and T > 6 s (printed p. 23, Eq. 4.1(2) defined for T <= 6 s). LF line endings kept; 7 lines changed per file (`git diff --stat`).
+
+Numeric changes (before -> after)
+- Soil C, T = 6.5 s, ESM: 0.23669 (extrapolated) -> ValueError. T = 10 s likewise.
+- NaN period: returned NaN -> ValueError. `calculate_esm` already rejected non-finite T.
+- 0 <= T <= 6 s: no change for any soil (parity test, 1e-12).
+
+Not changed: other implementations (spectral_shape_ch, elastic_site_spectrum_g, ch_modal_nltha, target_nltha_g, reconcile soil C helpers, Table 4-2 classifiers) matched the clause module; no production code applies the vertical 2/3 Z; importance factor is a user input.
+
+Verification: `python -m pytest -q` (1315 passed, 34 skipped), `python tests/verify_ref_tags.py`. No tkinter file edited. Unit tests only; no native ETABS/OpenSees; not engineering acceptance.
