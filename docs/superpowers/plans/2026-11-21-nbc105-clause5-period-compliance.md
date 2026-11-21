@@ -60,3 +60,17 @@
 - [ ] **Step 2:** run, expect fail. **Step 3:** route the sites; where a site cannot be unit-tested (tkinter GUI) keep the edit to replacing the arithmetic with the shared call and run `python -m py_compile` on it.
 - [ ] **Step 4:** write the compliance matrix: one row per rule (clause, printed page, requirement, code location, test name, status among `IMPLEMENTED_AND_TESTED`, `IMPLEMENTED_AND_TESTED` with the clause text verified against the printed page for Eq. 5.1(1), the shear-wall kt equation, Figure 5-1 text and Table 5-1, `CALLER_RESPONSIBILITY` for basement-condition judgement, wall-grouping around openings). State the limits plainly; a matrix is not design acceptance.
 - [ ] **Step 5:** `python -m pytest -q` all pass; commit.
+
+### Task 3: §5.2 mid-height tributary rule for the storey seismic-weight ledger
+
+**Files:**
+- Modify: `components/modal/nbc105_clause5.py` (add helper), `components/model/assembly.py:~1117-1132` (story ledger loop), `docs/validation/NBC105_CLAUSE5_COMPLIANCE_MATRIX.md` (Wi row: CALLER_RESPONSIBILITY -> IMPLEMENTED_AND_TESTED), `docs/source/components/modal/nbc105_clause5.py.md`
+- Test: `tests/test_nbc105_clause5.py` (helper), `tests/test_nbc105_clause5_callsites.py` (assembly uses the helper)
+
+**Interfaces:**
+- Produces: `storey_index_for_elevation(z_m: float, floor_elevations_m: Sequence[float]) -> int` (floors ascending). Rule: z at or below the first floor -> 0 (first-storey lower half stays with floor 1 so total weight is preserved; the base level carries no lateral level); z at/above the last floor -> last index; otherwise between floors i-1 and i, the node goes to i-1 when `z < (e[i-1]+e[i])/2 - 1e-7`, else to i (a node on a floor elevation within 1e-7 belongs to that floor). Raises ValueError on empty or non-ascending floors.
+- Consumes: the existing story ledger loop that currently assigns to the first floor at or above z (all weight above the floor below it goes up).
+
+- [ ] Tests: below-first-floor -> 0; exactly on floors; just under/at/above midpoint; above roof -> last; two-floor and uneven-storey cases with hand-computed midpoints; total weight preserved when summing assignments for a synthetic node set; ValueError cases.
+- [ ] Replace the `next((i for i,g in enumerate(groups) if g['master_xyz'][2]>=z-1e-7), ...)` assignment with the helper; update the code comment that states the old convention; total ledger weight and `story_ledger_mass_error_percent` must not change. Run the whole suite and report any test that pinned story-weight numbers (update only with justification written in the agent_edits note).
+- [ ] Commit.
