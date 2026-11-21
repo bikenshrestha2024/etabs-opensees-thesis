@@ -12,14 +12,14 @@ These screenshot observations do not prove file validity, content completeness, 
 
 ## Implemented changes
 
-1. Add an **explicit** `stage='ESM'` argument to the shared output resolver; it now maps to `<export>/03_ESM/RUNS/<same-case-id>`. Calls without the stage keep the legacy path so gravity/modal/MRSM consumers are not accidentally redirected.
+1. Add an **explicit** `stage='ESM'` argument to the shared output resolver; it now maps to `<export>/03_ESM/RUNS/<state>/<same-case-id>`. Calls without the stage keep the legacy path so gravity/modal/MRSM consumers are not accidentally redirected.
 2. Update ESM GUI default output/auto-state/change, ESM generated cases, Rayleigh default writer, ESM input synchronization and ETABS-linked Excel audit lookup to the stage-owned path. Historical lookup remains active, and saved Rayleigh input import still applies existing hashes/method/limit-state checks before accepting any archived period.
 3. Add `tools/repair_project_output_layout.py` with dry-run default. `--apply` uses the existing categorized root copy mirror and creates explicitly identified, hash-verified `03_ESM/REVIEW_SNAPSHOTS/HISTORICAL_<case>` copies for *already generated* ESM and Rayleigh files. Original byte content and locations remain unchanged.
 4. Add synthetic filesystem tests for exact canonical paths and non-destructive, repeated migration.
 
 ## Acceptance gates still open
 
-- Confirm Windows GUI uses `03_ESM/RUNS` for every ULS/SLS case, runner and Rayleigh output (and that linked validation/audit readers can reload them).
+- Confirm Windows GUI uses `03_ESM/RUNS/<state>/<case>` for every ULS/SLS case, runner and Rayleigh output (and that linked validation/audit readers can reload them).
 - Re-run native ETABS 23 + OpenSees/XARA source-matched cases and validate EDB/mass ledger SHA checks and actual result profiles.
 - Use `tools/audit_live_output_writers.py` and `components.inputs.folder_audit` to resolve remaining root writers stage by stage, without guessing from file names.
 - **Do not delete** root JSON/CSV/XLSX/PY files or historical analysis results until every source consumer and saved-run manifest reference is resolved.
