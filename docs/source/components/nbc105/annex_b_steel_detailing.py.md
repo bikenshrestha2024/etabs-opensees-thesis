@@ -9,3 +9,7 @@
 **Explicit safety limitation:** A thesis SHS outrigger, BRB or FVD is not automatically a qualifying seismic link; the classification, steel material, section I geometry, axial force reductions, links/web stiffeners/connection strength and actual inelastic rotation require structural model and design verification.
 
 **Tests:** `tests/test_nbc105_annex_ab_source_checks.py` (horizontal/vertical and wrong element type rejection).
+
+## EBF I-section classification is mandatory
+
+Annex B §7.1.1 printed p.95 restricts seismic links to **I-section geometry**. The reference calculator now requires `section_type='I'` or `'I-SECTION'` explicitly. SHS, FVD, BRB or generic project link objects are rejected rather than silently receiving the 0.08/0.02 rad limits. The input declaration alone still does not verify the actual exported section, link classification, material, axial reduction or demand rotation.
