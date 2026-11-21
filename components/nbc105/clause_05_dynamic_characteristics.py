@@ -234,7 +234,8 @@ _TABLE_5_2 = {
 }
 
 def table_5_2_system_factors(row):
-    """§5.3.1–5.3.4 p.32: exact Table 5-2 row selection (1..21)."""
+    """§5.3.1–5.3.4 p.32: exact Table 5-2 row selection (1..21).
+[REF NBC105-2025 §5, printed pp. 28–37]"""
     if isinstance(row,bool) or not isinstance(row,int) or row not in _TABLE_5_2:
         raise ValueError("NBC Table 5-2 requires one of 21 exact row numbers")
     name,rm,ou,os=_TABLE_5_2[row]
@@ -255,7 +256,8 @@ def weak_story(story_strength,above_strength):
 def soft_story(story_stiffness,above_stiffness,three_above=None):
     """§5.4.1.2 p.33: <70% above OR <80% three-above mean.
     The three-storey criterion is evaluated only if all three values supplied.
-    """
+    
+[REF NBC105-2025 §5, printed pp. 28–37]"""
     current=_positive(story_stiffness,"stiffness")
     above=_positive(above_stiffness,"above stiffness")
     flagged=_strictly_below(current,.7*above)
@@ -267,7 +269,8 @@ def soft_story(story_stiffness,above_stiffness,three_above=None):
     return flagged
 
 def torsion_irregularity(max_displacement,min_displacement):
-    """§5.4.2.1–2 p.34: >1.5 torsion, >2.5 extreme (prohibited)."""
+    """§5.4.2.1–2 p.34: >1.5 torsion, >2.5 extreme (prohibited).
+[REF NBC105-2025 §5, printed pp. 28–37]"""
     maxv=_positive(max_displacement,"maximum end displacement")
     minv=_positive(min_displacement,"minimum end displacement")
     if _strictly_above(maxv,2.5*minv):
@@ -277,12 +280,14 @@ def torsion_irregularity(max_displacement,min_displacement):
     return "REGULAR"
 
 def reentrant_corner_irregularity(projection_m,overall_dimension_m):
-    """§5.4.2.3 p.34: projection strictly >15% overall dimension."""
+    """§5.4.2.3 p.34: projection strictly >15% overall dimension.
+[REF NBC105-2025 §5, printed pp. 28–37]"""
     return _strictly_above(_positive(projection_m,"projection"),
                            .15*_positive(overall_dimension_m,"dimension"))
 
 def interstory_drift_check(relative_deflection_m,storey_height_m,limit_state):
-    """§5.5.3 p.37: <=0.025 ULS, <=0.006 SLS (design-level drift)."""
+    """§5.5.3 p.37: <=0.025 ULS, <=0.006 SLS (design-level drift).
+[REF NBC105-2025 §5, printed pp. 28–37]"""
     drift=float(relative_deflection_m)
     if not math.isfinite(drift):raise ValueError("nonfinite inter-storey drift")
     h=_positive(storey_height_m,"storey height")
@@ -295,19 +300,22 @@ def interstory_drift_check(relative_deflection_m,storey_height_m,limit_state):
             "basis":"DESIGN_DRIFT_INPUT_ONLY_NBC_3_4_STIFFNESS_MUST_BE_VERIFIED"}
 
 def uls_design_deflection(linear_deflection_m,ductility_factor):
-    """§5.5.1.1 p.36: multiply elastic ESM/MRSM horizontal deflection by Rmu."""
+    """§5.5.1.1 p.36: multiply elastic ESM/MRSM horizontal deflection by Rmu.
+[REF NBC105-2025 §5, printed pp. 28–37]"""
     d=float(linear_deflection_m)
     if not math.isfinite(d):raise ValueError("nonfinite elastic displacement")
     return d*_positive(ductility_factor,"Rmu")
 
 def separation_gap_m(building1_design_deflection_m,building2_design_deflection_m):
-    """§5.5.2 p.36: SRSS of design horizontal deflections."""
+    """§5.5.2 p.36: SRSS of design horizontal deflections.
+[REF NBC105-2025 §5, printed pp. 28–37]"""
     a=float(building1_design_deflection_m);z=float(building2_design_deflection_m)
     if not math.isfinite(a) or not math.isfinite(z):raise ValueError("nonfinite displacement")
     return math.hypot(a,z)
 
 def accidental_eccentricities_m(building_width_m):
-    """§5.6 p.37: ±0.05b, distinct from inherent CM–CR eccentricity."""
+    """§5.6 p.37: ±0.05b, distinct from inherent CM–CR eccentricity.
+[REF NBC105-2025 §5, printed pp. 28–37]"""
     e=.05*_positive(building_width_m,"b")
     return (-e,e)
 
