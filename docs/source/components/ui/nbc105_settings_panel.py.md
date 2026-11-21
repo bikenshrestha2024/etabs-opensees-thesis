@@ -42,3 +42,9 @@ V135 window now displays `Path(__file__)` and the actual new output directory. I
 `python -m unittest discover -s tests -p "test_nbc_settings_panel_v12.py" -v`
 
 Tests are deterministic synthetic config/file checks; an actual Windows Tk smoke test (tabs, scrolling, exported workbook, local launcher source path, 125% DPI) is still required.
+
+## Clause 1–10 reference calculator — source-routed
+
+The existing `launch(parent, export_dir)` panel now includes an **NBC clauses 1–10** button. It opens a local dialog listing each independently registered module's exported rule functions and accepts named JSON parameters. It calls `components.nbc105.dispatch.run_operation`; it does **not** duplicate clauses in GUI code, make an ETABS change, or issue building acceptance. Result status is `CODE_CALCULATION_ONLY_NOT_BUILDING_ACCEPTANCE`. Invalid input shows BLOCKED. The initial example uses Table 10-1 `a_p` for `T1=1.0 s`, `Tp=1.25 s` and produces `1.75`.
+
+Tests: `tests/test_nbc105_gui_clause_routing.py` plus `tests/test_nbc105_module_dispatch.py`. A native Windows tkinter smoke check remains required before production GUI acceptance.
