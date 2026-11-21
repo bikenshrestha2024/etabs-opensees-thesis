@@ -1796,7 +1796,9 @@ class GravityAnalysisGUI:
         if not payload.get("ok"):
             self._gravity_action_log("GRAVITY_FAILED_SOLVER_LOG",str(out/"Gravity_Run_V110.log"))
             self._gravity_action_log("GRAVITY_FAILED_RESULT",str(out/"Gravity_Result_V110.json"))
-            self._gravity_action_log("GRAVITY_GUI_LOG",str(out/"Gravity_GUI_Actions.log"))
+            from components.gravity.output_ownership import section
+            self._gravity_action_log("GRAVITY_GUI_LOG",
+                                     str(section(self.output_var.get(),"LOGS")/"Gravity_GUI_Actions.log"))
             self.status_var.set("Gravity run failed — see the log for the failing step.")
             messagebox.showerror("Gravity analysis failed", payload.get("error", "Unknown error"), parent=self.win)
             self.nb.select(self.log_tab)
