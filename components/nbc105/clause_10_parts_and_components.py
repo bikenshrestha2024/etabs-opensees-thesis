@@ -9,7 +9,7 @@ import math
 __all__=["component_amplification_factor","component_design_force",
          "component_ductility_factor","component_importance_factor",
          "component_scope","friction_design_resistance",
-         "shutdown_threshold_g"]
+         "shutdown_threshold_g","light_safety_cable_design_capacity"]
 _TABLE_DUCTILITY={"low":1.5,"moderate":2.5}
 _TABLE_IMPORTANCE={"hazardous":1.5,"life safety":1.5,
   "public storage":1.5,"emergency":1.5,"other":1.0}
@@ -71,6 +71,15 @@ def friction_design_resistance(vertical_normal_force,coefficient_of_friction):
     """§10.1 p.49: half of gravity-friction resistance for seismic design.
 [REF NBC105-2025 §10, printed pp. 49–52]"""
     return .5*_nonnegative(vertical_normal_force,"N")*_nonnegative(coefficient_of_friction,"mu")
+
+def light_safety_cable_design_capacity(component_weight_kN):
+    """§10.4(d) p.51: lateral safety-cable capacity >= four times fixture weight.
+
+    [REF NBC105-2025 §10.4(d), printed p.51]
+    This is a required minimum lateral load for hanging/swinging lights.
+    It does not check anchorage, durability or actual cable material strength.
+    """
+    return 4.0*_positive(component_weight_kN,"component_weight_kN")
 
 def shutdown_threshold_g(value):
     """§10.2 p.49: automatic service shut-off trigger cannot exceed 0.2g.
