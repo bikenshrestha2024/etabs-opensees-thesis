@@ -157,11 +157,35 @@ class GravityAnalysisGUI:
         self.output_var.trace_add("write", lambda *_: self._refresh_case_reaction())
         self.model_var.trace_add("write", lambda *_: self._refresh_case_reaction())
         self.model_var.trace_add("write", lambda *_: self._populate_registered_sources())
+        self.model_var.trace_add("write", lambda *_: self._update_auto_gravity_output())
         def populate_saved():
             from OpenSees_Complete_Export_V118 import autoselect_inputs
             folder=Path(self.model_var.get()).parent if self.model_var.get() else Path(r'D:/Thesis Opensees/Etabs Nodes Export')
             autoselect_inputs(self,folder,'gravity_model_script')
         self.win.after_idle(populate_saved)
+
+    def _update_auto_gravity_output(self):
+        """[REF docs/source/components/gravity/gui_and_reports.py.md]
+        Bind auto-selected source builder to its ONE source-owned gravity root.
+
+        Without this callback auto-detected models leave output_var empty until
+        clicking Run; previews/exports may then resolve the process CWD.
+        Explicit external custom output selections are never overwritten.
+        """
+        if not self._output_is_automatic:
+            return
+        raw=self.model_var.get().strip()
+        if not raw:
+            self.output_var.set("")
+            return
+        model=Path(raw).expanduser()
+        if not model.is_file():
+            self.output_var.set("")
+            return
+        from components.inputs.output_layout import owned_run_destination
+        destination=owned_run_destination(model.parent,"GRAVITY",model.stem)
+        if self.output_var.get()!=str(destination):
+            self.output_var.set(str(destination))
 
     def _populate_registered_sources(self):
         """Source selection must never invoke a missing-Git-LFS modal dialog.
