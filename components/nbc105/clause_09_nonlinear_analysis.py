@@ -17,7 +17,8 @@ def _pos(v,name):
 
 def nonlinear_model_prerequisites(*,is_3d,gravity,p_delta,torsion,
                                  bilinear,hysteretic):
-    """§9.2–9.3 pp.44–45, declarations, NOT proof of material calibration."""
+    """[REF NBC105-2025 §9, printed pp. 44–48]
+§9.2–9.3 pp.44–45, declarations, NOT proof of material calibration."""
     vals=locals()
     if any(type(v) is not bool for v in vals.values()):
         raise ValueError("nonlinear model prerequisites must be bool")
