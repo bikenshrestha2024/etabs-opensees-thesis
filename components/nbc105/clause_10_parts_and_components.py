@@ -34,13 +34,15 @@ def component_amplification_factor(building_period_s,component_period_s):
     return 1.0 if delta>=.5 else 2.5-3.0*delta
 
 def component_ductility_factor(deformability):
-    """§10.3.2 Table 10-2 p.50; research-supported higher <=3.5 is not auto-approved."""
+    """§10.3.2 Table 10-2 p.50; research-supported higher <=3.5 is not auto-approved.
+[REF NBC105-2025 §10, printed pp. 49–52]"""
     k=str(deformability).strip().lower()
     if k not in _TABLE_DUCTILITY:raise ValueError("unknown Table 10-2 category")
     return _TABLE_DUCTILITY[k]
 
 def component_importance_factor(component_class):
-    """§10.3.3 Table 10-3 p.51."""
+    """§10.3.3 Table 10-3 p.51.
+[REF NBC105-2025 §10, printed pp. 49–52]"""
     k=str(component_class).strip().lower().replace("_"," ")
     if k not in _TABLE_IMPORTANCE:raise ValueError("unknown Table 10-3 category")
     return _TABLE_IMPORTANCE[k]
@@ -49,25 +51,29 @@ def component_scope(building_seismic_weight,component_weight):
     """§10.1 p.49: §10 inapplicable if component weight MORE THAN 25% of building.
     Equality is allowed by the literal text, though independent structural
     modelling of a massive component remains necessary.
-    """
+    
+[REF NBC105-2025 §10, printed pp. 49–52]"""
     w=_positive(building_seismic_weight,"building weight")
     p=_nonnegative(component_weight,"component weight")
     return {"allowed":p<=.25*w,"component_to_building_ratio":p/w,
             "basis":"SECTION_10_SCOPE_NOT_CONNECTION_DESIGN"}
 
 def component_design_force(*,z,hp,H,ap,mu_p,Ip,Wp):
-    """§10.3 Eq.10.3(1) p.49: Z (1+hp/H) (ap/mu_p) Ip Wp."""
+    """§10.3 Eq.10.3(1) p.49: Z (1+hp/H) (ap/mu_p) Ip Wp.
+[REF NBC105-2025 §10, printed pp. 49–52]"""
     h=_positive(H,"H"); attach=_nonnegative(hp,"hp")
     if attach>h:raise ValueError("component attachment above top of building")
     return (_positive(z,"Z")*(1.+attach/h)*_positive(ap,"ap")/
       _positive(mu_p,"mu_p")*_positive(Ip,"Ip")*_positive(Wp,"Wp"))
 
 def friction_design_resistance(vertical_normal_force,coefficient_of_friction):
-    """§10.1 p.49: half of gravity-friction resistance for seismic design."""
+    """§10.1 p.49: half of gravity-friction resistance for seismic design.
+[REF NBC105-2025 §10, printed pp. 49–52]"""
     return .5*_nonnegative(vertical_normal_force,"N")*_nonnegative(coefficient_of_friction,"mu")
 
 def shutdown_threshold_g(value):
-    """§10.2 p.49: automatic service shut-off trigger cannot exceed 0.2g."""
+    """§10.2 p.49: automatic service shut-off trigger cannot exceed 0.2g.
+[REF NBC105-2025 §10, printed pp. 49–52]"""
     a=_nonnegative(value,"shutoff trigger")
     if a>.2:raise ValueError("automatic shut-off must trigger at no more than 0.2g")
     return a
