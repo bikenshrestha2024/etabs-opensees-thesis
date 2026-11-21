@@ -622,5 +622,274 @@
    "real_model": "identical result on the Nov-21 export: 284691.556 kN, 1571 nodes, 13841.212 kN, max discrepancy 3.1e-11 kN (old and new)",
    "source": "ported verbatim from origin/main 891843e"
   }
- ]
+ ],
+ "etabs_table_evidence": {
+  "status": "SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE",
+  "value_labels": {
+   "F": "read from file",
+   "H": "hand-computed from file values"
+  },
+  "evidence_sha256_prefix": {
+   "Assignment_Export_ULS_3_storey_latest.xlsx": "8b3a6b3373381c60",
+   "Beam_Forces_Element_1_latest.xlsx": "03167f4a7155e3b0",
+   "Beam_Forces_Element_2_latest.xlsx": "c0bfbb5ef681413c",
+   "Beam_Forces_Element_3_latest.xlsx": "0e28780546ea2a9e",
+   "MESH_08/.../RUN_20261121_105824_d198b6a0/Gravity_Storey_Load_Breakdown_V131.json": "b1a56a9fb5e03a70"
+  },
+  "reader": "tools/etabs_beam_slab_load_path.py",
+  "reader_run_folder": "02_GRAVITY/RUNS/AS_CONFIGURED/ETABS_TABLES_20261121/20261121T092048_987294Z_ff06d5b6 (outside repository; layout audit OK)",
+  "beam_force_coverage_F": [
+   {
+    "file": "Beam_Forces_Element_1_latest.xlsx",
+    "data_rows": 1048573,
+    "reached_excel_row_limit": true,
+    "last_row_identity": [
+     "Story15",
+     "1203",
+     "Time History Darfield-1"
+    ]
+   },
+   {
+    "file": "Beam_Forces_Element_2_latest.xlsx",
+    "data_rows": 1048573,
+    "reached_excel_row_limit": true,
+    "last_row_identity": [
+     "Story5",
+     "919",
+     "Time History Darfield-1"
+    ]
+   },
+   {
+    "file": "Beam_Forces_Element_3_latest.xlsx",
+    "data_rows": 477700,
+    "reached_excel_row_limit": false,
+    "last_row_identity": [
+     "Story1",
+     "911",
+     "8. DL + 0.3 LL - EQY"
+    ]
+   }
+  ],
+  "beam_force_coverage_note": "rows ordered storey > beam > case (146 cases); B1 Story25-15, B2 Story15-5, B3 Story5-1; Dead and Live 30 beams x 340 rows in every storey; truncation only Story15/Story5 beam B17 after 'Time History Darfield-1', complete in the next file; overlaps agree",
+  "open_item_1_mass": {
+   "verdict": "CLOSED",
+   "mass_source_F": {
+    "sheet": "Mass Source Definition",
+    "rows": "4-8",
+    "name": "MsSrc1",
+    "patterns": {
+     "Self Weight": 1,
+     "Live": 0.3,
+     "Wall": 1,
+     "Floor Finish": 1,
+     "Partition": 1
+    },
+    "source_self_mass": false,
+    "lump_mass": true,
+    "roof_live_included": false
+   },
+   "mass_summary_by_story_kg_F": {
+    "Story25": 942293.71,
+    "Story24": 1160401.52,
+    "Story3": 1160401.52,
+    "Story2": 1160401.52,
+    "typical": 1127751.27,
+    "Base": 218107.82,
+    "rows": "4-29"
+   },
+   "diaphragm_mass_sum_kg_H": 28106274.94,
+   "group_all_kg_F": 28324382.76,
+   "etabs_internal_g": 9.80665,
+   "comparison_H": {
+    "BASE": {
+     "diff_at_g_kN": -216.193,
+     "diff_at_source_g_kN": -215.463,
+     "etabs_kN_at_g": 2139.638,
+     "etabs_kN_at_source_g": 2138.907,
+     "etabs_mass_kg": 218107.82,
+     "ledger_kN": 1923.444,
+     "storey": "BASE"
+    },
+    "Storey 1": {
+     "diff_at_g_kN": 342.32,
+     "diff_at_source_g_kN": 346.098,
+     "etabs_kN_at_g": 11063.24,
+     "etabs_kN_at_source_g": 11059.462,
+     "etabs_mass_kg": 1127751.27,
+     "ledger_kN": 11405.56,
+     "storey": "Storey 1"
+    },
+    "Storey 2": {
+     "diff_at_g_kN": 342.211,
+     "diff_at_source_g_kN": 346.098,
+     "etabs_kN_at_g": 11383.539,
+     "etabs_kN_at_source_g": 11379.652,
+     "etabs_mass_kg": 1160401.52,
+     "ledger_kN": 11725.75,
+     "storey": "Storey 2"
+    },
+    "Storey 25": {
+     "diff_at_g_kN": 558.404,
+     "diff_at_source_g_kN": 561.561,
+     "etabs_kN_at_g": 9243.901,
+     "etabs_kN_at_source_g": 9240.745,
+     "etabs_mass_kg": 942293.71,
+     "ledger_kN": 9802.305,
+     "storey": "Storey 25"
+    }
+   },
+   "per_floor_offset_at_9p80665_kN_H": 346.098,
+   "gross_minus_clear_beam_per_storey_kN": 346.0977740639998,
+   "intermediate_mass_per_storey_kN_H": 545.839,
+   "intermediate_joints_F": "200 points at storey level -1.5 m (8 per storey), Point Object Connectivity rows 4-1104",
+   "lumped_down_kN_H": 215.463,
+   "roof_diff_clear_beam_kN_H": 215.463,
+   "base_diff_kN_H": -215.463,
+   "explanation": "ETABS splits intermediate-joint mass linearly between adjacent levels (inferred from exact fit); OpenSees ledger lumps it upward; roof +215.463 / base -215.463; earlier +212 = 215.463 - 3.16 (g 9.81 vs 9.80665); floor-1 +195.243 = V127 allocation of free z=0 nodes to floor 1, ETABS keeps z=0 mass in Base (outside W)",
+   "T_estimate_H": {
+    "X": {
+     "file": 1.6619659288392785,
+     "etabs_convention": 1.6600401243612843
+    },
+    "Y": {
+     "file": 2.3833406104118273,
+     "etabs_convention": 2.3805778562587006
+    },
+    "relative": -0.00116,
+    "basis": "V127 rows, F and d held, roof -215.463 kN, floor 1 -195.243 kN"
+   }
+  },
+  "open_item_2_hypotheses": [
+   {
+    "hypothesis": "wall membrane/bending modifiers",
+    "verdict": "SUPPORTED_PRIMARY",
+    "evidence_F": "Area Assigns - Sect Prop rows 4-728 Wall 600 x375; Wall Property Def - Specified row 15 f11=f22=f12=0.5 m=0.1 v=1",
+    "note": "only Wall 600 assigned; Wall 300-610 defined, unused"
+   },
+   {
+    "hypothesis": "assignment-level modifiers",
+    "verdict": "NONE_IN_EXPORT",
+    "evidence_F": "no frame/area assignment modifier sheet among 117"
+   },
+   {
+    "hypothesis": "rigid end zones",
+    "verdict": "STILL_OPEN_SECONDARY",
+    "evidence_F": "Frame Assigns - End Len Offsets rows 4-1370 Auto, RZ 1, I 550x400/625x225/0x742, J 550x400/625x225/800x450/0x292; ULS settings lack end_offsets_m"
+   },
+   {
+    "hypothesis": "slab load transfer",
+    "verdict": "REJECTED_AS_STATICS_CAUSE_STILL_OPEN_AS_STIFFNESS_TERM",
+    "evidence_F": "Area Assigns - Floor Auto Mesh rows 4-353 No Auto Mesh x350; beam forces section"
+   },
+   {
+    "hypothesis": "rigid diaphragm",
+    "verdict": "REJECTED",
+    "evidence_F": "Diaphragm Definitions rows 4-38 all Rigid; Area Assigns - Diaphragms D1 x350; beam P = 0 all stations"
+   },
+   {
+    "hypothesis": "pier/spandrel modifiers",
+    "verdict": "REJECTED",
+    "evidence_F": "Pier rows 4-78, Spandrel rows 4-103 geometry only; pier thickness 1.0/1.4 m equivalent (H)"
+   },
+   {
+    "hypothesis": "frame modifiers / BE columns",
+    "verdict": "REJECTED",
+    "evidence_F": "Conc Rect rows 11,14,21; Frame Assigns - Sect Prop rows 4-1370 (no BE)"
+   },
+   {
+    "hypothesis": "insertion point",
+    "verdict": "REJECTED",
+    "evidence_F": "Frame Assigns - Insertion Point rows 4-1370 No Transform Stiffness Yes"
+   },
+   {
+    "hypothesis": "wall meshing",
+    "verdict": "STILL_OPEN_SECONDARY",
+    "evidence_F": "Wall Auto Mesh Default x375; Analysis - Wall Mesh Settings 1 m; OpenSees cells to 3.8 m x 0.1 m"
+   },
+   {
+    "hypothesis": "gravity-case P-Delta stiffness",
+    "verdict": "NOT_DECIDABLE_MINOR",
+    "evidence_F": "Load Cases - Linear Static rows 4-7, 14"
+   }
+  ],
+  "open_item_3_load_path": {
+   "core_box_m": [
+    6,
+    18,
+    6,
+    12
+   ],
+   "live_max_V2_variation_kN_F": 0.0,
+   "live_clear_span_load_kN_H": 0.0,
+   "dead_clear_span_load_kN_H": 66994.1026,
+   "dead_expected_clear_span_kN_H": 66994.07788,
+   "dead_beam_load_to_joints_per_storey_kN_H": 2857.264,
+   "beam_P_max_abs_kN_F": 0.0,
+   "mixed_beams_per_storey": 10,
+   "beam_to_core_kN_H": {
+    "Dead": 8529.6028,
+    "Live": -751.778,
+    "simple_span_Dead": 10807.6059
+   },
+   "beam_flexure_transfer_core_to_perimeter_kN_H": {
+    "Dead": 2278.0031,
+    "Live": 751.778,
+    "total": 3029.7811
+   },
+   "slab_corner_core_area_m2_per_storey_H": 192.0,
+   "slab_area_m2_per_storey_F": 480.0,
+   "slab_DL_kN_m2_H": 10.748892708333333,
+   "core_statics_baseline_kN_H": {
+    "slab": 51594.685,
+    "beams_simple": 10807.6059,
+    "walls": 52934.3649,
+    "braces_half": 228.7069,
+    "total": 115565.3627,
+    "fraction": 0.371154
+   },
+   "etabs_core_reaction_kN": 109278.24091754066,
+   "opensees_core_reaction_kN": 127926.75455554467,
+   "etabs_minus_baseline_kN_H": -6287.1217,
+   "opensees_minus_baseline_kN_H": 12361.3919,
+   "etabs_residual_slab_corner_and_brace_kN_H": -3257.3406,
+   "verdict": "ETABS does no tributary transfer (No Auto Mesh: slab load to panel corners only); corner and shell paths give the same rigid-support split (40.0 % of slab to core); rejected as statics cause, possible secondary stiffness term; OpenSees beam/slab share needs a re-solve writing export_gravity_beam_actions"
+  },
+  "discrepancies": {
+   "mismatch": [
+    "D1 wall modifiers 0.5/0.1 vs gross",
+    "D2 beam J 0.01 vs gross",
+    "D3 beam weight clear vs gross (+346.098 kN/storey)",
+    "D4 rigid end zones RZ 1 vs centreline",
+    "D5 floor No Auto Mesh vs 4/8/16 subdivisions",
+    "D6 wall mesh 1 m vs cells to 3.8 m",
+    "D7 intermediate-joint mass linear split vs upward",
+    "D8 z=0 free-node mass Base vs floor 1 (195.243 kN)",
+    "D9 g 9.80665 vs 9.81"
+   ],
+   "match": [
+    "D10 storey heights 25 x 3.8 m",
+    "D11 M45 E 33541.02 MPa, G, nu, unit weight",
+    "D12 Fe345",
+    "D13 section sizes and wall/slab thickness",
+    "D14 slab m 0.25",
+    "D15 frame I 0.35/0.7, A 1",
+    "D16 brace releases",
+    "D17 76 fixed supports",
+    "D18 rigid diaphragm",
+    "D19 gravity load values",
+    "D20 mass-source factors"
+   ],
+   "unverified": [
+    "D21 Dead/Live P-Delta preset"
+   ],
+   "headline_mismatch_count": 9
+  },
+  "defects_fixed": [],
+  "needs_rerun": [
+   "OpenSees gravity rebuild with elastic comparison settings + end_offsets_m, writing export_gravity_beam_actions",
+   "ETABS pier base forces, slab/shell corner forces, brace axial forces (Dead, Live)",
+   "optional ETABS joint-mass check of the linear lumping rule",
+   "Rayleigh/ESM re-run on clear-beam export if the ETABS base/roof convention is adopted"
+  ]
+ }
 }
