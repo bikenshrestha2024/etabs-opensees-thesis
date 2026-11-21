@@ -19,10 +19,9 @@ from NBC105_Spectrum_Scaling_V115 import spectral_shape_ch
 from OpenSees_Response_Checks_V132 import write_csv,drift_check
 
 def cqc_matrix(omega,zeta=.05):
-    w=np.asarray(omega,float);b=w[None,:]/w[:,None]
-    rho=8*zeta*zeta*(1+b)*b**1.5/((1-b*b)**2+4*zeta*zeta*b*(1+b)**2)
-    np.fill_diagonal(rho,1.)
-    return rho
+    """Compatibility wrapper: Clause 7 owns the CQC correlation equation."""
+    from components.nbc105.clause_07_modal_response_spectrum import cqc_correlation_matrix
+    return np.asarray(cqc_correlation_matrix(omega,zeta),dtype=float)
 
 def combine(values,rho):
     a=np.asarray(values,float)
