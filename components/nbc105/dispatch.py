@@ -78,3 +78,44 @@ def run_operation(clause,operation,inputs):
     return {"standard":"NBC 105:2025","source_clause":str(clause),
             "clause":clause,"operation":operation,"status":_STATUS,
             "result":_json_primitive(value)}
+
+# Reference checks for mandatory Annexes are separate from main clause modules.
+# Annex C is a large source zoning dataset; it is NOT implemented/approved here.
+_ANNEX_MODULES={
+    "A":"annex_a_rc_detailing",
+    "B":"annex_b_steel_detailing",
+}
+
+def available_annex_operations():
+    """List source-based Annex A/B reference calculations, never design approval.
+
+    [REF NBC105-2025 Annex A §§5.1–5.5 and Annex B §§7.1–7.1.4]
+    """
+    result={}
+    for annex,slug in _ANNEX_MODULES.items():
+        module=importlib.import_module("components.nbc105."+slug)
+        result[annex]=sorted(name for name in getattr(module,"__all__",())
+                             if inspect.isfunction(fn:=getattr(module,name,None))
+                             and fn.__module__==module.__name__)
+    return result
+
+def run_annex_operation(annex,operation,inputs):
+    """Evaluate an explicitly exported Annex A/B function without certification.
+
+    [REF NBC105-2025 Annexes A and B; docs/nbc105/README.md]
+    """
+    if annex not in _ANNEX_MODULES:
+        raise ValueError("Only source-referenced Annex A or Annex B operations supported")
+    module=importlib.import_module("components.nbc105."+_ANNEX_MODULES[annex])
+    allowed=available_annex_operations()[annex]
+    if operation not in allowed:
+        raise ValueError("Unsupported or private NBC annex operation")
+    if not isinstance(inputs,dict) or any(not isinstance(k,str) for k in inputs):
+        raise ValueError("Annex arguments must be a JSON object of named parameters")
+    try:
+        value=getattr(module,operation)(**inputs)
+    except TypeError as exc:
+        raise ValueError("NBC annex operation input signature mismatch") from exc
+    return {"standard":"NBC 105:2025","annex":annex,"operation":operation,
+            "status":_STATUS,"result":_json_primitive(value),
+            "warning":"Preliminary rule evaluation; connection/strength and native model acceptance remain open"}

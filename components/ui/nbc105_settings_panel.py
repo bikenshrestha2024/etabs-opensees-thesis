@@ -547,15 +547,18 @@ def launch(parent,export_dir):
 
     def open_clause_calculator():
         """Open local, isolated NBC clauses 1–10 calculation interface."""
-        from components.nbc105.dispatch import available_operations,run_operation
+        from components.nbc105.dispatch import (
+            available_operations, run_operation,
+            available_annex_operations, run_annex_operation)
         all_ops=available_operations()
+        all_ops.update(available_annex_operations())
         dialog=tk.Toplevel(win)
-        dialog.title("NBC 105:2025 | clauses 1–10 reference calculator")
+        dialog.title("NBC 105:2025 | clauses 1–10 and Annexes A/B")
         dialog.geometry("840x610")
         dialog.transient(win)
         box=ttk.Frame(dialog,padding=12)
         box.pack(fill="both",expand=True)
-        ttk.Label(box,text="NBC clauses 1–10 | reference rules, NOT engineering acceptance",
+        ttk.Label(box,text="NBC clauses 1–10 + Annex A/B | reference rules, NOT engineering acceptance",
                   font=("Segoe UI",12,"bold")).pack(anchor="w",pady=(0,8))
         ttk.Label(box,text=("Select a clause and exported operation, enter JSON named parameters, "
                            "and evaluate a code calculation. This tool never changes ETABS/OpenSees "
@@ -566,7 +569,7 @@ def launch(parent,export_dir):
         ttk.Label(picker,text="Clause").pack(side="left")
         clause_var=tk.StringVar(value="10")
         clause_box=ttk.Combobox(picker,textvariable=clause_var,
-                                 values=[str(i) for i in sorted(all_ops)],
+                                 values=[str(i) for i in range(1,11)]+["A","B"],
                                  state="readonly",width=6)
         clause_box.pack(side="left",padx=(6,20))
         ttk.Label(picker,text="Operation").pack(side="left")
@@ -586,7 +589,9 @@ def launch(parent,export_dir):
         controls=ttk.Frame(box)
         controls.pack(fill="x",pady=8)
         def refresh_operations(*unused):
-            names=all_ops.get(int(clause_var.get()),[])
+            selection=clause_var.get()
+            key=int(selection) if selection.isdigit() else selection
+            names=all_ops.get(key,[])
             op_box.configure(values=names)
             operation_var.set("component_amplification_factor"
                 if "component_amplification_factor" in names else
@@ -595,12 +600,26 @@ def launch(parent,export_dir):
             if operation_var.get()=="component_amplification_factor":
                 payload.insert("1.0",json.dumps(
                     {"building_period_s":1.0,"component_period_s":1.25},indent=2))
+            elif operation_var.get()=="seismic_link_rotation_limit_rad":
+                payload.insert("1.0",json.dumps({
+                    "link_length_m":1.6,"mp_kNm":100,"vp_kN":100,
+                    "orientation":"horizontal","section_type":"I"},indent=2))
+            elif operation_var.get()=="rc_wall_detailing_minima":
+                payload.insert("1.0",json.dumps({
+                    "thickness_mm":600,"wall_length_mm":12000,"coupled":True,
+                    "fck_mpa":30,"shear_stress_mpa":1.0,
+                    "horizontal_ratio":0.0025,"vertical_ratio":0.0025,
+                    "bar_diameter_mm":20,"bar_spacing_mm":200,
+                    "reinforcement_curtains":2},indent=2))
             else:
                 payload.insert("1.0","{}")
         def evaluate():
             try:
                 arguments=json.loads(payload.get("1.0","end").strip())
-                result=run_operation(int(clause_var.get()),operation_var.get(),arguments)
+                selection=clause_var.get()
+                result=(run_operation(int(selection),operation_var.get(),arguments)
+                        if selection.isdigit() else
+                        run_annex_operation(selection,operation_var.get(),arguments))
                 text=json.dumps(result,indent=2,allow_nan=False)
                 status_var.set(result["status"])
             except Exception as exc:

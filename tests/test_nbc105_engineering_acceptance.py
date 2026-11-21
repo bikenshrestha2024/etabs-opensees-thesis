@@ -33,6 +33,17 @@ class ProjectEvidence(unittest.TestCase):
         self.assertEqual(report["gates"]["nltha_224"]["status"],"OPEN")
         self.assertTrue(set(MANDATORY_GATES).issubset(report["gates"]))
 
+    def test_annex_and_full_text_source_gates_must_be_exposed_in_project_acceptance(self):
+        report=evaluate_project_evidence(v107())
+        for key in ("full_nbc_source_requirement_audit",
+                    "annex_a_rc_detailing",
+                    "annex_b_steel_detailing",
+                    "annex_c_municipality_z_factor",
+                    "independent_professional_signoff"):
+            self.assertIn(key,report["gates"])
+            self.assertNotEqual(report["gates"][key]["status"],"PASS")
+        self.assertGreater(report["source_inventory_sections"],200)
+
     def test_cannot_hide_missing_native_by_setting_all_pass(self):
         x=v107()
         x["status"]="PASS"

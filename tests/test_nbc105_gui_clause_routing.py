@@ -12,6 +12,8 @@ class NBCClauseGUIRouting(unittest.TestCase):
         self.assertIn("open_clause_calculator",source)
         self.assertIn("available_operations",source)
         self.assertIn("run_operation",source)
+        self.assertIn("available_annex_operations",source)
+        self.assertIn("run_annex_operation",source)
         self.assertIn("NBC clauses 1–10",source)
         self.assertEqual(set(available_operations()),set(range(1,11)))
 
