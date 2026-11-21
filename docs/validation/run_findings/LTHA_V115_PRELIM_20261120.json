@@ -1,0 +1,315 @@
+{
+  "parsed": {
+    "cases": [
+      {
+        "dt_s": 0.005,
+        "elapsed_s": 288.696,
+        "full_record_s": 89.99,
+        "name": "RSN1505_CHICHI_TCU068-E_XY",
+        "peak_drift_x": 8.22881e-07,
+        "peak_drift_y": 4.8602e-05,
+        "stages": {
+          "case_exports_and_drift": 0.9951233999963733,
+          "damping_eigenanalysis": 21.040363799998886,
+          "model_and_gravity": 83.37876329999563,
+          "native_transient_solve": 176.9256594999897,
+          "transient_with_recording": 182.6274826000008
+        },
+        "steps": 100,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.005,
+        "elapsed_s": 297.914,
+        "full_record_s": 89.99,
+        "name": "RSN1505_CHICHI_TCU068-E_YX",
+        "peak_drift_x": 3.94415e-05,
+        "peak_drift_y": 1.01526e-06,
+        "stages": {
+          "case_exports_and_drift": 0.6188589000012144,
+          "damping_eigenanalysis": 21.443977000002633,
+          "model_and_gravity": 88.94728589999431,
+          "native_transient_solve": 180.42199340010848,
+          "transient_with_recording": 186.16130509999493
+        },
+        "steps": 100,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.005,
+        "elapsed_s": 300.487,
+        "full_record_s": 322.94,
+        "name": "KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY",
+        "peak_drift_x": 1.10303e-06,
+        "peak_drift_y": 3.58707e-06,
+        "stages": {
+          "case_exports_and_drift": 0.6628711000012117,
+          "damping_eigenanalysis": 22.533264199999394,
+          "model_and_gravity": 87.45980589999817,
+          "native_transient_solve": 183.0952169000011,
+          "transient_with_recording": 188.94926799999666
+        },
+        "steps": 100,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.005,
+        "elapsed_s": 330.419,
+        "full_record_s": 322.94,
+        "name": "KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX",
+        "peak_drift_x": 2.98735e-06,
+        "peak_drift_y": 1.35647e-06,
+        "stages": {
+          "case_exports_and_drift": 0.6372925999967265,
+          "damping_eigenanalysis": 26.35837440000614,
+          "model_and_gravity": 95.41995360000146,
+          "native_transient_solve": 200.5499414000151,
+          "transient_with_recording": 207.0872814999966
+        },
+        "steps": 100,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.005,
+        "elapsed_s": 325.212,
+        "full_record_s": 48.115,
+        "name": "RSN879_LANDERS_LCN260_XY",
+        "peak_drift_x": 3.28648e-05,
+        "peak_drift_y": 2.07655e-05,
+        "stages": {
+          "case_exports_and_drift": 0.6232330999991973,
+          "damping_eigenanalysis": 25.682279000000563,
+          "model_and_gravity": 93.18637949999538,
+          "native_transient_solve": 198.27313189998677,
+          "transient_with_recording": 204.84637510000175
+        },
+        "steps": 100,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.005,
+        "elapsed_s": 341.511,
+        "full_record_s": 48.115,
+        "name": "RSN879_LANDERS_LCN260_YX",
+        "peak_drift_x": 1.75366e-05,
+        "peak_drift_y": 4.14419e-05,
+        "stages": {
+          "case_exports_and_drift": 0.6873752000028617,
+          "damping_eigenanalysis": 25.94653290000133,
+          "model_and_gravity": 97.60898190000444,
+          "native_transient_solve": 209.78888590000133,
+          "transient_with_recording": 216.48995559999457
+        },
+        "steps": 100,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.01,
+        "elapsed_s": 227.792,
+        "full_record_s": 39.96,
+        "name": "RSN1086_NORTHR_SYL090_XY",
+        "peak_drift_x": 1.71481e-05,
+        "peak_drift_y": 0.000272058,
+        "stages": {
+          "case_exports_and_drift": 0.7422464999981457,
+          "damping_eigenanalysis": 25.705060899999808,
+          "model_and_gravity": 95.00729529999808,
+          "native_transient_solve": 102.24080239998875,
+          "transient_with_recording": 105.53670299999794
+        },
+        "steps": 50,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.01,
+        "elapsed_s": 230.289,
+        "full_record_s": 39.96,
+        "name": "RSN1086_NORTHR_SYL090_YX",
+        "peak_drift_x": 0.000228869,
+        "peak_drift_y": 2.37569e-05,
+        "stages": {
+          "case_exports_and_drift": 0.7021649000016623,
+          "damping_eigenanalysis": 27.50731519999681,
+          "model_and_gravity": 95.55544139999984,
+          "native_transient_solve": 102.4233529000121,
+          "transient_with_recording": 105.70023579999543
+        },
+        "steps": 50,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.01,
+        "elapsed_s": 224.021,
+        "full_record_s": 40.94,
+        "name": "RSN1120_KOBE_TAK000_XY",
+        "peak_drift_x": 7.85909e-05,
+        "peak_drift_y": 3.85623e-05,
+        "stages": {
+          "case_exports_and_drift": 0.6624898000009125,
+          "damping_eigenanalysis": 26.850394599998253,
+          "model_and_gravity": 96.0105998999934,
+          "native_transient_solve": 96.57594749997952,
+          "transient_with_recording": 99.681651100007
+        },
+        "steps": 50,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.01,
+        "elapsed_s": 231.706,
+        "full_record_s": 40.94,
+        "name": "RSN1120_KOBE_TAK000_YX",
+        "peak_drift_x": 2.89664e-05,
+        "peak_drift_y": 0.000101617,
+        "stages": {
+          "case_exports_and_drift": 0.6836892999999691,
+          "damping_eigenanalysis": 26.651774199999636,
+          "model_and_gravity": 96.16822349999711,
+          "native_transient_solve": 104.04842590000044,
+          "transient_with_recording": 107.36741930000426
+        },
+        "steps": 50,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.005,
+        "elapsed_s": 343.64,
+        "full_record_s": 29.99,
+        "name": "RSN1165_KOCAELI_IZT090_XY",
+        "peak_drift_x": 7.47494e-05,
+        "peak_drift_y": 0.0002385,
+        "stages": {
+          "case_exports_and_drift": 0.6732403999994858,
+          "damping_eigenanalysis": 25.61418319999939,
+          "model_and_gravity": 98.76754199999414,
+          "native_transient_solve": 210.87329250004404,
+          "transient_with_recording": 217.72257730000274
+        },
+        "steps": 100,
+        "truncated_diagnostic": true
+      },
+      {
+        "dt_s": 0.005,
+        "elapsed_s": 415.507,
+        "full_record_s": 29.99,
+        "name": "RSN1165_KOCAELI_IZT090_YX",
+        "peak_drift_x": 0.000204495,
+        "peak_drift_y": 8.96663e-05,
+        "stages": {
+          "case_exports_and_drift": 0.8289861000012024,
+          "damping_eigenanalysis": 32.392484000003606,
+          "model_and_gravity": 111.01411650000227,
+          "native_transient_solve": 261.6721736000036,
+          "transient_with_recording": 270.293316700001
+        },
+        "steps": 100,
+        "truncated_diagnostic": true
+      }
+    ],
+    "diagnostic_only": true,
+    "eigen_max_residual": 5.36e-07,
+    "scope": "PRELIMINARY setup check | pairs: RSN1505_CHICHI_TCU068-E, KATNP.HNE.NQ.01_a_EW_PEER_Gorkha, RSN879_LANDERS_LCN260, RSN1086_NORTHR_SYL090, RSN1120_KOBE_TAK000, RSN1165_KOCAELI_IZT090, RSN1787_HECTOR, RSN767_LOMAP | each pair runs XY and YX",
+    "solver_baseline_cases": 12,
+    "solver_experimental_cases": 0,
+    "started_unfinished": [
+      "RSN1787_HECTOR_XY"
+    ],
+    "workload": {
+      "cases": 16,
+      "requested_steps": 237646
+    }
+  },
+  "projection": {
+    "basis": "native_transient_solve seconds per step measured on the 0.5 s truncated diagnostic (linear baseline, no factor reuse, lower bound for nonlinear)",
+    "measured_native_s_per_step": 2.026888823800131,
+    "per_case": [
+      {
+        "dt_s": 0.005,
+        "full_record_s": 89.99,
+        "name": "RSN1505_CHICHI_TCU068-E_XY",
+        "projected_hours": 10.133318069654099,
+        "steps": 17998
+      },
+      {
+        "dt_s": 0.005,
+        "full_record_s": 89.99,
+        "name": "RSN1505_CHICHI_TCU068-E_YX",
+        "projected_hours": 10.133318069654099,
+        "steps": 17998
+      },
+      {
+        "dt_s": 0.005,
+        "full_record_s": 322.94,
+        "name": "KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_XY",
+        "projected_hours": 36.36463759766745,
+        "steps": 64588
+      },
+      {
+        "dt_s": 0.005,
+        "full_record_s": 322.94,
+        "name": "KATNP.HNE.NQ.01_a_EW_PEER_Gorkha_YX",
+        "projected_hours": 36.36463759766745,
+        "steps": 64588
+      },
+      {
+        "dt_s": 0.005,
+        "full_record_s": 48.115,
+        "name": "RSN879_LANDERS_LCN260_XY",
+        "projected_hours": 5.417986430952405,
+        "steps": 9623
+      },
+      {
+        "dt_s": 0.005,
+        "full_record_s": 48.115,
+        "name": "RSN879_LANDERS_LCN260_YX",
+        "projected_hours": 5.417986430952405,
+        "steps": 9623
+      },
+      {
+        "dt_s": 0.01,
+        "full_record_s": 39.96,
+        "name": "RSN1086_NORTHR_SYL090_XY",
+        "projected_hours": 2.249846594418145,
+        "steps": 3996
+      },
+      {
+        "dt_s": 0.01,
+        "full_record_s": 39.96,
+        "name": "RSN1086_NORTHR_SYL090_YX",
+        "projected_hours": 2.249846594418145,
+        "steps": 3996
+      },
+      {
+        "dt_s": 0.01,
+        "full_record_s": 40.94,
+        "name": "RSN1120_KOBE_TAK000_XY",
+        "projected_hours": 2.305023012399371,
+        "steps": 4094
+      },
+      {
+        "dt_s": 0.01,
+        "full_record_s": 40.94,
+        "name": "RSN1120_KOBE_TAK000_YX",
+        "projected_hours": 2.305023012399371,
+        "steps": 4094
+      },
+      {
+        "dt_s": 0.005,
+        "full_record_s": 29.99,
+        "name": "RSN1165_KOCAELI_IZT090_XY",
+        "projected_hours": 3.377021990320329,
+        "steps": 5998
+      },
+      {
+        "dt_s": 0.005,
+        "full_record_s": 29.99,
+        "name": "RSN1165_KOCAELI_IZT090_YX",
+        "projected_hours": 3.377021990320329,
+        "steps": 5998
+      }
+    ],
+    "total_projected_hours": 119.69566739082362
+  },
+  "source": "ltha_v115_prelim_log_excerpt.txt",
+  "status": "SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE"
+}
