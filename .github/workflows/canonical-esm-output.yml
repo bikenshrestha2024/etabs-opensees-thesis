@@ -1,0 +1,37 @@
+name: Canonical ESM output and safe legacy migration
+on:
+  push:
+    paths:
+      - 'components/inputs/project_workbooks.py'
+      - 'components/equivalent_static/calculation_and_gui.py'
+      - 'components/modal/rayleigh.py'
+      - 'components/inputs/aw_sources.py'
+      - 'components/inputs/opensees_nbc_sync.py'
+      - 'components/validation/etabs_comparison.py'
+      - 'tools/repair_project_output_layout.py'
+      - 'tests/test_canonical_esm_output_routing.py'
+      - '.github/workflows/canonical-esm-output.yml'
+  pull_request:
+    paths:
+      - 'components/inputs/project_workbooks.py'
+      - 'components/equivalent_static/calculation_and_gui.py'
+      - 'components/modal/rayleigh.py'
+      - 'components/inputs/aw_sources.py'
+      - 'components/inputs/opensees_nbc_sync.py'
+      - 'components/validation/etabs_comparison.py'
+      - 'tools/repair_project_output_layout.py'
+      - 'tests/test_canonical_esm_output_routing.py'
+      - '.github/workflows/canonical-esm-output.yml'
+jobs:
+  route-and-mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile amended modules
+        run: |
+          python -m py_compile components/inputs/project_workbooks.py components/equivalent_static/calculation_and_gui.py components/modal/rayleigh.py components/inputs/aw_sources.py components/inputs/opensees_nbc_sync.py components/validation/etabs_comparison.py tools/repair_project_output_layout.py tests/test_canonical_esm_output_routing.py
+      - name: Run output-routing and historical mirror regression
+        run: python -m unittest discover -s tests -p 'test_canonical_esm_output_routing.py' -v
