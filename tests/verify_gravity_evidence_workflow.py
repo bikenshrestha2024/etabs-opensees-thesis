@@ -43,7 +43,9 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
         for mode in ("ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED"):
             case=base/mode
             case.mkdir(parents=True)
-            (case/"Gravity_Result_V110.json").write_text(json.dumps(self.sample))
+            (case/"Gravity_Result_V110.json").write_text(json.dumps({
+                **self.sample,"wall_support_strategy":mode,
+                "gravity_profile":"GRAVITY_1.0D_1.0L"}))
             (case/"Gravity_Run_V110.log").write_text(mode)
             (case/"Gravity_Results_V110.xlsx").write_bytes(b"workbook")
         (base/"Gravity_Wall_Base_Strategy_Comparison.json").write_text("{}")
@@ -96,6 +98,22 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
                 "single_run_root/Gravity_Result_V110.json",
             ):
                 self.assertTrue(any(x.endswith(tail) for x in names),tail)
+
+    def test_explicit_dual_wrong_support_or_other_model_fails_closed(self):
+        dual=self._dual()
+        first=dual/"ETABS_SOURCE_SUPPORTS"/"Gravity_Result_V110.json"
+        doc=json.loads(first.read_text())
+        doc["wall_support_strategy"]="CONTINUOUS_WALL_BASE_FIXED"
+        first.write_text(json.dumps(doc),encoding="utf-8")
+        with self.assertRaisesRegex(ValueError,"support strategy"):
+            package_gravity_review(self.script,self.gravity,dual_run=dual,
+                single_run=self.gravity)
+        doc["wall_support_strategy"]="ETABS_SOURCE_SUPPORTS"
+        doc["model_script"]=str(self.root/"wrong_builder.py")
+        first.write_text(json.dumps(doc),encoding="utf-8")
+        with self.assertRaisesRegex(ValueError,"different or unknown"):
+            package_gravity_review(self.script,self.gravity,dual_run=dual,
+                single_run=self.gravity)
 
     def test_different_model_run_is_not_automatically_packaged(self):
         alien=self.gravity/"02_RESULTS"/"ETABS_SOURCE_SUPPORTS"/"GRAVITY_1.0D_1.0L"/"alien"
