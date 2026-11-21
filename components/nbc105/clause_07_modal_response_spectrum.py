@@ -25,7 +25,8 @@ def _weights_modes(weights,shapes):
     return w,p,signed
 
 def modal_effective_weight(weights,shapes):
-    """§7.2 Eq.7.1(2) p.40: (sum wj phi_ji)^2 / sum(wj phi_ji^2)."""
+    """[REF NBC105-2025 §7, printed pp. 40–41]
+§7.2 Eq.7.1(2) p.40: (sum wj phi_ji)^2 / sum(wj phi_ji^2)."""
     w,phi,num=_weights_modes(weights,shapes)
     return num*num/math.fsum(x*y*y for x,y in zip(w,phi))
 
