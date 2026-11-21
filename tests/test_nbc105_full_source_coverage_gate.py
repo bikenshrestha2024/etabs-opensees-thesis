@@ -27,6 +27,17 @@ class NBC105FullSourceGate(unittest.TestCase):
             self.assertIn(code,actual)
         self.assertTrue(source_index_path().is_file())
 
+    def test_cli_exposes_unverified_requirements_without_approving(self):
+        import contextlib,io,json
+        from components.nbc105.__main__ import main
+        output=io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code=main(["--audit"])
+        self.assertEqual(code,2)
+        obj=json.loads(output.getvalue())
+        self.assertEqual(obj["approval"],"NOT_CERTIFIED_SOURCE_AND_NATIVE_EVIDENCE_OPEN")
+        self.assertGreater(obj["open_requirements"],100)
+
     def test_section_missing_fails_source_index(self):
         items=read_source_index()
         items=[x for x in items if x["id"]!="A.5.6"]
