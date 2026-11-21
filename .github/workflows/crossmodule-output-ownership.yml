@@ -1,0 +1,51 @@
+name: Cross-module stage output ownership
+on:
+  push:
+    paths:
+      - 'components/inputs/output_layout.py'
+      - 'components/gravity/gui_and_reports.py'
+      - 'components/linear_time_history/runner_and_gui.py'
+      - 'components/nonlinear_time_history/runner_and_gui.py'
+      - 'components/inputs/project_workbooks.py'
+      - 'components/equivalent_static/calculation_and_gui.py'
+      - 'components/modal/rayleigh.py'
+      - 'components/inputs/opensees_nbc_sync.py'
+      - 'tools/audit_live_output_writers.py'
+      - 'tools/audit_output_stage_ownership.py'
+      - 'tests/test_crossmodule_output_stage_ownership.py'
+      - '.github/workflows/crossmodule-output-ownership.yml'
+  pull_request:
+    paths:
+      - 'components/inputs/output_layout.py'
+      - 'components/gravity/gui_and_reports.py'
+      - 'components/linear_time_history/runner_and_gui.py'
+      - 'components/nonlinear_time_history/runner_and_gui.py'
+      - 'components/inputs/project_workbooks.py'
+      - 'components/equivalent_static/calculation_and_gui.py'
+      - 'components/modal/rayleigh.py'
+      - 'components/inputs/opensees_nbc_sync.py'
+      - 'tools/audit_live_output_writers.py'
+      - 'tools/audit_output_stage_ownership.py'
+      - 'tests/test_crossmodule_output_stage_ownership.py'
+      - '.github/workflows/crossmodule-output-ownership.yml'
+jobs:
+  output-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile amended modules
+        run: |
+          python -m py_compile components/inputs/output_layout.py components/gravity/gui_and_reports.py components/linear_time_history/runner_and_gui.py components/nonlinear_time_history/runner_and_gui.py tools/audit_output_stage_ownership.py tests/test_crossmodule_output_stage_ownership.py
+      - name: Scan all active Python output writers and enforce known owner guards
+        run: python tools/audit_output_stage_ownership.py --strict --report-dir audit/output-ownership
+      - name: Test real-path routing decisions with synthetic sources
+        run: python -m unittest discover -s tests -p 'test_crossmodule_output_stage_ownership.py' -v
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crossmodule-output-owner-audit
+          path: audit/output-ownership/
+          retention-days: 30
