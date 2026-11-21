@@ -30,6 +30,7 @@ Use the [current launcher index](docs/programs/00_PROGRAM_INDEX.md) for all cano
 ## Research source documentation
 
 - [Active component source guides](docs/source/00_SOURCE_GUIDE_INDEX.md)
+- [Uniform output-folder standard](docs/OUTPUT_FOLDER_STANDARD.md) and read-only layout audit `tools/audit_output_layout.py`
 - [Scientific reference and citation register](docs/00_RESEARCH_REFERENCES.md)
 - [Thesis NLTHA acceptance gates](docs/00_THESIS_ACCEPTANCE_GATES.md)
 - [Contributor / ChatGPT / Codex instructions](AGENTS.md)
