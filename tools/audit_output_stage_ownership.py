@@ -148,6 +148,11 @@ def main(argv=None):
         "assessment","active_python_scanned","possible_write_calls",
         "source_owner_write_counts","legacy_writer_reference_candidates",
         "parse_errors","contract_violations")}
+    summary["legacy_candidate_files"]=[
+        {"path":x["path"],"owner":x["owner"],
+         "legacy_references":x["legacy_references"],
+         "possible_write_calls":x["possible_write_calls"]}
+        for x in report["review_queue"]]
     print(json.dumps(summary,indent=2))
     if args.strict and (report["parse_errors"] or report["contract_violations"]):
         return 2
