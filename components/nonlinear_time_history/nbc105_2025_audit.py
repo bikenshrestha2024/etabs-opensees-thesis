@@ -21,44 +21,37 @@ def positive(value,name):
     return v
 
 def nbc105_time_step_limit(*,record_dt_s,t1_x_s,t1_y_s,tn90_x_s,tn90_y_s):
-    """Clause 9.3.2.4: not greater than digitization, T1/100, Tn90, 0.01s.
+    """§9.3.2.4: delegate per-direction time-step limits to Clause 9.
 
-    Tn90 is the modal period at >=90% effective participation in EACH axis,
-    not necessarily the period of the 20th computed eigenmode.
+    Tn90 means the period required for 90% participation in each direction.
     """
-    inputs={"record_dt_s":record_dt_s,"t1_x_s":t1_x_s,"t1_y_s":t1_y_s,
-            "tn90_x_s":tn90_x_s,"tn90_y_s":tn90_y_s}
-    values={k:positive(v,k) for k,v in inputs.items()}
+    from components.nbc105.clause_09_nonlinear_analysis import history_time_step_limit_s
+    values={k:positive(v,k) for k,v in {
+        "record_dt_s":record_dt_s,"t1_x_s":t1_x_s,"t1_y_s":t1_y_s,
+        "tn90_x_s":tn90_x_s,"tn90_y_s":tn90_y_s}.items()}
     for axis in ("x","y"):
         if values["tn90_"+axis+"_s"]>values["t1_"+axis+"_s"]:
             raise ValueError("Tn90 cannot exceed T1 for axis "+axis)
-    return min(.01,values["record_dt_s"],values["t1_x_s"]/100.,
-               values["t1_y_s"]/100.,values["tn90_x_s"],values["tn90_y_s"])
+    return min(history_time_step_limit_s(values["t1_"+axis+"_s"],
+               values["tn90_"+axis+"_s"],values["record_dt_s"]) for axis in ("x","y"))
 
 def paired_ground_motion_scale(factor_x,factor_y):
-    """Clause 9.3.2.2(c,d): both factors in [0.33,3] and adopt lower one."""
-    x,y=float(factor_x),float(factor_y)
-    if not math.isfinite(x) or not math.isfinite(y):
-        raise ValueError("Nonfinite pair factors")
-    if not (.33<=x<=3. and .33<=y<=3.):
-        raise ValueError("NBC 9.3.2.2: independent pair factors outside 0.33..3; replace record")
-    return min(x,y)
+    """§9.3.2.2(c,d): delegate lower pair factor to canonical Clause 9."""
+    from components.nbc105.clause_09_nonlinear_analysis import pair_scale_factor
+    return pair_scale_factor(factor_x,factor_y)
 
 def scaling_period_range(tn90_s,t1_s,r_mu):
-    """Clause 9.3.2.2(b): spectral fit between Tn and sqrt(R_mu)*T1."""
-    tn,t1,r=(positive(value,label) for value,label in
-             ((tn90_s,"Tn90"),(t1_s,"T1"),(r_mu,"R_mu")))
-    upper=math.sqrt(r)*t1
-    if tn>upper: raise ValueError("Empty spectrum period matching window")
-    return [tn,upper]
+    """§9.3.2.2(b): preserve existing list return shape."""
+    from components.nbc105.clause_09_nonlinear_analysis import target_spectrum_period_range
+    return list(target_spectrum_period_range(t1_s,tn90_s,r_mu))
 
 def response_aggregation_rule(number_of_pairs):
-    """Clause 9.3.3: <7 maximum, >7 average; exactly seven is unspecified."""
+    """§9.3.3: uses Clause 8's shared record aggregation boundary rule."""
+    from components.nbc105.clause_08_elastic_time_history import record_response_rule
     if type(number_of_pairs) is not int:raise TypeError("Pair count must be integer")
     if number_of_pairs<3:raise ValueError("NBC 9.3.2.1: at least 3 orthogonal pairs")
-    if number_of_pairs==7:
-        return "REVIEW_REQUIRED_EXACTLY_SEVEN_NOT_DEFINED_IN_2025_TEXT"
-    return "MAXIMUM" if number_of_pairs<7 else "AVERAGE"
+    return record_response_rule(number_of_pairs)
+
 
 def validate_nbc105_design_metadata(evidence,*,record_dt_s,integration_dt_s,
                                     selected_scale,orientations):
