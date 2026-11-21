@@ -993,29 +993,23 @@ class GravityAnalysisGUI:
             messagebox.showwarning('Gravity busy','Finish the solver before packaging results.',
                                    parent=self.win)
             return
-        from components.inputs.project_workbooks import analysis_output_folder,source_limit_state
         from components.ui.organized_results import publish_organized_results
         try:
             model=Path(self.model_var.get()).expanduser().resolve()
             if not model.is_file():
                 raise FileNotFoundError('Choose the current generated OpenSees gravity model.')
-            state,_=source_limit_state(model.parent)
-            root=analysis_output_folder(model.parent,state or 'ULS')
             gravity=Path(self.output_var.get()).expanduser().resolve()
-            if not root.is_dir():
-                root=gravity
-                optional=None
-            else:
-                optional=gravity if gravity.is_dir() and gravity!=root else None
-            # Gravity belongs to the selected ETABS export's 02_GRAVITY,
-            # not a second all-module snapshot inside OpenSees_Analysis_Results.
-            # Legacy solver roots remain untouched and are only READ/COPIED.
+            if not gravity.is_dir():
+                raise FileNotFoundError('Current model gravity output workspace missing: '+str(gravity))
+            # Only this selected model's gravity workspace is authoritative.
+            # Including the old shared result root a second time would ZIP
+            # the same case evidence twice under different source labels.
             from components.inputs.output_layout import review_snapshots_for
-            destination_parent = review_snapshots_for(root, 'GRAVITY')
+            destination_parent=review_snapshots_for(model.parent,'GRAVITY')
             report=publish_organized_results(
-                root, gravity_root=optional,
+                gravity,
                 destination_parent=destination_parent,
-                selected_modules=('Gravity', 'Comparisons'),
+                selected_modules=('Gravity','Comparisons'),
                 bundle_name='GRAVITY_REVIEW',
                 archive_only=True)
             self._gravity_action_log('ORGANIZED_GRAVITY_ZIP',
