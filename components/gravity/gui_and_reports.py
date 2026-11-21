@@ -107,7 +107,9 @@ class GravityAnalysisGUI:
         self.win.geometry("1120x780")
         self.win.minsize(920, 650)
         self.model_var = tk.StringVar()
-        self.output_var = tk.StringVar(value=str(Path.cwd() / "OpenSees_Analysis_Results" / "Gravity_Results"))
+        # No cwd-derived analysis results: source model owns the project root.
+        self.output_var = tk.StringVar(value="")
+        self._output_is_automatic = True
         self.comparison_output_var = tk.StringVar(value="")
         self.etabs_gravity_json_var = tk.StringVar(value="")
         self.etabs_full_table_var=tk.StringVar(value="")
@@ -590,6 +592,10 @@ class GravityAnalysisGUI:
                     self._gravity_busy=False
                     if success:
                         self.model_var.set(str(new/"OpenSees_Complete_Gravity_Model.py"))
+                        if self._output_is_automatic:
+                            from components.inputs.output_layout import owned_run_destination
+                            self.output_var.set(str(owned_run_destination(
+                                new, "GRAVITY", "OpenSees_Complete_Gravity_Model")))
                         self._set_gravity_operation("FINISHED",
                             "New source ready; gravity not yet solved | "+str(new))
                         self.status_var.set("NEW verified clear-beam source selected. "
@@ -722,7 +728,9 @@ class GravityAnalysisGUI:
 
     def _browse_dir(self):
         p = filedialog.askdirectory(parent=self.win, title="Choose one folder for all gravity outputs")
-        if p: self.output_var.set(p)
+        if p:
+            self._output_is_automatic = False
+            self.output_var.set(p)
 
     def _gravity_action_log(self,stage,message):
         """Add bounded timestamped action messages to the existing Run log.
@@ -1017,6 +1025,10 @@ class GravityAnalysisGUI:
         p = filedialog.askopenfilename(parent=self.win, title="Select generated OpenSeesPy model script", filetypes=[("Python scripts", "*.py"), ("All files", "*.*")])
         if p:
             self.model_var.set(p)
+            if self._output_is_automatic:
+                from components.inputs.output_layout import owned_run_destination
+                self.output_var.set(str(owned_run_destination(
+                    Path(p).parent, "GRAVITY", Path(p).stem)))
             self._read_code_inputs(show_error=False)
 
     def _selected_gravity_evidence(self, model):
@@ -1410,13 +1422,16 @@ class GravityAnalysisGUI:
         if model.name.startswith('OpenSees_Complete_') and report_path.is_file():
             errors = json.loads(report_path.read_text(encoding='utf-8-sig')).get('assembly_errors', [])
             if errors: raise ValueError('Model assembly blocked: ' + '; '.join(errors) + '. Rebuild with the latest exporter. Manual support inputs cannot repair assembly.')
-        selected_output = Path(self.output_var.get()).expanduser().resolve()
-        from components.inputs.output_layout import canonical_gravity_run_root
-        out = canonical_gravity_run_root(selected_output)
-        if out != selected_output:
-            # Each stage owns newly written files. Old runs stay in place and
-            # can be inspected from the historical result browser.
-            self.output_var.set(str(out))
+        from components.inputs.output_layout import owned_run_destination
+        output_choice=self.output_var.get().strip()
+        if not output_choice and not self._output_is_automatic:
+            raise ValueError("Explicit gravity output directory is empty")
+        # Selected export root or a legacy/wrong in-project stage must never
+        # receive fresh gravity solver files. Explicit external overrides remain.
+        out=owned_run_destination(model.parent, "GRAVITY", model.stem,
+                                  selected=(output_choice
+                                            if not self._output_is_automatic else None))
+        self.output_var.set(str(out))
         py = Path(self.python_var.get()).expanduser().resolve()
         if not model.is_file(): raise ValueError("Select an existing generated OpenSees model script.")
         if not py.is_file(): raise ValueError("Select a valid Python executable with OpenSeesPy installed.")
