@@ -603,7 +603,7 @@ def launch(parent,export_dir):
             elif operation_var.get()=="seismic_link_rotation_limit_rad":
                 payload.insert("1.0",json.dumps({
                     "link_length_m":1.6,"mp_kNm":100,"vp_kN":100,
-                    "orientation":"horizontal"},indent=2))
+                    "orientation":"horizontal","section_type":"I"},indent=2))
             elif operation_var.get()=="rc_wall_detailing_minima":
                 payload.insert("1.0",json.dumps({
                     "thickness_mm":600,"wall_length_mm":12000,"coupled":True,
