@@ -196,5 +196,46 @@ class ESMGuiSafetyTests(unittest.TestCase):
             validate_mapping([{"source_edb":"C:/source.EDB"}])
 
 
+class ESMBothAxesArchiveTests(unittest.TestCase):
+    def test_archive_starts_only_after_both_axes_complete(self):
+        from unittest.mock import Mock
+        from components.equivalent_static.calculation_and_gui import ESMGui
+
+        for y_complete in (True, False):
+            with self.subTest(y_complete=y_complete):
+                gui = object.__new__(ESMGui)
+                gui.esm_module = Mock()
+                gui.esm_module.get.return_value = "OpenSees Direct Equivalent Static"
+                gui.direction = Mock()
+                gui.direction.get.side_effect = lambda: gui.direction.value
+                gui.direction.set.side_effect = lambda value: setattr(gui.direction, "value", value)
+                gui.direction.value = "Both X/Y"
+                gui.rayleigh_tx = Mock()
+                gui.rayleigh_ty = Mock()
+                gui.rayleigh_tx.get.return_value = "1.66"
+                gui.rayleigh_ty.get.return_value = "2.38"
+                gui.run_button = Mock()
+                gui.status = Mock()
+                events = []
+
+                def calculate_axis(*, announce):
+                    self.assertFalse(announce)
+                    axis = gui.direction.get()
+                    events.append(axis)
+                    gui.last_runners = [f"{axis}.py"]
+                    return axis == "X" or y_complete
+
+                gui._calculate_axis = calculate_axis
+                gui._auto_bundle_seismic_review = lambda: events.append(tuple(gui.last_runners))
+                gui._calculate()
+                self.assertEqual(gui.direction.get(), "Both X/Y")
+                if y_complete:
+                    self.assertEqual(events, ["X", "Y", ("X.py", "Y.py")])
+                else:
+                    self.assertEqual(events, ["X", "Y"])
+                    self.assertEqual(gui.last_runners, [])
+                    gui.run_button.configure.assert_called_with(state="disabled")
+
+
 if __name__=="__main__":
     unittest.main()

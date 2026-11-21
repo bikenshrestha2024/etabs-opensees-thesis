@@ -15,6 +15,7 @@ import csv
 import json
 import math
 import hashlib
+import os
 from components.nbc105.clause_05_dynamic_characteristics import amplified_period_s, empirical_period_s
 from components.nbc105.constants import GRAVITY_M_S2
 
@@ -113,6 +114,10 @@ def _diaphragm_translation(ops, master, members, dof):
 @timed_outputs('Preliminary Rayleigh X-Y analysis','folder')
 def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         output_dir=None, *, empirical_settings=None):
+    gravity_profile = os.environ.get('OPENSEES_GRAVITY_PROFILE', 'AS_CONFIGURED')
+    if empirical_settings is not None and gravity_profile not in ('AS_CONFIGURED', 'SEISMIC_SOURCE'):
+        raise ValueError('Empirical Rayleigh requires the assembled seismic preload. '
+                         'Use AS_CONFIGURED or SEISMIC_SOURCE for OPENSEES_GRAVITY_PROFILE.')
     import openseespy.opensees as ops
     from OpenSees_Complete_Export_V118 import build_complete_model
     from OpenSees_Analysis_Stack_V110 import configure_nonlinear_static
@@ -189,6 +194,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
     result={'story_weights_sha256':hashlib.sha256((folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv').read_bytes()).hexdigest(),'standard':'NBC 105:2025 §5.1.1-§5.1.3','model_sha256':hashlib.sha256(model.read_bytes()).hexdigest(),'gravity_state':'assembled sustained gravity','limit_state':state,'height_m':H,'height_basis':'story-ledger elevations from seismic base; confirm qualifying basements are excluded per §5.1.2','gravity_acceleration_m_s2':GRAVITY_M_S2,'rayleigh_equation':'T1 = 2*pi*sqrt(sum(Wi*di^2)/(g*sum(Fi*di)))','torsion':'diaphragm rotations restrained during reference lateral perturbation','diagnostic_only':True}
     result['model_config_sha256']=hashlib.sha256(config_file.read_bytes()).hexdigest()
     result['mass_elevation_audit']=mass_elevation_audit
+    result['gravity_profile'] = gravity_profile
     if empirical_settings is None:
         prefix = 'NBC105_Rayleigh_Preliminary_V126_' + state + '_Legacy_Reference'
     else:
@@ -214,7 +220,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
                 rows, height_m=H, aw_m2=aw, state=state, settings=empirical_settings)
             k = seed['period_exponent_k']
             print(f'[EMPIRICAL ESM SEED] {state} {axis} {json.dumps(seed)}', flush=True)
-        build_complete_model(folder,mode='elastic',preload=True,limit_state=state)
+        build = build_complete_model(folder,mode='elastic',preload=True,limit_state=state)
         dof=1 if axis=='X' else 2
         masters=[int(r['master_node_tag']) for r in rows]
         # Establish the torsion-suppressed gravity equilibrium BEFORE taking
@@ -265,6 +271,7 @@ def run(folder, awx, awy, reference_fraction=.01, limit_state='ULS',
         if not math.isfinite(period) or period<=0:raise ValueError(f'{axis} Rayleigh period is nonpositive or non-finite.')
         result[axis]=dict(Aw_m2=aw,empirical_period_s=empirical,amplified_empirical_s=amplified_period_s(empirical),period_s=period,adopted_period_s=min(period,amplified_period_s(empirical)),reference_force_exponent_k=k,reference_force_total_kN=sum(forces),rayleigh_numerator_kN_m2=numerator,rayleigh_denominator_gFiDi_kN_m2_s2=denominator,storey_audit=audit,rows=[dict(story=r['story_name'],height_m=float(r['height_m']),master_node=n,weight_kN=w,force_kN=f,displacement_m=d) for r,n,w,f,d in zip(rows,masters,weights,forces,u)])
         result[axis]['kinematic_audit']=kinematic_audit
+        result[axis]['stiffness_basis'] = build['stiffness_basis']
         if seed is not None:
             result[axis]['empirical_esm_reference'] = seed
         for record,raw in zip(result[axis]['rows'],retained):

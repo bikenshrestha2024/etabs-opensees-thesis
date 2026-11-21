@@ -62,3 +62,11 @@ def test_rayleigh_rejects_inconsistent_or_rotating_floor():
     domain.nodeDisp = lambda n, dof: 0. if dof == 6 else original(n, dof)
     with pytest.raises(RuntimeError, match="translations"):
         _diaphragm_translation(domain, 1, [2, 3], 1)
+
+
+def test_empirical_rayleigh_rejects_inherited_full_gravity(tmp_path, monkeypatch):
+    from components.modal.rayleigh import run
+
+    monkeypatch.setenv("OPENSEES_GRAVITY_PROFILE", "GRAVITY_1.0D_1.0L")
+    with pytest.raises(ValueError, match="assembled seismic preload"):
+        run(tmp_path, 2.0, 2.0, empirical_settings={})

@@ -1,6 +1,7 @@
 """Numbered workflow and factual input inventory; no automatic calibration approval."""
 from pathlib import Path
 import json
+from components.nbc105.constants import GRAVITY_M_S2
 STEPS=[
 ('1 Export','01_MAIN_GUI.py','Read source EDB; verify model hash, counts and physical units.'),
 ('2 Inputs','02_INPUT_READINESS.py','Verify source identity and incomplete section, load and diaphragm evidence.'),
@@ -22,7 +23,12 @@ GUIDE={
 'wall_opening_and_coupling_beam_mesh_reviewed':'Open 3D connectivity and wall-only view. Check each opening, pier, coupling beam, shared node and local axis against ETABS/drawings; perform mesh sensitivity.',
 'area_and_frame_gravity_loads_reconciled_to_etabs':'Export ETABS story/pattern totals and reactions with matching gravity factors. Compare with Source load detail and slab formula workbook, including physical self-weight exactly once.',
 'seismic_mass_reconciled_to_etabs_by_storey':'Export ETABS mass summary by story and diaphragm; compare independent total and directional masses with assembled ledger, including live-load fractions and roof treatment.',
-'record_pair_units_scales_and_nbc_limits_reviewed':'Use record audit and site spectrum diagnostic. Confirm record units, dt, pair length and matching/scaling band; g-to-m/s2 factor is 9.80665 once, separate from motion scale.'}
+'record_pair_units_scales_and_nbc_limits_reviewed':(
+    'Use the record audit and site spectrum diagnostic. Confirm each component’s units, '
+    'record time step (dt), sample count and duration, and the NBC matching/scaling band. '
+    f'Convert Acc(g) to m/s² once using {GRAVITY_M_S2:g} m/s² per g. '
+    'For input already in m/s², use a conversion factor of 1. '
+    'Record the dimensionless motion scale separately.')}
 def inventory(folder):
     folder=Path(folder);cfgpath=folder/'OpenSees_Complete_Model_Config_V118.json';cfg=json.loads(cfgpath.read_text(encoding='utf-8-sig')) if cfgpath.is_file() else {}
     facts={'folder':str(folder),'config_file':str(cfgpath),'configuration':cfg}

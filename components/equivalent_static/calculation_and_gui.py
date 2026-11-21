@@ -1654,7 +1654,8 @@ class ESMGui:
                     try:
                         proc=subprocess.run(command,capture_output=True,text=True,
                             errors='replace',encoding='utf-8',
-                            env={**dict(os.environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
+                            env={**os.environ, 'PYTHONIOENCODING':'utf-8', 'PYTHONUTF8':'1',
+                                 'OPENSEES_GRAVITY_PROFILE':'AS_CONFIGURED'})
                         log=out/(RAYLEIGH_PREFIX+'_'+state+'.log')
                         log.write_text(proc.stdout+'\n'+proc.stderr,encoding='utf-8')
                         if proc.returncode:
@@ -1885,18 +1886,26 @@ class ESMGui:
                 self.status.set('Both X/Y export needs calculated Rayleigh periods in both axes. Excel reference periods are already shown separately. Run Preliminary Rayleigh (X/Y), then Calculate + export.')
                 messagebox.showerror('Directional periods needed',self.status.get());return
             all_runners=[]
-            axis_counts=[]
-            for axis in ('X','Y'):
-                self.last_runners=[]
-                self.direction.set(axis);self._calculate()
-                all_runners.extend(self.last_runners)
-                axis_counts.append(len(self.last_runners))
-            self.last_runners=all_runners;self.direction.set('Both X/Y')
-            if not all(axis_counts):
+            completed=[]
+            try:
+                for axis in ('X','Y'):
+                    self.last_runners=[]
+                    self.direction.set(axis)
+                    completed.append(self._calculate_axis(announce=False))
+                    all_runners.extend(self.last_runners)
+            finally:
+                self.direction.set('Both X/Y')
+            if not all(completed):
                 self.last_runners=[];self.run_button.configure(state='disabled')
                 self.status.set('Both-axis export incomplete. Resolve the axis-specific errors in the run log; no combined run is enabled.');return
+            self.last_runners=all_runners
             self.status.set(f'Combined X/Y export: {len(all_runners)} runners. Each direction uses its own adopted period.')
+            self._auto_bundle_seismic_review()
             return
+        self._calculate_axis()
+
+    def _calculate_axis(self, *, announce=True):
+        """Write one axis and report whether all requested states were exported."""
         started=time.perf_counter()
         self._set_esm_operation("RUNNING","Calculating source-linked NBC ESM forces")
         try:
@@ -2026,11 +2035,14 @@ class ESMGui:
                 str(len(failures))+" blocked state cases")
             self.status.set(f"Completed in {elapsed:.2f} s | Location={self.location.get()} | soil={self.soil.get()} | Z={self.Z.get()} ({self.z_source.get()})\n"+"\n".join(summaries)+note+f"\nCreated: {files}")
             self.run_button.configure(state="normal" if Path(self.model_script.get()).is_file() else "disabled")
-            self._auto_bundle_seismic_review()
-            messagebox.showinfo("NBC 105 ESM calculation",f"Created {len(self.last_runners)} case runner(s) and documented force profiles.\n" + ("Blocked: "+" | ".join(failures) if failures else "Review inputs before running the exported cases.") + "\n\nUse Plots or Open output folder to inspect the results.")
+            if announce:
+                self._auto_bundle_seismic_review()
+                messagebox.showinfo("NBC 105 ESM calculation",f"Created {len(self.last_runners)} case runner(s) and documented force profiles.\n" + ("Blocked: "+" | ".join(failures) if failures else "Review inputs before running the exported cases.") + "\n\nUse Plots or Open output folder to inspect the results.")
+            return not failures
         except Exception as exc:
             self._set_esm_operation("BLOCKED",str(exc))
             self.status.set("Blocked: "+str(exc)); messagebox.showerror("ESM calculation blocked",str(exc))
+            return False
 
     def _cancel_generated(self):
         """Cancel the current case without killing the Tk application."""

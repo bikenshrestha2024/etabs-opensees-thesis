@@ -30,6 +30,8 @@ The ESM initialization previously referenced an undefined `rayleigh_state`; now 
 
 ## Period adoption and GUI contract (2026-11-05)
 
+The preliminary Rayleigh child process uses the assembled seismic preload even after a full-gravity verification session. For a combined X/Y calculation, the automatic review archive starts after both directions finish writing every requested state. A failed direction disables the combined runner list. Single-direction calculations publish their own review archive.
+
 - `resolve_esm_state_periods(height_m,aw_by_axis,factor,states,rayleigh_by_state)`: selects the *matching limit-state* X and Y periods as min(calculated Rayleigh period, amplified `0.075H^.75/sqrt(Aw)`). Strict units: H [m], Aw [m²], period [s]. A `Both` state request fails if separate SLS Rayleigh evidence is absent, rather than silently reusing ULS stiffness-period values.
 - `ESMGui._adopted_axis_period`: workbook adopted-period reference is now *opt-in* and is never labelled a native Rayleigh result; verifies selected Aw against the imported workbook Aw and, when available, independent exported geometry. A mismatched workbook value or reference beyond 1.25 empirical is rejected.
 - `recommended_story_weight_input`: prefers model-tag-matched assembled story CSV, retaining the historical manual-CSV override. Story weights and effective wall areas are physical inputs requiring ETABS verification: source correctness is not implied by tag equality.

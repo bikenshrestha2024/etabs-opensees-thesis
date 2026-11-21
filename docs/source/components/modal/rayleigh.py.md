@@ -1,5 +1,7 @@
 # rayleigh.py — source documentation
 
+The empirical-first runner rejects inherited gravity-only or uplift profiles. It records the preload profile and each direction's built elastic stiffness basis in the Rayleigh JSON. The directional sequence remains the amplified empirical ESM seed, fresh torsion-suppressed gravity equilibrium, then one centered elastic perturbation and the §5.1.1 quotient. The quotient uses the project NBC constant of 9.81 m/s². The signed ETABS EQ P-Delta cases required by the project for separate initial-state checks are outside this centered calculation.
+
 **Python source:** [components/modal/rayleigh.py](../../../../components/modal/rayleigh.py)
 **Git baseline content SHA:** 6c51ad3127a799fb4270cb14918ff92cca8bb50d
 **Subsystem:** Modal analysis and numerical damping

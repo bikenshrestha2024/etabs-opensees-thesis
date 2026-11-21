@@ -49,6 +49,22 @@ The 1,728.202 kN gap between sustained gravity and the seismic ledger is fully a
 
 The Windows regression run under `tests/` passed 427 tests and 218 subtests, with 39 skips. The retained-DOF benchmark ran against OpenSees 3.8.0. A separate import through the installed analysis runtime read back the corrected X/Y periods and reviewed X/Y Aw. Repository-root pytest also discovers historical `Verification_V*` scripts that expect archived local files and are outside the active suite.
 
+## November 21 clear-beam and native-elastic replay
+
+The newer ULS package used the original gross-beam and gross-shell export. Independent reconstruction of all 25 saved floors gave Rayleigh periods of 1.661966 s (X) and 2.383341 s (Y). Its automatic ZIP contained six X case calculations because packaging started before the Y export completed. The combined export now starts one archive after both directions finish.
+
+A fresh OpenSees 3.8.0 replay used the verified clear-beam export, reviewed ETABS elastic modifiers, 76 source supports, and the assembled seismic preload. The directional seed used the amplified empirical period, then each centered solve used the actual applied floor forces and incremental elastic translations in §5.1.1 with g = 9.81 m/s². The 25-floor active seismic weight was 276,039.112 kN. The nodal mass reconstruction matched each floor to within 1.5 × 10⁻¹¹ kN.
+
+| ULS quantity | X | Y |
+|---|---:|---:|
+| Empirical period (s) | 1.585025 | 1.537584 |
+| Amplified empirical period (s) | 1.981281 | 1.921980 |
+| Centered Rayleigh period (s) | 1.977548 | 2.703236 |
+| Adopted directional period (s) | 1.977548 | 1.921980 |
+| Adopted-period ESM comparison base shear (kN) | 17,448.316 | 17,952.785 |
+
+Incremental base reactions closed to within 7 × 10⁻¹⁵ relative error. The export holds all 12 directional, polarity and eccentricity force calculations. These are ULS comparisons under §3.2.1. Soil B remains provisional pending Vs,30 under §4.1.3.1. Verify the analytical restraints and mass allocation against native ETABS before comparing physical response. [NBC 105:2025, §5.1–5.2](https://ebps.kathmandu.gov.np/UploadFiles/NBC_105_2025_Sesmic_Design.pdf)
+
 ## Research and international context
 
 - Goel and Chopra evaluated empirical period expressions against measured motions of concrete shear-wall buildings. Their results explain why a fitted code estimate can differ from a calculated mode. They cannot explain step dependence with unchanged final loads. Here, X is 4.88% above the raw empirical period and Y is 55.03% above it. The corresponding Rayleigh/eigen discrepancies on the same domain are approximately 0.096% and 0.006%. [Period Formulas for Concrete Shear Wall Buildings](https://doi.org/10.1061/(ASCE)0733-9445(1998)124:4(426))
