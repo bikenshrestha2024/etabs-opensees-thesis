@@ -232,3 +232,8 @@ The tier is the highest tier the repository can currently show for that componen
 - It does not re-verify any native OpenSees behaviour, ETABS value or clause text.
 - It does not cover Steel02 and Concrete material calibration beyond the points above (see `LITERATURE/Reinforcing_Steel/README.md` and `docs/00_RESEARCH_REFERENCES.md`, material evidence policy).
 - UNKNOWN items above remain open until the named evidence is supplied.
+
+## Run evidence received (2026-11-21)
+
+- `docs/validation/run_findings/LTHA_V115_PRELIM_20261120.md`: a *linear* V115 preliminary setup run, 12 of 16 cases complete, each a 0.5 s `TRUNCATED_DIAGNOSTIC_NOT_CODE_ACCEPTANCE` trial. Measured native solve about 2.03 s/step with no factor reuse; the full-record projection is a lower bound for nonlinear cost.
+- It exercises ETABS-derived geometry, gravity preload and eigen solve only. It contains no FVD/BRB, FSAM or material-nonlinear evidence, so no row above changes tier.
