@@ -45,7 +45,8 @@ def inspect(export_dir, *, limit_files=20000):
             current=Path(current)
             dirs[:]=sorted(d for d in dirs
                 if not (current/d).is_symlink()
-                and d not in (".git","__pycache__",".pytest_cache"))
+                and d not in (".git","__pycache__",".pytest_cache",
+                              "GRAVITY_WORKSPACE_AUDIT"))
             for name in sorted(names):
                 path=current/name
                 if path.is_symlink():
