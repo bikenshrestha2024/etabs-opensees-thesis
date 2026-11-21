@@ -19,7 +19,7 @@ def _positive(v,name):
     return x
 
 def seismic_link_rotation_limit_rad(*,link_length_m,mp_kNm,vp_kN,
-                                    orientation,alpha=None):
+                                    orientation,section_type,alpha=None):
     """Annex B §7.1.2–7.1.4 pp.96–97: link rotation limit by classification.
 
     [REF NBC105-2025 Annex B §§7.1.2–7.1.4, printed pp.96–97]
@@ -27,8 +27,14 @@ def seismic_link_rotation_limit_rad(*,link_length_m,mp_kNm,vp_kN,
     Vertical: short e<=0.8(1+alpha)Mp/Vp, long e>=1.5(1+alpha)Mp/Vp.
     Short theta<=0.08 rad, long theta<=0.02 rad; intermediate interpolated.
     alpha (small/large end moment ratio) is needed for vertical links.
-    This is an acceptance limit ONLY, not a design/check of actual rotation.
+    section_type must explicitly certify that a real I-section seismic link
+    is being evaluated; no SHS/FVD/BRB default is allowed. This is an
+    acceptance limit ONLY, not a design/check of actual rotation.
     """
+    # Annex B §7.1.1 explicitly limits seismic links to I sections.
+    # A square hollow section outrigger or FVD must never be passed off as one.
+    if str(section_type).strip().upper() not in ("I","I-SECTION"):
+        raise ValueError("Annex B §7.1.1 permits seismic links of I section only")
     length=_positive(link_length_m,"link_length_m")
     m=_positive(mp_kNm,"mp_kNm")
     v=_positive(vp_kN,"vp_kN")
