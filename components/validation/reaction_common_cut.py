@@ -165,6 +165,74 @@ def compare_common_cut(payload, *, expected_primary_count=32,
     return result
 
 
+
+def compare_ablation(cases, *, expected_primary_count=32,
+                     expected_transfer_count=44):
+    """Compare four independently solved configurations without tuning weights.
+
+    Each case uses the same source EDB, joint map and native ETABS reference,
+    but a separately hashed OpenSees model. Scenario effects are reported,
+    not interpreted as proof of ETABS physical equivalence.
+    """
+    names = ("baseline", "wall_mesh_only", "end_zones_only", "combined")
+    if not isinstance(cases,dict) or set(cases)!=set(names):
+        raise ValueError("All four explicit ablation cases are mandatory")
+    results={}
+    original_etabs=None
+    original_mapping=None
+    original_origin=None
+    original_source=None
+    model_hashes=set()
+    for name in names:
+        data=cases[name]
+        current=compare_common_cut(data,
+            expected_primary_count=expected_primary_count,
+            expected_transfer_count=expected_transfer_count)
+        source=current["source"]
+        fingerprint=(source["edb_sha256"],source["case"],
+                     source["reaction_level"],source["native_restraints_verified"])
+        mappings=tuple((m["etabs"],m["opensees"],m["group"]) for m in data["map"])
+        source_nodes=tuple(sorted((row["id"],tuple(row["xyz_m"]),
+                                    tuple(row["reaction"])) for row in data["etabs"]))
+        if original_source is None:
+            original_etabs=source_nodes
+            original_mapping=mappings
+            original_origin=tuple(current["origin_m"])
+            original_source=fingerprint
+        elif (fingerprint!=original_source or source_nodes!=original_etabs
+              or mappings!=original_mapping or tuple(current["origin_m"])!=original_origin):
+            raise ValueError("Ablations must have identical ETABS reference, origin and node map")
+        # A new model fingerprint is expected for every intentionally distinct
+        # mesh/end-zone configuration, even when numerical output is unchanged.
+        model_sha=source["model_sha256"]
+        if model_sha in model_hashes:
+            raise ValueError("Ablation cases reuse assembled-model SHA256")
+        model_hashes.add(model_sha)
+        groups=current["groups"]
+        results[name]={
+            "model_sha256":model_sha,
+            "group_metrics":groups,
+            "l1_primary_FZ_kN":groups["PRIMARY_32"]["sum_abs_local_delta"][2],
+            "l1_total_FZ_kN":groups["ALL_MAPPED"]["sum_abs_local_delta"][2],
+            "signed_total_FZ_kN":groups["ALL_MAPPED"]["difference"][2],
+        }
+    baseline=results["baseline"]
+    for name in names:
+        item=results[name]
+        item["primary_l1_change_from_baseline_kN"]=(
+            item["l1_primary_FZ_kN"]-baseline["l1_primary_FZ_kN"])
+        item["worsens_primary_l1"]=(
+            item["primary_l1_change_from_baseline_kN"]>0)
+    return {
+        "status":"FOUR_CASE_NUMERICAL_ABLATION_ONLY_PHYSICAL_CAUSE_UNVERIFIED",
+        "source_edb_sha256":original_source[0],
+        "scenarios":results,
+        "warning":"Do not select the minimum L1 discrepancy as the physical model; "
+                  "verify shell formulation, edge MPCs, end-zone locations and native "
+                  "physical base-cut moments independently.",
+    }
+
+
 def export_report(payload_path, output_dir):
     """Save JSON + CSV under requested output directory with source hash."""
     inp = Path(payload_path)
