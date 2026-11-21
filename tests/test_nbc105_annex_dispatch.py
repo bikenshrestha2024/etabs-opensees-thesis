@@ -30,7 +30,7 @@ class AnnexDispatch(unittest.TestCase):
     def test_annex_b_horizontal_link_rotation(self):
         result=run_annex_operation("B","seismic_link_rotation_limit_rad",{
             "link_length_m":1.6,"mp_kNm":100,"vp_kN":100,
-            "orientation":"horizontal"})
+            "orientation":"horizontal","section_type":"I"})
         self.assertAlmostEqual(result["result"],.08)
         self.assertEqual(result["annex"],"B")
 
@@ -46,7 +46,7 @@ class AnnexDispatch(unittest.TestCase):
         output=io.StringIO()
         with contextlib.redirect_stdout(output):
             code=main(["--annex","B","--operation","seismic_link_rotation_limit_rad",
-                 "--json",'{"link_length_m":1.6,"mp_kNm":100,"vp_kN":100,"orientation":"horizontal"}'])
+                 "--json",'{"link_length_m":1.6,"mp_kNm":100,"vp_kN":100,"orientation":"horizontal","section_type":"I"}'])
         self.assertEqual(code,0)
         result=json.loads(output.getvalue())
         self.assertEqual(result["annex"],"B")
