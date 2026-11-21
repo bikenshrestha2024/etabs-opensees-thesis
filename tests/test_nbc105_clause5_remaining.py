@@ -23,7 +23,9 @@ class FullClause5(unittest.TestCase):
     def test_strict_irregularity_boundaries(self):
         self.assertFalse(weak_story(80,100))
         self.assertTrue(weak_story(79.999,100))
-        self.assertFalse(soft_story(70,100,[100,100,100]))
+        self.assertFalse(soft_story(70,100))
+        self.assertFalse(soft_story(80,100,[100,100,100]))
+        self.assertTrue(soft_story(79.999,100,[100,100,100]))
         self.assertTrue(soft_story(69.9,100,[100,100,100]))
         self.assertTrue(soft_story(79,140,[100,100,100]))
         self.assertEqual(torsion_irregularity(1.5,.999999999999), "REGULAR")
