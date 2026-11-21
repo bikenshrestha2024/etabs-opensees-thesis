@@ -57,7 +57,7 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
                                             single_run=self.gravity)
         self.assertTrue(Path(paths["upload_zip"]).is_file())
         self.assertEqual(Path(paths["upload_zip"]).parent,
-                         self.gravity/"Gravity_Evidence_Upload")
+                         self.gravity/"07_EXPORT_ZIP"/"Gravity_Evidence_Upload")
         manifest=Path(paths["evidence_manifest"])
         index=Path(paths["exact_file_paths"])
         pointer=Path(paths["latest_upload_pointer"])
@@ -95,6 +95,33 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
                 "single_run_root/Gravity_Result_V110.json",
             ):
                 self.assertTrue(any(x.endswith(tail) for x in names),tail)
+
+    def test_canonical_support_cases_and_upload_owner(self):
+        from components.gravity.output_ownership import case_directory,dual_runs_parent
+        for scenario in ("ETABS_NONZERO_REACTION_DIAGNOSTIC",
+                         "ETABS_SOURCE_SUPPORTS",
+                         "CONTINUOUS_WALL_BASE_FIXED"):
+            case=case_directory(self.gravity,scenario,"GRAVITY_1.0D_1.0L",
+                                "20261121T000000_123456",create=True)
+            (case/"Gravity_Result_V110.json").write_text(
+                json.dumps({**self.sample,
+                            "wall_support_strategy":scenario,
+                            "gravity_profile":"GRAVITY_1.0D_1.0L",
+                            "model_script":str(self.script),
+                            "ok":True}),encoding="utf-8")
+            (case/"Gravity_Run_V110.log").write_text("ok",encoding="utf-8")
+        latest=__import__(
+            "components.gravity.evidence_workflow",
+            fromlist=["latest_single_run"]).latest_single_run(
+                self.gravity,model_script=self.script)
+        self.assertTrue(latest.is_relative_to(self.gravity/"02_RESULTS"))
+        report,paths=package_gravity_review(self.script,self.gravity,single_run=latest)
+        self.assertTrue(Path(paths["upload_zip"]).is_relative_to(
+            self.gravity/"07_EXPORT_ZIP"/"Gravity_Evidence_Upload"))
+        self.assertTrue(Path(paths["latest_upload_pointer"]).is_relative_to(
+            self.gravity/"00_INDEXES"))
+        self.assertTrue(dual_runs_parent(self.gravity).is_relative_to(
+            self.gravity/"05_COMPARISONS"))
 
     def test_timestamped_32_node_run_is_discovered_and_packaged(self):
         import os
