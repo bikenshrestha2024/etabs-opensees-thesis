@@ -31,6 +31,10 @@ class GravityWorkspaceAuditTests(unittest.TestCase):
             self.assertTrue((saved/"EXACT_DUPLICATE_REVIEW.json").is_file())
             self.assertEqual(a.read_bytes(),b.read_bytes())
             self.assertTrue(a.is_file() and b.is_file() and unique.is_file())
+            after=inspect(root)
+            self.assertEqual(after["file_count"],report["file_count"])
+            self.assertEqual(after["exact_duplicate_groups"],
+                             report["exact_duplicate_groups"])
 
     def test_inventories_case_structure_without_discarding_distinct_runs(self):
         with tempfile.TemporaryDirectory() as td:
