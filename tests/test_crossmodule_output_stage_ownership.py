@@ -49,6 +49,24 @@ class StageOwnershipTests(unittest.TestCase):
                              root/"02_GRAVITY"/"RUNS"/"Case")
             self.assertFalse((root/"02_GRAVITY").exists())
 
+    def test_deformation_viewer_discovers_esm_mrsm_nltha_and_legacy(self):
+        from components.ui.response_viewer import find_deformation_cases
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            paths=[
+                root/"OpenSees_Analysis_Results"/"ULS_Floor_3_Model"/"Deformation_Old_V132.json",
+                root/"03_ESM"/"RUNS"/"ULS"/"case"/"Deformation_ESM_V132.json",
+                root/"05_MRSM"/"RUNS"/"ULS"/"case"/"run"/"02_RESULTS"/"Deformation_MRSM_V132.json",
+                root/"07_NONLINEAR_TIME_HISTORY"/"RUNS"/"trial"/"Deformation_NLTHA_V132.json",
+            ]
+            for p in paths:
+                p.parent.mkdir(parents=True,exist_ok=True)
+                p.write_text('{"unverified":true}',encoding="utf-8")
+            discovered=find_deformation_cases(root)
+            self.assertEqual(set(discovered),set(paths))
+            legacy=find_deformation_cases(root/"OpenSees_Analysis_Results")
+            self.assertEqual(set(legacy),set(paths))
+
     def test_readiness_discovers_new_stage_outputs_and_historical_sources(self):
         from components.model.readiness_dashboard import _candidates
         with tempfile.TemporaryDirectory() as td:
