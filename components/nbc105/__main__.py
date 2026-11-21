@@ -17,6 +17,7 @@ def main(argv=None):
     parser.add_argument("--list",action="store_true",help="List exported public operations")
     parser.add_argument("--audit",action="store_true",help="Show 1–10 plus Annexes A–C source/evidence compliance gate")
     parser.add_argument("--clause",type=int,help="1–10")
+    parser.add_argument("--annex",choices=("A","B"),help="Separate RC or steel annex reference checks")
     parser.add_argument("--operation",help="Exported operation name")
     parser.add_argument("--json",default="{}",help="JSON mapping of named parameters")
     args=parser.parse_args(argv)
@@ -28,6 +29,11 @@ def main(argv=None):
             return 2  # Deliberately blocked until exhaustive source and native review.
         if args.list:
             result=available_operations()
+        elif args.annex:
+            if args.clause is not None or not args.operation:
+                parser.error("--annex requires --operation and cannot be combined with --clause")
+            from components.nbc105.dispatch import run_annex_operation
+            result=run_annex_operation(args.annex,args.operation,json.loads(args.json))
         else:
             if args.clause is None or not args.operation:
                 parser.error("--clause and --operation required without --list")
