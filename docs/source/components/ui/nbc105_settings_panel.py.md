@@ -48,3 +48,7 @@ Tests are deterministic synthetic config/file checks; an actual Windows Tk smoke
 The existing `launch(parent, export_dir)` panel now includes an **NBC clauses 1–10** button. It opens a local dialog listing each independently registered module's exported rule functions and accepts named JSON parameters. It calls `components.nbc105.dispatch.run_operation`; it does **not** duplicate clauses in GUI code, make an ETABS change, or issue building acceptance. Result status is `CODE_CALCULATION_ONLY_NOT_BUILDING_ACCEPTANCE`. Invalid input shows BLOCKED. The initial example uses Table 10-1 `a_p` for `T1=1.0 s`, `Tp=1.25 s` and produces `1.75`.
 
 Tests: `tests/test_nbc105_gui_clause_routing.py` plus `tests/test_nbc105_module_dispatch.py`. A native Windows tkinter smoke check remains required before production GUI acceptance.
+
+## Annex A/B calculator entrypoints
+
+The existing **NBC clauses 1–10** button opens a dialog offering 1–10 plus separately registered Annex A/B operations. Annex examples show the 600 mm special RC coupled-wall minimum input and a horizontal I-section seismic link rotation *limit*. These do not infer that the ETABS 12 m X-direction wall coupling, real reinforcement or any SHS/FVD/BRB element has qualified as a steel seismic link. The preview result remains non-certifying. Regression: `tests/test_nbc105_gui_clause_routing.py`.
