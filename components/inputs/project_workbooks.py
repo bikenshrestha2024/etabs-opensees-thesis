@@ -187,8 +187,13 @@ def require_source_state(export_dir,selected_state):
     return note
 
 
-def analysis_output_folder(export_dir,limit_state='ULS'):
-    """Return a separate, source-identifiable result folder inside the shared results root."""
+def analysis_output_folder(export_dir,limit_state='ULS', *, stage=None):
+    """Resolve a source-identifiable case output folder.
+
+    Legacy callers still resolve OpenSees_Analysis_Results. New ESM producers
+    explicitly request stage='ESM' and write beneath 03_ESM/RUNS.
+    Stage selection does not migrate or delete historical result files.
+    """
     folder=Path(export_dir)
     source_edb=_source_edb_path(folder)
     stem=_portable_source_stem(source_edb) if source_edb else folder.name
@@ -198,7 +203,13 @@ def analysis_output_folder(export_dir,limit_state='ULS'):
     if state not in ('ULS','SLS','ULS_SLS'):raise ValueError('limit_state must be ULS, SLS, or Both')
     slug=re.sub(r'[^A-Za-z0-9]+','_',stem).strip('_')[:72].rstrip('_') or 'ETABS_Model'
     floor_label='Floor_'+floor if floor else 'Floor_Unspecified'
-    return folder/'OpenSees_Analysis_Results'/f'{state}_{floor_label}_{slug}'
+    case=f'{state}_{floor_label}_{slug}'
+    if stage is None or str(stage).strip().upper() == 'LEGACY':
+        return folder/'OpenSees_Analysis_Results'/case
+    if str(stage).strip().upper() == 'ESM':
+        from components.inputs.output_layout import canonical_stage_folder
+        return folder/canonical_stage_folder('ESM')/'RUNS'/case
+    raise ValueError('analysis_output_folder stage must be ESM or LEGACY')
 
 
 def _wall_aw_from_lines(height_m, lines):
@@ -988,15 +999,22 @@ def import_project_inputs(root, export_dir,limit_state='ULS'):
         verify_empirical_esm_reference,
     )
     from components.modal.rayleigh_ledger_audit import verify_saved_rayleigh_axis
-    ray_folder=analysis_output_folder(folder,state)
+    ray_folder=analysis_output_folder(folder,state,stage='ESM')
+    legacy_ray_folder=analysis_output_folder(folder,state)
     ray=ray_folder/(rayleigh_result_prefix(state)+'.json')
+    # Read historical, source-verified evidence without relocating the active
+    # legacy files. New runs are written only to the canonical ESM tree.
+    if not ray.is_file():
+        historical=legacy_ray_folder/(rayleigh_result_prefix(state)+'.json')
+        if historical.is_file():
+            ray=historical
     if not ray.is_file():
         old_name='NBC105_Rayleigh_Preliminary_V123'+('_SLS' if state=='SLS' else '')+'.json'
         if any((directory/old_name).is_file() for directory in
-               (ray_folder,folder/'OpenSees_Analysis_Results')):
+               (ray_folder,legacy_ray_folder,folder/'OpenSees_Analysis_Results')):
             notes.append(f'Archived {state} Rayleigh report used retained-node displacements. Rerun the preliminary analysis to refresh the periods.')
         legacy_name='NBC105_Rayleigh_Preliminary_V126'+('_SLS' if state=='SLS' else '')+'.json'
-        if (ray_folder/legacy_name).is_file():
+        if (ray_folder/legacy_name).is_file() or (legacy_ray_folder/legacy_name).is_file():
             notes.append(f'Archived {state} Rayleigh uses the legacy 1% load reference. Rerun to generate the amplified empirical ESM seed.')
     data=folder/'OpenSees_Complete_Model_Data_V118.json'
     if ray.is_file() and data.is_file():
