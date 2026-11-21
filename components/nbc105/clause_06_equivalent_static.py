@@ -12,7 +12,8 @@ def _positive(v,name):
     return x
 
 def base_shear_coefficient(spectrum,*,overstrength,limit_state,ductility=None):
-    """§6.1 p.38: Cd,ULS=C(T1)/(Rmu*Omega_u); Cd,SLS=Cs(T1)/Omega_s."""
+    """[REF NBC105-2025 §6, printed pp. 38–39]
+§6.1 p.38: Cd,ULS=C(T1)/(Rmu*Omega_u); Cd,SLS=Cs(T1)/Omega_s."""
     c=_positive(spectrum,"elastic spectrum"); o=_positive(overstrength,"overstrength")
     state=str(limit_state).upper()
     if state=="ULS":return c/(_positive(ductility,"ductility")*o)
