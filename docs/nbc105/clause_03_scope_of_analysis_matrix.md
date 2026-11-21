@@ -13,3 +13,7 @@ Source: user-uploaded official Second Revision, printed pp. 17–21. Scope: cano
 **Open / do not claim fully implemented:** §3.6/3.7 load combinations need independently verified canonical expression sets; Table 3-1 governs in absence of rational cracked-section assessment. Source incorrectly points irregularity to §5.5; actual §5.4.
 
 This matrix must be extended with one row per subclause, exact table footnotes, ETABS native evidence, explicit test identifiers and source hash before the overall Clause 3 gate can pass.
+
+## Verified 2025 source load-combination addition
+
+Clause 3 now also provides `load_combination_coefficients` for **printed §3.6.1 parallel LSM, §3.6.2 non-parallel LSM, and §3.7 WSM**, plus `vertical_seismic_combination` for printed §3.6.3: `(1.1 + 2Z/3)DL + λLL ± E`. The canonical record keys are `DL, LL, Ex, Ey, S`; the source additional-load multipliers are 1.2 snow, 1.2 static-liquid, 1.5 earth (LSM) and 1.0 each (WSM). The 30% orthogonal component is included for §3.6.2. Tests: `tests/test_nbc105_clause3_load_combinations.py`. These are coefficient records—not ETABS OAPI load-case creation or proof that actual load cases follow them. The project's supplementary IS 16700 P-Delta initial loading cases are separate and must never be relabeled NBC §3.6.
