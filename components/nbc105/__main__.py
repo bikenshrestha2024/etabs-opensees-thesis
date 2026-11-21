@@ -15,11 +15,17 @@ def main(argv=None):
     """[REF NBC105-2025 Clauses 1–10; docs/nbc105/README.md]"""
     parser=argparse.ArgumentParser(description="NBC 105:2025 clause-by-clause calculation interface")
     parser.add_argument("--list",action="store_true",help="List exported public operations")
+    parser.add_argument("--audit",action="store_true",help="Show 1–10 plus Annexes A–C source/evidence compliance gate")
     parser.add_argument("--clause",type=int,help="1–10")
     parser.add_argument("--operation",help="Exported operation name")
     parser.add_argument("--json",default="{}",help="JSON mapping of named parameters")
     args=parser.parse_args(argv)
     try:
+        if args.audit:
+            from components.nbc105.compliance_coverage import read_source_index,audit_source_index
+            result=audit_source_index(read_source_index())
+            print(json.dumps(result,indent=2,sort_keys=True,allow_nan=False))
+            return 2  # Deliberately blocked until exhaustive source and native review.
         if args.list:
             result=available_operations()
         else:
