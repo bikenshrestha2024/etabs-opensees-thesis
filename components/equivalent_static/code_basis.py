@@ -402,7 +402,7 @@ def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
     # Clauses 6.1–6.3 are owned by one source-verified implementation.
     # This keeps the established ESM results/report fields intact.
     from components.nbc105.clause_06_equivalent_static import (
-        base_shear_coefficient, base_shear, distribute_forces)
+        base_shear_coefficient, base_shear, distribute_forces, esm_deflection_factor)
     if state == "ULS":
         Cd=base_shear_coefficient(elastic_spectrum,overstrength=omega_u,
                                   ductility=r_mu,limit_state="ULS")
@@ -434,7 +434,7 @@ def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
         "coefficient_divisor":divisor,"period_exponent_k":k,
         "ductility_factor_R_mu":float(r_mu),"overstrength_factor_Omega_u":float(omega_u),
         "overstrength_factor_Omega_s":float(omega_s),
-        "deflection_scale_factor_kd":__import__("components.nbc105.clause_06_equivalent_static",fromlist=["esm_deflection_factor"]).esm_deflection_factor(len(normalized)),
+        "deflection_scale_factor_kd":esm_deflection_factor(len(normalized)),
         # NBC 105:2025 §5.5.3: design inter-storey drift limits.
         "drift_limit_ratio":(0.025 if state=="ULS" else 0.006),
         "uls_drift_amplification":(float(r_mu) if state=="ULS" else 1.0),
