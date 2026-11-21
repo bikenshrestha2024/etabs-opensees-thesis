@@ -680,12 +680,12 @@ class GravityAnalysisGUI:
                                  "saved cases in the selected output root.")
             self._gravity_action_log("GRAVITY_ORGANIZED_INDEX",
                                      "\n".join(published))
-            self.status_var.set(f"Organized {len(published)} saved gravity cases; "
+            self.status_var.set(f"Indexed {len(published)} saved gravity cases; "
                                 "original large solver files remain unchanged.")
-            messagebox.showinfo("Gravity case folders created",
-                "Organized case indexes and lightweight preview plots:\n" +
+            messagebox.showinfo("Gravity case indexes updated",
+                "Metadata pointers updated (no duplicate plot copies):\n" +
                 "\n".join(published) +
-                "\n\nFull solver files remain at their registered source paths.",
+                "\n\nFull solver files and original previews remain at registered source paths.",
                 parent=self.win)
         except (OSError, ValueError, KeyError, TypeError) as exc:
             messagebox.showerror("Organize gravity cases", str(exc),
