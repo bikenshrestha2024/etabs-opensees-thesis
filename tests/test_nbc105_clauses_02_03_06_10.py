@@ -124,7 +124,8 @@ class Clause10(unittest.TestCase):
         self.assertEqual(component_ductility_factor("moderate"),2.5)
         self.assertEqual(component_importance_factor("hazardous"),1.5)
         self.assertEqual(component_importance_factor("other"),1.0)
-        self.assertFalse(component_scope(100,25)["allowed"])
+        self.assertTrue(component_scope(100,25)["allowed"])
+        self.assertFalse(component_scope(100,25.0001)["allowed"])
         self.assertTrue(component_scope(100,24.9)["allowed"])
         self.assertAlmostEqual(friction_design_resistance(20,.3),3)
         self.assertAlmostEqual(component_design_force(z=.35,hp=47.5,H=95,
