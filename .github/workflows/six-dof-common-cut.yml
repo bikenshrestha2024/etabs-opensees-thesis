@@ -1,0 +1,26 @@
+name: Six DOF gravity common cut
+
+on:
+  push:
+    paths:
+      - "components/validation/reaction_common_cut.py"
+      - "tests/test_reaction_common_cut.py"
+      - ".github/workflows/six-dof-common-cut.yml"
+  pull_request:
+    paths:
+      - "components/validation/reaction_common_cut.py"
+      - "tests/test_reaction_common_cut.py"
+      - ".github/workflows/six-dof-common-cut.yml"
+
+jobs:
+  six-dof-common-cut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile pure offline reaction audit
+        run: python -m py_compile components/validation/reaction_common_cut.py tests/test_reaction_common_cut.py
+      - name: Run source-mapping and six-DOF regression
+        run: python -m unittest discover -s tests -p "test_reaction_common_cut.py" -v
