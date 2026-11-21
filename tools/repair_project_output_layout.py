@@ -25,7 +25,6 @@ _REPO = Path(__file__).resolve().parents[1]
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
-from components.inputs.export_mirror import export_mirror
 from components.inputs.output_layout import export_root_for
 
 _ELIGIBLE = ("nbc105_esm_", "nbc105_rayleigh_", "esm_runner_status",
@@ -195,7 +194,7 @@ def repair_layout(export_dir, *, apply=False):
         for source,dest,digest in staged_root:
             _safe_path(dest,root)
             _copy_verified(source,dest,digest)
-        report["root_mirror_manifest"]=str(
+        report["layout_repair_manifest"]=str(
             (root/"03_ESM"/"REVIEW_SNAPSHOTS"/"LAYOUT_REPAIR_MANIFEST.json").relative_to(root))
         if changed_root:
             report["status"]="APPLIED_COPIES_WITH_STALE_PRIMARY_MIRROR_REVIEW_REQUIRED"
@@ -232,7 +231,7 @@ def main(argv=None):
     # Do not print every confidential filename in a large project by default.
     print(json.dumps({key:result[key] for key in (
         "status","loose_root_file_count","historical_esm_mirror_files",
-        "root_mirror_manifest","notice") if key in result},indent=2))
+        "root_mirror_status","layout_repair_manifest","notice") if key in result},indent=2))
     return result
 
 
