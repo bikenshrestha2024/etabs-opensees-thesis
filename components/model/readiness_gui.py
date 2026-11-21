@@ -29,15 +29,30 @@ def available_evidence(model_script):
     add('seismic_mass_reconciled_to_etabs_by_storey',[folder/'OpenSees_Complete_Model_Data_V118.json'],'nodal mass inventory; independent ETABS reconciliation required')
     add('support_conditions_and_foundation_assumptions_reviewed',[folder/'OpenSees_Source_Model_Metadata_V118.json'],'exported restraints; foundation assumptions not certified')
     add('p_delta_and_gravity_preload_completed',[folder/'OpenSees_Complete_Gravity_Check_V118.json'],'saved gravity result; verify nonlinear model identity and P-Delta basis')
+    modal_stage=folder/'04_MODAL'/'RUNS'
+    modal_canonical=[
+        item for state in ('ULS','SLS')
+        for item in sorted(modal_stage.glob(
+            state+'/*/*/02_RESULTS/NBC105_Modal_V111.json'))[:30]
+    ]
     add('modal_periods_modes_and_mass_participation_reviewed',[
         analysis_output_folder(folder,state)/('Modal_'+state)/'NBC105_Modal_V111.json'
         for state in ('ULS','SLS')
-    ]+[out/'Modal_ULS/NBC105_Modal_V111.json',out/'Modal_SLS/NBC105_Modal_V111.json'],
+    ]+[out/'Modal_ULS/NBC105_Modal_V111.json',out/'Modal_SLS/NBC105_Modal_V111.json']
+      +modal_canonical,
         'saved elastic modal results; not nonlinear initial-stiffness validation')
     add('brace_fvd_brb_case_matches_selected_scenario',[folder/'OpenSees_Complete_Model_Config_V118.json'],'configuration available; scenario needs review')
     add('slab_and_diaphragm_idealization_compatible',[folder/'OpenSees_Complete_Model_Config_V118.json',folder/'LOAD_PATH_AND_DIAPHRAGM_AUDIT_V130.json'],'configured slab modifiers and constraints; compatibility needs engineering review')
-    add('is16700_initial_pdelta_plus_minus_cases_completed',list(out.glob('*PDelta*.json')),'saved files only; verify both signed cases and convergence')
-    add('record_pair_units_scales_and_nbc_limits_reviewed',list(out.glob('LTH*/*RunConfig*.json')),'saved input configuration; unit/spectrum compatibility requires review')
+    pdelta_stage=folder/'02_GRAVITY'
+    pdelta_candidates=(list(out.glob('*PDelta*.json'))
+                       +list(pdelta_stage.glob('RUNS/**/*PDelta*.json'))[:50])
+    add('is16700_initial_pdelta_plus_minus_cases_completed',
+        pdelta_candidates,'saved files only; verify both signed cases and convergence')
+    lth_stage=folder/'06_LINEAR_TIME_HISTORY'
+    add('record_pair_units_scales_and_nbc_limits_reviewed',
+        list(out.glob('LTH*/*RunConfig*.json'))
+        +list(lth_stage.glob('RUNS/*/*/*/00_INPUT_SOURCE/*RunConfig*.json'))[:50],
+        'saved input configuration; unit/spectrum compatibility requires review')
     cfg=folder/'OpenSees_Complete_Model_Config_V118.json'
     if cfg.is_file():
         config=json.loads(cfg.read_text(encoding='utf-8-sig'));material=config.get('nonlinear_materials_file')
@@ -48,7 +63,9 @@ def available_evidence(model_script):
     # The exploratory builder constructs these laws dynamically; its
     # Research_Material_Assignment is NOT a model-bound production material
     # file nor an experimentally calibrated project reinforcement schedule.
-    historical=list(out.glob('**/Research_Material_Assignment_V161.json'))
+    historical=(list(out.glob('**/Research_Material_Assignment_V161.json'))
+        +list((folder/'07_NONLINEAR_TIME_HISTORY').glob(
+            'RUNS/**/Research_Material_Assignment_V161.json'))[:50])
     if historical:
         result['research_material_transfer_reference_only']=(
             'AVAILABLE FOR REVIEW ONLY: exploratory research-material assignment, '
