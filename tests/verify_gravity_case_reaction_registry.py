@@ -99,6 +99,37 @@ class ReactionCaseRegistryTests(unittest.TestCase):
         self.assertIsNone(current_case(self.output,self.model,
             scenario=mode,profile="AS_CONFIGURED"))
 
+    def test_gravity_gui_reports_exact_result_availability_and_32_completion(self):
+        from types import SimpleNamespace
+        from components.gravity.gui_and_reports import GravityAnalysisGUI
+        class Var:
+            def __init__(self,value=""):self.value=value
+            def get(self):return self.value
+            def set(self,value):self.value=value
+        mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
+        gui=SimpleNamespace(
+            solved_reaction_var=Var(),solved_reaction_status_var=Var(),
+            model_var=Var(str(self.model)),output_var=Var(str(self.output)),
+            gravity_profile_var=Var("GRAVITY_1.0D_1.0L"),
+            reaction_support_var=Var(", ".join(map(str,range(1,33)))),
+            reaction_support_verification_var=Var("SCREENING: 32 verified"),
+            position_support_var=Var(""),
+            _selected_wall_support_strategy=lambda:mode)
+        GravityAnalysisGUI._refresh_case_reaction(gui)
+        self.assertEqual(gui.solved_reaction_var.get(),"No indexed run")
+        self.assertIn("NO_CASE_INDEX",gui.solved_reaction_status_var.get())
+        f=self.write(self.payload(mode))
+        register_case(self.output,f,self.model,scenario=mode,
+                      profile="GRAVITY_1.0D_1.0L")
+        GravityAnalysisGUI._refresh_case_reaction(gui)
+        self.assertAlmostEqual(float(gui.solved_reaction_var.get()),
+                               320047.788933,places=4)
+        self.assertIn("32 solved supports",gui.solved_reaction_status_var.get())
+        self.model.write_text("print('modified')\\n",encoding="utf-8")
+        GravityAnalysisGUI._refresh_case_reaction(gui)
+        self.assertEqual(gui.solved_reaction_var.get(),"Saved result unavailable")
+        self.assertIn("MODEL_SHA_CHANGED",gui.solved_reaction_status_var.get())
+
     def test_gui_export_resolves_selected_nested_case_without_parent_result(self):
         from types import SimpleNamespace
         from components.gravity.gui_and_reports import GravityAnalysisGUI
