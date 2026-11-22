@@ -9,7 +9,7 @@ import json
 import math
 from pathlib import Path
 
-from components.gravity.reaction_case_registry import current_case, SCENARIO_SUPPORTS
+from components.gravity.reaction_case_registry import current_case_diagnostic, SCENARIO_SUPPORTS
 
 CASES = (
     ("ETABS_NONZERO_REACTION_DIAGNOSTIC", "32"),
@@ -23,9 +23,11 @@ def collect_cases(output_root, model_path, profile="GRAVITY_1.0D_1.0L"):
     available = {}
     missing = []
     for strategy, label in CASES:
-        entry = current_case(output_root, model_path, scenario=strategy, profile=profile)
+        audit = current_case_diagnostic(
+            output_root, model_path, scenario=strategy, profile=profile)
+        entry = audit["result"]
         if entry is None:
-            missing.append(label + " supports: no current model-fingerprint-matched solved case")
+            missing.append(label+" supports: "+audit["status"]+" — "+audit["reason"])
             continue
         path = Path(entry["result_path"])
         data = json.loads(path.read_text(encoding="utf-8-sig"))
