@@ -38,6 +38,34 @@ def read(p):
                              "OPEN_UNTIL_WRITER_READER_NATIVE_SAVED_CASE_PARITY")
             self.assertFalse(report["historical_results_mutated"])
 
+    def test_every_legacy_line_and_reader_writer_is_exported_without_loss(self):
+        import csv
+        from tools.audit_output_writer_reader_pairs import main
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);p=root/"components"/"gravity"/"source.py"
+            p.parent.mkdir(parents=True)
+            p.write_text(
+                '"""Legacy OpenSees_Analysis_Results documented only."""\n'
+                'from pathlib import Path\n'
+                'LEGACY = "OpenSees_Analysis_Results"\n'
+                'def save(source):\n'
+                '    Path(source).write_text("ok")\n'
+                '    return Path(source).read_text()\n',encoding="utf-8")
+            report=build_matrix(root)
+            self.assertEqual(len(report["legacy_reference_lines"]),2)
+            self.assertEqual(len(report["reader_writer_candidate_lines"]),2)
+            self.assertEqual(
+                {x["literal_context"] for x in report["legacy_reference_lines"]},
+                {"DOCSTRING_REFERENCE","CODE_LITERAL_REVIEW"})
+            out=root/"review"
+            self.assertEqual(main(["--repo",str(root),"--report-dir",str(out)]),0)
+            for name,expected in (
+                ("legacy_reference_line_register.csv",2),
+                ("reader_writer_line_register.csv",2)):
+                with (out/name).open(encoding="utf-8-sig",newline="") as f:
+                    self.assertEqual(len(list(csv.DictReader(f))),expected)
+            self.assertFalse((p.parent/"02_RESULTS").exists())
+
     def test_syntax_error_is_retained_as_blocker_not_dropped(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
