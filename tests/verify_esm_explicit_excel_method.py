@@ -19,21 +19,21 @@ class Value:
 
 
 def prepared(root,state="ULS",source=None):
+    original=root/"ULTIMATE LOAD - NEPAL - 3 - BELT TRUSS.EDB"
+    original.write_bytes(b"original current source ETABS EDB bytes")
     if source is None:
-        source=r"D:\\Thesis\\NBC Ultimate\\ULTIMATE LOAD - NEPAL - 3 - BELT TRUSS.EDB"
+        source=str(original)
     (root/"OpenSees_Element_Connectivity.json").write_text(
-        json.dumps({"source_edb":source}),encoding="utf8")
+        json.dumps({"source_edb":str(source)}),encoding="utf8")
     wb=Workbook();ws=wb.active;ws.title="SCALING SUMMARY"
     ws["A5"]="Source EDB"
-    original=r"D:\\Thesis\\NBC Ultimate\\ULTIMATE LOAD - NEPAL - 3 - BELT TRUSS.EDB"
-    ws["B5"]=original
+    ws["B5"]=str(original)
     ws["B15"]="Aw (m²)";ws["C15"]="Adopted T1 (s)"
     ws["A16"]="X";ws["B16"]=1.9582936288;ws["C16"]=2.0385674001
     ws["A17"]="Y";ws["B17"]=2.2030803324;ws["C17"]=1.9219797767
     path=root/"actual_ETABS_scaling.xlsx"
     wb.save(path)
     return path
-
 
 class TestDirectExcelReference(unittest.TestCase):
     def test_reads_actual_shifted_workbook_cells_and_hash(self):
@@ -74,6 +74,30 @@ class TestDirectExcelReference(unittest.TestCase):
             self.assertEqual(ref['source_identity'],
                              'DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY')
             self.assertFalse(ref['code_accepted'])
+
+    def test_missing_edb_at_identical_path_is_research_reference_only(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);path=prepared(root)
+            (root/"ULTIMATE LOAD - NEPAL - 3 - BELT TRUSS.EDB").unlink()
+            ref=read_explicit_excel_calculation(path,root,"ULS")
+            self.assertEqual(ref["source_identity"],
+                             "DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY")
+            self.assertFalse(ref["code_accepted"])
+
+    def test_renamed_identical_edb_requires_real_byte_match(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            source=root/"ULTIMATE LOAD - COPY.EDB"
+            path=prepared(root,source=source)
+            original=root/"ULTIMATE LOAD - NEPAL - 3 - BELT TRUSS.EDB"
+            source.write_bytes(original.read_bytes())
+            ref=read_explicit_excel_calculation(path,root,"ULS")
+            self.assertEqual(ref["source_identity"],
+                             "BYTE_IDENTICAL_EDB_REFERENCE")
+            source.write_bytes(b"different copy")
+            ref=read_explicit_excel_calculation(path,root,"ULS")
+            self.assertEqual(ref["source_identity"],
+                             "DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY")
 
     def test_service_workbook_rejected_for_uls(self):
         with tempfile.TemporaryDirectory() as td:
