@@ -150,9 +150,14 @@ def compare_support_nodes(etabs,opensees,*,tolerance_m=0.01):
          if ranked else None)
     complete=(len(ranked)==len(ores)==len(eitems)
               and not any(x["status"] != "MATCHED_GLOBAL_Z" for x in details))
+    # Independently flag any measured large local mismatch, even when the
+    # full ETABS 76 supports cannot pair one-to-one with the 32 diagnostic
+    # restraints. Completeness is reported separately and is never assumed.
     pointwise_status=(
-        "NO_COMPLETE_ONE_TO_ONE_GLOBAL_Z_COMPARISON" if not complete
+        "NO_VERIFIED_MATCHED_GLOBAL_Z_PAIRS" if not ranked
         else "POINTWISE_RESIDUAL_EXCEEDS_NUMERICAL_SCREEN" if max_abs>1.0
+        else "INCOMPLETE_POINTWISE_COVERAGE_NOT_ENGINEERING_ACCEPTANCE"
+             if not complete
         else "POINTWISE_NUMERICAL_SCREEN_ONLY_NOT_ENGINEERING_ACCEPTANCE")
     return dict(schema="gravity-node-comparison-v1",
         interpretation="Support reaction differences only; not nodal applied load",
