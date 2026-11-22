@@ -256,7 +256,7 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
                  "OpenSees_Complete_Export_Report_V118.json",
                  "OpenSees_Complete_Model_Config_V118.json")
         for file in source.iterdir():
-            if not file.is_file() or file.suffix.lower() not in (".json",".csv",".xlsx"):
+            if not file.is_file() or file.suffix.lower() not in (".json",".csv"):
                 continue
             if file.name in ignored or file.name.startswith("Gravity_"):
                 continue
@@ -335,6 +335,8 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         audit["result"]=str(result)
         audit["gravity_state"]="NOT_RUN"
         audit["individual_32_reactions"]="NOT_VALIDATED"
+        audit["source_geometry_policy"]="CURRENT_12M_SOURCE_VERIFIED_NOT_NATIVE_EDB_ACCEPTED"
+        audit["unverified_old_scaling_workbooks"]="DO_NOT_USE_AS_CURRENT_MODEL_REFERENCE"
         if report.get("elastic_etabs_comparison"):
             audit["elastic_etabs_comparison"]=report["elastic_etabs_comparison"]
         write_status()
