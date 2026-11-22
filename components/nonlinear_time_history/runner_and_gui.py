@@ -157,6 +157,11 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
     else:
         algorithms = fallback_algorithms
     for algorithm in algorithms:
+        # [REF components/nonlinear_time_history/full_record_gate.py]
+        # The solver's return code is NOT an accepted physical time step.
+        attempt_start=float(ops.getTime())
+        if not math.isfinite(attempt_start):
+            raise RuntimeError('Nonfinite analysis clock before nonlinear transient retry; fresh-domain review required.')
         diagnostics['attempts']=diagnostics.get('attempts',0)+1
         diagnostics['algorithm_'+algorithm]=diagnostics.get('algorithm_'+algorithm,0)+1
         try:
@@ -168,20 +173,37 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
             failures.append(f"{algorithm}: {exc}")
         else:
             if rc == 0:
+                from components.nonlinear_time_history.full_record_gate import (
+                    verify_committed_transient_increment)
+                accepted_clock=verify_committed_transient_increment(
+                    attempt_start,ops.getTime(),dt)
+                # A response recorder may discover NaN/Inf even when OpenSees
+                # reports success. Never increment accepted-step counters,
+                # clear failed evidence or log minimum accepted dt beforehand.
+                if on_accept is not None:on_accept()
                 evidence_path = diagnostics.get("evidence_output_path")
                 if (evidence_path and Path(evidence_path).is_file()
                         and not diagnostics.get("preserve_first_step_failure_evidence")):
                     Path(evidence_path).unlink()
-                diagnostics['minimum_accepted_dt_s']=min(float(dt),diagnostics.get('minimum_accepted_dt_s',float(dt)))
-                try:diagnostics['max_convergence_iterations']=max(ops.testIter(),diagnostics.get('max_convergence_iterations',0))
+                diagnostics['minimum_accepted_dt_s']=min(
+                    accepted_clock['accepted_dt_s'],
+                    diagnostics.get('minimum_accepted_dt_s',accepted_clock['accepted_dt_s']))
+                diagnostics['accepted_steps']=diagnostics.get('accepted_steps',0)+1
+                diagnostics['last_accepted_time_s']=accepted_clock['end_time_s']
+                diagnostics.setdefault('first_accepted_step',{
+                    **accepted_clock,'algorithm':algorithm,'subdivision_depth':depth,
+                    'previous_failed_attempts':diagnostics.get('failed_attempts',0)})
+                try:diagnostics['max_convergence_iterations']=max(
+                    ops.testIter(),diagnostics.get('max_convergence_iterations',0))
                 except (AttributeError,TypeError):pass
-                if on_accept is not None:on_accept()
                 return 1
             failures.append(f"{algorithm}: return code {rc}")
         diagnostics['failed_attempts']=diagnostics.get('failed_attempts',0)+1
         diagnostics['last_failed_algorithm']=algorithm
         diagnostics['last_failed_time_s']=float(ops.getTime())
         diagnostics['last_failed_dt_s']=float(dt)
+        diagnostics['last_failed_return_code']=rc
+        diagnostics['last_failed_step_start_s']=attempt_start
         # Do not retry a domain whose trial state already contains NaN/Inf.
         # Such a retry can propagate a failed linear solve into every element;
         # it does not constitute a convergence recovery.
@@ -221,6 +243,22 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
                                 f"Non-finite element {response_name} after {algorithm} "
                                 f"failure at element {element}, t={ops.getTime():.6g}s. "
                                 "Stopping rather than retrying a contaminated model state.")
+        # If a rejected solve advanced time, a subsequent solver algorithm
+        # would start from an unverified trial state. Preserve the existing
+        # failure snapshot and abort rather than inventing a recovered step.
+        failed_clock=float(ops.getTime())
+        if not math.isfinite(failed_clock):
+            raise RuntimeError(
+                "Failed nonlinear step left a nonfinite analysis clock; "
+                "native solver state is not safe to retry.")
+        clock_tol=min(0.01*float(dt),
+                      max(1e-12,float(dt)*1e-7,abs(attempt_start)*1e-13))
+        if abs(failed_clock-attempt_start)>clock_tol:
+            raise RuntimeError(
+                f"Nonlinear failed step advanced analysis clock from "
+                f"{attempt_start:.12g}s to {failed_clock:.12g}s; "
+                "refusing retry on potentially contaminated trial state. "
+                "Inspect saved first-step evidence and rerun a fresh domain.")
     if depth >= max_depth:
         raise RuntimeError(f"Nonlinear step failed at t={ops.getTime():.6g}s, dt={dt:.6g}s after {depth} subdivision levels: " + "; ".join(failures))
     diagnostics['bisections']=diagnostics.get('bisections',0)+1
