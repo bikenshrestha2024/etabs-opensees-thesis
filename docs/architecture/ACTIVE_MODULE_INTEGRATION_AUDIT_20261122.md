@@ -135,6 +135,4 @@ consumer folder or silently duplicate saved evidence.
 | G7 — Windows release | Local Python 3.12/Spyder/ETABS v23/OpenSees stack, GUI reopen tests and production output contract |
 | G8 — Archive provenance | Historical EDB/workbooks/logs/results unchanged unless explicitly authorized and byte verified |
 
-**Do not mark all modules scientifically verified** from source AST,
-compilation, test discovery, or fixture-based CI alone. Existing integrated
-CI intentionally remains blocked while G2–G8 are outstanding.
+**Do not mark all modules scientifically verified** from source AST, compilation, test discovery, or fixture-based CI alone. The integrated **static** source audit now passes after an obsolete source-SHA attestation was preserved in a historical ledger and withdrawn from current approval. Engineering, native solver and complete producer/consumer migration gates G2–G8 remain open. See [current integrated audit](../../REVIEW_MAIN/08_SOFTWARE_SECURITY/20261122_INTEGRATED_ENGINEERING_AND_MIGRATION_AUDIT.md).
