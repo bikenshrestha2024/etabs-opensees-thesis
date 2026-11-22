@@ -4,7 +4,34 @@ import csv,json,math,time
 FIELDS=['method','limit_state','case','axis','location','metric','unit','basis']
 GUIDE='Export ETABS tables for the SAME model, mass source, effective stiffness, diaphragm, restraints, gravity/P-Delta, modes, damping, spectrum units, eccentricity and combinations. Normalize rows to this template. Modes must be paired by shape/participation, not only mode number. MRSM CQC envelopes are not signed simultaneous actions. No reinforcement-demand engine is claimed.'
 
-def collect(folder, issues=None, *, results_root=None):
+def source_execution_identity(document, expected_support_case='PHYSICAL_32',
+                              expected_mass_policy='SOURCE_DISTRIBUTED'):
+    """Assess MRSM execution configuration separately from geometric model SHA.
+
+    [REF engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md]
+    Older V132 records include the model SHA but omit the executed 32/76/97
+    restraint profile and actual seismic mass operator. Never infer those
+    from model filename, JSON case name, or matching base shear.
+    """
+    if not isinstance(document,dict):
+        return 'MISSING_EXECUTED_SUPPORT_OR_MASS_POLICY'
+    support=document.get('support_case')
+    mass=document.get('seismic_mass_policy')
+    if not support or not mass:
+        return 'MISSING_EXECUTED_SUPPORT_OR_MASS_POLICY'
+    if support!=expected_support_case:
+        return ('DIAGNOSTIC_SUPPORT_CASE_NOT_PRIMARY_32'
+                if expected_support_case=='PHYSICAL_32' and support in ('SOURCE_76','WALL_BASE_97')
+                else 'MISMATCHED_SELECTED_SUPPORT_CASE')
+    if mass!=expected_mass_policy:
+        return 'MISMATCHED_SELECTED_MASS_OPERATOR'
+    evidence=document.get('support_case_evidence') or {}
+    if evidence.get('status')!='MATCHED_SELECTED_CASE_NOT_NATIVE_EQUIVALENT':
+        return 'MISSING_ACTUAL_RUNTIME_SUPPORT_VERIFICATION'
+    return 'SOURCE_IDENTIFIED_NOT_NATIVE_ETABS_APPROVED'
+
+
+def collect(folder, issues=None, *, results_root=None, expected_support_case='PHYSICAL_32', expected_mass_policy='SOURCE_DISTRIBUTED'):
     """Collect ONLY current-model, source-state-matched result evidence.
 
     Historical model outputs without a model hash remain on disk but are not
@@ -53,11 +80,15 @@ def collect(folder, issues=None, *, results_root=None):
                 if resolved not in seen:
                     seen.add(resolved)
                     yield path
-    def add(method,state,case,axis,loc,metric,unit,basis,value,file):
+    def add(method,state,case,axis,loc,metric,unit,basis,value,file,execution_status=None):
         if value is not None and math.isfinite(float(value)):
             rows.append(dict(method=method,limit_state=state,case=case,axis=axis,
                 location=str(loc),metric=metric,unit=unit,basis=basis,
-                value=float(value),source_file=str(file)))
+                value=float(value),source_file=str(file),
+                source_execution_status=execution_status or '',
+                status=('SOURCE_EXECUTION_NOT_VERIFIED'
+                        if execution_status and execution_status!='SOURCE_IDENTIFIED_NOT_NATIVE_ETABS_APPROVED'
+                        else ''))) 
     def accepted(document,path,state):
         if state!=selected_state:
             issues.append(str(path)+': rejected opposite-state '+str(state))
@@ -101,17 +132,22 @@ def collect(folder, issues=None, *, results_root=None):
             if not accepted(d,p,d.get('limit_state')):
                 continue
             axis=d['axis']
+            execution=source_execution_identity(d,expected_support_case,expected_mass_policy)
+            if execution!='SOURCE_IDENTIFIED_NOT_NATIVE_ETABS_APPROVED':
+                issues.append(str(p)+': '+case+' '+execution+
+                              '; geometrical model SHA alone is not proof of selected '+expected_support_case+
+                              ' support / '+expected_mass_policy+' mass.')
             add('MRSM',state,case,axis,'BASE','base_shear','kN',
-                'CQC_force_scaled',d.get('scaled_modal_base_shear_kN'),p)
+                'CQC_force_scaled',d.get('scaled_modal_base_shear_kN'),p,execution)
             for r in d['stories']:
                 add('MRSM',state,case,axis,r['story_number'],'story_shear',
-                    'kN','CQC_force_scaled',r.get('scaled_story_shear_kN'),p)
+                    'kN','CQC_force_scaled',r.get('scaled_story_shear_kN'),p,execution)
                 # This is a master-node or extrapolated diaphragm response,
                 # not a reviewed exact ETABS point/displacement location.
                 add('MRSM',state,case,axis,r['story_number'],'displacement',
-                    'm','CQC_design_unscaled_by_7_5',r.get('design_displacement_m'),p)
+                    'm','CQC_design_unscaled_by_7_5',r.get('design_displacement_m'),p,execution)
                 add('MRSM',state,case,axis,r['story_number'],'drift_ratio',
-                    'ratio','CQC_design_unscaled_by_7_5',r.get('design_drift_ratio'),p)
+                    'ratio','CQC_design_unscaled_by_7_5',r.get('design_drift_ratio'),p,execution)
     for p in scan('NBC105_ESM_OpenSees_Response_*.json'):
         if not current_result(p):continue
         if 'Response_META_' in p.name:continue
@@ -182,10 +218,17 @@ def collect(folder, issues=None, *, results_root=None):
 def compare(rows, etabs, policy=None):
     """Compare exact normalized response bases with explicit evidence gates."""
     from components.validation.etabs_equivalence_report import evaluate
-    return evaluate(rows, etabs, FIELDS, policy)
+    results=evaluate(rows, etabs, FIELDS, policy)
+    for row in results:
+        identity=row.get('source_execution_status')
+        if identity and identity!='SOURCE_IDENTIFIED_NOT_NATIVE_ETABS_APPROVED':
+            row['status']='NOT_COMPARABLE'
+            row['note']='Executed MRSM support/mass identity requires review: '+identity+'. '+row.get('note','')
+            row['percent_difference']=None
+    return results
 
 
-def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None):
+def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None, expected_support_case='PHYSICAL_32', expected_mass_policy='SOURCE_DISTRIBUTED'):
     """Export source-normalized CSV and Excel comparisons.
 
     Existing CSV users remain supported. Direct ETABS API results are passed
@@ -198,7 +241,9 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None)
          else folder/'OpenSees_Analysis_Results')/'ETABS_Comparison_V148'
     out.mkdir(parents=True,exist_ok=True)
     source_issues=[]
-    rows=collect(folder,source_issues,results_root=results_root)
+    rows=collect(folder,source_issues,results_root=results_root,
+                 expected_support_case=expected_support_case,
+                 expected_mass_policy=expected_mass_policy)
     if not rows:
         source_issues.append('ZERO_SOURCE_MATCHED_ROWS: Check result location, '
                              'model SHA, limit state and completed solver outputs.')
@@ -232,6 +277,7 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None)
         result=rows
         write(out/'Comparison.csv',rows,FIELDS+['value','source_file'])
     (out/'Comparison_Guide.txt').write_text(GUIDE,encoding='utf-8')
+    (out/'Comparison_Execution_Profile.json').write_text(json.dumps(dict(support_case=expected_support_case,seismic_mass_policy=expected_mass_policy,source_identity_status='REVIEW_EACH_ROW'),indent=2),encoding='utf-8')
     (out/'run.json').write_text(json.dumps(
         dict(elapsed_s=time.perf_counter()-start,row_count=len(result),
              etabs_file=str(etabs_path or ''),direct_api=bool(etabs_rows and not etabs_path),
@@ -240,42 +286,93 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None)
     return result,out
 
 
+def verify_native_bundle(root, edb, expected_model_sha256):
+    """Verify one immutable-identity native API evidence set before auto-reuse.
+
+    [REF engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md §C]
+    Never auto-accept a hand-edited reference CSV, stale model hash,
+    opposite EDB path or a merely named 6 m-wall workbook.
+    """
+    from components.validation.etabs_direct_api import fingerprint, validate_mapping
+    root=Path(root)
+    csv_path=root/'ETABS_API_Normalized.csv'
+    provenance=root/'ETABS_API_Provenance.json'
+    mapping_file=root/'ETABS_API_Mapping_SELECTED.json'
+    if not all(p.is_file() for p in (csv_path,provenance,mapping_file)):
+        return None,'Missing approved native ETABS CSV, mapping or provenance'
+    try:
+        evidence=json.loads(provenance.read_text(encoding='utf-8-sig'))
+        mapping=json.loads(mapping_file.read_text(encoding='utf-8-sig'))
+        if not isinstance(evidence,dict) or not isinstance(mapping,dict):
+            return None,'Native ETABS mapping/provenance must be JSON objects'
+        if not mapping.get('assumptions_verified') is True:
+            return None,'Native ETABS mapping is not approved'
+        validate_mapping(mapping)
+        same_source=(Path(str(evidence.get('edb_path',''))).resolve()==Path(edb).resolve()
+                     and Path(str(mapping.get('source_edb',''))).resolve()==Path(edb).resolve()
+                     and evidence.get('edb_sha256')==fingerprint(edb))
+        if not same_source:
+            return None,'Original source EDB path/SHA mismatch'
+        if not expected_model_sha256 or evidence.get('source_model_sha256')!=expected_model_sha256:
+            return None,'Assembled model SHA does not match verified ETABS mapping export'
+        if evidence.get('native_csv_sha256')!=fingerprint(csv_path):
+            return None,'Native ETABS CSV SHA mismatch or missing provenance; re-read same EDB'
+        with csv_path.open(encoding='utf-8-sig',newline='') as stream:
+            values=list(csv.DictReader(stream))
+        if not values:
+            return None,'Native ETABS CSV has zero analyzed result rows'
+        required=tuple(k for k in FIELDS if k!='axis')+('value',)
+        for row in values:
+            if any(not str(row.get(k,'')).strip() for k in required):
+                return None,'ETABS normalized CSV has blank source/response identity fields'
+            if row.get('method')!='MODAL' and not str(row.get('axis','')).strip():
+                return None,'Directional ETABS normalized CSV has missing axis'
+            if not math.isfinite(float(row['value'])):
+                return None,'ETABS native row has nonfinite numerical value'
+        return csv_path,'Source EDB, assembled model, mapping and native CSV SHA verified'
+    except (OSError,ValueError,TypeError,OverflowError,KeyError) as exc:
+        return None,'Native source verification failed: '+str(exc)
+
+
 def find_verified_etabs_csv(source_folder, results_root):
-    """Auto-reuse only native ETABS API CSV with matching EDB SHA and approved map.
+    """Auto-select approved live API evidence from current or source-owned runs.
 
     [REF docs/source/components/validation/etabs_comparison.py.md]
-    A generated OpenSees_Normalized.csv or unfilled ETABS template is NOT
-    evidence of native ETABS analysis; review ZIPs are not live API sources.
+    No filename similarity is ever used as a source-identity assertion.
+    Only SHA-matched source EDB, assembled model and reference files qualify.
     """
+    import hashlib
     from components.inputs.project_workbooks import _source_edb_path
-    from components.validation.etabs_direct_api import fingerprint
-    edb=_source_edb_path(source_folder)
+    from components.inputs.output_layout import export_root_for
+    folder=Path(source_folder)
+    edb=_source_edb_path(folder)
+    model=folder/'OpenSees_Complete_Model_Data_V118.json'
     if not edb or not Path(edb).is_file():
-        return None,'Current original source EDB inaccessible'
-    root=Path(results_root)/'ETABS_Comparison_V148'
-    meta=root/'ETABS_API_Provenance.json'
-    mapfile=root/'ETABS_API_Mapping_SELECTED.json'
-    csv_path=root/'ETABS_API_Normalized.csv'
-    if not all(p.is_file() for p in (meta,mapfile,csv_path)):
-        return None,'No approved native ETABS CSV; run Direct ETABS API once'
-    try:
-        evidence=json.loads(meta.read_text(encoding='utf-8-sig'))
-        mapping=json.loads(mapfile.read_text(encoding='utf-8-sig'))
-        if not isinstance(evidence,dict) or not isinstance(mapping,dict):
-            return None,'Saved ETABS provenance/mapping JSON must be objects, not lists'
-        if (evidence.get('edb_sha256')!=fingerprint(edb) or
-            Path(evidence.get('edb_path','')).resolve()!=Path(edb).resolve() or
-            Path(mapping.get('source_edb','')).resolve()!=Path(edb).resolve()):
-            return None,'Previous ETABS source path or SHA differs'
-        if not mapping.get('assumptions_verified'):
-            return None,'Native mapping is not approved for physical comparison'
-        with csv_path.open(encoding='utf-8-sig',newline='') as f:
-            values=list(csv.DictReader(f))
-        if not values or any(not all(str(row.get(k,'')).strip() for k in FIELDS+['value']) for row in values):
-            return None,'Saved normalized native ETABS CSV is incomplete'
-        return csv_path,'Verified native ETABS CSV auto-selected'
-    except (OSError,ValueError,TypeError,KeyError) as exc:
-        return None,'ETABS source evidence failed verification: '+str(exc)
+        return None,'Current original source EDB inaccessible; live API can read only exact EDB'
+    if not model.is_file():
+        return None,'Current assembled model file missing; cannot establish source SHA'
+    expected_model=hashlib.sha256(model.read_bytes()).hexdigest()
+    root=Path(results_root).expanduser().resolve()
+    stage=export_root_for(folder)
+    candidates=[
+        root/'ETABS_Comparison_V148',
+        stage/'05_COMPARISONS'/'ETABS_Comparison_V148',
+        folder/'05_COMPARISONS'/'ETABS_Comparison_V148',
+        folder/'OpenSees_Analysis_Results'/'ETABS_Comparison_V148',
+    ]
+    if root.name=='02_RESULTS':
+        candidates.append(root.parent/'05_COMPARISONS'/'ETABS_Comparison_V148')
+    reasons=[]
+    used=set()
+    for location in candidates:
+        resolved=location.resolve()
+        if resolved in used:continue
+        used.add(resolved)
+        data,note=verify_native_bundle(resolved,edb,expected_model)
+        if data:
+            return data,'Verified native ETABS data auto-selected: '+str(data)
+        reasons.append(resolved.name+': '+note)
+    return None,'No SHA-verified same-model ETABS API data; '+(' | '.join(reasons[:3]) or 'no sources')
 
 
 def find_native_reference_csv(source_folder, results_root):
@@ -312,8 +409,21 @@ def launch(parent,folder,results_root=None):
  from tkinter import ttk,filedialog,messagebox
  win=tk.Toplevel(parent);win.title('ETABS comparison — verified source / cases');win.geometry('1200x750')
  path=tk.StringVar();status=tk.StringVar()
+ support_filter=tk.StringVar(value='PHYSICAL_32')
+ mass_filter=tk.StringVar(value='SOURCE_DISTRIBUTED')
  latest={'rows':None,'out':None,'etabs_rows':None,'policy':None}
  bar=ttk.Frame(win,padding=5);bar.pack(fill='x')
+ filter_row=ttk.Frame(bar);filter_row.pack(fill='x',pady=(0,4))
+ ttk.Label(filter_row,text='Actual OpenSees foundation case:').pack(side='left')
+ ttk.Combobox(filter_row,textvariable=support_filter,
+              values=('PHYSICAL_32','SOURCE_76','WALL_BASE_97'),
+              state='readonly',width=19).pack(side='left',padx=(4,16))
+ ttk.Label(filter_row,text='Executed seismic mass operator:').pack(side='left')
+ ttk.Combobox(filter_row,textvariable=mass_filter,
+              values=('SOURCE_DISTRIBUTED','STORY_LUMPED_NBC'),
+              state='readonly',width=22).pack(side='left',padx=5)
+ ttk.Label(filter_row,text='Older 76-restraint MRSM JSON without identity stays NOT_COMPARABLE.',
+           foreground='#953b19').pack(side='left',padx=8)
  file_row=ttk.Frame(bar);file_row.pack(fill='x',pady=(0,4))
  ttk.Label(file_row,text='Native ETABS normalized CSV (optional):').pack(side='left',padx=(0,5))
  ttk.Entry(file_row,textvariable=path,width=65).pack(side='left',fill='x',expand=True)
@@ -328,7 +438,10 @@ def launch(parent,folder,results_root=None):
                   else Path(folder)/'OpenSees_Analysis_Results')
  auto_file,auto_note=find_verified_etabs_csv(folder,comparison_root)
  native_file=None if auto_file else find_native_reference_csv(folder,comparison_root)
- if auto_file:path.set(str(auto_file))
+ if auto_file:
+  path.set(str(auto_file))
+  latest['policy']=json.loads((Path(auto_file).parent/'ETABS_API_Mapping_SELECTED.json').read_text(encoding='utf-8-sig'))
+  latest['approved_auto_csv']=str(Path(auto_file).resolve())
  elif native_file:path.set(str(native_file))
  status.set('SOURCE: '+auto_note)
  def template_for_current_edb():
@@ -425,14 +538,32 @@ def launch(parent,folder,results_root=None):
                        'and basis checks before using Direct ETABS API.')
      extracted=connect_and_extract(folder,mapping)
      compared,out=save(folder,etabs_rows=extracted,policy=mapping,
-                      results_root=results_root)
+                      results_root=results_root,
+                      expected_support_case=support_filter.get(),
+                      expected_mass_policy=mass_filter.get())
      from components.validation.etabs_direct_api import fingerprint
+     model_source=Path(folder)/'OpenSees_Complete_Model_Data_V118.json'
+     if not model_source.is_file():
+      raise FileNotFoundError('Current OpenSees assembled model is required to bind native ETABS data')
      provenance={"edb_path":str(Path(chosen).resolve()),"edb_sha256":fingerprint(chosen),
+                 "source_model_sha256":fingerprint(model_source),
+                 "native_csv_sha256":fingerprint(out/'ETABS_API_Normalized.csv'),
                  "mapping_path":str(Path(config).resolve()),
                  "row_count":len(extracted),"assumptions_verified":bool(mapping.get('assumptions_verified'))}
-     (out/'ETABS_API_Provenance.json').write_text(json.dumps(provenance,indent=2),encoding='utf-8')
      (out/'ETABS_API_Mapping_SELECTED.json').write_text(
          json.dumps(mapping,indent=2),encoding='utf-8')
+     (out/'ETABS_API_Provenance.json').write_text(json.dumps(provenance,indent=2),encoding='utf-8')
+     # Small SHA-pinned reference bundle has one stable stage-owned address
+     # across multiple MRSM per-case result folders. Do not duplicate actual
+     # EDB or private full ETABS source workbooks.
+     from components.inputs.output_layout import export_root_for
+     stable=export_root_for(folder)/'05_COMPARISONS'/'ETABS_Comparison_V148'
+     if stable.resolve()!=out.resolve():
+      import shutil
+      stable.mkdir(parents=True,exist_ok=True)
+      for filename in ('ETABS_API_Normalized.csv','ETABS_API_Mapping_SELECTED.json',
+                       'ETABS_API_Provenance.json'):
+       shutil.copy2(out/filename,stable/filename)
     finally:comtypes.CoUninitialize()
     def done():
      latest.update(rows=compared,out=out,etabs_rows=extracted,policy=mapping)
@@ -445,6 +576,112 @@ def launch(parent,folder,results_root=None):
   status.set('Reading the matching already-open EDB; files remain read-only…')
   threading.Thread(target=worker,daemon=True).start()
  ttk.Button(bar,text='Direct ETABS API / EDB…',command=direct_api).pack(side='left')
+ def observe_native(auto=False):
+  """Show read-only native ETABS values even before mapping is approved.
+
+  Raw signed BaseReact quantities are NOT silently relabelled CQC scaled
+  data; reviewed case/point mapping is still required to populate
+  etabs_value / percent_difference for physical comparison.
+  """
+  import threading
+  from components.inputs.project_workbooks import _source_edb_path
+  known=_source_edb_path(folder)
+  if auto and (not known or not Path(known).is_file()):
+   return
+  chosen=(str(Path(known).resolve()) if known and Path(known).is_file() else
+          ('' if auto else filedialog.askopenfilename(
+            parent=win,title='Choose current exact ETABS source .EDB',
+            filetypes=[('ETABS EDB','*.edb')])))
+  if not chosen:return
+  def worker():
+   try:
+    import comtypes
+    comtypes.CoInitialize()
+    try:
+     from OpenSees_Project_Inputs_V123 import connect_etabs
+     from components.validation.etabs_direct_api import discover_native_base_reactions
+     evidence=discover_native_base_reactions(
+         connect_etabs().SapModel,chosen)
+     from datetime import datetime,timezone
+     snapshot=(comparison_root/'ETABS_Comparison_V148'/'Native_Observed'/
+               datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S_%fZ'))
+     snapshot.mkdir(parents=True,exist_ok=False)
+     metadata=snapshot/'ETABS_Native_Observed.json'
+     metadata.write_text(json.dumps(evidence,indent=2),encoding='utf-8')
+     columns=('etabs_case','case_kind','step_type','step_number','Fx_kN','Fy_kN','Fz_kN','Mx_kNm','My_kNm','Mz_kNm')
+     write_rows=snapshot/'ETABS_Native_Observed.csv'
+     with write_rows.open('w',newline='',encoding='utf-8-sig') as output:
+      writer=csv.DictWriter(output,fieldnames=columns,extrasaction='ignore')
+      writer.writeheader();writer.writerows(evidence['rows'])
+    finally:
+     comtypes.CoUninitialize()
+    def done():
+     latest['native_observations']=evidence
+     status.set('LIVE ETABS SOURCE OBSERVED: '+str(len(evidence['rows']))+
+                ' raw reaction rows from exact EDB; '+str(len(evidence['excluded']))+
+                ' case read exceptions. NOT case/basis matched. '+str(snapshot))
+     panel=tk.Toplevel(win);panel.title('Actual native ETABS BaseReact — RAW observations, not mapped comparison')
+     panel.geometry('1060x530')
+     ttk.Label(panel,text='Read-only native EDB / SHA256: '+str(evidence['source_edb_sha256'])+
+               ' | Unpaired signed ETABS reactions. To fill verified etabs_value, use reviewed Direct ETABS API case/story map.',
+               wraplength=1000).pack(fill='x',padx=8,pady=7)
+     frame=ttk.Frame(panel);frame.pack(fill='both',expand=True,padx=6,pady=5)
+     table=ttk.Treeview(frame,columns=columns,show='headings')
+     vertical=ttk.Scrollbar(frame,orient='vertical',command=table.yview)
+     horizontal=ttk.Scrollbar(frame,orient='horizontal',command=table.xview)
+     table.configure(yscrollcommand=vertical.set,xscrollcommand=horizontal.set)
+     frame.rowconfigure(0,weight=1);frame.columnconfigure(0,weight=1)
+     table.grid(row=0,column=0,sticky='nsew');vertical.grid(row=0,column=1,sticky='ns');horizontal.grid(row=1,column=0,sticky='ew')
+     for col in columns:table.heading(col,text=col);table.column(col,width=125,stretch=False)
+     for row in evidence['rows']:
+      table.insert('','end',values=[row.get(col,'') for col in columns])
+     def preview_link():
+      """Attach actual signed native force to one selected BASE row as UNVERIFIED PREVIEW."""
+      source_selected=table.selection()
+      target_selected=tree.selection()
+      if len(source_selected)!=1 or len(target_selected)!=1:
+       messagebox.showwarning('Select both response rows',
+         'Select one actual ETABS native row above and one OpenSees MRSM BASE base_shear row in the comparison table behind this window.',
+         parent=panel)
+       return
+      ref=table.item(source_selected[0],'values')
+      item=tree.item(target_selected[0],'values')
+      native=dict(zip(columns,ref))
+      current=dict(zip(cols,item))
+      if current.get('method')!='MRSM' or current.get('metric')!='base_shear' or current.get('location')!='BASE' or current.get('axis') not in ('X','Y'):
+       messagebox.showerror('Unsupported comparison preview',
+         'Raw ETABS BaseReact can only be preview-linked to an OpenSees MRSM BASE base_shear row. Story response, modal modes and drift need their exact source/mapping.',
+         parent=panel)
+       return
+      direction=current['axis']
+      native_component='Fx_kN' if direction=='X' else 'Fy_kN'
+      raw_value=float(native[native_component])
+      # Record the ACTUAL RAW signed ETABS reaction, with no fictitious
+      # CQC/NBC force normalization, percentage comparison or PASS status.
+      tree.set(target_selected[0],'etabs_value',format(raw_value,'.9g'))
+      tree.set(target_selected[0],'percent_difference','')
+      tree.set(target_selected[0],'status','RAW_ETABS_PREVIEW_NOT_COMPARABLE')
+      status.set('RAW PREVIEW ONLY: OpenSees '+str(current.get('case'))+
+                ' shown alongside '+str(native['etabs_case'])+'/'+str(native['step_type'])+
+                ' native '+native_component+'. No response-basis approval; exact mapping and CQC/force-scaling review required.')
+     ttk.Button(panel,text='Preview-link selected ETABS base reaction to highlighted MRSM BASE row (NOT verified)',
+                command=preview_link).pack(anchor='w',padx=8,pady=5)
+     ttk.Label(panel,text='Source snapshot: '+str(write_rows),wraplength=1040).pack(anchor='w',padx=8,pady=4)
+     ttk.Button(panel,text='Close',command=panel.destroy).pack(anchor='e',padx=8,pady=4)
+    win.after(0,done)
+   except Exception as exc:
+    if not auto:
+     win.after(0,lambda error=str(exc):
+       messagebox.showerror('Native ETABS observation unavailable',error,parent=win))
+    else:
+     win.after(0,lambda error=str(exc):
+       status.set('AUTO LIVE ETABS READ UNAVAILABLE: '+error+
+                  ' | Use Read native ETABS values when source EDB and ETABS are ready.'))
+  status.set('Reading native analyzed base reactions from the exact already-open ETABS EDB; not modifying EDB…')
+  threading.Thread(target=worker,daemon=True).start()
+
+ ttk.Button(bar,text='Read native ETABS values (live, read-only)',command=observe_native).pack(side='left',padx=3)
+
  ttk.Label(win,text=GUIDE,wraplength=1150).pack(fill='x');ttk.Label(win,textvariable=status).pack(fill='x')
  frame=ttk.Frame(win);frame.pack(fill='both',expand=True);cols=FIELDS+['value','etabs_value','percent_difference','status'];tree=ttk.Treeview(frame,columns=cols,show='headings');sy=ttk.Scrollbar(frame,command=tree.yview);sx=ttk.Scrollbar(frame,orient='horizontal',command=tree.xview);tree.configure(yscrollcommand=sy.set,xscrollcommand=sx.set);tree.grid(row=0,column=0,sticky='nsew');sy.grid(row=0,column=1,sticky='ns');sx.grid(row=1,column=0,sticky='ew');frame.rowconfigure(0,weight=1);frame.columnconfigure(0,weight=1)
  for c in cols:tree.heading(c,text=c);tree.column(c,width=150,stretch=False)
@@ -454,10 +691,17 @@ def launch(parent,folder,results_root=None):
    tree.insert('','end',values=[row.get(c,'') for c in cols])
  def refresh():
   try:
-   rows,out=(save(folder,path.get(),results_root=results_root) if path.get() else
+   rows,out=(save(folder,path.get(),
+                  policy=(latest['policy'] if latest.get('approved_auto_csv')==str(Path(path.get()).resolve()) else None),
+                  results_root=results_root,
+                  expected_support_case=support_filter.get(),expected_mass_policy=mass_filter.get()) if path.get() else
              (save(folder,etabs_rows=latest['etabs_rows'],policy=latest['policy'],
-                   results_root=results_root) if latest['etabs_rows'] is not None
-              else save(folder,results_root=results_root)))
+                   results_root=results_root,
+                   expected_support_case=support_filter.get(),
+                   expected_mass_policy=mass_filter.get()) if latest['etabs_rows'] is not None
+              else save(folder,results_root=results_root,
+                        expected_support_case=support_filter.get(),
+                        expected_mass_policy=mass_filter.get())))
    show_rows(rows)
    if not rows:
     audit=out/'Comparison_Source_Exclusions.json'
@@ -477,9 +721,9 @@ def launch(parent,folder,results_root=None):
   selected=tree.selection()
   if not selected:messagebox.showinfo('Select quantity','Select a comparison row first.',parent=win);return
   key=tree.item(selected[0],'values')
-  rows=(save(folder,path.get(),results_root=results_root)[0] if path.get() else
+  rows=(save(folder,path.get(),results_root=results_root,expected_support_case=support_filter.get(),expected_mass_policy=mass_filter.get())[0] if path.get() else
         latest['rows'] if latest['rows'] is not None
-        else save(folder,results_root=results_root)[0])
+        else save(folder,results_root=results_root,expected_support_case=support_filter.get(),expected_mass_policy=mass_filter.get())[0])
   subset=[r for r in rows if all(str(r.get(k,''))==key[cols.index(k)] for k in ('method','limit_state','case','axis','metric','unit','basis'))]
   if not subset:
    messagebox.showwarning('No solved response','No verified source-matched response series for this selection. Review Comparison_Source_Exclusions.json; do not plot invented zeros.',parent=win)
@@ -495,6 +739,8 @@ def launch(parent,folder,results_root=None):
   candidate,note=find_verified_etabs_csv(folder,comparison_root)
   if candidate:
    path.set(str(candidate))
+   latest['policy']=json.loads((Path(candidate).parent/'ETABS_API_Mapping_SELECTED.json').read_text(encoding='utf-8-sig'))
+   latest['approved_auto_csv']=str(Path(candidate).resolve())
    refresh()
    status.set('VERIFIED ETABS SOURCE: '+str(candidate)+
               ' | match still requires the same structural response basis')

@@ -75,6 +75,72 @@ def select_diagnostic_duration(full_duration_s, trial_duration_s=None):
     return actual,actual<full-1e-9
 
 
+def parse_linear_gui_numeric_inputs(raw, *, source_state, selected_state, x_only):
+    """Fail before making history results when state/period inputs are missing.
+
+    [REF NBC105-2025 §5.1, §8.1.1, §8.1.2]
+    Do not treat empirical design T1 as the modal damping period. This
+    validates numbers and source state; it does not verify native ETABS
+    stiffness, source modal participation, P-Delta, or ground-motion scaling.
+    """
+    state=str(selected_state).strip().upper()
+    source=str(source_state or '').strip().upper()
+    if state not in ('ULS','SLS'):
+        raise ValueError('Select either ULS or SLS for time-history context.')
+    if source not in ('ULS','SLS'):
+        raise ValueError('Current source model ULS/SLS identity unavailable; select a verified EDB export before running.')
+    if state!=source:
+        raise ValueError('Selected '+state+' conflicts with source model '+source+
+                         '. Select the matching '+state+' export or change the GUI to '+source+
+                         '; cannot reuse the other limit state period/stiffness basis.')
+    names={
+        'damping':'Damping target (%)',
+        'p1':'Rayleigh period 1 (s)', 'p2':'Rayleigh period 2 (s)',
+        't1x':'T1 X (s)', 't1y':'T1 Y (s)',
+        'tnx':'Tn X (s)', 'tny':'Tn Y (s)',
+        'nmodes':'Modes to check', 'x_scale':'X record scale factor',
+        'pair_scale':'Common X/Y pair scale factor',
+        'trial_duration':'Optional short trial duration (s)',
+    }
+    required=('damping','p1','p2','t1x','tnx','nmodes','x_scale','pair_scale')
+    if not x_only:
+        required=required+('t1y','tny')
+    missing=[names[k] for k in required if str(raw.get(k,'')).strip()=='']
+    if missing:
+        raise ValueError('Enter or refresh missing numerical inputs: '+', '.join(missing)+
+                         '. Run the exact '+state+' Modal and Rayleigh source analyses before retrying.')
+    parsed={}
+    for key in required+tuple(k for k in ('t1y','tny','trial_duration') if k not in required):
+        val=str(raw.get(key,'')).strip()
+        if not val:
+            parsed[key]=None
+            continue
+        try:
+            number=float(val)
+        except (TypeError,ValueError,OverflowError) as exc:
+            raise ValueError(names[key]+' must be a finite positive number: '+repr(val)) from exc
+        if not math.isfinite(number) or number<=0:
+            raise ValueError(names[key]+' must be finite and positive.')
+        if key=='nmodes' and (number!=int(number) or number>1000):
+            raise ValueError(names[key]+' must be a positive integer (at most 1000).')
+        parsed[key]=int(number) if key=='nmodes' else number
+    if parsed['damping']>5.:
+        raise ValueError('NBC 105:2025 §8.1.1: linear viscous damping must not exceed 5%.')
+    if math.isclose(parsed['p1'],parsed['p2'],rel_tol=0,abs_tol=1e-10):
+        raise ValueError('Rayleigh period 1 (s) and Rayleigh period 2 (s) must be distinct modal-calibration periods.')
+    return {
+        'damping_ratio_percent':parsed['damping'],
+        'damping_period_1_s':parsed['p1'],
+        'damping_period_2_s':parsed['p2'],
+        'T1_x_s':parsed['t1x'],'T1_y_s':parsed['t1y'],
+        'Tn_x_s':parsed['tnx'],'Tn_y_s':parsed['tny'],
+        'modes_to_check':parsed['nmodes'],
+        'x_scale_factor':parsed['x_scale'],
+        'pair_scale_factor':parsed['pair_scale'],
+        'trial_duration_s':parsed['trial_duration'],
+    }
+
+
 def _run_analysis(config):
     config.setdefault('gravity_profile',os.environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
     if not config.get("execute_linear_time_history", False):
@@ -755,18 +821,35 @@ class LinearTimeHistoryGUI:
                 return
             x_only = self.motion_mode.get() == LTH_X_ONLY_MODE
             use_preloaded_pairs = (not x_only) and (not self.manifest.get().strip())
+            from components.inputs.project_workbooks import source_limit_state, require_source_state
+            script_path=Path(self.model.get().strip())
+            if not script_path.is_file():
+                raise ValueError('Select an existing, current linear model-builder script before running.')
+            source_state,source_note=source_limit_state(script_path.parent)
+            # Enforce source ULS/SLS before numerical parsing: a selected SLS
+            # GUI cannot use a ULS EDB's periods, stiffness or gravity preload.
+            raw_numeric=dict(
+                damping=self.damping.get(),p1=self.p1.get(),p2=self.p2.get(),
+                t1x=self.t1x.get(),t1y=self.t1y.get(),
+                tnx=self.tnx.get(),tny=self.tny.get(),nmodes=self.nmodes.get(),
+                x_scale=self.x_scale.get(),pair_scale=self.pair_scale.get(),
+                trial_duration=self.trial_duration.get())
+            numeric=parse_linear_gui_numeric_inputs(
+                raw_numeric,source_state=source_state,
+                selected_state=self.ls.get(),x_only=x_only)
+            require_source_state(script_path.parent,self.ls.get())
             values = {"model_script": self.model.get().strip(), "python": self.python.get().strip(), "model_length_unit": self.model_length_unit.get(), "motion_manifest": self.manifest.get().strip(),
                 "support_case": self.support_case.get(), "seismic_mass_policy": self.seismic_mass_policy.get(),
                 "story_nodes_csv": self.stories.get().strip(), "output_dir": self.output.get().strip(), "limit_state": self.ls.get(),
-                "damping_ratio_percent": float(self.damping.get()), "damping_period_1_s": float(self.p1.get()), "damping_period_2_s": float(self.p2.get()),
-                "T1_x_s": float(self.t1x.get()), "T1_y_s": float(self.t1y.get()) if self.t1y.get().strip() else None,
-                "Tn_x_s": float(self.tnx.get()), "Tn_y_s": float(self.tny.get()) if self.tny.get().strip() else None,
-                "modes_to_check": int(self.nmodes.get()), "torsion_sensitive": bool(self.torsion.get()),
+                "damping_ratio_percent": numeric["damping_ratio_percent"], "damping_period_1_s": numeric["damping_period_1_s"], "damping_period_2_s": numeric["damping_period_2_s"],
+                "T1_x_s": numeric["T1_x_s"], "T1_y_s": numeric["T1_y_s"],
+                "Tn_x_s": numeric["Tn_x_s"], "Tn_y_s": numeric["Tn_y_s"],
+                "modes_to_check": numeric["modes_to_check"], "torsion_sensitive": bool(self.torsion.get()),
                 "motion_mode": "X_ONLY_SCREENING" if x_only else "PAIRED_3D", "peer_x_paths": self.x_record_paths,
-                "x_scale_factor": float(self.x_scale.get()), "pair_scale_factor": float(self.pair_scale.get()),
+                "x_scale_factor": numeric["x_scale_factor"], "pair_scale_factor": numeric["pair_scale_factor"],
                 "use_preloaded_peer_pairs": use_preloaded_pairs, "peer_pairs": LTH_DEFAULT_PEER_PAIRS,
                 "execute_linear_time_history": True, "record_matching_metadata": LTH_MATCHING_METADATA,
-                "trial_duration_s": (float(self.trial_duration.get()) if self.trial_duration.get().strip() else None),
+                "trial_duration_s": numeric["trial_duration_s"],
                 "linear_factor_once_experimental": bool(self.linear_factor_once.get()),
                 "elastic_constant_tangent_verified": bool(self.elastic_constant_tangent_verified.get()),
                 "linear_vectorized_reactions_experimental": bool(self.vectorized_reactions.get())}

@@ -275,6 +275,78 @@ def connect_and_extract(folder, mapping):
     return extract_from_sap(app.SapModel,{**mapping,'export_dir':str(folder)})
 
 
+def discover_native_base_reactions(sap, source_edb, *, max_cases=250):
+    """Read actual analyzed native ETABS case and combo base forces, as RAW data.
+
+    [REF docs/validation/etabs_direct/README.md]
+    This observation is NOT a matching CQC/NBC response basis and must never
+    fill a verified ETABS comparison row until case/story/scaling assumptions
+    have been reviewed. Read-only: restore original output selections/units.
+    """
+    selected=Path(source_edb).expanduser().resolve()
+    if not selected.is_file() or selected.suffix.lower()!='.edb':
+        raise FileNotFoundError('Exact existing source EDB is required for live native ETABS read.')
+    actual=Path(str(sap.GetModelFilename())).expanduser().resolve()
+    if actual!=selected:
+        raise ValueError('The active ETABS source EDB does not match the selected current model; '
+                         'open the exact source EDB in ETABS and retry.')
+    limit=int(max_cases)
+    if limit<1 or limit>5000:
+        raise ValueError('max_cases must be between 1 and 5000.')
+    case_names=_names(sap.LoadCases,'LoadCases')
+    combo_names=_names(sap.RespCombo,'RespCombo')
+    if len(case_names)+len(combo_names)>limit:
+        raise ValueError('Native ETABS model contains too many cases for raw preview ('+
+                         str(len(case_names)+len(combo_names))+'); explicitly raise max_cases.')
+    old_units=sap.GetPresentUnits()
+    snapshot=_snapshot_setup(sap)
+    rows=[];excluded=[]
+    try:
+        _ok(sap.SetPresentUnits(UNITS_KN_M_C),'SetPresentUnits(kN-m-C)')
+        for kind,items in (('load_case',case_names),('response_combo',combo_names)):
+            for name in items:
+                try:
+                    _ok(sap.Results.Setup.DeselectAllCasesAndCombosForOutput(),
+                        'clear native raw selection')
+                    if kind=='load_case':
+                        _ok(sap.Results.Setup.SetCaseSelectedForOutput(name),
+                            'select native load case '+str(name))
+                    else:
+                        _ok(sap.Results.Setup.SetComboSelectedForOutput(name),
+                            'select native combo '+str(name))
+                    result=_arrays(sap.Results.BaseReact(),13,
+                                   'BaseReact raw '+str(name))
+                    for i in range(result[0]):
+                        if str(result[1][i])!=str(name):
+                            continue
+                        rows.append(dict(etabs_case=str(name),case_kind=kind,
+                            step_type=str(result[2][i]),
+                            step_number=float(result[3][i]),
+                            Fx_kN=_finite(result[4][i],'FX'),
+                            Fy_kN=_finite(result[5][i],'FY'),
+                            Fz_kN=_finite(result[6][i],'FZ'),
+                            Mx_kNm=_finite(result[7][i],'MX'),
+                            My_kNm=_finite(result[8][i],'MY'),
+                            Mz_kNm=_finite(result[9][i],'MZ')))
+                except (RuntimeError,ValueError,TypeError,IndexError) as exc:
+                    excluded.append(dict(case=str(name),case_kind=kind,
+                                         reason=type(exc).__name__+': '+str(exc)))
+    finally:
+        try:
+            _restore_setup(sap,snapshot)
+        finally:
+            _ok(sap.SetPresentUnits(old_units),'restore ETABS present units')
+    if not rows:
+        raise RuntimeError('ETABS returned no analyzed native BaseReact rows for available cases. '
+                           'Run the correct case in ETABS and review excluded cases.')
+    return dict(source_edb=str(selected),source_edb_sha256=fingerprint(selected),
+                observed_native_model=str(actual),
+                units='kN-m-s',analysis_equivalence='NOT_VERIFIED',
+                response_basis='RAW_ETABS_BASE_REACTIONS_SIGNED_NOT_CQC_NBC_MATCHED',
+                scanned_load_cases=len(case_names),scanned_combos=len(combo_names),
+                rows=rows,excluded=excluded)
+
+
 def fingerprint(path):
     digest=hashlib.sha256()
     with Path(path).open("rb") as f:
