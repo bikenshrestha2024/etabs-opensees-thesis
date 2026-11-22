@@ -224,7 +224,8 @@ def bundle_esm_validation(source_export,esm_output,save_under,progress=None,
         "and true ETABS responses by case, direction, branch and level.\n",
         encoding="utf-8")
     announce("PACKAGING | ESM validation ZIP")
-    bundle=root.parent/(root.name+"_UPLOAD.zip")
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    bundle=ensure_review_zip_directory(outputs)/(root.name+"_UPLOAD.zip")
     with zipfile.ZipFile(bundle,"w",compression=zipfile.ZIP_DEFLATED,
                          compresslevel=6,allowZip64=True) as z:
         for f in sorted(root.rglob("*")):
