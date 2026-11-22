@@ -48,7 +48,14 @@ def registered_project_source(export_dir, role, *, missing_lfs='error'):
                  _runtime_repo_root()/'project_sources.private.json',
                  Path(export_dir)/'excel'/'SOURCE_REGISTRY.json',
                  _runtime_repo_root()/'excel'/'SOURCE_REGISTRY.json']
-    if os.environ.get('OPENSEES_PROJECT_SOURCES'):
+    # Once a current ETABS export has a canonical source manifest, it
+    # becomes the sole source of native-table roles for that export.
+    # An absent role must remain absent, not silently fall back to an
+    # older bundled workbook with the same broad model name.
+    canonical=current_export/'01_ETABS_EXPORT'/'00_MANIFEST'/'PROJECT_SOURCES.private.json'
+    if canonical.is_file():
+        locations=[canonical]
+    elif os.environ.get('OPENSEES_PROJECT_SOURCES'):
         locations.insert(0, Path(os.environ['OPENSEES_PROJECT_SOURCES']))
     current = _source_edb_path(export_dir)
     for registry in locations:
