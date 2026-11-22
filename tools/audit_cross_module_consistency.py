@@ -122,12 +122,14 @@ def scan_consistency(root):
     versions=[]
     edges=Counter()
     owners=Counter()
+    domains=Counter()
     errors=[]
     n=0
     for path in source_files(root):
         rel=path.relative_to(root).as_posix()
         n+=1
         owners[owner(rel)]+=1
+        domains[domain_for(rel)]+=1
         try:
             code=path.read_text(encoding="utf-8-sig")
             tree=ast.parse(code,filename=rel)
@@ -166,6 +168,7 @@ def scan_consistency(root):
         "schema":"THESIS_ACTIVE_MODULE_INTEGRATION_AUDIT_V1",
         "scope":"STATIC_AST_NO_NATIVE_SOLVER_NO_MODEL_APPROVAL",
         "active_sources_scanned":n,"owner_counts":dict(sorted(owners.items())),
+        "domain_counts":dict(sorted(domains.items())),
         "shadowed_definitions":shadowed,
         "cross_file_exact_body_clone_candidates":clone_groups,
         "versioned_workbook_literal_review":versions,
