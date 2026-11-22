@@ -70,3 +70,43 @@ The local evidence checker `python -m components.nbc105.acceptance /path/to/V107
 ## Exhaustive compliance audit — latest evidence gates
 
 Run `python -m components.nbc105 --audit` to obtain the 235 indexed printed section headings and hard-stop source/production/native evidence gates; the command deliberately exits 2 because indexing a heading does not prove every normative sentence or detailing rule. The same mandatory source and Annex A/B/C gates are reported by `python -m components.nbc105.acceptance <local acceptance JSON>`. The current native model, support reactions, full Rayleigh COM displacements and completed nonlinear histories are not independently validated. The [acceptance register](EXHAUSTIVE_REQUIREMENTS_ACCEPTANCE_REGISTER_20261121.md) defines the missing evidence and limited source-reference scope.
+
+## 2026-11-22 — Usable input contracts for every exposed clause operation
+
+The settings dialog now obtains a **named JSON input template** from the
+actual exported Python signature for every Clause 1–10 and Annex A/B rule.
+For example, Clause 5 `accidental_eccentricities_m` displays:
+
+```json
+{"building_width_m": null}
+```
+
+Enter a verified building width in **metres**; the reference function
+calculates the signed ±5% eccentricities (it does not modify ETABS). An
+empty `{}` is not an adequate input to this function. The dispatcher now
+reports the missing/extra argument name rather than the generic
+"input signature mismatch" error. Switching operations refreshes the
+correct template and retains per-operation edits during the current dialog.
+
+CLI argument contract:
+
+```powershell
+python -m components.nbc105 --list
+python -m components.nbc105 --describe --clause 5 --operation accidental_eccentricities_m
+python -m components.nbc105 --clause 5 --operation accidental_eccentricities_m --json "{\\"building_width_m\\":24.0}"
+python -m components.nbc105 --audit
+```
+
+The dialog's **Source coverage (open gates)** button presents every indexed
+Clause 1–10 and Annex A/B/C heading and its printed page, source-review
+status and acceptance state. This is a heading-level inventory; the
+full-text normative review, local site/hazard inputs, numerical parity,
+member detailing and native building design checks remain separate.
+
+**Not implemented/certified as a comprehensive NBC digital rules engine:**
+the exhaustive normative sentence/figure/table/footnote mapping, all
+Annex C local zoning rows, every production integration and signed native
+structural acceptance. These omissions must continue to fail closed.
+Regression tests are under
+`tests/test_nbc105_operation_input_contracts.py`; CI workflow runs them,
+but an unobserved CI run is not reported as passing.
