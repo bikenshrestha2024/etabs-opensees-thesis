@@ -81,7 +81,7 @@ def discover_beam_force_parts(directory):
     for path in root.iterdir():
         if not path.is_file() or path.suffix.lower() not in (".xlsx",".xlsm"):
             continue
-        match=re.search(r"beam[ _-]*forces?[ _-]*element[ _-]*(\\d+)",
+        match=re.search(r"beam[ _-]*forces?[ _-]*element[ _-]*(\d+)",
                         path.stem.casefold())
         if not match:
             continue
