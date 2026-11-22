@@ -31,7 +31,7 @@ def source_execution_identity(document, expected_support_case='PHYSICAL_32',
     return 'SOURCE_IDENTIFIED_NOT_NATIVE_ETABS_APPROVED'
 
 
-def collect(folder, issues=None, *, results_root=None):
+def collect(folder, issues=None, *, results_root=None, expected_support_case='PHYSICAL_32', expected_mass_policy='SOURCE_DISTRIBUTED'):
     """Collect ONLY current-model, source-state-matched result evidence.
 
     Historical model outputs without a model hash remain on disk but are not
@@ -80,11 +80,15 @@ def collect(folder, issues=None, *, results_root=None):
                 if resolved not in seen:
                     seen.add(resolved)
                     yield path
-    def add(method,state,case,axis,loc,metric,unit,basis,value,file):
+    def add(method,state,case,axis,loc,metric,unit,basis,value,file,execution_status=None):
         if value is not None and math.isfinite(float(value)):
             rows.append(dict(method=method,limit_state=state,case=case,axis=axis,
                 location=str(loc),metric=metric,unit=unit,basis=basis,
-                value=float(value),source_file=str(file)))
+                value=float(value),source_file=str(file),
+                source_execution_status=execution_status or '',
+                status=('SOURCE_EXECUTION_NOT_VERIFIED'
+                        if execution_status and execution_status!='SOURCE_IDENTIFIED_NOT_NATIVE_ETABS_APPROVED'
+                        else ''))) 
     def accepted(document,path,state):
         if state!=selected_state:
             issues.append(str(path)+': rejected opposite-state '+str(state))
@@ -128,17 +132,22 @@ def collect(folder, issues=None, *, results_root=None):
             if not accepted(d,p,d.get('limit_state')):
                 continue
             axis=d['axis']
+            execution=source_execution_identity(d,expected_support_case,expected_mass_policy)
+            if execution!='SOURCE_IDENTIFIED_NOT_NATIVE_ETABS_APPROVED':
+                issues.append(str(p)+': '+case+' '+execution+
+                              '; geometrical model SHA alone is not proof of selected '+expected_support_case+
+                              ' support / '+expected_mass_policy+' mass.')
             add('MRSM',state,case,axis,'BASE','base_shear','kN',
-                'CQC_force_scaled',d.get('scaled_modal_base_shear_kN'),p)
+                'CQC_force_scaled',d.get('scaled_modal_base_shear_kN'),p,execution)
             for r in d['stories']:
                 add('MRSM',state,case,axis,r['story_number'],'story_shear',
-                    'kN','CQC_force_scaled',r.get('scaled_story_shear_kN'),p)
+                    'kN','CQC_force_scaled',r.get('scaled_story_shear_kN'),p,execution)
                 # This is a master-node or extrapolated diaphragm response,
                 # not a reviewed exact ETABS point/displacement location.
                 add('MRSM',state,case,axis,r['story_number'],'displacement',
-                    'm','CQC_design_unscaled_by_7_5',r.get('design_displacement_m'),p)
+                    'm','CQC_design_unscaled_by_7_5',r.get('design_displacement_m'),p,execution)
                 add('MRSM',state,case,axis,r['story_number'],'drift_ratio',
-                    'ratio','CQC_design_unscaled_by_7_5',r.get('design_drift_ratio'),p)
+                    'ratio','CQC_design_unscaled_by_7_5',r.get('design_drift_ratio'),p,execution)
     for p in scan('NBC105_ESM_OpenSees_Response_*.json'):
         if not current_result(p):continue
         if 'Response_META_' in p.name:continue
@@ -209,7 +218,14 @@ def collect(folder, issues=None, *, results_root=None):
 def compare(rows, etabs, policy=None):
     """Compare exact normalized response bases with explicit evidence gates."""
     from components.validation.etabs_equivalence_report import evaluate
-    return evaluate(rows, etabs, FIELDS, policy)
+    results=evaluate(rows, etabs, FIELDS, policy)
+    for row in results:
+        identity=row.get('source_execution_status')
+        if identity and identity!='SOURCE_IDENTIFIED_NOT_NATIVE_ETABS_APPROVED':
+            row['status']='NOT_COMPARABLE'
+            row['note']='Executed MRSM support/mass identity requires review: '+identity+'. '+row.get('note','')
+            row['percent_difference']=None
+    return results
 
 
 def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None):
