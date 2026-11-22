@@ -22,3 +22,12 @@ The direct native executor now calls `verify_full_duration_pair_outputs(output_d
 **Regression:** `tests/test_nltha_full_duration_result_verification.py`; tests are synthetic file metadata, not the full native building. Verified on connected GitHub's headless pytest for commit `72fff02649dc87cf035dea9482187b8489033670` before output collision guard, with final-head verification separately required.
 
 - By default the direct M0–M6 research run now sets `soil_c_primary_nltha=True`: `preflight_existing_model` checks actual A/B matched record SHA256 against the canonical eight-pair Soil-C register BEFORE loading the large existing building model. Original SeismoMatch scaling-factor logs, ground-motion selection, site Vs30, spectral-period window and material testing remain separately unverified. Gorkha and Loma Prieta require the existing documented reviewer/endpoint gates.
+
+
+## Input-command proof for the first complete numerical case
+
+The runner's `OpenSees_Bidirectional_Input_Commands.json` per `XY/` or `YX/` is now included in `verify_full_duration_pair_outputs`. An independently saved `Case_Summary.json` with a correct orientation string is insufficient. The verified command file must show simultaneous DOF1+DOF2 acceleration with source component A/B for XY, B/A for YX, original source path identity, 900001/900002 UniformExcitation/path-series IDs and one source-unit conversion (`Acc(g)` → `g * 9.81 m/s²`) with `source_records_already_scaled=True` and additional scale 1.0 for registered Soil C. Its file SHA is included with the accepted history in the direct-run status. This is input-command provenance, **not** proof of the physical solver state, material calibration or original SeismoMatch processing.
+
+Canonical numbered launch alias: `38_DIRECT_EXISTING_NLTHA.py`. This is equivalent to `tools/run_existing_nltha.py` and imports the **same** `main` function. No second NLTHA implementation is introduced.
+
+Sources: OpenSees UniformExcitation official documentation https://opensees.github.io/OpenSeesDocumentation/user/manual/model/pattern/uniformExcitationPattern.html and NBC 105:2025 §§9.3.2.2–9.3.2.3. The 25-storey original source config has no reliable M0–M6 source-state identifier; keep `--variant-id UNVERIFIED` until independently source-attributed.

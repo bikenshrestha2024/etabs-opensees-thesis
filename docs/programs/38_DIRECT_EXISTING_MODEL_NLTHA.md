@@ -135,3 +135,14 @@ A missing/corrupted/short response **fails closed** despite a positive runner re
 **Scientific basis for acceptance separation:** NBC 105:2025 §§9.3.1–9.3.3; NIST GCR 17-917-46v1 (2017) `https://nvlpubs.nist.gov/nistpubs/gcr/2017/NIST.GCR.17-917-46v1.pdf`; Kolozvari, López and Massone (2023), DOI `10.1016/j.engstruct.2023.116700` for 3D shear-flexure nonlinear wall idealization; OpenSees `E_SFI_MVLEM_3D` official documentation for element node/recorder conventions.
 
 - Stage 38's default full-record research config now requires the registered Soil-C earthquake components by their original byte SHA, not merely matching file names or different nonempty files. The audit is executed before source model load and the native gravity run; the X/Y pair must be registered in its original A/B order, while solver XY/YX rotations remain separate. A malformed, replaced, mislabeled or unreviewed Gorkha/Loma pair fails closed rather than producing a misleading first successful case.
+
+
+## 7. Final integration and first-case source validation (2026-11-22)
+
+One canonical numbered entry point now exists: `python 38_DIRECT_EXISTING_NLTHA.py --model-folder ... --x-path ... --y-path ... --output-dir ... --event Kobe --variant-id UNVERIFIED`. It is only a thin alias to the same direct module used by `python tools/run_existing_nltha.py`. The physical model is neither rebuilt differently nor duplicated. All current local example paths are placeholders and private user-owned inputs stay local.
+
+Along with full saved history, `verify_full_duration_pair_outputs` inspects both saved `OpenSees_Bidirectional_Input_Commands.json` files for original A/B bytes-source path identities, correct XY/YX global DOF assignment, and recorded OpenSees Path acceleration factor. The manifest SHA and orientation mapping are written to `DIRECT_EXISTING_NLTHA_STATUS.json`. Recorded command provenance is **not** proof that the first-step X-wall nonfinite was corrected.
+
+The archived source configuration lacks independently verified M0–M6 attribution. Accordingly, an exploratory run labeled `UNVERIFIED` can only be credited to that exact source SHA; do not place the result into a quantitative M0–M6 comparison until source-EDB/outrigger/damper variant fingerprints establish which state was run.
+
+The [three-pass code/engineering/organization audit](../../REVIEW_MAIN/06_NONLINEAR_TH/20261122_TRIPLE_PASS_NATIVE_NLTHA_INTEGRATION_AUDIT.md) records checks, accepted results and outstanding native tests. Direct model formulation: Kolozvari et al. (2015), PEER 2015/12 and Kolozvari, López & Massone (2023), Engineering Structures 294, 116700; official OpenSees E-SFI-MVLEM-3D input syntax. These references describe the chosen idealization but cannot replace M45, bar/FSAM, P-Delta, damper and seismic input calibration.

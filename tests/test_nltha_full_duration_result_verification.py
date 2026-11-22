@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 from components.nonlinear_time_history import direct_existing_model as native
+from components.nonlinear_time_history.nbc105_horizontal_input import applied_motion_manifest
 
 DIGEST_MODEL="a"*64
 DIGEST_MOTION="b"*64
@@ -23,7 +24,11 @@ class CompletedExistingNLTHAEvidence(unittest.TestCase):
         self.config={
             "pair_id":"Kobe","variant_id":"M0","limit_state":"ULS",
             "orientations":["XY","YX"],"diagnostic_excitation":"XY",
-            "duration_s":0.,"nonlinear_walls":True
+            "duration_s":0.,"nonlinear_walls":True,
+            "soil_c_primary_nltha":True,"source_records_already_scaled":True,
+            "scale":1.0,
+            "x_path":str(self.root/"Kobe_A_Matched.txt"),
+            "y_path":str(self.root/"Kobe_B_Matched.txt")
         }
         self.cases=[]
         for orientation in ("XY","YX"):
@@ -44,6 +49,13 @@ class CompletedExistingNLTHAEvidence(unittest.TestCase):
                 "physical_time_s":0.01,"full_record_duration_s":0.01,
                 "completion_gate":gate
             }
+            manifest=applied_motion_manifest(
+                orientation=orientation,
+                record_a=self.config["x_path"],record_b=self.config["y_path"],
+                dt_s=.005,units_a="g",units_b="g",
+                pair_scale=1.,already_scaled=True)
+            (folder/"OpenSees_Bidirectional_Input_Commands.json").write_text(
+                json.dumps(manifest),encoding="utf8")
             self.cases.append(summary)
             (folder/"Case_Summary.json").write_text(json.dumps(summary),encoding="utf8")
             (folder/"Accepted_History_Completion_Gate.json").write_text(json.dumps(gate),encoding="utf8")
@@ -87,6 +99,38 @@ class CompletedExistingNLTHAEvidence(unittest.TestCase):
     def test_stale_or_mixed_case_model_sha_is_blocked(self):
         self.cases[1]["model_sha256"]="c"*64
         with self.assertRaisesRegex(ValueError,"model|SHA|identity"):
+            native.verify_full_duration_pair_outputs(self.root,self.config,self.cases)
+
+    def test_missing_applied_motion_commands_cannot_count_as_complete(self):
+        (self.root/"YX"/"OpenSees_Bidirectional_Input_Commands.json").unlink()
+        with self.assertRaisesRegex((FileNotFoundError,ValueError),"YX|commands|manifest"):
+            native.verify_full_duration_pair_outputs(self.root,self.config,self.cases)
+
+    def test_xy_yx_command_mapping_must_really_rotate_record_components(self):
+        wrong=applied_motion_manifest(
+            orientation="XY",
+            record_a=self.config["x_path"],record_b=self.config["y_path"],
+            dt_s=.005,units_a="g",units_b="g",
+            pair_scale=1.,already_scaled=True)
+        (self.root/"YX"/"OpenSees_Bidirectional_Input_Commands.json").write_text(
+            json.dumps(wrong),encoding="utf8")
+        with self.assertRaisesRegex(ValueError,"YX|orientation|component|mapping"):
+            native.verify_full_duration_pair_outputs(self.root,self.config,self.cases)
+
+    def test_applied_motion_source_path_cannot_be_substituted(self):
+        file=self.root/"XY"/"OpenSees_Bidirectional_Input_Commands.json"
+        data=json.loads(file.read_text(encoding="utf8"))
+        data["commands"][0]["source_path"]="/some/other/record.txt"
+        file.write_text(json.dumps(data),encoding="utf8")
+        with self.assertRaisesRegex(ValueError,"source|component|manifest"):
+            native.verify_full_duration_pair_outputs(self.root,self.config,self.cases)
+
+    def test_matched_acceleration_unit_factor_must_remain_single_g_conversion(self):
+        file=self.root/"XY"/"OpenSees_Bidirectional_Input_Commands.json"
+        data=json.loads(file.read_text(encoding="utf8"))
+        data["commands"][0]["path_factor_m_s2"]=0.981
+        file.write_text(json.dumps(data),encoding="utf8")
+        with self.assertRaisesRegex(ValueError,"factor|unit|manifest"):
             native.verify_full_duration_pair_outputs(self.root,self.config,self.cases)
 
     def test_single_direction_probe_cannot_claim_bidirectional_full_record(self):

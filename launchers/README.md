@@ -39,5 +39,6 @@ Numbers locate modules; follow the engineering acceptance gates before execution
 | 35 | [35_SOIL_C_NLTHA_PREFLIGHT.py](../35_SOIL_C_NLTHA_PREFLIGHT.py) |
 | 36 | [36_SOIL_C_NLTHA_RUN_MATRIX.py](../36_SOIL_C_NLTHA_RUN_MATRIX.py) |
 | 37 | [37_THESIS_EVIDENCE_DASHBOARD.py](../37_THESIS_EVIDENCE_DASHBOARD.py) |
+| 38 | [38_DIRECT_EXISTING_NLTHA.py](../38_DIRECT_EXISTING_NLTHA.py) (alias for [tools/run_existing_nltha.py](../tools/run_existing_nltha.py)) |
 
 [Program guides](../docs/programs/00_PROGRAM_INDEX.md) · [Engineering sequence](../00_READ_FIRST_RUN_ORDER.md) · [Excel workbooks](../excel/README.md)

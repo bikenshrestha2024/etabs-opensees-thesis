@@ -140,6 +140,90 @@ def preflight_existing_model(config):
 
 
 
+
+def _verify_bidirectional_input_manifest(path, config, orientation):
+    """[REF docs/source/components/nonlinear_time_history/direct_existing_model.py.md]
+    Verify the commands *written by the native runner* before full-case credit.
+
+    The same command mapping is used to create OpenSees UniformExcitation
+    patterns. A manifest is strong input-provenance evidence, but cannot
+    independently prove a successful numerical solution or source licensing.
+    """
+    from components.nonlinear_time_history.nbc105_horizontal_input import (
+        component_direction_mapping, unit_and_scale)
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(
+            orientation + " missing applied excitation manifest: " + str(path))
+    try:
+        audit = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        raise ValueError(orientation + " invalid applied excitation manifest") from exc
+    if (not isinstance(audit, dict)
+            or audit.get("orientation") != orientation
+            or audit.get("directions") != [1, 2]
+            or audit.get("simultaneous_two_horizontal_inputs") is not True):
+        raise ValueError(orientation + " incorrect bidirectional excitation manifest")
+    commands = audit.get("commands")
+    if not isinstance(commands, list) or len(commands) != 2:
+        raise ValueError(orientation + " manifest requires two command mappings")
+    scale = float(config["scale"])
+    try:
+        applied_scale = float(audit["common_pair_scale_dimensionless"])
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(orientation + " invalid manifest source spectral scale") from exc
+    if not math.isfinite(applied_scale) or not math.isclose(
+            applied_scale, scale, rel_tol=0., abs_tol=1e-12):
+        raise ValueError(orientation + " manifest source spectral scale mismatch")
+    sample_dts = []
+    for (component, dof), axis, cmd in zip(
+            component_direction_mapping(orientation), ("X", "Y"), commands):
+        if not isinstance(cmd, dict):
+            raise ValueError(orientation + " invalid manifest command")
+        if (cmd.get("global_axis") != axis
+                or cmd.get("dof") != dof
+                or cmd.get("source_component") != component
+                or type(cmd.get("path_series_tag")) is not int
+                or cmd["path_series_tag"] != 900000 + dof
+                or type(cmd.get("uniform_excitation_pattern_tag")) is not int
+                or cmd["uniform_excitation_pattern_tag"] != 900000 + dof):
+            raise ValueError(orientation + " incorrect excitation component/dof mapping")
+        requested = Path(config["x_path" if component == "A" else "y_path"]).expanduser().resolve()
+        claimed = cmd.get("source_path")
+        if not isinstance(claimed, str) or Path(claimed).expanduser().resolve() != requested:
+            raise ValueError(orientation + " applied source component path mismatch")
+        units = cmd.get("source_units")
+        if config.get("soil_c_primary_nltha") is True and units != "g":
+            raise ValueError(orientation + " registered Soil-C source requires Acc(g) units")
+        try:
+            factor = float(cmd["path_factor_m_s2"])
+            dt = float(cmd["path_dt_s"])
+            expected = unit_and_scale(
+                units, scale,
+                already_scaled=config.get("source_records_already_scaled") is True)
+        except (KeyError, TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(orientation + " invalid manifest unit factor or record dt") from exc
+        if (not math.isfinite(factor)
+                or not math.isclose(factor, expected, rel_tol=1e-12, abs_tol=1e-12)):
+            raise ValueError(orientation + " incorrect acceleration unit conversion factor")
+        if not math.isfinite(dt) or dt <= 0:
+            raise ValueError(orientation + " invalid manifest time-sample interval")
+        sample_dts.append(dt)
+    if not math.isclose(sample_dts[0], sample_dts[1], rel_tol=0., abs_tol=1e-10):
+        raise ValueError(orientation + " A/B manifest digitization interval mismatch")
+    return dict(
+        command_manifest_sha256=source_sha256(path),
+        source_units=["g", "g"] if config.get("soil_c_primary_nltha") is True
+                     else [cmd["source_units"] for cmd in commands],
+        original_component_mapping=[
+            dict(global_axis=axis, component=cmd["source_component"])
+            for axis, cmd in zip(("X", "Y"), commands)],
+        digitization_interval_s=sample_dts[0],
+        matched_header_detected=bool(audit.get("input_is_preprocessed_matched_record")),
+        independently_verified_native_solver_execution=False,
+    )
+
+
 def verify_full_duration_pair_outputs(output_dir, config, cases):
     """Verify both saved XY/YX full histories against actual solver summaries.
 
@@ -193,6 +277,9 @@ def verify_full_duration_pair_outputs(output_dir, config, cases):
         for item in (summary_path, gate_path, history_path):
             if not item.is_file():
                 raise FileNotFoundError(direction + " required full history evidence missing: " + str(item))
+        motion_evidence = _verify_bidirectional_input_manifest(
+            folder / "OpenSees_Bidirectional_Input_Commands.json",
+            config, direction)
         try:
             on_disk = json.loads(summary_path.read_text(encoding="utf-8-sig"))
             disk_gate = json.loads(gate_path.read_text(encoding="utf-8-sig"))
@@ -256,6 +343,7 @@ def verify_full_duration_pair_outputs(output_dir, config, cases):
             "history_sha256": source_sha256(history_path),
             "completion_gate_sha256": source_sha256(gate_path),
             "case_summary_sha256": source_sha256(summary_path),
+            "applied_input_command_evidence": motion_evidence,
         }
     return results
 
