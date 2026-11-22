@@ -63,6 +63,8 @@ def assess(source_folder, *, primary_audit=None):
     model = _load_json(root / REQUIRED[0])
     meta = _load_json(root / REQUIRED[1])
     topology = _load_json(root / REQUIRED[2])
+    from components.model.source_node_identity import audit_node_map_identity
+    source_node_identity = audit_node_map_identity(topology.get('node_map'))
     original = model.get("supports")
     if not isinstance(original, dict) or not original:
         raise ValueError("Original assembled support DOFs missing")
@@ -194,6 +196,9 @@ def assess(source_folder, *, primary_audit=None):
             etabs_table_sha256=audit.get("source_sha256"),
             original_etabs_case=audit.get("case"))
     reasons = []
+    if source_node_identity['status'] != 'SOURCE_NODE_IDENTITY_UNIQUE_NOT_NATIVE_VERIFIED':
+        reasons.append('ETABS source joint ID / XYZ mapping requires review: '
+                       + source_node_identity['status'])
     if missing_primary:
         reasons.append("Project primary node tags missing from original source restraints")
     if released:
@@ -225,6 +230,7 @@ def assess(source_folder, *, primary_audit=None):
         native_frame_rigid_end_zone_review_count=nonzero_rigid,
         comparison=mismatch, blockers=reasons,
         support_topology_summary=support_topology_summary,
+        source_node_identity_audit=source_node_identity,
         support_rows=support_rows, offset_rows=offsets)
 
 
