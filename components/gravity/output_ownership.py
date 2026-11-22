@@ -78,6 +78,17 @@ def workspace_for_solver_case_run(run_directory):
     return path.parents[3]
 
 
+def workspace_for_dual_case_run(dual_run_folder):
+    """[REF docs/source/components/gravity/output_ownership.py.md]
+    Read true owner of an immutable 76/97 batch case, not current GUI path.
+    """
+    path=_unlinked(dual_run_folder)
+    if (path.parent.name!="Gravity_Wall_Base_Comparison" or
+            path.parents[1].name!=SECTIONS["COMPARISONS"]):
+        raise ValueError("Not a canonical 76/97 dual gravity run path: "+str(path))
+    return path.parents[2]
+
+
 def index_path(root, name, *, create=False):
     """[REF docs/source/components/gravity/output_ownership.py.md]
     Index lives with indexes, not mixed with solver workbooks/plots."""
