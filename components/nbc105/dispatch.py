@@ -60,6 +60,66 @@ def _json_primitive(value):
         return value
     raise ValueError("NBC calculation returned an unsupported result type")
 
+
+def _operation_signature(fn):
+    """Return an explicit JSON-input contract for one public code rule.
+
+    This exposes named required fields without guessing engineering values.
+    It does NOT validate the source standard or the selected structural model.
+    """
+    signature=inspect.signature(fn)
+    fields=[]
+    for param in signature.parameters.values():
+        if param.kind not in (inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                              inspect.Parameter.KEYWORD_ONLY):
+            raise ValueError("NBC function uses unsupported non-keyword JSON inputs")
+        required=param.default is inspect.Parameter.empty
+        default=None if required else _json_primitive(param.default)
+        fields.append({"name":param.name,"required":required,
+                       "default":default,
+                       "annotation":str(param.annotation) if
+                       param.annotation is not inspect.Parameter.empty else "",
+                       "description":""})
+    return {"parameters":fields,
+            "required":[p["name"] for p in fields if p["required"]],
+            "optional":[p["name"] for p in fields if not p["required"]],
+            "template":{p["name"]:p["default"] for p in fields},
+            "note":"Replace null required fields using independently verified project inputs; defaults are source-code defaults, not project verification."}
+
+
+def operation_input_spec(clause, operation):
+    """Describe the exact public Clause 1–10 operation arguments."""
+    operations=_operations(clause)
+    if operation not in operations:
+        raise ValueError("Unsupported NBC clause operation")
+    return _operation_signature(operations[operation])
+
+
+def annex_operation_input_spec(annex, operation):
+    """Describe the exact public Annex A/B operation arguments."""
+    if annex not in _ANNEX_MODULES:
+        raise ValueError("Only Annex A/B are implemented as callable rule modules")
+    module=importlib.import_module("components.nbc105."+_ANNEX_MODULES[annex])
+    if operation not in available_annex_operations()[annex]:
+        raise ValueError("Unsupported NBC annex operation")
+    return _operation_signature(getattr(module,operation))
+
+
+def _execute_named_rule(fn, inputs, *, label):
+    """Bind arguments before calling; never disguise an internal TypeError."""
+    if not isinstance(inputs,dict) or any(not isinstance(k,str) for k in inputs):
+        raise ValueError(label+" inputs must be a JSON object of named parameters")
+    signature=inspect.signature(fn)
+    try:
+        bound=signature.bind(**inputs)
+    except TypeError as exc:
+        raise ValueError(label+" input error: "+str(exc)) from exc
+    missing_null=[name for name,value in bound.arguments.items() if value is None
+                  and signature.parameters[name].default is inspect.Parameter.empty]
+    if missing_null:
+        raise ValueError(label+" requires project values for: "+", ".join(missing_null))
+    return fn(**inputs)
+
 def run_operation(clause,operation,inputs):
     """Execute only an explicitly exported Clause 1–10 rule with JSON inputs.
 
@@ -69,12 +129,8 @@ def run_operation(clause,operation,inputs):
     operations=_operations(clause)
     if not isinstance(operation,str) or operation not in operations:
         raise ValueError("Unsupported NBC clause operation")
-    if not isinstance(inputs,dict) or any(not isinstance(k,str) for k in inputs):
-        raise ValueError("NBC inputs must be a JSON object of named parameters")
-    try:
-        value=operations[operation](**inputs)
-    except TypeError as exc:
-        raise ValueError("NBC operation input signature mismatch") from exc
+    value=_execute_named_rule(operations[operation],inputs,
+                              label="NBC clause "+str(clause)+" / "+operation)
     return {"standard":"NBC 105:2025","source_clause":str(clause),
             "clause":clause,"operation":operation,"status":_STATUS,
             "result":_json_primitive(value)}
@@ -110,12 +166,8 @@ def run_annex_operation(annex,operation,inputs):
     allowed=available_annex_operations()[annex]
     if operation not in allowed:
         raise ValueError("Unsupported or private NBC annex operation")
-    if not isinstance(inputs,dict) or any(not isinstance(k,str) for k in inputs):
-        raise ValueError("Annex arguments must be a JSON object of named parameters")
-    try:
-        value=getattr(module,operation)(**inputs)
-    except TypeError as exc:
-        raise ValueError("NBC annex operation input signature mismatch") from exc
+    value=_execute_named_rule(getattr(module,operation),inputs,
+                              label="NBC annex "+annex+" / "+operation)
     return {"standard":"NBC 105:2025","annex":annex,"operation":operation,
             "status":_STATUS,"result":_json_primitive(value),
             "warning":"Preliminary rule evaluation; connection/strength and native model acceptance remain open"}
