@@ -23,10 +23,10 @@ class V4PrimaryGravityAndESMDisplayTests(unittest.TestCase):
             with self.subTest(path=path):
                 ast.parse(read(path), filename=path)
 
-    def test_primary_32_is_diagnostic_and_legacy_case_id_preserved(self):
+    def test_physical_32_is_primary_and_legacy_case_id_preserved(self):
         s = read("components/gravity/gui_and_reports.py")
-        self.assertIn('tk.StringVar(value="32 nonzero-reaction nodes (diagnostic)")', s)
-        self.assertIn('self.wall_support_strategy_var.set("32 nonzero-reaction nodes (diagnostic)")', s)
+        self.assertIn('tk.StringVar(value="32 physical foundation supports (primary)")', s)
+        self.assertIn('self.wall_support_strategy_var.set("32 physical foundation supports (primary)")', s)
         self.assertIn('"32 nonzero-reaction nodes (diagnostic)": "ETABS_NONZERO_REACTION_DIAGNOSTIC"', s)
         self.assertIn('"ETABS Reaction Validation (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC"', s)
         self.assertIn('"ETABS Node Position (76 nodes)"', s)
