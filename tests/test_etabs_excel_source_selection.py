@@ -7,6 +7,7 @@ from openpyxl import Workbook
 
 from components.inputs.etabs_excel_selection import (
     classify_etabs_excel_selection, validate_full_table_selection,
+    discover_beam_force_parts,
 )
 
 
@@ -57,6 +58,23 @@ class EtabsExcelRoleSelectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"Multiple analyzed exports"):
             classify_etabs_excel_selection([first,second,beam])
 
+    def test_folder_autodiscovery_requires_all_numbered_parts(self):
+        parts=[self.workbook(f"Beam Forces Element {i} latest.xlsx",
+                              ["Element Forces - Beams"]) for i in (2,1,3)]
+        result=discover_beam_force_parts(self.root)
+        self.assertEqual([p.name for p in result],
+                         [f"Beam Forces Element {i} latest.xlsx"
+                          for i in (1,2,3)])
+        parts[1].unlink()
+        with self.assertRaisesRegex(ValueError,"Missing numbered"):
+            discover_beam_force_parts(self.root)
+        parts[1]=self.workbook("Beam Forces Element 1 latest.xlsx",
+                               ["Element Forces - Beams"])
+        self.workbook("Beam Forces Element 2 alternate.xlsx",
+                      ["Element Forces - Beams"])
+        with self.assertRaisesRegex(ValueError,"Multiple beam force"):
+            discover_beam_force_parts(self.root)
+
     def test_combined_selection_is_wired_into_gravity_gui(self):
         code=(Path(__file__).resolve().parents[1]/"components"/"gravity"/
               "gui_and_reports.py").read_text(encoding="utf-8-sig")
@@ -65,6 +83,7 @@ class EtabsExcelRoleSelectionTests(unittest.TestCase):
         self.assertIn("classify_etabs_excel_selection(selected)",code)
         self.assertIn("self.etabs_beam_forces_paths=list(grouped",code)
         self.assertIn("self._choose_etabs_full_table",code)
+        self.assertIn("self._discover_etabs_beam_parts_folder",code)
 
 
 if __name__=="__main__":
