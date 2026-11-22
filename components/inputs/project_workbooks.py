@@ -716,6 +716,37 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     state=str(limit_state).strip().upper()
     if state=='BOTH':state='ULS'
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
+    # Current projects with a canonical EDB-hash-bound source manifest must
+    # NEVER scan legacy repository or neighboring folders for calculator or
+    # scaling values. A missing registered role is missing evidence, not
+    # permission to pick a similarly named older workbook.
+    from components.inputs.output_layout import export_root_for
+    manifest=(export_root_for(export_dir)/'01_ETABS_EXPORT'/'00_MANIFEST'/
+              'PROJECT_SOURCES.private.json')
+    if manifest.is_file():
+        from openpyxl import load_workbook
+        roles=('nbc_calculator','nbc_scaling_'+state.lower())
+        selected=[]
+        for role in roles:
+            candidate=registered_project_source(export_dir,role)
+            if candidate is None:
+                selected.append(None)
+                continue
+            path=Path(candidate)
+            book=load_workbook(path,read_only=True,data_only=True)
+            try:
+                required='NBC Calculator' if role=='nbc_calculator' else 'SCALING SUMMARY'
+                if required not in book.sheetnames:
+                    raise ValueError('Registered '+role+' lacks '+required+' worksheet')
+                if required=='SCALING SUMMARY':
+                    source,_=_scaling_summary(book[required])
+                    edb=_source_edb_path(export_dir)
+                    if not source or not edb or not _same_edb_file_content(edb,source):
+                        raise ValueError('Registered scaling workbook EDB is not byte-identical to current source')
+            finally:
+                book.close()
+            selected.append(path)
+        return selected
     # ETABS source exports and the legacy scaling workbooks are frequently
     # stored in adjacent folders rather than inside the same export folder.
     # Search a bounded directory set, and validate sheet + B4 model identity
