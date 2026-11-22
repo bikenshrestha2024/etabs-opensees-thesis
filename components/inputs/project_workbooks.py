@@ -40,7 +40,10 @@ def registered_project_source(export_dir, role, *, missing_lfs='error'):
             for block in iter(lambda: stream.read(1048576), b''):
                 h.update(block)
         return h.hexdigest()
+    from components.inputs.output_layout import export_root_for
+    current_export=export_root_for(export_dir)
     locations = [Path(export_dir)/'01_ETABS_EXPORT'/'00_MANIFEST'/'PROJECT_SOURCES.private.json',
+                 current_export/'01_ETABS_EXPORT'/'00_MANIFEST'/'PROJECT_SOURCES.private.json',
                  Path(export_dir)/'project_sources.private.json',
                  _runtime_repo_root()/'project_sources.private.json',
                  Path(export_dir)/'excel'/'SOURCE_REGISTRY.json',
