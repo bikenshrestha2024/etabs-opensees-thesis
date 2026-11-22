@@ -57,6 +57,13 @@ class DirectGravityPointwiseGateTests(unittest.TestCase):
         self.assertIn("GRAVITY_POINTWISE_REACTION_MISMATCH",source)
         self.assertIn("GRAVITY POINTWISE MISMATCH",source)
 
+    def test_direct_comparison_enforces_separate_nodal_status(self):
+        source=(Path(__file__).resolve().parents[1]/"components"/"validation"/
+                "gravity_etabs_direct.py").read_text(encoding="utf-8-sig")
+        self.assertIn('comp["pointwise_validation_status"]',source)
+        self.assertIn('comp["structural_equivalence_status"]="NOT_CERTIFIED"',source)
+        self.assertIn('"NODE_DISTRIBUTION_MISMATCH"',source)
+
 
 if __name__=="__main__":
     unittest.main()
