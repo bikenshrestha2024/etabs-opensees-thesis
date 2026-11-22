@@ -94,8 +94,9 @@ class LinkedFirstStorey(unittest.TestCase):
                 _read_reviewed_first_storey(engine, sap, stories, audit_dir, lambda _msg: None)
 
 
-def audit(edb='D:/Etabs/ULTIMATE LOAD - Copy.EDB', condition='Ultimate', thickness='MATCHED'):
-    return dict(source_edb=edb, output_excel='x.xlsx',
+def audit(edb='D:/Etabs/ULTIMATE LOAD - Copy.EDB', condition='Ultimate',
+          thickness='MATCHED', sha=None):
+    return dict(source_edb=str(edb),source_edb_sha256=sha, output_excel='x.xlsx',
                 direct_thickness_check=dict(status=thickness, mismatches=['G11=250']),
                 coefficients={a: dict(Aw_m2=aw, T1_s=t, condition=condition)
                               for a, aw, t in (('X', 1.9582936, 2.0385674), ('Y', 2.2030803, 1.9219798))})
@@ -103,47 +104,96 @@ def audit(edb='D:/Etabs/ULTIMATE LOAD - Copy.EDB', condition='Ultimate', thickne
 
 class LinkedReference(unittest.TestCase):
     def test_reference_shape_identity_and_gates(self):
-        edb = 'D:\\Etabs\\ULTIMATE LOAD - Copy.EDB'
-        ref = aw_sources.linked_reference_from_audit(audit(), 'p.json', state='ULS', current_edb=edb)
-        self.assertEqual(ref['source_identity'], 'SAME_EDB_PATH_REFERENCE')
-        self.assertAlmostEqual(ref['values']['awx'], 1.9582936)
-        self.assertAlmostEqual(ref['values']['workbook_adopted_ty'], 1.9219798)
-        self.assertFalse(ref['code_accepted'])
-        other = aw_sources.linked_reference_from_audit(audit(), 'p.json', state='ULS',
-                                                       current_edb='D:/Etabs/SERVICE LOAD.EDB')
-        self.assertEqual(other['source_identity'], 'DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY')
-        with self.assertRaisesRegex(ValueError, 'does not match'):
-            aw_sources.linked_reference_from_audit(audit(condition='Service'), 'p', state='ULS', current_edb=edb)
-        with self.assertRaisesRegex(ValueError, 'thickness'):
-            aw_sources.linked_reference_from_audit(audit(thickness='MISMATCH'), 'p', state='ULS', current_edb=edb)
+        import hashlib
+        with tempfile.TemporaryDirectory() as tmp:
+            edb=Path(tmp)/"ULTIMATE LOAD - Copy.EDB"
+            edb.write_bytes(b"verified unique ETABS source model")
+            sha=hashlib.sha256(edb.read_bytes()).hexdigest()
+            reference=audit(edb=edb,sha=sha)
+            ref=aw_sources.linked_reference_from_audit(
+                reference,'p.json',state='ULS',current_edb=str(edb))
+            self.assertEqual(ref['source_identity'],'SAME_EDB_PATH_REFERENCE')
+            self.assertAlmostEqual(ref['values']['awx'],1.9582936)
+            self.assertAlmostEqual(ref['values']['workbook_adopted_ty'],1.9219798)
+            self.assertFalse(ref['code_accepted'])
+            other=Path(tmp)/"SERVICE LOAD.EDB"
+            other.write_bytes(b"different ETABS source")
+            changed=aw_sources.linked_reference_from_audit(
+                reference,'p.json',state='ULS',current_edb=str(other))
+            self.assertEqual(changed['source_identity'],
+                             'DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY')
+            # Identical real EDB bytes may be deliberately copied to a new
+            # path; identity requires SHA and must be labelled as such.
+            other.write_bytes(edb.read_bytes())
+            copied=aw_sources.linked_reference_from_audit(
+                reference,'p.json',state='ULS',current_edb=str(other))
+            self.assertEqual(copied['source_identity'],
+                             'BYTE_IDENTICAL_EDB_REFERENCE')
+            with self.assertRaisesRegex(ValueError,'does not match'):
+                aw_sources.linked_reference_from_audit(
+                    audit(edb=edb,condition='Service',sha=sha),
+                    'p',state='ULS',current_edb=str(edb))
+            with self.assertRaisesRegex(ValueError,'thickness'):
+                aw_sources.linked_reference_from_audit(
+                    audit(edb=edb,thickness='MISMATCH',sha=sha),
+                    'p',state='ULS',current_edb=str(edb))
+
+    def test_matching_name_without_source_file_and_digest_never_auto_qualifies(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            edb=Path(tmp)/"same_name.EDB"
+            edb.write_bytes(b"changed model")
+            missing_hash=aw_sources.linked_reference_from_audit(
+                audit(edb=edb),'p.json',state='ULS',current_edb=str(edb))
+            self.assertEqual(missing_hash['source_identity'],
+                             'DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY')
+            wrong_hash=aw_sources.linked_reference_from_audit(
+                audit(edb=edb,sha='0'*64),'p.json',state='ULS',
+                current_edb=str(edb))
+            self.assertEqual(wrong_hash['source_identity'],
+                             'DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY')
+            edb.unlink()
+            self.assertEqual(aw_sources.edb_identity(str(edb),
+                             audit(edb=edb,sha='0'*64)),
+                             'CURRENT_EDB_NOT_ACCESSIBLE')
 
     def test_resolve_prefers_same_edb_excel_method_then_geometry(self):
+        import hashlib
         with tempfile.TemporaryDirectory() as tmp:
-            export, results = Path(tmp) / 'export', Path(tmp) / 'results'
-            export.mkdir()
-            results.mkdir()
-            edb = 'D:/Etabs/ULTIMATE LOAD - Copy.EDB'
-            snapshot = dict(aw_candidate_m2={'X': 1.9306371, 'Y': None},
-                            aw_evidence={'X': {'status': 'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC'},
-                                         'Y': {'status': 'NO_CONTINUOUS_PIER_IN_THIS_AXIS'}},
-                            assembled_model_sha256='abc')
-            with mock.patch('components.inputs.project_workbooks.analysis_output_folder', return_value=results), \
-                 mock.patch('components.inputs.project_workbooks._source_edb_path', return_value=edb), \
-                 mock.patch('components.inputs.opensees_nbc_sync._source_snapshot', return_value=snapshot):
-                out = aw_sources.resolve_aw(export, 'ULS')               # nothing linked yet
-                self.assertEqual(out['method'], 'OPEN_SEES_GEOMETRY_CANDIDATE')
-                self.assertAlmostEqual(out['X'], 1.9306371)
+            export,results=Path(tmp)/'export',Path(tmp)/'results'
+            export.mkdir();results.mkdir()
+            edb=Path(tmp)/'ULTIMATE LOAD - Copy.EDB'
+            edb.write_bytes(b"verified ETABS EDB bytes")
+            sha=hashlib.sha256(edb.read_bytes()).hexdigest()
+            snapshot=dict(aw_candidate_m2={'X':1.9306371,'Y':None},
+                          aw_evidence={
+                              'X':{'status':'PROVISIONAL_CONTINUOUS_PIER_DIAGNOSTIC'},
+                              'Y':{'status':'NO_CONTINUOUS_PIER_IN_THIS_AXIS'}},
+                          assembled_model_sha256='abc')
+            with mock.patch('components.inputs.project_workbooks.analysis_output_folder',
+                            return_value=results), \
+                 mock.patch('components.inputs.project_workbooks._source_edb_path',
+                            return_value=str(edb)), \
+                 mock.patch('components.inputs.opensees_nbc_sync._source_snapshot',
+                            return_value=snapshot):
+                out=aw_sources.resolve_aw(export,'ULS')
+                self.assertEqual(out['method'],'OPEN_SEES_GEOMETRY_CANDIDATE')
+                self.assertAlmostEqual(out['X'],1.9306371)
                 self.assertIsNone(out['Y'])
-                self.assertIn('not NBC accepted', out['labels']['X'])
-                (results / 'a_ETABS_LINKED_ESM.provenance.json').write_text(
-                    json.dumps(audit(edb='D:/Etabs/SERVICE LOAD.EDB')))
-                self.assertEqual(aw_sources.resolve_aw(export, 'ULS')['method'],
-                                 'OPEN_SEES_GEOMETRY_CANDIDATE')   # different EDB is not auto-filled
-                (results / 'b_ETABS_LINKED_ESM.provenance.json').write_text(json.dumps(audit(edb=edb)))
-                out = aw_sources.resolve_aw(export, 'Both')
-                self.assertEqual(out['method'], 'ORIGINAL_EXCEL_METHOD_ETABS_LINKED')
-                self.assertAlmostEqual(out['X'], 1.9582936)
-                self.assertAlmostEqual(out['Y'], 2.2030803)
+                self.assertIn('not NBC accepted',out['labels']['X'])
+                (results/'a_ETABS_LINKED_ESM.provenance.json').write_text(
+                    json.dumps(audit(edb=Path(tmp)/'SERVICE LOAD.EDB',sha='f'*64)))
+                self.assertEqual(aw_sources.resolve_aw(export,'ULS')['method'],
+                                 'OPEN_SEES_GEOMETRY_CANDIDATE')
+                # A same-path record lacking hash also remains diagnostic.
+                same=results/'b_ETABS_LINKED_ESM.provenance.json'
+                same.write_text(json.dumps(audit(edb=edb)))
+                self.assertEqual(aw_sources.resolve_aw(export,'ULS')['method'],
+                                 'OPEN_SEES_GEOMETRY_CANDIDATE')
+                same.write_text(json.dumps(audit(edb=edb,sha=sha)))
+                out=aw_sources.resolve_aw(export,'Both')
+                self.assertEqual(out['method'],'ORIGINAL_EXCEL_METHOD_ETABS_LINKED')
+                self.assertAlmostEqual(out['X'],1.9582936)
+                self.assertAlmostEqual(out['Y'],2.2030803)
 
 
 class GuiHelpers(unittest.TestCase):
