@@ -1,0 +1,15 @@
+# 2026-11-22 — modal source mass, NLTHA readiness UX and output scope
+
+**Editor:** OpenAI GPT-6 via connected GitHub app. **Base main:** `70fa26e68ab7c7d9fc581db6326be37c8d035f2a`. **Branch:** `fix/nltha-readiness-dialog-mass-doc-20261122`; **PR:** #157.
+
+**Mandatory preflight actually read:** `AGENTS.md`, `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md`, `.agents/skills/etabs-opensees-read-first/SKILL.md`, `engineering/rules/CORE_RULES.md`, `engineering/rules/ENGINEERING_GATES.md`. Sources inspected: `components/model/assembly.py`, `components/model/story_mass_operator.py`, `components/model/readiness.py`, `components/nonlinear_time_history/runner_and_gui.py`, modal, case output contract and readme. User screenshot and uploaded native modal and MRSM ZIP reviewed locally; **those private files, EDB, Excel results, and waveform bytes were not committed or uploaded to the public repository**.
+
+**Original GUI failure diagnosis:** readiness blocker message truncated in tkinter messagebox. Actual gate is 16 human-reviewed checklist items + not_approved + missing model-bound materials, wall FSAM region map and unreviewed parameters. There was no solver start. The safe fix is a group/scroll/copy/save locally presentation; NEVER alter actual approval requirement, material values or 32 physical support policy.
+
+**Independent software defect:** full input interval 0.0 was always classified as `Trial` due to `is not None`. New pure `_nltha_output_scope` recognizes full Suite, diagnostic >0 Trial. A full run can still fail physically and must pass independent full-history evidence checks.
+
+**Mass model:** source distributed mass is nodal mesh-positioned, while story-lumped changes the horizontal dynamic operator and explicitly assigns `Jz` per diaphragm; vertical masses remain. Source gravity 1D+1L, NBC seismic mass Table 5-1 and source configured 1D+0.3L are different cases. Current gross-shell ULS native model and its 32/44 support transfer remain not ETABS-equivalent by this code change.
+
+**TDD/CI:** RED test `tests/test_nltha_readiness_dialog_and_scope_20261122.py` at `6501f8c4563965a20a2b13d61d52f054d07edde1`, Actions run `45029457140` rejected missing formatter, then code fixes `da608744` and `86314cfb`. The first green-code run found an isolated AST-test namespace omission (`math`), fixed in test `d393ee70`. The integrated source audit also correctly invalidated the previous exact-blob semantic attestation for `runner_and_gui.py::_advance_nonlinear_interval`; the unchanged method was reinspected, and its attestation updated with a new checked blob and independent review at `REVIEW_MAIN/06_NONLINEAR_TH/20261122_NLTHA_READINESS_AND_GUI_SCOPE_SOURCE_REVIEW.md`. Do not claim success without exact final-head CI.
+
+**Unresolved, unchanged:** 25-storey first-step E-SFI wall nonfinite, full Kobe XY/YX real motion case, actual nonlinear RC/device source calibration, 32-support pointwise ETABS/OpenSees reactions, source Vs30 and code acceptance. Also the canonical `07_EXPORT_ZIP` folder is reserved and remains empty when no local modal ZIP has been exported; this is not failure of the eigen solver.
