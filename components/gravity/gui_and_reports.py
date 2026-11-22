@@ -114,6 +114,7 @@ class GravityAnalysisGUI:
         self.etabs_gravity_json_var = tk.StringVar(value="")
         self.etabs_full_table_var=tk.StringVar(value="")
         self.etabs_native_assignment_var=tk.StringVar(value="")
+        self.etabs_beam_forces_paths=[]
         self.etabs_case_var = tk.StringVar(value="1. DL + LL")
         self.allow_alternate_edb = tk.BooleanVar(value=False)
         self.launch_etabs_for_gravity = tk.BooleanVar(value=True)
@@ -210,6 +211,66 @@ class GravityAnalysisGUI:
                         variable.set(value)
         except (OSError, ValueError, KeyError) as exc:
             self.status_var.set('Optional ETABS workbook evidence needs review: '+str(exc))
+
+    def _select_all_etabs_beam_force_workbooks(self):
+        """Select all exported beam-force Excel parts, without changing model state."""
+        try:
+            paths=filedialog.askopenfilenames(
+                parent=self.win,
+                title="Select ALL ETABS Element Forces - Beams workbooks",
+                filetypes=[("ETABS beam-force workbooks","*.xlsx *.xlsm")])
+            if not paths:
+                return
+            chosen=[Path(p).expanduser().resolve() for p in paths]
+            if len(set(chosen)) != len(chosen):
+                raise ValueError("Duplicate beam-force file selected")
+            self.etabs_beam_forces_paths=chosen
+            self.status_var.set(
+                f"Selected {len(chosen)} ETABS beam-force Excel parts. "
+                "Click Validate + register + consolidate; no reactions altered.")
+        except Exception as exc:
+            messagebox.showerror("ETABS beam-force selection",str(exc),parent=self.win)
+
+    def _audit_all_etabs_beam_force_workbooks(self):
+        """Source-bound registration and station consolidation; no solver mutation."""
+        try:
+            if not self.model_var.get():
+                raise ValueError("Select a current exported OpenSees model first")
+            if not self.etabs_beam_forces_paths:
+                raise ValueError("Select all ETABS beam-force Excel parts first")
+            full=self.etabs_full_table_var.get().strip()
+            if not full or Path(full).suffix.lower() not in (".xlsx",".xlsm"):
+                raise ValueError("Select the current original ETABS analysis XLSX first")
+            from components.inputs.output_layout import export_root_for
+            from components.inputs.etabs_table_bundle import register_current_etabs_tables
+            from components.validation.etabs_split_beam_forces import consolidate
+            source_root=export_root_for(Path(self.model_var.get()).resolve().parent)
+            # Validate all source rows and schemas BEFORE publishing source registration.
+            # A fresh stage prevents overwriting historical comparison evidence.
+            stage=(source_root/"01_ETABS_EXPORT"/"03_BEAM_FORCES"/"RUNS"/
+                   datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+            summary=consolidate(self.etabs_beam_forces_paths,stage,
+                                case=self.etabs_case_var.get().strip())
+            native=self.etabs_native_assignment_var.get().strip()
+            manifest,_=register_current_etabs_tables(
+                source_root,full,self.etabs_beam_forces_paths,
+                assignment=native if native and Path(native).suffix.lower() in (".xlsx",".xlsm") else None)
+            self._gravity_action_log(
+                "ETABS_BEAM_FORCE_PARTS_AUDITED",
+                f"Parts={len(self.etabs_beam_forces_paths)}; rows={summary['unique_rows']}; "
+                f"CSV={summary['output']}; source_manifest={manifest}; "
+                "reaction equivalence NOT VERIFIED")
+            self.status_var.set(
+                f"ETABS beam-force rows={summary['unique_rows']} from "
+                f"{len(self.etabs_beam_forces_paths)} parts; reactions NOT VERIFIED")
+            messagebox.showinfo(
+                "ETABS beam-force source audit",
+                f"Consolidated {summary['unique_rows']} station rows.\n"
+                f"Results: {stage}\nSource registry: {manifest}\n"
+                "No changes to loads, supports, stiffness or solver results.",
+                parent=self.win)
+        except Exception as exc:
+            messagebox.showerror("ETABS beam-force audit",str(exc),parent=self.win)
 
     def _stage_selected_etabs_workbooks(self):
         """Copy both user-chosen native Excel inputs into this selected export."""
@@ -1223,6 +1284,18 @@ class GravityAnalysisGUI:
                  "Original workbook is READ ONLY; source hash and beam crosswalk are audited.",
             wraplength=1070,foreground="#9a3412",
             anchor="w",justify="left").pack(anchor="w",pady=(0,4))
+        beam_row=ttk.Frame(form); beam_row.pack(fill="x",pady=(2,5))
+        ttk.Button(beam_row,
+                   text="Select ALL ETABS Element Forces - Beams Excel parts",
+                   command=self._select_all_etabs_beam_force_workbooks).pack(side="left",padx=(0,8))
+        ttk.Button(beam_row,
+                   text="Validate + register + consolidate beam forces",
+                   command=self._audit_all_etabs_beam_force_workbooks).pack(side="left")
+        ttk.Label(form,
+                  text="All selected beam-force worksheets are read-only sources. "
+                       "Output: 01_ETABS_EXPORT/03_BEAM_FORCES/RUNS/<timestamp>. "
+                       "Consolidation verifies exported station rows, NOT OpenSees reaction equivalence.",
+                  wraplength=1050,anchor="w",justify="left").pack(anchor="w")
         ttk.Button(form,
             text="Stage BOTH selected ETABS XLSX files locally (SHA256, no LFS)",
             command=self._stage_selected_etabs_workbooks).pack(anchor="w",pady=(2,5))
