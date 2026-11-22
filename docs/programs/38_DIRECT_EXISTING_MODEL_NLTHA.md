@@ -150,3 +150,10 @@ The [three-pass code/engineering/organization audit](../../REVIEW_MAIN/06_NONLIN
 ## Source-bound production readiness versus Stage 38 numerical research (2026-11-22)
 
 Do not treat an isolated PEER 2015/12 material-draft plot as tested source structural reinforcement; research Stage 38 does not override the separate production 21-point approval. The current model's elastic modal/MRSM success and 32 selected physical supports leave actual 44 mesh-edge MPC native equivalence, nonlinear wall calibration, X-wall first-step convergence and the first full Kobe XY/YX run unverified. Read the [21-item evidence closure ledger](../../REVIEW_MAIN/06_NONLINEAR_TH/20261122_21_BLOCKERS_CLOSURE_PLAN.md) and [per-module ZIP ownership](../architecture/20261122_CANONICAL_REVIEW_ZIP_ROUTING.md). Never upload private source data automatically.
+
+
+## 2026-11-22 — direct PEER Appendix B.3 literature-baseline policy
+
+The user's thesis uses directly cited published constitutive inputs as a **research** baseline and reports source-specific parameter sensitivity; separate project material testing is **not** a prerequisite for attempting exploratory NLTHA. The PEER RW-A15-P10-S78 web FSAM reinforcement ratios are now directly adopted as `rho_x=rho_y=0.0074`, with published `nu=0.8` and dowel `alpha=0.01`. Its **distinct** boundary values (`rho_x=0.0082, rho_y=0.0587`) remain recorded, NOT applied to arbitrary wall panels without a verified region map. In the isolated PEER research draft, the former invented `20 mm @ 200 mm` bar proxy no longer controls these web values; mixed/nominal sensitivity bases remain labeled assumptions. See [the full page-specific source/units table and methodological distinction](https://github.com/bikenshrestha2024/etabs-opensees-thesis/blob/main/docs/engineering/20261122_DIRECT_PEER_LITERATURE_NLTHA_PARAMETERS.md).
+
+Source-level tests: `tests/test_peer_direct_literature_fsam_transfer_20261122.py`. This does not certify that the 25-storey X-wall first step converged, establish actual M0–M6 device input, or set `approved_for_nltha=true`.
