@@ -75,6 +75,7 @@ jobs:
           check python -m unittest tests.test_all_active_output_pair_matrix tests.test_etabs_comparison_stage_reader -v
           check python -m unittest tests.test_full_local_output_migration_audit -v
           check python -m unittest tests.test_etabs_excel_source_selection tests.test_etabs_split_beam_forces -v
+          check python -m unittest tests.test_gravity_pointwise_failure_gate tests.verify_gravity_node_comparison -v
           check python tools/audit_output_writer_reader_pairs.py --repo . --report-dir audit/output_pairs --fail-on-parse
           check python -m unittest tests.test_nbc105_operation_input_contracts tests.test_nbc105_gui_clause_routing tests.test_nbc105_module_dispatch tests.test_nbc105_annex_dispatch -v
           check python -m unittest discover -s tests -p 'test_history_inspection_scopes.py' -v
