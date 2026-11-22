@@ -437,7 +437,10 @@ def launch(parent,folder,results_root=None):
                   else Path(folder)/'OpenSees_Analysis_Results')
  auto_file,auto_note=find_verified_etabs_csv(folder,comparison_root)
  native_file=None if auto_file else find_native_reference_csv(folder,comparison_root)
- if auto_file:path.set(str(auto_file))
+ if auto_file:
+  path.set(str(auto_file))
+  latest['policy']=json.loads((Path(auto_file).parent/'ETABS_API_Mapping_SELECTED.json').read_text(encoding='utf-8-sig'))
+  latest['approved_auto_csv']=str(Path(auto_file).resolve())
  elif native_file:path.set(str(native_file))
  status.set('SOURCE: '+auto_note)
  def template_for_current_edb():
@@ -538,12 +541,28 @@ def launch(parent,folder,results_root=None):
                       expected_support_case=support_filter.get(),
                       expected_mass_policy=mass_filter.get())
      from components.validation.etabs_direct_api import fingerprint
+     model_source=Path(folder)/'OpenSees_Complete_Model_Data_V118.json'
+     if not model_source.is_file():
+      raise FileNotFoundError('Current OpenSees assembled model is required to bind native ETABS data')
      provenance={"edb_path":str(Path(chosen).resolve()),"edb_sha256":fingerprint(chosen),
+                 "source_model_sha256":fingerprint(model_source),
+                 "native_csv_sha256":fingerprint(out/'ETABS_API_Normalized.csv'),
                  "mapping_path":str(Path(config).resolve()),
                  "row_count":len(extracted),"assumptions_verified":bool(mapping.get('assumptions_verified'))}
-     (out/'ETABS_API_Provenance.json').write_text(json.dumps(provenance,indent=2),encoding='utf-8')
      (out/'ETABS_API_Mapping_SELECTED.json').write_text(
          json.dumps(mapping,indent=2),encoding='utf-8')
+     (out/'ETABS_API_Provenance.json').write_text(json.dumps(provenance,indent=2),encoding='utf-8')
+     # Small SHA-pinned reference bundle has one stable stage-owned address
+     # across multiple MRSM per-case result folders. Do not duplicate actual
+     # EDB or private full ETABS source workbooks.
+     from components.inputs.output_layout import export_root_for
+     stable=export_root_for(folder)/'05_COMPARISONS'/'ETABS_Comparison_V148'
+     if stable.resolve()!=out.resolve():
+      import shutil
+      stable.mkdir(parents=True,exist_ok=True)
+      for filename in ('ETABS_API_Normalized.csv','ETABS_API_Mapping_SELECTED.json',
+                       'ETABS_API_Provenance.json'):
+       shutil.copy2(out/filename,stable/filename)
     finally:comtypes.CoUninitialize()
     def done():
      latest.update(rows=compared,out=out,etabs_rows=extracted,policy=mapping)
@@ -671,7 +690,9 @@ def launch(parent,folder,results_root=None):
    tree.insert('','end',values=[row.get(c,'') for c in cols])
  def refresh():
   try:
-   rows,out=(save(folder,path.get(),results_root=results_root,
+   rows,out=(save(folder,path.get(),
+                  policy=(latest['policy'] if latest.get('approved_auto_csv')==str(Path(path.get()).resolve()) else None),
+                  results_root=results_root,
                   expected_support_case=support_filter.get(),expected_mass_policy=mass_filter.get()) if path.get() else
              (save(folder,etabs_rows=latest['etabs_rows'],policy=latest['policy'],
                    results_root=results_root,
@@ -717,6 +738,8 @@ def launch(parent,folder,results_root=None):
   candidate,note=find_verified_etabs_csv(folder,comparison_root)
   if candidate:
    path.set(str(candidate))
+   latest['policy']=json.loads((Path(candidate).parent/'ETABS_API_Mapping_SELECTED.json').read_text(encoding='utf-8-sig'))
+   latest['approved_auto_csv']=str(Path(candidate).resolve())
    refresh()
    status.set('VERIFIED ETABS SOURCE: '+str(candidate)+
               ' | match still requires the same structural response basis')
