@@ -40,7 +40,10 @@ try:
     os.environ['OPENSEES_LIMIT_STATE']={limit_state!r}
     os.environ['OPENSEES_SUPPORT_CASE']={support_case!r}
     os.environ['OPENSEES_SEISMIC_MASS_POLICY']={mass_policy!r}
-    runpy.run_path(str(MODEL), run_name='opensees_modal_model')
+    _MODEL_NAMESPACE=runpy.run_path(str(MODEL), run_name='opensees_modal_model')
+    from components.model.support_case_contract import require_runtime_support_case
+    _SELECTED_CASE=require_runtime_support_case({support_case!r},_MODEL_NAMESPACE.get('MODEL_REPORT'))
+    print('[MODAL SELECTED SUPPORT CASE VERIFIED]',_SELECTED_CASE,flush=True)
     import openseespy.opensees as ops
     from OpenSees_Modal_Analysis_NBC105_V111 import run_nbc105_modal_audit, modal_response_nodes
     model_data_path=MODEL.parent/'OpenSees_Complete_Model_Data_V118.json'
