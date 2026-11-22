@@ -10,7 +10,8 @@ from pathlib import Path
 
 
 def review_zip_directory(selected):
-    """Resolve the nearest source-owned case's `07_EXPORT_ZIP` folder.
+    """[REF docs/source/components/inputs/review_zip_paths.py.md]
+    Resolve the nearest source-owned case's `07_EXPORT_ZIP` folder.
 
     For canonical case runs, accept any nested 02_RESULTS/06_REVIEW/... path
     and locate the exact run ancestor (verified by its CASE_MANIFEST.json).
@@ -46,7 +47,8 @@ def review_zip_directory(selected):
 
 
 def ensure_review_zip_directory(selected):
-    """Create the selected case ZIP directory, refusing linked destinations."""
+    """[REF docs/source/components/inputs/review_zip_paths.py.md]
+    Create the selected case ZIP directory, refusing linked destinations."""
     target=review_zip_directory(selected)
     if any(part.is_symlink() for part in (target,*target.parents)):
         raise ValueError("Refusing redirected ZIP destination: "+str(target))
