@@ -574,22 +574,33 @@ def audit(root: Path) -> dict:
                          "count": len(graph["unresolved_explicit_local_imports"]),
                          "evidence": graph["unresolved_explicit_local_imports"][:25],
                          "gate": "Trace actual imports and conditional/generated module cases."})
-    legacy = writers["totals"]["legacy_literal_occurrences"]
+    # Docstrings must not be counted as live output migration targets.
+    # A literal in executable code is still only a candidate: preserved
+    # read aliases and diagnostic policy constants are often intentional.
+    legacy = writers["totals"]["legacy_executable_literal_occurrences"]
     if legacy:
         findings.append({"id": "P1_LEGACY_OUTPUT_REFERENCE_MIGRATION",
                          "priority": "P1", "status": "REVIEW_REQUIRED",
                          "count": legacy,
+                         "documentation_only_mentions":
+                             writers["totals"]["legacy_docstring_occurrences"],
                          "evidence": writers["top_legacy_candidates"][:12],
-                         "gate": "Migrate producer plus all consumers with native regression."})
+                         "gate": "Classify intentional aliases versus active output writers; migrate each producer with all consumers and native saved-case regression."})
     if graph["potential_import_cycles"]:
-        findings.append({"id": "P1_STATIC_LOCAL_IMPORT_CYCLES",
-                         "priority": "P1", "status": "REVIEW_REQUIRED",
-                         "count": len(graph["potential_import_cycles"]),
-                         "evidence": {
-                             "all_potential": graph["potential_import_cycles"][:25],
-                             "eager_only": graph["eager_import_cycles"][:25],
-                         },
-                         "gate": "Distinguish top-level import initialization from deferred function/GUI imports. Verify native import order before refactoring."})
+        eager=bool(graph["eager_import_cycles"])
+        findings.append({
+            "id": ("P1_EAGER_LOCAL_IMPORT_CYCLES" if eager else
+                   "P2_DEFERRED_LOCAL_IMPORT_REVIEW"),
+            "priority": ("P1" if eager else "P2"),
+            "status": ("EAGER_IMPORT_INITIALIZATION_RISK" if eager else
+                       "DEFERRED_IMPORT_CALL_ORDER_REVIEW_REQUIRED"),
+            "count": len(graph["potential_import_cycles"]),
+            "evidence": {
+                "all_potential": graph["potential_import_cycles"][:25],
+                "eager_only": graph["eager_import_cycles"][:25],
+            },
+            "gate": ("Resolve eager module initialization cycles" if eager else
+                     "Check deferred GUI/solver import call order; do not mistake deferred edges for eager import failures.")})
     if writers["parse_errors"]:
         findings.append({"id": "P0_OUTPUT_WRITER_SCAN_INCOMPLETE",
                          "priority": "P0", "status": "CONFIRMED",
