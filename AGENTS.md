@@ -1,5 +1,8 @@
 # STOP — MANDATORY READ-FIRST PROJECT CONTRACT (2026-11-22)
 
+> **2026-11-22 SOURCE CONVERSION ACCEPTANCE:** Before claiming ETABS → OpenSees structural equivalence, read [the current converter acceptance audit](REVIEW_MAIN/02_MODEL/20261122_NATIVE_ETABS_OPENSEES_CONVERSION_AUDIT.md) and [source-point identity guide](docs/source/components/model/source_node_identity.py.md). The mesher now fails closed if two distinct ETABS source node tags occupy the same rounded XYZ: a source joint cannot be chosen by arbitrary dict overwriting. This is a source safety correction, **not** proof that the 768.045-kN 32-support joint reaction mismatch is resolved. Keep 44 shear-wall mesh points connected to the 32 physical foundation support system and full 1D+1L gravity separate from NBC Table 5-1 seismic weight.
+
+
 > **CRITICAL 768 kN REBUILD FOLLOW-UP (2026-11-22):** The *best source-provenance-checked regular gravity run* is the ETABS-elastic conversion with max 768.045 kN and sum absolute 10072.106 kN at 32 real supports, **not** the gross-shell 3041.266 kN model. [Read the verified rebuilt-conversion residual audit](docs/validation/20261122_REBUILT_ELASTIC_768KN_RESIDUAL_AUDIT.md) before gravity conversion, stiffness or reaction edits. A newer uploaded MESH_04 metadata export records **1200 nonzero ETABS rigid-end-zone source assignments** across 750 beams/450 columns; the reviewed `20261121_native_gravity_uls.json` omits `end_offsets_m`, and current shear-flexible+offset combinations remain unqualified. Do not assert that all 1200 pertain to the archived 768-kN solved EDB without matching fingerprints. New `native_end_offset_coverage` reports missing inputs; static audit ≠ numerical correction. Retain 32 physical supports and 44 shear-wall mesh points.
 
 
