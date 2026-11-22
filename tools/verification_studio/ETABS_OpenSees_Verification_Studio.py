@@ -101,7 +101,7 @@ def _propped(ops,n):
     return {'R_pin':rx1,'R_fixed':rx2,'M_fixed_abs':abs(moment),'R_sum':rx1+rx2,
             'mid':mid,'exact_mid':exact_mid,'n':n,'L':L,'w':w,'EI':E*I}
 
-def _run_case(ops,case,tol):
+def _run_legacy_case(ops,case,tol):
     metrics=[];detail={}
     if case=='B01':
         s=_propped(ops,1);detail={'beam':s,'source':'CSI Software Verification Example 01, Table 1-1, Case II, 18-ft B1',
@@ -165,7 +165,7 @@ def _run_case(ops,case,tol):
             'metrics':metrics,'details':detail}
 
 # Preserve the user-tested v1 B01-B04 implementation unchanged.
-_run_legacy_case = _run_case
+# B01-B04 use the explicitly named legacy benchmark implementation.
 
 def _run_case(ops,case,tol):
     if case in ('B01','B02','B03','B04'):
