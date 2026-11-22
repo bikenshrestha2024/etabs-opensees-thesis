@@ -36,6 +36,21 @@ class UniformOutputStructureTests(unittest.TestCase):
             manifest.write_bytes(original)
             self.assertFalse(audit_export_layout(root)["issues"])
 
+    def test_unclassified_root_artifacts_reported_without_migration(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            artifact=root/"old_scaling_output.xlsx"
+            artifact.write_bytes(b"private legacy workbook placeholder")
+            report=audit_export_layout(root)
+            self.assertEqual(len(report["loose_root_artifacts"]),1)
+            self.assertEqual(report["loose_root_artifacts"][0]["relative_path"],
+                             artifact.name)
+            self.assertIn("ROOT_LEVEL_ARTIFACTS_NEED_OWNER_REVIEW",
+                          report["review_flags"])
+            self.assertEqual(artifact.read_bytes(),
+                             b"private legacy workbook placeholder")
+            self.assertFalse(report["issues"])
+
     def test_historical_dirs_are_visible_but_never_relocated(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
