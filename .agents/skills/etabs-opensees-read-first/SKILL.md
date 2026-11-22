@@ -53,6 +53,11 @@ The correct root-cause workflow for joint mismatch is:
 - Only implement a structural correction when a controlled test validates its mechanism. **Never "repair" by fitting support forces, deleting mesh points, assigning 44 extra fixities, renormalizing point reactions, hiding zero-FZ rows, or treating zero global imbalance as validation.**
 - Preserve the original 76/97 support numerical runs solely for sensitivity studies with unique source and results hashes. They may be generated on user request but cannot replace the 32-support actual foundation scenario.
 
+
+### After the 768 kN ETABS-elastic rebuild: mandatory rigid-zone source gate
+
+Before making another physical gravity-conversion correction, read `docs/validation/20261122_REBUILT_ELASTIC_768KN_RESIDUAL_AUDIT.md`. The independent **768.045-kN** residual belongs to the *reconstructed ETABS-elastic* model; 3041.266 kN is the old gross-wall case. In the newer source metadata upload, 1200 frame objects (750 beam, 450 column) carry a nonzero rigid end length and factor 1.0, while `20261121_native_gravity_uls.json` does not provide `end_offsets_m`. The three shear-flexible sections overlap all 1200, and the current Timoshenko-with-joint-offset combination is explicitly rejected. First request/recover the **actual same-model source and rebuilt result hashes**, then inspect the newly emitted `native_end_offset_coverage` ledger; do not introduce arbitrary offsets or wrongly conclude that omission numerically proves all 768 kN. Follow member subassembly validation, common physical wall-base cuts, source mesh-edge force recovery and Dead/Live corner load-path checks. Preserve 32 actual supports and 44 mesh points, and use the 1D+1L benchmark only.
+
 ## 3. Separate seismic mass from full gravity
 
 **Full gravity benchmark:** `1.0D + 1.0L`; 100% applicable physical permanent/self-weight plus assigned live including applicable roof live. Track by pattern, category and source EDB identity; count once. The 2026-11-22 run's 311367.313880 kN is historical observation, not universal constant.
