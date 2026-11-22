@@ -104,7 +104,8 @@ def register_current_etabs_tables(export_dir, analysis, beam_forces, *,
         old={}
     # The registry is a private local input inventory, not a solver result.
     # Re-registration must not retain stale beam parts from an older selection.
-    old={k:v for k,v in old.items() if not k.startswith("etabs_beam_forces_element_")}
+    old={k:v for k,v in old.items() if not k.startswith("etabs_beam_forces_element_")
+         and (k != "etabs_assignment" or k in entries)}
     manifest={
         "schema":"CURRENT_ETABS_WORKBOOKS_SHA256_V1",
         "source_edb_sha256":edbsha,
