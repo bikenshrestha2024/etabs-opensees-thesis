@@ -24,6 +24,7 @@ if str(_REPO) not in sys.path:
 
 from tools.audit_live_output_writers import source_files,scan_source
 from tools.audit_module_boundaries import domain_for
+from tools.module_import_edges import import_targets
 
 MODULE_FAMILIES={
     "components/inputs/":"SOURCE_INPUTS",
@@ -91,24 +92,22 @@ def _normalized_function(node):
     return hashlib.sha256(ast.dump(fresh,include_attributes=False).encode()).hexdigest()
 
 
-def _interlinks(tree, relative):
+def _interlinks(tree, relative, root):
+    """Map imports between stage owners, including relative package imports.
+
+    A file-level import is a STATIC edge, never a claim that a runtime
+    dependency or native solver path was exercised.
+    """
     from_owner=owner(relative)
     links=set()
-    for node in ast.walk(tree):
-        if isinstance(node,ast.Import):
-            names=[alias.name for alias in node.names]
-        elif isinstance(node,ast.ImportFrom):
-            names=[node.module] if node.level==0 and node.module else []
-        else:
+    for name in import_targets(tree, relative, root=root):
+        if not name.startswith("components."):
             continue
-        for name in names:
-            if not name or not name.startswith("components."):
-                continue
-            parts=name.split(".")
-            if len(parts)<2:
-                continue
-            to_owner=owner("components/"+parts[1]+"/")
-            links.add((from_owner,to_owner))
+        parts=name.split(".")
+        if len(parts)<2:
+            continue
+        to_owner=owner("components/"+parts[1]+"/")
+        links.add((from_owner,to_owner))
     return links
 
 
@@ -138,7 +137,7 @@ def scan_consistency(root):
                            "line":getattr(exc,"lineno",None)})
             continue
         shadowed.extend(_symbol_scope(tree,rel))
-        for frm,to in _interlinks(tree,rel):
+        for frm,to in _interlinks(tree,rel,root):
             edges[(frm,to)]+=1
         for node in ast.walk(tree):
             if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef)):
