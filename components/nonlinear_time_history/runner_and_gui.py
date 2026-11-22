@@ -335,7 +335,12 @@ def _run_analysis(config):
                 raise ValueError('Unknown seismic mass policy')
             os.environ['OPENSEES_SEISMIC_MASS_POLICY']=mass_policy
             os.environ['OPENSEES_LIMIT_STATE']=config['limit_state']
-            try:runpy.run_path(str(model), run_name="opensees_ltha_model")
+            try:
+                _model_scope=runpy.run_path(str(model), run_name="opensees_ltha_model")
+                from components.model.support_case_contract import require_runtime_support_case
+                verified_case=require_runtime_support_case(
+                    config.get('support_case','PHYSICAL_32'),_model_scope.get('MODEL_REPORT'))
+                print('[HISTORY SELECTED SUPPORT CASE VERIFIED]',verified_case,flush=True)
             except BaseException as exc:
                 profiler.add('model_and_gravity',phase_clock);profiler.finish('failed',str(exc));raise
             profiler.add('model_and_gravity',phase_clock)
