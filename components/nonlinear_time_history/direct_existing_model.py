@@ -50,7 +50,7 @@ def make_research_nltha_config(*, model_folder, x_path, y_path, output_dir,
         orientations=["XY","YX"],diagnostic_excitation="XY",
         diagnostic_zero_damping=False,diagnostic_mass_damping=False,
         source_records_already_scaled=True,scale=1.,
-        soil_type="C",soil_c_primary_nltha=False,
+        soil_type="C",soil_c_primary_nltha=True,
         duration_s=float(trial_duration_s),
         dt_s=float(dt_s),max_subdivision_depth=5,
         research_basis_not_project_approval=True,
@@ -83,9 +83,20 @@ def preflight_existing_model(config):
         motions.append(path)
     if motions[0]==motions[1] or source_sha256(motions[0])==source_sha256(motions[1]):
         raise ValueError("XY/YX requires distinct verified horizontal motion components")
-    # A motion file's name alone is NOT authentication of record, unit,
-    # SeismoMatch processing or original scale. The existing runner does its
-    # complete parser and NBC provenance check before native solving.
+    # Exact registered SeismoMatch byte hashes and A/B orientation are required
+    # BEFORE the costly 25-storey model is loaded and gravity is solved.
+    # Registry identity is NOT the original spectrum matching factor log.
+    paired_source = None
+    if config.get("soil_c_primary_nltha") is True:
+        from components.nonlinear_time_history.soil_c_nltha_suite import verify_runner_pair
+        paired_source = verify_runner_pair(
+            motions[0], motions[1],
+            registered_event=config.get("earthquake_event"),
+            gorkha_processing_approved=config.get("gorkha_processing_reviewed") is True,
+            reviewer=config.get("engineering_reviewer"),
+            loma_end_policy=config.get("loma_end_policy", "reject"))
+    # A motion file name and registered digest alone do not independently
+    # qualify the original scaling sessions or the model's spectral period range.
     config_path=source/"OpenSees_Complete_Model_Config_V118.json"
     data_path=source/"OpenSees_Complete_Model_Data_V118.json"
     data=json.loads(data_path.read_text(encoding="utf-8-sig"))
@@ -120,7 +131,10 @@ def preflight_existing_model(config):
         applied_material_basis=config["material_basis"],
         calibration_status="RESEARCH_SPECIMEN_TRANSFER_NOT_APPROVED",
         nbc105_2025_code_acceptance="NOT_VERIFIED",
-        input_motion_spectral_matching="NOT_VERIFIED_BY_THIS_PRECHECK",
+        matched_component_pair_source=paired_source,
+        input_motion_spectral_matching=(
+            "REGISTERED_FILE_SHA256_ONLY_ORIGINAL_SCALING_EVIDENCE_PENDING"
+            if paired_source else "NOT_VERIFIED_BY_THIS_PRECHECK"),
         source_gravity_profile="AS_CONFIGURED_SEPARATE_FROM_FULL_1D_1L_COMPARISON",
     )
 
