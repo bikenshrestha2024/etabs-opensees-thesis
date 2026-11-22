@@ -40,7 +40,16 @@ def prepare(source, destination, basis='PEER_2015_12_SINGLE_SOURCE',
     tags = {name: 962000+i for i,name in enumerate(sorted(properties))}
     # Historical layout only: two curtains of 20 mm bars at 200 mm spacing.
     # This is not extracted reinforcement and is never represented as verified.
-    ratios = {name: 2*math.pi*20**2/4/(200*thickness*1000) for name,thickness in properties.items()}
+    if single:
+        from components.nonlinear_time_history.material_source_sets import peer_fsam_panel_values
+        peer_fsam = peer_fsam_panel_values()
+        # Uniform WEB material is a stated research transfer. No boundary
+        # model/geometry is invented from a specimen's boundary reinforcement.
+        ratios = {name:peer_fsam['web']['rho_x'] for name in properties}
+    else:
+        peer_fsam = None
+        ratios = {name: 2*math.pi*20**2/4/(200*thickness*1000)
+                  for name,thickness in properties.items()}
     from components.nonlinear_time_history.research_building_materials import _steelmpf_transition
     transition = _steelmpf_transition(steelmpf_transition)
     s = dict(single['wall_steel'] if single else reference['wall_steel'])
@@ -58,7 +67,14 @@ def prepare(source, destination, basis='PEER_2015_12_SINGLE_SOURCE',
                 steelmpf_transition_profile=('PEER_APPENDIX_CONVERTED' if single else steelmpf_transition),
                 steelmpf_transition_basis=('PEER a1 / R0 transformation; same paper' if single else transition['basis']),
                 thickness_m=properties, fsam_tags=tags, assumed_rho=ratios,
-                reinforcement_assumption='Two curtains, 20 mm bars at 200 mm each way; confirm from project drawings.',
+                source_boundary_fsam=(dict(peer_fsam['boundary']) if peer_fsam else None),
+                wall_region_assignment=('UNCONFINED_WEB_ONLY' if single else 'ASSUMED_UNREVIEWED_LAYOUT'),
+                reinforcement_assumption=(
+                    'Published PEER 2015/12 Appendix B.3 web rhoX=rhoY=0.0074 '
+                    'adopted uniformly as research transfer; boundary region is NOT '
+                    'assigned without source geometry. No project bar schedule inferred.'
+                    if single else
+                    'Two curtains, 20 mm bars at 200 mm each way; confirm from project drawings.'),
                 status='RESEARCH DRAFT; NOT PROJECT CALIBRATED OR APPROVED',
                 provenance_limits=('PEER specimen inputs are not project data; FSAM geometry/reinforcement, '
                                    '3D element parameters, SHS and FVD/BRB still require independent sources; '
