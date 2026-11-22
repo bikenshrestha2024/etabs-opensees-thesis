@@ -386,6 +386,39 @@ def export_direct(folder,etabs,comp):
         from openpyxl import Workbook
         from openpyxl.styles import PatternFill,Font
         wb=Workbook();ws=wb.active;ws.title='Comparison'
+        pointwise=wb.create_sheet('Pointwise reaction gate')
+        pointwise.append(['Verification','Value','Interpretation'])
+        source=comp.get('node_comparison',{})
+        for key, interpretation in (
+            ('valid_one_to_one_global_z_count','Coordinate and axis verified pairs'),
+            ('complete_one_to_one_global_z','All source supports matched; no ambiguity'),
+            ('max_absolute_nodal_difference_kN','Worst local residual; not global balance'),
+            ('sum_absolute_nodal_difference_kN','Absolute residuals prevent cancellation'),
+            ('rms_nodal_difference_kN','Root mean squared nodal residual'),
+            ('pointwise_screening_status','Numerical screen only; no engineering approval'),
+        ):
+            pointwise.append([key,source.get(key),interpretation])
+        pointwise.append(['GLOBAL_FORCE_BALANCE_ONLY',
+                          comp.get('difference_kN'),
+                          'Near-zero global imbalance does not prove nodal equivalence'])
+        pointwise.append(['STIFFNESS_BASIS',
+                          comp.get('opensees_stiffness_basis'),
+                          'Compare the native ETABS elastic variant, not a gross-shell proxy'])
+        pointwise.append(['ENGINEERING_ACCEPTANCE','NOT_CERTIFIED',
+                          'Requires matched analytical mesh, offsets, constraints and wall base cuts'])
+        discrepancies=wb.create_sheet('Largest nodal differences')
+        discrepancies.append(['ETABS point','OpenSees node','ETABS minus OpenSees kN',
+                              'Absolute difference kN'])
+        for row in comp.get('top_node_discrepancies',[]):
+            discrepancies.append([
+                row.get('etabs_point'),row.get('opensees_node'),
+                row.get('delta_etabs_minus_opensees_kN'),row.get('abs_delta_kN')])
+        for sheet in (pointwise,discrepancies):
+            sheet.freeze_panes='A2'
+            sheet.auto_filter.ref=sheet.dimensions
+            for cell in sheet[1]:
+                cell.font=Font(bold=True,color='FFFFFF')
+                cell.fill=PatternFill('solid',fgColor='1E3A5F')
         for key,value in comp.items():
             if not isinstance(value,(list,dict)):ws.append([key,value])
         for title,rows in [('ETABS supports',etabs['joint_reactions']),
