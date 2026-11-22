@@ -1,6 +1,6 @@
 # Nonlinear time-history analysis and M0–M6 investigations
 
-**Active owner:** `components/nonlinear_time_history/` · **Current Python modules:** 27 · **Status:** module navigation only; engineering acceptance requires independent evidence.
+**Active owner:** `components/nonlinear_time_history/` · **Current Python modules:** 28 · **Status:** module navigation only; engineering acceptance requires independent evidence.
 
 ## Responsibilities and interfaces
 
@@ -33,6 +33,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [research_building_materials.py](research_building_materials.py)
 - [runner_and_gui.py](runner_and_gui.py)
 - [seismomatch_audit.py](seismomatch_audit.py)
+- [soil_c_case_execution.py](soil_c_case_execution.py) — direct, isolated Stage 38 execution of one existing paired case (not model approval)
 - [soil_c_nltha_suite.py](soil_c_nltha_suite.py)
 - [soil_c_physics_preflight.py](soil_c_physics_preflight.py)
 - [soil_c_run_matrix.py](soil_c_run_matrix.py)
@@ -43,3 +44,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [wall_topology.py](wall_topology.py)
 
 > This list reflects the current checked-in Python files. Do not delete, rename or relocate an active module until its importers, GUI callbacks, saved-case readers and native regression evidence have been verified together. Source-specific guides are under `docs/source/components/nonlinear_time_history/` where available.
+
+## Stage 38 direct case execution
+
+Use [`38_EXECUTE_SOIL_C_NLTHA.py`](../../38_EXECUTE_SOIL_C_NLTHA.py) with one existing Stage 36 JSON configuration. Default is a read-only preflight; `--run` launches the actual existing OpenSees model in a separate process. Research-diagnostic input requires explicit `--allow-research-diagnostic`. Two full-duration software screens remain **not thesis engineering acceptance**. See [Stage 38 procedure](../../docs/programs/38_DIRECT_SOIL_C_NLTHA_EXECUTION.md).
