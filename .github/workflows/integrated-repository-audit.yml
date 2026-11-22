@@ -29,7 +29,7 @@ jobs:
           python tools/audit_repository_integrated.py --repo . --output audit/integrated --fail-on-static-blockers
       - name: Verify cross-module navigation, duplicate symbols and migration queue
         run: |
-          python -m unittest -v tests.test_cross_module_consistency_audit tests.test_component_readme_catalog tests.test_all_active_output_pair_matrix tests.test_verification_studio_dispatch_contract tests.verify_aw_sources_and_thickness tests.test_gravity_pointwise_failure_gate
+          python -m unittest -v tests.test_cross_module_consistency_audit tests.test_source_dependency_edges tests.test_component_readme_catalog tests.test_all_active_output_pair_matrix tests.test_verification_studio_dispatch_contract tests.verify_aw_sources_and_thickness tests.test_gravity_pointwise_failure_gate
           python tools/audit_cross_module_consistency.py --repo . --report-dir audit/integrated/10_MODULE_CONSISTENCY --fail-on-parse --fail-on-shadowed
           python tools/audit_component_readmes.py --root . --output audit/integrated/11_COMPONENT_NAVIGATION/catalog.json --check
           python tools/audit_output_writer_reader_pairs.py --repo . --report-dir audit/integrated/12_MIGRATION_QUEUE --fail-on-parse

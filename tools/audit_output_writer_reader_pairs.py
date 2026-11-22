@@ -20,6 +20,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0,str(_ROOT))
 
 from tools.audit_live_output_writers import scan_source, source_files
+from tools.module_import_edges import import_targets
 from components.inputs.output_contract import atomic_json
 
 MODULE_OWNERS={
@@ -45,15 +46,9 @@ def _owner(path):
                  if path.startswith(k)),"ENTRYPOINT_OR_OTHER")
 
 
-def _imports(tree):
-    result=set()
-    for node in ast.walk(tree):
-        if isinstance(node,ast.Import):
-            for item in node.names:
-                result.add(item.name)
-        elif isinstance(node,ast.ImportFrom) and node.module:
-            result.add(node.module)
-    return sorted(result)
+def _imports(tree, relative, root):
+    """Include resolved relative paths in the static producer/consumer queue."""
+    return import_targets(tree, relative, root=root)
 
 
 def build_matrix(repo):
@@ -88,7 +83,7 @@ def build_matrix(repo):
         legacy=item.get("legacy_markers",0)
         try:
             tree=ast.parse(path.read_text(encoding="utf-8-sig"),filename=rel)
-            deps=_imports(tree)
+            deps=_imports(tree,rel,root)
         except (SyntaxError,UnicodeError,OSError) as exc:
             # Never silently omit one active source.
             deps=[]
