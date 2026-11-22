@@ -250,22 +250,33 @@ class GravityAnalysisGUI:
             # Old 03_BEAM_FORCES folders remain available as historical evidence.
             from components.inputs.output_contract import (
                 create_case_run, record_case_status)
+            from components.inputs.project_workbooks import _source_edb_path
+            from components.inputs.etabs_table_bundle import _sha
+            edb_path=_source_edb_path(source_root)
+            if not edb_path or not Path(edb_path).is_file():
+                raise FileNotFoundError(
+                    "Exact source ETABS EDB is unavailable; rebuild source export first")
+            edb_digest=_sha(edb_path)
             stage=create_case_run(source_root,"ETABS_EXPORT","BEAM_FORCES",
-                                  state="SOURCE_ONLY",units="kN-m-s")
+                                  state="SOURCE_ONLY",units="kN-m-s",
+                                  source_edb_sha256=edb_digest)
             try:
                 summary=consolidate(self.etabs_beam_forces_paths,
                                     stage/"02_RESULTS",
                                     case=self.etabs_case_var.get().strip())
+                native=self.etabs_native_assignment_var.get().strip()
+                manifest,registry=register_current_etabs_tables(
+                    source_root,full,self.etabs_beam_forces_paths,
+                    assignment=(native if native and Path(native).suffix.lower()
+                                in (".xlsx",".xlsm") else None))
+                if registry["source_edb_sha256"] != edb_digest:
+                    raise ValueError("Source EDB changed during beam-force registration")
             except Exception:
                 record_case_status(stage,"FAILED",
-                    message="ETABS source beam-force consolidation failed; not solver equivalence")
+                    message="SOURCE_ONLY ETABS beam evidence failed to validate or register")
                 raise
-            native=self.etabs_native_assignment_var.get().strip()
-            manifest,_=register_current_etabs_tables(
-                source_root,full,self.etabs_beam_forces_paths,
-                assignment=native if native and Path(native).suffix.lower() in (".xlsx",".xlsm") else None)
             record_case_status(stage,"INCOMPLETE",
-                message="SOURCE_ONLY: rows consolidated; native model equivalence not verified")
+                message="SOURCE_ONLY: source hashes and rows recorded; ETABS/OpenSees comparison not verified")
             self._gravity_action_log(
                 "ETABS_BEAM_FORCE_PARTS_AUDITED",
                 f"Parts={len(self.etabs_beam_forces_paths)}; rows={summary['unique_rows']}; "
