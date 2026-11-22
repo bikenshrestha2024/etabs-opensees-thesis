@@ -100,6 +100,15 @@ def copy_project_workbooks(runtime_dir, export_dir):
     """
     import shutil
     import hashlib
+    # Clear-beam rebuild variants are tied to the current source geometry.
+    # Copying repository-global October/November ULS/SLS scaling workbooks
+    # here would falsely present them as this model's verified input.
+    config_file=Path(export_dir)/'OpenSees_Complete_Model_Config_V118.json'
+    if config_file.is_file():
+        config=json.loads(config_file.read_text(encoding='utf-8-sig'))
+        if config.get('require_model_aligned_workbooks') is True:
+            # Explicit current-source registration remains supported separately.
+            return []
     source=Path(runtime_dir)/'excel'/'source'
     if not source.is_dir():source=Path(runtime_dir)/'Project_Input_Workbooks'
     target=Path(export_dir)/'excel'/'source'
@@ -671,6 +680,15 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     Read source files only; never modify their values or formula caches.
     """
     root=Path(root);export_dir=Path(export_dir)
+    cfg_file=export_dir/'OpenSees_Complete_Model_Config_V118.json'
+    if cfg_file.is_file():
+        cfg=json.loads(cfg_file.read_text(encoding='utf-8-sig'))
+        if cfg.get('require_model_aligned_workbooks') is True:
+            # A new clear-beam export is NOT permission to accept stale
+            # same-named scaling references from the repo or adjacent exports.
+            # The ESM module should calculate from source ETABS geometry or
+            # require an explicitly validated, source-aligned reference.
+            return [None,None]
     state=str(limit_state).strip().upper()
     if state=='BOTH':state='ULS'
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
