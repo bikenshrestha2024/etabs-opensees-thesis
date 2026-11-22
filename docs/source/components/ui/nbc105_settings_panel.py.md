@@ -52,3 +52,14 @@ Tests: `tests/test_nbc105_gui_clause_routing.py` plus `tests/test_nbc105_module_
 ## Annex A/B calculator entrypoints
 
 The existing **NBC clauses 1–10** button opens a dialog offering 1–10 plus separately registered Annex A/B operations. Annex examples show the 600 mm special RC coupled-wall minimum input and a horizontal I-section seismic link rotation *limit*. These do not infer that the ETABS 12 m X-direction wall coupling, real reinforcement or any SHS/FVD/BRB element has qualified as a steel seismic link. The preview result remains non-certifying. Regression: `tests/test_nbc105_gui_clause_routing.py`.
+
+## Clause input UI enhancement (2026-11-22)
+
+The main NBC settings dialog now automatically renders a JSON template for every
+selected public Clause 1–10 or Annex A/B calculation. Required fields use
+`null` placeholders rather than silently entering `{}`; the user must
+supply independently confirmed values. Selecting another operation updates its
+argument template, while current-dialog edits are preserved per operation.
+The optional **Source coverage (open gates)** viewer inventories indexed
+headings, source review and acceptance, including Annex C. It does not certify
+normative paragraph/footnote coverage or any building result.
