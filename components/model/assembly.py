@@ -1275,7 +1275,37 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
     if requested_strategy!='ETABS_SOURCE_SUPPORTS' and not os.environ.get('OPENSEES_GRAVITY_GUI_MODE'):
         raise ValueError('Wall-base support sensitivity mode is allowed only in the gravity GUI')
     etabs_reaction_support_audit=None
-    if requested_strategy=='ETABS_NONZERO_REACTION_DIAGNOSTIC':
+    support_case_evidence=None
+    # Shared physical boundary-condition choice for ESM, Rayleigh, modal,
+    # MRSM, LTHA and NLTHA. Gravity GUI retains its legacy comparison routing
+    # unless the operator explicitly invokes this shared case selector.
+    from components.model.support_case_contract import (
+        select_support_case, PROJECT_PRIMARY_32)
+    raw_shared_case=os.environ.get('OPENSEES_SUPPORT_CASE','').strip()
+    if raw_shared_case and not os.environ.get('OPENSEES_GRAVITY_GUI_MODE'):
+        if requested_strategy!='ETABS_SOURCE_SUPPORTS':
+            raise ValueError('Do not mix the legacy gravity sensitivity strategy and shared node case')
+        source_topology=_read(folder/'OpenSees_Element_Connectivity.json')
+        support_case_evidence=select_support_case(
+            data,source_topology,raw_shared_case,
+            wall_base_extension=_gravity_wall_support_strategy)
+        data['supports']=support_case_evidence['supports']
+        added_gravity_supports=support_case_evidence['added_wall_mesh_support_tags']
+        requested_strategy=support_case_evidence['profile']
+    elif (not raw_shared_case and not os.environ.get('OPENSEES_GRAVITY_GUI_MODE')
+          and {str(x) for x in PROJECT_PRIMARY_32}.issubset(data['supports'])):
+        # This thesis source has all 32 validated physical tags. Do not
+        # silently apply them to foreign toy/archived models without those IDs.
+        source_topology=_read(folder/'OpenSees_Element_Connectivity.json')
+        support_case_evidence=select_support_case(
+            data,source_topology,'PHYSICAL_32',
+            wall_base_extension=_gravity_wall_support_strategy)
+        data['supports']=support_case_evidence['supports']
+        added_gravity_supports=[]
+        requested_strategy='PHYSICAL_32'
+    if support_case_evidence is not None:
+        pass  # canonical selection already applied; preserve source metadata
+    elif requested_strategy=='ETABS_NONZERO_REACTION_DIAGNOSTIC':
         # ETABS FZ=0 is NOT proof of a free native restraint: this is opt-in.
         if profile!='GRAVITY_1.0D_1.0L':
             raise ValueError('Reaction diagnostic requires full 1.0D+1.0L gravity')
@@ -1299,6 +1329,12 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
         data['supports']=supports
     else:
         added_gravity_supports=[]
+    if support_case_evidence is not None:
+        print('[MODEL SUPPORT CASE]',json.dumps({
+            k:v for k,v in support_case_evidence.items() if k!='supports'
+        },sort_keys=True),flush=True)
+        print('[MODEL SUPPORT NATIVE GATE] NOT_VERIFIED: 44 shear-wall mesh points '
+              'require source-matched ETABS auto-edge/MPC force transfer.',flush=True)
     print('[GRAVITY WALL SUPPORT STRATEGY]',
           json.dumps(dict(strategy=requested_strategy,
                           added_mesh_fixed_nodes=added_gravity_supports,
@@ -1535,6 +1571,7 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
                 elements=len(ops.getEleTags()),analysis_ready=False,
                 gravity_base_support_tags=[int(n) for n,flags in data['supports'].items() if flags[2]],
                 gravity_support_strategy=requested_strategy,
+                support_case_evidence=({k:v for k,v in (support_case_evidence or {}).items() if k!='supports'}),
                 gravity_added_support_nodes=added_gravity_supports,
                 stiffness_basis=stiffness_basis,
                 model_config_sha256=data.get('config_sha256'),
