@@ -52,3 +52,10 @@ The standard production runner **always performs eigenanalysis and its regular R
 - Unit regression `tests/test_first_step_transition.py` exercises fake OpenSees read-only behavior. Real native OpenSees/XARA first-step and wall material calibration remain OPEN.
 
 **Source reference licensing:** the inspected fork has an MIT license. This module is independently written and does not paste any fork source code, but engineering inspiration and original attribution remain documented in this source guide and `REVIEW_MAIN/04_NONLINEAR/FORK_RC_ASSESSMENT_20261117/`.
+
+
+## 2026-11-22: fail-closed watched-wall accepted snapshot
+
+`require_accepted_focused_step(snapshot)` accepts **only** `stage='FIRST_ACCEPTED_STEP'`. A `NONFINITE_FOCUSED_RESPONSE` or `FOCUSED_ELEMENT_ABSENT` raises a clear run-stopping error and preserves the saved wall snapshot. `FINITE_WITH_UNSUPPORTED_CHANNELS` returns the raw limited evidence without falsely certifying all wall material integration-point responses. The production runner now writes this snapshot and the stage comparison before writing the first history CSV row, preventing a postfailure nonfinite localForce from being silently reported as an accepted history.
+
+This opt-in research diagnostic does not alter wall mesh, material, damping, support pattern or solver iteration. It does not resolve historical X-wall nonconvergence; native OpenSees/XARA verification remains mandatory.

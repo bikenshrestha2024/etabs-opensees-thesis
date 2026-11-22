@@ -110,6 +110,32 @@ def capture_transition(ops, path, *, stage, focus_tags,
     return state
 
 
+def require_accepted_focused_step(snapshot):
+    """[REF docs/source/components/nonlinear_time_history/first_step_transition.py.md]
+    Fail closed when a solver-accepted FIRST step has suspect RC-wall failures.
+
+    This gate applies only to explicitly enabled focused diagnostics and does
+    not claim that unsupported channels or an unseen wall are physically valid.
+    A nonfinite diagnostic must never become a completed accepted-history row.
+    """
+    if not isinstance(snapshot,dict) or snapshot.get("stage")!="FIRST_ACCEPTED_STEP":
+        raise ValueError("Focused transient gate requires FIRST_ACCEPTED_STEP evidence")
+    status=snapshot.get("status")
+    if status=="NONFINITE_FOCUSED_RESPONSE":
+        raise RuntimeError(
+            "NONFINITE accepted-step RC wall or connected-node response detected; "
+            "aborting history rather than recording corrupted wall results. "
+            "Inspect FIRST_ACCEPTED_STEP and original source element mapping.")
+    if status=="FOCUSED_ELEMENT_ABSENT":
+        raise RuntimeError(
+            "Requested focused wall element tags absent from live OpenSees "
+            "model: "+str(snapshot.get("missing_tags",[]))+
+            ". Reconcile source/solver element-map identifiers; no validated wall response.")
+    if status!="FINITE_WITH_UNSUPPORTED_CHANNELS":
+        raise ValueError("Unrecognized focused accepted-step status: "+str(status))
+    return snapshot
+
+
 def compare_first_step_stages(files, output_path):
     """[REF docs/source/components/nonlinear_time_history/first_step_transition.py.md]
     Compare stored snapshots in supplied chronological order; no solver calls.

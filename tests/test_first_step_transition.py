@@ -193,10 +193,13 @@ class FirstStepTransitionTests(unittest.TestCase):
         from components.nonlinear_time_history.runner_and_gui import (
             _advance_nonlinear_interval)
         class Success:
+            def __init__(self):self.clock=0.
             def test(self,*args):pass
             def algorithm(self,*args):pass
-            def analyze(self,*args):return 0
-            def getTime(self):return .005
+            def analyze(self,*args):
+                self.clock+=float(args[-1])
+                return 0
+            def getTime(self):return self.clock
             def testIter(self):return 1
         with tempfile.TemporaryDirectory() as td:
             evidence=Path(td)/"prior.json"
