@@ -43,6 +43,24 @@ SOURCE_REQUIRED_FILES=(
 )
 
 
+def canonical_clear_beam_destination(source, *, stamp=None):
+    """[REF docs/source/tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py.md]
+    Keep an immutable verified-model variant inside the parent ETABS export.
+
+    Existing source stays unchanged; only this reserved module-specific path
+    is permitted to be nested beneath the original source.
+    """
+    from components.inputs.output_layout import export_root_for
+    source=Path(source).expanduser().resolve()
+    root=export_root_for(source)
+    if source != root:
+        raise ValueError("Select the original ETABS export root for the canonical rebuild")
+    if stamp is None:
+        stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
+    from components.inputs.output_contract import safe_component
+    return root/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"/safe_component(stamp)
+
+
 def _verify_before_creating_output(source, workbook, target):
     """Fail closed before creating an output folder or changing source files."""
     source=Path(source).expanduser().resolve()
@@ -58,9 +76,17 @@ def _verify_before_creating_output(source, workbook, target):
             "not the NBC calculation or gravity-results workbook: "+str(workbook))
     if target.exists():
         raise FileExistsError("Refusing to overwrite existing destination: "+str(target))
-    if target==source or source in target.parents:
-        raise ValueError("Destination must NOT be within the original source export")
-    if not target.parent.is_dir():
+    if target==source:
+        raise ValueError("Destination must not overwrite the original source export")
+    canonical_base=source/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"
+    nested=source in target.parents
+    if nested and target.parent!=canonical_base:
+        raise ValueError(
+            "Nested clear-beam output is allowed ONLY at "
+            "<export>/02_MODEL/REBUILDS/VERIFIED_CLEAR_BEAM/<unique-run>")
+    if any(x.is_symlink() for x in (source,workbook,target,*target.parents)):
+        raise ValueError("Refusing linked source, workbook or rebuild destination")
+    if not nested and not target.parent.is_dir():
         raise FileNotFoundError("Selected output parent does not exist: "+str(target.parent))
     missing=[str(source/name) for name in SOURCE_REQUIRED_FILES
              if not (source/name).is_file()]
@@ -115,8 +141,8 @@ def _choose_in_spyder():
             "OpenSees_Element_Connectivity.json file.\n"
             "2. Select the original FULL ETABS native assignment workbook "
             "(Material List, Frame Summary and End Offsets).\n"
-            "3. Choose a parent output folder. A NEW timestamped folder "
-            "will be created.\n\n"
+            "3. The new version will be saved under the selected export's "
+            "02_MODEL/REBUILDS/VERIFIED_CLEAR_BEAM folder.\n\n"
             "No EDB will be saved, no existing model overwritten, "
             "and gravity will NOT be run.",parent=root)
         source=filedialog.askdirectory(
@@ -127,11 +153,8 @@ def _choose_in_spyder():
             filetypes=[("Original ETABS assignment workbook","*.xlsx *.xlsm"),
                        ("All files","*.*")])
         if not workbook:return None
-        parent=filedialog.askdirectory(
-            parent=root,title="Step 3/3 — Parent directory for NEW corrected export")
-        if not parent:return None
-        name="Verified_Clear_Beam_"+datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        return (source,workbook,str(Path(parent)/name))
+        target=canonical_clear_beam_destination(source)
+        return (source,workbook,str(target))
     finally:
         root.destroy()
 
@@ -202,8 +225,12 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
             raise ValueError("Elastic comparison settings must contain at least one stiffness state")
     print("[RUNNING] Preflight source JSON and native ETABS Excel tables verified.",
           flush=True)
+    # The canonical nested path is the only explicitly approved descendant.
+    # Never silently create arbitrary nested stages or overwrite model data.
+    if source in target.parents:
+        target.parent.mkdir(parents=True,exist_ok=True)
     target.mkdir(parents=True,exist_ok=False)
-    print('[RUNNING] New destination created; copying original source evidence.',flush=True)
+    print('[RUNNING] Immutable source-specific rebuild created.',flush=True)
     copied=[]
     audit={"status":"REBUILD_RUNNING","original_source_dir":str(source),
            "original_assignment_workbook":native.name,
