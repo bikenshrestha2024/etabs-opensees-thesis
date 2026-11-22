@@ -12,8 +12,8 @@ def _runtime_repo_root():
     components/<package>/<module>.py. __file__ alone then names the facade
     and its parents[2] would point outside the active project.
     """
-    source = globals().get("_component_source", __file__)
-    return Path(source).resolve().parents[2]
+    from components.shared.repository_paths import runtime_repo_root
+    return runtime_repo_root(__file__, globals().get("_component_source"))
 from OpenSees_Timing_V130 import timed_outputs
 from NBC105_Spectrum_Scaling_V115 import spectral_shape_ch
 from OpenSees_Response_Checks_V132 import write_csv,drift_check
