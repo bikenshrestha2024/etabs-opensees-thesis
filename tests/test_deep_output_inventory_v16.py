@@ -43,11 +43,11 @@ class DeepOutputInventoryTests(unittest.TestCase):
             p=root/"components"/"gravity"/"module.py"
             p.parent.mkdir(parents=True)
             p.write_text(
-                '"""Prior OpenSees_Analysis_Results folder is historical."""\\n'
-                'def helper():\\n'
-                '    """Another old OpenSees_Analysis_Results reference."""\\n'
-                '    return "02_GRAVITY"\\n'
-                'LEGACY="OpenSees_Analysis_Results"\\n',
+                '"""Prior OpenSees_Analysis_Results folder is historical."""\n'
+                'def helper():\n'
+                '    """Another old OpenSees_Analysis_Results reference."""\n'
+                '    return "02_GRAVITY"\n'
+                'LEGACY="OpenSees_Analysis_Results"\n',
                 encoding="utf-8")
             result=scan_source(root)
             totals=result["totals"]
