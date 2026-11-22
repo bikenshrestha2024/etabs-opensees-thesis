@@ -24,7 +24,10 @@ def review_zip_directory(selected):
     root=raw.parent if raw.is_file() else raw
     for ancestor in (root,*root.parents):
         if ancestor.name=="07_EXPORT_ZIP" and ancestor.is_dir():
-            return ancestor
+            # A caller may explicitly own a named ZIP subfolder such as
+            # 07_EXPORT_ZIP/Gravity_Evidence_Upload. Keep that selection;
+            # folding it into its parent breaks active evidence pointers.
+            return root
         candidate=ancestor/"07_EXPORT_ZIP"
         manifest=ancestor/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
         if candidate.is_dir() and manifest.is_file():
