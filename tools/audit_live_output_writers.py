@@ -88,6 +88,8 @@ def scan_source(repo):
     problems = []
     totals = {"files": 0, "possible_write_calls": 0,
               "legacy_literal_occurrences": 0, "canonical_literal_occurrences": 0,
+              "legacy_docstring_occurrences": 0,
+              "legacy_executable_literal_occurrences": 0,
               "possible_read_calls": 0}
     for path in source_files(root):
         rel = path.relative_to(root).as_posix()
@@ -99,6 +101,17 @@ def scan_source(repo):
             problems.append({"path": rel, "error": type(exc).__name__,
                              "line": getattr(exc, "lineno", None)})
             continue
+        # Distinguish descriptive docstrings from literals present in code.
+        # Neither proves an executed writer, but counting documentation as
+        # an operational migration target hides the meaningful review queue.
+        docstrings=set()
+        for owner in ast.walk(tree):
+            if isinstance(owner,(ast.Module,ast.ClassDef,
+                                 ast.FunctionDef,ast.AsyncFunctionDef)):
+                if (owner.body and isinstance(owner.body[0],ast.Expr)
+                    and isinstance(owner.body[0].value,ast.Constant)
+                    and isinstance(owner.body[0].value.value,str)):
+                    docstrings.add(id(owner.body[0].value))
         occurrences = []
         for node in ast.walk(tree):
             if isinstance(node, ast.Constant):
@@ -108,13 +121,19 @@ def scan_source(repo):
                 legacy = sorted(m for m in LEGACY_MARKERS if m in value)
                 canonical = sorted(m for m in CANONICAL_MARKERS if m in value)
                 if legacy or canonical:
+                    context=("DOCSTRING_REFERENCE" if id(node) in docstrings
+                             else "CODE_LITERAL_REVIEW")
                     occurrences.append({
                         "line": getattr(node, "lineno", 0),
                         "kind": "LITERAL_PATH_MARKER",
                         "markers": legacy + canonical,
                         "legacy": bool(legacy),
+                        "literal_context": context,
                     })
                     totals["legacy_literal_occurrences"] += len(legacy)
+                    totals[("legacy_docstring_occurrences" if
+                            context=="DOCSTRING_REFERENCE" else
+                            "legacy_executable_literal_occurrences")]+=len(legacy)
                     totals["canonical_literal_occurrences"] += len(canonical)
             elif isinstance(node, ast.Call):
                 func = node.func
@@ -182,15 +201,23 @@ def scan_source(repo):
                         if ref["kind"] == "LITERAL_PATH_MARKER"
                         and ref.get("legacy")]
         if legacy_lines:
+            executable = [ref for ref in item["occurrences"]
+                          if ref["kind"]=="LITERAL_PATH_MARKER"
+                          and ref.get("legacy") and
+                          ref.get("literal_context")=="CODE_LITERAL_REVIEW"]
             candidates.append({
                 "source": item["source"], "legacy_markers": len(legacy_lines),
+                "legacy_executable_markers":len(executable),
+                "legacy_docstring_markers":len(legacy_lines)-len(executable),
                 "first_lines": legacy_lines[:8],
                 "potential_write_calls": sum(
                     ref["kind"] == "POTENTIAL_WRITE_CALL"
                     for ref in item["occurrences"]),
-                "classification": "REVIEW_ONLY_CALLER_READER_TRACE_REQUIRED",
+                "classification": ("DOCUMENTATION_ONLY_STATIC_REFERENCE"
+                    if not executable else "REVIEW_ONLY_CALLER_READER_TRACE_REQUIRED"),
             })
-    candidates.sort(key=lambda item: (-item["legacy_markers"], item["source"]))
+    candidates.sort(key=lambda item: (-item["legacy_executable_markers"],
+                                      -item["legacy_markers"], item["source"]))
     return {
         "schema": "THESIS_STATIC_OUTPUT_WRITER_AUDIT_V1",
         "created_utc": datetime.now(timezone.utc).isoformat(),
@@ -213,7 +240,7 @@ def scan_source(repo):
                    for x in item["occurrences"])
         ], key=lambda row:row["source"]),
         "parse_errors": problems,
-        "next_action": "Trace every relevant writer and its result readers; migrate and test one stage/case at a time.",
+        "next_action": "Prioritize live code literals and verified writer/reader pairs; preserve documented legacy read aliases and historical results.",
     }
 
 
