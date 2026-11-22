@@ -207,47 +207,13 @@ def register_case(output_root, run_result_path, model_path, *,
 
 def current_case(output_root, model_path, *, scenario, profile,
                  expected_support_tags=None):
-    """Return matching solved reaction only; never return a stale value.
-
-    [REF docs/source/components/gravity/reaction_case_registry.py.md]
+    """[REF docs/source/components/gravity/reaction_case_registry.py.md]
+    Compatibility facade: share the single strict case-validation path.
+    The detailed API explains why a saved result cannot be trusted.
     """
-    from components.gravity.output_ownership import existing_index
-    index=existing_index(output_root,INDEX_NAME)
-    if not index.is_file():
-        return None
-    try:
-        entries=json.loads(index.read_text(encoding="utf-8-sig"))
-        entry=entries.get(scenario+"|"+profile)
-        if not entry:
-            return None
-        if entry["model_sha256"] != _sha256(model_path):
-            return None
-        if entry.get("input_sha256")!=_model_input_fingerprints(model_path):
-            return None
-        if Path(entry["model_path"]).resolve()!=Path(model_path).resolve():
-            return None
-        result=Path(entry["result_path"])
-        if not result.is_file():
-            return None
-        # A legacy entry without a saved digest must be re-registered from
-        # verified source evidence. Never silently trust equal reaction totals.
-        digest=entry.get("result_sha256")
-        evidence_bytes=result.read_bytes()
-        if (not isinstance(digest,str) or len(digest)!=64
-                or hashlib.sha256(evidence_bytes).hexdigest()!=digest):
-            return None
-        payload=json.loads(evidence_bytes.decode("utf-8-sig"))
-        if _sha256(result)!=digest:
-            return None
-        freshly=checked_reaction_result(payload,model_path,scenario=scenario,
-           profile=profile,expected_support_tags=expected_support_tags)
-        if abs(freshly["summed_reaction_kN"]-float(entry["summed_reaction_kN"]))>0.01:
-            return None
-        if abs(freshly["applied_load_kN"]-float(entry["applied_load_kN"]))>0.01:
-            return None
-        return dict(freshly,result_path=str(result))
-    except (OSError,ValueError,KeyError,TypeError,OverflowError):
-        return None
+    return current_case_diagnostic(
+        output_root, model_path, scenario=scenario, profile=profile,
+        expected_support_tags=expected_support_tags)["result"]
 
 
 def current_case_diagnostic(output_root, model_path, *, scenario, profile,
@@ -313,6 +279,12 @@ def current_case_diagnostic(output_root, model_path, *, scenario, profile,
         payload=json.loads(original.decode("utf-8-sig"))
         verified=checked_reaction_result(payload,model,scenario=scenario,
                    profile=profile,expected_support_tags=expected_support_tags)
+        # Recheck exact file identity after validation, guarding concurrent
+        # replacement between the first read and the returned display record.
+        if _sha256(target)!=digest:
+            return {"status":"SAVED_RESULT_CHANGED_DURING_CHECK",
+                    "reason":"Solver result changed while verifying; reselect stable evidence",
+                    "index":str(index),"result":None}
         if abs(verified["summed_reaction_kN"]-
                float(entry["summed_reaction_kN"]))>0.01:
             raise ValueError("Indexed vertical reaction differs from solved file")
