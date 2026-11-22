@@ -109,3 +109,47 @@ nonlinear convergence approval.
 success and private Windows output inspection were not independently
 verified during this edit. Do not claim that every historical module writer
 has already migrated solely because the shared policy and tests exist.
+
+## 2026-11-22 comprehensive producer/consumer evidence (implemented)
+
+`tools/audit_live_output_writers.py` inventories **both potential
+readers and writers**, using AST rather than trying to infer ownership from
+filenames. `tools/audit_output_writer_reader_pairs.py` scans *every active
+Python source file* and associates possible read/write sites with the owning
+module. The source/line references, import edges and unresolved statuses
+are **static review candidates**, not proof of actual runtime file use.
+
+The complete owner matrix can be generated with:
+
+```powershell
+python tools/audit_output_writer_reader_pairs.py --repo . --report-dir "audit/output_pairs" --fail-on-parse
+```
+
+The canonical read-only all-module Windows audit is:
+
+```powershell
+python tools/RUN_FULL_OUTPUT_MIGRATION_AUDIT.py --export-root "D:\\Thesis Opensees\\ETABS 11-22-2026"
+```
+
+That command inventories all active code, all nested real output-file
+metadata, canonical/legacy run manifests and stage ownership; it publishes a
+new source-only report under
+`09_SOFTWARE_DIAGNOSTICS/RUNS/SOURCE_ONLY/ALL_MODULE_OUTPUT_MIGRATION_AUDIT/<run-id>/02_RESULTS`.
+The tool does **not** silently copy, delete, migrate or rewrite existing
+artifacts and does **not** run ETABS/OpenSees. The return code is 2 while
+producer-consumer evidence or layout acceptance remains open; this is
+intentional, not a completed migration flag.
+
+`components/validation/etabs_comparison.py` now discovers native
+GRAVITY/ESM/MODAL/MRSM/LTHA/NLTHA stage roots as well as the historical
+shared result tree, retaining strict model-hash and limit-state filtering.
+
+The Windows GitHub Action
+`.github/workflows/windows-output-contracts.yml` runs direct Python
+filesystem and reader regressions on a hosted Windows VM. It cannot
+execute private ETABS COM, Spyder GUI, or native 32/76/97 comparisons.
+
+**Unfinished:** A complete all-module migration requires verifying every
+actual live writer/reader pair and its saved-case reopen contract on matching
+native Windows model data. No automatic bulk relocation is authorized in
+the absence of source identity and numerical parity checks.
