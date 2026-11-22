@@ -70,6 +70,38 @@ def classify_etabs_excel_selection(paths):
     }
 
 
+def discover_beam_force_parts(directory):
+    """[REF docs/source/components/inputs/etabs_excel_selection.py.md]
+    Return ordered Beam Forces Element 1/2/3 files without reading large cells.
+    """
+    root=Path(directory).expanduser().resolve(strict=True)
+    if not root.is_dir():
+        raise NotADirectoryError(root)
+    parts={}
+    for path in root.iterdir():
+        if not path.is_file() or path.suffix.lower() not in (".xlsx",".xlsm"):
+            continue
+        match=re.search(r"beam[ _-]*forces?[ _-]*element[ _-]*(\\d+)",
+                        path.stem.casefold())
+        if not match:
+            continue
+        index=int(match.group(1))
+        if index in parts:
+            raise ValueError(
+                f"Multiple beam force workbooks claim Element {index}: "
+                f"{parts[index].name} / {path.name}; manually choose exact parts.")
+        parts[index]=path
+    if not parts:
+        raise ValueError("No Beam Forces Element numbered Excel parts in "+str(root))
+    # A gap almost always represents an omitted split export. Do not publish
+    # a plausibly complete source if one workbook is missing.
+    indices=sorted(parts)
+    if indices!=list(range(1,indices[-1]+1)):
+        raise ValueError("Missing numbered beam-force part(s): "+str(
+            sorted(set(range(1,indices[-1]+1))-set(indices))))
+    return [parts[i] for i in indices]
+
+
 def validate_full_table_selection(path):
     """[REF docs/source/components/inputs/etabs_excel_selection.py.md]
     Reject a beam-only export as the source for ETABS joint reactions.
