@@ -57,6 +57,19 @@ class NBCOperationInputContractTests(unittest.TestCase):
             run_operation(5,"accidental_eccentricities_m",
                           {"building_width_m":24.,"other":123})
 
+    def test_cli_describe_exposes_exact_required_inputs(self):
+        import contextlib
+        import io
+        from components.nbc105.__main__ import main
+        stream=io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            exit_code=main(["--describe","--clause","5","--operation",
+                            "accidental_eccentricities_m"])
+        self.assertEqual(exit_code,0)
+        payload=json.loads(stream.getvalue())
+        self.assertEqual(payload["required"],["building_width_m"])
+        self.assertIsNone(payload["template"]["building_width_m"])
+
     def test_gui_uses_schema_on_operation_switch(self):
         from pathlib import Path
         gui=Path(__file__).resolve().parents[1]/"components"/"ui"/"nbc105_settings_panel.py"
