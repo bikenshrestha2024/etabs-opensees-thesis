@@ -1824,7 +1824,14 @@ class GravityAnalysisGUI:
         runner_path = out / "Gravity_Run_V110.py"
         log_path = out / "Gravity_Run_V110.log"
         runner_path.write_text(_runner_source(model, result_path, supports, total, steps, self.gravity_profile_var.get()), encoding="utf-8")
-        thread = threading.Thread(target=self._worker, args=(py, runner_path, result_path, log_path, out, self.gravity_profile_var.get(), self._selected_wall_support_strategy()), daemon=True)
+        # Pin the actual selected ETABS source at launch. Background work
+        # must never read a newly selected GUI source from another model.
+        source_etabs_table=self.etabs_full_table_var.get().strip()
+        thread = threading.Thread(target=self._worker,
+            args=(py, runner_path, result_path, log_path, out,
+                  self.gravity_profile_var.get(),
+                  self._selected_wall_support_strategy(),source_etabs_table),
+            daemon=True)
         thread.start()
 
     def _selected_wall_support_strategy(self):
@@ -2040,12 +2047,13 @@ class GravityAnalysisGUI:
             self.status_var.set("Runs completed but comparison export failed")
             messagebox.showerror("Dual gravity export failed",str(exc),parent=self.win)
 
-    def _worker(self, py, runner, result_path, log_path, out, profile, support_strategy="ETABS_SOURCE_SUPPORTS"):
+    def _worker(self, py, runner, result_path, log_path, out, profile,
+                support_strategy="ETABS_SOURCE_SUPPORTS", source_etabs_table=""):
         try:
             proc = subprocess.run([str(py), str(runner)], cwd=str(out), capture_output=True, text=True, errors="replace", env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1','OPENSEES_GRAVITY_PROFILE':profile,
                 'OPENSEES_GRAVITY_GUI_MODE':'1',
                 'OPENSEES_GRAVITY_WALL_SUPPORT_STRATEGY':support_strategy,
-                'OPENSEES_GRAVITY_ETABS_TABLE':str(self.etabs_full_table_var.get().strip()) if support_strategy=='ETABS_NONZERO_REACTION_DIAGNOSTIC' else '',
+                'OPENSEES_GRAVITY_ETABS_TABLE':str(source_etabs_table) if support_strategy=='ETABS_NONZERO_REACTION_DIAGNOSTIC' else '',
                 'OPENSEES_GRAVITY_AUDIT_DIR':str(out) if support_strategy=='ETABS_NONZERO_REACTION_DIAGNOSTIC' else ''}, encoding='utf-8')
             combined = proc.stdout + ("\n--- STDERR ---\n" + proc.stderr if proc.stderr else "")
             log_path.write_text(combined, encoding="utf-8")
@@ -2161,7 +2169,8 @@ class GravityAnalysisGUI:
         try:
             from components.gravity.reaction_case_registry import register_case
             scenario=payload["wall_support_strategy"]
-            registry_root=Path(self.output_var.get()).expanduser().resolve()
+            from components.gravity.output_ownership import workspace_for_solver_case_run
+            registry_root=workspace_for_solver_case_run(out)
             verified=register_case(registry_root,out/"Gravity_Result_V110.json",
                 payload["model_script"],scenario=scenario,
                 profile=payload["gravity_profile"])
