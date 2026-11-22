@@ -230,6 +230,9 @@ def main(argv=None):
         "versioned_workbook_literals":len(result["versioned_workbook_literal_review"]),
         "owner_links":len(result["module_owner_import_links"]),
         "parse_error_count":len(result["parse_errors"]),
+        "shadowed_definitions":result["shadowed_definitions"],
+        "cross_file_clone_review_top10":result[
+            "cross_file_exact_body_clone_candidates"][:10],
         "acceptance":result["acceptance"],
     },indent=2))
     return 2 if ((args.fail_on_parse and result["parse_errors"])
