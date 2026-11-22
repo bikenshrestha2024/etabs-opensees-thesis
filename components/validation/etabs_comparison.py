@@ -228,7 +228,7 @@ def compare(rows, etabs, policy=None):
     return results
 
 
-def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None):
+def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None, expected_support_case='PHYSICAL_32', expected_mass_policy='SOURCE_DISTRIBUTED'):
     """Export source-normalized CSV and Excel comparisons.
 
     Existing CSV users remain supported. Direct ETABS API results are passed
@@ -241,7 +241,9 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None)
          else folder/'OpenSees_Analysis_Results')/'ETABS_Comparison_V148'
     out.mkdir(parents=True,exist_ok=True)
     source_issues=[]
-    rows=collect(folder,source_issues,results_root=results_root)
+    rows=collect(folder,source_issues,results_root=results_root,
+                 expected_support_case=expected_support_case,
+                 expected_mass_policy=expected_mass_policy)
     if not rows:
         source_issues.append('ZERO_SOURCE_MATCHED_ROWS: Check result location, '
                              'model SHA, limit state and completed solver outputs.')
@@ -275,6 +277,7 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None)
         result=rows
         write(out/'Comparison.csv',rows,FIELDS+['value','source_file'])
     (out/'Comparison_Guide.txt').write_text(GUIDE,encoding='utf-8')
+    (out/'Comparison_Execution_Profile.json').write_text(json.dumps(dict(support_case=expected_support_case,seismic_mass_policy=expected_mass_policy,source_identity_status='REVIEW_EACH_ROW'),indent=2),encoding='utf-8')
     (out/'run.json').write_text(json.dumps(
         dict(elapsed_s=time.perf_counter()-start,row_count=len(result),
              etabs_file=str(etabs_path or ''),direct_api=bool(etabs_rows and not etabs_path),
@@ -355,8 +358,21 @@ def launch(parent,folder,results_root=None):
  from tkinter import ttk,filedialog,messagebox
  win=tk.Toplevel(parent);win.title('ETABS comparison — verified source / cases');win.geometry('1200x750')
  path=tk.StringVar();status=tk.StringVar()
+ support_filter=tk.StringVar(value='PHYSICAL_32')
+ mass_filter=tk.StringVar(value='SOURCE_DISTRIBUTED')
  latest={'rows':None,'out':None,'etabs_rows':None,'policy':None}
  bar=ttk.Frame(win,padding=5);bar.pack(fill='x')
+ filter_row=ttk.Frame(bar);filter_row.pack(fill='x',pady=(0,4))
+ ttk.Label(filter_row,text='Actual OpenSees foundation case:').pack(side='left')
+ ttk.Combobox(filter_row,textvariable=support_filter,
+              values=('PHYSICAL_32','SOURCE_76','WALL_BASE_97'),
+              state='readonly',width=19).pack(side='left',padx=(4,16))
+ ttk.Label(filter_row,text='Executed seismic mass operator:').pack(side='left')
+ ttk.Combobox(filter_row,textvariable=mass_filter,
+              values=('SOURCE_DISTRIBUTED','STORY_LUMPED_NBC'),
+              state='readonly',width=22).pack(side='left',padx=5)
+ ttk.Label(filter_row,text='Older 76-restraint MRSM JSON without identity stays NOT_COMPARABLE.',
+           foreground='#953b19').pack(side='left',padx=8)
  file_row=ttk.Frame(bar);file_row.pack(fill='x',pady=(0,4))
  ttk.Label(file_row,text='Native ETABS normalized CSV (optional):').pack(side='left',padx=(0,5))
  ttk.Entry(file_row,textvariable=path,width=65).pack(side='left',fill='x',expand=True)
@@ -468,7 +484,9 @@ def launch(parent,folder,results_root=None):
                        'and basis checks before using Direct ETABS API.')
      extracted=connect_and_extract(folder,mapping)
      compared,out=save(folder,etabs_rows=extracted,policy=mapping,
-                      results_root=results_root)
+                      results_root=results_root,
+                      expected_support_case=support_filter.get(),
+                      expected_mass_policy=mass_filter.get())
      from components.validation.etabs_direct_api import fingerprint
      provenance={"edb_path":str(Path(chosen).resolve()),"edb_sha256":fingerprint(chosen),
                  "mapping_path":str(Path(config).resolve()),
@@ -572,10 +590,15 @@ def launch(parent,folder,results_root=None):
    tree.insert('','end',values=[row.get(c,'') for c in cols])
  def refresh():
   try:
-   rows,out=(save(folder,path.get(),results_root=results_root) if path.get() else
+   rows,out=(save(folder,path.get(),results_root=results_root,
+                  expected_support_case=support_filter.get(),expected_mass_policy=mass_filter.get()) if path.get() else
              (save(folder,etabs_rows=latest['etabs_rows'],policy=latest['policy'],
-                   results_root=results_root) if latest['etabs_rows'] is not None
-              else save(folder,results_root=results_root)))
+                   results_root=results_root,
+                   expected_support_case=support_filter.get(),
+                   expected_mass_policy=mass_filter.get()) if latest['etabs_rows'] is not None
+              else save(folder,results_root=results_root,
+                        expected_support_case=support_filter.get(),
+                        expected_mass_policy=mass_filter.get())))
    show_rows(rows)
    if not rows:
     audit=out/'Comparison_Source_Exclusions.json'
@@ -595,9 +618,9 @@ def launch(parent,folder,results_root=None):
   selected=tree.selection()
   if not selected:messagebox.showinfo('Select quantity','Select a comparison row first.',parent=win);return
   key=tree.item(selected[0],'values')
-  rows=(save(folder,path.get(),results_root=results_root)[0] if path.get() else
+  rows=(save(folder,path.get(),results_root=results_root,expected_support_case=support_filter.get(),expected_mass_policy=mass_filter.get())[0] if path.get() else
         latest['rows'] if latest['rows'] is not None
-        else save(folder,results_root=results_root)[0])
+        else save(folder,results_root=results_root,expected_support_case=support_filter.get(),expected_mass_policy=mass_filter.get())[0])
   subset=[r for r in rows if all(str(r.get(k,''))==key[cols.index(k)] for k in ('method','limit_state','case','axis','metric','unit','basis'))]
   if not subset:
    messagebox.showwarning('No solved response','No verified source-matched response series for this selection. Review Comparison_Source_Exclusions.json; do not plot invented zeros.',parent=win)
