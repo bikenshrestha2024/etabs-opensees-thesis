@@ -52,7 +52,6 @@ class Registered12mModelWorkbookTests(unittest.TestCase):
                        return_value=("ULS","source")):
                 selected=source_workbooks(self.root,self.root,"ULS")
                 self.assertEqual(selected,[self.reference,None])
-                self.assertIsNone(verified_reference(self.root,state="SLS") if False else None)
                 with self.assertRaisesRegex(ValueError,"state mismatch"):
                     verified_reference(self.root,state="SLS")
 
