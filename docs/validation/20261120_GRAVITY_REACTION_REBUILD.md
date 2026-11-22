@@ -53,3 +53,50 @@ Direct gravity comparison now pins the requested EDB, checks the recorded source
 The standard Gravity runner was also exercised with the original ETABS support-reaction workbook, the matching 32-node diagnostic selection, and ten load increments. Its saved result records `ETABS_ELASTIC_COMPARISON`, agrees with the independent replay within 0.01 kN at every selected support, and can be reopened through the ordinary gravity case index.
 
 An additional ten-step native-elastic run directly restrained all 76 source positions. All 76 mapped by coordinates to the native ETABS extraction. The 44 points where ETABS recovered zero global vertical reaction carried 86,918.158 kN in OpenSees. The largest signed residual was +11,550.516 kN at joint 264, and both total reactions remained 311,367.314 kN. This rules out substituting the 76 direct restraints for the 32-point diagnostic as a way to improve the pointwise comparison. The residual remains open pending matched ETABS shell-edge constraints, analytical-mesh force recovery and boundary stiffness.
+
+## 2026-11-22 — runtime screenshots and enforced mismatch gates
+
+User GUI screenshots at ~10:33–10:36 Kathmandu time show:
+
+- `ETABS_SOURCE_SUPPORTS` / 76 restraints solved with source gravity
+  load 311,367.31387955 kN and matching summed OpenSees reactions.
+- After initially switching to `ETABS_NONZERO_REACTION_DIAGNOSTIC` the
+  GUI showed `Not analyzed for this case`; later a **separate 32-support
+  run was completed and indexed**, again balancing the applied load.
+  An initial unavailable saved-case state does not mean the 32-node
+  solver failed. Worker-thread case-registration UI refresh now uses the
+  Tk main thread.
+- Direct ETABS comparison explicitly identifies
+  `LEGACY_GROSS_SHELL`, ETABS 311,367.314 kN versus OpenSees
+  311,367.314 kN total, yet node 263 / 36 and 264 / 41 differ by
+  approximately **3,041.266 kN**. This is the historic gross-wall
+  model, NOT the 2026-11-20 native-elastic reviewed variant whose
+  maximum residual is 768.045 kN.
+- The GUI previously displayed solver status `FINISHED` without
+  prominently separating pointwise support mismatch. Direct JSON/Excel
+  now exposes max absolute, sum absolute, RMS, completeness and a
+  fail-closed numerical screening status independent of net global FZ.
+  The GUI puts unresolved node error in the status and event log.
+- The direct ETABS action now warns **before** ETABS COM runs if the
+  selected saved OpenSees case is not `ETABS_ELASTIC_COMPARISON`;
+  continuing is explicitly diagnostic only.
+
+These edits do **not** transfer force between nodes, change structural
+stiffness, invent support reactions, or certify any code or ETABS model.
+A gross-shell 3,041 kN mismatch and a native-elastic 768 kN mismatch
+cannot be equated as one unchanged failed run.
+
+### Required engineering resolution
+
+Rebuild a new source-hashed ETABS-elastic model from the **original** EDB
+export using actual native section/shell modifiers and assignment export.
+Run the exact same 32-support 1.0D+1.0L case, compare per-node FZ, full
+foundation wrench and native wall-base cuts. The remaining difference
+cannot be physically removed without identifying and verifying native
+ETABS analytical mesh/auto-edge constraint interpolation, frame end-offset
+stiffness and slab-to-beam/wall load transfer.
+
+The newly supplied slab-load-path Excel was not programmatically
+accessible in the active runtime; no cells, formulas or solver numbers
+from that new workbook have been validated by this patch. Do not treat
+the old workbook review or screenshot as proof of unseen cell values.
