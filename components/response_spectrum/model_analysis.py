@@ -40,6 +40,7 @@ def design_cd(T,cfg):
 def run_model_spectrum(folder,config,output_dir):
     import openseespy.opensees as ops
     from OpenSees_Complete_Export_V118 import build_complete_model
+    from components.model.support_case_contract import (normalize_support_case, require_runtime_support_case)
     from NBC105_Analysis_Settings_V109 import calculate_esm
     from OpenSees_Earthquake_Analysis_NBC105_V111 import read_story_csv
     from OpenSees_Modal_Analysis_NBC105_V111 import run_nbc105_modal_audit
@@ -65,8 +66,17 @@ def run_model_spectrum(folder,config,output_dir):
     for axis,dof in [('X',1),('Y',2)]:
         if axis not in config.get('axes',['X','Y']):continue
         __import__('os').environ['OPENSEES_GRAVITY_PROFILE']=config.get('gravity_profile',__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
-        print('[MRSM START]',state,axis,flush=True)
-        build_complete_model(folder,mode='elastic',preload=True,limit_state=state)
+        import os
+        selected_support=normalize_support_case(config.get('support_case','PHYSICAL_32'))
+        os.environ['OPENSEES_SUPPORT_CASE']=selected_support
+        selected_mass=str(config.get('seismic_mass_policy','SOURCE_DISTRIBUTED')).strip().upper()
+        if selected_mass not in ('SOURCE_DISTRIBUTED','STORY_LUMPED_NBC'):
+            raise ValueError('Unknown selected MRSM mass policy')
+        os.environ['OPENSEES_SEISMIC_MASS_POLICY']=selected_mass
+        print('[MRSM START]',state,axis,'support_case='+selected_support,'mass='+selected_mass,flush=True)
+        built=build_complete_model(folder,mode='elastic',preload=True,limit_state=state)
+        support_evidence=require_runtime_support_case(selected_support,built)
+        print('[MRSM SELECTED SUPPORT CASE VERIFIED]',support_evidence,flush=True)
         print('[MRSM STAGE]',state,axis,'gravity converged; solving eigenmodes, then CQC response and NBC force scaling. This is one state of the selected batch.',flush=True)
         from components.modal.analysis import modal_response_nodes
         modal=run_nbc105_modal_audit(
@@ -405,12 +415,12 @@ def launch(parent,folder):
     root=_runtime_repo_root()
     values=import_project_inputs(root,folder,initial_state)['values'];fields={}
     period_defaults,period_note=mrsm_period_defaults(folder,values,initial_state)
-    defaults=dict(limit_state=initial_state,soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=period_defaults['T1_X'],T1_Y=period_defaults['T1_Y'],nmodes=40,damping=.05)
+    defaults=dict(limit_state=initial_state,soil=values.get('soil',''),Z=values.get('Z',''),I=values.get('I',''),rmu=values.get('rmu',''),omegau=values.get('omegau',''),omegas=values.get('omegas',''),T1_X=period_defaults['T1_X'],T1_Y=period_defaults['T1_Y'],nmodes=40,damping=.05,support_case='PHYSICAL_32',seismic_mass_policy='SOURCE_DISTRIBUTED')
     ttk.Label(form,text='Model response spectrum: mode shapes + site spectrum → CQC actions, force scaling, drift and nodal envelopes',wraplength=1000,font=('Segoe UI',12,'bold')).pack(anchor='w')
     grid=ttk.Frame(form);grid.pack(fill='x')
     for i,(name,value) in enumerate(defaults.items()):
         fields[name]=tk.StringVar(value=str(value));r=i//2;c=(i%2)*2;ttk.Label(grid,text=name,width=20).grid(row=r,column=c,sticky='w',pady=4)
-        options=['ULS','SLS'] if name=='limit_state' else ['A','B','C','D'] if name=='soil' else None
+        options=['ULS','SLS'] if name=='limit_state' else ['A','B','C','D'] if name=='soil' else ['PHYSICAL_32','SOURCE_76','WALL_BASE_97'] if name=='support_case' else ['SOURCE_DISTRIBUTED','STORY_LUMPED_NBC'] if name=='seismic_mass_policy' else None
         widget=ttk.Combobox(grid,textvariable=fields[name],values=options,state='readonly',width=25) if options else ttk.Entry(grid,textvariable=fields[name],width=25);widget.grid(row=r,column=c+1,sticky='ew',padx=6)
     grid.columnconfigure(1,weight=1);grid.columnconfigure(3,weight=1)
     def refresh(*unused):
@@ -429,6 +439,7 @@ def launch(parent,folder):
             fields['T1_'+axis].set(str(period_values['T1_'+axis]) if period_values['T1_'+axis] else '')
     fields['limit_state'].trace_add('write',refresh)
     ttk.Label(form,text=period_note,wraplength=1000).pack(anchor='w',pady=3)
+    ttk.Label(form,text='32 physical foundations primary; 76/97 diagnostic restraints only. Optional floor-master mass changes eigenmodes and needs native ETABS verification.',wraplength=1000).pack(anchor='w',pady=3)
     ttk.Label(form,text='Each state runs X and Y, with E0 / Eplus / Eminus cases (6 cases/state). E0 is centered; Eplus/Eminus are signed 5% perpendicular-breadth eccentric inertia cases. Soil selection requires site evidence. Acceleration conversion is internal for the kN-m-s model. Workbook / PNG / PDF are exported automatically.',wraplength=1000).pack(anchor='w',pady=6)
     from components.inputs.output_layout import export_root_for
     from components.inputs.output_contract import create_case_run,record_case_status,atomic_json
