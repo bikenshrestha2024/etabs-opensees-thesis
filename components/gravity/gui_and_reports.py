@@ -212,12 +212,71 @@ class GravityAnalysisGUI:
         except (OSError, ValueError, KeyError) as exc:
             self.status_var.set('Optional ETABS workbook evidence needs review: '+str(exc))
 
+    def _choose_etabs_full_table(self):
+        """Pick an analysed full table or joint reactions CSV, never beam-only."""
+        try:
+            from components.inputs.etabs_excel_selection import validate_full_table_selection
+            selected=filedialog.askopenfilename(
+                parent=self.win,
+                title="Choose analyzed ETABS full table (NOT Beam Forces Element)",
+                filetypes=[("ETABS analyzed Excel / Joint Reactions CSV",
+                            "*.xlsx *.xlsm *.csv")])
+            if selected:
+                source=validate_full_table_selection(selected)
+                self.etabs_full_table_var.set(str(source))
+        except Exception as exc:
+            messagebox.showerror("Wrong ETABS source role",str(exc),parent=self.win)
+
+    def _choose_all_etabs_excel_sources(self):
+        """One multiselect picker for analysis, assignment, and ALL beam parts."""
+        try:
+            from components.inputs.etabs_excel_selection import (
+                classify_etabs_excel_selection)
+            selected=filedialog.askopenfilenames(
+                parent=self.win,
+                title="Ctrl/Shift select ONE Analysis Export + Assignment Export "
+                      "+ ALL Beam Forces Element 1/2/3",
+                filetypes=[("ETABS Excel exports","*.xlsx *.xlsm")])
+            if not selected:
+                return
+            grouped=classify_etabs_excel_selection(selected)
+            if grouped["analysis"] is None:
+                raise ValueError(
+                    "No analyzed Analysis Export selected; Ctrl+click it and "
+                    "ALL beam-force parts together.")
+            if not grouped["beam"]:
+                raise ValueError(
+                    "No Beam Forces Element parts selected; Ctrl+click all parts.")
+            from components.inputs.etabs_excel_selection import validate_full_table_selection
+            validate_full_table_selection(grouped["analysis"])
+            self.etabs_full_table_var.set(str(grouped["analysis"]))
+            if grouped["assignment"] is not None:
+                self.etabs_native_assignment_var.set(str(grouped["assignment"]))
+            self.etabs_beam_forces_paths=list(grouped["beam"])
+            names=", ".join(path.name for path in grouped["beam"])
+            self.status_var.set(
+                f"Sources selected: 1 analyzed Excel + "
+                f"{int(grouped['assignment'] is not None)} assignment + "
+                f"{len(grouped['beam'])} beam-force files: {names}. "
+                "Each file may contain multiple sheets.")
+            messagebox.showinfo(
+                "ETABS Excel sources selected",
+                f"Analysis: {grouped['analysis'].name}\\n"
+                f"Assignment: {grouped['assignment'].name if grouped['assignment'] else 'not selected'}\\n"
+                f"Beam parts ({len(grouped['beam'])}):\\n"+
+                "\\n".join(path.name for path in grouped["beam"])+
+                "\\n\\nAll parts will be read; rows are saved as CSV "
+                "without Excel worksheet row limits.",
+                parent=self.win)
+        except Exception as exc:
+            messagebox.showerror("ETABS multi-file selection",str(exc),parent=self.win)
+
     def _select_all_etabs_beam_force_workbooks(self):
         """Select all exported beam-force Excel parts, without changing model state."""
         try:
             paths=filedialog.askopenfilenames(
                 parent=self.win,
-                title="Select ALL ETABS Element Forces - Beams workbooks",
+                title="Select ALL ETABS Element Forces - Beams workbooks (Ctrl/Shift multi-select)",
                 filetypes=[("ETABS beam-force workbooks","*.xlsx *.xlsm")])
             if not paths:
                 return
@@ -226,7 +285,8 @@ class GravityAnalysisGUI:
                 raise ValueError("Duplicate beam-force file selected")
             self.etabs_beam_forces_paths=chosen
             self.status_var.set(
-                f"Selected {len(chosen)} ETABS beam-force Excel parts. "
+                f"Selected {len(chosen)} ETABS beam-force Excel parts: "+
+                ", ".join(path.name for path in chosen)+". "
                 "Click Validate + register + consolidate; no reactions altered.")
         except Exception as exc:
             messagebox.showerror("ETABS beam-force selection",str(exc),parent=self.win)
@@ -240,7 +300,9 @@ class GravityAnalysisGUI:
                 raise ValueError("Select all ETABS beam-force Excel parts first")
             full=self.etabs_full_table_var.get().strip()
             if not full or Path(full).suffix.lower() not in (".xlsx",".xlsm"):
-                raise ValueError("Select the current original ETABS analysis XLSX first")
+                raise ValueError("Select current analyzed ETABS Analysis Export XLSX first")
+            from components.inputs.etabs_excel_selection import validate_full_table_selection
+            validate_full_table_selection(full)
             from components.inputs.output_layout import export_root_for
             from components.inputs.etabs_table_bundle import register_current_etabs_tables
             from components.validation.etabs_split_beam_forces import consolidate
@@ -1287,10 +1349,8 @@ class GravityAnalysisGUI:
         ttk.Checkbutton(form,
           text="Use a separately saved ETABS gravity-copy EDB (diagnostic only; model equivalence UNVERIFIED)",
           variable=self.allow_alternate_edb).pack(anchor="w",pady=(2,4))
-        self._path_row(form,"Completed ETABS full table XLSX / Joint Reactions CSV",self.etabs_full_table_var,
-            lambda:self._browse_file(self.etabs_full_table_var,
-                "Choose original analyzed ETABS full-table export",
-                [("ETABS Excel or CSV","*.xlsx *.xlsm *.csv"),("All files","*.*")]))
+        self._path_row(form,"Analyzed ETABS full-table XLSX / Joint Reactions CSV (NOT beam parts)",
+            self.etabs_full_table_var,self._choose_etabs_full_table)
         self._path_row(form,
             "Original ETABS frame/material assignment XLSX (BEAM WEIGHT SOURCE)",
             self.etabs_native_assignment_var,
@@ -1306,6 +1366,9 @@ class GravityAnalysisGUI:
                  "Original workbook is READ ONLY; source hash and beam crosswalk are audited.",
             wraplength=1070,foreground="#9a3412",
             anchor="w",justify="left").pack(anchor="w",pady=(0,4))
+        ttk.Button(form,
+                   text="Select ALL ETABS Excel files together (Ctrl/Shift multi-select: Analysis + Assignment + Beam 1/2/3)",
+                   command=self._choose_all_etabs_excel_sources).pack(anchor="w",pady=(2,5))
         beam_row=ttk.Frame(form); beam_row.pack(fill="x",pady=(2,5))
         ttk.Button(beam_row,
                    text="Select ALL ETABS Element Forces - Beams Excel parts",
@@ -1314,7 +1377,8 @@ class GravityAnalysisGUI:
                    text="Validate + register + consolidate beam forces",
                    command=self._audit_all_etabs_beam_force_workbooks).pack(side="left")
         ttk.Label(form,
-                  text="All selected beam-force worksheets are read-only sources. "
+                  text="Use Ctrl/Shift-click for multiple workbooks, or the combined source selector above. "
+                       "All selected beam-force worksheets are read-only sources. "
                        "Output: 01_ETABS_EXPORT/RUNS/SOURCE_ONLY/BEAM_FORCES/<run-id>/02_RESULTS. "
                        "Consolidation verifies exported station rows, NOT OpenSees reaction equivalence.",
                   wraplength=1050,anchor="w",justify="left").pack(anchor="w")
