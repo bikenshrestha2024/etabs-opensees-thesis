@@ -70,7 +70,7 @@ python tools/audit_uniform_output_structure.py --export-root "D:\Thesis Opensees
 ```
 
 Reports stage presence, case-manifest validity, historical path presence,
-noncanonical or incomplete run directories and recorded engineering
+noncanonical or incomplete run directories, loose root-level CSV/JSON/Excel/ZIP/plot artifacts requiring ownership review, and recorded engineering
 status. It **never** relocates files, interprets solver equations, reads
 source XLSX/EDB contents, or changes analysis files. Private names/paths
 are not published to GitHub automatically. An explicit local execution
@@ -93,3 +93,19 @@ is still required to audit the user's Windows output folder.
 **Engineering acceptance remains open.** This document defines software
 organization and evidence handling, not NBC 105, structural equivalence or
 nonlinear convergence approval.
+
+## Enforcement added to main
+
+- `tests/test_uniform_output_structure.py`: exercises stage names and
+  manifests for ETABS, Gravity, ESM, Modal, MRSM, LTHA and NLTHA;
+  verifies legacy preservation, missing-manifest detection and root artifact
+  inventory without moving files.
+- `tests/test_gravity_beam_force_gui_integration.py`: checks the active
+  GUI creates SOURCE_ONLY beam runs using the shared contract, verifies the
+  EDB fingerprint and records source-validation errors explicitly.
+- `.github/workflows/repository-integrity.yml`: runs these tests.
+
+**Execution evidence:** changes are committed, but live GitHub Actions
+success and private Windows output inspection were not independently
+verified during this edit. Do not claim that every historical module writer
+has already migrated solely because the shared policy and tests exist.
