@@ -771,6 +771,13 @@ def main(argv=None) -> int:
         "static_gate": result["acceptance"]["static_audit"],
         "unresolved_local_import_candidates": len(
             result["dependency_graph"]["unresolved_explicit_local_imports"]),
+        "eager_local_import_cycles": result["dependency_graph"]["eager_import_cycles"][:15],
+        "potential_local_import_cycles": result["dependency_graph"]["potential_import_cycles"][:15],
+        "source_review_attestation_issue_count": len(
+            result["source_review_attestation_issues"]),
+        "legacy_path_review_examples": next(
+            (x["evidence"] for x in result["findings"]
+             if x["id"]=="P1_LEGACY_OUTPUT_REFERENCE_MIGRATION"), [])[:12],
         "writer_occurrences": result["writer_scan_totals"],
         "finding_ids": [x["id"] for x in result["findings"]],
         "report": str(summary), "file_register": str(register),
