@@ -129,6 +129,11 @@ class ReactionCaseRegistryTests(unittest.TestCase):
         GravityAnalysisGUI._refresh_case_reaction(gui)
         self.assertEqual(gui.solved_reaction_var.get(),"Saved result unavailable")
         self.assertIn("MODEL_SHA_CHANGED",gui.solved_reaction_status_var.get())
+        from components.gravity import gui_and_reports
+        import inspect
+        refresh=inspect.getsource(gui_and_reports.GravityAnalysisGUI._refresh_case_reaction)
+        self.assertNotIn('set("Not analyzed for this case")',refresh)
+        self.assertIn('Checking saved case',refresh)
 
     def test_canonical_run_owner_not_current_gui_output(self):
         from components.gravity.output_ownership import (
