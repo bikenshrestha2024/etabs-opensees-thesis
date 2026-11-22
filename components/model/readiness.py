@@ -628,6 +628,73 @@ def format_readiness_blockers(diagnosis: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+
+def format_readiness_review(diagnosis: Dict[str, Any]) -> str:
+    """Group unresolved NLTHA prerequisites for a readable *local* GUI report.
+
+    This formatting-only function cannot grant approval, validate source
+    evidence or mutate the model-bound manifest.
+    [REF docs/NLTHA_READINESS_WORKFLOW.md]
+    """
+    blocks = diagnosis.get("blockers", [])
+    if not isinstance(blocks, list):
+        raise ValueError("Readiness diagnosis blockers must be a list")
+    buckets = {
+        "HUMAN APPROVAL": [],
+        "ENGINEERING CHECKLIST": [],
+        "MODEL MATERIALS": [],
+        "MODEL INPUT BINDING": [],
+        "OTHER INPUTS": [],
+    }
+    material = {
+        "material_file_missing", "material_file_not_found",
+        "wall_fsam_tags_empty", "parameters_not_reviewed",
+    }
+    for block in blocks:
+        code = block.get("code", "")
+        if code == "not_approved":
+            category = "HUMAN APPROVAL"
+        elif code.startswith("check_false:"):
+            category = "ENGINEERING CHECKLIST"
+        elif code in material:
+            category = "MODEL MATERIALS"
+        elif ("binding" in code or "sha" in code or "model_config" in code
+              or code in ("model_script_missing", "manifest_missing",
+                          "manifest_unreadable", "template_unbound",
+                          "bound_to_other_model", "stale_runtime_copy")):
+            category = "MODEL INPUT BINDING"
+        else:
+            category = "OTHER INPUTS"
+        buckets[category].append(block)
+    lines = [
+        f"NLTHA READINESS — {len(blocks)} unresolved blocker(s)",
+        "NOT A NATIVE SOLVER FAILURE: this is a source/model/approval preflight.",
+        "No input file, material law, reinforcement, support or review flag was changed.",
+        "Complete only checks backed by source-specific evidence and a named reviewer.",
+        "",
+    ]
+    for group, items in buckets.items():
+        if not items:
+            continue
+        lines.append(f"{group} ({len(items)})")
+        for i, item in enumerate(items, 1):
+            lines.extend([
+                f"  {i}. [{item['code']}] {item['message']}",
+                "     Required: " + item["fix"],
+            ])
+        lines.append("")
+    lines.extend([
+        "NEXT ACTION",
+        "Use Prepare / inspect model-bound readiness checklist. Review the original",
+        "source, model geometry, nonlinear material/FSAM mappings and case reports.",
+        "An exploratory PEER research draft or a successful elastic MRSM is NOT",
+        "approved project-specific production NLTHA input.",
+        "For research-only numerical diagnosis use Stage 38 separately, with",
+        "the actual paired waveform files and its independent evidence gates.",
+    ])
+    return "\n".join(lines) + "\n"
+
+
 _NON_GATE_BLOCKER_CODES = ("material_file_missing", "material_file_not_found",
                            "wall_fsam_tags_empty", "parameters_not_reviewed", "binding_not_recorded")
 
