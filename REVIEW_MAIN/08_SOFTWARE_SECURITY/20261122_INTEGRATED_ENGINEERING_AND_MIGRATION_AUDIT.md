@@ -81,3 +81,7 @@ python tools/audit_gravity_workspace.py "D:\PATH\TO\EXACT_ETABS_EXPORT" --write
 The local export inspection is **not performed in GitHub Actions** because the user's Windows-only native EDB, COM environment and entire private solver results are not present there. Do not upload private EDB/XLSX/solver evidence merely to turn a status green.
 
 Tracking: [issue #141](https://github.com/bikenshrestha2024/etabs-opensees-thesis/issues/141) (all producer/consumer paths), [#142](https://github.com/bikenshrestha2024/etabs-opensees-thesis/issues/142) (duplicate semantics), [#140](https://github.com/bikenshrestha2024/etabs-opensees-thesis/issues/140) (gravity pointwise parity).
+
+## 2026-11-22 follow-up: previously omitted relative-import edges
+
+The cross-module and output migration scanners previously missed or under-described `from .` and `from ..` imports. They now share a non-executing Python import resolver with direct tests and integrated CI coverage. This improves the dependency review queue **without completing migration** or validating real runtime call order. See [source-level correction](20261122_RELATIVE_IMPORT_GRAPH_CORRECTION.md). All native engineering and saved-case gates above remain open.
