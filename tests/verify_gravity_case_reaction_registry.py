@@ -86,9 +86,9 @@ class ReactionCaseRegistryTests(unittest.TestCase):
             register_case(self.output,result,self.model,scenario=mode,
                           profile="GRAVITY_1.0D_1.0L")
             paths.append(result)
-        index=json.loads((self.output/"Gravity_Case_Reaction_Index.json").read_text())
+        index=json.loads((self.output/"00_INDEXES"/"Gravity_Case_Reaction_Index.json").read_text())
         self.assertEqual(len(index),3)
-        text=(self.output/"Gravity_Output_Index.txt").read_text(encoding="utf-8")
+        text=(self.output/"00_INDEXES"/"Gravity_Output_Index.txt").read_text(encoding="utf-8")
         for mode, result in zip(SCENARIO_SUPPORTS,paths):
             self.assertIn(str(result.resolve()),text)
             self.assertEqual(current_case(self.output,self.model,scenario=mode,
@@ -117,7 +117,7 @@ class ReactionCaseRegistryTests(unittest.TestCase):
         f=self.write(self.payload(mode))
         register_case(self.output,f,self.model,scenario=mode,
                       profile="GRAVITY_1.0D_1.0L")
-        index=self.output/"Gravity_Case_Reaction_Index.json"
+        index=self.output/"00_INDEXES"/"Gravity_Case_Reaction_Index.json"
         records=json.loads(index.read_text(encoding="utf-8"))
         records[mode+"|GRAVITY_1.0D_1.0L"].pop("result_sha256")
         index.write_text(json.dumps(records),encoding="utf-8")

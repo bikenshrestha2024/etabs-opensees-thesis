@@ -105,65 +105,45 @@ def checked_reaction_result(payload, model_path, *, scenario, profile,
 
 def publish_gravity_case_index(output_root, record):
     """[REF docs/source/components/gravity/reaction_case_registry.py.md]
-    Publish navigable case evidence in the project-selected Gravity folder.
+    Publish ONE metadata pointer, never duplicate physical solver plots or files.
 
-    Keep historical solver files exactly where their registered absolute paths
-    point; duplicate only small read-only plot previews and the case summary.
-    Never copy source EDB, original private spreadsheets or complete results.
+    Historical 02_GRAVITY/<scenario>/<run> previews remain readable. New
+    cases create just 00_INDEXES/CASES/<scenario>/<case-hash>.json.
     """
-    from shutil import copy2
+    from components.gravity.output_ownership import section
     root = Path(output_root).resolve()
-    # Both historical OpenSees_Analysis_Results and already canonical
-    # 02_GRAVITY/RUNS/... inputs belong to the SAME selected export root.
-    # Do not create nested 02_GRAVITY/RUNS/.../02_GRAVITY directories.
-    # For standalone folders with no recognized ancestor, preserve the
-    # previous behavior of keeping the index below the selected folder.
-    selection = export_root_for(root)
-    destination_root = selection / "02_GRAVITY"
-    case_path = Path(record["result_path"]).resolve()
-    scenario = record["scenario"]
+    stage = export_root_for(root) / "02_GRAVITY"
+    scenario=record["scenario"]
     if scenario not in SCENARIO_SUPPORTS:
         raise ValueError("Unrecognized gravity case identity")
-    # Case path hash avoids collisions even if run folders share a timestamp.
-    short = hashlib.sha256(str(case_path).encode("utf-8")).hexdigest()[:12]
-    case_dir = destination_root / scenario / (case_path.parent.name + "_" + short)
-    case_dir.mkdir(parents=True, exist_ok=True)
-    summary = {
-        "status": "SOLVER_RESULT_INDEXED_NOT_ETABS_VALIDATED",
-        "support_strategy": scenario,
-        "support_count": record["support_count"],
-        "gravity_profile": record["profile"],
-        "model_sha256": record["model_sha256"],
-        "result_path": str(case_path),
-        "original_full_run_folder": str(case_path.parent),
-        "applied_load_kN": record["applied_load_kN"],
-        "summed_reaction_kN": record["summed_reaction_kN"],
-        "equilibrium_error_percent": record["equilibrium_error_percent"],
+    result_path=Path(record["result_path"]).resolve()
+    digest=hashlib.sha256(str(result_path).encode("utf-8")).hexdigest()[:16]
+    case_dir=stage/"00_INDEXES"/"CASES"/scenario
+    if any(p.is_symlink() for p in (case_dir,*case_dir.parents)):
+        raise ValueError("Refusing linked gravity case index directory")
+    case_dir.mkdir(parents=True,exist_ok=True)
+    summary={
+        "status":"INDEX_POINTER_ONLY_NOT_ETABS_VALIDATED",
+        "support_strategy":scenario,
+        "support_count":record["support_count"],
+        "gravity_profile":record["profile"],
+        "model_sha256":record["model_sha256"],
+        "result_path":str(result_path),
+        "original_full_run_folder":str(result_path.parent),
+        "applied_load_kN":record["applied_load_kN"],
+        "summed_reaction_kN":record["summed_reaction_kN"],
+        "equilibrium_error_percent":record["equilibrium_error_percent"],
+        "case_result_sha256":record.get("result_sha256"),
     }
-    (case_dir / "CASE_SUMMARY.json").write_text(
-        json.dumps(summary, indent=2), encoding="utf-8")
-    (case_dir / "README_FIRST.txt").write_text(
-        "GRAVITY CASE — " + scenario + "\n" +
-        "Number of restrained support nodes: " + str(record["support_count"]) + "\n" +
-        "Full native solver reports and plots remain at:\n" +
-        str(case_path.parent) + "\n" +
-        "This directory is an organized INDEX + lightweight previews.\n" +
-        "Numerical equilibrium is not ETABS/OpenSees physical equivalence.\n",
-        encoding="utf-8")
-    (case_dir / "OPEN_FULL_LEGACY_RUN.url").write_text(
-        "[InternetShortcut]\nURL=" + case_path.parent.as_uri() + "\n",
-        encoding="utf-8")
-    for preview in ("Gravity_Reactions_V123.png",
-                    "Gravity_Deformation_V123.png"):
-        original = case_path.parent / preview
-        if original.is_file() and original.stat().st_size <= 20_000_000:
-            copy2(original, case_dir / preview)
-    (destination_root / "LATEST_GRAVITY_CASES.json").write_text(
-        json.dumps({"status": "INDEX_ONLY_NOT_ETABS_VALIDATED",
-                    "last_case": str(case_dir),
-                    "legacy_case_index": str(root / INDEX_NAME)}, indent=2),
-        encoding="utf-8")
-    return case_dir
+    from components.inputs.output_contract import atomic_json
+    pointer=case_dir/(digest+".json")
+    atomic_json(pointer,summary)
+    atomic_json(stage/"00_INDEXES"/"LATEST_GRAVITY_CASES.json",{
+        "status":"INDEX_POINTER_ONLY_NOT_ETABS_VALIDATED",
+        "last_case":str(pointer),
+        "case_index":str(Path(output_root).resolve()/"00_INDEXES"/INDEX_NAME),
+    })
+    return pointer
 
 
 def register_case(output_root, run_result_path, model_path, *,
@@ -186,9 +166,11 @@ def register_case(output_root, run_result_path, model_path, *,
         raise RuntimeError("Gravity solver result changed during case registration")
     record["indexed_at_utc"]=datetime.now(timezone.utc).isoformat()
     # Keep output index under selected output root; no claims about stale results.
-    dest=output_root/INDEX_NAME
-    if dest.is_file():
-        prior=json.loads(dest.read_text(encoding="utf-8-sig"))
+    from components.gravity.output_ownership import index_path, existing_index
+    dest=index_path(output_root,INDEX_NAME,create=True)
+    old_index=existing_index(output_root,INDEX_NAME)
+    if old_index.is_file():
+        prior=json.loads(old_index.read_text(encoding="utf-8-sig"))
         if not isinstance(prior,dict):
             raise ValueError("Gravity case registry is invalid")
     else:
@@ -208,7 +190,7 @@ def register_case(output_root, run_result_path, model_path, *,
             "  Supports: "+str(entry.get("support_count")),
             "  Result: "+str(entry.get("result_path")),
             "  Indexed UTC: "+str(entry.get("indexed_at_utc","unknown")), ""])
-    text_path=output_root/"Gravity_Output_Index.txt"
+    text_path=index_path(output_root,"Gravity_Output_Index.txt",create=True)
     text_tmp=text_path.with_suffix(".txt.tmp")
     text_tmp.write_text("\n".join(lines),encoding="utf-8")
     text_tmp.replace(text_path)
@@ -217,7 +199,7 @@ def register_case(output_root, run_result_path, model_path, *,
     try:
         publish_gravity_case_index(output_root, record)
     except (OSError, ValueError) as exc:
-        (output_root / "Gravity_Organized_Index_Warning.txt").write_text(
+        (index_path(output_root,"Gravity_Organized_Index_Warning.txt",create=True)).write_text(
             "The solver result is preserved; organized preview failed: " +
             str(exc), encoding="utf-8")
     return record
@@ -229,7 +211,8 @@ def current_case(output_root, model_path, *, scenario, profile,
 
     [REF docs/source/components/gravity/reaction_case_registry.py.md]
     """
-    index=Path(output_root).resolve()/INDEX_NAME
+    from components.gravity.output_ownership import existing_index
+    index=existing_index(output_root,INDEX_NAME)
     if not index.is_file():
         return None
     try:

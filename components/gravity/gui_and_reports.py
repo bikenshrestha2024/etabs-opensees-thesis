@@ -157,11 +157,35 @@ class GravityAnalysisGUI:
         self.output_var.trace_add("write", lambda *_: self._refresh_case_reaction())
         self.model_var.trace_add("write", lambda *_: self._refresh_case_reaction())
         self.model_var.trace_add("write", lambda *_: self._populate_registered_sources())
+        self.model_var.trace_add("write", lambda *_: self._update_auto_gravity_output())
         def populate_saved():
             from OpenSees_Complete_Export_V118 import autoselect_inputs
             folder=Path(self.model_var.get()).parent if self.model_var.get() else Path(r'D:/Thesis Opensees/Etabs Nodes Export')
             autoselect_inputs(self,folder,'gravity_model_script')
         self.win.after_idle(populate_saved)
+
+    def _update_auto_gravity_output(self):
+        """[REF docs/source/components/gravity/gui_and_reports.py.md]
+        Bind auto-selected source builder to its ONE source-owned gravity root.
+
+        Without this callback auto-detected models leave output_var empty until
+        clicking Run; previews/exports may then resolve the process CWD.
+        Explicit external custom output selections are never overwritten.
+        """
+        if not self._output_is_automatic:
+            return
+        raw=self.model_var.get().strip()
+        if not raw:
+            self.output_var.set("")
+            return
+        model=Path(raw).expanduser()
+        if not model.is_file():
+            self.output_var.set("")
+            return
+        from components.inputs.output_layout import owned_run_destination
+        destination=owned_run_destination(model.parent,"GRAVITY",model.stem)
+        if self.output_var.get()!=str(destination):
+            self.output_var.set(str(destination))
 
     def _populate_registered_sources(self):
         """Source selection must never invoke a missing-Git-LFS modal dialog.
@@ -383,7 +407,8 @@ class GravityAnalysisGUI:
                 raise FileNotFoundError("Select the original assembled OpenSees gravity model")
             root=Path(self.output_var.get()).expanduser().resolve()
             stamp=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            output=root/"Gravity_Native_Equivalence_Preflight"/stamp
+            from components.gravity.output_ownership import section
+            output=section(root,"REVIEWS",create=True)/"Gravity_Native_Equivalence_Preflight"/stamp
             # Matching original source metadata must be in the selected model
             # export folder.  Do NOT select arbitrary previous reactions by glob.
             report=export(model.parent,output)
@@ -655,12 +680,12 @@ class GravityAnalysisGUI:
                                  "saved cases in the selected output root.")
             self._gravity_action_log("GRAVITY_ORGANIZED_INDEX",
                                      "\n".join(published))
-            self.status_var.set(f"Organized {len(published)} saved gravity cases; "
+            self.status_var.set(f"Indexed {len(published)} saved gravity cases; "
                                 "original large solver files remain unchanged.")
-            messagebox.showinfo("Gravity case folders created",
-                "Organized case indexes and lightweight preview plots:\n" +
+            messagebox.showinfo("Gravity case indexes updated",
+                "Metadata pointers updated (no duplicate plot copies):\n" +
                 "\n".join(published) +
-                "\n\nFull solver files remain at their registered source paths.",
+                "\n\nFull solver files and original previews remain at registered source paths.",
                 parent=self.win)
         except (OSError, ValueError, KeyError, TypeError) as exc:
             messagebox.showerror("Organize gravity cases", str(exc),
@@ -679,7 +704,7 @@ class GravityAnalysisGUI:
         if record is None:
             raise ValueError("No current completed gravity result for the selected model, "
                 "load profile and support condition. Run that condition first. Index: "+
-                str(Path(self.output_var.get())/"Gravity_Case_Reaction_Index.json"))
+                str(__import__("components.gravity.output_ownership",fromlist=["index_path"]).index_path(self.output_var.get(),"Gravity_Case_Reaction_Index.json")))
         return Path(record["result_path"])
 
     def _export_all_pages(self):
@@ -743,9 +768,11 @@ class GravityAnalysisGUI:
         self.log.insert("end",line+"\n")
         self.log.see("end")
         try:
+            from components.gravity.output_ownership import section
             target=Path(self.output_var.get()).expanduser().resolve()
             if target.is_dir():
-                with (target/"Gravity_GUI_Actions.log").open("a",encoding="utf-8") as file:
+                log_folder=section(target,"LOGS",create=True)
+                with (log_folder/"Gravity_GUI_Actions.log").open("a",encoding="utf-8") as file:
                     file.write(line+"\n")
         except OSError:
             pass  # Logging must not interrupt the solver or output exports.
@@ -764,7 +791,10 @@ class GravityAnalysisGUI:
             mapping=export_folder/'OpenSees_Element_Connectivity.json'
             if not mapping.is_file():
                 raise FileNotFoundError('Missing source ETABS point mapping: '+str(mapping))
-            main=Path(self.output_var.get()).expanduser().resolve()/'Gravity_Wall_Base_Comparison'
+            from components.gravity.output_ownership import dual_runs_parent
+            main=dual_runs_parent(self.output_var.get())
+            if not main.is_dir():
+                main=Path(self.output_var.get()).expanduser().resolve()/'Gravity_Wall_Base_Comparison'
             runs=sorted((x for x in main.glob('*') if
                          (x/'ETABS_SOURCE_SUPPORTS'/'Gravity_Result_V110.json').is_file()),
                         reverse=True)
@@ -796,7 +826,8 @@ class GravityAnalysisGUI:
             # Keep the original root-level 76/97 workbook for compatibility.
             report=compare_etabs_export(source,mapping,a,b,case=current_case)
             export_offline_comparison(report,dst)
-            registry=Path(self.output_var.get()).expanduser().resolve()/"Gravity_Case_Reaction_Index.json"
+            from components.gravity.output_ownership import existing_index
+            registry=existing_index(self.output_var.get(),"Gravity_Case_Reaction_Index.json")
             if registry.is_file():
                 from components.validation.gravity_etabs_latest import run as run_current
                 run_current(source,mapping,registry,dst)
@@ -962,30 +993,25 @@ class GravityAnalysisGUI:
             messagebox.showwarning('Gravity busy','Finish the solver before packaging results.',
                                    parent=self.win)
             return
-        from components.inputs.project_workbooks import analysis_output_folder,source_limit_state
         from components.ui.organized_results import publish_organized_results
         try:
             model=Path(self.model_var.get()).expanduser().resolve()
             if not model.is_file():
                 raise FileNotFoundError('Choose the current generated OpenSees gravity model.')
-            state,_=source_limit_state(model.parent)
-            root=analysis_output_folder(model.parent,state or 'ULS')
             gravity=Path(self.output_var.get()).expanduser().resolve()
-            if not root.is_dir():
-                root=gravity
-                optional=None
-            else:
-                optional=gravity if gravity.is_dir() and gravity!=root else None
-            # Gravity belongs to the selected ETABS export's 02_GRAVITY,
-            # not a second all-module snapshot inside OpenSees_Analysis_Results.
-            # Legacy solver roots remain untouched and are only READ/COPIED.
+            if not gravity.is_dir():
+                raise FileNotFoundError('Current model gravity output workspace missing: '+str(gravity))
+            # Only this selected model's gravity workspace is authoritative.
+            # Including the old shared result root a second time would ZIP
+            # the same case evidence twice under different source labels.
             from components.inputs.output_layout import review_snapshots_for
-            destination_parent = review_snapshots_for(root, 'GRAVITY')
+            destination_parent=review_snapshots_for(model.parent,'GRAVITY')
             report=publish_organized_results(
-                root, gravity_root=optional,
+                gravity,
                 destination_parent=destination_parent,
-                selected_modules=('Gravity', 'Comparisons'),
-                bundle_name='GRAVITY_REVIEW')
+                selected_modules=('Gravity','Comparisons'),
+                bundle_name='GRAVITY_REVIEW',
+                archive_only=True)
             self._gravity_action_log('ORGANIZED_GRAVITY_ZIP',
                                      report['zip_files']['GRAVITY_REVIEW'])
             self.status_var.set('Gravity review ZIP: '+report['zip_files']['GRAVITY_REVIEW'])
@@ -1519,17 +1545,21 @@ class GravityAnalysisGUI:
         self._gravity_action_log("GRAVITY_SUPPORTS","Wall base strategy="+self._selected_wall_support_strategy())
         self._gravity_action_log("GRAVITY_SETTINGS",f"Profile={self.gravity_profile_var.get()} | "
             f"Downward load={total:.6f} kN | supports={len(supports)} | steps={steps}")
-        self._gravity_action_log("GRAVITY_OUTPUT","Common output root: "+str(out)+" | case index: "+str(out/"Gravity_Output_Index.txt"))
+        from components.gravity.output_ownership import index_path, uploads_parent, section
+        self._gravity_action_log("GRAVITY_OUTPUT","Common output root: "+str(out)+" | case index: "+str(index_path(out,"Gravity_Output_Index.txt")))
         self._gravity_action_log("GRAVITY_UPLOAD_DESTINATION",
-            str(out/"Gravity_Evidence_Upload"))
+            str(uploads_parent(out)))
         self._gravity_action_log("GRAVITY_GUI_LOG",
-            str(out/"Gravity_GUI_Actions.log"))
+            str(section(out,"LOGS")/"Gravity_GUI_Actions.log"))
         self.log.insert("end",f"Support tags: {supports}\n")
         self.win.update_idletasks()
-        if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
-            out=out/"Gravity_Reaction_Diagnostic"/datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            out.mkdir(parents=True,exist_ok=False)
-            self._gravity_action_log("ETABS_REACTION_DIAGNOSTIC_OUTPUT",str(out))
+        from components.gravity.output_ownership import case_directory
+        # Fresh, collision-safe folder for EVERY independent 32/76/97 run.
+        # No new files go at workspace root or overwrite another strategy.
+        out=case_directory(out,self._selected_wall_support_strategy(),
+            self.gravity_profile_var.get(),
+            datetime.now().strftime("%Y%m%d_%H%M%S_%f"),create=True)
+        self._gravity_action_log("GRAVITY_IMMUTABLE_SOLVER_CASE",str(out))
         self._gravity_action_log("GRAVITY_CASE_OUTPUT",str(out))
         result_path = out / "Gravity_Result_V110.json"
         runner_path = out / "Gravity_Run_V110.py"
@@ -1582,7 +1612,8 @@ class GravityAnalysisGUI:
                  "not overwritten.",parent=self.win):
                 return
             stamp=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-            root=out/"Gravity_Wall_Base_Comparison"/stamp
+            from components.gravity.output_ownership import dual_runs_parent
+            root=dual_runs_parent(out)/stamp
             if root.exists():raise FileExistsError(str(root))
             root.mkdir(parents=True)
             scenarios=("ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED")
@@ -1694,7 +1725,7 @@ class GravityAnalysisGUI:
                 info=records[mode]
                 case_path=Path(info["out"])/"Gravity_Result_V110.json"
                 try:
-                    verified=register_case(root.parents[1],case_path,
+                    verified=register_case(self.output_var.get(),case_path,
                         info["payload"]["model_script"],scenario=mode,
                         profile="GRAVITY_1.0D_1.0L")
                     self._gravity_action_log("SOLVED_CASE_REACTION",
@@ -1728,7 +1759,7 @@ class GravityAnalysisGUI:
                 "GRAVITY_1.0D_1.0L | 76 + 97 supports completed | source audit="+
                 ("RECONCILED" if source_evidence_ok else "BLOCKED")+
                 " | ETABS validation not established | comparison="+str(root)+
-                " | common index="+str(root.parents[1]/"Gravity_Output_Index.txt"))
+                " | common index="+str(__import__("components.gravity.output_ownership",fromlist=["index_path"]).index_path(self.output_var.get(),"Gravity_Output_Index.txt")))
             self.status_var.set(("Two solvers PASS; source ledgers reconciled" if source_evidence_ok
                 else "Two solvers PASS; at least one source ledger BLOCKED")
                 +"; comparison: "+str(root))
@@ -1784,7 +1815,9 @@ class GravityAnalysisGUI:
         if not payload.get("ok"):
             self._gravity_action_log("GRAVITY_FAILED_SOLVER_LOG",str(out/"Gravity_Run_V110.log"))
             self._gravity_action_log("GRAVITY_FAILED_RESULT",str(out/"Gravity_Result_V110.json"))
-            self._gravity_action_log("GRAVITY_GUI_LOG",str(out/"Gravity_GUI_Actions.log"))
+            from components.gravity.output_ownership import section
+            self._gravity_action_log("GRAVITY_GUI_LOG",
+                                     str(section(self.output_var.get(),"LOGS")/"Gravity_GUI_Actions.log"))
             self.status_var.set("Gravity run failed — see the log for the failing step.")
             messagebox.showerror("Gravity analysis failed", payload.get("error", "Unknown error"), parent=self.win)
             self.nb.select(self.log_tab)
@@ -1946,7 +1979,7 @@ class GravityAnalysisGUI:
         self._gravity_action_log("GRAVITY_CASE_COMPLETED",
             f"{payload.get('wall_support_strategy')} | {payload.get('gravity_profile')} | solver converged | "
             f"source audit={'RECONCILED' if source_audit_ok else 'BLOCKED'} | ETABS validation not established | result={out} | "
-            f"common index={Path(self.output_var.get())/'Gravity_Output_Index.txt'}")
+            f"common index={__import__('components.gravity.output_ownership',fromlist=['index_path']).index_path(self.output_var.get(),'Gravity_Output_Index.txt')}")
         messagebox.showinfo("Gravity analysis complete",
             "Gravity solver converged; equilibrium check passed; gravity frozen at time zero.\n\n"
             +("Source gravity ledger reconciled to solver input. ETABS equivalence NOT VALIDATED."

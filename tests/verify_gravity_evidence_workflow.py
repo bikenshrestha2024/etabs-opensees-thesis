@@ -21,6 +21,7 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
         self.gravity=self.root/"gravity";self.gravity.mkdir()
         self.sample={
             "ok":True,
+            "model_script":str(self.script.resolve()),
             "nodes":[{"tag":1,"x_m":0.0,"y_m":0.0,"z_m":0.0,
                       "ux_m":0.0,"uy_m":0.0,"uz_m":0.0,
                       "rx_rad":0.0,"ry_rad":0.0,"rz_rad":0.0}],
@@ -42,7 +43,9 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
         for mode in ("ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED"):
             case=base/mode
             case.mkdir(parents=True)
-            (case/"Gravity_Result_V110.json").write_text(json.dumps(self.sample))
+            (case/"Gravity_Result_V110.json").write_text(json.dumps({
+                **self.sample,"wall_support_strategy":mode,
+                "gravity_profile":"GRAVITY_1.0D_1.0L"}))
             (case/"Gravity_Run_V110.log").write_text(mode)
             (case/"Gravity_Results_V110.xlsx").write_bytes(b"workbook")
         (base/"Gravity_Wall_Base_Strategy_Comparison.json").write_text("{}")
@@ -57,7 +60,7 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
                                             single_run=self.gravity)
         self.assertTrue(Path(paths["upload_zip"]).is_file())
         self.assertEqual(Path(paths["upload_zip"]).parent,
-                         self.gravity/"Gravity_Evidence_Upload")
+                         self.gravity/"07_EXPORT_ZIP"/"Gravity_Evidence_Upload")
         manifest=Path(paths["evidence_manifest"])
         index=Path(paths["exact_file_paths"])
         pointer=Path(paths["latest_upload_pointer"])
@@ -95,6 +98,60 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
                 "single_run_root/Gravity_Result_V110.json",
             ):
                 self.assertTrue(any(x.endswith(tail) for x in names),tail)
+
+    def test_explicit_dual_wrong_support_or_other_model_fails_closed(self):
+        dual=self._dual()
+        first=dual/"ETABS_SOURCE_SUPPORTS"/"Gravity_Result_V110.json"
+        doc=json.loads(first.read_text())
+        doc["wall_support_strategy"]="CONTINUOUS_WALL_BASE_FIXED"
+        first.write_text(json.dumps(doc),encoding="utf-8")
+        with self.assertRaisesRegex(ValueError,"support strategy"):
+            package_gravity_review(self.script,self.gravity,dual_run=dual,
+                single_run=self.gravity)
+        doc["wall_support_strategy"]="ETABS_SOURCE_SUPPORTS"
+        doc["model_script"]=str(self.root/"wrong_builder.py")
+        first.write_text(json.dumps(doc),encoding="utf-8")
+        with self.assertRaisesRegex(ValueError,"different or unknown"):
+            package_gravity_review(self.script,self.gravity,dual_run=dual,
+                single_run=self.gravity)
+
+    def test_different_model_run_is_not_automatically_packaged(self):
+        alien=self.gravity/"02_RESULTS"/"ETABS_SOURCE_SUPPORTS"/"GRAVITY_1.0D_1.0L"/"alien"
+        alien.mkdir(parents=True)
+        wrong={**self.sample,"model_script":str(self.root/"another_model.py")}
+        (alien/"Gravity_Result_V110.json").write_text(
+            json.dumps(wrong),encoding="utf-8")
+        single=__import__("components.gravity.evidence_workflow",
+            fromlist=["latest_single_run"]).latest_single_run(
+                self.gravity,model_script=self.script)
+        self.assertEqual(single,self.gravity)
+
+    def test_canonical_support_cases_and_upload_owner(self):
+        from components.gravity.output_ownership import case_directory,dual_runs_parent
+        for scenario in ("ETABS_NONZERO_REACTION_DIAGNOSTIC",
+                         "ETABS_SOURCE_SUPPORTS",
+                         "CONTINUOUS_WALL_BASE_FIXED"):
+            case=case_directory(self.gravity,scenario,"GRAVITY_1.0D_1.0L",
+                                "20261121T000000_123456",create=True)
+            (case/"Gravity_Result_V110.json").write_text(
+                json.dumps({**self.sample,
+                            "wall_support_strategy":scenario,
+                            "gravity_profile":"GRAVITY_1.0D_1.0L",
+                            "model_script":str(self.script),
+                            "ok":True}),encoding="utf-8")
+            (case/"Gravity_Run_V110.log").write_text("ok",encoding="utf-8")
+        latest=__import__(
+            "components.gravity.evidence_workflow",
+            fromlist=["latest_single_run"]).latest_single_run(
+                self.gravity,model_script=self.script)
+        self.assertTrue(latest.is_relative_to(self.gravity/"02_RESULTS"))
+        report,paths=package_gravity_review(self.script,self.gravity,single_run=latest)
+        self.assertTrue(Path(paths["upload_zip"]).is_relative_to(
+            self.gravity/"07_EXPORT_ZIP"/"Gravity_Evidence_Upload"))
+        self.assertTrue(Path(paths["latest_upload_pointer"]).is_relative_to(
+            self.gravity/"00_INDEXES"))
+        self.assertTrue(dual_runs_parent(self.gravity).is_relative_to(
+            self.gravity/"05_COMPARISONS"))
 
     def test_timestamped_32_node_run_is_discovered_and_packaged(self):
         import os
