@@ -66,6 +66,27 @@ class FacadeContextTests(unittest.TestCase):
                     exec(func,env)
                     self.assertEqual(env["_runtime_repo_root"](),runtime)
 
+    def test_four_shared_root_resolvers_keep_direct_and_facade_behavior(self):
+        from components.shared.repository_paths import runtime_repo_root
+        for rel in (
+            "components/gravity/gui_and_reports.py",
+            "components/inputs/analysis_autofill.py",
+            "components/response_spectrum/model_analysis.py",
+            "components/ui/building_exploratory_gui.py",
+        ):
+            source=ROOT/rel
+            self.assertEqual(runtime_repo_root(source),ROOT)
+            code=source.read_text(encoding="utf-8-sig")
+            self.assertIn("from components.shared.repository_paths import runtime_repo_root",
+                          code)
+        with tempfile.TemporaryDirectory() as tmp:
+            export=Path(tmp)/"runtime"
+            actual=export/"components"/"gravity"/"gui_and_reports.py"
+            actual.parent.mkdir(parents=True)
+            actual.write_text("pass\\n")
+            facade=export/"OpenSees_Gravity_GUI_V110.py"
+            self.assertEqual(runtime_repo_root(facade,actual),export)
+
     def test_existing_aliases_keep_exec_facade_contract(self):
         for rel,alias in MODULES.items():
             source=(ROOT/alias).read_text(encoding="utf-8-sig")
