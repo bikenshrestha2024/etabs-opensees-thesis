@@ -23,3 +23,7 @@ The active `components/model/assembly.py::build_complete_model` resolves `OPENSE
 **Load-case firewall:** `GRAVITY_1.0D_1.0L` is the full 100% dead + live gravity comparison. Seismic mass/preload uses NBC 105:2025 §5.2 Table 5-1, categorized DL=1, storage LL=0.6, other LL=0.3, roof LL=0, when applicable. Support scenario selection must never silently change these.
 
 **Validation status:** synthetic software tests only; full 25-storey native ETABS/OpenSees model and 32/76/97 modal, ESM, MRSM and NLTHA equivalence remain NOT_VERIFIED.
+
+## 2026-11-22 stale packaged-runtime gate
+
+`require_runtime_support_case(profile, build_report)` compares the selected profile and **actual build-returned** `gravity_base_support_tags`, then requires matching `support_case_evidence.profile`. A stale exported `OpenSees_Runtime_V118` that ignores a new GUI support choice now triggers a clear **REFRESH THE EXPORTED RUNTIME** error instead of producing mislabeled 76/97 source results for a selected 32-case. This check is called after model construction by ESM, Modal, MRSM, LTHA and NLTHA, using the same project tag contract. The check verifies a source software selector, **not** native ETABS analytical edge interpolation, 768-kN gravity reaction parity or code design acceptance.
