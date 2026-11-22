@@ -389,8 +389,13 @@ def _run(config):
     out.mkdir(parents=True,exist_ok=True)
     model=out/'isolated_model';model.mkdir(exist_ok=True)
     _set_run_stage('reading_records_and_model_inputs')
-    for name in ('OpenSees_Complete_Model_Data_V118.json','OpenSees_Complete_Model_Config_V118.json','OpenSees_Complete_Export_Report_V118.json','OpenSees_Load_Conversion_Audit.json','OpenSees_Source_Model_Metadata_V118.json'):shutil.copy2(source/name,model/name)
-    if (source/'OpenSees_Complete_Story_Masters_V118.csv').exists():shutil.copy2(source/'OpenSees_Complete_Story_Masters_V118.csv',model/'OpenSees_Complete_Story_Masters_V118.csv')
+    # All OpenSees source files used by PHYSICAL_32 must travel together.
+    # Previously omitted Element_Connectivity caused native 32-support
+    # selection to fail in the isolated model. Never overwrite the source.
+    from components.nonlinear_time_history.source_model_handoff import (
+        stage_existing_model_sources, literature_section_inventory,
+        solver_reaction_support_tags)
+    stage_hashes=stage_existing_model_sources(source,model)
     # An explicitly selected source register must be copied into the isolated model
     # and its SHA and reviewer kept with each case. Never auto-approve bar schedules.
     register=config.get('approved_frame_reinforcement_csv')
@@ -407,6 +412,25 @@ def _run(config):
                  'OpenSees_Complete_Element_Map_V118.json'):
         if (source/name).is_file():shutil.copy2(source/name,model/name)
     data=json.loads((model/'OpenSees_Complete_Model_Data_V118.json').read_text(encoding='utf-8-sig'));start=time.perf_counter();unit_factor={'g':GRAVITY_M_S2,'m/s2':1.};records=[]
+    section_ledger=literature_section_inventory(
+        data,json.loads((model/'OpenSees_Complete_Model_Config_V118.json').read_text(encoding='utf-8-sig')))
+    (out/'NLTHA_Literature_Section_Basis.json').write_text(
+        json.dumps(section_ledger,indent=2,allow_nan=False),encoding='utf-8')
+    (out/'NLTHA_Isolated_Model_Source_Hashes.json').write_text(
+        json.dumps(stage_hashes,indent=2,allow_nan=False),encoding='utf-8')
+    # Use the real PHYSICAL_32 foundation unless explicitly running an
+    # alternate support sensitivity model. Do not inherit stale process env.
+    from components.model.support_case_contract import PROJECT_PRIMARY_32, normalize_support_case
+    requested=config.get('support_case')
+    source_primary={str(tag) for tag in PROJECT_PRIMARY_32}.issubset(data.get('supports',{}))
+    selected_support_case=(normalize_support_case(requested) if requested is not None
+                           else 'PHYSICAL_32' if source_primary else None)
+    if thesis_intent and selected_support_case!='PHYSICAL_32':
+        raise ValueError('THESIS_NLTHA requires actual 32 physical foundations')
+    if selected_support_case is not None:
+        os.environ['OPENSEES_SUPPORT_CASE']=selected_support_case
+    else:
+        os.environ.pop('OPENSEES_SUPPORT_CASE',None)
     # Stage 01: audit source wall geometry before expensive gravity and transient solves.
     from components.nonlinear_time_history.wall_diagnostics import write_wall_audit
     write_wall_audit(data, out/'NLTHA_Wall_Geometry_Preflight.json')
@@ -542,17 +566,28 @@ def _run(config):
         if orientation not in ('XY','YX'):raise ValueError('Orientation must be XY or YX')
         case=out/orientation;case.mkdir(exist_ok=True);print('[EXPLORATORY START]',orientation,'no calibration or design approval implied',flush=True)
         _set_run_stage('model_build_and_gravity',orientation=orientation,case_output_dir=str(case))
-        build_complete_model(
+        assembled_report=build_complete_model(
             model, mode='nonlinear', preload=True,
             limit_state=config.get('limit_state','ULS'),
             research_profile=profile, gravity_system=gravity_system)
         import openseespy.opensees as ops
-        support_nodes=[
-            int(node) for node,flags in data['supports'].items()
-            if any(bool(value) for value in flags[:3])
-        ]
-        if not support_nodes:
-            raise ValueError('The assembled model export has no support nodes for base-shear recording.')
+        if selected_support_case is not None:
+            support_nodes=solver_reaction_support_tags(
+                assembled_report,selected_support_case)
+        else:
+            raw=assembled_report.get('gravity_base_support_tags',[])
+            support_nodes=sorted(set(int(tag) for tag in raw))
+            if not support_nodes:
+                raise ValueError('Assembled OpenSees report omitted actual gravity base support tags')
+        (case/'NLTHA_Active_Foundation_Supports.json').write_text(
+            json.dumps(dict(
+                selected_case=selected_support_case or 'UNSPECIFIED_NONTHESIS_SOURCE',
+                active_tags=support_nodes,active_count=len(support_nodes),
+                original_export_point_count=len(data.get('supports',{})),
+                source_76_not_independent_foundations=True,
+                native_edge_mpc_transfer_verified=False,
+                status='SOURCE_MODEL_ASSEMBLED_NOT_ETABS_EQUIVALENT'),
+                indent=2,allow_nan=False),encoding='utf-8')
         base_reaction_reference=support_resultants(ops,support_nodes)
         if full_wall:
             shutil.copy2(model/'Research_Material_Assignment_V161.json',case/'Research_Material_Assignment_V161.json')
