@@ -1540,7 +1540,22 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
         raise ValueError('Unknown OpenSees seismic mass operator policy: '+mass_policy)
     source_mass_model=dict(data)
     source_mass_model['supports']=source_supports_for_mass
-    floor_mass_plan=story_lumped_mass_plan(source_mass_model)
+    if mass_policy=='STORY_LUMPED_NBC':
+        floor_mass_plan=story_lumped_mass_plan(source_mass_model)
+    else:
+        # Historical and standalone mesh/unit models can have no diaphragms
+        # or intentionally nonuniform master centroids. Never block their
+        # original distributed mass operator for a *diagnostic* only.
+        try:
+            floor_mass_plan=story_lumped_mass_plan(source_mass_model)
+        except (KeyError,TypeError,ValueError) as mass_issue:
+            floor_mass_plan=dict(
+                plan_status='DISTRIBUTED_MASS_UNCHANGED_STORY_AUDIT_UNAVAILABLE',
+                horizontal_mass_by_master={},
+                active_source_horizontal_mass=None,
+                intermediate_mass=None,
+                native_etabs_dynamic_mass_equivalence='NOT_VERIFIED',
+                diagnostic=str(mass_issue))
     # Reconcile floor Wi against the source ledger, never against a stale,
     # manually selected old workbook. A mismatch blocks condensed mode.
     if mass_policy=='STORY_LUMPED_NBC':
