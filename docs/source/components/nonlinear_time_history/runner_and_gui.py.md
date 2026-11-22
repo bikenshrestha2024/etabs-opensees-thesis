@@ -26,3 +26,14 @@ Unit/metadata tests, isolated material or wall benchmarks, complete solver log, 
 ## Nonfinite accepted-step safety (2026-11-04)
 
 `record_accepted` calls `full_record_gate.verify_numeric_accepted_row` before `HistoryStream.append`. This guards against generating a supposedly successful history with `NaN`, infinite or missing numeric response channels even when OpenSees returns 0. This is a **recorder** check, not proof that every constitutive integration point is finite or calibrated. CI covers the utility and compiles this module; native transient is still required.
+
+
+## 2026-11-22: original RC assessment reference / accepted-step wall safeguards
+
+Original upstream reference: `nirajkyadav/Framework_for_Seismic_Assessment_of_RC_Buildings`, MIT; see the dated `REVIEW_MAIN/04_NONLINEAR/FORK_RC_ASSESSMENT_20261117/SOURCE_REVIEW.md` adoption/exclusion table. This module is the active shared nonlinear interval owner; the exploratory runner imports the same function through its existing compatibility launcher.
+
+`_advance_nonlinear_interval` now obtains solver time before each algorithm attempt, checks the actual successful increment via `verify_committed_transient_increment`, and updates `accepted_steps`, `minimum_accepted_dt_s`, `first_accepted_step` and `last_accepted_time_s` **after** the callback verifies and records finite responses. Failed algorithms preserve the source first-failure evidence and may fall back only if the rejected time state has **not** advanced. The algorithm sequence and Newmark values, gravity/P-Delta source, 32 physical supports, 44 shell-mesh transfer points, NBC mass, damping, scaled input motions and adaptive subdivision depth are unchanged.
+
+When `diagnostic_first_step_wall=true`, `record_accepted` saves the first focused element/node snapshot and chronology report before writing any accepted history row. `require_accepted_focused_step` rejects nonfinite wall responses or missing requested solver tags, rather than recording an apparent success. For diagnostic-only watched tag `110280`, use a **matching live** `OpenSees_Complete_Element_Map_V118.json`; a historical X-wall tag is not assumed valid across versions.
+
+This is a headless software regression and an **incomplete physical verification**. Require native zero, X, Y, XY, YX first-step controls, independent wall material and coupling-beam patch tests, and full-duration XY/YX runs before claiming solved M0–M6 or NBC §9.3 compliance.
