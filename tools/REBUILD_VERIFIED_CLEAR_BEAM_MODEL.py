@@ -288,6 +288,29 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         print("[RUNNING] Native beam-ID/offset audit and new OpenSees assembly.",flush=True)
         from components.model.assembly import prepare_complete_export
         result=prepare_complete_export(target,runtime_dir=ROOT)
+        # The user's selected X-wall policy is a PHYSICAL source check,
+        # not a renamed 4x6m reference workbook. Do not mark a rebuild
+        # verified when its first-storey shell/node layout disagrees.
+        from components.inputs.project_workbooks import (
+            import_project_inputs,source_limit_state)
+        from components.inputs.grouped_wall_aw import (
+            verify_thesis_two_12m_wall_geometry)
+        state,_=source_limit_state(target)
+        if state not in ("ULS","SLS"):
+            raise ValueError("Cannot identify rebuilt ULS/SLS state for 12m source check")
+        rebuilt_inputs=import_project_inputs(ROOT,target,state)
+        values=rebuilt_inputs.get("values") or {}
+        profile=values.get("wall_aw_profile")
+        height=values.get("wall_aw_height_m")
+        if not profile or height is None:
+            raise ValueError(
+                "Missing rebuilt ETABS-derived wall profile/height; "
+                "will not claim the selected two-12m-wall configuration")
+        checked_wall=verify_thesis_two_12m_wall_geometry(profile,height)
+        audit["wall_12m_geometry_status"]=checked_wall["status"]
+        audit["wall_12m_source_geometry"]=checked_wall["wall_geometry_verification"]
+        audit["wall_12m_code_accepted"]=False
+        write_status()
         report_file=target/"OpenSees_Complete_Export_Report_V118.json"
         report=json.loads(report_file.read_text(encoding="utf-8-sig"))
         if report.get("assembly_errors"):
