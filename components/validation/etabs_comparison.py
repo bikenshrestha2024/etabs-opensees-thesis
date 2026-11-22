@@ -4,6 +4,33 @@ import csv,json,math,time
 FIELDS=['method','limit_state','case','axis','location','metric','unit','basis']
 GUIDE='Export ETABS tables for the SAME model, mass source, effective stiffness, diaphragm, restraints, gravity/P-Delta, modes, damping, spectrum units, eccentricity and combinations. Normalize rows to this template. Modes must be paired by shape/participation, not only mode number. MRSM CQC envelopes are not signed simultaneous actions. No reinforcement-demand engine is claimed.'
 
+def source_execution_identity(document, expected_support_case='PHYSICAL_32',
+                              expected_mass_policy='SOURCE_DISTRIBUTED'):
+    """Assess MRSM execution configuration separately from geometric model SHA.
+
+    [REF engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md]
+    Older V132 records include the model SHA but omit the executed 32/76/97
+    restraint profile and actual seismic mass operator. Never infer those
+    from model filename, JSON case name, or matching base shear.
+    """
+    if not isinstance(document,dict):
+        return 'MISSING_EXECUTED_SUPPORT_OR_MASS_POLICY'
+    support=document.get('support_case')
+    mass=document.get('seismic_mass_policy')
+    if not support or not mass:
+        return 'MISSING_EXECUTED_SUPPORT_OR_MASS_POLICY'
+    if support!=expected_support_case:
+        return ('DIAGNOSTIC_SUPPORT_CASE_NOT_PRIMARY_32'
+                if expected_support_case=='PHYSICAL_32' and support in ('SOURCE_76','WALL_BASE_97')
+                else 'MISMATCHED_SELECTED_SUPPORT_CASE')
+    if mass!=expected_mass_policy:
+        return 'MISMATCHED_SELECTED_MASS_OPERATOR'
+    evidence=document.get('support_case_evidence') or {}
+    if evidence.get('status')!='MATCHED_SELECTED_CASE_NOT_NATIVE_EQUIVALENT':
+        return 'MISSING_ACTUAL_RUNTIME_SUPPORT_VERIFICATION'
+    return 'SOURCE_IDENTIFIED_NOT_NATIVE_ETABS_APPROVED'
+
+
 def collect(folder, issues=None, *, results_root=None):
     """Collect ONLY current-model, source-state-matched result evidence.
 
