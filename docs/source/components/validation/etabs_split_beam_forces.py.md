@@ -23,3 +23,36 @@ Read ETABS Element Forces - Beams force-station rows when the native full-table 
 Run python -m unittest tests.test_etabs_split_beam_forces. Tests cover deduplication, conflicts, case mismatch, immutable source/output behavior. Native comparison still requires corresponding OpenSees beam forces mapped through the source frame unique-ID/segment connectivity, local axes, output stations and end-offset treatment.
 
 Related root-cause review: REVIEW_MAIN/01_GRAVITY/20261116_CONSOLIDATED_ROOT_CAUSE_AND_BEAM_FORCE_AUDIT.md.
+## 2026-11-22: multiple workbooks + multiple worksheets, beyond Excel row limit
+
+The importer now handles **all** worksheets matching the ETABS
+`Story / Unique Name / Output Case / Station` beam-force table signature,
+not exactly one table per workbook. Select all separate
+`Beam Forces Element 1/2/3` files, or a workbook containing three
+beam-force sheets. Other unrelated ETABS tables are ignored.
+
+The source workbook rows are streamed via read-only openpyxl, and a
+temporary on-disk SQLite key/value index checks overlapping stations.
+Memory is not proportional to total beam-force station count. The final
+`02_RESULTS/ETABS_Beam_Forces_Consolidated.csv` is not subject to Excel's
+1,048,576-row-per-sheet limit; do not re-import it to a single Excel sheet
+and assume missing rows are an ETABS problem.
+
+Every row carries story, member unique name, case, station and optional
+step identity. Conflicting repeated rows stop the import before result
+publication. Identical overlapping rows are counted and deduplicated.
+Per-workbook source SHA256 and per-sheet row counts appear in the JSON
+manifest. This is ETABS station-source evidence only and does not establish
+joint reaction equivalence or completion of unexported stations.
+
+For convenience the Gravity GUI has two options:
+- `Select ALL ETABS Excel files together`: Windows Ctrl/Shift selection
+  of one analyzed `Analysis Export`, optional `Assignment Export`, and
+  all separate `Beam Forces Element` parts.
+- `Select ALL ETABS Element Forces - Beams Excel parts`: chooses just the
+  beam-force workbooks, with Ctrl/Shift selection.
+
+The analyzed full-table input remains a **single authoritative analyzed
+export**, e.g. `Analysis Export ULS 3 storey latest_compressed.xlsx`.
+The assignment workbook and beam parts are separate input roles. A beam-only
+workbook cannot be used as the analyzed joint-reaction source.
