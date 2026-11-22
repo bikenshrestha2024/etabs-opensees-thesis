@@ -1053,6 +1053,28 @@ class GravityAnalysisGUI:
             model=Path(self.model_var.get()).expanduser().resolve()
             if not model.is_file():raise ValueError("Select a generated OpenSees gravity model first")
             gravity=self._selected_result_path()
+            # A globally balanced legacy shell run is not the native elastic
+            # ETABS comparison. Warn *before* launching expensive ETABS COM.
+            saved=json.loads(gravity.read_text(encoding="utf-8-sig"))
+            basis=saved.get("report",{}).get("stiffness_basis","UNRECORDED")
+            if basis!="ETABS_ELASTIC_COMPARISON":
+                if not messagebox.askyesno(
+                        "Unmatched OpenSees stiffness — diagnostic only",
+                        "Selected solved OpenSees stiffness basis: "+str(basis)+
+                        "\\n\\nThis run is NOT a source-identical ETABS elastic "
+                        "comparison. The previously measured gross-shell "
+                        "result had support errors of approximately 3,041 kN. "
+                        "The reviewed ETABS-elastic rebuild reduced that error "
+                        "but still requires further constraint reconciliation."
+                        "\\n\\nRecommended: Cancel and use 'Rebuild with "
+                        "ETABS elastic settings', then rerun 32 supports "
+                        "with the same 1.0D+1.0L load and compare the new model."
+                        "\\n\\nContinue ONLY for a diagnostic comparison?",
+                        parent=self.win):
+                    self.status_var.set(
+                        "Cancelled unmatched stiffness comparison; "
+                        "use Rebuild with ETABS elastic settings")
+                    return
             if self.gravity_profile_var.get()!="GRAVITY_1.0D_1.0L":
                 raise ValueError("Direct gravity comparison requires GRAVITY_1.0D_1.0L")
             self.nb.select(self.log_tab)
