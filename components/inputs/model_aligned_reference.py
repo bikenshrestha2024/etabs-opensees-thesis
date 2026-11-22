@@ -42,6 +42,10 @@ def verified_reference(export_dir, *, state=None):
         raise ValueError("Model-aligned workbook bytes changed; re-register")
     if state is not None and str(state).upper()!=record.get("limit_state"):
         raise ValueError("Model-aligned workbook ULS/SLS state mismatch")
+    model_data=root/"OpenSees_Complete_Model_Data_V118.json"
+    if (not model_data.is_file() or
+            _sha(model_data)!=record.get("assembled_model_sha256")):
+        raise ValueError("Rebuilt OpenSees shell/model bytes changed since 12m verification")
     wb=load_workbook(workbook,read_only=True,data_only=True)
     try:
         sheets=set(wb.sheetnames)
@@ -58,8 +62,6 @@ def verified_reference(export_dir, *, state=None):
             raise ValueError("Workbook worksheet inventory changed since registration")
     finally:
         wb.close()
-    from components.inputs.project_workbooks import import_project_inputs
-    from components.inputs.grouped_wall_aw import verify_thesis_two_12m_wall_geometry
     from components.inputs.project_workbooks import source_limit_state
     measured_state,_=source_limit_state(root)
     if measured_state!=record["limit_state"]:
@@ -87,6 +89,8 @@ def register_reference(export_dir, workbook, *, limit_state):
     state=str(limit_state).strip().upper()
     if not file.is_file() or file.suffix.lower() not in (".xlsx",".xlsm"):
         raise FileNotFoundError("Select an existing current model-aligned XLSX/XLSM")
+    if any(p.is_symlink() for p in (file,*file.parents,root,*root.parents)):
+        raise ValueError("Refusing linked workbook or source model path")
     actual,_=source_limit_state(root)
     if actual!=state:
         raise ValueError("Selected workbook limit state must match source EDB")
@@ -107,14 +111,34 @@ def register_reference(export_dir, workbook, *, limit_state):
             raise ValueError("Workbook must contain NBC Calculator or SCALING SUMMARY")
         workbook_source=None
         if "SCALING SUMMARY" in sheets:
-            workbook_source,_=_scaling_summary(wb["SCALING SUMMARY"])
+            workbook_source,fields=_scaling_summary(wb["SCALING SUMMARY"])
             if not workbook_source or not _same_edb_file_content(edb,workbook_source):
                 raise ValueError("Workbook SCALING SUMMARY B4 source EDB not verified "
                                  "as byte-identical to current ETABS EDB")
+            for axis in ("X","Y"):
+                cell=fields.get("aw"+axis.lower())
+                if cell is None:
+                    raise ValueError("SCALING SUMMARY lacks numerical Aw-"+axis+
+                                     "; cannot promote this workbook")
+                try:
+                    actual=float(cell[0])
+                    expected=float(verified["aw_candidate_m2"][axis])
+                except (ValueError,TypeError,KeyError) as exc:
+                    raise ValueError("Non-numeric Aw-"+axis+" in current workbook") from exc
+                if not (actual>0 and abs(actual-expected)<=max(0.001,0.005*expected)):
+                    raise ValueError(
+                        "Workbook Aw-"+axis+" differs from the exported 12m "
+                        "wall-geometry candidate; workbook="+str(actual)+
+                        ", source geometry="+str(expected)+
+                        ". Check openings, shell slices and formula cells.")
     finally:
         wb.close()
+    model_data=root/"OpenSees_Complete_Model_Data_V118.json"
+    if not model_data.is_file():
+        raise FileNotFoundError("Rebuilt structural model data is required")
     record={
         "status":"CURRENT_12M_WORKBOOK_SOURCE_IDENTIFIED_NOT_CODE_ACCEPTED",
+        "assembled_model_sha256":_sha(model_data),
         "workbook_path":str(file),"workbook_sha256":_sha(file),
         "source_edb":str(edb),"source_edb_sha256":_sha(edb),
         "limit_state":state,"sheets":sorted(sheets),
