@@ -1100,7 +1100,20 @@ class GravityAnalysisGUI:
             self._gravity_action_log("ETABS_OUTPUT_EXCEL",str(out/"ETABS_OpenSees_Direct_Gravity_Comparison.xlsx"))
             self._gravity_action_log("ETABS_OUTPUT_NATIVE_LOGS",str(out/"ETABS_Native_Analysis_Logs"))
             self.etabs_gravity_json_var.set(str(out/"etabs_gravity.json"))
-            self.status_var.set("Direct gravity comparison saved: "+str(out))
+            local=comp.get("node_comparison",{})
+            max_local=local.get("max_absolute_nodal_difference_kN")
+            if max_local is not None and max_local>1.0:
+                self.status_var.set(
+                    f"GRAVITY POINTWISE MISMATCH {max_local:,.3f} kN | "
+                    "global balance is NOT structural equivalence | "+str(out))
+            elif local.get("pointwise_screening_status","").startswith("NO_COMPLETE"):
+                self.status_var.set(
+                    "GRAVITY NODE AUDIT INCOMPLETE — support identities/axes "
+                    "cannot be matched | "+str(out))
+            else:
+                self.status_var.set(
+                    "Direct gravity comparison saved; structural equivalence "
+                    "NOT CERTIFIED: "+str(out))
             try:
                 self._publish_gravity_evidence()
             except Exception as pack_exc:
