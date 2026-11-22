@@ -5,7 +5,7 @@ description: Mandatory project preflight before ANY source, document, migration,
 
 # ETABS / OpenSees thesis — READ FIRST engineering agent skill
 
-> **MANDATORY:** Run this preflight before editing anything in this repository. Read `AGENTS.md` and `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md` first. **If either is unavailable, stop editing and disclose the limitation.** The words in this skill do not certify the physical model; source verification remains necessary.
+> **MANDATORY:** Run this preflight before editing anything in this repository. Read `AGENTS.md` and `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md` first. **If either is unavailable, stop editing and disclose the limitation.** The words in this skill do not certify the physical model; source verification remains necessary. **The preflight is not a source of solver PASS** and does not replace native ETABS/OpenSees tests.
 
 ## 0. Acknowledge the project facts, not an old assumption
 
