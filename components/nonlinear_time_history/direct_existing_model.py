@@ -255,6 +255,14 @@ def run_existing_model_nltha(config, *, check_only=False, executor=None):
     """
     preflight=preflight_existing_model(config)
     output=Path(config["output_dir"]).expanduser().resolve()
+    # An existing case may contain a successful XY/YX run or first-failure
+    # snapshots. Never mix a rerun into those immutable scientific records.
+    if output.exists():
+        if not output.is_dir():
+            raise FileExistsError("NLTHA output path already exists as a file: "+str(output))
+        if any(output.iterdir()):
+            raise FileExistsError(
+                "Refusing to overwrite existing NLTHA output evidence: "+str(output))
     output.mkdir(parents=True,exist_ok=True)
     target=output/"DIRECT_EXISTING_NLTHA_STATUS.json"
     plan=output/"DIRECT_EXISTING_NLTHA_SOURCE_AND_SECTION_BASIS.json"
