@@ -1648,26 +1648,49 @@ class GravityAnalysisGUI:
         self.solved_reaction_var.set("Not analyzed for this case")
         self.solved_reaction_status_var.set("No matching completed run; run the selected case")
         try:
-            from components.gravity.reaction_case_registry import current_case
-            model=Path(self.model_var.get()).expanduser().resolve()
-            root=Path(self.output_var.get()).expanduser().resolve()
+            from components.gravity.reaction_case_registry import current_case_diagnostic
+            raw_model=self.model_var.get().strip()
+            raw_root=self.output_var.get().strip()
+            if not raw_model or not raw_root:
+                self.solved_reaction_var.set("Select model and results")
+                self.solved_reaction_status_var.set(
+                    "Select current model and its source-owned gravity result folder")
+                return
+            model=Path(raw_model).expanduser().resolve()
+            root=Path(raw_root).expanduser().resolve()
             if not model.is_file():
+                self.solved_reaction_var.set("Model not found")
+                self.solved_reaction_status_var.set(
+                    "Current OpenSees source model is missing or still loading")
                 return
             scenario=self._selected_wall_support_strategy()
             profile=self.gravity_profile_var.get()
             expected=None
             if scenario=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
                 from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
+                # Use only the predefined 32 until source-table filtering has
+                # explicitly verified a different support selection.
                 expected=PROJECT_PRIMARY_32
+                verified_source=self.reaction_support_verification_var.get()
+                if verified_source.startswith("SCREENING:"):
+                    tags=self.reaction_support_var.get().strip()
+                    if tags:
+                        expected=[int(x.strip()) for x in tags.split(",") if x.strip()]
             elif scenario=="ETABS_SOURCE_SUPPORTS":
                 tags=self.position_support_var.get().strip()
                 if tags:
                     expected=[int(x.strip()) for x in tags.split(",") if x.strip()]
-            record=current_case(root,model,scenario=scenario,profile=profile,
-                                expected_support_tags=expected)
+            audit=current_case_diagnostic(root,model,scenario=scenario,
+                profile=profile,expected_support_tags=expected)
+            record=audit["result"]
             if record is None:
+                kind=audit["status"]
+                if kind in ("CASE_NOT_INDEXED","NO_CASE_INDEX"):
+                    self.solved_reaction_var.set("No indexed run")
+                else:
+                    self.solved_reaction_var.set("Saved result unavailable")
                 self.solved_reaction_status_var.set(
-                    "Not analyzed / model or load profile changed / output unavailable")
+                    kind+": "+audit["reason"])
                 return
             self.solved_reaction_var.set(f"{record['summed_reaction_kN']:.6f}")
             self.solved_reaction_status_var.set(
