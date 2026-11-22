@@ -286,42 +286,92 @@ def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None,
     return result,out
 
 
-def find_verified_etabs_csv(source_folder, results_root):
-    """Auto-reuse only native ETABS API CSV with matching EDB SHA and approved map.
+def verify_native_bundle(root, edb, expected_model_sha256):
+    """Verify one immutable-identity native API evidence set before auto-reuse.
 
-    [REF docs/source/components/validation/etabs_comparison.py.md]
-    A generated OpenSees_Normalized.csv or unfilled ETABS template is NOT
-    evidence of native ETABS analysis; review ZIPs are not live API sources.
+    [REF engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md §C]
+    Never auto-accept a hand-edited reference CSV, stale model hash,
+    opposite EDB path or a merely named 6 m-wall workbook.
     """
-    from components.inputs.project_workbooks import _source_edb_path
-    from components.validation.etabs_direct_api import fingerprint
-    edb=_source_edb_path(source_folder)
-    if not edb or not Path(edb).is_file():
-        return None,'Current original source EDB inaccessible'
-    root=Path(results_root)/'ETABS_Comparison_V148'
-    meta=root/'ETABS_API_Provenance.json'
-    mapfile=root/'ETABS_API_Mapping_SELECTED.json'
+    from components.validation.etabs_direct_api import fingerprint, validate_mapping
+    root=Path(root)
     csv_path=root/'ETABS_API_Normalized.csv'
-    if not all(p.is_file() for p in (meta,mapfile,csv_path)):
-        return None,'No approved native ETABS CSV; run Direct ETABS API once'
+    provenance=root/'ETABS_API_Provenance.json'
+    mapping_file=root/'ETABS_API_Mapping_SELECTED.json'
+    if not all(p.is_file() for p in (csv_path,provenance,mapping_file)):
+        return None,'Missing approved native ETABS CSV, mapping or provenance'
     try:
-        evidence=json.loads(meta.read_text(encoding='utf-8-sig'))
-        mapping=json.loads(mapfile.read_text(encoding='utf-8-sig'))
+        evidence=json.loads(provenance.read_text(encoding='utf-8-sig'))
+        mapping=json.loads(mapping_file.read_text(encoding='utf-8-sig'))
         if not isinstance(evidence,dict) or not isinstance(mapping,dict):
-            return None,'Saved ETABS provenance/mapping JSON must be objects, not lists'
-        if (evidence.get('edb_sha256')!=fingerprint(edb) or
-            Path(evidence.get('edb_path','')).resolve()!=Path(edb).resolve() or
-            Path(mapping.get('source_edb','')).resolve()!=Path(edb).resolve()):
-            return None,'Previous ETABS source path or SHA differs'
-        if not mapping.get('assumptions_verified'):
-            return None,'Native mapping is not approved for physical comparison'
-        with csv_path.open(encoding='utf-8-sig',newline='') as f:
-            values=list(csv.DictReader(f))
-        if not values or any(not all(str(row.get(k,'')).strip() for k in FIELDS+['value']) for row in values):
-            return None,'Saved normalized native ETABS CSV is incomplete'
-        return csv_path,'Verified native ETABS CSV auto-selected'
-    except (OSError,ValueError,TypeError,KeyError) as exc:
-        return None,'ETABS source evidence failed verification: '+str(exc)
+            return None,'Native ETABS mapping/provenance must be JSON objects'
+        if not mapping.get('assumptions_verified') is True:
+            return None,'Native ETABS mapping is not approved'
+        validate_mapping(mapping)
+        same_source=(Path(str(evidence.get('edb_path',''))).resolve()==Path(edb).resolve()
+                     and Path(str(mapping.get('source_edb',''))).resolve()==Path(edb).resolve()
+                     and evidence.get('edb_sha256')==fingerprint(edb))
+        if not same_source:
+            return None,'Original source EDB path/SHA mismatch'
+        if not expected_model_sha256 or evidence.get('source_model_sha256')!=expected_model_sha256:
+            return None,'Assembled model SHA does not match verified ETABS mapping export'
+        if evidence.get('native_csv_sha256')!=fingerprint(csv_path):
+            return None,'Native ETABS CSV SHA mismatch or missing provenance; re-read same EDB'
+        with csv_path.open(encoding='utf-8-sig',newline='') as stream:
+            values=list(csv.DictReader(stream))
+        if not values:
+            return None,'Native ETABS CSV has zero analyzed result rows'
+        required=tuple(k for k in FIELDS if k!='axis')+('value',)
+        for row in values:
+            if any(not str(row.get(k,'')).strip() for k in required):
+                return None,'ETABS normalized CSV has blank source/response identity fields'
+            if row.get('method')!='MODAL' and not str(row.get('axis','')).strip():
+                return None,'Directional ETABS normalized CSV has missing axis'
+            if not math.isfinite(float(row['value'])):
+                return None,'ETABS native row has nonfinite numerical value'
+        return csv_path,'Source EDB, assembled model, mapping and native CSV SHA verified'
+    except (OSError,ValueError,TypeError,OverflowError,KeyError) as exc:
+        return None,'Native source verification failed: '+str(exc)
+
+
+def find_verified_etabs_csv(source_folder, results_root):
+    """Auto-select approved live API evidence from current or source-owned runs.
+
+    No filename similarity is ever used as a source-identity assertion.
+    Only SHA-matched source EDB, assembled model and reference files qualify.
+    """
+    import hashlib
+    from components.inputs.project_workbooks import _source_edb_path
+    from components.inputs.output_layout import export_root_for
+    folder=Path(source_folder)
+    edb=_source_edb_path(folder)
+    model=folder/'OpenSees_Complete_Model_Data_V118.json'
+    if not edb or not Path(edb).is_file():
+        return None,'Current original source EDB inaccessible; live API can read only exact EDB'
+    if not model.is_file():
+        return None,'Current assembled model file missing; cannot establish source SHA'
+    expected_model=hashlib.sha256(model.read_bytes()).hexdigest()
+    root=Path(results_root).expanduser().resolve()
+    stage=export_root_for(folder)
+    candidates=[
+        root/'ETABS_Comparison_V148',
+        stage/'05_COMPARISONS'/'ETABS_Comparison_V148',
+        folder/'05_COMPARISONS'/'ETABS_Comparison_V148',
+        folder/'OpenSees_Analysis_Results'/'ETABS_Comparison_V148',
+    ]
+    if root.name=='02_RESULTS':
+        candidates.append(root.parent/'05_COMPARISONS'/'ETABS_Comparison_V148')
+    reasons=[]
+    used=set()
+    for location in candidates:
+        resolved=location.resolve()
+        if resolved in used:continue
+        used.add(resolved)
+        data,note=verify_native_bundle(resolved,edb,expected_model)
+        if data:
+            return data,'Verified native ETABS data auto-selected: '+str(data)
+        reasons.append(resolved.name+': '+note)
+    return None,'No SHA-verified same-model ETABS API data; '+(' | '.join(reasons[:3]) or 'no sources')
 
 
 def find_native_reference_csv(source_folder, results_root):
