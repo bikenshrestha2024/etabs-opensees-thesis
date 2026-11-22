@@ -38,6 +38,10 @@ def register_current_etabs_tables(export_dir, analysis, beam_forces, *,
     from components.inputs.output_contract import atomic_json
     from components.inputs.project_workbooks import _source_edb_path
     root=Path(export_dir).expanduser().resolve()
+    from components.inputs.output_layout import export_root_for
+    if export_root_for(root)!=root:
+        raise ValueError("Register ETABS native tables at the ORIGINAL export "
+                         "root, not within 02_MODEL or an analysis run.")
     source=_source_edb_path(root)
     if not source or not Path(source).is_file():
         raise FileNotFoundError("Current source EDB unavailable; re-export before registration")
