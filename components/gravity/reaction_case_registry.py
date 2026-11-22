@@ -248,3 +248,81 @@ def current_case(output_root, model_path, *, scenario, profile,
         return dict(freshly,result_path=str(result))
     except (OSError,ValueError,KeyError,TypeError,OverflowError):
         return None
+
+
+def current_case_diagnostic(output_root, model_path, *, scenario, profile,
+                            expected_support_tags=None):
+    """[REF docs/source/components/gravity/reaction_case_registry.py.md]
+    Explain why a saved run is unavailable without weakening source checks.
+
+    Inspect only existing index/result metadata. Never trust a global reaction
+    sum as evidence of file identity or promote a mismatched 32/76/97 case.
+    Codes distinguish NEVER_INDEXED from a previous completed-but-stale run.
+    """
+    from components.gravity.output_ownership import existing_index
+    if scenario not in SCENARIO_SUPPORTS:
+        return {"status":"INVALID_SUPPORT_SCENARIO",
+                "reason":"Unknown 32/76/97 scenario","result":None}
+    index=existing_index(output_root,INDEX_NAME)
+    if not index.is_file():
+        return {"status":"NO_CASE_INDEX","reason":
+                "No saved reaction index at "+str(index),"result":None}
+    try:
+        entries=json.loads(index.read_text(encoding="utf-8-sig"))
+        if not isinstance(entries,dict):
+            raise ValueError("Index is not a JSON object")
+        entry=entries.get(scenario+"|"+profile)
+        if entry is None:
+            return {"status":"CASE_NOT_INDEXED","reason":
+                    "No saved run indexed for this exact support case and gravity profile",
+                    "index":str(index),"result":None}
+        if not isinstance(entry,dict):
+            raise ValueError("Case index record is not an object")
+        model=Path(model_path).expanduser().resolve()
+        if not model.is_file():
+            return {"status":"MODEL_NOT_FOUND","reason":
+                    "Selected model file is missing","index":str(index),"result":None}
+        if entry.get("model_sha256")!=_sha256(model):
+            return {"status":"MODEL_SHA_CHANGED","reason":
+                    "Saved case exists, but selected model bytes differ; choose original model or rerun",
+                    "index":str(index),"result":None}
+        if entry.get("input_sha256")!=_model_input_fingerprints(model):
+            return {"status":"MODEL_INPUTS_CHANGED","reason":
+                    "Saved case exists, but model config/load/connectivity fingerprint changed",
+                    "index":str(index),"result":None}
+        if Path(entry.get("model_path","")).resolve()!=model:
+            return {"status":"DIFFERENT_MODEL_PATH","reason":
+                    "Saved case belongs to a different original model path",
+                    "index":str(index),"result":None}
+        target=Path(entry.get("result_path",""))
+        if not target.is_file():
+            return {"status":"RESULT_FILE_MISSING","reason":
+                    "Indexed run was solved previously, but saved result is now missing: "+
+                    str(target),"index":str(index),"result":None}
+        digest=entry.get("result_sha256")
+        if not isinstance(digest,str) or len(digest)!=64:
+            return {"status":"LEGACY_DIGEST_NOT_INDEXED","reason":
+                    "Saved solver result exists but lacks a registered SHA256; "
+                    "re-register from verified source without rerunning the solver",
+                    "index":str(index),"result":None}
+        original=target.read_bytes()
+        if hashlib.sha256(original).hexdigest()!=digest:
+            return {"status":"SAVED_RESULT_HASH_CHANGED","reason":
+                    "Saved solver result bytes differ from indexed result; evidence not trusted",
+                    "index":str(index),"result":None}
+        payload=json.loads(original.decode("utf-8-sig"))
+        verified=checked_reaction_result(payload,model,scenario=scenario,
+                   profile=profile,expected_support_tags=expected_support_tags)
+        if abs(verified["summed_reaction_kN"]-
+               float(entry["summed_reaction_kN"]))>0.01:
+            raise ValueError("Indexed vertical reaction differs from solved file")
+        if abs(verified["applied_load_kN"]-
+               float(entry["applied_load_kN"]))>0.01:
+            raise ValueError("Indexed gravity load differs from solved file")
+        return {"status":"SOLVED_VERIFIED_INDEX","reason":
+                "Completed native OpenSees solver case; ETABS pointwise equivalence NOT certified",
+                "index":str(index),
+                "result":dict(verified,result_path=str(target))}
+    except (OSError,ValueError,KeyError,TypeError,OverflowError) as exc:
+        return {"status":"SAVED_CASE_VALIDATION_BLOCKED",
+                "reason":str(exc),"index":str(index),"result":None}
