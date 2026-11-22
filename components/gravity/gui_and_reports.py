@@ -1987,11 +1987,13 @@ class GravityAnalysisGUI:
                         mode+" | "+str(issue))
             export_wall_support_comparison(comparison,root)
             from components.gravity.reaction_case_registry import register_case
+            from components.gravity.output_ownership import workspace_for_dual_case_run
+            immutable_owner=workspace_for_dual_case_run(root)
             for mode in scenarios:
                 info=records[mode]
                 case_path=Path(info["out"])/"Gravity_Result_V110.json"
                 try:
-                    verified=register_case(self.output_var.get(),case_path,
+                    verified=register_case(immutable_owner,case_path,
                         info["payload"]["model_script"],scenario=mode,
                         profile="GRAVITY_1.0D_1.0L")
                     self._gravity_action_log("SOLVED_CASE_REACTION",
