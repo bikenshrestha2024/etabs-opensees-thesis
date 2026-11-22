@@ -63,3 +63,14 @@ The preceding V123 workflow and values are historical. OpenSees 3.8.0 can accumu
 ## 2026-11-21 clause 5 routing and ledger convention
 
 Empirical and amplified periods come from `empirical_period_s` / `amplified_period_s` in the [clause 5 module](../nbc105/clause_05_dynamic_characteristics.py.md) (same operation order as before). Eq. 5.1(1) is still evaluated in this file, not by the module; its g is the shared `GRAVITY_M_S2` (9.81 m/s^2, USER_DECISION 2026-11-21, [constants guide](../nbc105/constants.py.md)) in the Eq. 5.1(1) denominator, the audit JSON `gravity_acceleration_m_s2`, `verify_rayleigh_sum` and the workbook formula, so Rayleigh T is about 0.017 % longer than with the printed 9.81. The story weights `Wi` it consumes come from the assembly ledger, which now follows the NBC 105:2025 §5.2 mid-height rule (re-assemble exports; saved ledgers carry the old next-floor-above assignment).
+
+
+## 2026-11-22 authoritative §5.1 pipeline and source guard
+
+The complete runner now calculates each `Wi` through `components.nbc105.clause_05_dynamic_characteristics.seismic_weight_kN` (§5.2, Table 5-1), each raw directional `T_R` through `rayleigh_period_s` (§5.1.1), and each adopted period through `adopted_period_s` (§5.1.3, `min(T_R,1.25*T_emp)`). `components.modal.rayleigh_ledger_audit.verify_rayleigh_sum` is its independent all-storey numerical reconstruction, now using the same canonical calculation. The two paths still independently assemble input terms; no 25-storey native model was rerun during this change.
+
+The direct CLI/function entry invokes `components.inputs.project_workbooks.require_source_state` to reject `ULS` versus an explicitly labelled `SLS` EDB (and vice versa), just as the GUI does, and records the state evidence. Matching source path labels are **not a source EDB SHA or stiffness parity test**. The supplied 2026-11-22 log has a ULS-only source; the cross-state block is correct.
+
+**Erratum:** The prior 2026-11-21 paragraph stating that a calculation with `g=9.81` produces a period 0.017% longer than the *printed `g=9.81`* is internally contradictory. The active shared constant is `9.81`; any historical comparison must name its **different** numerical `g` and full source model identity. This erratum supersedes that sentence.
+
+See [live Clause 5 matrix](../../../nbc105/clause_05_dynamic_characteristics_matrix.md) and [review of the current supplied ESM run](../../../../REVIEW_MAIN/02_ESM/20261122_RAYLEIGH_NBC_PERIOD_AND_LOG_SOURCE_AUDIT.md).
