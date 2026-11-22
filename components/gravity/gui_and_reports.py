@@ -1922,7 +1922,9 @@ class GravityAnalysisGUI:
                 except Exception as register_error:
                     self._gravity_action_log("CASE_REACTION_REGISTRATION_FAILED",
                         mode+": "+str(register_error))
-            self._refresh_case_reaction()
+            # Solver worker must not read/write Tk variables from this thread.
+            # The UI thread re-resolves the selected, source-hashed case.
+            self.win.after(0,self._refresh_case_reaction)
             for mode in scenarios:
                 case=root/mode
                 self._gravity_action_log("DUAL_GRAVITY_RESULT_JSON_"+mode,
