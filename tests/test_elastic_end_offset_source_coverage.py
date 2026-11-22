@@ -60,7 +60,7 @@ def test_exact_source_offset_entries_are_identified_but_not_accepted_as_native()
     assert coverage["native_rigid_zone_on_selected_shear_flexible_objects"] == 0
     assert coverage["engineering_acceptance"] == "NOT_VERIFIED"
     plan = compile_settings({"ULS": options}, FRAMES, [], metadata())["ULS"]
-    assert plan["frame_segments"][0]["joint_offsets_m"][:3] == pytest.approx([0.8,0,0])
+    assert plan["frame_segments"][0]["joint_offsets_m"][3:] == pytest.approx([-0.8,0,0])
 
 
 def test_mismatched_source_rigid_length_is_flagged_not_silently_called_equivalent():
