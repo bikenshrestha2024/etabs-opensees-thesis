@@ -127,7 +127,7 @@ class GravityAnalysisGUI:
         self.reaction_support_var = tk.StringVar(value=", ".join(map(str, sorted(PROJECT_PRIMARY_32))))
         self.position_support_var = tk.StringVar()
         self.reaction_support_verification_var = tk.StringVar(
-            value="32 nonzero-reaction screening tags only; source has 76 restraints")
+            value="32 physical foundation tags; 44 shear-wall mesh points in original source require native transfer verification")
         self.load_var = tk.StringVar()
         self.solved_reaction_var = tk.StringVar(value="Checking saved case…")
         self.solved_reaction_status_var = tk.StringVar(
@@ -136,7 +136,7 @@ class GravityAnalysisGUI:
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
         self.gravity_profile_var = tk.StringVar(value="GRAVITY_1.0D_1.0L")
-        self.wall_support_strategy_var=tk.StringVar(value="32 nonzero-reaction nodes (diagnostic)")
+        self.wall_support_strategy_var=tk.StringVar(value="32 physical foundation supports (primary)")
         self.coverage_confirmed = tk.BooleanVar(value=False)
         self.status_var = tk.StringVar(value="Select a generated model, then read the support tags and load total from its code.")
         self.gravity_operation_state=tk.StringVar(value="IDLE | No gravity solver or exporter running")
@@ -148,7 +148,7 @@ class GravityAnalysisGUI:
         # All modal/MRSM/TH production runs independently retain the exact
         # 76-source-restraint baseline until native constraint equivalence is
         # established. Preserve old case-registry and run identifiers.
-        self.wall_support_strategy_var.set("32 nonzero-reaction nodes (diagnostic)")
+        self.wall_support_strategy_var.set("32 physical foundation supports (primary)")
         self.wall_support_strategy_var.trace_add(
             "write", lambda *_: self._read_code_inputs(show_error=False)
             if self.model_var.get() else self._refresh_case_reaction())
@@ -1357,7 +1357,7 @@ class GravityAnalysisGUI:
             if self._selected_wall_support_strategy()=="ETABS_NONZERO_REACTION_DIAGNOSTIC":
                 self.support_var.set(", ".join(map(str,reaction_supports)))
                 if not source_table:
-                    self.status_var.set("32-node diagnostic selection displayed. Original 76 source restraints must not be discarded for physical equivalence.")
+                    self.status_var.set("32 physical foundation support case selected; native 44 shear-wall mesh-point transfer remains unverified.")
             else:
                 self.support_var.set(", ".join(map(str,supports)))
             if total is not None: self.load_var.set(f"{float(total):.8f}")
@@ -1407,8 +1407,8 @@ class GravityAnalysisGUI:
         ttk.Label(wall_row,text="Gravity wall-base supports:").pack(side="left",padx=(0,6))
         ttk.Combobox(wall_row,textvariable=self.wall_support_strategy_var,
             state="readonly",width=38,
-            values=("32 nonzero-reaction nodes (diagnostic)","76 source-restraint nodes (reference)","97 wall-base idealization (sensitivity)")).pack(side="left")
-        ttk.Label(wall_row,text="32 nonzero-reaction nodes is a user-selected SCREENING default ONLY (releases 44 source restraints). 76 is the exported-restraint reference for modal/seismic production; 97 adds 21 idealized base fixities. NO case is yet native ETABS-equivalence certified.",
+            values=("32 physical foundation supports (primary)","76 source-restraint points (diagnostic)","97 wall-base idealization (diagnostic)")).pack(side="left")
+        ttk.Label(wall_row,text="32 joints are user-confirmed PHYSICAL FOUNDATIONS. The other 44 in the exported 76-point map are SHEAR-WALL MESH POINTS, NOT independent foundations. 76/97 are diagnostic restraints only; restoring 32 requires source wall-edge/MPC transfer verification before ETABS equivalence.",
                   wraplength=485).pack(side="left",padx=8)
         self._path_row(form, "Comparison bundle output folder (optional)", self.comparison_output_var,
                        lambda: self._browse_file_or_dir_for_comparison())
@@ -1490,9 +1490,9 @@ class GravityAnalysisGUI:
         ttk.Entry(inputs, textvariable=self.load_var, width=16, state="readonly").grid(row=0, column=3, sticky="w", padx=4)
         ttk.Label(inputs, text="Support case (solved reaction)").grid(row=1, column=0, sticky="w", padx=4, pady=(5,0))
         ttk.Combobox(inputs, textvariable=self.wall_support_strategy_var, state="readonly", width=39,
-            values=("32 nonzero-reaction nodes (diagnostic)",
-                    "76 source-restraint nodes (reference)",
-                    "97 wall-base idealization (sensitivity)")).grid(row=1, column=1, sticky="w", padx=4, pady=(5,0))
+            values=("32 physical foundation supports (primary)",
+                    "76 source-restraint points (diagnostic)",
+                    "97 wall-base idealization (diagnostic)")).grid(row=1, column=1, sticky="w", padx=4, pady=(5,0))
         ttk.Label(inputs, text="Solved vertical support reaction (kN)").grid(
             row=1,column=2,sticky="w",padx=4,pady=(5,0))
         ttk.Entry(inputs,textvariable=self.solved_reaction_var,state="readonly",width=22).grid(
@@ -1581,9 +1581,9 @@ class GravityAnalysisGUI:
         plot_toolbar.pack(fill="x", padx=5, pady=3)
         ttk.Label(plot_toolbar, text="Display saved setup:").pack(side="left", padx=(0, 5))
         ttk.Combobox(plot_toolbar, textvariable=self.wall_support_strategy_var,
-            values=("32 nonzero-reaction nodes (diagnostic)",
-                    "76 source-restraint nodes (reference)",
-                    "97 wall-base idealization (sensitivity)"),
+            values=("32 physical foundation supports (primary)",
+                    "76 source-restraint points (diagnostic)",
+                    "97 wall-base idealization (diagnostic)"),
             state="readonly", width=38).pack(side="left", padx=4)
         ttk.Button(plot_toolbar, text="Load selected setup plots",
                    command=self._view_saved_case).pack(side="left", padx=4)
@@ -1847,13 +1847,16 @@ class GravityAnalysisGUI:
         """
         return {
             "32 nonzero-reaction nodes (diagnostic)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+            "32 physical foundation supports (primary)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
+            "76 source-restraint points (diagnostic)": "ETABS_SOURCE_SUPPORTS",
+            "97 wall-base idealization (diagnostic)": "CONTINUOUS_WALL_BASE_FIXED",
             "Primary ETABS-matched set (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
             "ETABS Reaction Validation": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
             "ETABS Reaction Validation (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC",
-            "76 source-restraint nodes (reference)": "ETABS_SOURCE_SUPPORTS",
+            "76 source-restraint points (diagnostic)": "ETABS_SOURCE_SUPPORTS",
             "ETABS Node Position (76 nodes)": "ETABS_SOURCE_SUPPORTS",
             "ETABS Node Position / Continuous": "ETABS_SOURCE_SUPPORTS",
-            "97 wall-base idealization (sensitivity)": "CONTINUOUS_WALL_BASE_FIXED",
+            "97 wall-base idealization (diagnostic)": "CONTINUOUS_WALL_BASE_FIXED",
             "Continuous Wall Base (97 nodes)": "CONTINUOUS_WALL_BASE_FIXED",
             "Continuous Wall Base (97)": "CONTINUOUS_WALL_BASE_FIXED",
             "ETABS_SOURCE_SUPPORTS": "ETABS_SOURCE_SUPPORTS",

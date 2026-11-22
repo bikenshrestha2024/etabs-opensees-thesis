@@ -24,7 +24,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 
-def _runner_source(model, output, nmodes, solver, period_inputs, mode_x, mode_y, limit_state='ULS'):
+def _runner_source(model, output, nmodes, solver, period_inputs, mode_x, mode_y, limit_state='ULS', support_case='PHYSICAL_32', mass_policy='SOURCE_DISTRIBUTED'):
     helper_dir = str(_runtime_repo_root())
     return f'''import json, runpy, sys, traceback, os
 from pathlib import Path
@@ -38,7 +38,12 @@ try:
     # Include the intended gravity preload in the same script if P-Delta effects
     # are to be present in the eigenanalysis.
     os.environ['OPENSEES_LIMIT_STATE']={limit_state!r}
-    runpy.run_path(str(MODEL), run_name='opensees_modal_model')
+    os.environ['OPENSEES_SUPPORT_CASE']={support_case!r}
+    os.environ['OPENSEES_SEISMIC_MASS_POLICY']={mass_policy!r}
+    _MODEL_NAMESPACE=runpy.run_path(str(MODEL), run_name='opensees_modal_model')
+    from components.model.support_case_contract import require_runtime_support_case
+    _SELECTED_CASE=require_runtime_support_case({support_case!r},_MODEL_NAMESPACE.get('MODEL_REPORT'))
+    print('[MODAL SELECTED SUPPORT CASE VERIFIED]',_SELECTED_CASE,flush=True)
     import openseespy.opensees as ops
     from OpenSees_Modal_Analysis_NBC105_V111 import run_nbc105_modal_audit, modal_response_nodes
     model_data_path=MODEL.parent/'OpenSees_Complete_Model_Data_V118.json'
@@ -59,6 +64,8 @@ try:
     basis=modal_model_basis_report(model_payload,config_payload,
         {limit_state!r},{period_inputs!r})
     result['modal_model_basis_audit']=basis
+    result['selected_support_case_verification']=_SELECTED_CASE
+    result['seismic_mass_policy']={mass_policy!r}
     result['rayleigh_period_provenance']='EXTERNAL_GUI_INPUT_NOT_COMPUTED_BY_MODAL_SOLVER'
     result['limit_state']={limit_state!r}
     result['native_etabs_opensees_equivalence']='NOT_VERIFIED'
@@ -211,6 +218,8 @@ class ModalAuditGUI:
         self.nmodes = tk.StringVar(value="40")
         self.solver = tk.StringVar(value="PythonSparse")
         self.limit_state=tk.StringVar(value='ULS')
+        self.support_case=tk.StringVar(value='PHYSICAL_32')
+        self.seismic_mass_policy=tk.StringVar(value='SOURCE_DISTRIBUTED')
         self.height = tk.StringVar()
         self.period_system = tk.StringVar(value="concrete shear-wall building")
         self.project_system=tk.StringVar(value='Project structural system: load the reviewed Excel source; confirm the period formula separately.')
@@ -244,6 +253,16 @@ class ModalAuditGUI:
         form = ttk.LabelFrame(outer, text="Run inputs", padding=10); form.pack(fill="x")
         self._path_row(form, "OpenSees model script", self.model, self._pick_model)
         self._path_row(form, "Python executable with OpenSeesPy", self.python, self._pick_python)
+        case_row=ttk.Frame(form);case_row.pack(fill='x',pady=4)
+        ttk.Label(case_row,text="Foundation node case").pack(side='left')
+        ttk.Combobox(case_row,textvariable=self.support_case,values=("PHYSICAL_32","SOURCE_76","WALL_BASE_97"),
+                     state="readonly",width=19).pack(side='left',padx=8)
+        ttk.Label(case_row,text="Seismic mass operator").pack(side='left',padx=(12,4))
+        ttk.Combobox(case_row,textvariable=self.seismic_mass_policy,
+                     values=("SOURCE_DISTRIBUTED","STORY_LUMPED_NBC"),
+                     state="readonly",width=22).pack(side='left',padx=8)
+        ttk.Label(form,text="32 physical foundations are primary; 76/97 are diagnostic restraints. Optional floor lumping changes dynamic mass and must be checked against source ETABS.",
+                  wraplength=970).pack(anchor='w')
         self._path_row(form, "Output folder", self.output, self._pick_output)
         row = ttk.Frame(form); row.pack(fill="x", pady=4)
         ttk.Label(row, text="Requested modes").pack(side="left")
@@ -404,6 +423,9 @@ class ModalAuditGUI:
                 period_inputs["rayleigh_y_s"] = float(self.tr_y.get()) if self.tr_y.get().strip() else None
             mode_x = int(self.mode_x.get()) if self.mode_x.get().strip() else None
             mode_y = int(self.mode_y.get()) if self.mode_y.get().strip() else None
+            from components.model.support_case_contract import normalize_support_case
+            chosen_case=normalize_support_case(self.support_case.get())
+            chosen_mass=self.seismic_mass_policy.get()
         except Exception as exc:
             messagebox.showerror("Modal audit inputs", str(exc), parent=self.root); return
         states=('ULS','SLS') if self.limit_state.get()=='Both' else (self.limit_state.get(),)
@@ -445,7 +467,7 @@ class ModalAuditGUI:
                         resolution=self.aw_resolution,
                         code_accepted=False),indent=2,default=str),encoding='utf-8')
                     self.root.after(0,lambda state=state,output=output:self.status.set(f'Running {state} stiffness case: stage 1/3: rebuild + gravity preload; stage 2/3: solve {n} modes with {solver}; stage 3/3: mass participation, period comparison and export. Results: {output}'))
-                    source=_runner_source(model,output,n,solver,period_inputs,mode_x,mode_y,state)
+                    source=_runner_source(model,output,n,solver,period_inputs,mode_x,mode_y,state,chosen_case,chosen_mass)
                     runner=(run_root/"00_INPUT_SOURCE" if run_root else output)/'_run_nbc105_modal_v111.py'
                     runner.write_text(source,encoding='utf-8')
                     proc = subprocess.Popen([str(python), '-u', str(runner)], cwd=str(model.parent), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})

@@ -328,8 +328,19 @@ def _run_analysis(config):
             sys.path.insert(0, str(model.parent))
             if "openseespy.opensees" in sys.modules:
                 del sys.modules["openseespy.opensees"]
+            from components.model.support_case_contract import normalize_support_case
+            os.environ['OPENSEES_SUPPORT_CASE']=normalize_support_case(config.get('support_case','PHYSICAL_32'))
+            mass_policy=str(config.get('seismic_mass_policy','SOURCE_DISTRIBUTED')).strip().upper()
+            if mass_policy not in ('SOURCE_DISTRIBUTED','STORY_LUMPED_NBC'):
+                raise ValueError('Unknown seismic mass policy')
+            os.environ['OPENSEES_SEISMIC_MASS_POLICY']=mass_policy
             os.environ['OPENSEES_LIMIT_STATE']=config['limit_state']
-            try:runpy.run_path(str(model), run_name="opensees_ltha_model")
+            try:
+                _model_scope=runpy.run_path(str(model), run_name="opensees_ltha_model")
+                from components.model.support_case_contract import require_runtime_support_case
+                verified_case=require_runtime_support_case(
+                    config.get('support_case','PHYSICAL_32'),_model_scope.get('MODEL_REPORT'))
+                print('[HISTORY SELECTED SUPPORT CASE VERIFIED]',verified_case,flush=True)
             except BaseException as exc:
                 profiler.add('model_and_gravity',phase_clock);profiler.finish('failed',str(exc));raise
             profiler.add('model_and_gravity',phase_clock)
@@ -785,6 +796,8 @@ class NonlinearTimeHistoryGUI:
         self.win.geometry("1120x880"); self.win.minsize(900, 700)
         self.model = tk.StringVar(); self.python = tk.StringVar(value=sys.executable)
         self.model_length_unit = tk.StringVar(value="m")
+        self.support_case=tk.StringVar(value="PHYSICAL_32")
+        self.seismic_mass_policy=tk.StringVar(value="SOURCE_DISTRIBUTED")
         self.manifest = tk.StringVar(); self.stories = tk.StringVar(); self.output = tk.StringVar(); self.readiness = tk.StringVar()
         self.damping_model=tk.StringVar(value="Rayleigh committed")
         self.linear_solver=tk.StringVar(value="UmfPack")
@@ -861,6 +874,17 @@ class NonlinearTimeHistoryGUI:
         inputs = ttk.LabelFrame(root, text="1. Reviewed nonlinear OpenSees model and project inputs", padding=8); inputs.pack(fill="x")
         self._entry(inputs, "Nonlinear model-builder script", self.model, lambda: self._browse(self.model, "file", "Select complete nonlinear OpenSeesPy model script"))
         self._entry(inputs, "Python interpreter with OpenSeesPy", self.python, lambda: self._browse(self.python, "python", "Select OpenSeesPy Python interpreter"))
+        case_row=ttk.Frame(inputs);case_row.pack(fill="x",pady=3)
+        ttk.Label(case_row,text="Foundation node case",width=30).pack(side="left")
+        ttk.Combobox(case_row,textvariable=self.support_case,
+            values=("PHYSICAL_32","SOURCE_76","WALL_BASE_97"),
+            state="readonly",width=20).pack(side="left")
+        ttk.Label(case_row,text="Mass operator").pack(side="left",padx=(16,5))
+        ttk.Combobox(case_row,textvariable=self.seismic_mass_policy,
+            values=("SOURCE_DISTRIBUTED","STORY_LUMPED_NBC"),
+            state="readonly",width=22).pack(side="left")
+        ttk.Label(inputs,text="32 physical foundations primary; 76/97 diagnostic restraints. Floor-lumped mass changes dynamics and requires independent ETABS validation.",
+                  wraplength=980).pack(anchor="w")
         unit_row = ttk.Frame(inputs); unit_row.pack(fill="x", pady=3)
         ttk.Label(unit_row, text="Model length unit", width=30).pack(side="left")
         ttk.Combobox(unit_row, textvariable=self.model_length_unit, values=("m", "mm"), state="readonly", width=10).pack(side="left")
@@ -981,6 +1005,7 @@ class NonlinearTimeHistoryGUI:
                 "use_preloaded_peer_pairs": not x_only and not self.manifest.get().strip(),
                 "peer_pairs": LTH_DEFAULT_PEER_PAIRS,
                 "motion_manifest": self.manifest.get().strip(),
+                "support_case": self.support_case.get(), "seismic_mass_policy": self.seismic_mass_policy.get(),
                 "story_nodes_csv": self.stories.get().strip(),
                 "model_script": self.model.get().strip(),
                 "torsion_sensitive": True,
