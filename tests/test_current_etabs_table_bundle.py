@@ -54,6 +54,28 @@ class CurrentEtabsBundleTests(unittest.TestCase):
             self.assertIsNone(registered_project_source(
                 variant,"etabs_assignment"))
 
+    def test_variable_number_of_beam_parts_and_stale_role_cleanup(self):
+        extra=self.root.parent/"extra_part.xlsx"
+        w=Workbook();w.active.title="ExtraBeamForcePart";w.active["A1"]="Distinct";w.save(extra)
+        with patch("components.inputs.project_workbooks._source_edb_path",
+                   return_value=str(self.edb)):
+            _,initial=register_current_etabs_tables(
+                self.root,self.books[0],[self.books[1],self.books[2],self.books[3],extra])
+            self.assertIn("etabs_beam_forces_element_4",initial["sources"])
+            _,updated=register_current_etabs_tables(
+                self.root,self.books[0],[self.books[1],self.books[2]])
+            self.assertNotIn("etabs_beam_forces_element_3",updated["sources"])
+            self.assertNotIn("etabs_beam_forces_element_4",updated["sources"])
+            self.assertEqual(len([k for k in updated["sources"]
+                                  if k.startswith("etabs_beam_forces_element_")]),2)
+
+    def test_empty_beam_selection_fails_before_manifest(self):
+        with patch("components.inputs.project_workbooks._source_edb_path",
+                   return_value=str(self.edb)):
+            with self.assertRaisesRegex(ValueError,"at least one"):
+                register_current_etabs_tables(self.root,self.books[0],[])
+        self.assertFalse((self.root/"01_ETABS_EXPORT").exists())
+
     def test_byte_identical_beam_parts_are_rejected(self):
         # Distinct paths whose bytes are identical cannot represent
         # two independently exported beam-force table parts.
