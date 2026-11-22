@@ -1,0 +1,51 @@
+name: Windows output contracts and saved-case navigation (no ETABS)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'components/inputs/**'
+      - 'components/gravity/**'
+      - 'components/ui/**'
+      - 'tools/audit_*output*.py'
+      - 'tests/test_*output*.py'
+      - 'tests/test_gravity_beam_force_gui_integration.py'
+      - '.github/workflows/windows-output-contracts.yml'
+  pull_request:
+    paths:
+      - 'components/inputs/**'
+      - 'components/gravity/**'
+      - 'components/ui/**'
+      - 'tools/audit_*output*.py'
+      - 'tests/test_*output*.py'
+      - 'tests/test_gravity_beam_force_gui_integration.py'
+      - '.github/workflows/windows-output-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-filesystem-contracts:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: thesis-windows-io
+          create-args: >-
+            -c conda-forge
+            python=3.12
+            openpyxl
+            numpy
+          cache-environment: true
+      - name: Windows static reader/writer and canonical run contracts
+        shell: micromamba-shell {0}
+        run: |
+          python -m unittest tests.test_uniform_output_structure tests.test_output_reader_writer_inventory tests.test_all_active_output_pair_matrix tests.test_gravity_beam_force_gui_integration tests.test_project_output_layout_v171 -v
+          python tools/audit_output_writer_reader_pairs.py --repo . --fail-on-parse
+      - name: State exact native engineering boundary
+        shell: micromamba-shell {0}
+        run: |
+          python -c "print('WINDOWS_PYTHON_FILESYSTEM_CHECKS_ONLY: no ETABS COM, no actual OpenSees gravity rerun, no 32/76/97 equivalence or 224 NLTHA acceptance')"
