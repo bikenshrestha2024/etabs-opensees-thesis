@@ -28,7 +28,8 @@ OPTIONAL_SOURCE_FILES = (
 
 
 def source_sha256(path):
-    """Hash local source bytes without uploading them to GitHub or a service."""
+    """[REF docs/source/components/nonlinear_time_history/source_model_handoff.py.md]
+    Hash local source bytes without uploading them to GitHub or a service."""
     digest = hashlib.sha256()
     with Path(path).open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -37,7 +38,8 @@ def source_sha256(path):
 
 
 def required_source_files(source):
-    """Ensure all primary 32-support topology inputs exist before writing outputs."""
+    """[REF docs/source/components/nonlinear_time_history/source_model_handoff.py.md]
+    Ensure all primary 32-support topology inputs exist before writing outputs."""
     source=Path(source).expanduser().resolve()
     if not source.is_dir():
         raise FileNotFoundError("Existing OpenSees model folder missing: " + str(source))
@@ -48,7 +50,8 @@ def required_source_files(source):
 
 
 def stage_existing_model_sources(source, destination):
-    """Copy exact source inputs into one isolated NLTHA run; verify byte hashes.
+    """[REF docs/source/components/nonlinear_time_history/source_model_handoff.py.md]
+    Copy exact source inputs into one isolated NLTHA run; verify byte hashes.
 
     No edits to user source; refuses to overwrite preexisting different copies.
     Model reassembly is performed separately by the existing builder.
@@ -77,7 +80,8 @@ def stage_existing_model_sources(source, destination):
 
 
 def solver_reaction_support_tags(report, support_case="PHYSICAL_32"):
-    """Use only actual assembled OpenSees base supports; not 76 exported point rows.
+    """[REF docs/source/components/nonlinear_time_history/source_model_handoff.py.md]
+    Use only actual assembled OpenSees base supports; not 76 exported point rows.
 
     Native ETABS edge/MPC transfer remains unverified even if tags match.
     """
@@ -96,7 +100,8 @@ def solver_reaction_support_tags(report, support_case="PHYSICAL_32"):
 
 
 def literature_section_inventory(data, config):
-    """Create a non-approving, geometry-bound frame/wall/source literature ledger.
+    """[REF docs/source/components/nonlinear_time_history/source_model_handoff.py.md]
+    Create a non-approving, geometry-bound frame/wall/source literature ledger.
 
     Frame dimensions/rebar cards originate from existing repository templates;
     NOT an experimental specimen or source ETABS bar schedule.
