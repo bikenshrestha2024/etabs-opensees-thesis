@@ -15,3 +15,13 @@
 ## Annex A/B reference routing
 
 The same safe dispatcher now exposes independent `available_annex_operations()` and `run_annex_operation('A'|'B',operation,inputs)`. Main `available_operations()` remains **exactly Clauses 1–10**. Annex A RC minima and Annex B steel I-link limits stay in their own modules, not copied into Clause 5 or Clause 9. Each result is tagged `CODE_CALCULATION_ONLY_NOT_BUILDING_ACCEPTANCE`. Annex C municipal zoning data are still **not** transcribed/approved. Regression: `tests/test_nbc105_annex_dispatch.py`.
+
+## Rule parameter introspection (2026-11-22)
+
+`operation_input_spec(clause,operation)` and
+`annex_operation_input_spec(annex,operation)` expose callable required/optional
+parameters and a valid JSON-serializable template without inventing building
+geometry or source coefficients. `run_operation` and `run_annex_operation`
+bind user arguments against exact function signatures and report missing and
+extra parameters by name; internal computational TypeErrors are not
+misrepresented as input signatures. No ETABS/OpenSees solver state is changed.
