@@ -51,14 +51,25 @@ try:
     import hashlib
     data=MODEL.parent/'OpenSees_Complete_Model_Data_V118.json'
     target=OUT/'NBC105_Modal_V111.json'
+    result=json.loads(target.read_text(encoding='utf-8-sig'))
+    config_path=MODEL.parent/'OpenSees_Complete_Model_Config_V118.json'
+    model_payload=json.loads(data.read_text(encoding='utf-8-sig')) if data.is_file() else {{}}
+    config_payload=json.loads(config_path.read_text(encoding='utf-8-sig')) if config_path.is_file() else {{}}
+    from components.modal.analysis import modal_model_basis_report
+    basis=modal_model_basis_report(model_payload,config_payload,
+        {limit_state!r},{period_inputs!r})
+    result['modal_model_basis_audit']=basis
+    result['limit_state']={limit_state!r}
+    result['native_etabs_opensees_equivalence']='NOT_VERIFIED'
+    print('[MODAL MODEL BASIS]',json.dumps(basis,sort_keys=True),flush=True)
     if data.is_file():
-        result=json.loads(target.read_text(encoding='utf-8-sig'))
         result['model_sha256']=hashlib.sha256(data.read_bytes()).hexdigest()
-        result['limit_state']={limit_state!r}
-        from OpenSees_Model_Audit_V130 import implementation_digest, modal_numeric_digest
-        result['implementation_sha256']=implementation_digest(Path({helper_dir!r}))
-        result['modal_numeric_sha256']=modal_numeric_digest(Path({helper_dir!r}))
-        target.write_text(json.dumps(result,indent=2),encoding='utf-8')
+    if config_path.is_file():
+        result['model_config_sha256']=hashlib.sha256(config_path.read_bytes()).hexdigest()
+    from OpenSees_Model_Audit_V130 import implementation_digest, modal_numeric_digest
+    result['implementation_sha256']=implementation_digest(Path({helper_dir!r}))
+    result['modal_numeric_sha256']=modal_numeric_digest(Path({helper_dir!r}))
+    target.write_text(json.dumps(result,indent=2),encoding='utf-8')
 except Exception as exc:
     (OUT / 'NBC105_Modal_V111_error.txt').write_text(
         str(exc) + '\\n' + traceback.format_exc(), encoding='utf-8')
@@ -129,6 +140,12 @@ def _export_plot_and_excel(result, output):
             ("Missing-mass correction", result["missing_mass_correction"]),
             ("Modal combination", result["modal_combination"]), ("Base-shear scaling", result["base_shear_scaling"]),
             ("Interpretation", "Eigen/modal-mass audit only; not a complete NBC response-spectrum analysis."),
+            ("Modal mass coverage", result.get("mass_coverage_only_status","NOT_CERTIFIED")),
+            ("Source foundation mapping", str(result.get("modal_model_basis_audit",{}).get("exported_restraint_point_count","UNAVAILABLE"))+" mapped source restraint IDs; 32 user-confirmed physical foundations + 44 wall mesh points"),
+            ("Modal stiffness basis", result.get("modal_model_basis_audit",{}).get("case_stiffness_basis","UNAVAILABLE")),
+            ("Rayleigh period provenance", "EXTERNAL GUI INPUT, NOT CALCULATED IN THIS MODAL SOLVE"),
+            ("Native ETABS/OpenSees equivalence", result.get("native_etabs_opensees_equivalence","NOT_VERIFIED")),
+
         ]: summary.append(row)
         if pcheck:
             summary.append(("NBC 5.1 system family", pcheck.get("system_type")))
