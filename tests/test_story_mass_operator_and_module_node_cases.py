@@ -50,6 +50,7 @@ class StoryMassOperatorTests(unittest.TestCase):
         for source in (
             "components/equivalent_static/calculation_and_gui.py",
             "components/modal/gui_and_reports.py",
+            "components/response_spectrum/model_analysis.py",
             "components/linear_time_history/runner_and_gui.py",
             "components/nonlinear_time_history/runner_and_gui.py",
         ):
