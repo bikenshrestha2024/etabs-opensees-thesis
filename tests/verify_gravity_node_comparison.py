@@ -25,6 +25,25 @@ class GravityNodeAuditTests(unittest.TestCase):
                  rz_global_kN=220,global_z_basis='GLOBAL_Z_VERIFIED_DEFAULT_AXES'),
             dict(point='C',x_m=19,y_m=0,z_m=0,
                  rz_global_kN=70,global_z_basis='GLOBAL_Z_VERIFIED_DEFAULT_AXES')])
+    def test_global_zero_difference_does_not_hide_3000kn_nodal_error(self):
+        etabs={"joint_reactions":[
+            dict(point="A",x_m=0,y_m=0,z_m=0,rz_global_kN=10000,
+                 global_z_basis="GLOBAL_Z_VERIFIED_DEFAULT_AXES"),
+            dict(point="B",x_m=6,y_m=0,z_m=0,rz_global_kN=10000,
+                 global_z_basis="GLOBAL_Z_VERIFIED_DEFAULT_AXES")]}
+        opens={"nodes":[dict(tag=1,x_m=0,y_m=0,z_m=0),
+                        dict(tag=2,x_m=6,y_m=0,z_m=0)],
+               "reactions":[dict(node_tag=1,rz_kN=13000),
+                            dict(node_tag=2,rz_kN=7000)]}
+        result=compare_support_nodes(etabs,opens)
+        self.assertEqual(result["matched_sum_difference_kN"],0)
+        self.assertEqual(result["max_absolute_nodal_difference_kN"],3000)
+        self.assertEqual(result["sum_absolute_nodal_difference_kN"],6000)
+        self.assertEqual(result["rms_nodal_difference_kN"],3000)
+        self.assertTrue(result["complete_one_to_one_global_z"])
+        self.assertEqual(result["pointwise_screening_status"],
+                         "POINTWISE_RESIDUAL_EXCEEDS_NUMERICAL_SCREEN")
+
     def test_numeric_etabs_reaction_without_verified_axis_remains_unverified(self):
         for basis in ("POINT_LOCAL_ROTATED", "POINT_LOCAL_AXES_UNAVAILABLE",
                       "UNVERIFIED", None):
