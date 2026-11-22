@@ -28,10 +28,18 @@ def collect(folder, issues=None, *, results_root=None):
         raise ValueError('Cannot prove one-model/one-state ETABS comparison: '+state_note)
     # Search the selected output root and the canonical source-bound root.
     # Existing strict model hash/limit-state gates still reject stale evidence.
+    from components.inputs.output_layout import result_roots
+    # Search stage-owned result roots plus historical shared outputs.
+    # Saved-case model SHA and ULS/SLS checks below remain mandatory.
     scan_roots = [root]
-    for candidate in (analysis_output_folder(folder, selected_state, stage='ESM'),
-                      analysis_output_folder(folder, selected_state),
-                      folder / 'OpenSees_Analysis_Results'):
+    candidates=(
+        *result_roots(folder, stages=('GRAVITY','ESM','MODAL','MRSM',
+                                      'LTHA','NLTHA'), include_legacy=True),
+        analysis_output_folder(folder, selected_state, stage='ESM'),
+        analysis_output_folder(folder, selected_state),
+        folder / 'OpenSees_Analysis_Results',
+    )
+    for candidate in candidates:
         candidate = Path(candidate).resolve()
         if candidate.is_dir() and candidate not in scan_roots:
             scan_roots.append(candidate)
