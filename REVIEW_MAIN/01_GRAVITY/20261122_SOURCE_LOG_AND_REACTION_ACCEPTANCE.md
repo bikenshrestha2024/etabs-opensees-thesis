@@ -59,10 +59,13 @@ The 97-node case changes support topology and is diagnostic.
 
 ## Folder ownership and immutability
 
-Current GUI beam-force stage:
-`01_ETABS_EXPORT/03_BEAM_FORCES/RUNS/<timestamp>/` containing
-`ETABS_Beam_Forces_Consolidated.csv` and
-`ETABS_Beam_Forces_Manifest.json`.
+Current GUI beam-force stage (new runs):
+`01_ETABS_EXPORT/RUNS/SOURCE_ONLY/BEAM_FORCES/<run-id>/`
+with `00_INPUT_SOURCE/CASE_MANIFEST.json` and
+`02_RESULTS/ETABS_Beam_Forces_Consolidated.csv` plus
+`02_RESULTS/ETABS_Beam_Forces_Manifest.json`. Historical
+`01_ETABS_EXPORT/03_BEAM_FORCES/RUNS/<timestamp>/` remains readable
+and unmodified.
 One canonical private registry:
 `01_ETABS_EXPORT/00_MANIFEST/PROJECT_SOURCES.private.json`.
 The original XLSX inputs are read-only and must remain outside public git.
