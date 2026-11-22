@@ -1103,7 +1103,11 @@ class NonlinearTimeHistoryGUI:
                 record_case_status(self._run_contract_root,"RUNNING")
             else:
                 from datetime import datetime
-                base=Path(values["output_dir"])
+                from components.inputs.output_layout import owned_run_destination
+                base=owned_run_destination(
+                    Path(values["model_script"]).parent, "NLTHA",
+                    "NLTH_"+values["limit_state"]+"_"+scope,
+                    selected=values["output_dir"])
                 base.mkdir(parents=True,exist_ok=True)
                 out=base/f"NLTH_{values['limit_state']}_{scope}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
                 out.mkdir(parents=True,exist_ok=True)

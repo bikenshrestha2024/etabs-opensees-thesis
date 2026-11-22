@@ -155,7 +155,12 @@ def launch_irregularity_legacy(parent,folder):
     source_choice=tk.StringVar(value='Geometry / reviewed inputs only')
     source_box=ttk.Combobox(win,textvariable=source_choice,state='readonly',width=130);source_box.pack(fill='x')
     def sources():
-        values=['Geometry / reviewed inputs only']+[str(p.relative_to(folder)) for p in sorted((folder/'OpenSees_Analysis_Results').rglob('Irregularity_*_E0_V132.json'))]
+        from components.inputs.output_layout import result_roots
+        candidates=set()
+        for root in result_roots(folder,stages=("ESM",),include_legacy=True):
+            candidates.update(root.rglob('Irregularity_*_E0_V132.json'))
+        values=['Geometry / reviewed inputs only'] + [
+            str(p.relative_to(folder)) for p in sorted(candidates)]
         source_box['values']=values
         if source_choice.get() not in values:source_choice.set(values[0])
     sources()
@@ -183,7 +188,17 @@ def launch_irregularity_legacy(parent,folder):
             result['overall']='IRREGULAR' if any(r['status']=='IRREGULAR' for r in result['checks']) else 'INCOMPLETE' if any(r['status']=='NOT EVALUATED' for r in result['checks']) else 'NO TRIGGER FOUND'
             for row in tree.get_children():tree.delete(row)
             for row in result['checks']:tree.insert('','end',values=[row.get(k,'') for k in tree['columns']])
-            current['result']=result;out=folder/'OpenSees_Analysis_Results';out.mkdir(exist_ok=True);from OpenSees_Timing_V130 import StageTimer;timer=StageTimer(out,'Irregularity review export');(out/'NBC105_Irregularity_V132.json').write_text(json.dumps(result,indent=2),encoding='utf-8');write_csv(out/'NBC105_Irregularity_V132.csv',result['checks']);timer.finish('completed')
+            from components.inputs.output_contract import create_case_run
+            run_root=create_case_run(folder,"SOFTWARE_DIAGNOSTICS",
+                "NBC105_IRREGULARITY_REVIEW_V132",state="AS_CONFIGURED")
+            out=run_root/"02_RESULTS"
+            current['result']=result
+            from OpenSees_Timing_V130 import StageTimer
+            timer=StageTimer(out,'Irregularity review export')
+            (out/'NBC105_Irregularity_V132.json').write_text(
+                json.dumps(result,indent=2),encoding='utf-8')
+            write_csv(out/'NBC105_Irregularity_V132.csv',result['checks'])
+            timer.finish('completed')
             win.title('NBC 5.4 review: '+result['overall'])
         except Exception as exc:messagebox.showerror('Irregularity input',str(exc),parent=win)
     def load():

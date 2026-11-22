@@ -116,7 +116,8 @@ def launch(parent,folder):
     import tkinter as tk
     from tkinter import ttk,filedialog,messagebox
     import subprocess,threading,sys
-    folder=Path(folder);out=folder/'OpenSees_Analysis_Results';win=tk.Toplevel(parent);win.title('NBC 5.4 — calculated geometry, soft-storey and torsion review');win.geometry('1250x850');from components.inputs.project_workbooks import source_limit_state; model_state,_=source_limit_state(folder); states=tk.StringVar(value=model_state or 'ULS');review=tk.StringVar();status=tk.StringVar(value='Run model review to calculate soft-storey and torsion; exterior geometry supplies re-entrant checks.')
+    from components.inputs.output_layout import owned_run_destination
+    folder=Path(folder);out=owned_run_destination(folder,"SOFTWARE_DIAGNOSTICS","IRREGULARITY_REVIEW_V134");win=tk.Toplevel(parent);win.title('NBC 5.4 — calculated geometry, soft-storey and torsion review');win.geometry('1250x850');from components.inputs.project_workbooks import source_limit_state; model_state,_=source_limit_state(folder); states=tk.StringVar(value=model_state or 'ULS');review=tk.StringVar();status=tk.StringVar(value='Run model review to calculate soft-storey and torsion; exterior geometry supplies re-entrant checks.')
     controls=ttk.Frame(win);controls.pack(fill='x');ttk.Combobox(controls,textvariable=states,values=['ULS','SLS'],state='readonly',width=12).pack(side='left');ttk.Entry(controls,textvariable=review,width=58).pack(side='left')
     def browse():
         path=filedialog.askopenfilename(parent=win,title='Reviewed strengths or continuity evidence',filetypes=[('Reviewed CSV / JSON','*.csv *.json')])

@@ -254,7 +254,9 @@ def launch(parent, folder):
         try:
             if not state["report"]:
                 raise ValueError("Refresh and assess before exporting")
-            target = Path(project_var.get()) / "OpenSees_Analysis_Results" / "Readiness_Audit"
+            from components.inputs.output_layout import owned_run_destination
+            target = owned_run_destination(
+                project_var.get(), "SOFTWARE_DIAGNOSTICS", "READINESS_AUDIT")
             js, md = export_report(state["report"], target)
             messagebox.showinfo("Readiness exported",
                 "Read-only evidence audit saved:\n" + str(js) + "\n" + str(md) +
@@ -314,7 +316,9 @@ def launch(parent, folder):
         script = root / args[0]
         if not script.is_file():
             raise FileNotFoundError("Required launcher is missing: " + str(script))
-        destination = Path(project_var.get()).resolve() / "OpenSees_Analysis_Results" / "Readiness_Diagnostics"
+        from components.inputs.output_layout import owned_run_destination
+        destination = owned_run_destination(
+            project_var.get(), "SOFTWARE_DIAGNOSTICS", "READINESS_TOOL_LOGS")
         destination.mkdir(parents=True, exist_ok=True)
         logfile = destination / (script.stem + ".log")
         # The log remains attached to the child until it exits; no fabricated
@@ -343,7 +347,9 @@ def launch(parent, folder):
                 filetypes=[("JSON", "*.json")])
             if not source:
                 return
-            destination = Path(project_var.get()).resolve() / "OpenSees_Analysis_Results" / "Wall_Probes"
+            from components.inputs.output_layout import owned_run_destination
+            destination = owned_run_destination(
+                project_var.get(), "SOFTWARE_DIAGNOSTICS", "WALL_PROBES")
             _spawn_tool(["21_NLTHA_TRIAGE.py", "--config", source,
                          "--output", str(destination)],
                         "Wall first-step diagnostic configurations")
@@ -352,7 +358,9 @@ def launch(parent, folder):
 
     def run_device_benchmark():
         try:
-            destination = Path(project_var.get()).resolve() / "OpenSees_Analysis_Results" / "Native_Device_Benchmark"
+            from components.inputs.output_layout import owned_run_destination
+            destination = owned_run_destination(
+                project_var.get(), "SOFTWARE_DIAGNOSTICS", "NATIVE_DEVICE_BENCHMARK")
             _spawn_tool(["29_NATIVE_DEVICE_BENCHMARK.py", "--output", str(destination)],
                         "Isolated native FVD/BRB benchmark")
         except Exception as exc:
