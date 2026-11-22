@@ -65,6 +65,15 @@ class CurrentEtabsBundleTests(unittest.TestCase):
                     self.root,self.books[0],self.books[1:])
         self.assertFalse((self.root/"01_ETABS_EXPORT"/"00_MANIFEST").exists())
 
+    def test_nested_model_folder_cannot_own_duplicate_etabs_manifest(self):
+        nested=self.root/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"/"run"
+        nested.mkdir(parents=True)
+        with patch("components.inputs.project_workbooks._source_edb_path",
+                   return_value=str(self.edb)):
+            with self.assertRaisesRegex(ValueError,"ORIGINAL export"):
+                register_current_etabs_tables(nested,self.books[0],self.books[1:])
+        self.assertFalse((nested/"01_ETABS_EXPORT").exists())
+
     def test_missing_native_source_blocks_creation(self):
         with patch("components.inputs.project_workbooks._source_edb_path",
                    return_value=None):
