@@ -250,10 +250,14 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
                          compresslevel=9,allowZip64=True) as archive:
         for f in sorted(package.rglob("*")):
             if f.is_file():archive.write(f,arcname=f.relative_to(package).as_posix())
-    (zip_root/("LATEST_"+method+"_REVIEW.txt")).write_text(
+    # Keep the longstanding review-root locator for existing GUI/readers.
+    # Its ZIP path points to the canonical 07_EXPORT_ZIP; never duplicate ZIP bytes.
+    (review_root/("LATEST_"+method+"_REVIEW.txt")).write_text(
         "UPLOAD ZIP: "+str(zip_path)+"\nREVIEW FOLDER: "+str(package)+
         "\nMANIFEST: "+str(package/"REVIEW_MANIFEST.json")+"\n",
         encoding="utf-8")
+    (zip_root/("LATEST_"+method+"_REVIEW.txt")).write_text(
+        str(zip_path)+"\n",encoding="utf-8")
     return {"zip":str(zip_path),"folder":str(package),"manifest":manifest}
 
 
