@@ -30,8 +30,7 @@ def main(argv=None):
             print(json.dumps(result,indent=2,sort_keys=True,allow_nan=False))
             return 2  # Deliberately blocked until exhaustive source and native review.
         if args.list:
-            from components.nbc105.dispatch import available_annex_operations
-            result={"clauses":available_operations(),"annexes":available_annex_operations()}
+            result=available_operations()
         elif args.describe:
             if not args.operation or ((args.clause is None)==(args.annex is None)):
                 parser.error("--describe requires --operation and exactly one --clause or --annex")
