@@ -17,13 +17,38 @@ def main(argv=None):
     parser.add_argument("--export-root",type=Path,required=True)
     parser.add_argument("--analysis",type=Path,required=True)
     for i in (1,2,3):
-        parser.add_argument(f"--beam-{i}",type=Path,required=True)
+        parser.add_argument(f"--beam-{i}",type=Path)
+    parser.add_argument("--beam-files",type=Path,nargs="+",
+                        help="All ETABS Element Forces - Beams Excel parts (any count)")
+    parser.add_argument("--select-beams",action="store_true",
+                        help="Open multi-select Excel file picker for all beam-force parts")
     parser.add_argument("--native-assignment",type=Path)
     args=parser.parse_args(argv)
+    explicit=[p for p in (args.beam_1,args.beam_2,args.beam_3) if p is not None]
+    if args.beam_files and explicit:
+        parser.error("Use --beam-files OR --beam-1/2/3, not both")
+    if args.select_beams and (args.beam_files or explicit):
+        parser.error("Use --select-beams OR explicit beam paths, not both")
+    if args.select_beams:
+        from tkinter import Tk, filedialog
+        window=Tk()
+        window.withdraw()
+        try:
+            chosen=filedialog.askopenfilenames(
+                title="Select ALL ETABS Element Forces - Beams Excel files",
+                filetypes=[("Excel workbooks","*.xlsx *.xlsm")])
+        finally:
+            window.destroy()
+        beams=[Path(p) for p in chosen]
+    else:
+        beams=list(args.beam_files or explicit)
+    if not beams:
+        parser.error("Select one or more beam-force workbooks")
+    if explicit and len(explicit)!=3:
+        parser.error("Legacy --beam-1/2/3 requires all three; use --beam-files for any count")
     from components.inputs.etabs_table_bundle import register_current_etabs_tables
     dest,meta=register_current_etabs_tables(
-        args.export_root,args.analysis,
-        (args.beam_1,args.beam_2,args.beam_3),
+        args.export_root,args.analysis,beams,
         assignment=args.native_assignment)
     print("Local source registry:",dest)
     print("ETABS EDB SHA256:",meta["source_edb_sha256"])
