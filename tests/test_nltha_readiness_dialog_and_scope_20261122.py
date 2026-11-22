@@ -16,7 +16,9 @@ def _scope_function():
     tree=ast.parse(source)
     function=next(n for n in tree.body
                   if isinstance(n,ast.FunctionDef) and n.name=="_nltha_output_scope")
-    ns={}
+    # AST extraction isolates GUI logic; preserve module math binding explicitly.
+    import math
+    ns={"math":math}
     exec(compile(ast.Module([function],type_ignores=[]),"nltha_scope_test","exec"),ns)
     return ns["_nltha_output_scope"]
 
