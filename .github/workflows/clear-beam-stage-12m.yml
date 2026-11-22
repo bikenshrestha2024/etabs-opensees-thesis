@@ -7,8 +7,11 @@ on:
       - 'components/inputs/project_workbooks.py'
       - 'components/inputs/aw_sources.py'
       - 'components/inputs/model_aligned_reference.py'
+      - 'components/inputs/etabs_table_bundle.py'
       - 'tools/REGISTER_12M_MODEL_REFERENCE.py'
+      - 'tools/REGISTER_CURRENT_ETABS_TABLES.py'
       - 'tests/test_registered_12m_model_reference.py'
+      - 'tests/test_current_etabs_table_bundle.py'
       - 'components/inputs/grouped_wall_aw.py'
       - 'tests/test_clear_beam_12m_stage_ownership.py'
       - 'tests/verify_spyder_clear_beam_rebuild.py'
@@ -21,8 +24,11 @@ on:
       - 'components/inputs/project_workbooks.py'
       - 'components/inputs/aw_sources.py'
       - 'components/inputs/model_aligned_reference.py'
+      - 'components/inputs/etabs_table_bundle.py'
       - 'tools/REGISTER_12M_MODEL_REFERENCE.py'
+      - 'tools/REGISTER_CURRENT_ETABS_TABLES.py'
       - 'tests/test_registered_12m_model_reference.py'
+      - 'tests/test_current_etabs_table_bundle.py'
       - 'components/inputs/grouped_wall_aw.py'
       - 'tests/test_clear_beam_12m_stage_ownership.py'
       - 'tests/verify_spyder_clear_beam_rebuild.py'
@@ -38,8 +44,8 @@ jobs:
           python-version: '3.12'
       - name: Compile affected Python
         run: |
-          python -m py_compile tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py components/gravity/gui_and_reports.py components/inputs/project_workbooks.py components/inputs/aw_sources.py components/inputs/model_aligned_reference.py tools/REGISTER_12M_MODEL_REFERENCE.py tests/test_clear_beam_12m_stage_ownership.py
+          python -m py_compile tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py components/gravity/gui_and_reports.py components/inputs/project_workbooks.py components/inputs/aw_sources.py components/inputs/model_aligned_reference.py components/inputs/etabs_table_bundle.py tools/REGISTER_12M_MODEL_REFERENCE.py tools/REGISTER_CURRENT_ETABS_TABLES.py tests/test_clear_beam_12m_stage_ownership.py
       - name: Install minimal workbook/test libraries
         run: python -m pip install --disable-pip-version-check openpyxl numpy matplotlib
       - name: Test new source-owned model stage and fail-closed workbook selection
-        run: python -m unittest -v tests.test_clear_beam_12m_stage_ownership tests.test_registered_12m_model_reference tests.verify_spyder_clear_beam_rebuild tests.test_grouped_wall_aw_ubc_seaoc
+        run: python -m unittest -v tests.test_clear_beam_12m_stage_ownership tests.test_registered_12m_model_reference tests.test_current_etabs_table_bundle tests.verify_spyder_clear_beam_rebuild tests.test_grouped_wall_aw_ubc_seaoc
