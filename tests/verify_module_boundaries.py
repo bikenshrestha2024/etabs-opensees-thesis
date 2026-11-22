@@ -13,6 +13,10 @@ class BoundaryTests(unittest.TestCase):
                          "MIXED_SOURCE_ASSEMBLY_MIGRATION_REQUIRED")
         self.assertEqual(domain_for("components/gravity/solver_stack.py"),
                          "ETABS_OPENSEES_INTEGRATION")
+        self.assertEqual(domain_for("components/linear_time_history/runner_and_gui.py"),
+                         "OPENSEES_ANALYSIS")
+        self.assertEqual(domain_for("components/nbc105/dispatch.py"),
+                         "NBC105_REFERENCE_RULES_NOT_NATIVE_ACCEPTANCE")
     def test_forbidden_import_caught(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);f=root/"test.py"
