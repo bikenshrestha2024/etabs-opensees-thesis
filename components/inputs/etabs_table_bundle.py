@@ -46,13 +46,14 @@ def register_current_etabs_tables(export_dir, analysis, beam_forces, *,
     if not source or not Path(source).is_file():
         raise FileNotFoundError("Current source EDB unavailable; re-export before registration")
     edb=Path(source).expanduser().resolve()
+    beam_forces = tuple(beam_forces)
+    if not beam_forces:
+        raise ValueError("Select at least one ETABS beam-force workbook")
     selected={
         "etabs_full_table":Path(analysis).expanduser().resolve(),
         **{f"etabs_beam_forces_element_{i}":Path(path).expanduser().resolve()
            for i,path in enumerate(beam_forces,start=1)}
     }
-    if len(beam_forces)!=3:
-        raise ValueError("Provide three source-labelled beam-force workbook parts")
     if assignment is not None:
         selected["etabs_assignment"]=Path(assignment).expanduser().resolve()
     if len({str(p).casefold() for p in selected.values()})!=len(selected):
@@ -87,8 +88,9 @@ def register_current_etabs_tables(export_dir, analysis, beam_forces, *,
             set(records["etabs_full_table"]["sheets"])):
         entries["etabs_assignment"]=dict(entries["etabs_full_table"])
         records["etabs_assignment"]=dict(records["etabs_full_table"])
-    beam_hashes=[records[f"etabs_beam_forces_element_{i}"]["sha256"] for i in (1,2,3)]
-    if len(set(beam_hashes))!=3:
+    beam_hashes=[records[f"etabs_beam_forces_element_{i}"]["sha256"]
+                 for i in range(1,len(beam_forces)+1)]
+    if len(set(beam_hashes))!=len(beam_hashes):
         raise ValueError("Beam force parts have identical bytes; check duplicated uploads")
     destination=root/"01_ETABS_EXPORT"/"00_MANIFEST"/"PROJECT_SOURCES.private.json"
     destination.parent.mkdir(parents=True,exist_ok=True)
@@ -100,6 +102,9 @@ def register_current_etabs_tables(export_dir, analysis, beam_forces, *,
         old=prior.get("sources",{})
     else:
         old={}
+    # The registry is a private local input inventory, not a solver result.
+    # Re-registration must not retain stale beam parts from an older selection.
+    old={k:v for k,v in old.items() if not k.startswith("etabs_beam_forces_element_")}
     manifest={
         "schema":"CURRENT_ETABS_WORKBOOKS_SHA256_V1",
         "source_edb_sha256":edbsha,
