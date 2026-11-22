@@ -101,6 +101,10 @@ class GravityNodeAuditTests(unittest.TestCase):
         self.assertEqual(report['top_discrepancies'][0]['etabs_point'],'B')
         self.assertAlmostEqual(report['top_discrepancies'][0]['abs_delta_kN'],20)
         self.assertEqual(report['matched_sum_difference_kN'],25)
+        self.assertEqual(report["pointwise_screening_status"],
+                         "POINTWISE_RESIDUAL_EXCEEDS_NUMERICAL_SCREEN")
+        self.assertFalse(report["complete_one_to_one_global_z"])
+        self.assertAlmostEqual(report["max_absolute_nodal_difference_kN"],20.)
         self.assertTrue(report['unmatched_reactions_not_zeroed'])
         with tempfile.TemporaryDirectory() as root:
             out=write_node_comparison(root,report)
