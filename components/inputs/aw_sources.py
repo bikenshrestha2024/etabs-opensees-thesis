@@ -59,26 +59,31 @@ def _sha256(path):
 
 
 def edb_identity(current_edb, audit):
-    """SAME_EDB_PATH / BYTE_IDENTICAL_EDB / DIFFERENT_EDB / UNKNOWN_CURRENT_EDB.
+    """SAME_EDB_PATH / BYTE_IDENTICAL_EDB / DIFFERENT_EDB / UNVERIFIED_EDB_SHA256.
 
     [REF components/inputs/project_workbooks.py _same_edb_file_content]
     A matching file name after dropping '- Copy' is NOT accepted.
     """
     if not current_edb:
         return 'UNKNOWN_CURRENT_EDB'
-    if _norm(current_edb) == _norm(audit.get('source_edb')):
-        if Path(str(current_edb)).is_file() and audit.get('source_edb_sha256'):
-            if _sha256(current_edb)!=audit['source_edb_sha256']:
-                return 'DIFFERENT_EDB'
-        return 'SAME_EDB_PATH'
     path = Path(str(current_edb))
-    if audit.get('source_edb_sha256') and path.is_file():
-        try:
-            if _sha256(path) == audit['source_edb_sha256']:
-                return 'BYTE_IDENTICAL_EDB'
-        except OSError:
-            pass
-    return 'DIFFERENT_EDB'
+    digest = audit.get('source_edb_sha256')
+    if (not isinstance(digest,str) or len(digest)!=64
+            or any(ch not in '0123456789abcdefABCDEF' for ch in digest)):
+        # Same filename is not evidence of the same physical model. The
+        # workbook remains a research reference, never automatic Aw input.
+        return 'UNVERIFIED_EDB_SHA256'
+    if not path.is_file():
+        return 'CURRENT_EDB_NOT_ACCESSIBLE'
+    try:
+        actual = _sha256(path)
+    except OSError:
+        return 'CURRENT_EDB_NOT_ACCESSIBLE'
+    if actual.casefold()!=digest.casefold():
+        return 'DIFFERENT_EDB'
+    if _norm(current_edb)==_norm(audit.get('source_edb')):
+        return 'SAME_EDB_PATH'
+    return 'BYTE_IDENTICAL_EDB'
 
 
 def linked_reference_from_audit(audit, audit_path, *, state, current_edb):
