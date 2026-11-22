@@ -72,8 +72,8 @@ def audit_export_layout(export_dir):
         for relative in ("OpenSees_Analysis_Results",
                          "01_ETABS_EXPORT/03_BEAM_FORCES"):
             prior=root/relative
-            if stage=="ETABS_EXPORT" and relative.endswith("03_BEAM_FORCES") or (
-                stage=="GRAVITY" and relative=="OpenSees_Analysis_Results"):
+            if ((stage=="ETABS_EXPORT" and relative.endswith("03_BEAM_FORCES"))
+                    or (stage=="GRAVITY" and relative=="OpenSees_Analysis_Results")):
                 if prior.is_symlink():
                     issues.append({"stage":stage,"issue":"LINKED_LEGACY_REFUSED"})
                 elif prior.is_dir():
