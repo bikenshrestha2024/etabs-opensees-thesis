@@ -174,12 +174,15 @@ def safe_write(path, text):
 
 
 @timed_outputs('Equivalent-static calculations and case export','outdir')
-def write_outputs(template_path, rows, result, direction, polarity, accidental, breadth, outdir, model_script=""):
+def write_outputs(template_path, rows, result, direction, polarity, accidental, breadth, outdir, model_script="", support_case="PHYSICAL_32"):
     out=Path(outdir); out.mkdir(parents=True,exist_ok=True)
     ecc_case=(f"E{'+' if int(breadth[1])>0 else '-'}" if accidental and int(breadth[1])!=0 else "E0")
     suffix=f"{result['limit_state']}_{direction}{'+' if polarity>0 else '-'}_{ecc_case}"
     result["response_case"]=suffix
+    from components.model.support_case_contract import normalize_support_case
+    support_case=normalize_support_case(support_case)
     report=dict(result)
+    report["support_case"]=support_case
     report["comparison_remark"] = result["esm_eligibility"] if not result.get("code_eligible",True) else "Eligible ESM case"
     report["direction_case"]=suffix
     report["calculation_route"]="OPENSEES_DIRECT_ESM"
@@ -293,6 +296,7 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "# Freeze the verified gravity stage before running this lateral case. This file does not create slabs/walls/elements/materials.",
         "import json, openseespy.opensees as ops",
         "import os, csv, time, traceback, sys",
+        "os.environ['OPENSEES_SUPPORT_CASE'] = "+repr(support_case),
         "OUTPUT_DIR = "+repr(str(out.resolve())),
         "sys.path.insert(0,os.path.join(os.path.dirname("+repr(str(model_script))+"),'OpenSees_Runtime_V118'))",
         "sys.path.insert(0,"+repr(str(HERE))+")",
@@ -585,6 +589,7 @@ class ESMGui:
         self.direction=tk.StringVar(value="Both X/Y"); self.polarity=tk.StringVar(value="Both ±")
         self.centered_case=tk.BooleanVar(value=True); self.include_torsion=tk.BooleanVar(value=True); self.bdim=tk.StringVar(value="")
         self.eccsign=tk.StringVar(value="Both ±")
+        self.support_case_var=tk.StringVar(value="PHYSICAL_32")
         self.model_script=tk.StringVar(value="")
         self.python_exe=tk.StringVar(value=sys.executable)
         self.last_runners=[]
@@ -655,16 +660,16 @@ class ESMGui:
         def worker():
             try:
                 from components.equivalent_static.organized_exports import build_combined_esm_export
-                report=build_combined_esm_export(root)
+                report=build_combined_esm_export(root,allow_incomplete=True)
                 def done():
                     self._esm_combined_export_busy=False
-                    self._set_esm_operation("EXPORTED","Combined result workbook and ZIP saved")
-                    self.status.set("ESM SNAPSHOT "+report["solver_batch_status"]+" | Excel: "+report["workbook"]+
+                    self._set_esm_operation("EXPORTED","Combined evidence workbook and ZIP saved | "+report["calculation_status"])
+                    self.status.set("ESM SNAPSHOT "+report["solver_batch_status"]+" | "+report["calculation_status"]+" | Excel: "+report["workbook"]+
                                     " | ZIP: "+report["zip"]+" | manifest: "+report["manifest"])
                     messagebox.showinfo("ESM combined results",
                         "Combined Excel:\n"+report["workbook"]+
                         "\n\nCategorized review ZIP:\n"+report["zip"]+
-                        "\n\nSolver batch: "+report["solver_batch_status"]+"\nPartial exports may omit running cases."+
+                        "\n\nSolver batch: "+report["solver_batch_status"]+"\nCalculation status: "+report["calculation_status"]+"\nIf absent, workbook is MANIFEST ONLY with no invented V/T/Fi. Partial exports may omit running cases."+
                         "\nThis report does not imply source-matched ETABS or NBC acceptance.",
                         parent=self.root)
                 self.root.after(0,done)
@@ -1016,6 +1021,12 @@ class ESMGui:
         ttk.Label(runbox,text="Complete model script (nodes, sections/elements, diaphragms, mass and gravity)").grid(row=0,column=0,sticky="w",padx=5,pady=3)
         ttk.Entry(runbox,textvariable=self.model_script).grid(row=0,column=1,sticky="ew",padx=5,pady=3)
         ttk.Button(runbox,text="Browse…",command=self._browse_model).grid(row=0,column=2,padx=4)
+        ttk.Label(runbox,text="Foundation node case (applies to every generated ESM runner)").grid(row=2,column=0,sticky="w",padx=5,pady=3)
+        ttk.Combobox(runbox,textvariable=self.support_case_var,values=[
+            "PHYSICAL_32","SOURCE_76","WALL_BASE_97"],state="readonly",width=18
+        ).grid(row=2,column=1,sticky="w",padx=5,pady=3)
+        ttk.Label(runbox,text="32 physical foundations (primary); 76 exported mesh restraint IDs / 97 idealized fixed wall-base diagnostic only. Native ETABS edge/MPC transfer unverified.",
+                  wraplength=900,foreground="#8a341c").grid(row=3,column=0,columnspan=3,sticky="w",padx=5,pady=3)
         ttk.Label(runbox,text="Python executable with OpenSeesPy").grid(row=1,column=0,sticky="w",padx=5,pady=3)
         ttk.Entry(runbox,textvariable=self.python_exe).grid(row=1,column=1,sticky="ew",padx=5,pady=3)
         ttk.Button(runbox,text="Browse…",command=self._browse_python).grid(row=1,column=2,padx=4)
@@ -1660,7 +1671,8 @@ class ESMGui:
                         proc=subprocess.run(command,capture_output=True,text=True,
                             errors='replace',encoding='utf-8',
                             env={**os.environ, 'PYTHONIOENCODING':'utf-8', 'PYTHONUTF8':'1',
-                                 'OPENSEES_GRAVITY_PROFILE':'AS_CONFIGURED'})
+                                 'OPENSEES_GRAVITY_PROFILE':'AS_CONFIGURED',
+                                 'OPENSEES_SUPPORT_CASE':self.support_case_var.get()})
                         log=out/(RAYLEIGH_PREFIX+'_'+state+'.log')
                         log.write_text(proc.stdout+'\n'+proc.stderr,encoding='utf-8')
                         if proc.returncode:
@@ -1986,6 +1998,7 @@ class ESMGui:
                     if not result["site_subsoil_verified"]:summaries.append("SITE CLASSIFICATION NOT VERIFIED: "+result["site_subsoil_status"])
                     result["period_source"]=("Separate matched "+state+" Rayleigh/empirical minimum" if state_periods else self.period_sources.get(self.direction.get(),"Directional Rayleigh/empirical calculation"))
                     result["input_provenance"]=getattr(self,"project_input_audit",{})
+                    result["support_case"]=self.support_case_var.get()
                     result["wall_aw_source_classification"]={
                         axis: getattr(self,'_aw_sync_evidence',{}).get(axis,{}).get(
                             'status','USER_OR_IMPORTED_UNVERIFIED') for axis in ('X','Y')}
@@ -2027,7 +2040,7 @@ class ESMGui:
                         for ecc_sign in ecc_signs:
                             breadth=(bdim,ecc_sign)
                             state_outdir=analysis_output_folder(self.export_dir,state,stage='ESM') if self._output_is_automatic else Path(self.outdir.get())
-                            output_paths=write_outputs(self.path.get(),rows,result,self.direction.get(),polarity,self.include_torsion.get(),breadth,state_outdir,self.model_script.get())
+                            output_paths=write_outputs(self.path.get(),rows,result,self.direction.get(),polarity,self.include_torsion.get(),breadth,state_outdir,self.model_script.get(),self.support_case_var.get())
                             made.extend(output_paths); self.last_runners.append(str(output_paths[2]))
                             summaries.append(f"{state} {self.direction.get()}{'+' if polarity>0 else '-'} E{('+' if ecc_sign>0 else '-') if self.include_torsion.get() and ecc_sign else '0'}: V={result['base_shear_kN']:.3f} kN, k={result['period_exponent_k']:.4f}")
                 except Exception as state_exc:
@@ -2125,7 +2138,7 @@ class ESMGui:
                     timed_out = False
                     try:
                         args = [self.python_exe.get(), "-u", str(script)]
-                        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
+                        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "OPENSEES_SUPPORT_CASE": self.support_case_var.get()}
                         proc = subprocess.Popen(args, cwd=str(output),
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, encoding="utf-8", errors="replace", bufsize=1, env=env)
