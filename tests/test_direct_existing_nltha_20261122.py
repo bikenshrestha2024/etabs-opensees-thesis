@@ -105,6 +105,7 @@ class ExistingModelNLTHATests(unittest.TestCase):
             self.assertEqual(cfg["analysis_intent"],"RESEARCH_DIAGNOSTIC")
             self.assertEqual(cfg["duration_s"],0.)
             self.assertEqual(cfg["scale"],1.)
+            self.assertTrue(cfg["soil_c_primary_nltha"], "Direct primary thesis run must verify registered Soil-C pair by SHA256")
             self.assertFalse(cfg.get("approved_for_thesis",False))
 
     def test_missing_waveforms_cannot_be_reported_as_run_completion(self):

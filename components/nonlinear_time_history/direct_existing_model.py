@@ -50,7 +50,7 @@ def make_research_nltha_config(*, model_folder, x_path, y_path, output_dir,
         orientations=["XY","YX"],diagnostic_excitation="XY",
         diagnostic_zero_damping=False,diagnostic_mass_damping=False,
         source_records_already_scaled=True,scale=1.,
-        soil_type="C",soil_c_primary_nltha=False,
+        soil_type="C",soil_c_primary_nltha=True,
         duration_s=float(trial_duration_s),
         dt_s=float(dt_s),max_subdivision_depth=5,
         research_basis_not_project_approval=True,
@@ -83,9 +83,20 @@ def preflight_existing_model(config):
         motions.append(path)
     if motions[0]==motions[1] or source_sha256(motions[0])==source_sha256(motions[1]):
         raise ValueError("XY/YX requires distinct verified horizontal motion components")
-    # A motion file's name alone is NOT authentication of record, unit,
-    # SeismoMatch processing or original scale. The existing runner does its
-    # complete parser and NBC provenance check before native solving.
+    # Exact registered SeismoMatch byte hashes and A/B orientation are required
+    # BEFORE the costly 25-storey model is loaded and gravity is solved.
+    # Registry identity is NOT the original spectrum matching factor log.
+    paired_source = None
+    if config.get("soil_c_primary_nltha") is True:
+        from components.nonlinear_time_history.soil_c_nltha_suite import verify_runner_pair
+        paired_source = verify_runner_pair(
+            motions[0], motions[1],
+            registered_event=config.get("earthquake_event"),
+            gorkha_processing_approved=config.get("gorkha_processing_reviewed") is True,
+            reviewer=config.get("engineering_reviewer"),
+            loma_end_policy=config.get("loma_end_policy", "reject"))
+    # A motion file name and registered digest alone do not independently
+    # qualify the original scaling sessions or the model's spectral period range.
     config_path=source/"OpenSees_Complete_Model_Config_V118.json"
     data_path=source/"OpenSees_Complete_Model_Data_V118.json"
     data=json.loads(data_path.read_text(encoding="utf-8-sig"))
@@ -120,9 +131,133 @@ def preflight_existing_model(config):
         applied_material_basis=config["material_basis"],
         calibration_status="RESEARCH_SPECIMEN_TRANSFER_NOT_APPROVED",
         nbc105_2025_code_acceptance="NOT_VERIFIED",
-        input_motion_spectral_matching="NOT_VERIFIED_BY_THIS_PRECHECK",
+        matched_component_pair_source=paired_source,
+        input_motion_spectral_matching=(
+            "REGISTERED_FILE_SHA256_ONLY_ORIGINAL_SCALING_EVIDENCE_PENDING"
+            if paired_source else "NOT_VERIFIED_BY_THIS_PRECHECK"),
         source_gravity_profile="AS_CONFIGURED_SEPARATE_FROM_FULL_1D_1L_COMPARISON",
     )
+
+
+
+def verify_full_duration_pair_outputs(output_dir, config, cases):
+    """Verify both saved XY/YX full histories against actual solver summaries.
+
+    [REF NBC105-2025 §9.3.2–9.3.3; components/nonlinear_time_history/full_record_gate.py]
+    This is a numerical completion / source-identity screen, NEVER a claim
+    of code compliance, project reinforcement or component calibration.
+    """
+    import csv
+    import re
+
+    if (config.get("orientations") != ["XY", "YX"]
+            or config.get("diagnostic_excitation") != "XY"):
+        raise ValueError("A full XY/YX paired run requires bidirectional XY excitation")
+    if config.get("duration_s") not in (None, 0, 0.0):
+        raise ValueError("A truncated trial is not a full record")
+    if not isinstance(cases, list) or len(cases) != 2:
+        raise ValueError("Full NLTHA evidence requires two independent XY/YX cases")
+    by_orientation = {c.get("orientation"): c for c in cases if isinstance(c, dict)}
+    if len(by_orientation) != 2 or set(by_orientation) != {"XY", "YX"}:
+        raise ValueError("Missing or duplicated XY/YX orientation summary")
+    required_identity = (
+        "model_sha256", "record_sha256", "pair_id", "variant_id",
+        "limit_state", "diagnostic_excitation")
+    for key in required_identity:
+        values = [by_orientation[direction].get(key) for direction in ("XY", "YX")]
+        if any(not isinstance(v, str) or not v.strip() for v in values):
+            raise ValueError("Missing full-run case identity: " + key)
+        if values[0] != values[1]:
+            raise ValueError("XY/YX model/record case identity mismatch: " + key)
+    for key in ("model_sha256", "record_sha256"):
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", by_orientation["XY"][key]):
+            raise ValueError("Invalid SHA256 source identity: " + key)
+    for key in ("pair_id", "variant_id", "limit_state"):
+        if by_orientation["XY"][key] != config.get(key):
+            raise ValueError("Requested model/record case identity mismatch: " + key)
+    if by_orientation["XY"]["diagnostic_excitation"] != "XY":
+        raise ValueError("Only simultaneous XY excitation qualifies as full record")
+    results = {}
+    for direction in ("XY", "YX"):
+        saved = by_orientation[direction]
+        gate = saved.get("completion_gate")
+        if (saved.get("status") != "COMPLETED_EXPLORATORY_RECORD"
+                or not isinstance(gate, dict)
+                or gate.get("status") != "FULL_DURATION_NUMERIC_SCREEN"
+                or gate.get("full_record_completed") is not True):
+            raise ValueError(direction + " is not a full-duration completed numerical case")
+        folder = Path(output_dir) / direction
+        summary_path = folder / "Case_Summary.json"
+        gate_path = folder / "Accepted_History_Completion_Gate.json"
+        history_path = folder / "Building_Nonlinear_history.csv"
+        for item in (summary_path, gate_path, history_path):
+            if not item.is_file():
+                raise FileNotFoundError(direction + " required full history evidence missing: " + str(item))
+        try:
+            on_disk = json.loads(summary_path.read_text(encoding="utf-8-sig"))
+            disk_gate = json.loads(gate_path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(direction + " invalid saved case summary or completion gate") from exc
+        for key in ("orientation", "status", *required_identity,
+                    "physical_time_s", "full_record_duration_s"):
+            if on_disk.get(key) != saved.get(key):
+                raise ValueError(direction + " saved summary does not match solver case: " + key)
+        if on_disk.get("completion_gate") != gate or disk_gate != gate:
+            raise ValueError(direction + " saved completion gate differs from solver evidence")
+        try:
+            end = float(gate["full_record_duration_s"])
+            last = float(gate["achieved_time_s"])
+            physical_end = float(saved["physical_time_s"])
+            count_expected = int(gate["accepted_states"])
+        except (KeyError, ValueError, TypeError, OverflowError) as exc:
+            raise ValueError(direction + " invalid full-duration gate numbers") from exc
+        if (not all(math.isfinite(v) and v > 0 for v in (end, last, physical_end))
+                or count_expected < 2
+                or abs(last - end) > 1e-7
+                or abs(physical_end - end) > 1e-7
+                or abs(float(saved["full_record_duration_s"]) - end) > 1e-7):
+            raise ValueError(direction + " full-duration end/achieved time mismatch")
+        first = None
+        previous = None
+        count = 0
+        with history_path.open(encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames or "time_s" not in reader.fieldnames or len(reader.fieldnames) < 2:
+                raise ValueError(direction + " history has no numeric response channels")
+            if len(set(reader.fieldnames)) != len(reader.fieldnames):
+                raise ValueError(direction + " history contains duplicated channel headers")
+            for row in reader:
+                if set(row) != set(reader.fieldnames):
+                    raise ValueError(direction + " history row has inconsistent channels")
+                for key, raw in row.items():
+                    try:
+                        number = float(raw)
+                    except (TypeError, ValueError, OverflowError) as exc:
+                        raise ValueError(direction + " history contains invalid numeric response: " + key) from exc
+                    if not math.isfinite(number):
+                        raise ValueError(direction + " Nonfinite accepted history response: " + key)
+                    if key == "time_s":
+                        t = number
+                if previous is not None and t <= previous:
+                    raise ValueError(direction + " history must have strictly increasing accepted time")
+                if first is None:
+                    first = t
+                previous = t
+                count += 1
+        if (first is None or abs(first) > 1e-7 or count != count_expected
+                or previous is None or abs(previous - end) > 1e-7):
+            raise ValueError(direction + " accepted states / recorded duration does not match completion gate")
+        results[direction] = {
+            "status": "FULL_DURATION_NUMERIC_SCREEN_NOT_DESIGN_APPROVAL",
+            "accepted_states": count,
+            "first_time_s": first, "last_time_s": previous,
+            "source_model_sha256": saved["model_sha256"],
+            "record_pair_sha256": saved["record_sha256"],
+            "history_sha256": source_sha256(history_path),
+            "completion_gate_sha256": source_sha256(gate_path),
+            "case_summary_sha256": source_sha256(summary_path),
+        }
+    return results
 
 
 def run_existing_model_nltha(config, *, check_only=False, executor=None):
@@ -134,6 +269,14 @@ def run_existing_model_nltha(config, *, check_only=False, executor=None):
     """
     preflight=preflight_existing_model(config)
     output=Path(config["output_dir"]).expanduser().resolve()
+    # An existing case may contain a successful XY/YX run or first-failure
+    # snapshots. Never mix a rerun into those immutable scientific records.
+    if output.exists():
+        if not output.is_dir():
+            raise FileExistsError("NLTHA output path already exists as a file: "+str(output))
+        if any(output.iterdir()):
+            raise FileExistsError(
+                "Refusing to overwrite existing NLTHA output evidence: "+str(output))
     output.mkdir(parents=True,exist_ok=True)
     target=output/"DIRECT_EXISTING_NLTHA_STATUS.json"
     plan=output/"DIRECT_EXISTING_NLTHA_SOURCE_AND_SECTION_BASIS.json"
@@ -169,9 +312,16 @@ def run_existing_model_nltha(config, *, check_only=False, executor=None):
             raise RuntimeError(
                 "Existing NLTHA engine returned no complete, independently identified XY/YX results")
         is_full=all(c["status"]=="COMPLETED_EXPLORATORY_RECORD" for c in cases)
+        verified_pair = (verify_full_duration_pair_outputs(output, config, cases)
+                         if is_full else {})
+        if is_full and any(
+                c["source_model_sha256"] != preflight["model_files_sha256"]["OpenSees_Complete_Model_Data_V118.json"]
+                for c in verified_pair.values()):
+            raise ValueError("Saved full-duration case model differs from preflight source SHA256")
         return status("EXPLORATORY_FULL_DURATION_NUMERICAL_SCREEN"
                       if is_full else "EXPLORATORY_TRUNCATED_TRIAL_ONLY",
                       case_ids=[c.get("orientation") for c in cases],
+                      independently_checked_case_histories=verified_pair,
                       native_solver_executed=True,
                       thesis_materials_approved=False,
                       etabs_opensees_equivalence_verified=False,
