@@ -130,6 +130,39 @@ class ReactionCaseRegistryTests(unittest.TestCase):
         self.assertEqual(gui.solved_reaction_var.get(),"Saved result unavailable")
         self.assertIn("MODEL_SHA_CHANGED",gui.solved_reaction_status_var.get())
 
+    def test_canonical_run_owner_not_current_gui_output(self):
+        from components.gravity.output_ownership import (
+            case_directory,workspace_for_solver_case_run)
+        a=self.root/"first_model_workspace"
+        b=self.root/"second_model_workspace"
+        a.mkdir();b.mkdir()
+        run=case_directory(a,"ETABS_NONZERO_REACTION_DIAGNOSTIC",
+            "GRAVITY_1.0D_1.0L","case_001",create=True)
+        self.assertEqual(workspace_for_solver_case_run(run),a.resolve())
+        with self.assertRaisesRegex(ValueError,"Not a canonical"):
+            workspace_for_solver_case_run(b)
+        # Simulate user selecting model B after model A's solver launched:
+        # model A's result must remain indexed at A, not at mutable GUI B.
+        result=run/"Gravity_Result_V110.json"
+        result.write_text(json.dumps(self.payload()),encoding="utf-8")
+        owner=workspace_for_solver_case_run(run)
+        register_case(owner,result,self.model,
+                      scenario="ETABS_NONZERO_REACTION_DIAGNOSTIC",
+                      profile="GRAVITY_1.0D_1.0L")
+        self.assertIsNotNone(current_case(a,self.model,
+            scenario="ETABS_NONZERO_REACTION_DIAGNOSTIC",
+            profile="GRAVITY_1.0D_1.0L"))
+        self.assertFalse((b/"00_INDEXES"/"Gravity_Case_Reaction_Index.json").exists())
+
+    def test_background_solver_cannot_take_late_changed_source_workbook(self):
+        from components.gravity import gui_and_reports
+        import inspect
+        code=inspect.getsource(gui_and_reports.GravityAnalysisGUI._worker)
+        self.assertIn("source_etabs_table",code)
+        self.assertNotIn("self.etabs_full_table_var.get()",code)
+        finished=inspect.getsource(gui_and_reports.GravityAnalysisGUI._finished)
+        self.assertIn("workspace_for_solver_case_run(out)",finished)
+
     def test_gui_export_resolves_selected_nested_case_without_parent_result(self):
         from types import SimpleNamespace
         from components.gravity.gui_and_reports import GravityAnalysisGUI
