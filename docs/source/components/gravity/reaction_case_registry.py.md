@@ -56,3 +56,31 @@ Changes authored by ChatGPT GPT-6; do not infer provenance for historical commit
 ## 2026-11-15 saved result byte identity
 
 `register_case()` validates the JSON it read and records `result_sha256` from those **same verified bytes**, checking the file again before writing the registry. `current_case()` requires that immutable result fingerprint and independently rechecks the stored source file when it loads each candidate. A redistribution between two support nodes that leaves the total support FZ and applied load unchanged now **invalidates** the previously registered case. Legacy entries without a result hash are not silently accepted and must be re-registered using the existing verified solver result; the original result is never mutated. This protects local evidence identity, not 32/76/97 support physics or ETABS equivalence. Tests: `tests/verify_gravity_case_reaction_registry.py`, including a compensating-reaction modification and a missing-SHA legacy record.
+
+
+## 2026-11-22 — exact unavailable-case explanations
+
+`current_case_diagnostic()` is a read-only, strictly source-hashed lookup
+for the 32/76/97 saved-case index. It reports:
+
+- `SOLVED_VERIFIED_INDEX`: exact model path, model/input SHA256, result
+  SHA256, support count/tags, gravity profile and summed reaction agree.
+- `NO_CASE_INDEX` / `CASE_NOT_INDEXED`: the selected workspace or case
+  lacks a registered result. Only these states indicate no discoverable run
+  through the selected index.
+- `MODEL_SHA_CHANGED`, `MODEL_INPUTS_CHANGED`,
+  `DIFFERENT_MODEL_PATH`: historical case exists but does **not** belong to
+  the currently selected model inputs. This is **not** "never analyzed".
+- `RESULT_FILE_MISSING`, `LEGACY_DIGEST_NOT_INDEXED`,
+  `SAVED_RESULT_HASH_CHANGED`, `SAVED_CASE_VALIDATION_BLOCKED`: a
+  prior case entry is unusable; no result is invented or shown as verified.
+
+The Gravity GUI's support selector, saved-case loader and three-case
+comparison now communicate these reasons. A run's ETABS source workbook
+and its index destination are pinned at launch instead of being read from
+GUI variables after the user switches model or output folders. Both
+single-case and 76/97 batch indexes use the actual immutable run owner.
+
+This fixes misleading/mislocated case discovery, **not** the physical
+ETABS/OpenSees reaction-distribution difference. Any `SOLVED` result is
+still explicitly not approved for native ETABS pointwise equivalence.
