@@ -39,6 +39,7 @@ def _file_rows(root, exclude):
             continue
         relative=file.relative_to(root)
         if len(relative.parts)>10:continue
+        if any(part.casefold() in {'07_export_zip','zip_exports','review_zips'} for part in relative.parts):continue
         if any(part.startswith(("ESM_Validation_Evidence_",
                                 "Seismic_Review_","Gravity_Evidence_Upload"))
                for part in relative.parts):continue
