@@ -51,6 +51,7 @@ CANONICAL = {
     35: "35_SOIL_C_NLTHA_PREFLIGHT.py",
     36: "36_SOIL_C_NLTHA_RUN_MATRIX.py",
     37: "37_THESIS_EVIDENCE_DASHBOARD.py",
+    38: "38_EXECUTE_SOIL_C_NLTHA.py",
 }
 STAGE = [
     ("00", "Target and source provenance", "Target workbook, soil C, Z/I, SeismoMatch SHA"),
