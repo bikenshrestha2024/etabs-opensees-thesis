@@ -488,6 +488,81 @@ def launch(parent,folder,results_root=None):
   status.set('Reading the matching already-open EDB; files remain read-only…')
   threading.Thread(target=worker,daemon=True).start()
  ttk.Button(bar,text='Direct ETABS API / EDB…',command=direct_api).pack(side='left')
+ def observe_native(auto=False):
+  """Show read-only native ETABS values even before mapping is approved.
+
+  Raw signed BaseReact quantities are NOT silently relabelled CQC scaled
+  data; reviewed case/point mapping is still required to populate
+  etabs_value / percent_difference for physical comparison.
+  """
+  import threading
+  from components.inputs.project_workbooks import _source_edb_path
+  known=_source_edb_path(folder)
+  if auto and (not known or not Path(known).is_file()):
+   return
+  chosen=(str(Path(known).resolve()) if known and Path(known).is_file() else
+          ('' if auto else filedialog.askopenfilename(
+            parent=win,title='Choose current exact ETABS source .EDB',
+            filetypes=[('ETABS EDB','*.edb')])))
+  if not chosen:return
+  def worker():
+   try:
+    import comtypes
+    comtypes.CoInitialize()
+    try:
+     from OpenSees_Project_Inputs_V123 import connect_etabs
+     from components.validation.etabs_direct_api import discover_native_base_reactions
+     evidence=discover_native_base_reactions(
+         connect_etabs().SapModel,chosen)
+     from datetime import datetime,timezone
+     snapshot=(comparison_root/'ETABS_Comparison_V148'/'Native_Observed'/
+               datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S_%fZ'))
+     snapshot.mkdir(parents=True,exist_ok=False)
+     metadata=snapshot/'ETABS_Native_Observed.json'
+     metadata.write_text(json.dumps(evidence,indent=2),encoding='utf-8')
+     columns=('etabs_case','case_kind','step_type','step_number','Fx_kN','Fy_kN','Fz_kN','Mx_kNm','My_kNm','Mz_kNm')
+     write_rows=snapshot/'ETABS_Native_Observed.csv'
+     with write_rows.open('w',newline='',encoding='utf-8-sig') as output:
+      writer=csv.DictWriter(output,fieldnames=columns,extrasaction='ignore')
+      writer.writeheader();writer.writerows(evidence['rows'])
+    finally:
+     comtypes.CoUninitialize()
+    def done():
+     latest['native_observations']=evidence
+     status.set('LIVE ETABS SOURCE OBSERVED: '+str(len(evidence['rows']))+
+                ' raw reaction rows from exact EDB; '+str(len(evidence['excluded']))+
+                ' case read exceptions. NOT case/basis matched. '+str(snapshot))
+     panel=tk.Toplevel(win);panel.title('Actual native ETABS BaseReact — RAW observations, not mapped comparison')
+     panel.geometry('1060x530')
+     ttk.Label(panel,text='Read-only native EDB / SHA256: '+str(evidence['source_edb_sha256'])+
+               ' | Unpaired signed ETABS reactions. To fill verified etabs_value, use reviewed Direct ETABS API case/story map.',
+               wraplength=1000).pack(fill='x',padx=8,pady=7)
+     frame=ttk.Frame(panel);frame.pack(fill='both',expand=True,padx=6,pady=5)
+     table=ttk.Treeview(frame,columns=columns,show='headings')
+     vertical=ttk.Scrollbar(frame,orient='vertical',command=table.yview)
+     horizontal=ttk.Scrollbar(frame,orient='horizontal',command=table.xview)
+     table.configure(yscrollcommand=vertical.set,xscrollcommand=horizontal.set)
+     frame.rowconfigure(0,weight=1);frame.columnconfigure(0,weight=1)
+     table.grid(row=0,column=0,sticky='nsew');vertical.grid(row=0,column=1,sticky='ns');horizontal.grid(row=1,column=0,sticky='ew')
+     for col in columns:table.heading(col,text=col);table.column(col,width=125,stretch=False)
+     for row in evidence['rows']:
+      table.insert('','end',values=[row.get(col,'') for col in columns])
+     ttk.Label(panel,text='Source snapshot: '+str(write_rows),wraplength=1040).pack(anchor='w',padx=8,pady=4)
+     ttk.Button(panel,text='Close',command=panel.destroy).pack(anchor='e',padx=8,pady=4)
+    win.after(0,done)
+   except Exception as exc:
+    if not auto:
+     win.after(0,lambda error=str(exc):
+       messagebox.showerror('Native ETABS observation unavailable',error,parent=win))
+    else:
+     win.after(0,lambda error=str(exc):
+       status.set('AUTO LIVE ETABS READ UNAVAILABLE: '+error+
+                  ' | Use Read native ETABS values when source EDB and ETABS are ready.'))
+  status.set('Reading native analyzed base reactions from the exact already-open ETABS EDB; not modifying EDB…')
+  threading.Thread(target=worker,daemon=True).start()
+
+ ttk.Button(bar,text='Read native ETABS values (live, read-only)',command=observe_native).pack(side='left',padx=3)
+
  ttk.Label(win,text=GUIDE,wraplength=1150).pack(fill='x');ttk.Label(win,textvariable=status).pack(fill='x')
  frame=ttk.Frame(win);frame.pack(fill='both',expand=True);cols=FIELDS+['value','etabs_value','percent_difference','status'];tree=ttk.Treeview(frame,columns=cols,show='headings');sy=ttk.Scrollbar(frame,command=tree.yview);sx=ttk.Scrollbar(frame,orient='horizontal',command=tree.xview);tree.configure(yscrollcommand=sy.set,xscrollcommand=sx.set);tree.grid(row=0,column=0,sticky='nsew');sy.grid(row=0,column=1,sticky='ns');sx.grid(row=1,column=0,sticky='ew');frame.rowconfigure(0,weight=1);frame.columnconfigure(0,weight=1)
  for c in cols:tree.heading(c,text=c);tree.column(c,width=150,stretch=False)
