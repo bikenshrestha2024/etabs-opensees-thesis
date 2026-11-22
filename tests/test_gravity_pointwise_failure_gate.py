@@ -55,6 +55,7 @@ class DirectGravityPointwiseGateTests(unittest.TestCase):
                 "gui_and_reports.py").read_text(encoding="utf-8-sig")
         self.assertIn("self.win.after(0,self._refresh_case_reaction)",source)
         self.assertIn("GRAVITY_POINTWISE_REACTION_MISMATCH",source)
+        self.assertIn("GRAVITY POINTWISE MISMATCH",source)
 
 
 if __name__=="__main__":
