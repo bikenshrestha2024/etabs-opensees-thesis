@@ -119,3 +119,17 @@ Current default `dt_s=0.005 s` is only a preliminary selection and is rejected i
 ## 6. Current execution constraint and explicit next local action
 
 As of this change, the conversation's uploaded MESH source ZIPs contain the model data and Python entry points, **but none of the original 16 matched horizontal waveform files**. The current isolated execution environment also has **no installed `openseespy` native solver** and no running ETABS. Thus this session can inspect/verify section assignments, implement source/solver handoffs and test the runnable orchestration in CI; it **cannot truthfully deliver your physical Kobe X/Y, 25-storey NLTHA curves or a resolved first-step wall failure**. The full local run is directly invoked by the command above when the real waveform and native solver are present; blocked cases are recorded as `NATIVE_NLTHA_INCOMPLETE`, not fabricated success.
+
+## Native run completion conditions — evidence gate update (2026-11-22)
+
+For the first full M0/Kobe/ULS case, use a new output directory containing no previous trial/failure. Launch `tools/run_existing_nltha.py` with the **actual** complete six-file OpenSees export and two matched PEER/SeismoMatch horizontal components. A path or model filename alone is never a source-material calibration, SeismoMatch log, site classification or ground-motion acceptance.
+
+On actual completion, inspect `DIRECT_EXISTING_NLTHA_STATUS.json` and `independently_checked_case_histories`. A completed numerical screen requires both XY/YX cases and for **each** the on-disk:
+- `Case_Summary.json`, `Accepted_History_Completion_Gate.json`, `Building_Nonlinear_history.csv`;
+- full duration, finite response values, strictly increasing accepted time from 0 through exact record end, counts matching gate;
+- original source model fingerprint and identical registered component pair/limit state/model identity;
+- complete native execution without any failed/written-over previous case.
+
+A missing/corrupted/short response **fails closed** despite a positive runner return. The full-diagnostic output status is not a thesis engineering PASS. The 0.005-s Kobe X-wall obstacle, one-to-one 32-support gravity reaction mismatch, actual M45/steel detailing, core boundary/web FSAM, hysteresis, FVD, SeismoMatch provenance and NBC 105:2025 §9.3.3 remain mandatory distinct validations. The previous connectivity staging omission was corrected in current `building_exploratory` on `main`; this change does not duplicate staging or rebuild the user model.
+
+**Scientific basis for acceptance separation:** NBC 105:2025 §§9.3.1–9.3.3; NIST GCR 17-917-46v1 (2017) `https://nvlpubs.nist.gov/nistpubs/gcr/2017/NIST.GCR.17-917-46v1.pdf`; Kolozvari, López and Massone (2023), DOI `10.1016/j.engstruct.2023.116700` for 3D shear-flexure nonlinear wall idealization; OpenSees `E_SFI_MVLEM_3D` official documentation for element node/recorder conventions.
