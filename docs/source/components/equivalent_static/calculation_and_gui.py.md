@@ -83,3 +83,12 @@ Successful direct solver batches and linked workbook completion both request the
 ## 2026-11-21 clause 5 routing
 
 The empirical `0.075H^.75/sqrt(Aw)` and the 1.25 amplification are evaluated by `empirical_period_s` / `amplified_period_s` in the [clause 5 module](../nbc105/clause_05_dynamic_characteristics.py.md) at four sites (`resolve_esm_state_periods`, `_show_empirical`, `_adopted_axis_period`, `_update_periods`). The amplification factor is fixed at 1.25 by NBC 105:2025 §5.1.3: any other `period_factor` is rejected, and `_show_empirical` shows the DEVIATION message and leaves the adopted period unset. The earlier "free factor" wording above is superseded.
+
+
+## 2026-11-22 — selected CSV geometry and direct Clause 5 routing
+
+`recommended_story_weight_input` used to auto-select an assembled story-weight CSV if the source diaphragm tags were equal, even if its elevations were stale or the model had no stored master XYZ/base. This is an unsafe auto-selection mechanism, now addressed by invoking `components.modal.rayleigh_ledger_audit.verify_storey_elevations`. Tags, all levels, model base and matching floor heights are required for automatic selection; the original source file is not edited and the user can still intentionally supply verified manual data. The confirmation text now says **diaphragm tags AND elevations**, while ETABS mass/weight/components remain independent review gates.
+
+`resolve_esm_state_periods`, `_adopted_axis_period` and `_update_periods` now use `components.nbc105.clause_05_dynamic_characteristics.adopted_period_s` for the §5.1 lesser-of period when a directional Rayleigh value exists. ULS/SLS and X/Y isolation are retained. The permitted advanced workbook research reference remains explicitly non-Rayleigh. No source Vs30, structural irregularity or native ETABS acceptance was claimed.
+
+**Output coverage caveat:** The supplied 2026-11-22 terminal log reports 8 ESM runner scripts (X/Y, ± earthquake polarity, `E+` and `E0` accidental eccentricity). `E−` is absent in that execution. The GUI defaults to Both ±; a user-selected eccentricity subset can legitimately create 8 scripts, but cannot be described as a complete ±5% set until 12 scripts are generated and executed on source-matched models. Script creation is not solver completion.
