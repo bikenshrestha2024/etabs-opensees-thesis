@@ -648,7 +648,51 @@ def launch(parent,export_dir):
             output.delete("1.0","end")
             output.insert("1.0",text)
             output.configure(state="disabled")
+        def show_source_coverage():
+            """Read-only subsection index, clearly separate from engineering approval."""
+            from components.nbc105.compliance_coverage import (
+                read_source_index, audit_source_index)
+            records=read_source_index()
+            audit=audit_source_index(records)
+            viewer=tk.Toplevel(dialog)
+            viewer.title("NBC 105:2025 | source coverage and pending engineering evidence")
+            viewer.geometry("1120x640")
+            shell=ttk.Frame(viewer,padding=10)
+            shell.pack(fill="both",expand=True)
+            info=("Indexed source headings: "+str(audit["total_indexed_sections"])+
+                  " | 10 clauses + Annex A/B/C | Certification: "+
+                  audit["approval"]+
+                  " | Source index does not enumerate every normative sentence")
+            ttk.Label(shell,text=info,wraplength=1050).pack(anchor="w",pady=(0,8))
+            container=ttk.Frame(shell)
+            container.pack(fill="both",expand=True)
+            cols=("Section","Group","Page","Source review","Approval","Heading")
+            tree=ttk.Treeview(container,columns=cols,show="headings")
+            widths=(115,75,65,285,185,420)
+            for name,width in zip(cols,widths):
+                tree.heading(name,text=name)
+                tree.column(name,width=width,minwidth=55,stretch=name=="Heading")
+            for entry in records:
+                tree.insert("","end",values=(
+                    entry["id"],entry["group"],entry["printed_page"],
+                    entry["source_review"],entry["approval"],entry["title"]))
+            vertical=ttk.Scrollbar(container,orient="vertical",command=tree.yview)
+            horizontal=ttk.Scrollbar(container,orient="horizontal",command=tree.xview)
+            tree.configure(yscrollcommand=vertical.set,xscrollcommand=horizontal.set)
+            tree.grid(row=0,column=0,sticky="nsew")
+            vertical.grid(row=0,column=1,sticky="ns")
+            horizontal.grid(row=1,column=0,sticky="ew")
+            container.columnconfigure(0,weight=1)
+            container.rowconfigure(0,weight=1)
+            ttk.Label(shell,text=(
+                "This is a heading-level traceability inventory, not full code compliance. "
+                "All normative text, equations, tables, annexes, native ETABS/OpenSees "
+                "results and signed structural review require independent acceptance."),
+                wraplength=1050).pack(anchor="w",pady=(8,4))
+            ttk.Button(shell,text="Close",command=viewer.destroy).pack(anchor="e")
+
         ttk.Button(controls,text="Calculate reference rule",command=evaluate).pack(side="left")
+        ttk.Button(controls,text="Source coverage (open gates)",command=show_source_coverage).pack(side="left",padx=10)
         ttk.Button(controls,text="Close",command=dialog.destroy).pack(side="right")
         clause_box.bind("<<ComboboxSelected>>",refresh_operations)
         op_box.bind("<<ComboboxSelected>>",load_operation_template)
