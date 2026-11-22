@@ -2,8 +2,7 @@
 
 This module orchestrates the existing building_exploratory solver. It never
 creates a new structural model, relaxes project readiness gates, or declares
-engineering acceptance. Literature/standard basis: docs/00_RESEARCH_REFERENCES.md
-R01/R02/R10 and docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md.
+engineering acceptance. Governing-code implementation guidance: docs/00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md. Scientific wall and material citations stay with the existing solver owners.
 """
 from __future__ import annotations
 
@@ -48,6 +47,7 @@ def _resolve(path, base):
 def preflight_case(config_file, *, allow_research_diagnostic=False):
     """Fail closed on mismatched sources, duplicate output or implicit approval.
 
+    [REF NBC105-2025 §9.3.2; components/nonlinear_time_history/soil_c_nltha_suite.py verify_runner_pair]
     Config values are normalized to absolute local file paths for the child
     process. No source CSV/EDB/ground-motion data leaves this machine.
     """
@@ -144,6 +144,7 @@ def _orientation_screens(output):
 def execute_case(config_file, *, allow_research_diagnostic=False, launcher=None):
     """Run one config (both XY/YX domains) and persist truthful local evidence.
 
+    [REF NBC105-2025 §9.3.1-9.3.3; components/nonlinear_time_history/full_record_gate.py]
     Exact solver input/state/calibration, wall failure, component tests and
     ETABS parity remain independent gates. A zero child exit code is not enough.
     """
@@ -191,6 +192,7 @@ def execute_case(config_file, *, allow_research_diagnostic=False, launcher=None)
 
 
 def main(argv=None):
+    """Command-line contract. [REF docs/programs/38_DIRECT_SOIL_C_NLTHA_EXECUTION.md]"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, help="Existing Stage 36 case JSON")
     parser.add_argument("--run", action="store_true",
