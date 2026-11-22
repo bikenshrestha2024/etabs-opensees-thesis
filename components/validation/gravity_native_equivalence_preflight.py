@@ -276,7 +276,8 @@ def export(source_folder, output_folder, *, primary_audit=None):
     # Include just the small forensic evidence, not private source datasets.
     # The new run directory makes this ZIP non-overwriting by construction.
     from zipfile import ZipFile, ZIP_DEFLATED
-    with ZipFile(target / "GRAVITY_NATIVE_EQUIVALENCE_UPLOAD.zip",
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    with ZipFile(ensure_review_zip_directory(target) / "GRAVITY_NATIVE_EQUIVALENCE_UPLOAD.zip",
                  "x",compression=ZIP_DEFLATED) as archive:
         for name in ("GRAVITY_NATIVE_EQUIVALENCE_PREFLIGHT.json",
                      "SOURCE_SUPPORT_DOF_VS_PRIMARY32.csv",

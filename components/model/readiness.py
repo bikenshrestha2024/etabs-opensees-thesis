@@ -324,6 +324,9 @@ def approval_binding_problems(model_script: Union[str, Path], config: Optional[D
         problems.append("nonlinear_materials_file does not exist: " + str(b["nonlinear_materials_file_resolved"]))
     if b["nonlinear_wall_fsam_tags_sha256"] is None:
         problems.append("nonlinear_wall_fsam_tags is empty (FSAM tag mapping required for approval)")
+    _config_file,opt = _model_options(model, config or {})
+    if opt("nonlinear_parameters_reviewed") is not True:
+        problems.append("nonlinear_parameters_reviewed is not True (source-specific calibration review required for approval)")
     return problems
 
 

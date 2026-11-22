@@ -180,7 +180,7 @@ def package_mesh_case(folder, subdivisions):
     A ZIP is a diagnostic export, not evidence of a completed gravity solve.
 
     [REF docs/source/components/gravity/mesh_cases.py.md]
-    Store it at 02_MODEL/SLAB_LOAD_PATH/UPLOAD_PACKAGES/MESH_nn.zip.
+    Store it at 02_MODEL/07_EXPORT_ZIP/MESH_nn.zip.
     Existing case data are read-only; symlinks and recursive uploads refused.
     """
     import zipfile
@@ -189,7 +189,8 @@ def package_mesh_case(folder, subdivisions):
     case=_refuse_linked_chain(case_base(root,n))
     if not case.is_dir():
         raise FileNotFoundError(f"MESH_{n:02d} case has no outputs to package")
-    output=root/"02_MODEL"/"SLAB_LOAD_PATH"/"UPLOAD_PACKAGES"/f"MESH_{n:02d}.zip"
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    output=ensure_review_zip_directory(root/"02_MODEL")/f"MESH_{n:02d}.zip"
     _refuse_linked_chain(output)
     # Do not label an in-progress write as a complete debugging snapshot.
     for status_path in case.glob("RUNS/RUN_*/MESH_BUILD_STATUS.json"):

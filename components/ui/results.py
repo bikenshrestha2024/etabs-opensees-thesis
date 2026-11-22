@@ -105,7 +105,7 @@ def saved_modal_result(folder, state):
     for root in result_roots(folder,stages=("MODAL",)):
         for p in root.rglob("NBC105_Modal_V111.json"):
             if any(x.casefold() in {"review_snapshots","organized_results",
-                    "zip_exports","seismic_review_packages"} for x in p.parts):
+                    "zip_exports","07_export_zip","review_zips","seismic_review_packages"} for x in p.parts):
                 continue
             inferred=next((x[-3:].upper() for x in p.parts if x.upper() in
                            ("MODAL_ULS","MODAL_SLS")),None)
@@ -119,7 +119,7 @@ def saved_modal_result(folder, state):
             candidates.append(p)
         for p in root.rglob(f"NBC105_Modal_{state}_V127.json"):
             if any(x.casefold() in {"review_snapshots","organized_results",
-                    "zip_exports","seismic_review_packages"} for x in p.parts):
+                    "zip_exports","07_export_zip","review_zips","seismic_review_packages"} for x in p.parts):
                 continue
             try:
                 d=json.loads(p.read_text(encoding="utf-8-sig"))

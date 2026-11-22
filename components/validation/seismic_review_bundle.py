@@ -39,6 +39,7 @@ def _file_rows(root, exclude):
             continue
         relative=file.relative_to(root)
         if len(relative.parts)>10:continue
+        if any(part.casefold() in {'07_export_zip','zip_exports','review_zips'} for part in relative.parts):continue
         if any(part.startswith(("ESM_Validation_Evidence_",
                                 "Seismic_Review_","Gravity_Evidence_Upload"))
                for part in relative.parts):continue
@@ -243,15 +244,21 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
     manifest["stored_unique_bytes"]=sum(x["bytes"] for x in manifest["collected"])
     (package/"REVIEW_MANIFEST.json").write_text(
         json.dumps(manifest,indent=2,ensure_ascii=False),encoding="utf-8")
-    zip_path=review_root/(package.name+"_UPLOAD.zip")
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    zip_root=ensure_review_zip_directory(output)
+    zip_path=zip_root/(package.name+"_UPLOAD.zip")
     with zipfile.ZipFile(zip_path,"w",compression=zipfile.ZIP_DEFLATED,
                          compresslevel=9,allowZip64=True) as archive:
         for f in sorted(package.rglob("*")):
             if f.is_file():archive.write(f,arcname=f.relative_to(package).as_posix())
+    # Keep the longstanding review-root locator for existing GUI/readers.
+    # Its ZIP path points to the canonical 07_EXPORT_ZIP; never duplicate ZIP bytes.
     (review_root/("LATEST_"+method+"_REVIEW.txt")).write_text(
         "UPLOAD ZIP: "+str(zip_path)+"\nREVIEW FOLDER: "+str(package)+
         "\nMANIFEST: "+str(package/"REVIEW_MANIFEST.json")+"\n",
         encoding="utf-8")
+    (zip_root/("LATEST_"+method+"_REVIEW.txt")).write_text(
+        str(zip_path)+"\n",encoding="utf-8")
     return {"zip":str(zip_path),"folder":str(package),"manifest":manifest}
 
 

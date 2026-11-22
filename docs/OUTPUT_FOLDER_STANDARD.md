@@ -47,3 +47,7 @@ Only the four modules below were identified as writing ad hoc folders (they call
 Two further LTHA runner behaviours the audit cannot detect (verified in `components/linear_time_history/runner_and_gui.py`): outside contract mode it writes an ad hoc `LTH_<limit state>_<scope>_<stamp>` folder under the chosen output directory; in contract mode it writes its `.xlsx` and `.png` files into `02_RESULTS`, and only for a run whose completion gate passes does it copy `.xlsx`, `.png` and `.pdf` files of 25 MB or less into `03_EXCEL` / `04_FIGURES`.
 
 Old outputs stay where they are; the audit tool reports them as non-conforming rather than moving them.
+
+## Canonical `07_EXPORT_ZIP` owner (2026-11-22)
+
+All **new** local review ZIPs must live in the selected source-case's `07_EXPORT_ZIP`, including gravity, mesh diagnostics, ESM, MRSM, LTHA, NLTHA and independent native checks. Non-ZIP source/solver reports remain in their original slots; old ZIPs remain at their original paths. A solved modal case may have an empty `07_EXPORT_ZIP` when export was not requested. Read the [cross-module migration and security contract](architecture/20261122_CANONICAL_REVIEW_ZIP_ROUTING.md).

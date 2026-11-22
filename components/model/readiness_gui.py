@@ -3,6 +3,25 @@ from pathlib import Path
 import json,hashlib
 
 
+def _is_reviewed_evidence_reference(value):
+    """Only reviewer-supplied source references qualify, never UI placeholders.
+
+    Presence of a discovered local result is not a reviewed source approval.
+    This syntactic guard cannot independently authenticate a human review,
+    experiment or nonlinear source material calibration.
+    """
+    if not isinstance(value,str) or not value.strip():
+        return False
+    normalized=value.strip().casefold()
+    return not normalized.startswith((
+        "available for review:",
+        "input / review required:",
+        "review required:",
+        "missing:",
+        "not configured",
+    ))
+
+
 def prepare(model_script,template=None):
     """Create or reuse the model-bound UNAPPROVED draft (shared non-GUI implementation)."""
     from components.model.readiness import bind_readiness_draft
@@ -126,8 +145,8 @@ def launch(parent,model_script,readiness_variable):
     ttk.Button(footer,text='Rebind changed model as UNAPPROVED draft',command=rebind_draft).pack(anchor='w')
     def save():
         try:
-            missing=[k for k,v in checks.items() if v.get() and (not evidence[k].get().strip() or evidence[k].get().startswith('INPUT / REVIEW REQUIRED:'))]
-            if missing:raise ValueError('Checked items need an evidence reference: '+', '.join(missing))
+            missing=[k for k,v in checks.items() if v.get() and not _is_reviewed_evidence_reference(evidence[k].get())]
+            if missing:raise ValueError('Checked items require independently reviewed references, not auto-discovered AVAILABLE FOR REVIEW/INPUT placeholders: '+', '.join(missing))
             if approved.get() and not all(v.get() for v in checks.values()):raise ValueError('Approval requires every prerequisite checked and evidenced')
             if approved.get():
                 from components.model.readiness import approval_binding_problems

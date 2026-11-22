@@ -90,7 +90,8 @@ def main(output_dir=None):
                 "sha256":_sha(file)})
         (out/"UPLOAD_MANIFEST.json").write_text(
             json.dumps(manifest,indent=2),encoding="utf-8")
-        zip_path=out.parent/(out.name+"_UPLOAD.zip")
+        from components.inputs.review_zip_paths import ensure_review_zip_directory
+        zip_path=ensure_review_zip_directory(out)/(out.name+"_UPLOAD.zip")
         with zipfile.ZipFile(zip_path,"w",
                              compression=zipfile.ZIP_DEFLATED,
                              compresslevel=6) as archive:

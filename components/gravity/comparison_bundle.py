@@ -196,12 +196,14 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             raise ValueError("ETABS JSON must be an object")
     # Build in staging area; existing bundle is never overwritten by failed exports.
     output_dir.mkdir(parents=True,exist_ok=True)
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    zip_dir=ensure_review_zip_directory(output_dir)
     # Keep previous evidence immutable; choose one unused revision for BOTH
     # extracted folder and upload ZIP. Do not overwrite or reuse old data.
     base_name="Gravity_ETABS_OpenSees_Evidence"
     bundle_name=base_name
     rev=1
-    while (output_dir/bundle_name).exists() or (output_dir/(bundle_name+".zip")).exists():
+    while (output_dir/bundle_name).exists() or (zip_dir/(bundle_name+".zip")).exists():
         rev+=1
         bundle_name=base_name+f"_V{rev:02d}"
     dest=output_dir/bundle_name
@@ -626,7 +628,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         (stage/"EVIDENCE_MANIFEST.json").write_text(json.dumps(audit,indent=2,allow_nan=False),encoding="utf-8")
         with (stage/"EVIDENCE_FILE_PATHS.txt").open("w",encoding="utf8") as stream:
             stream.write("GRAVITY EVIDENCE INPUTS AND PACKAGE FILES\\n")
-            stream.write("UPLOAD ZIP: "+str(output_dir/(bundle_name+".zip"))+"\\n")
+            stream.write("UPLOAD ZIP: "+str(zip_dir/(bundle_name+".zip"))+"\\n")
             stream.write("EXTRACTED REVIEW FOLDER: "+str(dest)+"\\n")
             stream.write("SOURCE EXPORT: "+str(export_dir)+"\\n")
             stream.write("GRAVITY ROOT: "+str(gravity_dir)+"\\n")
@@ -660,7 +662,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             "Include native ETABS gravity JSON with the same load case.\n"
             "Inspect EVIDENCE_MANIFEST.json for MISSING and SKIPPED files.\n"
             "No missing physical responses are inferred.\n",encoding="utf8")
-        zip_path=output_dir/(bundle_name+".zip")
+        zip_path=zip_dir/(bundle_name+".zip")
         with zipfile.ZipFile(zip_path,"w",compression=zipfile.ZIP_DEFLATED) as z:
             for file in stage.rglob("*"):
                 if file.is_file(): z.write(file,file.relative_to(stage.parent).as_posix())
