@@ -218,7 +218,8 @@ def define_building_materials(ops,data,folder,material_overrides=None):
     material_overrides=validate_material_overrides(material_overrides or {})
     basis=os.environ.get('OPENSEES_RESEARCH_MATERIAL_BASIS','PUBLISHED_REFERENCE')
     # [REF components/nonlinear_time_history/material_source_sets.py; R01 PEER 2015/12]
-    from components.nonlinear_time_history.material_source_sets import BASES,SINGLE_SOURCE_BASIS,peer_single_source
+    from components.nonlinear_time_history.material_source_sets import (
+        BASES,SINGLE_SOURCE_BASIS,peer_single_source,peer_fsam_panel_values)
     if basis not in BASES:
         raise ValueError('Unknown research material basis')
     single=peer_single_source() if basis==SINGLE_SOURCE_BASIS else None
@@ -308,6 +309,14 @@ def define_building_materials(ops,data,folder,material_overrides=None):
         # Available layout in the historical project library: two curtains,
         # 20-mm bars at 200-mm spacing. It remains confirmation-pending.
         ratios=sections.wall_reinforcement_ratios(p['thickness']*1000.)
+        if single:
+            # PEER 2015/12 B.3 FSAM 6: published WEB rhoX=rhoY=.0074.
+            # The source specimen's boundary FSAM 7 is NOT applied to
+            # arbitrary building wall properties without a boundary map.
+            web=peer_fsam_panel_values()['web']
+            ratios['fsam_rouX_horizontal']=web['rho_x']
+            ratios['fsam_rouY_vertical']=web['rho_y']
+            ratios['source']='PEER_2015_12_APPENDIX_B3_WEB_SPECIMEN_TRANSFER'
         if 'wall.rho_x' in material_overrides:
             ratios['fsam_rouX_horizontal']=material_overrides['wall.rho_x']
         if 'wall.rho_y' in material_overrides:
@@ -317,7 +326,9 @@ def define_building_materials(ops,data,folder,material_overrides=None):
                        ratios['fsam_rouX_horizontal'],ratios['fsam_rouY_vertical'],
                        wall['fsam']['nu'],wall['fsam']['alpha'])
         rows.append(dict(property=key,fsam_tag=tag,thickness_m=p['thickness'],
-                         reinforcement=ratios,confinement='UNCONFINED WEB THROUGHOUT'))
+                         reinforcement=ratios,confinement='UNCONFINED WEB THROUGHOUT',
+                         source_region=('PEER_B3_WEB_NOT_BOUNDARY' if single else 'UNVERIFIED_LAYOUT'),
+                         research_transfer_only=bool(single)))
     brace=brace_steel_parameters(material_overrides)
     report=dict(basis=basis,scope='LITERATURE_INFORMED_RESEARCH_NOT_PROJECT_CALIBRATION',
         wall_constitutive_source=wall['source'],wall_source_locator=wall['citation'],
