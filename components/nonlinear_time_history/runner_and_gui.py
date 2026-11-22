@@ -559,14 +559,21 @@ def _run_analysis(config):
                     # writing a misleading completed NLTHA history.
                     from components.nonlinear_time_history.full_record_gate import (
                         verify_numeric_accepted_row)
-                    verify_numeric_accepted_row(row, row_index=len(lines))
-                    lines.append(row)
-                    stream.append(row)
+                    # Snapshot the watched wall BEFORE appending a purported
+                    # accepted history row; rc=0 can still conceal nonfinite
+                    # E-SFI wall/connected-node channels. This preserves
+                    # onset evidence even when the normal story recorder fails.
                     if first_step_diagnostic and not any(
                             path.name=="FIRST_ACCEPTED_STEP.json"
                             for path in first_step_files):
-                        write_focus("FIRST_ACCEPTED_STEP")
+                        from components.nonlinear_time_history.first_step_transition import (
+                            require_accepted_focused_step)
+                        focused=write_focus("FIRST_ACCEPTED_STEP")
                         summarize_focus()
+                        require_accepted_focused_step(focused)
+                    verify_numeric_accepted_row(row, row_index=len(lines))
+                    lines.append(row)
+                    stream.append(row)
                     profiler.internal_steps+=1
                     profiler.sample_seconds+=time.perf_counter()-sample_clock
                 profiler.solve_clock=time.perf_counter()
