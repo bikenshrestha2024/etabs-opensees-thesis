@@ -1274,6 +1274,9 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
     # exported support baseline, even when custom environment is present.
     if requested_strategy!='ETABS_SOURCE_SUPPORTS' and not os.environ.get('OPENSEES_GRAVITY_GUI_MODE'):
         raise ValueError('Wall-base support sensitivity mode is allowed only in the gravity GUI')
+    # Preserve the source's horizontal restraint classification to avoid
+    # inventing base seismic mass when the 44 shell mesh restraints are freed.
+    source_supports_for_mass={str(tag):list(flags) for tag,flags in data['supports'].items()}
     etabs_reaction_support_audit=None
     support_case_evidence=None
     # Shared physical boundary-condition choice for ESM, Rayleigh, modal,
@@ -1529,7 +1532,56 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             "scope":"Elastic ULS ETABS-model comparison only; no nonlinear constitutive application",
         })
         print("[LINEAR_SHELL_STIFFNESS_AUDIT]",str(shell_audit_file),flush=True)
-    for n,m in data['nodal_mass'].items(): ops.mass(int(n),m,m,m,0.,0.,0.)
+    # The §5.2 storey-weight CSV is not by itself the OpenSees mass operator.
+    # Explicitly record actual distributed vs condensed solver mass basis.
+    from components.model.story_mass_operator import story_lumped_mass_plan
+    mass_policy=os.environ.get('OPENSEES_SEISMIC_MASS_POLICY','SOURCE_DISTRIBUTED').strip().upper()
+    if mass_policy not in ('SOURCE_DISTRIBUTED','STORY_LUMPED_NBC'):
+        raise ValueError('Unknown OpenSees seismic mass operator policy: '+mass_policy)
+    source_mass_model=dict(data)
+    source_mass_model['supports']=source_supports_for_mass
+    floor_mass_plan=story_lumped_mass_plan(source_mass_model)
+    # Reconcile floor Wi against the source ledger, never against a stale,
+    # manually selected old workbook. A mismatch blocks condensed mode.
+    if mass_policy=='STORY_LUMPED_NBC':
+        import csv
+        ledger=folder/'NBC105_ESM_Story_Weights_Assembled_V118.csv'
+        if not ledger.is_file():
+            raise ValueError('Source-matched assembled seismic story-weight CSV required for story-lumped mass')
+        with ledger.open(encoding='utf-8-sig',newline='') as stream:
+            mass_rows=list(csv.DictReader(stream))
+        by_story={int(row['story_number']):row for row in mass_rows}
+        records=floor_mass_plan['horizontal_mass_by_master']
+        if len(by_story)!=len(records):
+            raise ValueError('NBC §5.2 source floor-mass row count differs from assembled model')
+        for master,record in records.items():
+            source_row=by_story.get(record['storey_number'])
+            if source_row is None or int(source_row['master_node_tag'])!=master:
+                raise ValueError('NBC §5.2 source floor-mass master identity differs')
+            seismic_weight=(float(source_row['dead_load_kN'])+
+                            .6*float(source_row['storage_live_load_kN'])+
+                            .3*float(source_row['other_live_load_kN']))
+            if not math.isclose(seismic_weight,record['mass']*GRAVITY_M_S2,
+                                rel_tol=0,abs_tol=.01):
+                raise ValueError('NBC §5.2 story Wi != actual selected model mass; regenerate source ledger')
+    for n,m in data['nodal_mass'].items():
+        # Source 44 originally restrained wall-mesh nodes do not acquire
+        # artificial horizontal mass when released by the intended 32 profile.
+        orig_flags=source_supports_for_mass.get(str(n),[0]*6)
+        source_xy_fixed=bool(orig_flags[0]) and bool(orig_flags[1])
+        horizontal=0. if source_xy_fixed or mass_policy=='STORY_LUMPED_NBC' else m
+        ops.mass(int(n),horizontal,horizontal,m,0.,0.,0.)
+    if mass_policy=='STORY_LUMPED_NBC':
+        for master,record in floor_mass_plan['horizontal_mass_by_master'].items():
+            ops.mass(int(master),record['mass'],record['mass'],0.,0.,0.,record['Jz'])
+    print('[SEISMIC MASS OPERATOR]',json.dumps({
+        'policy':mass_policy,
+        'source_active_horizontal_mass':floor_mass_plan['active_source_horizontal_mass'],
+        'floor_count':len(floor_mass_plan['horizontal_mass_by_master']),
+        'intermediate_mass_before_optional_lumping':floor_mass_plan['intermediate_mass'],
+        'native_etabs_equivalence':'NOT_VERIFIED'
+    },sort_keys=True),flush=True)
+
     for i,(pattern,values) in enumerate(data['gravity'].items(),700001):
         ops.timeSeries('Linear',i); ops.pattern('Plain',i,i)
         for n,vector in values.items(): ops.load(int(n),*vector)
@@ -1574,6 +1626,8 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
                 support_case_evidence=({k:v for k,v in (support_case_evidence or {}).items() if k!='supports'}),
                 gravity_added_support_nodes=added_gravity_supports,
                 stiffness_basis=stiffness_basis,
+                seismic_mass_policy=mass_policy,
+                seismic_mass_plan_evidence={k:v for k,v in floor_mass_plan.items() if k!='horizontal_mass_by_master'},
                 model_config_sha256=data.get('config_sha256'),
                 research_profile=research_profile,
                 scope='EXPLORATORY_ASSUMED_MATERIALS_NOT_DESIGN_ACCEPTANCE'
