@@ -72,6 +72,8 @@ jobs:
           check python -m unittest discover -s tests -p 'test_nbc105_load_case_purpose.py' -v
           check python -m unittest tests.test_uniform_output_structure tests.test_gravity_beam_force_gui_integration -v
           check python -m unittest tests.test_output_reader_writer_inventory -v
+          check python -m unittest tests.test_cross_module_consistency_audit tests.verify_module_boundaries -v
+          check python tools/audit_cross_module_consistency.py --repo . --report-dir audit/module_consistency --fail-on-parse
           check python -m unittest tests.test_all_active_output_pair_matrix tests.test_etabs_comparison_stage_reader -v
           check python -m unittest tests.test_full_local_output_migration_audit -v
           check python -m unittest tests.test_etabs_excel_source_selection tests.test_etabs_split_beam_forces -v
@@ -102,4 +104,5 @@ jobs:
             audit/documentation_coverage.json
             audit/output_pairs/all_active_output_pairs.json
             audit/output_pairs/all_active_output_pairs.csv
+            audit/module_consistency/
           if-no-files-found: warn
