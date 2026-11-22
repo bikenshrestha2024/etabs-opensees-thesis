@@ -75,7 +75,8 @@ def _sum(vectors):
 
 def compare_common_cut(payload, *, expected_primary_count=32,
                        expected_transfer_count=44):
-    """Compare mapped six-DOF support reactions, not force-only equilibrium.
+    """[REF docs/source/components/validation/reaction_common_cut.py.md]
+    Compare mapped six-DOF support reactions, not force-only equilibrium.
 
     Do not issue a structural-equivalence PASS even with exact numerical
     agreement: analysis-mesh topology and stiffness require external review.
@@ -168,7 +169,8 @@ def compare_common_cut(payload, *, expected_primary_count=32,
 
 def compare_ablation(cases, *, expected_primary_count=32,
                      expected_transfer_count=44):
-    """Compare four independently solved configurations without tuning weights.
+    """[REF docs/source/components/validation/reaction_common_cut.py.md]
+    Compare four independently solved configurations without tuning weights.
 
     Each case uses the same source EDB, joint map and native ETABS reference,
     but a separately hashed OpenSees model. Scenario effects are reported,
@@ -234,7 +236,8 @@ def compare_ablation(cases, *, expected_primary_count=32,
 
 
 def export_report(payload_path, output_dir):
-    """Save JSON + CSV under requested output directory with source hash."""
+    """[REF docs/source/components/validation/reaction_common_cut.py.md]
+    Save JSON + CSV under requested output directory with source hash."""
     inp = Path(payload_path)
     payload = json.loads(inp.read_text(encoding="utf-8-sig"))
     result = compare_common_cut(payload)
