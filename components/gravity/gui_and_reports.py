@@ -517,8 +517,9 @@ class GravityAnalysisGUI:
                 "variant folder; open the original export and select its model.",
                 parent=self.win)
             return
-        from tools.REBUILD_VERIFIED_CLEAR_BEAM_MODEL import canonical_clear_beam_destination
-        new=canonical_clear_beam_destination(source)
+        import datetime as _dt
+        new=(export/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"/
+             _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ"))
         # In an exported copy the runtime contains components but not tools.
         # Run the rebuilt source implementation from the current updated repo.
         current_root=_runtime_repo_root()
