@@ -78,9 +78,22 @@ def audit_export_layout(export_dir):
                     issues.append({"stage":stage,"issue":"LINKED_LEGACY_REFUSED"})
                 elif prior.is_dir():
                     legacy.append(relative)
+        # A stage may still contain historical flat producer outputs. Surface
+        # their ownership for review; do not silently relocate them.
+        stage_flat=[]
+        if location.is_dir():
+            for child in sorted(location.iterdir()):
+                if child.is_symlink():
+                    issues.append({"stage":stage,"issue":"LINKED_STAGE_CHILD_REFUSED"})
+                elif child.is_file() and child.suffix.lower() in (
+                    ".json",".csv",".xlsx",".xlsm",".html",".pdf",".png",
+                    ".jpg",".jpeg",".zip",".log"):
+                    stage_flat.append({"filename":child.name,
+                                       "size_bytes":child.stat().st_size})
         sections.append({"stage":stage,"folder":folder,
                          "status":"PRESENT" if location.is_dir() else "ABSENT",
-                         "cases":cases,"historical_locations":legacy})
+                         "cases":cases,"historical_locations":legacy,
+                         "loose_stage_artifacts":stage_flat})
     # Root-level derived artifacts are inventory-only warnings; they may be
     # intentionally preserved by older export/analysis consumers. Never move
     # or infer deletion safety from file names.
