@@ -245,16 +245,27 @@ class GravityAnalysisGUI:
             from components.inputs.etabs_table_bundle import register_current_etabs_tables
             from components.validation.etabs_split_beam_forces import consolidate
             source_root=export_root_for(Path(self.model_var.get()).resolve().parent)
-            # Validate all source rows and schemas BEFORE publishing source registration.
-            # A fresh stage prevents overwriting historical comparison evidence.
-            stage=(source_root/"01_ETABS_EXPORT"/"03_BEAM_FORCES"/"RUNS"/
-                   datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
-            summary=consolidate(self.etabs_beam_forces_paths,stage,
-                                case=self.etabs_case_var.get().strip())
+            # All newly published evidence follows the shared immutable
+            # stage/state/case/run-id contract, including SOURCE_ONLY imports.
+            # Old 03_BEAM_FORCES folders remain available as historical evidence.
+            from components.inputs.output_contract import (
+                create_case_run, record_case_status)
+            stage=create_case_run(source_root,"ETABS_EXPORT","BEAM_FORCES",
+                                  state="SOURCE_ONLY",units="kN-m-s")
+            try:
+                summary=consolidate(self.etabs_beam_forces_paths,
+                                    stage/"02_RESULTS",
+                                    case=self.etabs_case_var.get().strip())
+            except Exception:
+                record_case_status(stage,"FAILED",
+                    message="ETABS source beam-force consolidation failed; not solver equivalence")
+                raise
             native=self.etabs_native_assignment_var.get().strip()
             manifest,_=register_current_etabs_tables(
                 source_root,full,self.etabs_beam_forces_paths,
                 assignment=native if native and Path(native).suffix.lower() in (".xlsx",".xlsm") else None)
+            record_case_status(stage,"INCOMPLETE",
+                message="SOURCE_ONLY: rows consolidated; native model equivalence not verified")
             self._gravity_action_log(
                 "ETABS_BEAM_FORCE_PARTS_AUDITED",
                 f"Parts={len(self.etabs_beam_forces_paths)}; rows={summary['unique_rows']}; "
@@ -1293,7 +1304,7 @@ class GravityAnalysisGUI:
                    command=self._audit_all_etabs_beam_force_workbooks).pack(side="left")
         ttk.Label(form,
                   text="All selected beam-force worksheets are read-only sources. "
-                       "Output: 01_ETABS_EXPORT/03_BEAM_FORCES/RUNS/<timestamp>. "
+                       "Output: 01_ETABS_EXPORT/RUNS/SOURCE_ONLY/BEAM_FORCES/<run-id>/02_RESULTS. "
                        "Consolidation verifies exported station rows, NOT OpenSees reaction equivalence.",
                   wraplength=1050,anchor="w",justify="left").pack(anchor="w")
         ttk.Button(form,
