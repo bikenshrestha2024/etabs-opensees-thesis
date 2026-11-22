@@ -154,6 +154,22 @@ class ReactionCaseRegistryTests(unittest.TestCase):
             profile="GRAVITY_1.0D_1.0L"))
         self.assertFalse((b/"00_INDEXES"/"Gravity_Case_Reaction_Index.json").exists())
 
+    def test_dual_76_97_batch_owns_its_original_index(self):
+        from components.gravity.output_ownership import (
+            dual_runs_parent,workspace_for_dual_case_run)
+        workspace=self.root/"source_model_out"
+        workspace.mkdir()
+        folder=dual_runs_parent(workspace,create=True)/"batch_20261122"
+        folder.mkdir()
+        self.assertEqual(workspace_for_dual_case_run(folder),workspace.resolve())
+        with self.assertRaisesRegex(ValueError,"Not a canonical"):
+            workspace_for_dual_case_run(self.root)
+        from components.gravity.gui_and_reports import GravityAnalysisGUI
+        import inspect
+        source=inspect.getsource(GravityAnalysisGUI._finished_both_wall_supports)
+        self.assertIn("immutable_owner=workspace_for_dual_case_run(root)",source)
+        self.assertIn("register_case(immutable_owner,case_path",source)
+
     def test_background_solver_cannot_take_late_changed_source_workbook(self):
         from components.gravity import gui_and_reports
         import inspect
