@@ -34,6 +34,48 @@ class SplitBeamForceTests(unittest.TestCase):
         return [story, "B1", unique, "1. DL + LL", station,
                 0., shear, 0., 0., 0., 0.]
 
+    def test_three_beam_force_sheets_in_one_workbook(self):
+        from openpyxl import Workbook
+        book=Workbook()
+        first=book.active; first.title="Element Forces - Beams"
+        for i in range(3):
+            sheet=first if i==0 else book.create_sheet(
+                "Element Forces - Beams "+str(i+1))
+            sheet.append(["Table: Element Forces - Beams"])
+            sheet.append(self.headers)
+            sheet.append(self.row(unique=str(100+i)))
+        path=self.root/"all_three_sheets.xlsx"
+        book.save(path)
+        result=consolidate([path],self.root/"three")
+        self.assertEqual(result["source_rows"],3)
+        self.assertEqual(result["unique_rows"],3)
+        self.assertEqual(len(result["input_files"][0]["sheets"]),3)
+        self.assertEqual(
+            sum(s["rows_read"] for s in result["input_files"][0]["sheets"]),3)
+
+    def test_multi_workbook_multi_sheet_overlaps_and_late_conflict(self):
+        from openpyxl import load_workbook
+        first=self.part("first.xlsx",[self.row(unique="101")])
+        second=self.part("second.xlsx",[self.row(unique="102")])
+        book=load_workbook(second)
+        sheet=book.create_sheet("Element Forces - Beams 2")
+        sheet.append(self.headers)
+        sheet.append(self.row(unique="101"))
+        book.save(second)
+        result=consolidate([first,second],self.root/"combined")
+        self.assertEqual(result["source_rows"],3)
+        self.assertEqual(result["unique_rows"],2)
+        self.assertEqual(result["exact_or_tolerance_matched_overlaps"],1)
+        self.assertEqual(result["output_format"],
+                         "CSV_UNLIMITED_EXCEL_WORKSHEET_ROWS")
+        book=load_workbook(second)
+        sheet=book["Element Forces - Beams 2"]
+        sheet["G2"]=999.0
+        book.save(second)
+        with self.assertRaisesRegex(ValueError,"Conflicting duplicate"):
+            consolidate([first,second],self.root/"conflict")
+        self.assertFalse((self.root/"conflict").exists())
+
     def test_overlaps_deduplicated_without_row_loss(self):
         a = self.part("one.xlsx", [self.row(), self.row(station=1.)])
         b = self.part("two.xlsx", [self.row(station=1.),
