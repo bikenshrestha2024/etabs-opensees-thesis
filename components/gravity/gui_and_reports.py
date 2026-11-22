@@ -1061,15 +1061,15 @@ class GravityAnalysisGUI:
                 if not messagebox.askyesno(
                         "Unmatched OpenSees stiffness — diagnostic only",
                         "Selected solved OpenSees stiffness basis: "+str(basis)+
-                        "\\n\\nThis run is NOT a source-identical ETABS elastic "
+                        "\n\nThis run is NOT a source-identical ETABS elastic "
                         "comparison. The previously measured gross-shell "
                         "result had support errors of approximately 3,041 kN. "
                         "The reviewed ETABS-elastic rebuild reduced that error "
                         "but still requires further constraint reconciliation."
-                        "\\n\\nRecommended: Cancel and use 'Rebuild with "
+                        "\n\nRecommended: Cancel and use 'Rebuild with "
                         "ETABS elastic settings', then rerun 32 supports "
                         "with the same 1.0D+1.0L load and compare the new model."
-                        "\\n\\nContinue ONLY for a diagnostic comparison?",
+                        "\n\nContinue ONLY for a diagnostic comparison?",
                         parent=self.win):
                     self.status_var.set(
                         "Cancelled unmatched stiffness comparison; "
