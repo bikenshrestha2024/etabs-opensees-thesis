@@ -3,6 +3,10 @@ name: token-efficient-thesis
 description: Use for small or medium scoped Codex tasks in this ETABS-to-OpenSeesPy/NBC 105 thesis repo when reducing context, tool calls, repeated compaction, and unnecessary file reads is important. Applies to coding, debugging, GitHub review, tests and documentation; never relax physical validation gates.
 ---
 
+> **MANDATORY PRE-EDIT GATE:** Read `AGENTS.md`, `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md` and `.agents/skills/etabs-opensees-read-first/SKILL.md` before editing anything, even on a token-saving task. The physical foundation has **32 supports + 44 shear-wall mesh points**, not 76 physical foundations. Full gravity **1.0D+1.0L** is separate from **NBC Table 5-1 seismic weight**. Efficiency guidance can never skip this contract.
+
+
+
 # Token-efficient thesis engineering workflow
 
 **Goal:** minimize wasted context and repeated work, not minimize engineering correctness. Follow the root `AGENTS.md` first. This skill cannot override code, evidence, confidentiality, or native-validation requirements.
