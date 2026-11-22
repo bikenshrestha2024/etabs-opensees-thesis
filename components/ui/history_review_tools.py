@@ -90,8 +90,8 @@ def export_review_zip(output_dir, analysis, *, max_file_bytes=512 * 1024 * 1024)
     if not root.is_dir():
         raise NotADirectoryError(root)
     analysis = {"linear": "Linear_Time_History", "nonlinear": "Nonlinear_Time_History"}[analysis]
-    target_dir = root / "Review_ZIPs"
-    target_dir.mkdir(exist_ok=True)
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    target_dir = ensure_review_zip_directory(root)
     dest = target_dir / (analysis + "_" + datetime.now().strftime("%Y%m%d_%H%M%S_%f") + ".zip")
     manifest = {
         "schema": "history-review-evidence-v1", "analysis": analysis,
@@ -107,7 +107,7 @@ def export_review_zip(output_dir, analysis, *, max_file_bytes=512 * 1024 * 1024)
                     continue
                 relative = path.relative_to(root)
                 rel = relative.as_posix()
-                if relative.parts[0] == "Review_ZIPs" or any(part.startswith(".") for part in relative.parts):
+                if relative.parts[0] in {"Review_ZIPs", "07_EXPORT_ZIP"} or any(part.startswith(".") for part in relative.parts):
                     continue
                 if path.suffix.lower() in {".zip", ".rar", ".7z", ".edb", ".p12", ".pem", ".key", ".env"}:
                     manifest["excluded"].append({"file": rel, "reason": "archive/model/credential file excluded"})
