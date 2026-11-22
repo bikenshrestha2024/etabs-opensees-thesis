@@ -52,6 +52,10 @@ def canonical_clear_beam_destination(source, *, stamp=None):
     """
     from components.inputs.output_layout import export_root_for
     source=Path(source).expanduser().resolve()
+    if source.name.casefold().startswith("verified_clear_beam_"):
+        raise ValueError("The selected folder is an OLD sibling rebuild. "
+                         "Select the original ETABS export folder (e.g. 1) "
+                         "to create a new canonical model-owned variant.")
     root=export_root_for(source)
     if source != root:
         raise ValueError("Select the original ETABS export root for the canonical rebuild")
@@ -64,6 +68,9 @@ def canonical_clear_beam_destination(source, *, stamp=None):
 def _verify_before_creating_output(source, workbook, target):
     """Fail closed before creating an output folder or changing source files."""
     source=Path(source).expanduser().resolve()
+    if source.name.casefold().startswith("verified_clear_beam_"):
+        raise ValueError("Do not rebuild a historical Verified_Clear_Beam sibling recursively; "
+                         "select original ETABS source export instead")
     workbook=Path(workbook).expanduser().resolve()
     target=Path(target).expanduser().resolve()
     if not source.is_dir():
