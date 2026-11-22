@@ -32,3 +32,14 @@ disk-backed SQLite index.
 
 **Not certified:** source ETABS gravity case matching, complete export,
 32/76/97 nodal reaction equivalence or NBC engineering approval.
+
+## No Ctrl-click needed: folder auto-discovery
+
+The Gravity GUI also offers **Auto-find Beam 1/2/3 in folder**. Select the
+folder containing the numbered `Beam Forces Element N` workbooks. The
+selector identifies consecutive part numbers, sorts them numerically,
+rejects gaps and duplicate claims for one number, and asks you to confirm
+the exact filenames. It does not inspect or modify the source workbook
+contents until the explicit Validate + register + consolidate operation.
+For workbook exports containing three beam-force worksheets inside a single
+file, use the multi-file dialog instead of the numbered-folder helper.
