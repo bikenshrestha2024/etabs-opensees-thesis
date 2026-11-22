@@ -28,6 +28,26 @@ def _card(name):
     return json.loads((ROOT / 'Material_Catalog' / name).read_text(encoding='utf-8'))
 
 
+
+def peer_fsam_panel_values():
+    """[REF docs/source/components/nonlinear_time_history/material_source_sets.py.md]
+    Exact *specimen* FSAM web and boundary values, PEER 2015/12 Appendix B.3.
+
+    Printed pp. 90-91, RW-A15-P10-S78: rouXw=.0074, rouYw=.0074,
+    rouXb=.0082, rouYb=.0587, nu=.8, alfadow=.01.
+    Boundary panels use DIFFERENT steel/concrete; do not select them without
+    a real boundary-region map. This is direct literature transfer, not
+    project reinforcement or independent material calibration.
+    """
+    return dict(
+        web=dict(rho_x=0.0074, rho_y=0.0074, nu=0.8, alpha=0.01),
+        boundary=dict(rho_x=0.0082, rho_y=0.0587, nu=0.8, alpha=0.01),
+        citation="Kolozvari, Orakcal and Wallace (2015), PEER 2015/12, Appendix B.3, printed pp. 90-91; specimen RW-A15-P10-S78",
+        source="https://peer.berkeley.edu/sites/default/files/webpeer-2015-12-kristijan_kolozvari_kutay_orakcal_john_wallace.pdf",
+        region_assignment="Only PEER web panel can be transferred uniformly without inventing a boundary-region source map",
+    )
+
+
 def peer_single_source():
     """Concrete, steel, frame and FSAM inputs all from PEER 2015/12 Appendix B.3.
 
@@ -78,9 +98,16 @@ def peer_single_source():
     for k in ('fy_rebar_mpa', 'E0_mpa', 'steel_b', 'steel_R0', 'steel_cR1', 'steel_cR2'):
         add('Frame rebar (Steel02)', k, frame[k], 'MPa' if k in ('fy_rebar_mpa', 'E0_mpa') else '-',
             'FROM_SOURCE', 'Same PEER web steel card (Steel02 uses the identical Menegotto-Pinto terms)')
+    panel = peer_fsam_panel_values()
+    for region in ('web', 'boundary'):
+        for k, v in panel[region].items():
+            add('FSAM panel', region + '.' + k, v, '-', 'FROM_SOURCE',
+                panel['citation'] + ' | FSAM panel ' + ('6 unconfined' if region == 'web' else '7 confined'))
     for k, v in fsam.items():
-        add('FSAM panel', k, v, '-', 'PROVENANCE_NOT_RECORDED',
-            'Value in PEER_Web_ESFI_Patch.json has no recorded locator; verify in PEER 2015/12')
+        # The existing catalog's numerical FSAM inputs are confirmed by
+        # Appendix B.3 as WEB parameters, rather than unattributed defaults.
+        if k in ('nu', 'alpha') and v != panel['web'][k]:
+            raise ValueError('PEER FSAM card differs from original Appendix B.3: ' + k)
     for family in ('Ordinary SHS brace (Steel01)', 'Fluid viscous damper', 'Buckling-restrained brace'):
         add(family, 'all', None, '-', 'NOT_IN_SOURCE',
             'PEER 2015/12 is an RC wall study; supply a separate cited device/brace card')
@@ -146,7 +173,8 @@ def baseline_values(basis, transition='OPENSEES_DOCUMENTED'):
     else:
         groups['s'].update({k: v for k, v in _steelmpf_transition(transition).items() if k != 'basis'})
     out = {'brace.fy_mpa': 345., 'brace.E_mpa': None, 'brace.b': .01,
-           'wall.rho_x': None, 'wall.rho_y': None}
+           'wall.rho_x': peer_fsam_panel_values()['web']['rho_x'] if single else None,
+           'wall.rho_y': peer_fsam_panel_values()['web']['rho_y'] if single else None}
     out.update({key: frame[field] for key, field in FRAME_OVERRIDE_TARGETS.items()})
     out.update({'wall.' + k: groups[g].get(field) for k, (g, field) in WALL_KEYS.items()})
     return out

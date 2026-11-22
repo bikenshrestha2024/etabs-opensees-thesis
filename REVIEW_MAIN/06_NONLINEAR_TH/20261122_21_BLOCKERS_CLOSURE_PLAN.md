@@ -73,3 +73,10 @@ The error consists of **1 human approval + 16 checklist checks + 3 material/conf
 - All **new** local export ZIP files belong in `07_EXPORT_ZIP` of their exact run/source stage. Existing result ZIPs retain original paths for provenance; no automatic migration or overwriting. See `docs/architecture/20261122_CANONICAL_REVIEW_ZIP_ROUTING.md`.
 
 **Engineering acceptance:** `SOURCE_CHECKED=PARTIAL`; `NUMERICALLY_CONVERGED=ELASTIC_MODAL_AND_MRSM_ONLY`; `ETABS_OPENSEES_MATCHED=NOT_VERIFIED`; `EXPERIMENT_VALIDATED=NOT_VERIFIED`; `CODE_ACCEPTED=NOT_VERIFIED`; `FULL_DURATION_NLTHA=NOT_VERIFIED`.
+
+
+## 2026-11-22 — direct PEER Appendix B.3 literature-baseline policy
+
+The user's thesis uses directly cited published constitutive inputs as a **research** baseline and reports source-specific parameter sensitivity; separate project material testing is **not** a prerequisite for attempting exploratory NLTHA. The PEER RW-A15-P10-S78 web FSAM reinforcement ratios are now directly adopted as `rho_x=rho_y=0.0074`, with published `nu=0.8` and dowel `alpha=0.01`. Its **distinct** boundary values (`rho_x=0.0082, rho_y=0.0587`) remain recorded, NOT applied to arbitrary wall panels without a verified region map. In the isolated PEER research draft, the former invented `20 mm @ 200 mm` bar proxy no longer controls these web values; mixed/nominal sensitivity bases remain labeled assumptions. See [the full page-specific source/units table and methodological distinction](https://github.com/bikenshrestha2024/etabs-opensees-thesis/blob/main/docs/engineering/20261122_DIRECT_PEER_LITERATURE_NLTHA_PARAMETERS.md).
+
+Source-level tests: `tests/test_peer_direct_literature_fsam_transfer_20261122.py`. This does not certify that the 25-storey X-wall first step converged, establish actual M0–M6 device input, or set `approved_for_nltha=true`.
