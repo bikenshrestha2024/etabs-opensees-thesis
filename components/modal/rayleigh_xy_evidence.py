@@ -165,6 +165,9 @@ def audit_rayleigh_pair(payload):
 
 
 def write_audit(json_path, output_dir):
+    """[REF docs/source/components/modal/rayleigh_xy_evidence.py.md]
+    Persist saved dual-axis source-hashed diagnostic only.
+    """
     path=Path(json_path)
     report=audit_rayleigh_pair(json.loads(path.read_text(encoding="utf-8-sig")))
     report["saved_source_sha256"]=hashlib.sha256(path.read_bytes()).hexdigest()
