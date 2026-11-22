@@ -31,7 +31,7 @@ class V4PrimaryGravityAndESMDisplayTests(unittest.TestCase):
         self.assertIn('"ETABS Reaction Validation (32 nodes)": "ETABS_NONZERO_REACTION_DIAGNOSTIC"', s)
         self.assertIn('"ETABS Node Position (76 nodes)"', s)
         self.assertIn('"Continuous Wall Base (97 nodes)"', s)
-        self.assertIn("releases 44 source restraints", s)
+        self.assertIn("44 shear-wall mesh points", s)
         self.assertIn("NOT certified", s)
         self.assertIn("def _view_saved_case(self):", s)
 
