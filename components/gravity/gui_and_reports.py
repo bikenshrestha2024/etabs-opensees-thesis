@@ -508,6 +508,14 @@ class GravityAnalysisGUI:
         # Do not create independent sibling exports which lose ownership of
         # current geometry, source hashes and module result references.
         source=model.resolve().parent
+        if source.name.casefold().startswith("verified_clear_beam_"):
+            messagebox.showerror("Historical sibling model",
+                "The selected model is inside a historical "
+                "Verified_Clear_Beam sibling export. Select the original "
+                "ETABS source export folder (e.g. 1) before making a new "
+                "module-owned rebuild. Original files remain unchanged.",
+                parent=self.win)
+            return
         from components.inputs.output_layout import export_root_for
         export=export_root_for(source)
         if export!=source:
