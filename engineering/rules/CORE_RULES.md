@@ -1,3 +1,5 @@
+> **MANDATORY FIRST READ:** Before any edit, read `AGENTS.md`, [the current 32-support/44-mesh and gravity/NBC load-purpose contract](READ_FIRST_PHYSICAL_MODEL_CONTRACT.md), and `.agents/skills/etabs-opensees-read-first/SKILL.md`. This supersedes *historical descriptive* classifications of 76 mapped base nodes as 76 physical foundations. Full gravity benchmark is 1.0D+1.0L; seismic weight uses NBC 105:2025 §5.2/Table 5-1 separately. Preserve native evidence and all existing engineering gates.
+
 # Canonical cross-agent research engineering contract
 Status: governance policy; not structural verification. Existing `AGENTS.md`, established decisions, source guides, and existing agent skills remain in force and must be merged rather than overwritten.
 
