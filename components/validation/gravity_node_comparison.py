@@ -142,6 +142,18 @@ def compare_support_nodes(etabs,opensees,*,tolerance_m=0.01):
                   key=lambda r:r["abs_delta_kN"],reverse=True)
     matched_e_total=sum(r["etabs_global_rz_kN"] for r in ranked)
     matched_o_total=sum(r["opensees_rz_kN"] for r in ranked)
+    # Global cancellation may show 0.0000% although local reactions differ
+    # by several thousand kN. Keep these independent acceptance dimensions.
+    sum_abs=sum(r["abs_delta_kN"] for r in ranked)
+    max_abs=max((r["abs_delta_kN"] for r in ranked), default=None)
+    rms=(math.sqrt(sum(r["abs_delta_kN"]**2 for r in ranked)/len(ranked))
+         if ranked else None)
+    complete=(len(ranked)==len(ores)==len(eitems)
+              and not any(x["status"] != "MATCHED_GLOBAL_Z" for x in details))
+    pointwise_status=(
+        "NO_COMPLETE_ONE_TO_ONE_GLOBAL_Z_COMPARISON" if not complete
+        else "POINTWISE_RESIDUAL_EXCEEDS_NUMERICAL_SCREEN" if max_abs>1.0
+        else "POINTWISE_NUMERICAL_SCREEN_ONLY_NOT_ENGINEERING_ACCEPTANCE")
     return dict(schema="gravity-node-comparison-v1",
         interpretation="Support reaction differences only; not nodal applied load",
         acceptance="DIAGNOSTIC_NOT_ENGINEERING_ACCEPTANCE",
@@ -154,6 +166,12 @@ def compare_support_nodes(etabs,opensees,*,tolerance_m=0.01):
         opensees_unmatched_count=sum(x["status"]=="UNMATCHED_OPENSEES" for x in details),
         matched_etabs_sum_kN=matched_e_total,matched_opensees_sum_kN=matched_o_total,
         matched_sum_difference_kN=matched_e_total-matched_o_total,
+        sum_absolute_nodal_difference_kN=sum_abs,
+        max_absolute_nodal_difference_kN=max_abs,
+        rms_nodal_difference_kN=rms,
+        pointwise_numerical_screen_threshold_kN=1.0,
+        pointwise_screening_status=pointwise_status,
+        complete_one_to_one_global_z=complete,
         unmatched_reactions_not_zeroed=True,
         top_discrepancies=ranked[:30],rows=details,
         diagnostic_hypotheses=[
