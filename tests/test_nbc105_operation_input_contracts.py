@@ -64,6 +64,8 @@ class NBCOperationInputContractTests(unittest.TestCase):
         self.assertIn("operation_input_spec",source)
         self.assertIn("annex_operation_input_spec",source)
         self.assertIn("entry_cache",source)
+        self.assertIn("Source coverage (open gates)",source)
+        self.assertIn("audit_source_index(records)",source)
 
 
 if __name__ == "__main__":
