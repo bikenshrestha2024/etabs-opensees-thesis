@@ -174,7 +174,7 @@ def safe_write(path, text):
 
 
 @timed_outputs('Equivalent-static calculations and case export','outdir')
-def write_outputs(template_path, rows, result, direction, polarity, accidental, breadth, outdir, model_script="", support_case="PHYSICAL_32"):
+def write_outputs(template_path, rows, result, direction, polarity, accidental, breadth, outdir, model_script="", support_case="PHYSICAL_32", mass_policy="SOURCE_DISTRIBUTED"):
     out=Path(outdir); out.mkdir(parents=True,exist_ok=True)
     ecc_case=(f"E{'+' if int(breadth[1])>0 else '-'}" if accidental and int(breadth[1])!=0 else "E0")
     suffix=f"{result['limit_state']}_{direction}{'+' if polarity>0 else '-'}_{ecc_case}"
@@ -183,6 +183,10 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
     support_case=normalize_support_case(support_case)
     report=dict(result)
     report["support_case"]=support_case
+    mass_policy=str(mass_policy).strip().upper()
+    if mass_policy not in ("SOURCE_DISTRIBUTED","STORY_LUMPED_NBC"):
+        raise ValueError("Unknown seismic mass operator policy")
+    report["seismic_mass_policy"]=mass_policy
     report["comparison_remark"] = result["esm_eligibility"] if not result.get("code_eligible",True) else "Eligible ESM case"
     report["direction_case"]=suffix
     report["calculation_route"]="OPENSEES_DIRECT_ESM"
@@ -297,6 +301,7 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "import json, openseespy.opensees as ops",
         "import os, csv, time, traceback, sys",
         "os.environ['OPENSEES_SUPPORT_CASE'] = "+repr(support_case),
+        "os.environ['OPENSEES_SEISMIC_MASS_POLICY'] = "+repr(mass_policy),
         "OUTPUT_DIR = "+repr(str(out.resolve())),
         "sys.path.insert(0,os.path.join(os.path.dirname("+repr(str(model_script))+"),'OpenSees_Runtime_V118'))",
         "sys.path.insert(0,"+repr(str(HERE))+")",
@@ -590,6 +595,7 @@ class ESMGui:
         self.centered_case=tk.BooleanVar(value=True); self.include_torsion=tk.BooleanVar(value=True); self.bdim=tk.StringVar(value="")
         self.eccsign=tk.StringVar(value="Both ±")
         self.support_case_var=tk.StringVar(value="PHYSICAL_32")
+        self.seismic_mass_policy=tk.StringVar(value="SOURCE_DISTRIBUTED")
         self.model_script=tk.StringVar(value="")
         self.python_exe=tk.StringVar(value=sys.executable)
         self.last_runners=[]
@@ -1025,6 +1031,10 @@ class ESMGui:
         ttk.Combobox(runbox,textvariable=self.support_case_var,values=[
             "PHYSICAL_32","SOURCE_76","WALL_BASE_97"],state="readonly",width=18
         ).grid(row=2,column=1,sticky="w",padx=5,pady=3)
+        ttk.Label(runbox,text="Seismic mass operator").grid(row=4,column=0,sticky="w",padx=5,pady=3)
+        ttk.Combobox(runbox,textvariable=self.seismic_mass_policy,
+                     values=["SOURCE_DISTRIBUTED","STORY_LUMPED_NBC"],
+                     state="readonly",width=23).grid(row=4,column=1,sticky="w",padx=5,pady=3)
         ttk.Label(runbox,text="32 physical foundations (primary); 76 exported mesh restraint IDs / 97 idealized fixed wall-base diagnostic only. Native ETABS edge/MPC transfer unverified.",
                   wraplength=900,foreground="#8a341c").grid(row=3,column=0,columnspan=3,sticky="w",padx=5,pady=3)
         ttk.Label(runbox,text="Python executable with OpenSeesPy").grid(row=1,column=0,sticky="w",padx=5,pady=3)
@@ -1672,7 +1682,8 @@ class ESMGui:
                             errors='replace',encoding='utf-8',
                             env={**os.environ, 'PYTHONIOENCODING':'utf-8', 'PYTHONUTF8':'1',
                                  'OPENSEES_GRAVITY_PROFILE':'AS_CONFIGURED',
-                                 'OPENSEES_SUPPORT_CASE':getattr(getattr(self,'support_case_var',None),'get',lambda:'PHYSICAL_32')()})
+                                 'OPENSEES_SUPPORT_CASE':getattr(getattr(self,'support_case_var',None),'get',lambda:'PHYSICAL_32')(),
+                                 'OPENSEES_SEISMIC_MASS_POLICY':getattr(getattr(self,'seismic_mass_policy',None),'get',lambda:'SOURCE_DISTRIBUTED')()})
                         log=out/(RAYLEIGH_PREFIX+'_'+state+'.log')
                         log.write_text(proc.stdout+'\n'+proc.stderr,encoding='utf-8')
                         if proc.returncode:
@@ -1999,6 +2010,7 @@ class ESMGui:
                     result["period_source"]=("Separate matched "+state+" Rayleigh/empirical minimum" if state_periods else self.period_sources.get(self.direction.get(),"Directional Rayleigh/empirical calculation"))
                     result["input_provenance"]=getattr(self,"project_input_audit",{})
                     result["support_case"]=self.support_case_var.get()
+                    result["seismic_mass_policy"]=self.seismic_mass_policy.get()
                     result["wall_aw_source_classification"]={
                         axis: getattr(self,'_aw_sync_evidence',{}).get(axis,{}).get(
                             'status','USER_OR_IMPORTED_UNVERIFIED') for axis in ('X','Y')}
@@ -2040,7 +2052,7 @@ class ESMGui:
                         for ecc_sign in ecc_signs:
                             breadth=(bdim,ecc_sign)
                             state_outdir=analysis_output_folder(self.export_dir,state,stage='ESM') if self._output_is_automatic else Path(self.outdir.get())
-                            output_paths=write_outputs(self.path.get(),rows,result,self.direction.get(),polarity,self.include_torsion.get(),breadth,state_outdir,self.model_script.get(),self.support_case_var.get())
+                            output_paths=write_outputs(self.path.get(),rows,result,self.direction.get(),polarity,self.include_torsion.get(),breadth,state_outdir,self.model_script.get(),self.support_case_var.get(),self.seismic_mass_policy.get())
                             made.extend(output_paths); self.last_runners.append(str(output_paths[2]))
                             summaries.append(f"{state} {self.direction.get()}{'+' if polarity>0 else '-'} E{('+' if ecc_sign>0 else '-') if self.include_torsion.get() and ecc_sign else '0'}: V={result['base_shear_kN']:.3f} kN, k={result['period_exponent_k']:.4f}")
                 except Exception as state_exc:
@@ -2138,7 +2150,7 @@ class ESMGui:
                     timed_out = False
                     try:
                         args = [self.python_exe.get(), "-u", str(script)]
-                        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "OPENSEES_SUPPORT_CASE": self.support_case_var.get()}
+                        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "OPENSEES_SUPPORT_CASE": self.support_case_var.get(), "OPENSEES_SEISMIC_MASS_POLICY": self.seismic_mass_policy.get()}
                         proc = subprocess.Popen(args, cwd=str(output),
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, encoding="utf-8", errors="replace", bufsize=1, env=env)
