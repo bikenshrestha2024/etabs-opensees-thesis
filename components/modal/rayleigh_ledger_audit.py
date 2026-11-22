@@ -6,6 +6,7 @@ records; geometry and weights must come from the matching source model.
 from __future__ import annotations
 import math
 from components.nbc105.constants import GRAVITY_M_S2
+from components.nbc105.clause_05_dynamic_characteristics import rayleigh_period_s
 
 
 def verify_storey_coverage(model_diaphragms, ledger_rows):
@@ -51,7 +52,9 @@ def verify_rayleigh_sum(rows, *, g=GRAVITY_M_S2):
     denominator = g * sum_fidi
     if numerator <= 0 or denominator <= 0:
         raise ValueError("Nonpositive Rayleigh quotient: check displacement sign and boundary conditions")
-    period = 2 * math.pi * math.sqrt(numerator / denominator)
+    period = rayleigh_period_s([float(r['weight_kN']) for r in rows],
+                               [float(r['displacement_m']) for r in rows],
+                               [float(r['force_kN']) for r in rows],g=g)
     return {"storey_count": len(rows), "numerator_kN_m2": numerator,
             "sum_Fi_di_kN_m": sum_fidi, "denominator_kN_m2_s2": denominator,
             "period_s": period, "gravity_m_s2": g,
