@@ -81,10 +81,24 @@ def audit_export_layout(export_dir):
         sections.append({"stage":stage,"folder":folder,
                          "status":"PRESENT" if location.is_dir() else "ABSENT",
                          "cases":cases,"historical_locations":legacy})
+    # Root-level derived artifacts are inventory-only warnings; they may be
+    # intentionally preserved by older export/analysis consumers. Never move
+    # or infer deletion safety from file names.
+    derived={".json",".csv",".xlsx",".xlsm",".html",".pdf",".png",
+             ".jpg",".jpeg",".zip",".log"}
+    loose=[]
+    for item in sorted(root.iterdir()):
+        if item.is_symlink():
+            issues.append({"stage":"PROJECT_ROOT","issue":"LINKED_ROOT_CHILD_REFUSED"})
+        elif item.is_file() and item.suffix.lower() in derived:
+            loose.append({"relative_path":item.name,"size_bytes":item.stat().st_size,
+                          "status":"LEGACY_OR_UNCLASSIFIED_REVIEW_ONLY"})
     return {
         "schema":"THESIS_OUTPUT_STRUCTURE_AUDIT_V1",
         "scope":"METADATA_ONLY_READ_ONLY_NO_SOLVER_OR_ENGINEERING_ACCEPTANCE",
         "stages":sections,
+        "loose_root_artifacts":loose,
+        "review_flags":["ROOT_LEVEL_ARTIFACTS_NEED_OWNER_REVIEW"] if loose else [],
         "issues":issues,
         "case_counts":{row["stage"]:len(row["cases"]) for row in sections},
         "engineering_status":"NOT_ASSESSED",
