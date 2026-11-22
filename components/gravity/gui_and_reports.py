@@ -271,6 +271,33 @@ class GravityAnalysisGUI:
         except Exception as exc:
             messagebox.showerror("ETABS multi-file selection",str(exc),parent=self.win)
 
+    def _discover_etabs_beam_parts_folder(self):
+        """Pick one directory; require confirmation of every numbered part."""
+        try:
+            from components.inputs.etabs_excel_selection import (
+                discover_beam_force_parts)
+            folder=filedialog.askdirectory(
+                parent=self.win,
+                title="Folder containing Beam Forces Element 1/2/3 XLSX exports")
+            if not folder:
+                return
+            paths=discover_beam_force_parts(folder)
+            if not messagebox.askyesno(
+                    "Confirm ETABS beam-force parts",
+                    f"Found {len(paths)} numbered beam-force files:\\n"+
+                    "\\n".join(p.name for p in paths)+
+                    "\\n\\nUse ALL of these as the original ETABS beam-source parts?",
+                    parent=self.win):
+                return
+            self.etabs_beam_forces_paths=paths
+            self.status_var.set(
+                f"Found all numbered beam-force Excel parts ({len(paths)}): "+
+                ", ".join(p.name for p in paths)+
+                ". Ready for source validation and consolidation.")
+        except Exception as exc:
+            messagebox.showerror(
+                "ETABS beam-force folder discovery",str(exc),parent=self.win)
+
     def _select_all_etabs_beam_force_workbooks(self):
         """Select all exported beam-force Excel parts, without changing model state."""
         try:
@@ -1373,6 +1400,9 @@ class GravityAnalysisGUI:
         ttk.Button(beam_row,
                    text="Select ALL ETABS Element Forces - Beams Excel parts",
                    command=self._select_all_etabs_beam_force_workbooks).pack(side="left",padx=(0,8))
+        ttk.Button(beam_row,
+                   text="Auto-find Beam 1/2/3 in folder",
+                   command=self._discover_etabs_beam_parts_folder).pack(side="left",padx=(0,8))
         ttk.Button(beam_row,
                    text="Validate + register + consolidate beam forces",
                    command=self._audit_all_etabs_beam_force_workbooks).pack(side="left")
