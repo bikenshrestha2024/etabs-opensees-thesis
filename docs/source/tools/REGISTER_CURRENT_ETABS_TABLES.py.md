@@ -11,3 +11,20 @@ python tools/REGISTER_CURRENT_ETABS_TABLES.py --export-root "D:\Thesis Opensees\
 The program checks source EDB availability, workbook format and sheet inventories, separates the three beam-force records and writes just a small manifest inside `01_ETABS_EXPORT/00_MANIFEST`. If the analysis workbook also contains every mandatory native frame-assignment and offset worksheet, it can serve as `etabs_assignment`; otherwise pass `--native-assignment` with the original complete ETABS workbook.
 
 It does **not** infer that any of these workbooks match a revised 12 m shear-wall model merely from filenames. Verify actual source ETABS EDB provenance and row-level wall/element mappings separately; do not use the manifest as engineering validation.
+
+## Multi-file beam-force picker (2026-11-22)
+
+The registered beam force evidence is not limited to three parts. Select all
+`Element Forces - Beams` Excel workbooks (any positive number) at once:
+
+```powershell
+python tools/REGISTER_CURRENT_ETABS_TABLES.py --export-root "D:\\Thesis Opensees\\ETABS 11-22-2026" --analysis "D:\\ETABS Source\\Analysis Export.xlsx" --select-beams
+```
+
+For noninteractive automation use `--beam-files FILE1.xlsx FILE2.xlsx ...`.
+The legacy `--beam-1/2/3` flags still work when all three are supplied.
+Every chosen path must be unique, its bytes must differ from other beam parts,
+and its SHA-256 is stored in the private canonical source registry. Replacing
+the selection removes stale earlier beam-part roles. This is inventory only;
+combine and verify stations with `components.validation.etabs_split_beam_forces`.
+Never interpret selected beam parts as a passed gravity-reaction comparison.
