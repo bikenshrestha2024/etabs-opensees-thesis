@@ -16,7 +16,9 @@ class TestThreeCaseGravity(unittest.TestCase):
         self.model.write_text("pass\n", encoding="utf-8")
 
     def test_no_solved_case_never_substitutes_defaults(self):
-        with patch("components.gravity.three_case_comparison.current_case", return_value=None):
+        with patch("components.gravity.three_case_comparison.current_case_diagnostic",
+                   return_value={"result":None,"status":"NO_CASE_INDEX",
+                                 "reason":"fixture has no indexed runs"}):
             with self.assertRaisesRegex(ValueError, "No current separately solved"):
                 collect_cases(self.root, self.model)
 
@@ -28,7 +30,11 @@ class TestThreeCaseGravity(unittest.TestCase):
             result = self.root / ("case_" + str(n) + ".json")
             result.write_text(json.dumps({"ok": True, "reactions": [{"node_tag": i} for i in range(n)]}))
             return {"result_path": str(result), "applied_load_kN": 100.0}
-        with patch("components.gravity.three_case_comparison.current_case", side_effect=current):
+        with patch("components.gravity.three_case_comparison.current_case_diagnostic",
+                   side_effect=lambda *a,**k:{
+                       "result":current(*a,**k),
+                       "status":"CASE_NOT_INDEXED",
+                       "reason":"fixture 97 missing"}):
             available, missing = collect_cases(self.root, self.model)
         self.assertEqual(set(available), {"32", "76"})
         self.assertEqual(len(missing), 1)
@@ -51,7 +57,11 @@ class TestThreeCaseGravity(unittest.TestCase):
             return {"result_path": str(result), "applied_load_kN": 100.0,
                     "summed_reaction_kN": 100.0,
                     "equilibrium_error_percent": 0.0}
-        with patch("components.gravity.three_case_comparison.current_case", side_effect=current):
+        with patch("components.gravity.three_case_comparison.current_case_diagnostic",
+                   side_effect=lambda *a,**k:{
+                       "result":current(*a,**k),
+                       "status":"CASE_NOT_INDEXED",
+                       "reason":"fixture 97 missing"}):
             report, directory, _figure = export_case_comparison(self.root, self.model)
         self.assertEqual(set(report["available_cases"]), {"32", "76"})
         import csv
@@ -86,7 +96,11 @@ class TestThreeCaseGravity(unittest.TestCase):
             result.write_text(json.dumps({"ok": True, "reactions": [{"node_tag": i} for i in range(n)]}))
             return {"result_path": str(result),
                     "applied_load_kN": 101.0 if n == 76 else 100.0}
-        with patch("components.gravity.three_case_comparison.current_case", side_effect=current):
+        with patch("components.gravity.three_case_comparison.current_case_diagnostic",
+                   side_effect=lambda *a,**k:{
+                       "result":current(*a,**k),
+                       "status":"CASE_NOT_INDEXED",
+                       "reason":"fixture 97 missing"}):
             with self.assertRaisesRegex(ValueError, "different applied gravity"):
                 collect_cases(self.root, self.model)
 
