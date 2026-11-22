@@ -41,6 +41,13 @@ WRITE_METHODS = frozenset({
     "to_excel", "to_csv", "to_json", "dump",
     "writestr", "write", "copyfile", "copy2", "replace",
 })
+# Potential readers need to be paired with producers during migration;
+# this is a conservative AST search, not proof of a runtime file dependency.
+READ_METHODS = frozenset({
+    "read_text", "read_bytes", "read_csv", "read_excel", "read_json",
+    "load_workbook", "loadtxt", "genfromtxt", "read_parquet",
+    "read_pickle", "from_json", "load",
+})
 ROOT_SCRIPTS = (".py",)
 SOURCE_FOLDERS = ("components", "src", "tools")
 
@@ -80,7 +87,8 @@ def scan_source(repo):
     records = []
     problems = []
     totals = {"files": 0, "possible_write_calls": 0,
-              "legacy_literal_occurrences": 0, "canonical_literal_occurrences": 0}
+              "legacy_literal_occurrences": 0, "canonical_literal_occurrences": 0,
+              "possible_read_calls": 0}
     for path in source_files(root):
         rel = path.relative_to(root).as_posix()
         totals["files"] += 1
@@ -112,6 +120,14 @@ def scan_source(repo):
                 func = node.func
                 method = (func.attr if isinstance(func, ast.Attribute)
                           else func.id if isinstance(func, ast.Name) else "")
+                if method in READ_METHODS:
+                    occurrences.append({
+                        "line": getattr(node, "lineno", 0),
+                        "kind": "POTENTIAL_READ_CALL",
+                        "method": method,
+                    })
+                    totals["possible_read_calls"] += 1
+                    continue
                 if method not in WRITE_METHODS and method != "open":
                     continue
                 mode_status = None
@@ -137,6 +153,13 @@ def scan_source(repo):
                         mode_status = "DYNAMIC_MODE_REVIEW_REQUIRED"
                     if mode_status != "DYNAMIC_MODE_REVIEW_REQUIRED":
                         if not any(flag in mode for flag in "wax+"):
+                            occurrences.append({
+                                "line": getattr(node, "lineno", 0),
+                                "kind": "POTENTIAL_READ_CALL",
+                                "method": "open",
+                                "mode_classification": mode_status,
+                            })
+                            totals["possible_read_calls"] += 1
                             continue
                 occurrence = {
                     "line": getattr(node, "lineno", 0),
@@ -176,6 +199,19 @@ def scan_source(repo):
         "totals": totals,
         "files": records,
         "top_legacy_candidates": candidates[:25],
+        "reader_writer_files": sorted([
+            {"source": item["source"],
+             "read_calls": sum(x["kind"]=="POTENTIAL_READ_CALL"
+                               for x in item["occurrences"]),
+             "write_calls": sum(x["kind"]=="POTENTIAL_WRITE_CALL"
+                                for x in item["occurrences"]),
+             "legacy_markers": sum(x["kind"]=="LITERAL_PATH_MARKER" and
+                                  x.get("legacy",False)
+                                  for x in item["occurrences"])}
+            for item in records
+            if any(x["kind"] in ("POTENTIAL_READ_CALL","POTENTIAL_WRITE_CALL")
+                   for x in item["occurrences"])
+        ], key=lambda row:row["source"]),
         "parse_errors": problems,
         "next_action": "Trace every relevant writer and its result readers; migrate and test one stage/case at a time.",
     }
