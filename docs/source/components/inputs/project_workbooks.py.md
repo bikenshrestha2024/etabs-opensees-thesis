@@ -63,3 +63,14 @@ The source-inspected read_explicit_excel_calculation(workbook_path, export_dir, 
 A confirmed memory issue existed in the final provenance check: hashlib.sha256(path.read_bytes()) duplicated the entire Excel source ZIP in Python memory after it had been parsed. On a large user-selected workbook, this creates an avoidable full-file allocation and may induce swapping or failure. The correction uses hashlib.file_digest(open_binary_stream, 'sha256') on Python 3.12, preserving the exact digest, Aw/T extraction, source identity and research-only restrictions. A deterministic test forbids whole-file XLSX Path.read_bytes() and checks the output SHA against an independently computed expected digest.
 
 This correction does NOT change NBC 105:2025 Aw calculations, source piers/opening grouping, ULS/SLS source state, effective period, ESM/MRSM factors, root EDB selection or native OpenSees model assembly. Large workbook parsing may still take time and must be profiled separately. Native ETC/ETABS numerical and 32/76/97 reaction comparisons remain unverified.
+
+
+## 2026-11-22 — current ETABS Excel source priority
+
+For a model export containing `01_ETABS_EXPORT/00_MANIFEST/PROJECT_SOURCES.private.json`, that exact EDB SHA-256-linked manifest is the **only** source of current NBC calculator and scaling references. The active source roles are `nbc_calculator`, `nbc_scaling_uls`, and `nbc_scaling_sls`. A role not registered is **missing**, not permission to search the repository's `excel/source`, sibling model folders or historical workbooks. Any registered file whose bytes have changed fails closed, and a registered scaling sheet must identify the exact EDB bytes via `SCALING SUMMARY`.
+
+For rebuilt models with `require_model_aligned_workbooks=true`, the stronger `MODEL_ALIGNED_12M_WORKBOOK.json` manifest and native source geometry gate remain authoritative; they take precedence over global repository defaults. This preserves separate ULS/SLS selection and prevents an older 4 × 6 m wall assumption being reintroduced as a current 2 × 12 m X-wall input. An unverified Excel workbook is never silently substituted.
+
+Registration is a prerequisite, not a claim of physical or NBC acceptance. Workbook formula caches are *read* but are not recalculated by openpyxl. A missing or stale result must be re-exported and re-registered against the source EDB and wall geometry; engineering checks remain open.
+
+Regression: `tests/test_current_excel_manifest_all_modules.py`.
