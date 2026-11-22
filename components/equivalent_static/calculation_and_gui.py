@@ -19,7 +19,9 @@ from tkinter import ttk, filedialog, messagebox
 
 HERE=Path(__file__).resolve().parent
 from components.inputs.project_workbooks import analysis_output_folder
-from components.nbc105.clause_05_dynamic_characteristics import amplified_period_s, empirical_period_s, period_factor_deviation
+from components.nbc105.clause_05_dynamic_characteristics import (
+    adopted_period_s, amplified_period_s, empirical_period_s, period_factor_deviation
+)
 try:
     from NBC105_Analysis_Settings_V109 import (
         NBC105_ESM_SYSTEM_FACTORS, calculate_esm,
@@ -58,8 +60,8 @@ def resolve_esm_state_periods(*, height_m, aw_by_axis, factor, states,
             ray=float(raw)
             if not math.isfinite(ray) or ray<=0:
                 raise ValueError(f"{state} {axis}: Rayleigh period must be finite positive.")
-            empirical=amplified_period_s(empirical_period_s(h,'concrete shear-wall',area),fac)
-            results[state][axis]=min(empirical,ray)
+            empirical=empirical_period_s(h,'concrete shear-wall',area)
+            results[state][axis]=adopted_period_s(empirical,ray,fac)['adopted_s']
     return results
 
 
@@ -123,12 +125,15 @@ def recommended_story_weight_input(export_dir):
         source={(int(d['storey_number']),int(d['master_tag'])) for d in diaphragms}
         if len(current)!=len(rows) or current!=source:
             raise ValueError('assembled ledger diaphragm tags differ from current model')
+        # Matching master tags do not establish a matching seismic-base or height.
+        from components.modal.rayleigh_ledger_audit import verify_storey_elevations
+        verify_storey_elevations(diaphragms,rows,data['base_z_m'])
         for i,r in enumerate(rows,2):
             for k in ('height_m','dead_load_kN','storage_live_load_kN','other_live_load_kN'):
                 v=float(r[k])
                 if not math.isfinite(v) or v<0:
                     raise ValueError(f'invalid {k} at assembled ledger row {i}')
-        return assembled,('Assembled story-weight ledger selected: model diaphragm tags match; '
+        return assembled,('Assembled story-weight ledger selected: diaphragm tags and elevations match the model; '
             'independently review ETABS gravity/live-load components and seismic mass')
     except (OSError,ValueError,TypeError,KeyError,OverflowError) as exc:
         return (manual if manual.is_file() else None,
@@ -1744,7 +1749,8 @@ class ESMGui:
         H=float(height)
         if not all(math.isfinite(v) and v>0 for v in (aw,factor,H)):
             raise ValueError(axis+": Aw, height and factor must be finite positive.")
-        empirical=amplified_period_s(empirical_period_s(H,'concrete shear-wall',aw),factor)
+        raw_empirical=empirical_period_s(H,'concrete shear-wall',aw)
+        empirical=amplified_period_s(raw_empirical,factor)
         ray=(self.rayleigh_tx if axis=='X' else self.rayleigh_ty).get().strip()
         if ray:
             ray_value=float(ray)
@@ -1755,7 +1761,7 @@ class ESMGui:
             self.period_sources[axis]=(
                 'Empirical ESM followed by centered Rayleigh' if seed else
                 'Manual Rayleigh period input; empirical solve provenance unverified')
-            return min(empirical,ray_value)
+            return adopted_period_s(raw_empirical,ray_value,factor)['adopted_s']
         if self.use_workbook_periods.get() and getattr(self,'excel_direct_reference',None):
             r=self.excel_direct_reference
             if r['limit_state']!=self.state.get().strip().upper():
@@ -1811,7 +1817,7 @@ class ESMGui:
             rayleigh=float(rayleigh)
             if rayleigh<=0: raise ValueError('Rayleigh period must be positive.')
             modal=(self.etabs_tx if d=="X" else self.etabs_ty).get().strip()
-            adopted=min(amplified,rayleigh)
+            adopted=adopted_period_s(empirical,rayleigh,factor)['adopted_s']
             self.T.set(f"{adopted:.12g}")
             self.period_note.set(f"{d}: H={H:.3f} m; Aw={aw:.4f} m²; empirical T1={empirical:.4f} s; amplified={amplified:.4f} s; Rayleigh T1={rayleigh:.4f} s; ETABS/Excel period reference={modal or 'not supplied'}; adopted T1=min(amplified empirical, Rayleigh)={adopted:.4f} s.")
         except Exception as exc: messagebox.showerror("Period calculation needs review",str(exc))
