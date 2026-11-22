@@ -235,6 +235,8 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
     audit={"status":"REBUILD_RUNNING","original_source_dir":str(source),
            "original_assignment_workbook":native.name,
            "original_assignment_sha256":digest(native),
+           "reference_workbooks_status":"OLD_SCALING_QUARANTINED",
+           "x_wall_layout_requirement":"VERIFY_2_X_WALLS_12M_GROSS_EACH",
            "created_utc":datetime.now(timezone.utc).isoformat(),
            "files":[],"new_export_directory":str(target)}
     statusfile=target/"CLEAR_BEAM_REBUILD_STATUS.json"
@@ -266,6 +268,13 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         cfg=json.loads((source/"OpenSees_Complete_Model_Config_V118.json").read_text(encoding="utf-8-sig"))
         if cfg.get("joint_volume_weight_policy") not in ("AUDIT_ONLY",None):
             raise ValueError("Single-owner physical volume changes must be independently reviewed")
+        # Rebuilt variants must not automatically inherit the repository's
+        # older ULS/SLS scaling workbook names. Model-dependent Aw/T remains
+        # from verified ETABS geometry until an explicit model-aligned workbook
+        # is source-hash and wall-layout checked.
+        cfg["require_model_aligned_workbooks"]=True
+        cfg["reference_workbooks_status"]="QUARANTINED_LEGACY_NO_AUTO_IMPORT"
+        cfg["required_x_wall_policy"]="TWO_12M_CONTINUOUS_X_WALLS_WITH_SOURCE_OPENINGS"
         cfg["etabs_beam_weight_policy"]="ETABS_BEAM_CLEAR_LENGTH"
         cfg["etabs_clear_beam_weight_confirmed"]=True
         cfg["joint_volume_weight_policy"]="AUDIT_ONLY"
