@@ -85,3 +85,7 @@ Tracking: [issue #141](https://github.com/bikenshrestha2024/etabs-opensees-thesi
 ## 2026-11-22 follow-up: previously omitted relative-import edges
 
 The cross-module and output migration scanners previously missed or under-described `from .` and `from ..` imports. They now share a non-executing Python import resolver with direct tests and integrated CI coverage. This improves the dependency review queue **without completing migration** or validating real runtime call order. See [source-level correction](20261122_RELATIVE_IMPORT_GRAPH_CORRECTION.md). All native engineering and saved-case gates above remain open.
+
+## Post-merge CI readout (2026-11-22)
+
+The 2026-11-22 merged relative-import correction was verified by six successful CI workflows. The [source-attested CI findings and acceptance status](20261122_VERIFIED_CI_AUDIT_READOUT.md) contain the current 396-module AST scope, 32 clone-group review queue, 82 executable legacy literal matches, 292 candidate producer/consumer sources and detailed still-open native validation gates. This update is static evidence only; no native model runs or user-output migration were performed.
