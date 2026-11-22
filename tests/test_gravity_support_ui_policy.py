@@ -8,12 +8,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class GravitySupportDefaultPolicyTests(unittest.TestCase):
-    def test_diagnostic_ui_default_is_labeled_non_equivalent(self):
+    def test_physical_32_is_default_with_native_equivalence_still_unverified(self):
         text = (ROOT / "components/gravity/gui_and_reports.py").read_text(
             encoding="utf-8-sig")
         ast.parse(text)
         self.assertIn(
-            'self.wall_support_strategy_var.set("32 nonzero-reaction nodes (diagnostic)")',
+            'self.wall_support_strategy_var.set("32 physical foundation supports (primary)")',
             text)
         self.assertIn(
             '"32 nonzero-reaction nodes (diagnostic)": '
