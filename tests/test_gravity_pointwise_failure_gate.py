@@ -56,6 +56,8 @@ class DirectGravityPointwiseGateTests(unittest.TestCase):
         self.assertIn("self.win.after(0,self._refresh_case_reaction)",source)
         self.assertIn("GRAVITY_POINTWISE_REACTION_MISMATCH",source)
         self.assertIn("GRAVITY POINTWISE MISMATCH",source)
+        self.assertIn("Unmatched OpenSees stiffness — diagnostic only",source)
+        self.assertIn('basis!="ETABS_ELASTIC_COMPARISON"',source)
 
     def test_direct_comparison_enforces_separate_nodal_status(self):
         source=(Path(__file__).resolve().parents[1]/"components"/"validation"/
