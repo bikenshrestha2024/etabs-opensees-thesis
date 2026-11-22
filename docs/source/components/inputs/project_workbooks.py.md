@@ -74,3 +74,7 @@ For rebuilt models with `require_model_aligned_workbooks=true`, the stronger `MO
 Registration is a prerequisite, not a claim of physical or NBC acceptance. Workbook formula caches are *read* but are not recalculated by openpyxl. A missing or stale result must be re-exported and re-registered against the source EDB and wall geometry; engineering checks remain open.
 
 Regression: `tests/test_current_excel_manifest_all_modules.py`.
+
+## 2026-11-22 direct Excel path identity correction
+
+`read_explicit_excel_calculation()` is a **user-selected research-reference reader**, not equivalent to the stronger current registered workbook manifest. A same-string source EDB pathname no longer earns `SAME_EDB_PATH_REFERENCE` if the actual EDB file is absent. Real byte-identical renamed copies can be labelled `BYTE_IDENTICAL_EDB_REFERENCE`; different or inaccessible files stay `DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY`. No workbook is modified; `code_accepted` remains false. Importantly, a currently accessible same-path EDB alone still does not prove that an older XLSX was calculated from the identical **historical revision**—that requires independent recorded source hashing and model-aligned geometry evidence before production adoption. Regression: `tests/verify_esm_explicit_excel_method.py`.
