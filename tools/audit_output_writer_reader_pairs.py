@@ -62,6 +62,23 @@ def build_matrix(repo):
     by_path={item["source"]:item for item in scan["reader_writer_files"]}
     rows=[]
     counts=Counter()
+    # Carry original source lines through to a reproducible per-stage queue.
+    # Aggregate totals alone cannot prove every legacy writer was migrated.
+    reference_lines=[]
+    io_call_lines=[]
+    for source_record in scan["files"]:
+        source=source_record["source"]
+        for ref in source_record["occurrences"]:
+            row={"source":source,"owner":_owner(source),
+                 "line":ref["line"],"kind":ref["kind"],
+                 "method":ref.get("method",""),
+                 "markers":";".join(ref.get("markers",[])),
+                 "literal_context":ref.get("literal_context",""),
+                 "migration_status":"SOURCE_REVIEW_REQUIRED_NOT_NATIVE_VALIDATED"}
+            if ref["kind"]=="LITERAL_PATH_MARKER" and ref.get("legacy"):
+                reference_lines.append(row)
+            elif ref["kind"] in ("POTENTIAL_READ_CALL","POTENTIAL_WRITE_CALL"):
+                io_call_lines.append(row)
     for path in source_files(root):
         rel=path.relative_to(root).as_posix()
         owner=_owner(rel)
@@ -101,6 +118,8 @@ def build_matrix(repo):
         "source_count":len(rows),
         "owner_counts":dict(sorted(counts.items())),
         "totals":scan["totals"],
+        "legacy_reference_lines":reference_lines,
+        "reader_writer_candidate_lines":io_call_lines,
         "parse_errors":scan["parse_errors"],
         "producer_consumer_review_required":sum(
             x["review_status"]!="NO_DIRECT_IO_CALL_FOUND_STATIC_ONLY"
@@ -134,6 +153,15 @@ def main(argv=None):
             writer.writeheader()
             for item in report["sources"]:
                 writer.writerow({k:item.get(k) for k in columns})
+        columns=("source","owner","line","kind","method","markers",
+                 "literal_context","migration_status")
+        for name,rows in (
+                ("legacy_reference_line_register.csv",report["legacy_reference_lines"]),
+                ("reader_writer_line_register.csv",report["reader_writer_candidate_lines"])):
+            with (out/name).open("w",newline="",encoding="utf-8-sig") as stream:
+                writer=csv.DictWriter(stream,fieldnames=columns)
+                writer.writeheader()
+                writer.writerows(rows)
     summary={key:report[key] for key in
              ("scope","source_count","owner_counts","totals",
               "producer_consumer_review_required","parse_errors","acceptance")}
