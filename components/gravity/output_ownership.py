@@ -60,6 +60,24 @@ def case_directory(root, scenario, profile, token, *, create=False):
     return dest
 
 
+def workspace_for_solver_case_run(run_directory):
+    """[REF docs/source/components/gravity/output_ownership.py.md]
+    Recover one immutable case's output workspace, never current GUI state.
+
+    Case path: <workspace>/02_RESULTS/<scenario>/<profile>/<run-id>.
+    This prevents late UI folder switching from registering a result into a
+    foreign model's index. Historical irregular folders must use the explicit
+    workspace captured at launch, not a guessed ancestor.
+    """
+    path=_unlinked(run_directory)
+    base=path.parents[2]
+    if (base.name!=SECTIONS["SOLVER"] or
+            path.parents[1].name not in SCENARIOS):
+        raise ValueError("Not a canonical 32/76/97 gravity solver case path: "+
+                         str(path))
+    return path.parents[3]
+
+
 def index_path(root, name, *, create=False):
     """[REF docs/source/components/gravity/output_ownership.py.md]
     Index lives with indexes, not mixed with solver workbooks/plots."""
