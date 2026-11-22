@@ -352,7 +352,8 @@ def build_combined_esm_export(output_root, *, allow_incomplete=False):
     }
     manifest_file = snapshot / "ESM_Export_Manifest.json"
     manifest_file.write_text(json.dumps(overview, indent=2, ensure_ascii=False), encoding="utf-8")
-    archive = snapshot.parent / ("ESM_Combined_Inspection_" + datetime_token + ".zip")
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    archive = ensure_review_zip_directory(root) / ("ESM_Combined_Inspection_" + datetime_token + ".zip")
     with ZipFile(archive, "w", compression=ZIP_DEFLATED, compresslevel=6) as zipped:
         for file in sorted(snapshot.rglob("*")):
             if file.is_file():
