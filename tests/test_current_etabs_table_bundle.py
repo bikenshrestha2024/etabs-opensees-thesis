@@ -44,11 +44,14 @@ class CurrentEtabsBundleTests(unittest.TestCase):
             self.assertEqual(Path(actual),self.books[0])
 
     def test_byte_identical_beam_parts_are_rejected(self):
+        # Distinct paths whose bytes are identical cannot represent
+        # two independently exported beam-force table parts.
+        self.books[2].write_bytes(self.books[1].read_bytes())
         with patch("components.inputs.project_workbooks._source_edb_path",
                    return_value=str(self.edb)):
             with self.assertRaisesRegex(ValueError,"identical bytes"):
                 register_current_etabs_tables(
-                    self.root,self.books[0],(self.books[1],self.books[1],self.books[3]))
+                    self.root,self.books[0],self.books[1:])
         self.assertFalse((self.root/"01_ETABS_EXPORT"/"00_MANIFEST").exists())
 
     def test_missing_native_source_blocks_creation(self):
