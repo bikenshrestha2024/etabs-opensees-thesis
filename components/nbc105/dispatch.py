@@ -88,7 +88,10 @@ def _operation_signature(fn):
 
 
 def operation_input_spec(clause, operation):
-    """Describe the exact public Clause 1–10 operation arguments."""
+    """Describe the exact public Clause 1–10 operation arguments.
+
+    [REF docs/source/components/nbc105/dispatch.py.md]
+    """
     operations=_operations(clause)
     if operation not in operations:
         raise ValueError("Unsupported NBC clause operation")
@@ -96,7 +99,10 @@ def operation_input_spec(clause, operation):
 
 
 def annex_operation_input_spec(annex, operation):
-    """Describe the exact public Annex A/B operation arguments."""
+    """Describe the exact public Annex A/B operation arguments.
+
+    [REF docs/source/components/nbc105/dispatch.py.md]
+    """
     if annex not in _ANNEX_MODULES:
         raise ValueError("Only Annex A/B are implemented as callable rule modules")
     module=importlib.import_module("components.nbc105."+_ANNEX_MODULES[annex])
