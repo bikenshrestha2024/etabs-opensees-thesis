@@ -139,10 +139,20 @@ def assess(source_folder, *, primary_audit=None):
                          source_shell_incidence=None,solver_frame_incidence=None,
                          solver_shell_incidence=None,
                          assembled_support_class="CONNECTIVITY_NOT_IN_EXPORT")
+        if tag in primary:
+            physical_point_role="PHYSICAL_FOUNDATION_SUPPORT_USER_CONFIRMED"
+        elif (topology_complete and summary["solver_shell_incidence"] > 0
+              and summary["solver_frame_incidence"] == 0
+              and any(e.get("category") == "SHEAR WALL"
+                      for e in solver_shell_adj.get(tag, []))):
+            physical_point_role="SHEAR_WALL_MESH_POINT_USER_CONFIRMED_NATIVE_EDGE_PENDING"
+        else:
+            physical_point_role="NONPRIMARY_POINT_ROLE_NEEDS_NATIVE_TOPOLOGY_REVIEW"
         support_rows.append(dict(opensees_node=int(tag),
             etabs_point=native_points.get(tag),
             source_dof="".join(str(int(x)) for x in flags),
             primary32_selected=(tag in primary),
+            physical_point_role=physical_point_role,
             native_source_uz_restrained=bool(original_vertical.get(tag)),
             released_in_primary32=(tag in source_tags - primary),
             provenance="SOURCE_EXPORT_RESTRAINT_NOT_NATIVE_INTERNAL_AUTOMESH",
@@ -152,6 +162,10 @@ def assess(source_folder, *, primary_audit=None):
         "status":("SOURCE_AND_ASSEMBLED_CONNECTIVITY_ONLY_NOT_ETABS_INTERNAL_MESH"
                   if topology_complete else "ASSEMBLED_TOPOLOGY_NOT_AVAILABLE"),
         "released_original_restraints_count":len(released_rows),
+        "physical_foundation_supports_user_confirmed":len(primary),
+        "shear_wall_mesh_points_classified_by_assembled_incidence":sum(
+            row["physical_point_role"].startswith("SHEAR_WALL_MESH_POINT")
+            for row in support_rows),
         "released_are_assembled_shell_only":(
             sum(r["assembled_support_class"]=="SHELL_ONLY" for r in released_rows)
             if topology_complete else None),
@@ -202,7 +216,7 @@ def assess(source_folder, *, primary_audit=None):
     if missing_primary:
         reasons.append("Project primary node tags missing from original source restraints")
     if released:
-        reasons.append("Primary 32-node run releases originally restrained base points; native ETABS DOF equivalence NOT demonstrated")
+        reasons.append("Primary 32 selection releases originally restrained nonprimary source mesh/other points in the OpenSees comparison; the user-confirmed 44 are shear-wall mesh points, NOT 44 additional physical foundations. Native ETABS edge/MPC force transfer remains unverified")
     if not native_frames:
         reasons.append("Native frame assignment metadata missing")
     if missing_offsets:
