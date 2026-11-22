@@ -43,8 +43,25 @@ def _sha256(path):
     return digest.hexdigest()
 
 
-def _source_files(root):
-    """Yield ESM files only; ignore gravity, other analysis and previous snapshots."""
+def _exact_calculation_roots(root):
+    """Locate only this source-model and limit-state ESM calculation case.
+
+    [REF components/inputs/project_workbooks.py analysis_output_folder]
+    Never recursively scan sibling case folders, model variants or states.
+    """
+    root = Path(root).resolve()
+    roots = [root]
+    if root.parent.name == "OpenSees_Analysis_Results":
+        state = root.name.split("_", 1)[0].upper()
+        if state in ("ULS", "SLS"):
+            candidate = root.parent.parent / "03_ESM" / "RUNS" / state / root.name
+            if candidate.is_dir() and not candidate.is_symlink():
+                roots.append(candidate)
+    return tuple(roots)
+
+
+def _source_files(root, calculation_roots=()):
+    """Yield ESM sources, including the exact matched case's calculations."""
     for source in sorted(root.iterdir()):
         if source.is_file() and source.name.startswith(_DIRECT_PREFIXES):
             if source.name.startswith(("Deformation_", "Drift_Check_", "Floor_Edge_Drift_",
@@ -52,6 +69,15 @@ def _source_files(root):
                 continue
             if source.suffix.lower() in _CATEGORIES and not source.name.endswith(".processing.json"):
                 yield "opensees", source
+    for case_root in calculation_roots:
+        if Path(case_root).resolve() == root.resolve():
+            continue
+        # No archive/global search: same case folder and state only.
+        for pattern in ("NBC105_ESM_Calculation_*.json",
+                        "NBC105_ESM_Storey_Forces_*.csv"):
+            for source in sorted(Path(case_root).glob(pattern)):
+                if source.is_file() and not source.is_symlink():
+                    yield "opensees", source
     for subfolder, role in (("ETABS_Linked_ESM", "etabs"),
                             ("ESM_Runner_Status", "opensees"),
                             ("ESM_Route_Comparison", "comparison")):
@@ -71,9 +97,10 @@ def _case_info(path):
     return "GENERAL", match.group(1).upper() if match else "UNSPECIFIED"
 
 
-def _data_rows(input_root):
+def _data_rows(input_root, calculation_roots=()):
     cases, stories = [], []
-    for file in sorted(input_root.glob("NBC105_ESM_Calculation_*.json")):
+    roots = calculation_roots or (input_root,)
+    for file in sorted({f for base in roots for f in Path(base).glob("NBC105_ESM_Calculation_*.json")}):
         try:
             document = json.loads(file.read_text(encoding="utf-8-sig"))
             if not isinstance(document, dict):
@@ -237,12 +264,13 @@ def _latest_batch_status(root):
                 "status_file": str(path), "error": str(exc)}
 
 
-def build_combined_esm_export(output_root):
+def build_combined_esm_export(output_root, *, allow_incomplete=False):
     """[REF docs/source/components/equivalent_static/organized_exports.py.md]
     Return copy-only artifact paths. Never edit input EDB, XLSX, model or case.
     """
     root = Path(output_root).expanduser().resolve(strict=True)
-    selected = list(_source_files(root))
+    calc_roots = _exact_calculation_roots(root)
+    selected = list(_source_files(root, calc_roots))
     if not selected:
         raise ValueError("No ESM source output files found. Calculate and export a case first.")
     datetime_token = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
@@ -266,9 +294,10 @@ def build_combined_esm_export(output_root):
             "sha256": _sha256(source), "bytes": source.stat().st_size,
             "module": _MODULES[module], "state": state, "case": case,
         })
-    cases, stories = _data_rows(root)
+    cases, stories = _data_rows(root, calc_roots)
     batch = _latest_batch_status(root)
-    if not cases:
+    calculation_status = "CALCULATION_JSON_AVAILABLE" if cases else "NO_CALCULATION_JSON"
+    if not cases and not allow_incomplete:
         raise ValueError("ESM artifacts were found, but no calculation JSON is available; "
                          "an engineering combined result cannot be generated.")
     workbook = snapshot / "ESM_Combined_Inspection.xlsx"
@@ -291,6 +320,9 @@ def build_combined_esm_export(output_root):
                              item.get("return_code"), item.get("elapsed_s")))
     status_sheet.append(("Note", "This workbook can contain calculated ESM forces before all solver cases finish."))
     status_sheet.append(("Engineering status", "NOT NATIVE ETABS VERIFIED; ULS high-rise ESM comparison only"))
+    status_sheet.append(("Calculation JSON", calculation_status))
+    if not cases:
+        status_sheet.append(("Missing data", "No T, V, Wi or Fi inferred; locate source-aligned 03_ESM/RUNS JSON."))
     from openpyxl.styles import Alignment, Font, PatternFill
     status_sheet.freeze_panes = "B2"
     status_sheet.column_dimensions["A"].width = 70
@@ -309,7 +341,10 @@ def build_combined_esm_export(output_root):
         "created_utc": datetime.now(timezone.utc).isoformat(), "files": manifest,
         "case_count": len(cases), "story_rows": len(stories),
         "solver_batch": batch,
-        "snapshot_status": ("COMPLETE_SOLVER_ONLY" if batch["status"] == "COMPLETE_SOLVER_ONLY"
+        "calculation_status": calculation_status,
+        "calculation_source_roots": [str(v) for v in calc_roots],
+        "snapshot_status": ("CALCULATIONS_MISSING_SOLVER_ONLY" if not cases else
+                            "COMPLETE_SOLVER_ONLY" if batch["status"] == "COMPLETE_SOLVER_ONLY"
                             else "PARTIAL_OR_UNVERIFIED"),
         "acceptance": "COMPARISON_ONLY_NOT_NATIVE_ETABS_OR_NBC_CERTIFICATION",
         "original_outputs_modified": False,
@@ -330,4 +365,5 @@ def build_combined_esm_export(output_root):
         "manifest": str(manifest_file), "folder": str(snapshot),
         "source_count": len(manifest), "cases": len(cases),
         "solver_batch_status": batch["status"],
+        "calculation_status": calculation_status,
     }
