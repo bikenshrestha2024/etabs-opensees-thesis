@@ -10,7 +10,9 @@ from pathlib import Path
 from components.linear_time_history.runner_and_gui import parse_linear_gui_numeric_inputs
 from components.validation.etabs_direct_api import discover_native_base_reactions
 from components.validation.etabs_comparison import compare, source_execution_identity
-from tests.verify_etabs_direct_equivalence import FakeSap
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from verify_etabs_direct_equivalence import FakeSap
 
 
 class LinearPreflight(unittest.TestCase):
