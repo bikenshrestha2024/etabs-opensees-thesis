@@ -595,11 +595,17 @@ def read_explicit_excel_calculation(workbook_path, export_dir, limit_state):
             if math.isfinite(period) and period>0:
                 values[tkey]=period;cells[tkey]=cell
     current=_source_edb_path(export_dir)
-    exact=bool(current and
-               _portable_source_stem(current).casefold()==_portable_source_stem(source).casefold()
-               and str(current).replace('\\','/').casefold()==
-                   str(source).replace('\\','/').casefold())
-    identical=bool(not exact and _same_edb_file_content(current,source))
+    # Matching text alone is not evidence of an accessible current ETABS
+    # model. The explicit Excel reference can still be viewed in research
+    # mode, but it cannot be automatically source-qualified unless the
+    # current EDB exists and matches the referenced on-disk EDB bytes.
+    same_file_bytes=_same_edb_file_content(current,source)
+    same_path=bool(current and
+        _portable_source_stem(current).casefold()==_portable_source_stem(source).casefold()
+        and str(current).replace('\\','/').casefold()==
+            str(source).replace('\\','/').casefold())
+    exact=bool(same_path and same_file_bytes)
+    identical=bool(not same_path and same_file_bytes)
     status=('SAME_EDB_PATH_REFERENCE' if exact else
             'BYTE_IDENTICAL_EDB_REFERENCE' if identical else
             'DIFFERENT_EDB_RESEARCH_REFERENCE_ONLY')
