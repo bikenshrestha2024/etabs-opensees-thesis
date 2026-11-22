@@ -1008,7 +1008,7 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
                            shells_with_transverse_shear_approximation=sum(
                                not shell['transverse_shear_exact'] for shell in plan['shell_objects'].values()),
                            segments_with_offsets=sum(bool(any(r['joint_offsets_m'])) for r in plan['frame_segments']),
-                           shear_flexible_segments=sum(r['shear_flexible'] for r in plan['frame_segments'],
+                           shear_flexible_segments=sum(r['shear_flexible'] for r in plan['frame_segments']),
                            native_end_offset_coverage=plan.get('native_end_offset_coverage', {}))
                 for state,plan in elastic_comparison.items()
             }
