@@ -1,3 +1,5 @@
+> **Current active modules (2026-11-22):** [Unified component index](components/README.md) · [Source identity, module interfaces and duplicate-code review](docs/architecture/ACTIVE_MODULE_INTEGRATION_AUDIT_20261122.md) · [Uniform output ownership](docs/architecture/UNIFORM_OUTPUT_STRUCTURE_20261122.md). Legacy V134 module inventories and historical worksheets are not the current source of truth; the CI index checks actual checked-in Python files. Native ETABS/OpenSees engineering acceptance remains open.
+
 > **Integrated repository audit and evidence:** [Consolidated 3,039-file inventory, dependency findings, engineering acceptance gates and run output contract](REVIEW_MAIN/08_SOFTWARE_SECURITY/20261115_V31_INTEGRATED_REPOSITORY_AUDIT.md). [Repeatable audit script](tools/audit_repository_integrated.py); [review findings CSV](docs/review/ledger/20261115_V31_INTEGRATED_FINDINGS.csv). Passing static CI does not establish native ETABS/OpenSees equivalence.
 
 > **Root archive index:** [Historical research notes organized by family](archive/previous_versions/HISTORICAL_NOTES/README.md) (13 byte-identical relocated files; 173 tracked root files).
