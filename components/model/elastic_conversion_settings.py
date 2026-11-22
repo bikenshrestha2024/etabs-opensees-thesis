@@ -88,6 +88,99 @@ def _offsets(offsets, frames):
     return result
 
 
+
+def audit_native_end_offset_coverage(options, frames, metadata):
+    """Compare ETABS *source* rigid end-zone assignments with explicit inputs.
+
+    Diagnostic only. Does NOT apply an offset, recalibrate a support reaction,
+    or certify that the OpenSees element reproduces ETABS rigid-zone stiffness.
+    [REF docs/source/components/model/elastic_conversion_settings.py.md]
+    """
+    frame_lookup = {}
+    for frame in frames:
+        obj = str(frame["object"])
+        section = str(frame["properties"]["section"])
+        if obj in frame_lookup and frame_lookup[obj] != section:
+            raise ValueError("Conflicting section assignments across segments of frame " + obj)
+        frame_lookup[obj] = section
+    source_frames = (metadata or {}).get("frames") or {}
+    supplied = options.get("end_offsets_m", {})
+    shear_sections = set(options.get("shear_flexible_sections", []))
+    missing_source = []
+    unmodeled = []
+    conflicting = []
+    matched = []
+    native_active = 0
+    native_shear_active = 0
+    native_active_by_section = defaultdict(int)
+    for obj, section in sorted(frame_lookup.items()):
+        row = source_frames.get(obj) or {}
+        raw = row.get("GetEndLengthOffset")
+        if not isinstance(raw, (list, tuple)) or len(raw) != 5 or raw[-1] != 0:
+            missing_source.append(obj)
+            continue
+        try:
+            i_length, j_length, rigid = map(float, raw[1:4])
+        except (TypeError, ValueError):
+            missing_source.append(obj)
+            continue
+        if not all(math.isfinite(value) for value in (i_length, j_length, rigid)):
+            missing_source.append(obj)
+            continue
+        if min(i_length, j_length, rigid) < 0 or rigid > 1:
+            missing_source.append(obj)
+            continue
+        if (i_length + j_length) * rigid <= 1e-9:
+            continue
+        native_active += 1
+        native_active_by_section[section] += 1
+        if section in shear_sections:
+            native_shear_active += 1
+        values = supplied.get(obj)
+        if values is None:
+            unmodeled.append(obj)
+            continue
+        try:
+            same = all(math.isclose(float(values[key]), expected, rel_tol=0., abs_tol=1e-8)
+                       for key, expected in (("i", i_length), ("j", j_length),
+                                             ("rigid_fraction", rigid)))
+        except (TypeError, ValueError, KeyError):
+            same = False
+        (matched if same else conflicting).append(obj)
+    if not frame_lookup:
+        status = "NO_ASSEMBLED_FRAME_OBJECTS"
+    elif len(missing_source) == len(frame_lookup):
+        status = "NATIVE_RIGID_ZONE_SOURCE_METADATA_UNAVAILABLE"
+    elif missing_source or unmodeled or conflicting:
+        status = "NATIVE_RIGID_ZONE_COVERAGE_INCOMPLETE"
+    else:
+        status = "NATIVE_RIGID_ZONE_INPUTS_MATCH_SOURCE_NOT_SOLVER_VALIDATION"
+    return dict(
+        status=status,
+        assembled_unique_frame_objects=len(frame_lookup),
+        native_offset_metadata_available_count=len(frame_lookup)-len(missing_source),
+        native_active_rigid_zone_objects=native_active,
+        native_active_rigid_zone_by_section=dict(sorted(native_active_by_section.items())),
+        native_rigid_zone_on_selected_shear_flexible_objects=native_shear_active,
+        native_offsets_configured_exact_count=len(matched),
+        native_offsets_unmodeled_count=len(unmodeled),
+        native_offsets_differ_from_source_count=len(conflicting),
+        native_offset_metadata_missing_count=len(missing_source),
+        unmodeled_object_ids_sample=unmodeled[:12],
+        conflicting_object_ids_sample=conflicting[:12],
+        missing_source_object_ids_sample=missing_source[:12],
+        engineering_acceptance="NOT_VERIFIED",
+        warning=(
+            "An ETABS-elastic modifier match is not an end-zone stiffness match. "
+            "Native ETABS rigid offsets with no reviewed end_offsets_m remain "
+            "unmodeled. The current ElasticTimoshenkoBeam adapter explicitly "
+            "rejects combining shear-flexible elements and nonzero joint offsets; "
+            "isolate, validate, and document a compatible formulation before "
+            "changing production stiffness or declaring ETABS reaction equivalence."
+        ),
+    )
+
+
 def compile_settings(config, frames, shells, metadata):
     """Bind state-specific settings to the actual frame segments and shell objects.
 
@@ -114,6 +207,7 @@ def compile_settings(config, frames, shells, metadata):
         shear = options.get("shear_flexible_sections", [])
         if not isinstance(shear, list) or any(not isinstance(k, str) or k not in frame_sections for k in shear):
             raise ValueError(f"{state} shear_flexible_sections must list assembled section names")
+        offset_coverage = audit_native_end_offset_coverage(options, frames, metadata)
         offsets = _offsets(options.get("end_offsets_m", {}), frames)
         segments = []
         for index, frame in enumerate(frames):
@@ -172,5 +266,6 @@ def compile_settings(config, frames, shells, metadata):
                 source_kind="ETABS_MODIFIERS_WITH_EXPLICIT_ELASTIC_OVERRIDES",
                 transverse_shear_policy=("ALLOW_REVIEWED_THIN_SHELL_APPROX" if approximate
                                          else "REJECT_DIFFERENCE"))
-        result[state] = dict(frame_segments=segments, shell_objects=shell_plan)
+        result[state] = dict(frame_segments=segments, shell_objects=shell_plan,
+                             native_end_offset_coverage=offset_coverage)
     return result
