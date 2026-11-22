@@ -1,6 +1,6 @@
 # Solver-independent shared utilities and runtime conventions
 
-**Active owner:** `components/shared/` · **Current Python modules:** 8 · **Status:** module navigation only; engineering acceptance requires independent evidence.
+**Active owner:** `components/shared/` · **Current Python modules:** 9 · **Status:** module navigation only; engineering acceptance requires independent evidence.
 
 ## Responsibilities and interfaces
 
@@ -19,6 +19,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [gravity_transient_handoff.py](gravity_transient_handoff.py)
 - [legacy_solver_stack.py](legacy_solver_stack.py)
 - [response_recorders.py](response_recorders.py)
+- [repository_paths.py](repository_paths.py)
 - [runtime_utilities.py](runtime_utilities.py)
 - [timing.py](timing.py)
 - [transient_runtime.py](transient_runtime.py)
