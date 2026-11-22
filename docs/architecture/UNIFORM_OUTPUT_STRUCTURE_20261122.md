@@ -70,7 +70,7 @@ python tools/audit_uniform_output_structure.py --export-root "D:\Thesis Opensees
 ```
 
 Reports stage presence, case-manifest validity, historical path presence,
-noncanonical or incomplete run directories, loose root-level CSV/JSON/Excel/ZIP/plot artifacts requiring ownership review, and recorded engineering
+noncanonical or incomplete run directories, loose root-level **and stage-level** CSV/JSON/Excel/ZIP/plot artifacts requiring ownership review, and recorded engineering
 status. It **never** relocates files, interprets solver equations, reads
 source XLSX/EDB contents, or changes analysis files. Private names/paths
 are not published to GitHub automatically. An explicit local execution
