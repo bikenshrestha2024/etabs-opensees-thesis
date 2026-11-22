@@ -94,7 +94,7 @@ class ReadFirstEngineeringContractTests(unittest.TestCase):
     def test_new_agent_frontmatter(self) -> None:
         data = contents(".github/agents/etabs-opensees-engineer.agent.md")
         self.assertTrue(data.startswith("---\nname: etabs-opensees-engineer\n"))
-        self.assertIn("32 actual foundation", data)
+        self.assertIn("Actual physical foundation = 32 support joints", data)
         self.assertIn("full gravity", data.lower())
 
 
