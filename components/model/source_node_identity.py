@@ -12,7 +12,10 @@ import math
 
 
 def coordinate_key(xyz, *, decimals=8):
-    """Return a finite kN-m-s model XYZ rounded for deterministic mesh matching."""
+    """Return a finite kN-m-s model XYZ rounded for deterministic mesh matching.
+
+    [REF components/model/assembly.py source coordinate matching contract]
+    """
     if not isinstance(xyz, (list, tuple)) or len(xyz) != 3:
         raise ValueError("ETABS source joint must have three XYZ coordinates")
     values = []
@@ -35,6 +38,7 @@ def unique_coordinate_lookup(source_nodes):
     Source points at the same XYZ can be independent or MPC-linked. Without
     native relationship evidence, neither sharing a solver node nor creating
     an automatic rigid/equalDOF relation is safe.
+    [REF docs/source/components/model/source_node_identity.py.md source tag identity]
     """
     lookup = {}
     for tag, xyz in source_nodes.items():
@@ -51,7 +55,10 @@ def unique_coordinate_lookup(source_nodes):
 
 
 def audit_node_map_identity(node_map):
-    """Read-only evidence audit; never create or erase a source-node relation."""
+    """Read-only evidence audit; never create or erase a source-node relation.
+
+    [REF docs/source/components/model/source_node_identity.py.md point identity preflight]
+    """
     if not isinstance(node_map, list):
         return dict(status="SOURCE_NODE_MAP_UNAVAILABLE", records=0,
                     parsed=0, missing_rows=0, duplicate_coordinate_groups=[],
