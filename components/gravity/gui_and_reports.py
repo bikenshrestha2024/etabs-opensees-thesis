@@ -129,8 +129,9 @@ class GravityAnalysisGUI:
         self.reaction_support_verification_var = tk.StringVar(
             value="32 nonzero-reaction screening tags only; source has 76 restraints")
         self.load_var = tk.StringVar()
-        self.solved_reaction_var = tk.StringVar(value="Not analyzed for this case")
-        self.solved_reaction_status_var = tk.StringVar(value="No matching completed 32/76/97-node run")
+        self.solved_reaction_var = tk.StringVar(value="Checking saved case…")
+        self.solved_reaction_status_var = tk.StringVar(
+            value="Select model and result folder to verify 32/76/97 saved case")
         self.steps_var = tk.StringVar(value="10")
         # Full independent gravity: all assigned dead, live AND roof live at 1.0.
         # Seismic workflows remain on AS_CONFIGURED with independent mass_factors.
