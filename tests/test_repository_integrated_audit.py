@@ -374,6 +374,15 @@ class IntegratedAuditTests(unittest.TestCase):
             self.assertEqual(graph["eager_import_cycles"],[])
             self.assertEqual(graph["eager_import_edges"],0)
             self.assertEqual(graph["deferred_import_edges"],2)
+            subprocess.run(["git","init","-q",str(root)],
+                           check=True,capture_output=True)
+            subprocess.run(["git","-C",str(root),"add","-A"],
+                           check=True,capture_output=True)
+            findings=audit(root)["findings"]
+            self.assertIn("P2_DEFERRED_LOCAL_IMPORT_REVIEW",
+                          {item["id"] for item in findings})
+            self.assertNotIn("P1_EAGER_LOCAL_IMPORT_CYCLES",
+                             {item["id"] for item in findings})
 
     def test_missing_root_canonical_is_not_mislabeled_as_equivalence_failure(self):
         with tempfile.TemporaryDirectory() as td:
