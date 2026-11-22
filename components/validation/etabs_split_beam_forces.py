@@ -1,8 +1,13 @@
-"""Consolidate split ETABS 'Element Forces - Beams' Excel tables without row loss.
+"""Consolidate ETABS Element Forces - Beams from multiple XLSX files/sheets.
 
-All input XLSX files remain unmodified. Use streaming workbook readers and CSV
-output: the original ETABS full-table sheet can hit Excel's 1,048,576-row limit.
-Duplicate keys must agree numerically and textually or the audit fails closed.
+[REF docs/source/components/validation/etabs_split_beam_forces.py.md]
+Excel's 1,048,576-row sheet limit is NOT the limit for this importer.
+Sources remain read-only, each matching worksheet is consumed, and output
+CSV may contain more than one million data rows. SQLite provides a disk-backed
+unique-key store instead of retaining all station rows in Python RAM.
+
+Strict mode rejects different gravity cases and conflicting overlapping rows.
+This is source ETABS data ONLY, not ETABS/OpenSees reaction equivalence.
 
 Usage:
  python -m components.validation.etabs_split_beam_forces OUTPUT_DIR part1.xlsx part2.xlsx part3.xlsx
@@ -14,11 +19,13 @@ import csv
 import hashlib
 import json
 import math
+import sqlite3
+import tempfile
 from pathlib import Path
 
 IDENTITY = ("Story", "Unique Name", "Output Case", "Station")
-IGNORED_IDENTITY = {"Label", "Case Type", "Step Type", "Step Number"}
 CASE_NAME = "1. DL + LL"
+NEEDED = ("story", "unique name", "output case", "station")
 
 
 def _normalized(value):
@@ -33,111 +40,171 @@ def _digest(path):
     return h.hexdigest()
 
 
-def _stream_rows(path):
+def _headers(path):
+    """Find all beam-force tables in a workbook, without loading data rows."""
     from openpyxl import load_workbook
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
         candidates = []
         for sheet in wb:
-            # Search first 30 rows; ETABS exports sometimes prefix a table
-            # caption and units above the actual column names.
-            iterator = sheet.iter_rows(values_only=True)
-            for ix, record in enumerate(iterator):
+            for ix, record in enumerate(sheet.iter_rows(values_only=True)):
                 labels = {_normalized(v): n for n, v in enumerate(record)
                           if v is not None and str(v).strip()}
-                needed = ("story", "unique name", "output case", "station")
-                if all(k in labels for k in needed):
+                if all(k in labels for k in NEEDED):
                     columns = [str(v).strip() if v is not None else ""
                                for v in record]
+                    named = [v for v in columns if v]
+                    if len(named) != len(set(named)):
+                        raise ValueError(f"{path}: duplicate column names in {sheet.title}")
                     candidates.append((sheet.title, ix, columns))
                     break
                 if ix >= 29:
                     break
-        if len(candidates) != 1:
-            raise ValueError(f"{path}: expected exactly one beam-force table, found {len(candidates)}")
-        name, heading, columns = candidates[0]
-        if len(set(c for c in columns if c)) != len([c for c in columns if c]):
-            raise ValueError(f"{path}: duplicate column names in sheet {name}")
-        for record in wb[name].iter_rows(min_row=heading + 2, values_only=True):
-            if not any(v is not None and str(v).strip() for v in record):
-                continue
-            row = {column: record[i] if i < len(record) else None
-                   for i, column in enumerate(columns) if column}
-            if any(row.get(col) is None for col in IDENTITY):
-                raise ValueError(f"{path}: incomplete beam-force identity in {name}")
-            yield row
+        if not candidates:
+            raise ValueError(
+                f"{path}: no Element Forces - Beams table found. "
+                "Choose Beam Forces Element 1/2/3 (or workbook with those sheets), "
+                "not a different ETABS export.")
+        return candidates
     finally:
         wb.close()
 
 
+def _stream_tables(path):
+    """Yield (sheet-name, row) from every matching Excel worksheet."""
+    from openpyxl import load_workbook
+    candidates = _headers(path)
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        for sheet_name, heading, columns in candidates:
+            for record in wb[sheet_name].iter_rows(
+                    min_row=heading + 2, values_only=True):
+                if not any(v is not None and str(v).strip() for v in record):
+                    continue
+                row = {column: record[i] if i < len(record) else None
+                       for i, column in enumerate(columns) if column}
+                if any(row.get(col) is None for col in IDENTITY):
+                    raise ValueError(
+                        f"{path} / {sheet_name}: incomplete beam-force identity")
+                yield sheet_name, row
+    finally:
+        wb.close()
+
+
+def _same_value(lhs, rhs, *, atol, rtol):
+    if lhs is None and rhs is None:
+        return True
+    if isinstance(lhs, (int, float)) and isinstance(rhs, (int, float)):
+        return (math.isfinite(float(lhs)) and math.isfinite(float(rhs))
+                and math.isclose(float(lhs), float(rhs),
+                                 abs_tol=atol, rel_tol=rtol))
+    return _normalized(lhs) == _normalized(rhs)
+
+
 def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9):
-    """[REF docs/source/components/validation/etabs_split_beam_forces.py.md]"""
-    if not inputs or len(inputs) < 1:
+    """[REF docs/source/components/validation/etabs_split_beam_forces.py.md]
+    Merge any positive number of workbooks and all their beam-force sheets.
+    No partial CSV/manifest is published on input validation failure.
+    """
+    if not inputs:
         raise ValueError("At least one ETABS beam-force workbook required")
-    paths = [Path(x).resolve() for x in inputs]
-    if len(set(paths)) != len(paths):
+    paths = [Path(p).expanduser().resolve() for p in inputs]
+    if len({str(p).casefold() for p in paths}) != len(paths):
         raise ValueError("Same input workbook supplied twice")
-    target = Path(output_dir).resolve()
+    target = Path(output_dir).expanduser().resolve()
     if target.exists() and any(target.iterdir()):
         raise FileExistsError("Output directory must be new or empty")
-    records = {}
-    column_names = None
-    manifest = []
-    duplicate_count = 0
     for path in paths:
-        if not path.is_file() or path.is_symlink():
-            raise ValueError("Missing or linked input file: " + str(path))
-        count = 0
-        for row in _stream_rows(path):
-            if _normalized(row["Output Case"]) != _normalized(case):
-                raise ValueError(f"{path}: unexpected Output Case {row['Output Case']!r}")
-            keys = list(row)
-            if column_names is None:
-                column_names = keys
-            elif set(keys) != set(column_names):
-                raise ValueError(f"{path}: beam-force column schema differs between exports")
-            # A unique beam may have multiple stations, but a station must
-            # never be conflated across distinct steps.
-            key = tuple(_normalized(row[n]) for n in IDENTITY)
-            extra_key = tuple(_normalized(row.get(k)) for k in
-                              ("Step Type", "Step Number") if k in row)
-            key += extra_key
-            existing = records.get(key)
-            if existing is not None:
-                for col in column_names:
-                    lhs, rhs = existing[col], row[col]
-                    if lhs is None and rhs is None:
-                        continue
-                    if isinstance(lhs, (int, float)) and isinstance(rhs, (int, float)):
-                        if not (math.isfinite(float(lhs)) and math.isfinite(float(rhs))
-                                and math.isclose(float(lhs), float(rhs), abs_tol=atol, rel_tol=rtol)):
-                            raise ValueError(f"Conflicting duplicate at {key}, column {col}: {lhs} vs {rhs}")
-                    elif _normalized(lhs) != _normalized(rhs):
-                        raise ValueError(f"Conflicting duplicate at {key}, column {col}: {lhs} vs {rhs}")
-                duplicate_count += 1
-            else:
-                records[key] = row
-            count += 1
-        manifest.append(dict(filename=path.name, source_sha256=_digest(path),
-                             rows_read=count))
-    if not records:
-        raise ValueError("No beam-force rows recovered from source exports")
-    # Fail before publishing a partial success. CSV has no worksheet row cap.
-    target.mkdir(parents=True, exist_ok=True)
-    output = target / "ETABS_Beam_Forces_Consolidated.csv"
-    with output.open("w", newline="", encoding="utf-8-sig") as fp:
-        writer = csv.DictWriter(fp, fieldnames=column_names, extrasaction="raise")
-        writer.writeheader()
-        for key in sorted(records):
-            writer.writerow(records[key])
-    summary = dict(status="ETABS_BEAM_FORCE_SOURCE_ONLY_NOT_OPENSEES_EQUIVALENCE",
-                   case=case, input_files=manifest, source_rows=sum(x["rows_read"] for x in manifest),
-                   exact_or_tolerance_matched_overlaps=duplicate_count,
-                   unique_rows=len(records), output=str(output),
-                   scope="ETABS beam stations only; no joint reactions, wall-shell resultants or solver matching",
-                   limitations=["Split workbooks do not verify unexported beam stations",
-                                "Map ETABS member unique names and end locations to assembled solver segments",
-                                "Rigid offsets, force axes and output station convention require comparison"])
+        if (not path.is_file() or path.is_symlink()
+                or path.suffix.lower() not in (".xlsx", ".xlsm")):
+            raise ValueError("Missing, linked or non-Excel input file: " + str(path))
+
+    columns = None
+    manifest = []
+    source_rows = 0
+    duplicate_count = 0
+    with tempfile.TemporaryDirectory(prefix="etabs_beam_sqlite_") as scratch:
+        database = Path(scratch) / "stations.sqlite"
+        db = sqlite3.connect(str(database))
+        try:
+            db.execute("CREATE TABLE stations (k TEXT PRIMARY KEY, row_json TEXT NOT NULL)")
+            for path in paths:
+                counts = {}
+                for sheet_name, row in _stream_tables(path):
+                    if _normalized(row["Output Case"]) != _normalized(case):
+                        raise ValueError(
+                            f"{path} / {sheet_name}: unexpected Output Case "
+                            f"{row['Output Case']!r} (expected {case!r})")
+                    keys = list(row)
+                    if columns is None:
+                        columns = keys
+                    elif set(keys) != set(columns):
+                        raise ValueError(
+                            f"{path} / {sheet_name}: beam-force column schema "
+                            "differs between parts")
+                    # Preserve local identity, load case, output station, and
+                    # response step. Do not collapse unlike histories.
+                    identity = [_normalized(row[n]) for n in IDENTITY]
+                    identity += [_normalized(row.get(n)) for n in
+                                 ("Step Type", "Step Number") if n in row]
+                    key = json.dumps(identity, ensure_ascii=False,
+                                     separators=(",", ":"))
+                    prior = db.execute(
+                        "SELECT row_json FROM stations WHERE k=?", (key,)).fetchone()
+                    if prior:
+                        previous = json.loads(prior[0])
+                        for col in columns:
+                            if not _same_value(previous[col], row[col],
+                                               atol=atol, rtol=rtol):
+                                raise ValueError(
+                                    f"Conflicting duplicate at {identity}, "
+                                    f"column {col}: {previous[col]} vs {row[col]}")
+                        duplicate_count += 1
+                    else:
+                        db.execute(
+                            "INSERT INTO stations (k,row_json) VALUES (?,?)",
+                            (key, json.dumps(row, allow_nan=False,
+                                             ensure_ascii=False, default=str)))
+                    counts[sheet_name] = counts.get(sheet_name, 0) + 1
+                    source_rows += 1
+                manifest.append({
+                    "filename": path.name, "source_sha256": _digest(path),
+                    "rows_read": sum(counts.values()),
+                    "sheets": [{"name": name, "rows_read": n}
+                               for name, n in counts.items()],
+                })
+            if not source_rows:
+                raise ValueError("No beam-force rows recovered from selected sources")
+            db.commit()
+            unique = db.execute("SELECT COUNT(*) FROM stations").fetchone()[0]
+            # The CSV is emitted only after every source row is validated.
+            target.mkdir(parents=True, exist_ok=True)
+            output = target / "ETABS_Beam_Forces_Consolidated.csv"
+            with output.open("w", newline="", encoding="utf-8-sig") as fp:
+                writer = csv.DictWriter(fp, fieldnames=columns, extrasaction="raise")
+                writer.writeheader()
+                for (payload,) in db.execute(
+                        "SELECT row_json FROM stations ORDER BY k"):
+                    writer.writerow(json.loads(payload))
+        finally:
+            db.close()
+
+    summary = {
+        "status": "ETABS_BEAM_FORCE_SOURCE_ONLY_NOT_OPENSEES_EQUIVALENCE",
+        "case": case,
+        "input_files": manifest,
+        "source_rows": source_rows,
+        "exact_or_tolerance_matched_overlaps": duplicate_count,
+        "unique_rows": unique,
+        "output": str(output),
+        "output_format": "CSV_UNLIMITED_EXCEL_WORKSHEET_ROWS",
+        "scope": "ETABS beam stations only; not joint reactions or solver matching",
+        "limitations": [
+            "Unexported stations cannot be verified from selected files",
+            "Map ETABS unique names, local axes, stations and offsets to model",
+            "Source table aggregation does not prove ETABS/OpenSees equivalence",
+        ],
+    }
     (target / "ETABS_Beam_Forces_Manifest.json").write_text(
         json.dumps(summary, indent=2, allow_nan=False), encoding="utf-8")
     return summary
