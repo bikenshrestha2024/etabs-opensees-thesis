@@ -22,7 +22,9 @@ class GravityArchiveOnlyTests(unittest.TestCase):
             folder=Path(result["folder"])
             items=list(folder.iterdir())
             self.assertEqual({x.name for x in items},
-                {"EVIDENCE_MANIFEST.json","README_FIRST.txt","ZIP_Exports"})
+                {"EVIDENCE_MANIFEST.json","README_FIRST.txt"})
+            self.assertEqual(Path(result["zip_files"]["GRAVITY_REVIEW"]).parent,
+                             root/"07_EXPORT_ZIP")
             self.assertEqual(set(result["zip_files"]),{"GRAVITY_REVIEW"})
             manifest=json.loads((folder/"EVIDENCE_MANIFEST.json").read_text(encoding="utf-8"))
             self.assertTrue(manifest["archive_only_no_extracted_copies"])
