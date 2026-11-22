@@ -47,10 +47,24 @@ def _headers(path):
     try:
         candidates = []
         for sheet in wb:
+            # The identity columns are also present in some non-beam ETABS
+            # tables; require a beam-specific worksheet title, export name,
+            # or ETABS caption to avoid quietly importing column forces.
+            beam_identity = (
+                ("beam" in sheet.title.casefold()
+                 and "force" in sheet.title.casefold())
+                or ("beam forces element" in Path(path).stem.casefold())
+            )
             for ix, record in enumerate(sheet.iter_rows(values_only=True)):
+                if any("element forces - beams" in _normalized(value)
+                       for value in record if value is not None):
+                    beam_identity = True
                 labels = {_normalized(v): n for n, v in enumerate(record)
                           if v is not None and str(v).strip()}
                 if all(k in labels for k in NEEDED):
+                    if not beam_identity:
+                        # Same column shape is not evidence of a beam table.
+                        break
                     columns = [str(v).strip() if v is not None else ""
                                for v in record]
                     named = [v for v in columns if v]
