@@ -9,7 +9,7 @@ from pathlib import Path
 
 from components.linear_time_history.runner_and_gui import parse_linear_gui_numeric_inputs
 from components.validation.etabs_direct_api import discover_native_base_reactions
-from components.validation.etabs_comparison import compare, source_execution_identity
+from components.validation.etabs_comparison import compare, source_execution_identity, verify_native_bundle
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from verify_etabs_direct_equivalence import FakeSap
@@ -73,6 +73,37 @@ class NativeETABSObservations(unittest.TestCase):
             other=Path(tmp)/"b.edb";other.write_bytes(b"b")
             with self.assertRaisesRegex(ValueError,"source EDB|active ETABS"):
                 discover_native_base_reactions(FakeSap(p),other,max_cases=10)
+
+class NativeSourceFingerprintTest(unittest.TestCase):
+    def test_exact_edb_model_csv_and_mapping_sha_verified(self):
+        import json,hashlib,csv
+        from components.validation.etabs_direct_api import fingerprint
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);edb=root/"source.edb";edb.write_bytes(b"etabs original")
+            model=root/"OpenSees_Complete_Model_Data_V118.json"
+            model.write_text('{"model":"same"}',encoding="utf8")
+            reference=root/"ETABS_Comparison_V148";reference.mkdir()
+            row=dict(method="MRSM",limit_state="ULS",case="X_E0",axis="X",
+                     location="BASE",metric="base_shear",unit="kN",
+                     basis="CQC_force_scaled",value="100")
+            with (reference/"ETABS_API_Normalized.csv").open("w",newline="",encoding="utf-8-sig") as stream:
+                writer=csv.DictWriter(stream,fieldnames=list(row));writer.writeheader();writer.writerow(row)
+            mapping=dict(source_edb=str(edb),assumptions_verified=True,cases=[dict(
+                method="MRSM",limit_state="ULS",case="X_E0",axis="X",
+                etabs_case="RSX",story_map={"Story1":1})])
+            (reference/"ETABS_API_Mapping_SELECTED.json").write_text(json.dumps(mapping))
+            provenance=dict(edb_path=str(edb),edb_sha256=fingerprint(edb),
+                source_model_sha256=fingerprint(model),
+                native_csv_sha256=fingerprint(reference/"ETABS_API_Normalized.csv"))
+            (reference/"ETABS_API_Provenance.json").write_text(json.dumps(provenance))
+            candidate,note=verify_native_bundle(reference,edb,fingerprint(model))
+            self.assertEqual(candidate,reference/"ETABS_API_Normalized.csv")
+            self.assertIn("verified",note.lower())
+            (reference/"ETABS_API_Normalized.csv").write_text("tampered",encoding="utf8")
+            candidate,note=verify_native_bundle(reference,edb,fingerprint(model))
+            self.assertIsNone(candidate)
+            self.assertIn("SHA",note)
+
 
 class MRSMExecutionIdentity(unittest.TestCase):
     def test_historical_same_sha_but_unknown_76_support_must_not_be_verified(self):
