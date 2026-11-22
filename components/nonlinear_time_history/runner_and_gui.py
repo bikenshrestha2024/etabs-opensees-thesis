@@ -111,6 +111,25 @@ def _require_nonlinear_readiness(config):
     return {"path": str(path), "model_script": str(model), "check_count": len(keys)}
 
 
+
+def _nltha_output_scope(config):
+    """0-second full record is Suite; a positive truncated diagnostic is Trial.
+
+    Previously the GUI always wrote Trial because 0.0 is not None.
+    A scope label is never structural model or solver acceptance.
+    """
+    interval = config.get("trial_duration_s")
+    if interval in (None, ""):
+        interval = 0.
+    try:
+        interval = float(interval)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("trial_duration_s must be finite and nonnegative") from exc
+    if not math.isfinite(interval) or interval < 0:
+        raise ValueError("trial_duration_s must be finite and nonnegative")
+    return "Trial" if config.get("preliminary_selection") or interval > 0 else "Suite"
+
+
 def _analysis_duration_s(motion, orientation, requested_duration_s):
     """Return analyzed and full record durations for a bounded diagnostic trial."""
     try:
@@ -1117,6 +1136,89 @@ class NonlinearTimeHistoryGUI:
             self.x_record_paths = list(paths)
             self.x_count.configure(text=f"{len(paths)} files selected")
 
+
+    def _open_readiness_blockers_dialog(self, config, diagnosis):
+        """Scrollable readiness refusal; never sets human approval true."""
+        from components.model.readiness import format_readiness_review
+        from tkinter import filedialog
+        from tkinter.scrolledtext import ScrolledText
+
+        content = format_readiness_review(diagnosis)
+        dialog = tk.Toplevel(self.win)
+        dialog.title("NLTHA blocked — source/model readiness")
+        dialog.geometry("1050x710")
+        dialog.minsize(700, 480)
+        ttk.Label(
+            dialog,
+            text=(f"Analysis did not start — {len(diagnosis.get('blockers', []))} "
+                  "unresolved engineering/model prerequisites"),
+            font=("Segoe UI", 11, "bold"),
+        ).pack(anchor="w", padx=12, pady=(10, 5))
+        ttk.Label(
+            dialog,
+            text=("Production NLTHA cannot be approved by code. Review source "
+                  "materials, 32 physical foundations, gravity/P-Delta, FSAM "
+                  "calibration and record inputs. Separate Stage 38 is research-only."),
+            wraplength=995,
+        ).pack(anchor="w", padx=12, pady=(0, 7))
+        viewer = ScrolledText(dialog, wrap="word", font=("Consolas", 10))
+        viewer.pack(fill="both", expand=True, padx=12, pady=5)
+        viewer.insert("1.0", content)
+        viewer.configure(state="disabled")
+        buttons = ttk.Frame(dialog)
+        buttons.pack(fill="x", padx=12, pady=(6, 12))
+
+        def copy_report():
+            dialog.clipboard_clear()
+            dialog.clipboard_append(content)
+
+        def save_report():
+            selected = filedialog.asksaveasfilename(
+                parent=dialog,
+                title="Save local unapproved NLTHA readiness evidence list",
+                defaultextension=".txt",
+                filetypes=[("Text report", "*.txt"), ("Markdown report", "*.md")],
+                initialfile="NLTHA_Readiness_Blockers_UNAPPROVED.txt",
+            )
+            if not selected:
+                return
+            try:
+                Path(selected).write_text(content, encoding="utf-8")
+            except OSError as exc:
+                messagebox.showerror("Cannot save readiness report", str(exc),
+                                     parent=dialog)
+                return
+            messagebox.showinfo(
+                "Local diagnostic saved",
+                "Report saved locally; no model or approval changed.\n" +
+                str(selected),
+                parent=dialog,
+            )
+
+        def open_checklist():
+            model = Path(config.get("model_script", "")).expanduser()
+            if not model.is_file():
+                messagebox.showerror("Model source missing",
+                                     "Select a real nonlinear model script first.",
+                                     parent=dialog)
+                return
+            try:
+                __import__("OpenSees_Readiness_GUI_V134").launch(
+                    self.win, str(model), self.readiness)
+            except Exception as exc:
+                messagebox.showerror("Cannot open model-bound checklist",
+                                     str(exc), parent=dialog)
+
+        ttk.Button(buttons, text="Open model-bound readiness checklist",
+                   command=open_checklist).pack(side="left", padx=(0, 8))
+        ttk.Button(buttons, text="Copy all blockers",
+                   command=copy_report).pack(side="left", padx=(0, 8))
+        ttk.Button(buttons, text="Save report locally",
+                   command=save_report).pack(side="left", padx=(0, 8))
+        ttk.Button(buttons, text="Close",
+                   command=dialog.destroy).pack(side="right")
+        return dialog
+
     def _run(self):
         if self.running: return
         try:
@@ -1160,10 +1262,20 @@ class NonlinearTimeHistoryGUI:
                 for trial_orientation in (("X_ONLY",) if motion.get("mode") == "X_ONLY" else ("XY", "YX")):
                     _analysis_duration_s(
                         motion, trial_orientation, values["trial_duration_s"])
-            _require_nonlinear_readiness(values)
+            try:
+                _require_nonlinear_readiness(values)
+            except (FileNotFoundError, RuntimeError) as readiness_error:
+                # A source/model readiness refusal is not a native solver crash.
+                from components.model.readiness import diagnose_nonlinear_readiness
+                diagnosis = diagnose_nonlinear_readiness(values)
+                self._open_readiness_blockers_dialog(values, diagnosis)
+                self.log.insert("end", "[NLTHA PRECHECK BLOCKED] " +
+                                str(len(diagnosis["blockers"])) +
+                                " source/engineering prerequisites; no solver launched. " +
+                                str(type(readiness_error).__name__) + "\n")
+                return
             from components.inputs.output_contract import prepare_history_run, record_case_status
-            scope='Trial' if (values.get('preliminary_selection')
-                              or values.get('trial_duration_s') is not None) else 'Suite'
+            scope = _nltha_output_scope(values)
             self._run_contract_root=None
             if self._output_is_automatic:
                 self._run_contract_root=prepare_history_run(
