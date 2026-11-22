@@ -42,6 +42,17 @@ class CurrentEtabsBundleTests(unittest.TestCase):
             variant.mkdir(parents=True)
             actual=registered_project_source(variant,"etabs_full_table")
             self.assertEqual(Path(actual),self.books[0])
+            # Canonical current export does not contain native assignment
+            # sheets: an older root-level registry must NOT fill this gap.
+            import json
+            old={"source_edb_sha256":registry["source_edb_sha256"],
+                 "sources":{"etabs_assignment":{
+                     "path":str(self.books[1]),
+                     "sha256":hashlib.sha256(self.books[1].read_bytes()).hexdigest()}}}
+            (self.root/"project_sources.private.json").write_text(
+                json.dumps(old),encoding="utf-8")
+            self.assertIsNone(registered_project_source(
+                variant,"etabs_assignment"))
 
     def test_byte_identical_beam_parts_are_rejected(self):
         # Distinct paths whose bytes are identical cannot represent
