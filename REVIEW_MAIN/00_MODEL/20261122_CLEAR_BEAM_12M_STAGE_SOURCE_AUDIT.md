@@ -52,3 +52,15 @@ A rebuilt variant's `require_model_aligned_workbooks` config prevents old reposi
 ## Engineering and release gates
 
 Native Windows rebuild, current source EDB hashing, actual user-uploaded workbook inspection, ULS/SLS 12 m Ao/period replay, 32/76/97 ETABS/OpenSees six-DOF support reactions, and nonlinear X-wall convergence are outstanding. No files on the user's D: drive are moved by these GitHub changes, and no native calculation is claimed complete.
+
+## Revised current source registration (code committed)
+
+The linked source-system registries now support user-selected current native ETABS tables without copying files into `excel/source` or changing spreadsheet formulas.
+
+- `tools/REGISTER_CURRENT_ETABS_TABLES.py` records the current analysis workbook plus three distinct beam-force parts, their exact bytes, sheet inventories, and current source EDB SHA under `01_ETABS_EXPORT/00_MANIFEST/PROJECT_SOURCES.private.json`. The corresponding `etabs_full_table` role can be read by the existing GUI source registry from a nested rebuild variant. Native assignment workbooks are promoted only if all required assignment sheets exist.
+- `tools/REGISTER_12M_MODEL_REFERENCE.py` separately checks one source-model-specific NBC workbook. If `SCALING SUMMARY` exists it requires the actual source EDB file to be byte-identical to the current EDB and both cached Aw-X/Aw-Y values to agree within 0.5% (minimum 0.001 m²) with current verified source shell geometry, not stale four-by-six-metre grouping. It records full rebuilt model data SHA as well as EDB and workbook hashes. A pure `NBC Calculator` workbook can be registered as a calculator reference but cannot substitute for a missing scaling sheet.
+- `components/inputs/project_workbooks.py` prioritizes the current canonical `01_ETABS_EXPORT` registry over old global `Project_Input_Workbooks` source names. Any modified EDB, cached XLSX, source shell model or state fails closed for the current rebuild reference.
+
+The user's uploaded workbook bytes themselves have **not** been read in this GitHub-only code change; therefore no claim about their actual cached Aw, periods, source model cell B4, native shell assignments, connection lengths or beam forces is made. A local registration is an action to validate source identity, not an acceptance gate for all engineering values.
+
+The clear-beam model's new location is `<ETABS export>/02_MODEL/REBUILDS/VERIFIED_CLEAR_BEAM/<timestamp>`, while older siblings and the original source are preserved without deletion. A clean native Windows re-export and ULS/SLS end-to-end run remain mandatory before merging to production.
