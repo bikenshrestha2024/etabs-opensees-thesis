@@ -21,6 +21,8 @@ class Registered12mModelWorkbookTests(unittest.TestCase):
         self.reference=self.root/"NBC105_2025_95m_12m_MODEL_ALIGNED_V10_7.xlsx"
         wb=Workbook();wb.active.title="NBC Calculator"
         wb.save(self.reference)
+        self.model_data=self.root/"OpenSees_Complete_Model_Data_V118.json"
+        self.model_data.write_text('{"source":"unaltered"}',encoding="utf-8")
         self.manifest=self.root/"00_SOURCE_MANIFEST"/"MODEL_ALIGNED_12M_WORKBOOK.json"
         self.manifest.parent.mkdir()
         self.config=self.root/"OpenSees_Complete_Model_Config_V118.json"
@@ -34,6 +36,7 @@ class Registered12mModelWorkbookTests(unittest.TestCase):
             "workbook_sha256":sha(self.reference),
             "source_edb":str(self.edb),
             "source_edb_sha256":sha(self.edb),
+            "assembled_model_sha256":sha(self.model_data),
             "limit_state":"ULS",
             "sheets":["NBC Calculator"],
             "wall_geometry_verification":{
@@ -59,6 +62,12 @@ class Registered12mModelWorkbookTests(unittest.TestCase):
         self.reference.write_bytes(self.reference.read_bytes()+b"tampered")
         with self._guards():
             with self.assertRaisesRegex(ValueError,"changed"):
+                source_workbooks(self.root,self.root,"ULS")
+
+    def test_changed_rebuilt_shell_geometry_invalidates_workbook(self):
+        self.model_data.write_text('{"source":"new shell geometry"}',encoding="utf-8")
+        with self._guards():
+            with self.assertRaisesRegex(ValueError,"shell/model bytes changed"):
                 source_workbooks(self.root,self.root,"ULS")
 
     def test_wrong_edb_blocks_selection(self):
