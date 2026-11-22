@@ -51,6 +51,20 @@ class UniformOutputStructureTests(unittest.TestCase):
                              b"private legacy workbook placeholder")
             self.assertFalse(report["issues"])
 
+    def test_flat_stage_artifacts_are_listed_without_relocation(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            folder=root/"05_MRSM";folder.mkdir()
+            old=folder/"MRSM_legacy_results.json"
+            old.write_text('{"legacy":true}',encoding="utf-8")
+            report=audit_export_layout(root)
+            row=next(x for x in report["stages"] if x["stage"]=="MRSM")
+            self.assertEqual(row["loose_stage_artifacts"][0]["filename"],
+                             old.name)
+            self.assertEqual(old.read_text(encoding="utf-8"),
+                             '{"legacy":true}')
+            self.assertFalse(report["issues"])
+
     def test_historical_dirs_are_visible_but_never_relocated(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)
