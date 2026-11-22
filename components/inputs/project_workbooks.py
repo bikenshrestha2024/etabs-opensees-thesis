@@ -684,11 +684,24 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     if cfg_file.is_file():
         cfg=json.loads(cfg_file.read_text(encoding='utf-8-sig'))
         if cfg.get('require_model_aligned_workbooks') is True:
-            # A new clear-beam export is NOT permission to accept stale
-            # same-named scaling references from the repo or adjacent exports.
-            # The ESM module should calculate from source ETABS geometry or
-            # require an explicitly validated, source-aligned reference.
-            return [None,None]
+            # Only an explicitly registered CURRENT 12m workbook with exact
+            # ETABS source EDB byte identity can supply current-model values.
+            # Without registration return no workbook, never the old repo
+            # default calculator or ULS/SLS scaling file.
+            from components.inputs.model_aligned_reference import verified_reference
+            reference=verified_reference(export_dir,state=limit_state)
+            if reference is None:
+                return [None,None]
+            from openpyxl import load_workbook
+            candidate=Path(reference['workbook_path'])
+            wb=load_workbook(candidate,read_only=True,data_only=True)
+            try:
+                sheets=set(wb.sheetnames)
+            finally:
+                wb.close()
+            return [
+                candidate if 'NBC Calculator' in sheets else None,
+                candidate if 'SCALING SUMMARY' in sheets else None]
     state=str(limit_state).strip().upper()
     if state=='BOTH':state='ULS'
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')
