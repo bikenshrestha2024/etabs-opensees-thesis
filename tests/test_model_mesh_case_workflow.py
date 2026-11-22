@@ -184,7 +184,7 @@ class MeshCasesTests(unittest.TestCase):
             (cache/"runtime.cpython-312.pyc").write_bytes(b"synthetic-cache")
             zip_path=mesh.package_mesh_case(self.root,n)
             self.assertEqual(zip_path.name,f"MESH_{n:02d}.zip")
-            self.assertEqual(zip_path.parent.name,"UPLOAD_PACKAGES")
+            self.assertEqual(zip_path.parent.name,"07_EXPORT_ZIP")
             with zipfile.ZipFile(zip_path) as z:
                 self.assertIsNone(z.testzip())
                 names=z.namelist()
