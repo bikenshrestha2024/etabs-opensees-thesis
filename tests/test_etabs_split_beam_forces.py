@@ -53,6 +53,19 @@ class SplitBeamForceTests(unittest.TestCase):
         self.assertEqual(
             sum(s["rows_read"] for s in result["input_files"][0]["sheets"]),3)
 
+    def test_non_beam_force_sheet_with_same_columns_is_excluded(self):
+        from openpyxl import load_workbook
+        source=self.part("mixed.xlsx",[self.row(unique="BEAM")])
+        book=load_workbook(source)
+        other=book.create_sheet("Element Forces - Columns")
+        other.append(self.headers)
+        other.append(self.row(unique="COLUMN"))
+        book.save(source)
+        result=consolidate([source],self.root/"beam_only")
+        self.assertEqual(result["source_rows"],1)
+        self.assertEqual(result["unique_rows"],1)
+        self.assertEqual(len(result["input_files"][0]["sheets"]),1)
+
     def test_multi_workbook_multi_sheet_overlaps_and_late_conflict(self):
         from openpyxl import load_workbook
         first=self.part("first.xlsx",[self.row(unique="101")])
