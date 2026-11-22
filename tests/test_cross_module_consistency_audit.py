@@ -84,6 +84,8 @@ class CrossModuleConsistencyTests(unittest.TestCase):
                   "LTHA","NLTHA","NBC105","SECTIONS","VALIDATION","GUI"}
         self.assertTrue(required <= present)
         self.assertEqual(report["parse_errors"],[])
+        self.assertEqual(report["shadowed_definitions"],[],
+                         "Shadowed Python definitions must be triaged, not silently overridden")
         self.assertEqual(report["active_sources_scanned"],
                          sum(report["owner_counts"].values()))
         self.assertEqual(owner("components/nbc105/dispatch.py"),"NBC105")
