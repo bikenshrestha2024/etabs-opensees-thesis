@@ -71,7 +71,9 @@ def classify_etabs_excel_selection(paths):
 
 
 def validate_full_table_selection(path):
-    """Reject a beam-only export as the source for ETABS joint reactions."""
+    """[REF docs/source/components/inputs/etabs_excel_selection.py.md]
+    Reject a beam-only export as the source for ETABS joint reactions.
+    """
     source=Path(path).expanduser().resolve()
     if not source.is_file():
         raise FileNotFoundError("Analyzed full table missing: "+str(source))
