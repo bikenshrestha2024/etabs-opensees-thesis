@@ -1,2 +1,6 @@
+# Mandatory first-read ETABS/OpenSees project rules
+
+Before suggesting or applying ANY edit, read `AGENTS.md`, `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md`, and `.agents/skills/etabs-opensees-read-first/SKILL.md`. The full skill contains a ready-to-use agent prompt and verification checklist; when working as Copilot agent, also use `.github/agents/etabs-opensees-engineer.agent.md`. **32 actual foundation support joints + 44 shear-wall mesh points** != 76 independent foundations. **Full gravity = 100% dead + 100% live**, while **NBC 105:2025 Table 5-1 seismic weight** has category-specific reduced live fractions. Never conflate the two or claim joint-reaction equivalence from global balance. Declare preflight status before editing.
+
 # GitHub Copilot project instructions
 Follow `AGENTS.md` and the single canonical `engineering/rules/CORE_RULES.md`. Search existing code, tests, decision register and work-order index before creating files. Maintain scientific source traceability, unit/sign conventions and original ETABS EDB read-only. Preserve active launcher compatibility. Architectural goal: shared ETABS-free OpenSees engine, ETABS optional adapter; not yet implemented. Mark native Windows/ETABS checks PENDING unless executed. Track actual code editor/provider when known, never infer attribution from commit author.
