@@ -549,7 +549,8 @@ def launch(parent,export_dir):
         """Open local, isolated NBC clauses 1–10 calculation interface."""
         from components.nbc105.dispatch import (
             available_operations, run_operation,
-            available_annex_operations, run_annex_operation)
+            available_annex_operations, run_annex_operation,
+            operation_input_spec, annex_operation_input_spec)
         all_ops=available_operations()
         all_ops.update(available_annex_operations())
         dialog=tk.Toplevel(win)
@@ -577,7 +578,8 @@ def launch(parent,export_dir):
         op_box=ttk.Combobox(picker,textvariable=operation_var,
                             state="readonly",width=53)
         op_box.pack(side="left",fill="x",expand=True,padx=(6,0))
-        ttk.Label(box,text="Input JSON (named parameters)").pack(anchor="w")
+        ttk.Label(box,text="Input JSON (named parameters; replace required null placeholders)")\
+.pack(anchor="w")
         payload=ScrolledText(box,height=7,wrap="none",font=("Consolas",10))
         payload.pack(fill="x",pady=(3,8))
         ttk.Label(box,text="Result (local calculation only)").pack(anchor="w")
@@ -588,7 +590,41 @@ def launch(parent,export_dir):
         ttk.Label(box,textvariable=status_var,wraplength=790).pack(anchor="w")
         controls=ttk.Frame(box)
         controls.pack(fill="x",pady=8)
+        # Preserve user-entered inputs when switching between clause operations.
+        # Show the complete callable signature rather than a misleading empty {}.
+        entry_cache={}
+        active_key=[None]
+        def selected_key():
+            selection=clause_var.get()
+            return (int(selection) if selection.isdigit() else selection,
+                    operation_var.get())
+
+        def schema_for_selected():
+            clause,operation=selected_key()
+            return (operation_input_spec(clause,operation)
+                    if isinstance(clause,int) else
+                    annex_operation_input_spec(clause,operation))
+
+        def load_operation_template(*unused):
+            key=selected_key()
+            if active_key[0] is not None:
+                entry_cache[active_key[0]]=payload.get("1.0","end").strip()
+            if not key[1]:
+                return
+            spec=schema_for_selected()
+            template=json.dumps(spec["template"],indent=2,allow_nan=False)
+            payload.delete("1.0","end")
+            payload.insert("1.0",entry_cache.get(key,template))
+            active_key[0]=key
+            required=", ".join(spec["required"]) or "(none)"
+            optional=", ".join(spec["optional"]) or "(none)"
+            status_var.set("Required: "+required+" | optional: "+optional+
+                           ". Replace null with verified values; no structural approval.")
+
         def refresh_operations(*unused):
+            if active_key[0] is not None:
+                entry_cache[active_key[0]]=payload.get("1.0","end").strip()
+                active_key[0]=None
             selection=clause_var.get()
             key=int(selection) if selection.isdigit() else selection
             names=all_ops.get(key,[])
@@ -596,23 +632,7 @@ def launch(parent,export_dir):
             operation_var.set("component_amplification_factor"
                 if "component_amplification_factor" in names else
                 names[0] if names else "")
-            payload.delete("1.0","end")
-            if operation_var.get()=="component_amplification_factor":
-                payload.insert("1.0",json.dumps(
-                    {"building_period_s":1.0,"component_period_s":1.25},indent=2))
-            elif operation_var.get()=="seismic_link_rotation_limit_rad":
-                payload.insert("1.0",json.dumps({
-                    "link_length_m":1.6,"mp_kNm":100,"vp_kN":100,
-                    "orientation":"horizontal","section_type":"I"},indent=2))
-            elif operation_var.get()=="rc_wall_detailing_minima":
-                payload.insert("1.0",json.dumps({
-                    "thickness_mm":600,"wall_length_mm":12000,"coupled":True,
-                    "fck_mpa":30,"shear_stress_mpa":1.0,
-                    "horizontal_ratio":0.0025,"vertical_ratio":0.0025,
-                    "bar_diameter_mm":20,"bar_spacing_mm":200,
-                    "reinforcement_curtains":2},indent=2))
-            else:
-                payload.insert("1.0","{}")
+            load_operation_template()
         def evaluate():
             try:
                 arguments=json.loads(payload.get("1.0","end").strip())
@@ -632,6 +652,7 @@ def launch(parent,export_dir):
         ttk.Button(controls,text="Calculate reference rule",command=evaluate).pack(side="left")
         ttk.Button(controls,text="Close",command=dialog.destroy).pack(side="right")
         clause_box.bind("<<ComboboxSelected>>",refresh_operations)
+        op_box.bind("<<ComboboxSelected>>",load_operation_template)
         refresh_operations()
 
     ttk.Button(toolrow,text="NBC clauses 1–10",command=open_clause_calculator).pack(side="left",padx=8)
