@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install workbook regression dependency
-        run: python -m pip install openpyxl==3.1.5 numpy
+        run: python -m pip install openpyxl==3.1.5 numpy pytest==8.4.2
       - name: Enforce engineering first-read guidance and load-purpose contract
         run: python -m unittest -v tests.test_read_first_engineering_contract
       - name: Verify ETABS rigid end-zone source coverage regressions
