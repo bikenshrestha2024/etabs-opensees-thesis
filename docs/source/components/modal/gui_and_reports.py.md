@@ -33,3 +33,9 @@ The shared `panel` already has a **Stop selected batch** control; avoid duplicat
 NBC 105 modal child runner source and original input workbook import previously derived helper/project root using Path(__file__).parent, dependent on direct-module vs root exec facade context. Source-aware root used for both. Mode selection, actual original workbook, Ritz/eigen etc remain unchanged; native ETABS/OpenSees equivalence not verified.
 
 Scope of tests: synthetic direct-module import, exec-root facade, exported-runtime facade path consistency in `tests/test_facade_runtime_context.py`. No native ETABS/OpenSees, source workbook or full engineering model was executed in these path-only regressions.
+
+## 2026-11-22 — modal Rayleigh periods are external GUI inputs
+
+The modal dialog variables tr_x and tr_y are externally supplied reference periods that the GUI passes to nbc105_period_estimate. The eigenvalue/mass audit DOES NOT perform a new NBC §5.1.1 Wi-Fi-di Rayleigh analysis, nor does it independently verify the provenance of an entered period. The generated runner now records EXTERNAL_GUI_INPUT_NOT_COMPUTED_BY_MODAL_SOLVER, exports modal_model_basis_audit, and prints [MODAL MODEL BASIS] so the 76 source restraint IDs, 32 physical foundations, mesh transfer and active stiffness basis cannot be conflated.
+
+The workbook NBC Summary now distinguishes source-based model restraint count, stiffness policy, Rayleigh input origin, successful numerical mass coverage, and native physical engineering acceptance. Source model is not modified. This fixes misleading reporting but does NOT repair the known original 768.045-kN pointwise ETABS-elastic reaction residual.
