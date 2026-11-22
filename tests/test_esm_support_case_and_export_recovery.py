@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 from components.equivalent_static.organized_exports import build_combined_esm_export
-from components.model.support_case_contract import select_support_case, normalize_support_case
+from components.model.support_case_contract import (select_support_case, normalize_support_case, require_runtime_support_case)
 
 PHYSICAL=(1,2,3,4,5,6,7,8,13,14,23,24,25,26,35,36,
           41,42,51,52,53,54,63,64,69,70,71,72,73,74,75,76)
@@ -26,6 +26,19 @@ class CaseContractTests(unittest.TestCase):
         self.assertEqual(len(item["excluded_mesh_point_tags"]),44)
         self.assertEqual(len(self.data["supports"]),76)
         self.assertEqual(item["engineering_acceptance"],"NOT_VERIFIED")
+    def test_fails_old_76_runtime_when_gui_selected_physical_32(self):
+        old_report={"gravity_base_support_tags":list(range(1,77)),
+                    "gravity_support_strategy":"ETABS_SOURCE_SUPPORTS"}
+        with self.assertRaisesRegex(ValueError,"refresh|runtime|source"):
+            require_runtime_support_case("PHYSICAL_32",old_report)
+
+    def test_selected_case_runtime_must_match_exact_tags_and_profile(self):
+        new_report={"gravity_base_support_tags":list(PHYSICAL),
+                    "support_case_evidence":{"profile":"PHYSICAL_32"}}
+        evidence=require_runtime_support_case("PHYSICAL_32",new_report)
+        self.assertEqual(evidence["actual_supports"],32)
+        self.assertEqual(evidence["status"],"MATCHED_SELECTED_CASE_NOT_NATIVE_EQUIVALENT")
+
     def test_opt_in_diagnostic_76_source_supports(self):
         item=select_support_case(self.data,{},"SOURCE_76")
         self.assertEqual(item["profile"],"SOURCE_76")
