@@ -44,6 +44,15 @@ class ClearBeamStageAndWorkbookTests(unittest.TestCase):
         self.assertFalse(target.exists())
         self.assertFalse(target.parent.exists())
 
+    def test_legacy_verified_clear_beam_sibling_is_not_used_as_new_source(self):
+        old=Path(self.temp.name)/"Verified_Clear_Beam_20261121_110844"
+        old.mkdir()
+        with self.assertRaisesRegex(ValueError,"OLD sibling"):
+            canonical_clear_beam_destination(old)
+        with self.assertRaisesRegex(ValueError,"historical"):
+            _verify_before_creating_output(old,self.book,
+                old/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"/"again")
+
     def test_new_model_does_not_inherit_old_scaling_workbooks(self):
         export=Path(self.temp.name)/"new_export"
         export.mkdir()
