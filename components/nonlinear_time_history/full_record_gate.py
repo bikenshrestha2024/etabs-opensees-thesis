@@ -8,6 +8,51 @@ import json
 import math
 from pathlib import Path
 
+def verify_committed_transient_increment(start_time_s, end_time_s, requested_dt_s):
+    """[REF docs/source/components/nonlinear_time_history/full_record_gate.py.md]
+    Require actual requested solver clock progression BEFORE recording rc=0.
+
+    This only validates OpenSees time bookkeeping. It neither changes the
+    integrator nor proves wall constitutive convergence or NBC code acceptance.
+    Values are in seconds. A 0 return without a correct committed increment
+    cannot be recorded as an accepted step.
+    """
+    parsed = []
+    for label, raw in (("start_time_s", start_time_s),
+                       ("end_time_s", end_time_s),
+                       ("requested_dt_s", requested_dt_s)):
+        if isinstance(raw, bool):
+            raise ValueError(label + " must be finite numerical seconds, not boolean")
+        try:
+            number = float(raw)
+        except (ValueError, TypeError, OverflowError) as exc:
+            raise ValueError(label + " must be finite numerical seconds") from exc
+        if not math.isfinite(number):
+            raise ValueError(label + " must be finite numerical seconds")
+        parsed.append(number)
+    start, end, requested = parsed
+    if requested <= 0:
+        raise ValueError("requested_dt_s must be positive")
+    if end <= start:
+        raise RuntimeError(
+            "OpenSees reported step success but did not advance analysis time: "
+            f"start={start:.12g}s, end={end:.12g}s, requested_dt={requested:.12g}s")
+    actual = end - start
+    # Physical dt cannot be 'verified' by a fixed tolerance larger than the
+    # requested substep; allow only tight floating-point clock roundoff.
+    tolerance = min(0.01 * requested,
+                    max(1e-12, requested * 1e-7,
+                        abs(start) * 1e-13))
+    if abs(actual - requested) > tolerance:
+        raise RuntimeError(
+            "OpenSees accepted clock increment differs from requested nonlinear "
+            f"step: start={start:.12g}s end={end:.12g}s, "
+            f"actual={actual:.12g}s, requested={requested:.12g}s")
+    return dict(status="CLOCK_MATCHED_NOT_PHYSICS_VALIDATED",
+                start_time_s=start, end_time_s=end,
+                requested_dt_s=requested, accepted_dt_s=actual)
+
+
 def verify_numeric_accepted_row(row, *, row_index=None):
     """Fail closed before writing a solver-accepted row to the CSV output.
 
