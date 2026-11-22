@@ -37,6 +37,33 @@ class DeepOutputInventoryTests(unittest.TestCase):
             self.assertEqual(src.read_bytes(), old_bytes)
             self.assertFalse((repo / "09_SOFTWARE_DIAGNOSTICS").exists())
 
+    def test_legacy_docstring_not_mistaken_for_active_output_migration(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            p=root/"components"/"gravity"/"module.py"
+            p.parent.mkdir(parents=True)
+            p.write_text(
+                '"""Prior OpenSees_Analysis_Results folder is historical."""\\n'
+                'def helper():\\n'
+                '    """Another old OpenSees_Analysis_Results reference."""\\n'
+                '    return "02_GRAVITY"\\n'
+                'LEGACY="OpenSees_Analysis_Results"\\n',
+                encoding="utf-8")
+            result=scan_source(root)
+            totals=result["totals"]
+            self.assertEqual(totals["legacy_docstring_occurrences"],2)
+            self.assertEqual(totals["legacy_executable_literal_occurrences"],1)
+            self.assertEqual(totals["legacy_literal_occurrences"],3)
+            entries=[x for x in result["files"][0]["occurrences"]
+                     if x["kind"]=="LITERAL_PATH_MARKER" and x.get("legacy")]
+            self.assertEqual(
+                {x["literal_context"] for x in entries},
+                {"DOCSTRING_REFERENCE","CODE_LITERAL_REVIEW"})
+            self.assertEqual(
+                result["top_legacy_candidates"][0]["legacy_executable_markers"],1)
+            self.assertEqual(
+                result["top_legacy_candidates"][0]["legacy_docstring_markers"],2)
+
     def test_writer_inventory_scans_new_standalone_src_tree(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)
