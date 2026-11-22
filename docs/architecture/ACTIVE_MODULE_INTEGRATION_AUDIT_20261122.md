@@ -136,3 +136,7 @@ consumer folder or silently duplicate saved evidence.
 | G8 — Archive provenance | Historical EDB/workbooks/logs/results unchanged unless explicitly authorized and byte verified |
 
 **Do not mark all modules scientifically verified** from source AST, compilation, test discovery, or fixture-based CI alone. The integrated **static** source audit now passes after an obsolete source-SHA attestation was preserved in a historical ledger and withdrawn from current approval. Engineering, native solver and complete producer/consumer migration gates G2–G8 remain open. See [current integrated audit](../../REVIEW_MAIN/08_SOFTWARE_SECURITY/20261122_INTEGRATED_ENGINEERING_AND_MIGRATION_AUDIT.md).
+
+## 2026-11-22 follow-up: relative-import edge accuracy
+
+The previously reported `module_owner_import_links` omitted relative package imports. `tools/module_import_edges.py` now resolves physical relative modules for both `tools/audit_cross_module_consistency.py` and the output producer/consumer audit, with regression coverage in `tests/test_source_dependency_edges.py`. Regenerate the static reports after merging; prior edge counts are **not comparable**. This is not runtime graph or numerical engineering acceptance. [Full correction and still-open migration gates](../../REVIEW_MAIN/08_SOFTWARE_SECURITY/20261122_RELATIVE_IMPORT_GRAPH_CORRECTION.md).
