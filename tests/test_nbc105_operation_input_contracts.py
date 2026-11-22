@@ -47,7 +47,8 @@ class NBCOperationInputContractTests(unittest.TestCase):
             run_operation(5,"accidental_eccentricities_m",spec["template"])
         response=run_operation(5,"accidental_eccentricities_m",
                                {"building_width_m":24.})
-        self.assertEqual(response["result"],[-1.2,1.2])
+        self.assertAlmostEqual(response["result"][0],-1.2)
+        self.assertAlmostEqual(response["result"][1],1.2)
         self.assertEqual(response["status"],
                          "CODE_CALCULATION_ONLY_NOT_BUILDING_ACCEPTANCE")
 
