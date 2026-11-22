@@ -787,6 +787,27 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             report('NODE_COMPARISON_BLOCKED',
                    'Could not verify support-node comparison; global totals remain separate',
                    error=str(exc))
+        pointwise=comp.get("node_comparison",{})
+        comp["pointwise_validation_status"]=pointwise.get(
+            "pointwise_screening_status",
+            "NO_COMPLETE_ONE_TO_ONE_GLOBAL_Z_COMPARISON")
+        comp["structural_equivalence_status"]="NOT_CERTIFIED"
+        comp["structural_equivalence_blockers"]=[
+            "NATIVE_ANALYTICAL_MESH_AND_EDGE_CONSTRAINTS_NOT_VERIFIED",
+            "NATIVE_FRAME_END_OFFSETS_AND_SLAB_LOAD_PATH_NOT_VERIFIED",
+            "FOUNDATION_SUPPORT_RESULTANT_AND_POINTWISE_PARITY_NOT_ESTABLISHED",
+        ]
+        if comp["pointwise_validation_status"] == (
+                "POINTWISE_RESIDUAL_EXCEEDS_NUMERICAL_SCREEN"):
+            report(
+                "NODE_DISTRIBUTION_MISMATCH",
+                "Global ETABS/OpenSees FZ balance cannot certify support reactions",
+                maximum_absolute_node_difference_kN=pointwise.get(
+                    "max_absolute_nodal_difference_kN"),
+                sum_absolute_node_difference_kN=pointwise.get(
+                    "sum_absolute_nodal_difference_kN"),
+                stiffness_basis=comp.get("opensees_stiffness_basis"),
+                native_equivalence="BLOCKED")
         report('DIRECT_COMPARISON','Compared ETABS global FZ and OpenSees support RZ',
                etabs_FZ_kN=comp['etabs_base_FZ_kN'],
                opensees_RZ_kN=comp['opensees_support_FZ_kN'],
