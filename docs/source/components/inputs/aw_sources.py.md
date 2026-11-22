@@ -20,3 +20,26 @@ NBC 105:2025 §5.1.2 (R10); docs/review/20261106_THESIS_EXCEL_METHOD_DECISION_RE
 Test: `tests/verify_aw_sources_and_thickness.py`. Fake-ETABS and synthetic-file tests only; a live ETABS session is not exercised.
 
 [Guide index](../../00_SOURCE_GUIDE_INDEX.md) · [Thesis gates](../../../../docs/00_THESIS_ACCEPTANCE_GATES.md)
+
+
+## 2026-11-22 source identity and selection hardening
+
+An ETABS-linked Aw/T reference is **not** automatically source-qualified
+because the recorded EDB pathname resembles the current EDB. The active
+EDB file must exist and its actual SHA-256 must match a valid 64-hex
+`source_edb_sha256` in the provenance JSON. If the digest is missing,
+mismatched or the EDB is inaccessible, the record can only remain a
+research-comparison reference. Existing values are not silently promoted.
+
+When selecting among multiple verified ETABS-linked Aw provenance files,
+`registered_project_source(..., "etabs_linked_audit")` takes priority
+provided it passes current EDB identity and ULS/SLS checks. Newer
+unregistered files sorted by modification time are only fallback candidates;
+a copied old spreadsheet's mtime is never more authoritative than explicit
+source registration.
+
+Files are read-only, linked provenance paths are rejected, and no old
+workbook or EDB is moved, renamed or overwritten. The matching EDB SHA
+does not by itself prove that a current two-12-m X-wall opening/mesh
+interpretation is NBC compliant; the grouped-wall geometry and engineering
+acceptance checks remain independent.
