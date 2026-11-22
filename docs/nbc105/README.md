@@ -93,7 +93,7 @@ CLI argument contract:
 ```powershell
 python -m components.nbc105 --list
 python -m components.nbc105 --describe --clause 5 --operation accidental_eccentricities_m
-python -m components.nbc105 --clause 5 --operation accidental_eccentricities_m --json "{\\"building_width_m\\":24.0}"
+python -m components.nbc105 --clause 5 --operation accidental_eccentricities_m --json '{"building_width_m":24.0}'
 python -m components.nbc105 --audit
 ```
 
