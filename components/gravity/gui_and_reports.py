@@ -866,14 +866,18 @@ class GravityAnalysisGUI:
         [REF docs/source/components/gravity/reaction_case_registry.py.md]
         Never substitute another condition or infer results from a parent directory.
         """
-        from components.gravity.reaction_case_registry import current_case
-        record=current_case(self.output_var.get(),self.model_var.get(),
+        from components.gravity.reaction_case_registry import current_case_diagnostic
+        audit=current_case_diagnostic(
+            self.output_var.get(),self.model_var.get(),
             scenario=self._selected_wall_support_strategy(),
             profile=self.gravity_profile_var.get())
+        record=audit["result"]
         if record is None:
-            raise ValueError("No current completed gravity result for the selected model, "
-                "load profile and support condition. Run that condition first. Index: "+
-                str(__import__("components.gravity.output_ownership",fromlist=["index_path"]).index_path(self.output_var.get(),"Gravity_Case_Reaction_Index.json")))
+            raise ValueError(
+                "No current completed gravity result for the selected model, "
+                "load profile and support condition. "
+                +audit["status"]+": "+audit["reason"]
+                +" | Saved case index: "+str(audit.get("index","UNAVAILABLE")))
         return Path(record["result_path"])
 
     def _export_all_pages(self):
