@@ -1,0 +1,56 @@
+"""Cross-stage output-path ownership regression without ETABS/OpenSees runtime."""
+import tempfile
+import unittest
+from pathlib import Path
+
+from components.inputs.output_contract import create_case_run
+from tools.audit_uniform_output_structure import audit_export_layout
+
+
+class UniformOutputStructureTests(unittest.TestCase):
+    def test_every_active_stage_uses_same_run_folder_contract(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)/"export";root.mkdir()
+            for stage in ("ETABS_EXPORT","GRAVITY","ESM","MODAL","MRSM","LTHA","NLTHA"):
+                run=create_case_run(root,stage,"TEST_CASE",state="ULS",
+                                    units="kN-m-s")
+                self.assertEqual(run.parent.parent.parent.name,"RUNS")
+                self.assertTrue((run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json").is_file())
+                self.assertTrue((run/"02_RESULTS").is_dir())
+            report=audit_export_layout(root)
+            self.assertFalse(report["issues"],report["issues"])
+            for name in ("ETABS_EXPORT","GRAVITY","ESM","MODAL","MRSM","LTHA","NLTHA"):
+                self.assertEqual(report["case_counts"][name],1)
+
+    def test_missing_or_corrupted_manifest_is_flagged_without_changes(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);run=create_case_run(root,"GRAVITY","REVIEW",
+                                             state="ULS",units="kN-m-s")
+            manifest=run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json"
+            original=manifest.read_bytes()
+            self.assertFalse(audit_export_layout(root)["issues"])
+            manifest.unlink()
+            report=audit_export_layout(root)
+            self.assertTrue(report["issues"])
+            self.assertFalse(manifest.exists())
+            manifest.write_bytes(original)
+            self.assertFalse(audit_export_layout(root)["issues"])
+
+    def test_historical_dirs_are_visible_but_never_relocated(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            legacy=root/"OpenSees_Analysis_Results"
+            beam=root/"01_ETABS_EXPORT"/"03_BEAM_FORCES"
+            legacy.mkdir();beam.mkdir(parents=True)
+            report=audit_export_layout(root)
+            by_stage={row["stage"]:row for row in report["stages"]}
+            self.assertIn("OpenSees_Analysis_Results",
+                          by_stage["GRAVITY"]["historical_locations"])
+            self.assertIn("01_ETABS_EXPORT/03_BEAM_FORCES",
+                          by_stage["ETABS_EXPORT"]["historical_locations"])
+            self.assertTrue(legacy.is_dir())
+            self.assertTrue(beam.is_dir())
+
+
+if __name__=="__main__":
+    unittest.main()
