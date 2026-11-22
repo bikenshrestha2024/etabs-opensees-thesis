@@ -7,6 +7,7 @@ import csv
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from components.nonlinear_time_history import direct_existing_model as native
 
@@ -97,6 +98,18 @@ class CompletedExistingNLTHAEvidence(unittest.TestCase):
         self.cases[1]["record_sha256"]="d"*64
         with self.assertRaisesRegex(ValueError,"record|SHA"):
             native.verify_full_duration_pair_outputs(self.root,self.config,self.cases)
+
+    def test_nonempty_existing_output_folder_must_not_be_reused_for_native_run(self):
+        old=self.root/"Old_Native_Result.json"
+        old.write_text('{"status":"PREVIOUS_SOLVED_RUN"}',encoding="utf8")
+        config=dict(self.config, output_dir=str(self.root),analysis_intent="RESEARCH_DIAGNOSTIC")
+        with patch.object(native, "preflight_existing_model", return_value={
+            "model_files_sha256":{"OpenSees_Complete_Model_Data_V118.json":DIGEST_MODEL}
+        }):
+            with self.assertRaisesRegex(FileExistsError,"existing|overwrite|output"):
+                native.run_existing_model_nltha(config, check_only=True)
+        self.assertEqual(old.read_text(encoding="utf8"),
+                         '{"status":"PREVIOUS_SOLVED_RUN"}')
 
     def test_saved_summary_must_match_returned_solver_case(self):
         self.cases[0]["physical_time_s"]=0.02
