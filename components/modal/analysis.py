@@ -26,6 +26,87 @@ NBC105_MIN_DIRECTIONAL_MASS_PERCENT = 90.0
 NBC105_MODAL_COMBINATION_MAX_FREQUENCY_HZ = 33.0
 
 
+def modal_model_basis_report(model_data, config, limit_state, period_inputs=None):
+    """Read-only source and period-provenance gate for modal reports.
+
+    [REF engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md]
+    [REF NBC105-2025 §7.3 printed p.40; §5.1 printed p.28]
+    The project has 32 physical foundation supports plus 44 additional
+    shear-wall mesh points in its 76-ID source export. Treat the latter as
+    source/analytical mesh DOF evidence, NEVER extra physical foundations.
+    This does not modify, remove or create a solver support or MPC relation.
+    """
+    from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
+    state=str(limit_state).strip().upper()
+    if state not in ("ULS","SLS"):
+        raise ValueError("Modal model basis requires single ULS/SLS state")
+    data=model_data if isinstance(model_data,dict) else {}
+    cfg=config if isinstance(config,dict) else {}
+    src=data.get("supports")
+    expected={str(x) for x in PROJECT_PRIMARY_32}
+    if isinstance(src,dict):
+        source_tags={str(x) for x in src}
+        source_n=len(source_tags)
+        missing=sorted(expected-source_tags,key=lambda x:int(x))
+        extra=sorted(source_tags-expected,key=lambda x:int(x) if x.isdigit() else x)
+        source_status=("PRIMARY_32_MAPPED_SOURCE_REQUIRES_NATIVE_MPC_REVIEW"
+                       if not missing else "SOURCE_MODEL_TAG_MISMATCH_REQUIRES_REVIEW")
+    else:
+        source_tags=None
+        source_n=None
+        missing=[]
+        extra=[]
+        source_status="UNAVAILABLE"
+    elastic=cfg.get("elastic_etabs_comparison") or {}
+    if isinstance(elastic,dict) and state in elastic:
+        stiffness="ETABS_ELASTIC_COMPARISON"
+    else:
+        stiffness=str(cfg.get("linear_shell_stiffness_policy") or "LEGACY_GROSS_SHELL")
+    inputs=period_inputs if isinstance(period_inputs,dict) else {}
+    raw={a:inputs.get("rayleigh_"+a.lower()+"_s") for a in ("X","Y")}
+    ray_inputs={}
+    for axis,value in raw.items():
+        if value is None or str(value).strip()=="":
+            ray_inputs[axis]=None
+            continue
+        val=float(value)
+        if not math.isfinite(val) or val<=0:
+            raise ValueError("External modal Rayleigh "+axis+" must be finite positive")
+        ray_inputs[axis]=val
+    warnings=[]
+    if source_n is None:
+        warnings.append("No assembled source support mapping available; modal physical restraint equivalence NOT VERIFIED.")
+    elif source_n!=32 or extra or missing:
+        warnings.append(
+            str(source_n)+" mapped exported restraint IDs; intended 32 physical foundation supports"
+            +" plus 44 shear-wall mesh points (current model only). "
+            +"The "+str(len(extra))+" nonprimary source IDs are NOT independent physical foundations; "
+            +"native shell-edge/MPC and runtime constraints require validation.")
+    if missing:
+        warnings.append("User-confirmed physical tags missing in this source: "+", ".join(missing))
+    if stiffness=="LEGACY_GROSS_SHELL":
+        warnings.append("LEGACY_GROSS_SHELL: the ETABS-elastic 768.045-kN rebuilt conversion is not this stiffness model.")
+    if any(v is not None for v in ray_inputs.values()):
+        warnings.append("Rayleigh periods were provided via GUI inputs; this modal eigen run did NOT compute NBC §5.1.1 Rayleigh work sums.")
+    return {
+        "limit_state":state,
+        "source_support_identity_status":source_status,
+        "exported_restraint_point_count":source_n,
+        "user_confirmed_physical_foundation_count":32,
+        "extra_exported_restrained_point_count":len(extra) if source_n is not None else None,
+        "missing_primary_support_tag_count":len(missing) if source_n is not None else None,
+        "case_stiffness_basis":stiffness,
+        "rayleigh_period_provenance":"EXTERNAL_GUI_INPUT_NOT_COMPUTED_BY_MODAL_SOLVER",
+        "external_rayleigh_X_s":ray_inputs["X"],
+        "external_rayleigh_Y_s":ray_inputs["Y"],
+        "physical_model_equivalence":"NOT_VERIFIED",
+        "code_design_acceptance":"NOT_VERIFIED",
+        "warnings":warnings,
+    }
+
+
+
+
 def nbc105_period_estimate(*, height_m, system_type, wall_aw_x_m2=None,
                            wall_aw_y_m2=None, rayleigh_x_s=None,
                            rayleigh_y_s=None):
@@ -308,6 +389,9 @@ def run_nbc105_modal_audit(ops, *, nmodes=30, output_dir=".",
         "modal_combination": "NOT PERFORMED: apply an accepted method such as CQC/SRSS per NBC 105:2025 §7.4; for closely spaced modes within 15%, observe §7.4(b).",
         "base_shear_scaling": "NOT PERFORMED: compare combined MRSM base shear with ESM base shear and apply §7.5 when required.",
         "rows": rows,
+        "mass_coverage_only_status": "TARGET_MET_NATIVE_MODEL_UNVERIFIED" if ux_ok and uy_ok else "TARGET_NOT_MET",
+        "native_etabs_opensees_equivalence": "NOT_VERIFIED",
+        "rayleigh_input_origin": "EXTERNAL_REFERENCE_NOT_RECOMPUTED_BY_MODAL_SOLVER" if period_inputs else "NO_PERIOD_INPUTS",
         "story_mode_shapes_csv": str(mode_shape_path) if mode_shape_path else None,
     }
     out = Path(output_dir).expanduser().resolve()
@@ -348,7 +432,7 @@ def run_nbc105_modal_audit(ops, *, nmodes=30, output_dir=".",
                      f"{fmt(r['UY_participation_percent'])} / {fmt(r['UY_cumulative_percent'])} | "
                      f"{fmt(r['RZ_participation_percent'])}")
     txt_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"[NBC105 MODAL] {'PASS' if ux_ok and uy_ok else 'REVIEW'} | "
+    print(f"[NBC105 MODAL] {'MASS_COVERAGE_PASS_NATIVE_MODEL_UNVERIFIED' if ux_ok and uy_ok else 'MASS_COVERAGE_REVIEW'} | "
           f"UX={ux_final if ux_final is not None else 'NA'}% | "
           f"UY={uy_final if uy_final is not None else 'NA'}% | "
           f">=33Hz modes={len(high_modes)} | elapsed={elapsed:.3f}s")
