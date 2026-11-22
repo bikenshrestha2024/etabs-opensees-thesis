@@ -243,12 +243,14 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
     manifest["stored_unique_bytes"]=sum(x["bytes"] for x in manifest["collected"])
     (package/"REVIEW_MANIFEST.json").write_text(
         json.dumps(manifest,indent=2,ensure_ascii=False),encoding="utf-8")
-    zip_path=review_root/(package.name+"_UPLOAD.zip")
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    zip_root=ensure_review_zip_directory(output)
+    zip_path=zip_root/(package.name+"_UPLOAD.zip")
     with zipfile.ZipFile(zip_path,"w",compression=zipfile.ZIP_DEFLATED,
                          compresslevel=9,allowZip64=True) as archive:
         for f in sorted(package.rglob("*")):
             if f.is_file():archive.write(f,arcname=f.relative_to(package).as_posix())
-    (review_root/("LATEST_"+method+"_REVIEW.txt")).write_text(
+    (zip_root/("LATEST_"+method+"_REVIEW.txt")).write_text(
         "UPLOAD ZIP: "+str(zip_path)+"\nREVIEW FOLDER: "+str(package)+
         "\nMANIFEST: "+str(package/"REVIEW_MANIFEST.json")+"\n",
         encoding="utf-8")
