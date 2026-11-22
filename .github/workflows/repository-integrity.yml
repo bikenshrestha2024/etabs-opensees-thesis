@@ -73,6 +73,7 @@ jobs:
           check python -m unittest tests.test_uniform_output_structure tests.test_gravity_beam_force_gui_integration -v
           check python -m unittest tests.test_output_reader_writer_inventory -v
           check python -m unittest tests.test_all_active_output_pair_matrix -v
+          check python tools/audit_output_writer_reader_pairs.py --repo . --report-dir audit/output_pairs --fail-on-parse
           check python -m unittest tests.test_nbc105_operation_input_contracts tests.test_nbc105_gui_clause_routing tests.test_nbc105_module_dispatch tests.test_nbc105_annex_dispatch -v
           check python -m unittest discover -s tests -p 'test_history_inspection_scopes.py' -v
           check python -m unittest tests.verify_readiness_dashboard -v
@@ -95,4 +96,6 @@ jobs:
             audit/active_inventory.json
             audit/repository_layout.json
             audit/documentation_coverage.json
+            audit/output_pairs/all_active_output_pairs.json
+            audit/output_pairs/all_active_output_pairs.csv
           if-no-files-found: warn
