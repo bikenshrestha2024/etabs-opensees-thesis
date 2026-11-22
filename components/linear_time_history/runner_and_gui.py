@@ -120,6 +120,12 @@ def _run_analysis(config):
             if "openseespy.opensees" in sys.modules:
                 del sys.modules["openseespy.opensees"]
             os.environ['OPENSEES_GRAVITY_PROFILE']=config.get('gravity_profile',os.environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
+            from components.model.support_case_contract import normalize_support_case
+            os.environ['OPENSEES_SUPPORT_CASE']=normalize_support_case(config.get('support_case','PHYSICAL_32'))
+            mass_policy=str(config.get('seismic_mass_policy','SOURCE_DISTRIBUTED')).strip().upper()
+            if mass_policy not in ('SOURCE_DISTRIBUTED','STORY_LUMPED_NBC'):
+                raise ValueError('Unknown seismic mass policy')
+            os.environ['OPENSEES_SEISMIC_MASS_POLICY']=mass_policy
             os.environ['OPENSEES_LIMIT_STATE']=config['limit_state']
             try:runpy.run_path(str(model), run_name="opensees_ltha_model")
             except BaseException as exc:
@@ -555,6 +561,8 @@ class LinearTimeHistoryGUI:
         self.win.geometry("1120x880"); self.win.minsize(900, 700)
         self.model = tk.StringVar(); self.python = tk.StringVar(value=sys.executable)
         self.model_length_unit = tk.StringVar(value="m")
+        self.support_case=tk.StringVar(value="PHYSICAL_32")
+        self.seismic_mass_policy=tk.StringVar(value="SOURCE_DISTRIBUTED")
         self.manifest = tk.StringVar(); self.stories = tk.StringVar(); self.output = tk.StringVar()
         self.damping = tk.StringVar(value="5.0"); self.p1 = tk.StringVar(); self.p2 = tk.StringVar()
         self.t1x = tk.StringVar(); self.t1y = tk.StringVar(); self.tnx = tk.StringVar(); self.tny = tk.StringVar()
@@ -627,6 +635,17 @@ class LinearTimeHistoryGUI:
         inputs = ttk.LabelFrame(root, text="1. Complete linear OpenSees model and project inputs", padding=8); inputs.pack(fill="x")
         self._entry(inputs, "Linear model-builder script", self.model, lambda: self._browse(self.model, "file", "Select complete linear OpenSeesPy model script"))
         self._entry(inputs, "Python interpreter with OpenSeesPy", self.python, lambda: self._browse(self.python, "python", "Select OpenSeesPy Python interpreter"))
+        case_row=ttk.Frame(inputs);case_row.pack(fill="x",pady=3)
+        ttk.Label(case_row,text="Foundation node case",width=30).pack(side="left")
+        ttk.Combobox(case_row,textvariable=self.support_case,
+            values=("PHYSICAL_32","SOURCE_76","WALL_BASE_97"),
+            state="readonly",width=20).pack(side="left")
+        ttk.Label(case_row,text="Mass operator").pack(side="left",padx=(16,5))
+        ttk.Combobox(case_row,textvariable=self.seismic_mass_policy,
+            values=("SOURCE_DISTRIBUTED","STORY_LUMPED_NBC"),
+            state="readonly",width=22).pack(side="left")
+        ttk.Label(inputs,text="32 physical foundations primary; 76/97 diagnostic restraints. Floor-lumped mass changes dynamics and requires independent ETABS validation.",
+                  wraplength=980).pack(anchor="w")
         unit_row = ttk.Frame(inputs); unit_row.pack(fill="x", pady=3)
         ttk.Label(unit_row, text="Model length unit", width=30).pack(side="left")
         ttk.Combobox(unit_row, textvariable=self.model_length_unit, values=("m", "mm"), state="readonly", width=10).pack(side="left")
@@ -732,6 +751,7 @@ class LinearTimeHistoryGUI:
             x_only = self.motion_mode.get() == LTH_X_ONLY_MODE
             use_preloaded_pairs = (not x_only) and (not self.manifest.get().strip())
             values = {"model_script": self.model.get().strip(), "python": self.python.get().strip(), "model_length_unit": self.model_length_unit.get(), "motion_manifest": self.manifest.get().strip(),
+                "support_case": self.support_case.get(), "seismic_mass_policy": self.seismic_mass_policy.get(),
                 "story_nodes_csv": self.stories.get().strip(), "output_dir": self.output.get().strip(), "limit_state": self.ls.get(),
                 "damping_ratio_percent": float(self.damping.get()), "damping_period_1_s": float(self.p1.get()), "damping_period_2_s": float(self.p2.get()),
                 "T1_x_s": float(self.t1x.get()), "T1_y_s": float(self.t1y.get()) if self.t1y.get().strip() else None,
