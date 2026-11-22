@@ -20,7 +20,8 @@ from components.nonlinear_time_history.source_model_handoff import (
 def make_research_nltha_config(*, model_folder, x_path, y_path, output_dir,
                                event, variant_id, limit_state="ULS",
                                dt_s=0.005, trial_duration_s=0.0):
-    """Prepare actual existing-source XY/YX NLTHA using PEER research material law.
+    """[REF docs/source/components/nonlinear_time_history/direct_existing_model.py.md]
+    Prepare actual existing-source XY/YX NLTHA using PEER research material law.
 
     Never silently label transferred specimen cards as THESIS_NLTHA approval.
     All earthquake components act simultaneously, both orientations rebuilt.
@@ -58,7 +59,8 @@ def make_research_nltha_config(*, model_folder, x_path, y_path, output_dir,
 
 
 def preflight_existing_model(config):
-    """Audit exact local model and motion bytes; do not create solver domain.
+    """[REF docs/source/components/nonlinear_time_history/direct_existing_model.py.md]
+    Audit exact local model and motion bytes; do not create solver domain.
 
     Source files are sensitive and remain on the user's workstation; returned
     identity manifest belongs only in its selected local run output folder.
@@ -124,7 +126,8 @@ def preflight_existing_model(config):
 
 
 def run_existing_model_nltha(config, *, check_only=False, executor=None):
-    """Run both orientations immediately in native current interpreter.
+    """[REF docs/source/components/nonlinear_time_history/direct_existing_model.py.md]
+    Run both orientations immediately in native current interpreter.
 
     If OpenSees is missing the run is blocked with a saved error; never
     generate fake peak drifts, report completion, or push private model files.
@@ -183,6 +186,7 @@ def run_existing_model_nltha(config, *, check_only=False, executor=None):
 
 
 def main(argv=None):
+    """[REF docs/source/components/nonlinear_time_history/direct_existing_model.py.md] Execute the one-file local NLTHA CLI."""
     p=argparse.ArgumentParser(
         description="Run the already exported 3D OpenSees model with literature-baseline nonlinear RC walls and XY/YX motions; research-only until calibrated.")
     p.add_argument("--model-folder",required=True)
