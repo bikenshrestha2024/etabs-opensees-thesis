@@ -36,6 +36,7 @@ The table lists the current canonical launchers. Numeric IDs are stable navigati
 | 35 | [`35_SOIL_C_NLTHA_PREFLIGHT.py`](../../35_SOIL_C_NLTHA_PREFLIGHT.py) | [Guide](35_SOIL_C_PRIMARY_NLTHA_RUNBOOK.md) | Preflight Soil C motion and model evidence |
 | 36 | [`36_SOIL_C_NLTHA_RUN_MATRIX.py`](../../36_SOIL_C_NLTHA_RUN_MATRIX.py) | [Guide](36_SOIL_C_M0_M6_RUN_MATRIX.md) | Plan the Soil C M0-M6 run matrix; does not run analyses |
 | 37 | [`37_THESIS_EVIDENCE_DASHBOARD.py`](../../37_THESIS_EVIDENCE_DASHBOARD.py) | [Guide](37_THESIS_EVIDENCE_DASHBOARD.md) | Inspect evidence status and hashes; does not approve results |
+| 38 | [`38_EXECUTE_SOIL_C_NLTHA.py`](../../38_EXECUTE_SOIL_C_NLTHA.py) | [Guide](38_DIRECT_SOIL_C_NLTHA_EXECUTION.md) | Preflight or explicitly execute one existing matched Soil-C XY/YX pair; results are not automatically thesis-accepted |
 
 Legacy filenames remain functional as launch aliases. Underlying components, external records and saved outputs have not been renamed. The nonlinear transient failure is still an open issue.
 
