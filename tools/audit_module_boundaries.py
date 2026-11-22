@@ -35,12 +35,14 @@ def domain_for(path):
     if p.startswith(("01_ETABS/","src/etabs_adapter/")):
         return "ETABS_ONLY"
     if p.startswith(("02_OPENSEES/","components/modal/","components/response_spectrum/",
-                     "components/nonlinear_time_history/","components/sections/",
-                     "components/shared/")):
+                     "components/linear_time_history/","components/nonlinear_time_history/",
+                     "components/sections/","components/shared/")):
         return "OPENSEES_ANALYSIS"
     if p.startswith(("03_INTEGRATION/","components/inputs/","components/gravity/",
                      "components/equivalent_static/","components/validation/")):
         return "ETABS_OPENSEES_INTEGRATION"
+    if p.startswith("components/nbc105/"):
+        return "NBC105_REFERENCE_RULES_NOT_NATIVE_ACCEPTANCE"
     if p=="components/model/assembly.py":
         return "MIXED_SOURCE_ASSEMBLY_MIGRATION_REQUIRED"
     if p.startswith("components/model/"):
