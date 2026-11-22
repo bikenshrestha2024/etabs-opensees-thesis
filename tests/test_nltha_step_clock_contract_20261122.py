@@ -8,6 +8,9 @@ import unittest
 from components.nonlinear_time_history.full_record_gate import (
     verify_committed_transient_increment,
 )
+from components.nonlinear_time_history.first_step_transition import (
+    require_accepted_focused_step,
+)
 from components.nonlinear_time_history.runner_and_gui import (
     _advance_nonlinear_interval,
 )
@@ -80,6 +83,34 @@ class AcceptedTransientStepContract(unittest.TestCase):
                                          on_accept=bad_callback,diagnostics=diag)
         self.assertNotIn('accepted_steps',diag)
         self.assertNotIn('minimum_accepted_dt_s',diag)
+
+
+
+class AcceptedWallFocusGate(unittest.TestCase):
+    def test_reported_nonfinite_wall_after_zero_return_cannot_be_accepted(self):
+        payload={"stage":"FIRST_ACCEPTED_STEP",
+                 "status":"NONFINITE_FOCUSED_RESPONSE",
+                 "elements":[{"tag":110280,"responses":{
+                   "localForce":{"status":"NONFINITE"}}}],
+                 "source_model_sha256":"a"*64}
+        with self.assertRaisesRegex(RuntimeError,"nonfinite|NONFINITE"):
+            require_accepted_focused_step(payload)
+    def test_unmapped_requested_wall_does_not_count_as_valid_focus(self):
+        payload={"stage":"FIRST_ACCEPTED_STEP",
+                 "status":"FOCUSED_ELEMENT_ABSENT",
+                 "missing_tags":[110280]}
+        with self.assertRaisesRegex(RuntimeError,"110280"):
+            require_accepted_focused_step(payload)
+    def test_finite_focused_snapshot_preserves_limited_evidence(self):
+        source={"stage":"FIRST_ACCEPTED_STEP",
+                "status":"FINITE_WITH_UNSUPPORTED_CHANNELS",
+                "diagnostic_limitations":["not a validated model"]}
+        self.assertIs(require_accepted_focused_step(source),source)
+    def test_wrong_stage_must_not_be_mislabeled_accepted(self):
+        with self.assertRaisesRegex(ValueError,"FIRST_ACCEPTED_STEP"):
+            require_accepted_focused_step({
+                "stage":"BEFORE_EXCITATION",
+                "status":"FINITE_WITH_UNSUPPORTED_CHANNELS"})
 
 
 if __name__=='__main__':
