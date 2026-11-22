@@ -36,12 +36,14 @@ class FullLocalOutputAuditTests(unittest.TestCase):
             self.assertTrue(run.is_dir())
             self.assertIn("09_SOFTWARE_DIAGNOSTICS",run.parts)
             self.assertEqual(status["sources_inspected"],1)
+            self.assertEqual(status["project_output_files_inspected"],1)
             self.assertFalse(status["source_archive_moved"])
             result=run/"02_RESULTS"
             for name in (
                 "00_SUMMARY.json","01_ALL_ACTIVE_WRITERS_READERS.json",
                 "02_PROJECT_OUTPUT_LAYOUT.json","03_STAGE_MIGRATION.json",
-                "04_ACTIVE_OUTPUT_OWNERSHIP.json"):
+                "04_ACTIVE_OUTPUT_OWNERSHIP.json",
+                "05_ALL_OUTPUT_FILE_INVENTORY.json"):
                 self.assertTrue((result/name).is_file())
             self.assertEqual(inspect_case_manifest(run)["solver_status"],
                              "INCOMPLETE")
