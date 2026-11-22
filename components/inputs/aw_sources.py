@@ -207,6 +207,19 @@ def resolve_aw(export_dir, state):
                 'connected-wall length. Native ETABS validation and code '
                 'acceptance remain separate.')
             return out
+    # Guard newly rebuilt model variants against an older independently
+    # successful ETABS-linked workbook from a physically DIFFERENT 4x6m
+    # wall model. If the current shell/node source check did not pass,
+    # neither a dated Excel file nor a matching global reaction can replace it.
+    config=Path(export_dir)/'OpenSees_Complete_Model_Config_V118.json'
+    if config.is_file():
+        data=json.loads(config.read_text(encoding='utf-8-sig'))
+        if data.get('require_model_aligned_workbooks') is True:
+            out['method']='REQUIRES_SOURCE_VERIFIED_TWO_12M_WALLS'
+            out['notes'].append(
+                'Current geometry failed/unavailable: older workbook reference '
+                'must NOT be promoted to the active 12m X-wall model.')
+            return out
     ref, reason = latest_linked_reference(export_dir, state)
     if ref:
         out.update(X=ref['values']['awx'], Y=ref['values']['awy'],

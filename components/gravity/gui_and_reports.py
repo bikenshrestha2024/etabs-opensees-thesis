@@ -504,33 +504,30 @@ class GravityAnalysisGUI:
                 "not NBC105_RS_Scaling or the gravity reactions summary.",
                 parent=self.win)
             return
-        destination=(str(model.resolve().parent.parent) if auto else
-            filedialog.askdirectory(
-                parent=self.win,
-                title="Choose parent directory for NEW verified clear-beam source export"))
-        if not destination:return
+        # Save a new immutable variant in this source export's 02_MODEL stage.
+        # Do not create independent sibling exports which lose ownership of
+        # current geometry, source hashes and module result references.
         source=model.resolve().parent
-        import datetime as _dt
-        parent_dir=Path(destination).resolve()
-        if parent_dir==source or source in parent_dir.parents:
-            proposed=source.parent/(
-                "Verified_Clear_Beam_"+_dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
-            approved=messagebox.askyesno(
-                "Create separate export beside original source?",
-                "Your selected destination is INSIDE the original ETABS export folder. "
-                "The rebuild refuses to put a corrected source inside a source "
-                "used for other gravity/ESM calculations.\n\n"
-                "Create this NEW SIBLING folder instead?\n"+str(proposed)+
-                "\n\nNo existing model or ETABS EDB will be changed.",
+        if source.name.casefold().startswith("verified_clear_beam_"):
+            messagebox.showerror("Historical sibling model",
+                "The selected model is inside a historical "
+                "Verified_Clear_Beam sibling export. Select the original "
+                "ETABS source export folder (e.g. 1) before making a new "
+                "module-owned rebuild. Original files remain unchanged.",
                 parent=self.win)
-            if not approved:
-                self._set_gravity_operation("CANCELLED",
-                    "Select an output folder OUTSIDE the original export")
-                return
-            new=proposed
-        else:
-            new=parent_dir/(
-                "Verified_Clear_Beam_"+_dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+            return
+        from components.inputs.output_layout import export_root_for
+        export=export_root_for(source)
+        if export!=source:
+            messagebox.showerror("Choose original model export",
+                "Rebuild must start from the original ETABS export root. "
+                "Rebuilt variants cannot be recursively rebuilt in another "
+                "variant folder; open the original export and select its model.",
+                parent=self.win)
+            return
+        import datetime as _dt
+        new=(export/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"/
+             _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ"))
         # In an exported copy the runtime contains components but not tools.
         # Run the rebuilt source implementation from the current updated repo.
         current_root=_runtime_repo_root()
@@ -595,7 +592,7 @@ class GravityAnalysisGUI:
         self._gravity_busy=True
         self._set_gravity_operation("RUNNING","Verifying native ETABS workbook and rebuilding source")
         self._gravity_action_log("CORRECTED_EXPORT_START",
-            "Old source="+str(source)+" | new target="+str(new))
+            "Original export="+str(source)+" | new variant="+str(new))
         def worker():
             try:
                 command=[str(self.python_var.get()),"-u",str(script),

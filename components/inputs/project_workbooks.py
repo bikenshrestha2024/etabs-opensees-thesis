@@ -40,11 +40,22 @@ def registered_project_source(export_dir, role, *, missing_lfs='error'):
             for block in iter(lambda: stream.read(1048576), b''):
                 h.update(block)
         return h.hexdigest()
-    locations = [Path(export_dir)/'project_sources.private.json',
+    from components.inputs.output_layout import export_root_for
+    current_export=export_root_for(export_dir)
+    locations = [Path(export_dir)/'01_ETABS_EXPORT'/'00_MANIFEST'/'PROJECT_SOURCES.private.json',
+                 current_export/'01_ETABS_EXPORT'/'00_MANIFEST'/'PROJECT_SOURCES.private.json',
+                 Path(export_dir)/'project_sources.private.json',
                  _runtime_repo_root()/'project_sources.private.json',
                  Path(export_dir)/'excel'/'SOURCE_REGISTRY.json',
                  _runtime_repo_root()/'excel'/'SOURCE_REGISTRY.json']
-    if os.environ.get('OPENSEES_PROJECT_SOURCES'):
+    # Once a current ETABS export has a canonical source manifest, it
+    # becomes the sole source of native-table roles for that export.
+    # An absent role must remain absent, not silently fall back to an
+    # older bundled workbook with the same broad model name.
+    canonical=current_export/'01_ETABS_EXPORT'/'00_MANIFEST'/'PROJECT_SOURCES.private.json'
+    if canonical.is_file():
+        locations=[canonical]
+    elif os.environ.get('OPENSEES_PROJECT_SOURCES'):
         locations.insert(0, Path(os.environ['OPENSEES_PROJECT_SOURCES']))
     current = _source_edb_path(export_dir)
     for registry in locations:
@@ -100,6 +111,15 @@ def copy_project_workbooks(runtime_dir, export_dir):
     """
     import shutil
     import hashlib
+    # Clear-beam rebuild variants are tied to the current source geometry.
+    # Copying repository-global October/November ULS/SLS scaling workbooks
+    # here would falsely present them as this model's verified input.
+    config_file=Path(export_dir)/'OpenSees_Complete_Model_Config_V118.json'
+    if config_file.is_file():
+        config=json.loads(config_file.read_text(encoding='utf-8-sig'))
+        if config.get('require_model_aligned_workbooks') is True:
+            # Explicit current-source registration remains supported separately.
+            return []
     source=Path(runtime_dir)/'excel'/'source'
     if not source.is_dir():source=Path(runtime_dir)/'Project_Input_Workbooks'
     target=Path(export_dir)/'excel'/'source'
@@ -671,6 +691,28 @@ def source_workbooks(root, export_dir,limit_state='ULS'):
     Read source files only; never modify their values or formula caches.
     """
     root=Path(root);export_dir=Path(export_dir)
+    cfg_file=export_dir/'OpenSees_Complete_Model_Config_V118.json'
+    if cfg_file.is_file():
+        cfg=json.loads(cfg_file.read_text(encoding='utf-8-sig'))
+        if cfg.get('require_model_aligned_workbooks') is True:
+            # Only an explicitly registered CURRENT 12m workbook with exact
+            # ETABS source EDB byte identity can supply current-model values.
+            # Without registration return no workbook, never the old repo
+            # default calculator or ULS/SLS scaling file.
+            from components.inputs.model_aligned_reference import verified_reference
+            reference=verified_reference(export_dir,state=limit_state)
+            if reference is None:
+                return [None,None]
+            from openpyxl import load_workbook
+            candidate=Path(reference['workbook_path'])
+            wb=load_workbook(candidate,read_only=True,data_only=True)
+            try:
+                sheets=set(wb.sheetnames)
+            finally:
+                wb.close()
+            return [
+                candidate if 'NBC Calculator' in sheets else None,
+                candidate if 'SCALING SUMMARY' in sheets else None]
     state=str(limit_state).strip().upper()
     if state=='BOTH':state='ULS'
     if state not in ('ULS','SLS'):raise ValueError('limit_state must be ULS or SLS')

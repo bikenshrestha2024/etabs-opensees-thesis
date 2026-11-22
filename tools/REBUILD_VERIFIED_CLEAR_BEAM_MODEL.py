@@ -43,9 +43,34 @@ SOURCE_REQUIRED_FILES=(
 )
 
 
+def canonical_clear_beam_destination(source, *, stamp=None):
+    """[REF docs/source/tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py.md]
+    Keep an immutable verified-model variant inside the parent ETABS export.
+
+    Existing source stays unchanged; only this reserved module-specific path
+    is permitted to be nested beneath the original source.
+    """
+    from components.inputs.output_layout import export_root_for
+    source=Path(source).expanduser().resolve()
+    if source.name.casefold().startswith("verified_clear_beam_"):
+        raise ValueError("The selected folder is an OLD sibling rebuild. "
+                         "Select the original ETABS export folder (e.g. 1) "
+                         "to create a new canonical model-owned variant.")
+    root=export_root_for(source)
+    if source != root:
+        raise ValueError("Select the original ETABS export root for the canonical rebuild")
+    if stamp is None:
+        stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
+    from components.inputs.output_contract import safe_component
+    return root/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"/safe_component(stamp)
+
+
 def _verify_before_creating_output(source, workbook, target):
     """Fail closed before creating an output folder or changing source files."""
     source=Path(source).expanduser().resolve()
+    if source.name.casefold().startswith("verified_clear_beam_"):
+        raise ValueError("Do not rebuild a historical Verified_Clear_Beam sibling recursively; "
+                         "select original ETABS source export instead")
     workbook=Path(workbook).expanduser().resolve()
     target=Path(target).expanduser().resolve()
     if not source.is_dir():
@@ -58,9 +83,17 @@ def _verify_before_creating_output(source, workbook, target):
             "not the NBC calculation or gravity-results workbook: "+str(workbook))
     if target.exists():
         raise FileExistsError("Refusing to overwrite existing destination: "+str(target))
-    if target==source or source in target.parents:
-        raise ValueError("Destination must NOT be within the original source export")
-    if not target.parent.is_dir():
+    if target==source:
+        raise ValueError("Destination must not overwrite the original source export")
+    canonical_base=source/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"
+    nested=source in target.parents
+    if nested and target.parent!=canonical_base:
+        raise ValueError(
+            "Nested clear-beam output is allowed ONLY at "
+            "<export>/02_MODEL/REBUILDS/VERIFIED_CLEAR_BEAM/<unique-run>")
+    if any(x.is_symlink() for x in (source,workbook,target,*target.parents)):
+        raise ValueError("Refusing linked source, workbook or rebuild destination")
+    if not nested and not target.parent.is_dir():
         raise FileNotFoundError("Selected output parent does not exist: "+str(target.parent))
     missing=[str(source/name) for name in SOURCE_REQUIRED_FILES
              if not (source/name).is_file()]
@@ -115,8 +148,8 @@ def _choose_in_spyder():
             "OpenSees_Element_Connectivity.json file.\n"
             "2. Select the original FULL ETABS native assignment workbook "
             "(Material List, Frame Summary and End Offsets).\n"
-            "3. Choose a parent output folder. A NEW timestamped folder "
-            "will be created.\n\n"
+            "3. The new version will be saved under the selected export's "
+            "02_MODEL/REBUILDS/VERIFIED_CLEAR_BEAM folder.\n\n"
             "No EDB will be saved, no existing model overwritten, "
             "and gravity will NOT be run.",parent=root)
         source=filedialog.askdirectory(
@@ -127,11 +160,8 @@ def _choose_in_spyder():
             filetypes=[("Original ETABS assignment workbook","*.xlsx *.xlsm"),
                        ("All files","*.*")])
         if not workbook:return None
-        parent=filedialog.askdirectory(
-            parent=root,title="Step 3/3 — Parent directory for NEW corrected export")
-        if not parent:return None
-        name="Verified_Clear_Beam_"+datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        return (source,workbook,str(Path(parent)/name))
+        target=canonical_clear_beam_destination(source)
+        return (source,workbook,str(target))
     finally:
         root.destroy()
 
@@ -202,12 +232,18 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
             raise ValueError("Elastic comparison settings must contain at least one stiffness state")
     print("[RUNNING] Preflight source JSON and native ETABS Excel tables verified.",
           flush=True)
+    # The canonical nested path is the only explicitly approved descendant.
+    # Never silently create arbitrary nested stages or overwrite model data.
+    if source in target.parents:
+        target.parent.mkdir(parents=True,exist_ok=True)
     target.mkdir(parents=True,exist_ok=False)
-    print('[RUNNING] New destination created; copying original source evidence.',flush=True)
+    print('[RUNNING] Immutable source-specific rebuild created.',flush=True)
     copied=[]
     audit={"status":"REBUILD_RUNNING","original_source_dir":str(source),
            "original_assignment_workbook":native.name,
            "original_assignment_sha256":digest(native),
+           "reference_workbooks_status":"OLD_SCALING_QUARANTINED",
+           "x_wall_layout_requirement":"VERIFY_2_X_WALLS_12M_GROSS_EACH",
            "created_utc":datetime.now(timezone.utc).isoformat(),
            "files":[],"new_export_directory":str(target)}
     statusfile=target/"CLEAR_BEAM_REBUILD_STATUS.json"
@@ -227,7 +263,7 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
                  "OpenSees_Complete_Export_Report_V118.json",
                  "OpenSees_Complete_Model_Config_V118.json")
         for file in source.iterdir():
-            if not file.is_file() or file.suffix.lower() not in (".json",".csv",".xlsx"):
+            if not file.is_file() or file.suffix.lower() not in (".json",".csv"):
                 continue
             if file.name in ignored or file.name.startswith("Gravity_"):
                 continue
@@ -239,6 +275,13 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         cfg=json.loads((source/"OpenSees_Complete_Model_Config_V118.json").read_text(encoding="utf-8-sig"))
         if cfg.get("joint_volume_weight_policy") not in ("AUDIT_ONLY",None):
             raise ValueError("Single-owner physical volume changes must be independently reviewed")
+        # Rebuilt variants must not automatically inherit the repository's
+        # older ULS/SLS scaling workbook names. Model-dependent Aw/T remains
+        # from verified ETABS geometry until an explicit model-aligned workbook
+        # is source-hash and wall-layout checked.
+        cfg["require_model_aligned_workbooks"]=True
+        cfg["reference_workbooks_status"]="QUARANTINED_LEGACY_NO_AUTO_IMPORT"
+        cfg["required_x_wall_policy"]="TWO_12M_CONTINUOUS_X_WALLS_WITH_SOURCE_OPENINGS"
         cfg["etabs_beam_weight_policy"]="ETABS_BEAM_CLEAR_LENGTH"
         cfg["etabs_clear_beam_weight_confirmed"]=True
         cfg["joint_volume_weight_policy"]="AUDIT_ONLY"
@@ -252,6 +295,29 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         print("[RUNNING] Native beam-ID/offset audit and new OpenSees assembly.",flush=True)
         from components.model.assembly import prepare_complete_export
         result=prepare_complete_export(target,runtime_dir=ROOT)
+        # The user's selected X-wall policy is a PHYSICAL source check,
+        # not a renamed 4x6m reference workbook. Do not mark a rebuild
+        # verified when its first-storey shell/node layout disagrees.
+        from components.inputs.project_workbooks import (
+            import_project_inputs,source_limit_state)
+        from components.inputs.grouped_wall_aw import (
+            verify_thesis_two_12m_wall_geometry)
+        state,_=source_limit_state(target)
+        if state not in ("ULS","SLS"):
+            raise ValueError("Cannot identify rebuilt ULS/SLS state for 12m source check")
+        rebuilt_inputs=import_project_inputs(ROOT,target,state)
+        values=rebuilt_inputs.get("values") or {}
+        profile=values.get("wall_aw_profile")
+        height=values.get("wall_aw_height_m")
+        if not profile or height is None:
+            raise ValueError(
+                "Missing rebuilt ETABS-derived wall profile/height; "
+                "will not claim the selected two-12m-wall configuration")
+        checked_wall=verify_thesis_two_12m_wall_geometry(profile,height)
+        audit["wall_12m_geometry_status"]=checked_wall["status"]
+        audit["wall_12m_source_geometry"]=checked_wall["wall_geometry_verification"]
+        audit["wall_12m_code_accepted"]=False
+        write_status()
         report_file=target/"OpenSees_Complete_Export_Report_V118.json"
         report=json.loads(report_file.read_text(encoding="utf-8-sig"))
         if report.get("assembly_errors"):
@@ -276,6 +342,8 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
         audit["result"]=str(result)
         audit["gravity_state"]="NOT_RUN"
         audit["individual_32_reactions"]="NOT_VALIDATED"
+        audit["source_geometry_policy"]="CURRENT_12M_SOURCE_VERIFIED_NOT_NATIVE_EDB_ACCEPTED"
+        audit["unverified_old_scaling_workbooks"]="DO_NOT_USE_AS_CURRENT_MODEL_REFERENCE"
         if report.get("elastic_etabs_comparison"):
             audit["elastic_etabs_comparison"]=report["elastic_etabs_comparison"]
         write_status()
