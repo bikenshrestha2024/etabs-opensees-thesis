@@ -20,7 +20,7 @@ MODULES = ("Model", "Gravity", "ESM", "Modal", "MRSM", "LinearTH", "NonlinearTH"
 SKIP_DIRS = {
     "Organized_Results", "REVIEW_SNAPSHOTS", "Seismic_Review_Packages", "Gravity_Evidence_Upload",
     "00_SOURCE_MANIFEST", "01_ETABS_EXPORT", "09_SOFTWARE_DIAGNOSTICS",
-    "90_UPLOAD_PACKAGES", "REVIEW_MAIN", "__pycache__", ".git", ".pytest_cache",
+    "90_UPLOAD_PACKAGES", "REVIEW_MAIN", "07_EXPORT_ZIP", "ZIP_Exports", "__pycache__", ".git", ".pytest_cache",
 }
 # Review archives are not authoritative-source backups. Source workbooks and
 # private manifests must be supplied separately only with explicit approval.
@@ -305,8 +305,10 @@ def publish_organized_results(results_root, *, gravity_root=None,
         "Review EVIDENCE_MANIFEST.json for source path and SHA256 of every copy.\n"
         "The ZIPs are meant for sharing and debugging. They do not establish code compliance.\n",
         encoding="utf-8")
-    zipdir = destination / "ZIP_Exports"
-    zipdir.mkdir()
+    # Review ZIPs are owned by the exact selected case, not a hidden
+    # 06_REVIEW/Organized_Results/<timestamp>/ZIP_Exports directory.
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    zipdir = ensure_review_zip_directory(root)
     archives = {}
 
     # The full, absolute-path evidence manifest stays LOCAL. Every upload ZIP
