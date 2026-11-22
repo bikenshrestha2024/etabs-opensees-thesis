@@ -1133,6 +1133,21 @@ class GravityAnalysisGUI:
             if node_info:
                 note+=f"\nMatched global-Z pairs: {node_info.get('valid_one_to_one_global_z_count',0)}"
                 note+=f" | Ambiguous: {node_info.get('ambiguous_count',0)}"
+                maximum=node_info.get("max_absolute_nodal_difference_kN")
+                total_abs=node_info.get("sum_absolute_nodal_difference_kN")
+                if maximum is not None and total_abs is not None:
+                    note+=(
+                        f"\nMAXIMUM absolute nodal difference: {maximum:,.3f} kN"
+                        f"\nSUM of absolute nodal differences: {total_abs:,.3f} kN"
+                        f"\nPointwise result: {node_info.get('pointwise_screening_status')}"
+                        "\nWARNING: zero total imbalance does NOT mean nodal equivalence."
+                    )
+                    if maximum>1.0:
+                        self._gravity_action_log(
+                            "GRAVITY_POINTWISE_REACTION_MISMATCH",
+                            f"max_abs={maximum:.6f} kN | sum_abs={total_abs:.6f} kN "
+                            f"| source={comp.get('opensees_stiffness_basis')} "
+                            "| DO NOT APPROVE EQUILIBRIUM AS MODEL EQUIVALENCE")
             messagebox.showinfo("Direct ETABS/OpenSees gravity comparison",note,parent=self.win)
         except Exception as exc:
             self._gravity_action_log("ETABS_ERROR",str(exc))
