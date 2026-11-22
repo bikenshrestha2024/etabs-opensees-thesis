@@ -196,6 +196,34 @@ class LinkedReference(unittest.TestCase):
                 self.assertAlmostEqual(out['Y'],2.2030803)
 
 
+    def test_explicitly_registered_provenance_takes_priority_over_newer_file(self):
+        import hashlib
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);results=root/'results';results.mkdir()
+            edb=root/'current.EDB';edb.write_bytes(b"source edb")
+            sha=hashlib.sha256(edb.read_bytes()).hexdigest()
+            older=results/'old_ETABS_LINKED_ESM.provenance.json'
+            newer=results/'new_ETABS_LINKED_ESM.provenance.json'
+            old=audit(edb=edb,sha=sha);old['coefficients']['X']['Aw_m2']=4.8
+            fresh=audit(edb=edb,sha=sha);fresh['coefficients']['X']['Aw_m2']=9.6
+            older.write_text(json.dumps(old),encoding="utf-8")
+            newer.write_text(json.dumps(fresh),encoding="utf-8")
+            os.utime(older,(1_600_000_000,1_600_000_000))
+            os.utime(newer,(1_700_000_000,1_700_000_000))
+            with mock.patch('components.inputs.project_workbooks.analysis_output_folder',
+                            return_value=results), \
+                 mock.patch('components.inputs.project_workbooks._source_edb_path',
+                            return_value=str(edb)), \
+                 mock.patch('components.inputs.project_workbooks.registered_project_source',
+                            return_value=str(older)):
+                ref,reason=aw_sources.latest_linked_reference(root,'ULS')
+            self.assertEqual(reason,'OK')
+            self.assertEqual(ref['values']['awx'],4.8)
+            self.assertEqual(Path(ref['provenance_json']),older)
+
+
+
 class GuiHelpers(unittest.TestCase):
     def test_resolve_folder(self):
         with tempfile.TemporaryDirectory() as tmp:
