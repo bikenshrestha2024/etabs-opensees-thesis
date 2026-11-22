@@ -363,7 +363,9 @@ def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=
     outside the individual panel. Adjacent panels therefore share subdivisions.
     No source opening is filled; each mesh cell belongs to an existing polygon.
     """
-    nodes=dict(source_nodes); lookup={tuple(round(x,8) for x in p):n for n,p in nodes.items()}
+    from components.model.source_node_identity import unique_coordinate_lookup
+    nodes=dict(source_nodes)
+    lookup=unique_coordinate_lookup(nodes)
     if not nodes:
         raise ValueError("Cannot mesh ETABS area panels without source nodes")
     next_node=max(nodes)+1000; shells=[]; by_object={}
