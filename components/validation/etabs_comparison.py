@@ -565,6 +565,37 @@ def launch(parent,folder,results_root=None):
      for col in columns:table.heading(col,text=col);table.column(col,width=125,stretch=False)
      for row in evidence['rows']:
       table.insert('','end',values=[row.get(col,'') for col in columns])
+     def preview_link():
+      """Attach actual signed native force to one selected BASE row as UNVERIFIED PREVIEW."""
+      source_selected=table.selection()
+      target_selected=tree.selection()
+      if len(source_selected)!=1 or len(target_selected)!=1:
+       messagebox.showwarning('Select both response rows',
+         'Select one actual ETABS native row above and one OpenSees MRSM BASE base_shear row in the comparison table behind this window.',
+         parent=panel)
+       return
+      ref=table.item(source_selected[0],'values')
+      item=tree.item(target_selected[0],'values')
+      native=dict(zip(columns,ref))
+      current=dict(zip(cols,item))
+      if current.get('method')!='MRSM' or current.get('metric')!='base_shear' or current.get('location')!='BASE' or current.get('axis') not in ('X','Y'):
+       messagebox.showerror('Unsupported comparison preview',
+         'Raw ETABS BaseReact can only be preview-linked to an OpenSees MRSM BASE base_shear row. Story response, modal modes and drift need their exact source/mapping.',
+         parent=panel)
+       return
+      direction=current['axis']
+      native_component='Fx_kN' if direction=='X' else 'Fy_kN'
+      raw_value=float(native[native_component])
+      # Record the ACTUAL RAW signed ETABS reaction, with no fictitious
+      # CQC/NBC force normalization, percentage comparison or PASS status.
+      tree.set(target_selected[0],'etabs_value',format(raw_value,'.9g'))
+      tree.set(target_selected[0],'percent_difference','')
+      tree.set(target_selected[0],'status','RAW_ETABS_PREVIEW_NOT_COMPARABLE')
+      status.set('RAW PREVIEW ONLY: OpenSees '+str(current.get('case'))+
+                ' shown alongside '+str(native['etabs_case'])+'/'+str(native['step_type'])+
+                ' native '+native_component+'. No response-basis approval; exact mapping and CQC/force-scaling review required.')
+     ttk.Button(panel,text='Preview-link selected ETABS base reaction to highlighted MRSM BASE row (NOT verified)',
+                command=preview_link).pack(anchor='w',padx=8,pady=5)
      ttk.Label(panel,text='Source snapshot: '+str(write_rows),wraplength=1040).pack(anchor='w',padx=8,pady=4)
      ttk.Button(panel,text='Close',command=panel.destroy).pack(anchor='e',padx=8,pady=4)
     win.after(0,done)
