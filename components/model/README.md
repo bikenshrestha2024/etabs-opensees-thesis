@@ -1,6 +1,6 @@
 # Structural model and physical load assembly
 
-**Active owner:** `components/model/` · **Current Python modules:** 23 · **Status:** module navigation only; engineering acceptance requires independent evidence.
+**Active owner:** `components/model/` · **Current Python modules:** 24 · **Status:** module navigation only; engineering acceptance requires independent evidence.
 
 ## Responsibilities and interfaces
 
@@ -37,5 +37,6 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [section_tags.py](section_tags.py)
 - [single_count_self_weight.py](single_count_self_weight.py)
 - [source_node_identity.py](source_node_identity.py)
+- [support_case_contract.py](support_case_contract.py)
 
 > This list reflects the current checked-in Python files. Do not delete, rename or relocate an active module until its importers, GUI callbacks, saved-case readers and native regression evidence have been verified together. Source-specific guides are under `docs/source/components/model/` where available.
