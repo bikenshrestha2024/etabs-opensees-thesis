@@ -337,6 +337,7 @@ def verify_native_bundle(root, edb, expected_model_sha256):
 def find_verified_etabs_csv(source_folder, results_root):
     """Auto-select approved live API evidence from current or source-owned runs.
 
+    [REF docs/source/components/validation/etabs_comparison.py.md]
     No filename similarity is ever used as a source-identity assertion.
     Only SHA-matched source EDB, assembled model and reference files qualify.
     """
