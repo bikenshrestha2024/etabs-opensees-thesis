@@ -1672,7 +1672,7 @@ class ESMGui:
                             errors='replace',encoding='utf-8',
                             env={**os.environ, 'PYTHONIOENCODING':'utf-8', 'PYTHONUTF8':'1',
                                  'OPENSEES_GRAVITY_PROFILE':'AS_CONFIGURED',
-                                 'OPENSEES_SUPPORT_CASE':self.support_case_var.get()})
+                                 'OPENSEES_SUPPORT_CASE':getattr(getattr(self,'support_case_var',None),'get',lambda:'PHYSICAL_32')()})
                         log=out/(RAYLEIGH_PREFIX+'_'+state+'.log')
                         log.write_text(proc.stdout+'\n'+proc.stderr,encoding='utf-8')
                         if proc.returncode:
