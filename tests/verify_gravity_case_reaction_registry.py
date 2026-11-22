@@ -4,7 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 from components.gravity.reaction_case_registry import (
-    SCENARIO_SUPPORTS,checked_reaction_result,register_case,current_case)
+    SCENARIO_SUPPORTS,checked_reaction_result,register_case,current_case,
+    current_case_diagnostic)
 
 class ReactionCaseRegistryTests(unittest.TestCase):
     def setUp(self):
@@ -43,6 +44,48 @@ class ReactionCaseRegistryTests(unittest.TestCase):
                 self.assertEqual(result["support_count"],n)
                 self.assertAlmostEqual(result["summed_reaction_kN"],320047.788933,places=5)
                 self.assertAlmostEqual(result["applied_load_kN"],320047.788933,places=5)
+
+    def test_distinguishes_missing_case_from_solved_result_and_stale_model(self):
+        mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
+        initial=current_case_diagnostic(
+            self.output,self.model,scenario=mode,profile="GRAVITY_1.0D_1.0L")
+        self.assertEqual(initial["status"],"NO_CASE_INDEX")
+        f=self.write(self.payload(mode))
+        register_case(self.output,f,self.model,scenario=mode,
+                      profile="GRAVITY_1.0D_1.0L")
+        solved=current_case_diagnostic(
+            self.output,self.model,scenario=mode,profile="GRAVITY_1.0D_1.0L",
+            expected_support_tags=range(1,33))
+        self.assertEqual(solved["status"],"SOLVED_VERIFIED_INDEX")
+        self.assertEqual(solved["result"]["support_count"],32)
+        absent=current_case_diagnostic(
+            self.output,self.model,scenario="ETABS_SOURCE_SUPPORTS",
+            profile="GRAVITY_1.0D_1.0L")
+        self.assertEqual(absent["status"],"CASE_NOT_INDEXED")
+        self.model.write_text("print('new source')\\n",encoding="utf-8")
+        stale=current_case_diagnostic(
+            self.output,self.model,scenario=mode,profile="GRAVITY_1.0D_1.0L")
+        self.assertEqual(stale["status"],"MODEL_SHA_CHANGED")
+        self.assertIsNone(stale["result"])
+
+    def test_digest_and_support_mismatch_are_not_labeled_never_analyzed(self):
+        mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
+        f=self.write(self.payload(mode))
+        register_case(self.output,f,self.model,scenario=mode,
+                      profile="GRAVITY_1.0D_1.0L")
+        wrong=current_case_diagnostic(
+            self.output,self.model,scenario=mode,profile="GRAVITY_1.0D_1.0L",
+            expected_support_tags=range(2,34))
+        self.assertEqual(wrong["status"],"SAVED_CASE_VALIDATION_BLOCKED")
+        self.assertIn("support tags differ",wrong["reason"])
+        self.assertIsNone(wrong["result"])
+        data=self.payload(mode)
+        data["reactions"][0]["rz_kN"]+=5.0
+        data["reactions"][1]["rz_kN"]-=5.0
+        f.write_text(json.dumps(data),encoding="utf-8")
+        tampered=current_case_diagnostic(
+            self.output,self.model,scenario=mode,profile="GRAVITY_1.0D_1.0L")
+        self.assertEqual(tampered["status"],"SAVED_RESULT_HASH_CHANGED")
 
     def test_case_switch_fails_closed_and_cannot_show_other_case(self):
         mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
