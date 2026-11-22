@@ -1,6 +1,6 @@
 # Source files, project provenance and output contracts
 
-**Active owner:** `components/inputs/` · **Current Python modules:** 18 · **Status:** module navigation only; engineering acceptance requires independent evidence.
+**Active owner:** `components/inputs/` · **Current Python modules:** 19 · **Status:** module navigation only; engineering acceptance requires independent evidence.
 
 ## Responsibilities and interfaces
 
@@ -30,6 +30,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [output_layout.py](output_layout.py)
 - [pair_selection.py](pair_selection.py)
 - [project_output_layout.py](project_output_layout.py)
+- [review_zip_paths.py](review_zip_paths.py)
 - [project_workbooks.py](project_workbooks.py)
 - [records.py](records.py)
 
