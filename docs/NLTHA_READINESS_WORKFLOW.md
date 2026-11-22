@@ -155,3 +155,16 @@ No solver PASS is engineering acceptance.
 - All 16 checks and `approved_for_nltha` remain False until you complete them.
 
 Evidence notes: `engineering/agent_edits/20261120_nltha_readiness_gate.md`, `engineering/agent_edits/20261120_etabs_ingest_guards.md`, `engineering/agent_edits/20261120_nltha_binding_runtime_guard.md`.
+
+
+## 6. Screenshot (2026-11-22): 20 blocker items and readable remediation
+
+The legacy GUI's long `Input needs review` message showed **20 unresolved blockers** (16 `check_false` source reviews, 1 `not_approved`, `material_file_missing`, `wall_fsam_tags_empty`, `parameters_not_reviewed`). This is a **preflight refusal**, not an OpenSees Newton iteration or wall convergence error. Correct physical-model gating must never be disabled simply to avoid the dialog.
+
+The source GUI now opens a **scrollable review dialog** instead of squeezing these items into a narrow one-button message box. It groups checks into Human Approval, Engineering Checklist, Model Materials and Model Input Binding, and provides **Open model-bound checklist**, **Copy blockers**, **Save report locally**, and **Close**. Saving produces a plain text report in the operator-selected local path; no source EDB, model config, material data or human approval is changed. The original `_require_nonlinear_readiness` still rejects the run before allocating the output case or starting the solver.
+
+The UI also correctly labels a requested `trial_duration_s=0` **Suite** (full-record request) rather than `Trial`; a positive duration is `Trial`. This is a directory/scope bug fix, **not** evidence the full physical record has solved.
+
+**Action on current export:** Open **Prepare / inspect model-bound readiness checklist**. Supply independently reviewed project material definitions and section-specific FSAM tags, then verify the 16 checks with source-linked notes. A research-only PEER material *draft* can help isolate a numerical wall failure but it is not an acceptable project production material calibration. The independent [Stage 38 runbook](programs/38_DIRECT_EXISTING_MODEL_NLTHA.md) describes source-bound exploratory full XY/YX execution, not a bypass of this production approval.
+
+See [NLTHA screenshot and source review](../REVIEW_MAIN/06_NONLINEAR_TH/20261122_NLTHA_READINESS_AND_GUI_SCOPE_SOURCE_REVIEW.md).
