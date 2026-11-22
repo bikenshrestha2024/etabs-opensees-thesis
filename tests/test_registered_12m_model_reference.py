@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from openpyxl import Workbook
-from components.inputs.model_aligned_reference import verified_reference
+from components.inputs.model_aligned_reference import verified_reference,register_reference
 from components.inputs.project_workbooks import source_workbooks
 
 
@@ -57,6 +57,39 @@ class Registered12mModelWorkbookTests(unittest.TestCase):
                 self.assertEqual(selected,[self.reference,None])
                 with self.assertRaisesRegex(ValueError,"state mismatch"):
                     verified_reference(self.root,state="SLS")
+
+    def test_scaling_aw_must_match_verified_12m_geometry(self):
+        from openpyxl import load_workbook
+        wb=load_workbook(self.reference)
+        sh=wb.create_sheet("SCALING SUMMARY")
+        sh["A4"]="Source EDB"
+        sh["B4"]=str(self.edb)
+        sh["A14"]="X";sh["B14"]=1.9583;sh["C14"]=2.0
+        sh["A15"]="Y";sh["B15"]=2.203;sh["C15"]=1.9
+        wb.save(self.reference)
+        geometry={"aw_candidate_m2":{"X":2.073,"Y":2.203},
+                  "wall_geometry_verification":{
+                      "classification":"EXPORTED_GEOMETRY_VERIFIED_NOT_NATIVE_ETABS_CERTIFIED"}}
+        imported={"values":{"wall_aw_profile":{"rows":[{"synthetic":True}]},
+                            "wall_aw_height_m":95.0}}
+        with self._guards(),patch(
+            "components.inputs.project_workbooks.source_limit_state",
+            return_value=("ULS","source")),patch(
+            "components.inputs.project_workbooks.import_project_inputs",
+            return_value=imported),patch(
+            "components.inputs.grouped_wall_aw.verify_thesis_two_12m_wall_geometry",
+            return_value=geometry):
+            with self.assertRaisesRegex(ValueError,"Aw-X differs"):
+                register_reference(self.root,self.reference,limit_state="ULS")
+            wb=load_workbook(self.reference)
+            wb["SCALING SUMMARY"]["B14"]=2.073
+            wb.save(self.reference)
+            registered=register_reference(self.root,self.reference,
+                                          limit_state="ULS")
+            self.assertEqual(registered["source_edb_sha256"],
+                             self.record["source_edb_sha256"])
+            loaded=source_workbooks(self.root,self.root,"ULS")
+            self.assertEqual(loaded,[self.reference,self.reference])
 
     def test_modified_workbook_invalidates_registry_and_never_falls_back(self):
         self.reference.write_bytes(self.reference.read_bytes()+b"tampered")
