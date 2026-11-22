@@ -151,7 +151,14 @@ def latest_linked_reference(export_dir, state, *, search_dirs=()):
         return None, 'No ETABS-linked original Excel run found for ' + str(state)
     current = _source_edb_path(export_dir)
     reasons = []
-    for path in sorted(set(found), key=lambda p: p.stat().st_mtime, reverse=True):
+    # A deliberately registered, model-matched source is authoritative.
+    # Filesystem mtime is only a deterministic fallback among unregistered
+    # candidates; a copied old file must not supersede a registered one.
+    registered_path=Path(registered).resolve() if registered else None
+    paths=sorted(set(Path(p).resolve() for p in found if Path(p).is_file()),
+                 key=lambda p:(0 if registered_path is not None and p==registered_path
+                               else 1,-p.stat().st_mtime,p.name.casefold()))
+    for path in paths:
         try:
             audit = json.loads(path.read_text(encoding='utf-8-sig'))
             ref = linked_reference_from_audit(audit, path, state=state, current_edb=current)
