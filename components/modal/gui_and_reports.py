@@ -59,6 +59,7 @@ try:
     basis=modal_model_basis_report(model_payload,config_payload,
         {limit_state!r},{period_inputs!r})
     result['modal_model_basis_audit']=basis
+    result['rayleigh_period_provenance']='EXTERNAL_GUI_INPUT_NOT_COMPUTED_BY_MODAL_SOLVER'
     result['limit_state']={limit_state!r}
     result['native_etabs_opensees_equivalence']='NOT_VERIFIED'
     print('[MODAL MODEL BASIS]',json.dumps(basis,sort_keys=True),flush=True)
