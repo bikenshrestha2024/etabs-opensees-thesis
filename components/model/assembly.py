@@ -1008,10 +1008,22 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
                            shells_with_transverse_shear_approximation=sum(
                                not shell['transverse_shear_exact'] for shell in plan['shell_objects'].values()),
                            segments_with_offsets=sum(bool(any(r['joint_offsets_m'])) for r in plan['frame_segments']),
-                           shear_flexible_segments=sum(r['shear_flexible'] for r in plan['frame_segments']))
+                           shear_flexible_segments=sum(r['shear_flexible'] for r in plan['frame_segments'],
+                           native_end_offset_coverage=plan.get('native_end_offset_coverage', {}))
                 for state,plan in elastic_comparison.items()
             }
             report['warnings'].append('State-specific elastic ETABS comparison settings applied to the stiffness input only. Review joint reactions and modal results for this rebuilt model.')
+            for state, plan in elastic_comparison.items():
+                offset_coverage = plan.get('native_end_offset_coverage', {})
+                if offset_coverage.get('status') != 'NATIVE_RIGID_ZONE_INPUTS_MATCH_SOURCE_NOT_SOLVER_VALIDATION':
+                    report['warnings'].append(
+                        'ETABS elastic ' + state + ': SOURCE RIGID END-ZONE COVERAGE INCOMPLETE | '
+                        + 'source_active=' + str(offset_coverage.get('native_active_rigid_zone_objects'))
+                        + ' | exact_configured=' + str(offset_coverage.get('native_offsets_configured_exact_count'))
+                        + ' | missing=' + str(offset_coverage.get('native_offsets_unmodeled_count'))
+                        + ' | metadata_unavailable=' + str(offset_coverage.get('native_offset_metadata_missing_count'))
+                        + ' | source_shear_conflict=' + str(offset_coverage.get('native_rigid_zone_on_selected_shear_flexible_objects'))
+                        + '. Do not claim complete native ETABS stiffness or joint-reaction equivalence.')
         from OpenSees_Storey_Gravity_V131 import export_storey_gravity
         # The user-supplied 2026-11-16 worker log measured 1,614.536 s
         # inside storey gravity and its mesh-level Excel formula exporter.
@@ -1304,6 +1316,16 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
     stiffness_basis=('ETABS_ELASTIC_COMPARISON' if comparison is not None
                      else cfg.get('linear_shell_stiffness_policy','LEGACY_GROSS_SHELL'))
     print('[ELASTIC STIFFNESS BASIS]',limit_state,stiffness_basis,flush=True)
+    if comparison is not None:
+        coverage=comparison.get('native_end_offset_coverage',{})
+        print('[ETABS SOURCE RIGID END-ZONE COVERAGE]',
+              json.dumps({key:coverage.get(key) for key in (
+                  'status','native_active_rigid_zone_objects',
+                  'native_offsets_configured_exact_count',
+                  'native_offsets_unmodeled_count',
+                  'native_rigid_zone_on_selected_shear_flexible_objects',
+                  'native_offset_metadata_missing_count',
+                  'engineering_acceptance')},allow_nan=False),flush=True)
     if mode=='nonlinear' and not research and not cfg.get('nonlinear_parameters_reviewed'):
         raise ValueError('Nonlinear model requires reviewed frame and wall constitutive inputs. Set nonlinear_materials_file and nonlinear_wall_fsam_tags in OpenSees_Complete_Model_Config_V118.json after calibration. The elastic assembled model is available for conversion/gravity checks.')
     from OpenSees_Mapping_Audit_V125 import read as read_mapping,OVERRIDES,add_device
