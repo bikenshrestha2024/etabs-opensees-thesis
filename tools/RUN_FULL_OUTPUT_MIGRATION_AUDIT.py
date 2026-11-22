@@ -24,6 +24,7 @@ from tools.audit_output_writer_reader_pairs import build_matrix
 from tools.audit_uniform_output_structure import audit_export_layout
 from tools.audit_stage_output_migration import audit_stage_migration
 from tools.audit_output_stage_ownership import audit as audit_active_owners
+from tools.audit_output_storage import scan_output
 
 
 def run_full_audit(export_root, *, repository=_REPO):
@@ -39,6 +40,7 @@ def run_full_audit(export_root, *, repository=_REPO):
     layout=audit_export_layout(root)
     stage=audit_stage_migration(root)
     owners=audit_active_owners(repo)
+    disk=scan_output(root,hash_duplicates=False)
     if source["parse_errors"] or owners["parse_errors"]:
         raise ValueError("Active source cannot be fully parsed; no audit published")
     run=create_case_run(root,"SOFTWARE_DIAGNOSTICS",
@@ -51,6 +53,7 @@ def run_full_audit(export_root, *, repository=_REPO):
             ("02_PROJECT_OUTPUT_LAYOUT.json",layout),
             ("03_STAGE_MIGRATION.json",stage),
             ("04_ACTIVE_OUTPUT_OWNERSHIP.json",owners),
+            ("05_ALL_OUTPUT_FILE_INVENTORY.json",disk),
         ):
             atomic_json(output/filename,document)
         outcome={
@@ -58,6 +61,9 @@ def run_full_audit(export_root, *, repository=_REPO):
             "status":"INVENTORY_COMPLETED_ENGINEERING_AND_MIGRATION_OPEN",
             "sources_inspected":source["source_count"],
             "owners":source["owner_counts"],
+            "project_output_files_inspected":disk["total_files"],
+            "project_output_bytes_accounted":disk["total_bytes"],
+            "duplicate_hash_check":"NOT_RUN_UNLESS_EXPLICITLY_REQUESTED",
             "producer_consumer_review_required":
                 source["producer_consumer_review_required"],
             "stage_case_count":layout["case_counts"],
