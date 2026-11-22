@@ -15,6 +15,8 @@ def main(argv=None):
     """[REF NBC105-2025 Clauses 1–10; docs/nbc105/README.md]"""
     parser=argparse.ArgumentParser(description="NBC 105:2025 clause-by-clause calculation interface")
     parser.add_argument("--list",action="store_true",help="List exported public operations")
+    parser.add_argument("--describe",action="store_true",
+                        help="Show required/optional JSON fields for selected clause/annex rule")
     parser.add_argument("--audit",action="store_true",help="Show 1–10 plus Annexes A–C source/evidence compliance gate")
     parser.add_argument("--clause",type=int,help="1–10")
     parser.add_argument("--annex",choices=("A","B"),help="Separate RC or steel annex reference checks")
@@ -28,7 +30,15 @@ def main(argv=None):
             print(json.dumps(result,indent=2,sort_keys=True,allow_nan=False))
             return 2  # Deliberately blocked until exhaustive source and native review.
         if args.list:
-            result=available_operations()
+            from components.nbc105.dispatch import available_annex_operations
+            result={"clauses":available_operations(),"annexes":available_annex_operations()}
+        elif args.describe:
+            if not args.operation or ((args.clause is None)==(args.annex is None)):
+                parser.error("--describe requires --operation and exactly one --clause or --annex")
+            from components.nbc105.dispatch import operation_input_spec,annex_operation_input_spec
+            result=(operation_input_spec(args.clause,args.operation)
+                    if args.annex is None else
+                    annex_operation_input_spec(args.annex,args.operation))
         elif args.annex:
             if args.clause is not None or not args.operation:
                 parser.error("--annex requires --operation and cannot be combined with --clause")
