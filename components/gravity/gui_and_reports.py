@@ -1649,8 +1649,9 @@ class GravityAnalysisGUI:
 
         [REF docs/source/components/gravity/reaction_case_registry.py.md]
         """
-        self.solved_reaction_var.set("Not analyzed for this case")
-        self.solved_reaction_status_var.set("No matching completed run; run the selected case")
+        self.solved_reaction_var.set("Checking saved case…")
+        self.solved_reaction_status_var.set(
+            "Verifying 32/76/97 selection, model fingerprint and exact saved solver evidence")
         try:
             from components.gravity.reaction_case_registry import current_case_diagnostic
             raw_model=self.model_var.get().strip()
