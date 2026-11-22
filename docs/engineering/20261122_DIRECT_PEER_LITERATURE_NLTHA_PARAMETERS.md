@@ -36,6 +36,14 @@
 
 **R02.** Kolozvari, K., López, C., Massone, L. (2023), *Efficient three-dimensional shear-flexure interaction model for reinforced concrete walls*, *Engineering Structures* **294**, article 116700, DOI https://doi.org/10.1016/j.engstruct.2023.116700 . Author's element guide https://kkolozvari.github.io/E-SFI-MVLEM-3D/ . It supports `E_SFI_MVLEM_3D` four-node 3D axial–flexure–shear modeling and syntax, **not** evidence that the older 2D RW specimen reproduces the re-entrant 25-storey core. The E-SFI element's optional `CoR`, `ThickMod` and *Poisson* parameters have different meanings from the *FSAM* friction/dowel `nu=0.8 / alpha=0.01`. Do not swap or silently copy values between those definitions.
 
+## Damped-outrigger FVD literature source (separate from RC wall source)
+
+**R03.** Yang, Y., Zhao, X., Shi, W. and Li, J. (2021), *Optimal Design of Mega-Frame Core Wall Structures Equipped with Viscous Damped Outriggers for Human Comfort Performance under Wind Loading*, *Shock and Vibration* (2021), article 6673682. DOI https://doi.org/10.1155/2021/6673682 .
+
+The paper explicitly reports an **initial design trial** with **one damper at each outrigger end in zone 4**, coefficient **C=700 kN/(mm/s)^0.3** and exponent **alpha=0.3**; later wind-serviceability optimization reports **C=635 kN/(mm/s)^0.3** in zones 4 and 6. This confirms the origin of the user's earlier **C=700, alpha=0.3** literature baseline; it is **not** the paper's optimized final coefficient, and the paper is about *wind comfort*, not an experimental seismic qualification of the thesis damper.
+
+In `kN–m–s` the same force–velocity law `F=C|v|^alpha sign(v)` has `C_model=700*(1000**0.3) kN·(s/m)^0.3` (approximately 5560.3), **NOT 700 kN·(s/m)^0.3**. However, an OpenSees **Maxwell** `ViscousDamper(K,Cd,alpha)` additionally requires a separately sourced and physically consistent spring stiffness `K`; do not invent `K` or assign the same `C` with an incompatible velocity unit. The existing `components/sections/devices.py` enforces positive finite `K,Cd,alpha`. No FVD is needed for the M0 no-device baseline; M2/M4/M6 must record the separate damper/connection model and units before execution.
+
 ## Direct transfer in the repository
 
 - `components/nonlinear_time_history/material_source_sets.py::peer_fsam_panel_values` stores the exact Appendix B.3 **web and boundary** `rho_x/rho_y/nu/alpha` values and printed-page citation. Its provenance rows are `FROM_SOURCE` for these now directly attested FSAM values.
