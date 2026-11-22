@@ -160,7 +160,7 @@ class ReactionCaseRegistryTests(unittest.TestCase):
         workspace=self.root/"source_model_out"
         workspace.mkdir()
         folder=dual_runs_parent(workspace,create=True)/"batch_20261122"
-        folder.mkdir()
+        folder.mkdir(parents=True)
         self.assertEqual(workspace_for_dual_case_run(folder),workspace.resolve())
         with self.assertRaisesRegex(ValueError,"Not a canonical"):
             workspace_for_dual_case_run(self.root)
