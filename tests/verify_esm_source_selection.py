@@ -18,7 +18,7 @@ class ESMSourceSelection(unittest.TestCase):
                 "1,1234,3.8,100,0,30\n",encoding="utf8")
             model=root/"OpenSees_Complete_Model_Data_V118.json"
             model.write_text(json.dumps({"diaphragms":[
-                {"storey_number":1,"master_tag":1234}]}),encoding="utf8")
+                {"storey_number":1,"master_tag":1234,"master_xyz":[0.,0.,3.8]}],"base_z_m":0.0}),encoding="utf8")
             chosen,note=recommended_story_weight_input(root)
             self.assertEqual(chosen,source)
             self.assertIn("independently review",note)
@@ -26,6 +26,38 @@ class ESMSourceSelection(unittest.TestCase):
             chosen,note=recommended_story_weight_input(root)
             self.assertEqual(chosen,template)
             self.assertIn("rejected",note)
+    def test_same_diaphragm_ids_with_stale_heights_are_not_auto_selected(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manual = root/"NBC105_ESM_Story_Weights_Input_V108.csv"
+            manual.write_text("story_number,height_m\n1,3.8\n",encoding="utf8")
+            assembled = root/"NBC105_ESM_Story_Weights_Assembled_V118.csv"
+            assembled.write_text(
+                "story_number,master_node_tag,height_m,dead_load_kN,storage_live_load_kN,other_live_load_kN\n"
+                "1,1234,4.3,100,0,30\n",encoding="utf8")
+            (root/"OpenSees_Complete_Model_Data_V118.json").write_text(
+                json.dumps({"base_z_m":0.0,"diaphragms":[{
+                    "storey_number":1,"master_tag":1234,"master_xyz":[0.,0.,3.8]}]}),
+                encoding="utf8")
+            chosen,note=recommended_story_weight_input(root)
+            self.assertEqual(chosen,manual)
+            self.assertIn("height",note.lower())
+
+    def test_missing_diaphragm_xyz_cannot_auto_claim_matching_ledger(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            manual=root/"NBC105_ESM_Story_Weights_Input_V108.csv"
+            manual.write_text("story_number,height_m\n1,3.8\n",encoding="utf8")
+            (root/"NBC105_ESM_Story_Weights_Assembled_V118.csv").write_text(
+                "story_number,master_node_tag,height_m,dead_load_kN,storage_live_load_kN,other_live_load_kN\n"
+                "1,1234,3.8,100,0,30\n",encoding="utf8")
+            (root/"OpenSees_Complete_Model_Data_V118.json").write_text(
+                json.dumps({"diaphragms":[{"storey_number":1,"master_tag":1234}]}),
+                encoding="utf8")
+            chosen,note=recommended_story_weight_input(root)
+            self.assertEqual(chosen,manual)
+            self.assertIn("rejected",note.lower())
+
     def test_missing_structural_model_never_auto_promotes_old_weights(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d)

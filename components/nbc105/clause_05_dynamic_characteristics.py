@@ -10,11 +10,13 @@ height rule are verified against the printed pages 28-30 of NBC 105:2025
 (user-supplied PDF).
 
 Production-routed helpers: empirical_period_s, amplified_period_s,
+adopted_period_s, rayleigh_period_s, seismic_weight_kN,
 period_factor_deviation, effective_wall_area_m2 (grouped_wall_aw only) and
-storey_index_for_elevation. adopted_period_s, rayleigh_period_s,
-building_height_m and seismic_weight_kN are reference implementations
-exercised by tests; their rules are applied inline elsewhere. See
-docs/nbc105/clause_05_dynamic_characteristics_matrix.md.
+storey_index_for_elevation. The Rayleigh runner, its saved ledger auditor and
+ESM period selection now use this canonical clause module directly.
+building_height_m remains a reference implementation. Source identity,
+load distribution, COM displacements and structural parity are separate gates.
+See docs/nbc105/clause_05_dynamic_characteristics_matrix.md.
 """
 from __future__ import annotations
 
