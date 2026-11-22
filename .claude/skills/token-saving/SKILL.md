@@ -3,6 +3,10 @@ name: token-saving
 description: Use for every Claude Code task in this NBC 105 / ETABS-to-OpenSeesPy thesis repo to keep context and usage low (weekly-limit friendly) without relaxing engineering gates. Mirrors .agents/skills/token-efficient-thesis for Codex.
 ---
 
+> **MANDATORY PRE-EDIT GATE:** Before any edit, read root `AGENTS.md`, `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md`, and `.agents/skills/etabs-opensees-read-first/SKILL.md` (also available as `.claude/skills/etabs-opensees-read-first/SKILL.md`). **32 physical supports + 44 shear-wall mesh nodes; full gravity 1.0D+1.0L; separate NBC Table 5-1 seismic weight.** Token-saving is not permission to skip first-read or engineering checks.
+
+
+
 # Token-saving workflow (Claude Code)
 
 AGENTS.md rules still apply in full. Saving tokens never means skipping native checks or relabelling results.

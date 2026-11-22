@@ -1,3 +1,13 @@
+# STOP — MANDATORY READ-FIRST PROJECT CONTRACT (2026-11-22)
+
+**Before performing ANY edit, source review, refactor, file move, commit, physical-model diagnosis or documentation rewrite**, read **this root file**, [the authoritative physical-model contract](engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md), and [the full preflight skill](.agents/skills/etabs-opensees-read-first/SKILL.md). The detailed skill contains the complete engineering agent prompt and a required acknowledgement template. Do not begin edits if these files were not actually read.
+
+**User-confirmed facts (not negotiable by stale archived prose):** **32 real physical foundation support joints**; **44 additional shear-wall *mesh* points** (76 mapped IDs, **not** 76 foundations). Mesh joints must keep verified connectivity/edge-constraint force paths; do not arbitrarily ground-fix or disconnect them. **Full gravity ETABS/OpenSees comparison = 100% DL + 100% LL (`GRAVITY_1.0D_1.0L`)**. **Seismic weight is a different purpose:** **NBC 105:2025 §5.2 Table 5-1**; currently classified source patterns use dead 1.0, storage LL 0.6 where applicable, other LL 0.3, roof LL 0.0 where applicable. Never apply reduced seismic live fractions to the full gravity benchmark. Source case/EDB/workbook hashes and independent native checks are mandatory for physical equivalence.
+
+**Reaction residuals refer to different saved stiffness runs:** 3,041.266 kN maximum on `LEGACY_GROSS_SHELL`; 768.045 kN on a separately rebuilt ETABS-elastic case. Both balance global FZ and **neither** is pointwise accepted. Preserve the two X-direction 12 m shear walls with openings and current model-aligned NBC workbook; do not substitute older X-wall geometry. Agent must announce project preflight before changing source code. Static file links or a checked PR box cannot prove it actually read them.
+
+---
+
 # AGENTS.md — Nonlinear ETABS-to-OpenSeesPy thesis coding contract
 
 ## Export-case folder organization (2026-11-14)

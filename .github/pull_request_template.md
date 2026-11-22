@@ -1,3 +1,18 @@
+## MANDATORY READ-FIRST ENGINEERING PREFLIGHT
+
+- [ ] Actually read `AGENTS.md`, `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md` and `.agents/skills/etabs-opensees-read-first/SKILL.md` **before edits** (do not check this box if only a tool automatically checked that the files exist).
+- [ ] Physical topology remains **32 true foundation supports + 44 shear-wall mesh points**; no automatic 76/97 physical support substitution or severed mesh connectivity.
+- [ ] Full gravity comparison remains **1.0D + 1.0L**, distinct from NBC 105:2025 **§5.2/Table 5-1** seismic-weight participation.
+- [ ] Exact model EDB/source-workbook hashes, source case, wall geometry and module/reader effects documented, or marked **UNAVAILABLE**.
+- [ ] Historic gross-shell 3041 kN and rebuilt elastic 768 kN residuals not conflated; no claim of native acceptance from total reaction balance.
+- [ ] Structural changes have same-source independent native ETABS/OpenSees evidence; if not, engineering acceptance explicitly remains **NOT_VERIFIED**.
+
+**Preflight paths actually read:** <paths or NOT_READ>  
+**32+44 topology impact:** <PRESERVED / CHANGED_WITH_EVIDENCE / UNVERIFIED>  
+**Gravity 1D+1L impact:** <PRESERVED / CHANGED_WITH_EVIDENCE / UNVERIFIED>  
+**NBC Table 5-1 seismic-weight impact:** <PRESERVED / CHANGED_WITH_EVIDENCE / UNVERIFIED>  
+**Native comparison gate:** <RUN with evidence / NOT_RUN>
+
 ## ROLE
 Which engineering and code-review responsibilities apply?
 
