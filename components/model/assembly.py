@@ -1573,6 +1573,13 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             source_row=by_story.get(record['storey_number'])
             if source_row is None or int(source_row['master_node_tag'])!=master:
                 raise ValueError('NBC §5.2 source floor-mass master identity differs')
+            group_xyz=next(g['master_xyz'] for g in data['diaphragms']
+                           if int(g['master_tag'])==master)
+            source_height=float(source_row['height_m'])
+            expected_height=float(group_xyz[2])-float(data['base_z_m'])
+            if not math.isfinite(source_height) or not math.isclose(
+                    source_height,expected_height,rel_tol=0,abs_tol=1e-6):
+                raise ValueError('NBC §5.2 source floor-mass elevation differs from assembled diaphragm')
             seismic_weight=(float(source_row['dead_load_kN'])+
                             .6*float(source_row['storage_live_load_kN'])+
                             .3*float(source_row['other_live_load_kN']))
