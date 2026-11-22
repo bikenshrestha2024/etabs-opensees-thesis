@@ -578,8 +578,7 @@ def launch(parent,export_dir):
         op_box=ttk.Combobox(picker,textvariable=operation_var,
                             state="readonly",width=53)
         op_box.pack(side="left",fill="x",expand=True,padx=(6,0))
-        ttk.Label(box,text="Input JSON (named parameters; replace required null placeholders)")\
-.pack(anchor="w")
+        ttk.Label(box,text="Input JSON (named parameters; replace required null placeholders)").pack(anchor="w")
         payload=ScrolledText(box,height=7,wrap="none",font=("Consolas",10))
         payload.pack(fill="x",pady=(3,8))
         ttk.Label(box,text="Result (local calculation only)").pack(anchor="w")
