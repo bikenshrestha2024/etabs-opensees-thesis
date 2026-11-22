@@ -134,7 +134,8 @@ def latest_linked_reference(export_dir, state, *, search_dirs=()):
     BYTE_IDENTICAL EDB identity is returned for automatic filling.
     """
     from components.inputs.project_workbooks import _source_edb_path, analysis_output_folder, registered_project_source
-    dirs = [analysis_output_folder(export_dir, state), *map(Path, search_dirs)]
+    dirs = [analysis_output_folder(export_dir, state, stage='ESM'),
+            analysis_output_folder(export_dir, state), *map(Path, search_dirs)]
     found = []
     registered=registered_project_source(export_dir,'etabs_linked_audit')
     if registered:found.append(Path(registered))
