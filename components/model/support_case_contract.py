@@ -90,3 +90,33 @@ def select_support_case(data, topology, case=None, *, wall_base_extension=None):
         native_wall_edge_mpc_transfer="NOT_VERIFIED",
         purpose=purpose,
     )
+
+
+def require_runtime_support_case(case, report):
+    """Reject stale exported runtime that ignored the selected foundation case.
+
+    [REF engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md]
+    [REF components/model/assembly.py MODEL_REPORT support_case_evidence]
+    This checks executed OpenSees source support identities, not native ETABS
+    wall auto-edge/MPC equivalence. Never silently accept an old 76-restraint
+    bundle after the user selected 32 real foundations.
+    """
+    profile=normalize_support_case(case)
+    if not isinstance(report,dict):
+        raise ValueError("Model runtime report unavailable; refresh exported OpenSees_Runtime_V118")
+    actual=set()
+    for tag in report.get("gravity_base_support_tags",[]):
+        actual.add(int(tag))
+    details=report.get("support_case_evidence") or {}
+    expected=32 if profile=="PHYSICAL_32" else 76 if profile=="SOURCE_76" else 97
+    if not actual or len(actual)!=expected or details.get("profile")!=profile:
+        raise ValueError(
+            "Selected physical support case "+profile+" not applied by model runtime; "
+            "refresh/rebuild the exported OpenSees_Runtime_V118 from current source. "
+            "Actual restraints="+str(len(actual))+
+            " source profile="+str(details.get("profile","UNAVAILABLE")))
+    if profile=="PHYSICAL_32" and actual!={int(x) for x in PROJECT_PRIMARY_32}:
+        raise ValueError("Physical 32 support tags differ from this current model source")
+    return dict(status="MATCHED_SELECTED_CASE_NOT_NATIVE_EQUIVALENT",
+                selected_profile=profile,actual_supports=len(actual),
+                native_wall_edge_mpc_equivalence="NOT_VERIFIED")
