@@ -67,3 +67,28 @@ manifest and an explicit distinction between pre-solver force packages and
 post-solver response packages. A historical success row with an unchanged
 runner filename still requires an executed-runner SHA256 before its solver
 status is treated as belonging to newly generated inputs.
+
+## 2026-11-23 — Recorded runner SHA and current-case batch identity
+
+`_latest_batch_status(root, calculation_roots)` now requires every
+`SUCCESS` / `return_code == 0` record to include a valid
+`runner_sha256` and `runner_path`. The path must be a non-symlink exact-case
+runner under the discovered legacy/canonical roots, and its current SHA256
+must match the saved digest. A status from an older runner with an identical
+filename, a historical row with no digest, or a path into an unrelated case
+is marked `PARTIAL_OR_FAILED` with `runner_identity_issues`; source rows
+remain visible and are not modified. This does not certify the native EDB,
+model state, source workbook, numerical response or NBC compliance.
+
+The `Solver Batch Status` worksheet now lists these identity issues
+rather than only missing/duplicated case names. Regression:
+`tests/test_esm_runner_sha_identity.py`, original
+`test_esm_organized_export_gui.py`, and
+`test_esm_legacy_canonical_split.py`. The producer records a digest
+immediately before launching its child process, and compares with the
+current script after a success before saving source evidence.
+
+**Residual limitation:** the live source EDB, model input JSON and project
+workbook can still change between runs; their own SHA/case manifests must be
+validated independently. A file content digest before/after execution
+is not an immutable process image and does not prove solver physics.
