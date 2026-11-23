@@ -662,6 +662,10 @@ class LinearTimeHistoryGUI:
         self._period_refresh_queued = False
         self.model.trace_add('write',lambda *_:self._queue_period_refresh())
         self.ls.trace_add('write',lambda *_:self._queue_period_refresh())
+        # A modal reference is defined by model+state+actual support+mass.
+        # Changing either policy invalidates previously auto-filled damping.
+        self.support_case.trace_add('write',lambda *_:self._queue_period_refresh())
+        self.seismic_mass_policy.trace_add('write',lambda *_:self._queue_period_refresh())
 
     def _queue_period_refresh(self):
         if self._period_refresh_queued:
