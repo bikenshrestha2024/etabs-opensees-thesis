@@ -149,3 +149,17 @@ def test_3d_plotly_handoff_has_dimension_even_for_same_numeric_id():
             "idKind":"solver","idValue":"100002","category":"area"}
         assert plotly_query_for_key("SOLVER:100001",data)=={
             "idKind":"solver","idValue":"100001","category":"frame"}
+
+
+def test_inline_etabs_lookup_disambiguates_frame_and_area_numeric_collisions():
+    from components.sections.mapping_gui import inline_source_keys
+    with tempfile.TemporaryDirectory() as td:
+        data=collect(_fixture(Path(td)))
+        assert inline_source_keys("ETABS frame object","1",data)==["FRAME:1"]
+        assert inline_source_keys("ETABS area object","1",data)==["AREA:1"]
+        try:
+            inline_source_keys("ETABS object","1",data)
+        except ValueError as exc:
+            assert "ambiguous" in str(exc).lower()
+        else:
+            raise AssertionError("ETABS object 1 is shared by a frame and an area")
