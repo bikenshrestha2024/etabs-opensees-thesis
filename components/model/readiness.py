@@ -719,6 +719,47 @@ def material_prerequisite_notice(diagnosis: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+
+def select_model_bound_readiness(model_script: Union[str, Path],
+                                 candidates: Iterable[Union[str, Path]]) -> Optional[Path]:
+    """[REF docs/NLTHA_READINESS_WORKFLOW.md section 3 (selected model binding)]
+
+    Choose a saved, exact-model + SHA-bound readiness file for *display* only.
+
+    An unbound V116 template, wrong-model file, stale draft or unreadable JSON
+    can never win merely because its filename happens to exist. The caller
+    supplies the priority order (normally model-specific V134 draft first).
+    Selection does not create files, change review flags, or grant approval.
+    """
+    import hashlib
+    model = Path(model_script).expanduser().resolve()
+    if not model.is_file():
+        return None
+    model_digest = hashlib.sha256(model.read_bytes()).hexdigest()
+    for raw in candidates:
+        if not raw:
+            continue
+        path = Path(raw).expanduser().resolve()
+        if not path.is_file() or path.suffix.lower() != ".json":
+            continue
+        try:
+            obj = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError, UnicodeError):
+            continue
+        if not isinstance(obj, dict):
+            continue
+        recorded = obj.get("model_script")
+        if not isinstance(recorded, str) or not recorded.strip():
+            continue
+        resolved = Path(recorded).expanduser()
+        if not resolved.is_absolute():
+            resolved = path.parent / resolved
+        if (resolved.resolve() == model
+                and obj.get("model_script_sha256") == model_digest):
+            return path
+    return None
+
+
 def bind_readiness_draft(template_path: Union[str, Path], model_script: Union[str, Path],
                          out_path: Union[str, Path, None] = None) -> Path:
     """Write (or keep) a model-bound UNAPPROVED readiness draft and return its path.
