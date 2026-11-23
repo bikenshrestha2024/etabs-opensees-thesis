@@ -88,3 +88,22 @@ edit to a currently displayed saved-review selection invalidates that
 label. Synthetic AST regression:
 `tests/test_mrsm_reopen_source_gate.py::test_saved_numeric_readback_does_not_block_tk_launch_thread`.
 The user does not need to wait for a large historical result to open the GUI.
+
+
+### Saved numerical support/mass operator identity
+
+The optional `validate_mrsm_case_output(..., expected_support_case=...,
+expected_mass_policy=...)` contract now checks **every** X/Y E0/Eplus/Eminus
+saved result for the executed `support_case`,
+`support_case_evidence.selected_profile`, and
+`seismic_mass_policy`. A matching `model_sha256` is not sufficient
+to establish identical 32/76/97 runtime restraints or distributed versus
+floor-lumped dynamic mass. The saved-run reopen gate and new-run
+completion checkpoint pass both selected values to the same validator;
+older unrelated callers may omit them for historical comparison.
+
+This is a source-identity check only. The native wall mesh-edge MPC,
+generalized mass, six-component foundation cuts, stiffness, ETABS
+modal participation, CQC combination and code acceptance still require
+independent numerical validation. Red regression at `24498fe9`: one
+new test failed on a tampered support case while 1,781 prior tests passed.
