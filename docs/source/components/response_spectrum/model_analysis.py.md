@@ -74,3 +74,17 @@ constraints and wall-edge force transfer; independent 32-support cut
 comparison, modal CQC/scaling/drift and nonlinearity. This software
 change does not alter spectrum equations, stiffening, damping, mass,
 support selection, gravity/P-Delta preload or calculated responses.
+
+
+### Nonblocking saved-run readback
+
+`launch()` now performs only an inexpensive existence check before showing
+the MRSM window. It reviews large saved JSON response files on a background
+thread and schedules the status label update through `win.after` on the
+Tk UI thread. The initial label is `CHECKING SAVED RUN`. If an analysis
+input changes while this runs, or a new analysis starts, the earlier
+saved numeric-review message cannot overwrite the new state. Any later
+edit to a currently displayed saved-review selection invalidates that
+label. Synthetic AST regression:
+`tests/test_mrsm_reopen_source_gate.py::test_saved_numeric_readback_does_not_block_tk_launch_thread`.
+The user does not need to wait for a large historical result to open the GUI.
