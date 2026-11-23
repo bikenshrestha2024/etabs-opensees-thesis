@@ -101,6 +101,85 @@ def workflow_status(folder):
          'Another export/model/state folder may contain results; absence does not prove no run.')
         for found in sources
     ]
+def workflow_evidence_status(folder):
+    """[REF docs/source/OpenSees_Workflow_V144.py.md]
+    Surface saved-case provenance, without mislabeling file presence as approval.
+
+    Keep the original workflow_status() candidate lookup for compatibility.
+    This GUI-only layer checks canonical run manifests, current model bytes and
+    whether a selected file is a review snapshot rather than solver output.
+    A completed manifest is NOT proof that output data are complete/converged.
+    """
+    import hashlib
+    from components.inputs.output_contract import inspect_case_manifest
+    from components.inputs.output_layout import STAGE_FOLDERS
+    root=Path(folder).expanduser().resolve()
+    statuses=workflow_status(root)
+    model=root/"OpenSees_Complete_Model_Data_V118.json"
+    source_sha=(hashlib.sha256(model.read_bytes()).hexdigest()
+                if model.is_file() and not model.is_symlink() else None)
+    stages={2:"GRAVITY",3:"MODAL",4:"ESM",5:"MRSM",
+            6:"LTHA",7:"NLTHA",8:"NLTHA"}
+    reviewed=[]
+    for index,(state,description) in enumerate(statuses):
+        if index not in stages or not state.startswith("CANDIDATE"):
+            reviewed.append((state,description))
+            continue
+        label=stages[index]
+        # workflow_status returns a single selected path after "Candidate: ".
+        path=Path(description.split("Candidate: ",1)[1].split(" | SHA",1)[0])
+        stage_dir=root/STAGE_FOLDERS[label]
+        try:
+            path.relative_to(stage_dir)
+        except ValueError:
+            reviewed.append((state,description+" | LEGACY LOCATION: no run manifest verification"))
+            continue
+        if "REVIEW_SNAPSHOTS" in path.parts or "07_EXPORT_ZIP" in path.parts:
+            reviewed.append(("REVIEW SNAPSHOT ONLY - NOT EXECUTED",
+                             "Candidate: "+str(path)+" | This is review/export evidence, "
+                             "not a solver run. Select completed stage RUNS evidence."))
+            continue
+        run=next((parent for parent in path.parents
+                  if parent.parent.name=="RUNS" or (
+                      len(parent.parents)>2 and parent.parents[2].name=="RUNS")),None)
+        # Recognize only canonical <stage>/RUNS/<state>/<case>/<run-id>/02_RESULTS/file
+        try:
+            relative=path.relative_to(stage_dir)
+            parts=relative.parts
+            if len(parts)<6 or parts[0]!="RUNS" or parts[4]!="02_RESULTS":
+                raise ValueError("Not canonical result path")
+            run=stage_dir.joinpath(*parts[:4])
+        except ValueError:
+            reviewed.append((state,description+" | STAGE FILE NOT A CANONICAL SOLVER RESULT"))
+            continue
+        identity=inspect_case_manifest(run,expected_stage=label)
+        if not identity["valid"]:
+            reviewed.append(("CANDIDATE - RUN MANIFEST INCOMPLETE",
+                             "Candidate: "+str(path)+" | Manifest issues: "+
+                             ", ".join(identity["issues"])+" | NOT engineering approved"))
+            continue
+        manifest=json.loads((run/"00_INPUT_SOURCE"/"CASE_MANIFEST.json").read_text(encoding="utf-8-sig"))
+        recorded=manifest.get("model_sha256")
+        if not source_sha or not recorded or recorded.lower()!=source_sha:
+            reviewed.append(("CANDIDATE - MODEL IDENTITY MISMATCH",
+                             "Candidate: "+str(path)+
+                             " | Source/model SHA missing or differs from selected model; "
+                             "do not reuse this result."))
+            continue
+        if identity["solver_status"]!="COMPLETED_SOLVER_ONLY":
+            reviewed.append(("CANDIDATE - SOLVER COMPLETION NOT VERIFIED",
+                             "Candidate: "+str(path)+" | MODEL SHA MATCHED; manifest "
+                             "solver status="+str(identity["solver_status"])+
+                             ". No numeric completeness verified."))
+            continue
+        reviewed.append(("MANIFEST COMPLETED - NUMERICAL EVIDENCE UNVERIFIED",
+                         "Candidate: "+str(path)+" | MODEL SHA MATCHED; valid run "
+                         "manifest and COMPLETED_SOLVER_ONLY recorded. This does not "
+                         "validate response content, convergence, structural equivalence "
+                         "or engineering approval."))
+    return reviewed
+
+
 def launch(parent=None,folder=None):
     import tkinter as tk
     from tkinter import ttk,filedialog,messagebox
@@ -116,7 +195,7 @@ def launch(parent=None,folder=None):
         if not path.get():return
         try:
             facts=inventory(path.get());values.delete('1.0','end');values.insert('end',json.dumps(facts,indent=2))
-            statuses=workflow_status(path.get());guide.delete('1.0','end');guide.insert('end','Status indicates saved file presence only; verify provenance, completion, and the selected model. Linear time history is an optional comparison, not a prerequisite for nonlinear execution.\n\n'+'\n\n'.join(a+' — '+b+'\n'+statuses[i][0]+' | '+statuses[i][1]+'\n'+c for i,(a,b,c) in enumerate(STEPS)));return facts
+            statuses=workflow_evidence_status(path.get());guide.delete('1.0','end');guide.insert('end','Workflow status checks canonical run identity where available, but numerical completion and engineering acceptance require independent evidence. Linear time history is optional for nonlinear execution.\n\n'+'\n\n'.join(a+' — '+b+'\n'+statuses[i][0]+' | '+statuses[i][1]+'\n'+c for i,(a,b,c) in enumerate(STEPS)));return facts
         except Exception as exc:messagebox.showerror('Inventory',str(exc),parent=win)
     def export():
         facts=refresh()
