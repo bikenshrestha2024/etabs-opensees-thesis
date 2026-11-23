@@ -54,12 +54,12 @@ class UnifiedOutputContractTests(unittest.TestCase):
                 {root/"04_MODAL",root/"03_ESM"})
             self.assertFalse((root/"OpenSees_Analysis_Results").exists())
 
-    def test_explicit_outside_export_directory_remains_selectable(self):
+    def test_unstructured_export_root_does_not_invent_modal_results(self):
         with tempfile.TemporaryDirectory() as td:
             external=Path(td)/"scratch"
             external.mkdir()
             self.assertEqual(result_roots(external,stages=("MODAL",),
-                                          include_legacy=False),(external,))
+                                          include_legacy=False),())
 
     def test_canonical_aliases_and_no_side_effects(self):
         self.assertEqual(canonical_stage_folder("06_LINEAR_TH"), "06_LINEAR_TIME_HISTORY")
