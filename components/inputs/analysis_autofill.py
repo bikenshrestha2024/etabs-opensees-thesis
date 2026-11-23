@@ -179,6 +179,12 @@ def populate_spectrum(app, gui):
         if source in values:getattr(app,target).set(str(values[source]))
     if hasattr(app,'omegas') and 'omegas' in values:app.omegas.set(str(values['omegas']))
     for attr in ('t1x','t1y','tnx','tny'):getattr(app,attr).set(getattr(gui,attr).get())
+    if hasattr(app,'source_folder'):
+        app.source_folder.set(str(Path(gui.model.get()).expanduser().parent))
+    if hasattr(app,'period_source'):
+        app.period_source.set('Adopted X/Y T1 transferred from selected history-model source; '
+                              'NBC §5.1.3 provenance is in the history input audit. '
+                              'Elastic modal Tn is independent of adopted T1.')
     app.status.set('Imported current project parameters and matching analysis periods. Review soil evidence and record matching procedure. '+ ' '.join(inputs['notes']))
 
 
@@ -212,23 +218,76 @@ def populate_available(gui,folder=None,role='linear_model_script'):
 
 
 def populate_site(app,folder=None):
+    """[REF docs/source/components/inputs/analysis_autofill.py.md]
+    Load site-spectrum T1 from the SAME selected source/state as MRSM.
+
+    NBC-adopted T1 is not an eigenperiod. Never use an unrelated legacy
+    workbook value, stale GUI value, or first available modal result.
+    """
     from OpenSees_Project_Inputs_V123 import import_project_inputs
-    folder=Path(folder or r'D:/Thesis Opensees/Etabs Nodes Export');inputs=import_project_inputs(_runtime_repo_root(),folder);v=inputs['values']
-    if hasattr(app,'omegas') and 'omegas' in v:app.omegas.set(str(v['omegas']))
-    for target,source in [('soil','soil'),('z','Z'),('imp','I'),('rmu','rmu'),('omega','omegau'),('t1x','workbook_adopted_tx'),('t1y','workbook_adopted_ty')]:
-        if source in v:getattr(app,target).set(str(v[source]))
-    state='ULS'
-    datafile=folder/'OpenSees_Complete_Model_Data_V118.json'
-    model_sha=hashlib.sha256(datafile.read_bytes()).hexdigest() if datafile.is_file() else None
+    from components.inputs.project_workbooks import source_limit_state
+    from components.response_spectrum.model_analysis import mrsm_period_defaults
+    if folder is None:
+        raise ValueError('Select a current ETABS/OpenSees export folder to load periods.')
+    folder=Path(folder).expanduser()
+    if not folder.is_dir():
+        raise FileNotFoundError('Selected site-spectrum source folder does not exist: '+str(folder))
+    source_state,source_note=source_limit_state(folder)
+    state=source_state or 'ULS'
+    inputs=import_project_inputs(_runtime_repo_root(),folder,state)
+    v=inputs['values']
+    if hasattr(app,'source_folder'):
+        app.source_folder.set(str(folder))
+    for target in ('t1x','t1y','tnx','tny'):
+        getattr(app,target).set('')
+    if hasattr(app,'omegas') and 'omegas' in v:
+        app.omegas.set(str(v['omegas']))
+    for target,source in (('soil','soil'),('z','Z'),('imp','I'),
+                          ('rmu','rmu'),('omega','omegau')):
+        if source in v and v[source] not in (None,''):
+            getattr(app,target).set(str(v[source]))
+    adopted,note=mrsm_period_defaults(folder,v,state)
+    for axis in ('X','Y'):
+        candidate=adopted.get('T1_'+axis)
+        if candidate not in (None,''):
+            try:
+                numeric=float(candidate)
+            except (TypeError,ValueError) as exc:
+                raise ValueError('Invalid source-adopted period T1 '+axis+': '+str(candidate)) from exc
+            if not math.isfinite(numeric) or numeric<=0:
+                raise ValueError('NBC-adopted T1 '+axis+' must be finite and positive.')
+            getattr(app,'t1'+axis.lower()).set(format(numeric,'.15g'))
+    if source_state is None:
+        inputs['notes'].append('Source EDB limit state unclassified; using ULS as a '
+                               'provisional diagnostic only: '+source_note)
+    inputs['notes'].append('NBC §5.1.3 adopted X/Y design periods: '+note)
+    if any(not getattr(app,'t1'+axis).get() for axis in ('x','y')):
+        inputs['notes'].append('T1 unavailable from the selected source; run '
+                               'the appropriate ESM/Rayleigh audit or supply '
+                               'reviewed current-model parameters.')
+    model=folder/'OpenSees_Complete_Model_Data_V118.json'
+    model_sha=hashlib.sha256(model.read_bytes()).hexdigest() if model.is_file() else None
     modal=matching_modal_reference(folder,state,model_sha)
     if modal is not None:
         result=json.loads(modal.read_text(encoding='utf-8-sig'))
         for axis in ('X','Y'):
-            row=next((r for r in result['rows'] if
-                      (r.get('U'+axis+'_cumulative_percent') or 0)>=90),None)
-            if row:getattr(app,'tn'+axis.lower()).set(str(row['period_s']))
-        inputs['notes'].append('Tn from serialized-model-matching ULS modal file: '
-                               +str(modal)+'. Elastic reference only; nonlinear initial tangent requires independent audit.')
+            row=next((r for r in result.get('rows',[]) if
+                      float(r.get('U'+axis+'_cumulative_percent') or 0)>=90),None)
+            if row:
+                value=float(row['period_s'])
+                if math.isfinite(value) and value>0:
+                    getattr(app,'tn'+axis.lower()).set(str(value))
+        inputs['notes'].append('Tn from model-SHA/state-matched '+state+
+                               ' elastic modal file: '+str(modal)+
+                               '. This is NOT the NBC-adopted design period.')
     else:
-        inputs['notes'].append('Saved ULS modal reference unavailable or source SHA differs. No unrelated Tn imported.')
-    app.status.set('Imported available project/source references: '+str(folder)+' | '+' '.join(inputs['notes']));return inputs
+        inputs['notes'].append('No model-SHA/state-matched '+state+
+                               ' modal reference; Tn remains empty.')
+    if hasattr(app,'period_source'):
+        app.period_source.set('NBC §5.1.3 T1 ['+state+']: '+note)
+    app.status.set('Current export: '+str(folder)+' | '+state+' | '+
+                   ' '.join(inputs['notes']))
+    app.project_input_audit=inputs
+    return inputs
+
+

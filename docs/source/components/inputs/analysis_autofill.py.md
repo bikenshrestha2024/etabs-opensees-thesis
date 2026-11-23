@@ -44,3 +44,11 @@ The historical `OpenSees_Linear_Autofill_V124.py` root launcher executes this co
 ## 2026-11-21 clause 5 period routing and DEVIATION
 
 `workbook_adopted_period(height_m, aw_m2, rayleigh_s, factor)` applies the NBC 105:2025 §5.1 lesser-of rule through the [clause 5 module](../nbc105/clause_05_dynamic_characteristics.py.md). When the workbook `period_factor` is not 1.25 it returns no period and a DEVIATION note, and `populate_linear` clears the T1 field (including any value pre-filled from `workbook_adopted_t*`) instead of adopting a non-NBC period. Test: `tests/test_nbc105_clause5_callsites.py`.
+
+## 2026-11-23 — site-spectrum MRSM adopted period parity
+
+populate_site(app, folder) requires an existing selected export folder. It reads current ULS/SLS source state, imports project parameters for that state and calls components.response_spectrum.model_analysis.mrsm_period_defaults() for directional adopted T1: the same calculation and same-source/workbook fallback as Model MRSM. It clears stale period fields before loading, rather than copying workbook periods from a generic working directory. The status reports source, state and provenance. Missing adopted-period evidence remains blank; no default eigenperiod is invented.
+
+matching_modal_reference() still requires model SHA and state matches for modal mass-derived Tn. The history-window path through populate_spectrum retains selected-source T1/Tn values and updates the site-spectrum provenance label. Actual Rayleigh / Aw and ETABS/OpenSees physical identity remain acceptance gates, not auto-certified by GUI import.
+
+Regression: tests/test_site_spectrum_period_autofill_20261123.py.
