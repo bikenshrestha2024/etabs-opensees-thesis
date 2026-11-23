@@ -35,3 +35,21 @@ The Area Element Integration V116 window now offers **Open output folder**. It u
 ## 2026-11-15 — default Python integration-call export location
 
 The Area Integration GUI now opens its `Save area integration call` dialog in the selected ETABS export root's `02_MODEL/AREA_INTEGRATION/PYTHON/` directory (the default is `OpenSees_Area_Integration_Call_V116.py`). The directory is created if absent so Windows Save As does not silently fall back to the previous arbitrary folder. Selecting an alternate `.py` file still works; non-`.py` targets and symlink final file are rejected. This action creates an **inactive** review snippet (`AREA_STAGE_EXECUTION=False`), not an OpenSees assembled area model or permission to run nonlinear FSAM walls. Original ETABS source input files and folders remain unchanged. Pure helper `default_area_integration_script_path` may be tested independently of Tk/Windows.
+
+
+## 2026-11-23 — local evidence ZIP (source-only)
+
+The GUI offers **Export area integration evidence ZIP** without executing OpenSees.
+The helper `package_area_integration_evidence` requires the selected topology JSON,
+area-assignment CSV and area config JSON. It may include an explicitly selected
+inventory JSON, inventory Excel and disabled Python integration call. Each entry
+has a SHA256 digest in `AREA_EVIDENCE_MANIFEST.json`; the archive is reopened
+and verified before atomic publication under
+`02_MODEL/AREA_INTEGRATION/07_EXPORT_ZIP/`.
+
+A missing source, unsafe linked path or changed source blocks publication.
+The ZIP manifest omits local absolute filenames, though individual selected source
+files can themselves contain private model information: **local use only; review
+before any external sharing**. A ZIP indicates no solver analysis, code acceptance
+or structural equivalence. Synthetic regression:
+`tests/test_area_integration_evidence_zip.py`.
