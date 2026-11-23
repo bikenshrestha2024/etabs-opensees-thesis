@@ -122,3 +122,32 @@ def test_missing_material_mapping_kept_unresolved_not_backfilled_from_peer(tmp_p
     assert {"nonlinear_materials_file","nonlinear_wall_fsam_tags",
             "nonlinear_parameters_reviewed"} <= set(missing)
     assert result["available_values"]["literature_research_only"]["web_fsam"]["rho_x"]==0.0074
+
+
+def test_ulssls_modal_results_loaded_separately_for_same_model(tmp_path):
+    model,uls=project(tmp_path)
+    sls=tmp_path/"04_MODAL"/"RUNS"/"SLS"/"case"/"run"/"02_RESULTS"/"NBC105_Modal_V111.json"
+    sls.parent.mkdir(parents=True)
+    payload=json.loads(uls.read_text())
+    payload["limit_state"]="SLS"
+    payload["rows"][0]["period_s"]=2.8
+    sls.write_text(json.dumps(payload))
+    result=collect_available_project_values(model)
+    screens=result["available_values"]["modal_mass_screen_by_state"]
+    assert set(screens)=={"ULS","SLS"}
+    assert screens["ULS"]["limit_state"]=="ULS"
+    assert screens["SLS"]["limit_state"]=="SLS"
+    assert screens["ULS"]["periods_first_three_s"][0]==2.4
+    assert screens["SLS"]["periods_first_three_s"][0]==2.8
+    assert result["modal_reference"]["status"]=="MATCHED_SERIALIZED_MODEL_REVIEW_REQUIRED"
+
+
+def test_modal_ambiguous_same_state_does_not_use_that_state(tmp_path):
+    model,uls=project(tmp_path)
+    other=tmp_path/"04_MODAL"/"RUNS"/"ULS"/"new_case"/"run"/"02_RESULTS"/"NBC105_Modal_V111.json"
+    other.parent.mkdir(parents=True)
+    other.write_bytes(uls.read_bytes())
+    result=collect_available_project_values(model)
+    assert result["modal_reference"]["status"]=="AMBIGUOUS_MATCHED_MODAL_SOURCES_NOT_REUSED"
+    assert "modal_mass_screen" not in result["available_values"]
+    assert "modal_mass_screen_by_state" not in result["available_values"]
