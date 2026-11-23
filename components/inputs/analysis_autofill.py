@@ -35,12 +35,14 @@ def workbook_adopted_period(height_m, aw_m2, rayleigh_s, factor=1.25):
     return min(amplified_period_s(empirical), float(rayleigh_s)), None
 
 
-def matching_modal_reference(folder, state, model_sha):
+def matching_modal_reference(folder, state, model_sha, *,
+                             support_case=None, seismic_mass_policy=None):
     """[REF docs/source/components/inputs/analysis_autofill.py.md]
-    Read only a saved canonical/legacy modal result for the same model state.
+    Read a saved modal result only for this model, state and selected policies.
 
-    Never select the first unrelated period source as a fallback. An eligible
-    result must explicitly record the same serialized model fingerprint.
+    Both support restraints and seismic mass operator affect eigenmodes.
+    A legacy result without required policy evidence is not compatible with
+    a current LTHA selected policy; no filename/mtime fallback can override it.
     """
     from components.inputs.output_layout import result_roots
     state=str(state).upper()
@@ -66,6 +68,19 @@ def matching_modal_reference(folder, state, model_sha):
                 or not isinstance(data.get("rows"),list)
                 or not data["rows"]):
             continue
+        if support_case is not None:
+            from components.model.support_case_contract import normalize_support_case
+            selected=normalize_support_case(support_case)
+            evidence=data.get("selected_support_case_verification")
+            if (not isinstance(evidence,dict)
+                    or evidence.get("selected_profile")!=selected
+                    or evidence.get("status")!="MATCHED_SELECTED_CASE_NOT_NATIVE_EQUIVALENT"):
+                continue
+        if seismic_mass_policy is not None:
+            selected_mass=str(seismic_mass_policy).strip().upper()
+            if (selected_mass not in ("SOURCE_DISTRIBUTED","STORY_LUMPED_NBC")
+                    or data.get("seismic_mass_policy")!=selected_mass):
+                continue
         eligible.append(path)
     return (max(eligible,key=lambda p:(p.stat().st_mtime_ns,str(p)))
             if eligible else None)
@@ -93,11 +108,16 @@ def populate_linear(gui, folder):
                     inputs['notes'].append(axis.upper()+' '+deviation)
                 else:getattr(gui,'t1'+axis).set(f'{period:.9g}')
     model_sha=hashlib.sha256(datafile.read_bytes()).hexdigest() if datafile.is_file() else None
-    modal=matching_modal_reference(folder,gui.ls.get(),model_sha)
+    modal=matching_modal_reference(
+        folder,gui.ls.get(),model_sha,
+        support_case=gui.support_case.get() if hasattr(gui,"support_case") else "PHYSICAL_32",
+        seismic_mass_policy=(gui.seismic_mass_policy.get()
+                             if hasattr(gui,"seismic_mass_policy")
+                             else "SOURCE_DISTRIBUTED"))
     if modal is None:
         inputs['notes'].append(
             'NO MATCHING SAVED MODAL REFERENCE: source model SHA and limit state '
-            'must match; no unrelated elastic Tn/damping reference imported.')
+            'and selected support/mass policy must match; no unrelated elastic Tn/damping reference imported.')
     if modal is not None and modal.is_file() and datafile.is_file():
         result=json.loads(modal.read_text(encoding='utf-8-sig'))
         inputs['notes'].append('Modal input reference: '+str(modal))
