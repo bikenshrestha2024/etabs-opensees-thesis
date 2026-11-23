@@ -114,3 +114,23 @@ The complete synthetic regression is in
 `tests/test_esm_runner_sha_identity.py`. No changes were made to
 `calculate_esm`, seismic mass, gravity, support topology, wall Aw,
 Rayleigh periods, initial P-Delta or OpenSees solver algorithms.
+
+
+## 2026-11-23 — ESM actual-support reaction recovery
+
+User-supplied Nov 23 ESM review ZIP showed all twelve `SAVED_RESULT_*.json`
+reporting `support_count=76` while solver logs confirmed `PHYSICAL_32`
+with 32 assembled actual foundation supports (and 44 source wall-mesh points).
+Root cause: ESM generated runner recorded baseline, incremental base shear and
+six-component reactions from the original exported source `MODEL_DATA['supports']`
+instead of the assembled runtime support set. MRSM already had the canonical
+`solver_reaction_support_tags(report, selected_case)` helper. The generated ESM
+runner now uses this same fail-closed helper after validating its model runtime
+report; it does not change structural fixities, masses, edge transfer or
+numerical solver parameters.
+
+Synthetic regression: `tests/test_esm_runtime_support_reaction_source.py`.
+The previously uploaded `COMPLETE_SAVED_RESPONSE_ONLY` records claiming 76
+remain **historical and uncorrected**; rerun source-matched ESM to regenerate
+32-support reaction CSV and saved-evidence summaries. ESM high-rise ULS and
+Vs30/native wall auto-edge equivalence remain explicitly unverified.
