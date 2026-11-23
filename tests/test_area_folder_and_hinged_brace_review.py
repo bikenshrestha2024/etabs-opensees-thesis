@@ -23,6 +23,9 @@ class AreaOutputFolderTests(unittest.TestCase):
             expected=root/"02_MODEL"/"AREA_INTEGRATION"
             expected.mkdir(parents=True)
             self.assertEqual(area_output_directory(root),expected)
+            self.assertEqual(area_output_directory(root/'02_MODEL'),expected)
+            self.assertEqual(area_output_directory(expected),expected)
+            self.assertEqual(area_output_directory(root/'02_MODEL'/'07_EXPORT_ZIP'),expected)
             self.assertEqual(area_output_directory(topology_json=root/"topology.json"),expected)
             generated=root/"custom"/"Reviewed_Area_Call.py"
             generated.parent.mkdir()
