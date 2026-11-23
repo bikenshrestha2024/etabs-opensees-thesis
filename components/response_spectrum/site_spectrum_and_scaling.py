@@ -161,9 +161,30 @@ class SpectrumScalingGUI:
         self.omega = tk.StringVar(); self.omegas=tk.StringVar(); self.rmu = tk.StringVar()
         self.t1x = tk.StringVar(); self.tnx = tk.StringVar()
         self.t1y = tk.StringVar(); self.tny = tk.StringVar()
+        self.source_folder = tk.StringVar()
+        self.period_source = tk.StringVar(value="NBC-adopted T1 not loaded; select the source export folder.")
         self.xfile = tk.StringVar(); self.yfile = tk.StringVar()
         self.status = tk.StringVar(value="Select the geotechnically verified soil class; enter project-verified NBC inputs.")
         self._build()
+
+    def _reload_project_periods(self):
+        """[REF docs/source/components/response_spectrum/site_spectrum_and_scaling.py.md]
+        Reload the selected model/state period source, never a legacy fallback.
+        """
+        try:
+            from OpenSees_Linear_Autofill_V124 import populate_site
+            populate_site(self,self.source_folder.get().strip() or None)
+        except Exception as exc:
+            messagebox.showerror("Load NBC project periods",str(exc),parent=self.win)
+            self.status.set("Source period refresh failed: "+str(exc))
+
+    def _choose_project_folder(self):
+        selected=filedialog.askdirectory(parent=self.win,
+            title="Select the current ETABS/OpenSees export folder",
+            initialdir=self.source_folder.get() or str(Path.cwd()))
+        if selected:
+            self.source_folder.set(selected)
+            self._reload_project_periods()
 
     def _browse_record(self, variable):
         p = filedialog.askopenfilename(parent=self.win, title="Choose a SeismoMatch / PEER record",
@@ -175,6 +196,11 @@ class SpectrumScalingGUI:
         root = scrollable_form(self.win)
         ttk.Label(root, text="NBC 105:2025 SITE SPECTRUM + RECORD SCALE CHECK", font=("Segoe UI", 15, "bold")).pack(anchor="w")
         ttk.Label(root, text="Soil classes A–D • Eq. 4.1(2) / Table 4-1 • candidate factor over Tn to √Rμ × T1", wraplength=960).pack(anchor="w", pady=5)
+        source_row=ttk.Frame(root);source_row.pack(fill="x",pady=(2,5))
+        ttk.Label(source_row,text="Selected export folder").pack(side="left",padx=3)
+        ttk.Entry(source_row,textvariable=self.source_folder).pack(side="left",fill="x",expand=True,padx=4)
+        ttk.Button(source_row,text="Browse…",command=self._choose_project_folder).pack(side="left",padx=3)
+        ttk.Button(source_row,text="Refresh periods",command=self._reload_project_periods).pack(side="left",padx=3)
         box = ttk.LabelFrame(root, text="Project spectra: SLS / ULS; record matching diagnostic is ULS", padding=8); box.pack(fill="x", pady=5)
         fields = [("Location / ward", self.location), ("Zoning factor Z (verified)", self.z),
                   ("Importance factor I", self.imp), ("ULS overstrength Ωu", self.omega),
@@ -189,6 +215,8 @@ class SpectrumScalingGUI:
             ttk.Label(box, text=label).grid(row=r, column=c, sticky="w", padx=4, pady=3)
             ttk.Entry(box, textvariable=var, width=26).grid(row=r, column=c+1, sticky="ew", padx=4, pady=3)
         box.columnconfigure(1, weight=1); box.columnconfigure(3, weight=1)
+        ttk.Label(root,textvariable=self.period_source,wraplength=1000,
+                  foreground="#174a7e").pack(anchor="w",pady=(1,5))
         ttk.Label(root, text="NBC Table 4-3 lists Kirtipur Municipality Ward 10 as Soil D by default. NBC §4.1.3.3 allows another class when supported by soil test results; use project Vs,30 / NSPT evidence and record the basis. Soil C is selectable but must be supported by the geotechnical report.", wraplength=1000, foreground="#9a3e1d").pack(anchor="w", pady=4)
         rec = ttk.LabelFrame(root, text="Optional component records for scale diagnostic", padding=8); rec.pack(fill="x", pady=5)
         for r, (label, var) in enumerate((("X component", self.xfile), ("Y component", self.yfile))):
@@ -270,10 +298,15 @@ class SpectrumScalingGUI:
         except Exception as exc: messagebox.showerror("Save CSV", str(exc), parent=self.win)
 
 
-def launch_spectrum_gui(parent=None):
+def launch_spectrum_gui(parent=None, folder=None):
+    """[REF docs/source/components/response_spectrum/site_spectrum_and_scaling.py.md]
+    Open a site-spectrum tool with the caller's selected source folder.
+    A standalone launch intentionally does not consult a guessed legacy folder.
+    """
     app = SpectrumScalingGUI(parent)
-    from OpenSees_Linear_Autofill_V124 import populate_site
-    populate_site(app)
+    if folder is not None:
+        app.source_folder.set(str(Path(folder).expanduser()))
+        app._reload_project_periods()
     if parent is None: app.win.mainloop()
     return app
 
