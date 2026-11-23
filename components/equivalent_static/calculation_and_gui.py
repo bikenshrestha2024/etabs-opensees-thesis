@@ -462,6 +462,7 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "    import csv; w=csv.DictWriter(f,fieldnames=list(SUPPORT_REACTION_ROWS[0]) if SUPPORT_REACTION_ROWS else ['node_tag']); w.writeheader(); w.writerows(SUPPORT_REACTION_ROWS)",
         "with open(os.path.join(OUTPUT_DIR,'Response_Recorder_Index_'+ESM_CASE+'.json'),'w',encoding='utf-8') as f: json.dump({'analysis':'equivalent_static','files':[{'name':os.path.basename(ESM_BASE_CURVE_PATH),'channels':['accepted load factor','base shear','roof displacement']},{'name':'NBC105_ESM_OpenSees_Response_'+ESM_CASE+'.csv','channels':['story displacement','story drift','story shear','secant story stiffness']},{'name':'NBC105_ESM_Support_Reactions_'+ESM_CASE+'.csv','channels':['incremental support forces and moments']},{'name':'NBC105_ESM_All_Node_Displacements_'+ESM_CASE+'.csv','channels':['every node displacement increment and ETABS original source ID']},{'name':'NBC105_ESM_OpenSees_Response_META_'+ESM_CASE+'.json','channels':['model SHA256 and response provenance']}],'notes':['The base-shear/roof-displacement curve is the converged linear static load-control path, not a nonlinear pushover capacity curve.']},f,indent=2)",
         "try:",
+        "    if os.environ.get('OPENSEES_ESM_OPTIONAL_OUTPUTS', '1') != '1': raise ImportError('Optional ESM plotting deferred in fast I/O mode')",
         "    import matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt",
         "    fig, ax=plt.subplots(1,5,figsize=(20,6),constrained_layout=True); h=[r['height_m'] for r in ESM_RESPONSE]",
         "    ax[0].barh(h,[r['Fx_kN'] if ESM_DIRECTION=='X' else r['Fy_kN'] for r in ESM_RESPONSE]); ax[0].set(title='Floor force',xlabel='Fi (kN)',ylabel='Height (m)')",
@@ -470,14 +471,15 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "    ax[3].barh(h,[r['design_drift_ratio'] for r in ESM_RESPONSE]); ax[3].axvline(DRIFT_LIMIT,color='r',ls='--'); ax[3].set(title='Design drift',xlabel='Drift ratio')",
         "    ax[4].plot([r['story_stiffness_kN_per_m']/1000 for r in ESM_RESPONSE],h,'o-'); ax[4].set(title='Secant storey stiffness',xlabel='ki (MN/m)')",
         "    [a.grid(alpha=.25) for a in ax]; fig.suptitle('NBC 105:2025 '+ESM_CASE+' | V='+str(round(abs(APPLIED_BASE_SHEAR_KN),3))+' kN'); fig.savefig(os.path.join(OUTPUT_DIR,'NBC105_ESM_Response_Profiles_'+ESM_CASE+'.png'),dpi=180); plt.close(fig)",
-        "except ImportError: print('Matplotlib not available: response plot skipped.')",
+        "except ImportError: print('ESM response plot deferred or Matplotlib unavailable.')",
         "try:",
+        "    if os.environ.get('OPENSEES_ESM_OPTIONAL_OUTPUTS', '1') != '1': raise ImportError('Optional ESM workbook deferred in fast I/O mode')",
         "    from openpyxl import Workbook",
         "    wb=Workbook(); ws=wb.active; ws.title='ESM Summary'; ws.append(['Item','Value'])",
         "    for item,value in [('Case',ESM_CASE),('Limit state',LIMIT_STATE),('Design base shear (kN)',APPLIED_BASE_SHEAR_KN),('Base reaction (kN)',BASE_REACTION_KN),('Equilibrium error (%)',BASE_SHEAR_ERROR_PCT),('Drift limit',DRIFT_LIMIT),('kD',KD)]: ws.append([item,value])",
         "    wr=wb.create_sheet('OpenSees Response'); wr.append(list(ESM_RESPONSE[0]) if ESM_RESPONSE else []); [wr.append([r.get(k) for k in ESM_RESPONSE[0]]) for r in ESM_RESPONSE]",
         "    wb.save(os.path.join(OUTPUT_DIR,'NBC105_ESM_OpenSees_Response_'+ESM_CASE+'.xlsx'))",
-        "except ImportError: print('openpyxl not available: response workbook skipped.')",
+        "except ImportError: print('ESM response workbook deferred or openpyxl unavailable.')",
         "_processing_timer.finish('completed')",
         "print('OpenSees ESM elapsed (s):', round(time.perf_counter()-_run_started,3))",
         "print('Run log:', LOG_PATH)",
@@ -620,6 +622,7 @@ class ESMGui:
         self.eccsign=tk.StringVar(value="Both ±")
         self.support_case_var=tk.StringVar(value="PHYSICAL_32")
         self.seismic_mass_policy=tk.StringVar(value="SOURCE_DISTRIBUTED")
+        self.esm_optional_case_reports=tk.BooleanVar(value=False)  # Fast I/O: core solver evidence remains mandatory
         self.model_script=tk.StringVar(value="")
         self.python_exe=tk.StringVar(value=sys.executable)
         self.last_runners=[]
@@ -1065,7 +1068,10 @@ class ESMGui:
         ttk.Entry(runbox,textvariable=self.python_exe).grid(row=1,column=1,sticky="ew",padx=5,pady=3)
         ttk.Button(runbox,text="Browse…",command=self._browse_python).grid(row=1,column=2,padx=4)
         runbox.columnconfigure(1,weight=1)
-        ttk.Label(runbox,text="The runner starts a fresh Python process and builds the model. Before NBC ESM it requires the model builder to attest that both IS 16700:2023 §7.2(d) initial P-Delta cases converged and were reviewed (1.2DL + 0.5IL ± 1.5EL/WL). It then freezes the reviewed gravity state, checks diaphragm masters, applies NBC floor forces/torsion, and reports reactions, drift and storey stiffness. This prerequisite does not replace NBC §3.6 combinations; a partial topology exporter is not a complete analysis model.",foreground="#8a341c",wraplength=1100).grid(row=2,column=0,columnspan=3,sticky="w",padx=5,pady=4)
+        ttk.Checkbutton(runbox,text="Detailed PNG/XLSX per case (slower; core solver evidence always saved)",
+                        variable=self.esm_optional_case_reports).grid(
+                            row=5,column=0,columnspan=3,sticky="w",padx=5,pady=3)
+        ttk.Label(runbox,text="The runner starts a fresh Python process and builds the model. Before NBC ESM it requires the model builder to attest that both IS 16700:2023 §7.2(d) initial P-Delta cases converged and were reviewed (1.2DL + 0.5IL ± 1.5EL/WL). It then freezes the reviewed gravity state, checks diaphragm masters, applies NBC floor forces/torsion, and reports reactions, drift and storey stiffness. This prerequisite does not replace NBC §3.6 combinations; a partial topology exporter is not a complete analysis model.",foreground="#8a341c",wraplength=1100).grid(row=6,column=0,columnspan=3,sticky="w",padx=5,pady=4)
         out=ttk.LabelFrame(top,text="6. ESM case output (default: 03_ESM/RUNS/<state>/<case>; existing legacy folders remain readable)",padding=8); out.pack(fill="x",pady=5)
         ttk.Entry(out,textvariable=self.outdir).pack(side="left",fill="x",expand=True,padx=4); ttk.Button(out,text="Browse…",command=self._browse_out).pack(side="left",padx=4)
         from OpenSees_Research_UI_V123 import copyable_log
@@ -2134,6 +2140,12 @@ class ESMGui:
         if missing:
             messagebox.showerror("Missing exported cases", "\n".join(missing))
             return
+        # Tk variables must be captured on the GUI thread before workers start.
+        # Fast I/O does not skip gravity, P-Delta, static response or acceptance gates.
+        support_case_for_run = self.support_case_var.get()
+        mass_policy_for_run = self.seismic_mass_policy.get()
+        optional_reports_for_run = "1" if self.esm_optional_case_reports.get() else "0"
+        python_executable_for_run = self.python_exe.get()
         self._esm_cancel_requested = False
         self._esm_last_batch_state = None
         self._esm_running = True
@@ -2177,8 +2189,11 @@ class ESMGui:
                         # Bind the current batch to the runner bytes launched.
                         # A same-named script regenerated later is not this run.
                         runner_sha256 = hashlib.sha256(script.read_bytes()).hexdigest()
-                        args = [self.python_exe.get(), "-u", str(script)]
-                        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "OPENSEES_SUPPORT_CASE": self.support_case_var.get(), "OPENSEES_SEISMIC_MASS_POLICY": self.seismic_mass_policy.get()}
+                        args = [python_executable_for_run, "-u", str(script)]
+                        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1",
+                               "OPENSEES_SUPPORT_CASE": support_case_for_run,
+                               "OPENSEES_SEISMIC_MASS_POLICY": mass_policy_for_run,
+                               "OPENSEES_ESM_OPTIONAL_OUTPUTS": optional_reports_for_run}
                         proc = subprocess.Popen(args, cwd=str(output),
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, encoding="utf-8", errors="replace", bufsize=1, env=env)
@@ -2208,10 +2223,15 @@ class ESMGui:
                         # stdout accumulation and no Tk widgets touched from worker.
                         with log_path.open("w", encoding="utf-8") as sink:
                             sink.write("COMMAND: " + repr(args) + "\nPID: " + str(proc.pid) + "\n")
+                            last_flush = time.monotonic()
                             for line in proc.stdout:
                                 sink.write(line)
-                                sink.flush()
+                                now = time.monotonic()
+                                if now - last_flush >= 1.0:
+                                    sink.flush()  # bounded log visibility, not one disk flush per line
+                                    last_flush = now
                             proc.wait()
+                            sink.flush()
                             sink.write("\nRETURN CODE: " + str(proc.returncode) + "\n")
                         rc = proc.returncode
                         status = ("CANCELLED" if self._esm_cancel_requested
@@ -2235,7 +2255,9 @@ class ESMGui:
                     finally:
                         self._esm_active_proc = None
                     entry = {"case": script.name, "runner_path": str(script),
-                             "runner_sha256": runner_sha256, "status": status,
+                             "runner_sha256": runner_sha256,
+                             "optional_reports": "FULL_PNG_XLSX" if optional_reports_for_run == "1" else "FAST_CORE_JSON_CSV",
+                             "status": status,
                              "return_code": rc, "log": str(log_path),
                              "elapsed_s": round(time.monotonic() - started, 3),
                              "error": message if status in ("FAILED","INCOMPLETE") else ""}
