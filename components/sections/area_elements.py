@@ -485,6 +485,99 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
     return out,json_path
 
 
+
+def package_area_integration_evidence(*, topology_json, area_assignment_csv,
+                                      config_json, output_dir, inventory_json=None,
+                                      inventory_excel=None, integration_script=None):
+    """Create a source-only, verified local ZIP; never run or approve a model.
+
+    Only explicitly selected files are included. A missing required input,
+    unsafe linked path or changed source aborts publication. The manifest has
+    relative archive names and digests, not private host filesystem paths.
+    """
+    import hashlib
+    import uuid
+    import zipfile
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+
+    required = {
+        "source/OpenSees_Element_Connectivity.json": topology_json,
+        "source/OpenSees_Area_Section_Assignment_Audit.csv": area_assignment_csv,
+        "source/OpenSees_Area_Model_Config_V116.json": config_json,
+    }
+    optional = {
+        "inventory/Area_Integration_Inventory.json": inventory_json,
+        "inventory/Area_Integration_Inventory.xlsx": inventory_excel,
+        "python/OpenSees_Area_Integration_Call.py": integration_script,
+    }
+    selected = {**required, **{k: v for k, v in optional.items() if v}}
+    files = {}
+    for arcname, candidate in selected.items():
+        path = Path(candidate).expanduser()
+        if any(part.is_symlink() for part in (path, *path.parents)):
+            raise ValueError("Refusing linked area evidence source: " + arcname)
+        if not path.is_file():
+            raise FileNotFoundError("Missing area evidence input: " + arcname)
+        files[arcname] = path.resolve(strict=True)
+    output_root = Path(output_dir).expanduser()
+    if any(part.is_symlink() for part in (output_root, *output_root.parents)):
+        raise ValueError("Refusing linked area evidence output")
+    if not output_root.is_dir():
+        raise FileNotFoundError("Selected ETABS export root is missing")
+    zip_root = output_root / "02_MODEL" / "AREA_INTEGRATION" / "07_EXPORT_ZIP"
+    if any(part.is_symlink() for part in (zip_root, *zip_root.parents)):
+        raise ValueError("Refusing linked area evidence ZIP directory")
+    checksums = {
+        arc: hashlib.sha256(path.read_bytes()).hexdigest()
+        for arc, path in files.items()
+    }
+    manifest = {
+        "package_purpose": "SOURCE_ONLY_AREA_INTEGRATION_REVIEW",
+        "analysis_ready": False,
+        "solver_executed": False,
+        "engineering_acceptance": "NOT_VERIFIED",
+        "files_sha256": checksums,
+        "missing_optional": [arc for arc in optional if arc not in files],
+        "source_path_policy": "NO_ABSOLUTE_HOST_PATHS_IN_PACKAGE_MANIFEST",
+    }
+    # The canonical case ZIP helper is shared with other components, but
+    # this source-only stage owns its dedicated AREA_INTEGRATION directory.
+    from components.inputs.review_zip_paths import ensure_review_zip_directory
+    destination = ensure_review_zip_directory(zip_root.parent) / (
+        "Area_Integration_" + checksums[
+            "source/OpenSees_Element_Connectivity.json"][:12] + ".zip"
+    )
+    temporary = destination.with_name(destination.name + ".tmp-" + uuid.uuid4().hex)
+    try:
+        with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED,
+                             compresslevel=6, allowZip64=True) as archive:
+            for arcname, path in files.items():
+                if hashlib.sha256(path.read_bytes()).hexdigest() != checksums[arcname]:
+                    raise RuntimeError("Area source changed before packaging: " + arcname)
+                archive.write(path, arcname=arcname)
+            archive.writestr("AREA_EVIDENCE_MANIFEST.json",
+                             json.dumps(manifest, indent=2))
+        with zipfile.ZipFile(temporary) as archive:
+            corrupt = archive.testzip()
+            if corrupt:
+                raise IOError("Invalid area ZIP entry: " + corrupt)
+            for arcname, expected in checksums.items():
+                digest = hashlib.sha256()
+                with archive.open(arcname) as stream:
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                if digest.hexdigest() != expected:
+                    raise IOError("Area ZIP digest mismatch: " + arcname)
+        for arcname, path in files.items():
+            if hashlib.sha256(path.read_bytes()).hexdigest() != checksums[arcname]:
+                raise RuntimeError("Area source changed during packaging: " + arcname)
+        temporary.replace(destination)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+    return destination
+
+
 def area_output_directory(export_dir=None, *, topology_json=None, generated_output=None):
     """Resolve the existing area-integration output folder for GUI browsing.
 
@@ -626,6 +719,32 @@ def launch_area_integration_gui(parent=None, export_dir=None):
                 f'Excel: {workbook}\\nJSON: {manifest}\\n\\nSOURCE REVIEW ONLY: no elements, loads or dynamic analysis executed.',parent=win)
         except Exception as exc:messagebox.showerror('Area inventory',str(exc),parent=win)
     ttk.Button(root,text="Export area-object inventory (Excel + JSON)",command=export_inventory).pack(anchor="w",pady=4)
+    def export_evidence_zip():
+        if not all(paths[k].get().strip() for k in ("topology", "audit", "config")):
+            messagebox.showerror("Source files required",
+                "Select topology, section audit and config before ZIP export.", parent=win)
+            return
+        try:
+            destination = (Path(export_dir).resolve() if export_dir
+                           else Path(paths["topology"].get()).resolve().parent)
+            # Inventory and scripts are included only when they exist and were
+            # generated for the current selected source inputs.
+            extra = {}
+            candidate = paths["output"].get().strip()
+            if candidate:
+                extra["integration_script"] = candidate
+            archive = package_area_integration_evidence(
+                topology_json=paths["topology"].get(),
+                area_assignment_csv=paths["audit"].get(),
+                config_json=paths["config"].get(),
+                output_dir=destination, **extra)
+            messagebox.showinfo("Area evidence ZIP saved",
+                f"{archive}\\n\\nSource-only review package; no solver executed or approval granted.",
+                parent=win)
+        except Exception as exc:
+            messagebox.showerror("Area evidence ZIP", str(exc), parent=win)
+    ttk.Button(root, text="Export area integration evidence ZIP",
+               command=export_evidence_zip).pack(anchor="w", pady=4)
     def open_output_folder():
         try:
             import os
