@@ -144,7 +144,12 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
     output=Path(analysis_output).resolve()
     if not source.is_dir() or not output.is_dir():
         raise FileNotFoundError("Model source and analysis output folders must exist")
-    review_root=output/"Seismic_Review_Packages"
+    from components.inputs.output_layout import stage_review_owner
+    review_owner=stage_review_owner(source,output,method)
+    # Existing canonical run uses its own seventh ZIP section; a legacy
+    # all-stage results folder publishes new review material in 03_ESM/05_MRSM.
+    review_root=(output/"Seismic_Review_Packages" if review_owner==output
+                 else review_owner/"REVIEW_SNAPSHOTS")
     review_root.mkdir(parents=True,exist_ok=True)
     stamp=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     package=review_root/(method+"_Review_"+stamp)
@@ -245,7 +250,7 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
     (package/"REVIEW_MANIFEST.json").write_text(
         json.dumps(manifest,indent=2,ensure_ascii=False),encoding="utf-8")
     from components.inputs.review_zip_paths import ensure_review_zip_directory
-    zip_root=ensure_review_zip_directory(output)
+    zip_root=ensure_review_zip_directory(review_owner)
     zip_path=zip_root/(package.name+"_UPLOAD.zip")
     with zipfile.ZipFile(zip_path,"w",compression=zipfile.ZIP_DEFLATED,
                          compresslevel=9,allowZip64=True) as archive:
