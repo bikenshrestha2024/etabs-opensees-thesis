@@ -35,13 +35,19 @@ def prepare(model_script,template=None):
     return bind_readiness_draft(template,model)
 
 
-def available_evidence(model_script):
-    """Inventory saved facts; presence never certifies review or calibration."""
-    model=Path(model_script).resolve();folder=model.parent;out=folder/'OpenSees_Analysis_Results';result={}
+def available_evidence(model_script, *, with_metadata=False):
+    """Inventory saved facts; presence never certifies review or calibration.
+
+    with_metadata=True additionally returns a local-only mapping of requirement
+    keys to source paths. Historical GUI hint strings remain unchanged.
+    """
+    model=Path(model_script).resolve();folder=model.parent;out=folder/'OpenSees_Analysis_Results';result={};discovered={}
     from components.inputs.project_workbooks import analysis_output_folder
     def add(key,paths,note):
         found=[str(p.resolve()) for p in paths if p.is_file()]
-        if found:result[key]='AVAILABLE FOR REVIEW: '+note+' | '+'; '.join(found)
+        if found:
+            result[key]='AVAILABLE FOR REVIEW: '+note+' | '+'; '.join(found)
+            discovered[key]=found
     add('etabs_topology_and_story_mapping_reviewed',[folder/'OpenSees_Complete_Model_Data_V118.json',folder/'OpenSees_Complete_Story_Masters_V118.csv'],'source geometry / story mapping')
     add('wall_opening_and_coupling_beam_mesh_reviewed',[folder/'OpenSees_Area_Section_Assignment_Audit.json'],'area geometry audit; opening/coupling mesh still needs review')
     add('area_and_frame_gravity_loads_reconciled_to_etabs',[folder/'OpenSees_Load_Conversion_Audit.json',folder/'Gravity_Storey_Load_Breakdown_V131.json'],'load inventory only; load-set completeness and ETABS comparison required')
@@ -89,7 +95,51 @@ def available_evidence(model_script):
         result['research_material_transfer_reference_only']=(
             'AVAILABLE FOR REVIEW ONLY: exploratory research-material assignment, '
             'not a calibrated production mapping | '+str(historical[-1]))
-    return result
+    return (result,discovered) if with_metadata else result
+
+
+def evidence_inventory(model_script):
+    """[REF docs/source/components/model/readiness_gui.py.md]
+    Read-only evidence index; source existence and SHA are NOT review or approval.
+    
+    Modal results are compared to the serialized model JSON SHA, not the
+    nonlinear Python-builder SHA (different files with different identities).
+    """
+    from components.model.readiness import READINESS_CHECK_KEYS
+    model=Path(model_script).expanduser().resolve()
+    if not model.is_file():
+        raise FileNotFoundError("No selected nonlinear builder: "+str(model))
+    serialized=model.with_name("OpenSees_Complete_Model_Data_V118.json")
+    payload_sha=hashlib.sha256(serialized.read_bytes()).hexdigest() if serialized.is_file() else None
+    hints,sources=available_evidence(model,with_metadata=True)
+    output={}
+    for key in READINESS_CHECK_KEYS:
+        items=[]
+        for raw in sources.get(key,[]):
+            path=Path(raw)
+            digest=hashlib.sha256(path.read_bytes()).hexdigest()
+            identity="NOT_ASSERTED"
+            if path.name.startswith("NBC105_Modal") and path.suffix.lower()==".json":
+                try:
+                    source=json.loads(path.read_text(encoding="utf-8-sig"))
+                    claim=source.get("model_sha256") if isinstance(source,dict) else None
+                except (OSError,ValueError,UnicodeError):
+                    claim=None
+                identity=("MATCHING_SERIALIZED_MODEL" if payload_sha and claim==payload_sha
+                          else "MISMATCH" if payload_sha and claim
+                          else "UNVERIFIED_NO_MODEL_HASH")
+            items.append({"path":str(path),"sha256":digest,"bytes":path.stat().st_size,
+                          "model_identity":identity})
+        output[key]={"status":"AVAILABLE_NOT_REVIEWED" if items else "MISSING",
+                     "files":items,"review_status":"HUMAN_REVIEW_REQUIRED",
+                     "hint":hints.get(key,"No source evidence found")}
+    return {"schema":"NLTHA_EVIDENCE_INVENTORY_V1",
+            "model_script":str(model),
+            "model_script_sha256":hashlib.sha256(model.read_bytes()).hexdigest(),
+            "serialized_model_sha256":payload_sha,
+            "approved_for_nltha":False,"approval_unchanged":True,
+            "purpose":"DISCOVERY_ONLY_NOT_ANALYSIS_OR_ENGINEERING_APPROVAL",
+            "checks":output}
 
 
 def launch(parent,model_script,readiness_variable):
