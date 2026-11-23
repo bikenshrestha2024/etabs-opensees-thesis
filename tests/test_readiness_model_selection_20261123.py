@@ -106,3 +106,27 @@ def test_manual_nonlinear_builder_change_clears_old_manifest(tmp_path):
     sync(gui)
     assert gui.readiness.get()==""
     assert draft_a.read_bytes()==before
+
+def test_runner_default_manifest_resolves_same_source_draft(tmp_path):
+    from components.model.readiness import readiness_manifest_for_run,diagnose_nonlinear_readiness
+    model,template=project(tmp_path)
+    draft=bind_readiness_draft(TEMPLATE,model)
+    assert readiness_manifest_for_run(model)==draft
+    # A caller that omits an explicit manifest must diagnose the saved draft,
+    # rather than a stale placeholder template in the same folder.
+    diagnosis=diagnose_nonlinear_readiness({"model_script":str(model)})
+    codes=[x["code"] for x in diagnosis["blockers"]]
+    assert "template_unbound" not in codes
+    assert "not_approved" in codes
+    assert diagnosis["ready"] is False
+    assert template.read_bytes()==TEMPLATE.read_bytes()
+
+
+def test_explicit_unbound_template_is_not_silently_replaced(tmp_path):
+    from components.model.readiness import readiness_manifest_for_run,diagnose_nonlinear_readiness
+    model,template=project(tmp_path)
+    bind_readiness_draft(TEMPLATE,model)
+    assert readiness_manifest_for_run(model,str(template))==template.resolve()
+    codes=[x["code"] for x in diagnose_nonlinear_readiness({
+        "model_script":str(model),"model_readiness_json":str(template)})["blockers"]]
+    assert "template_unbound" in codes
