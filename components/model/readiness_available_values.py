@@ -23,15 +23,17 @@ def _sha256(path: Path) -> str:
 
 
 def _local_source(root: Path, path: Path) -> bool:
-    """Do not follow symbolic links outside the selected project."""
+    """Accept only real files inside the selected export, never linked paths."""
     try:
+        root=root.resolve()
         path=Path(path)
-        return (path.is_file() and not path.is_symlink()
-                and root == path.resolve().parent or
-                path.is_file() and not path.is_symlink()
-                and root in path.resolve().parents
-                and not any(part.is_symlink() for part in
-                            (path,*list(path.parents)[:len(path.parents)])))
+        relative=path.relative_to(root)
+        if '..' in relative.parts or not relative.parts:
+            return False
+        if any((root / Path(*relative.parts[:i])).is_symlink()
+               for i in range(1,len(relative.parts)+1)):
+            return False
+        return path.is_file() and path.resolve().is_relative_to(root)
     except (OSError, ValueError):
         return False
 
@@ -82,50 +84,66 @@ def _summarize_geometry(data):
 
 def _modal_candidate(root, data_sha):
     stage=root/"04_MODAL"/"RUNS"
-    candidates=[]
     if not stage.is_dir():
-        return {"status":"NO_MATCHING_SAVED_MODAL","candidates":[]},None
+        return {"status":"NO_MATCHING_SAVED_MODAL","candidates":[]},{}
+    valid_by_state={}
+    source_by_state={}
+    ambiguous=[]
+    seen=0
     for state in ("ULS","SLS"):
-        # Search ONLY selected model's stage, not unrelated project folders.
+        scanned=[]
+        # Avoid selecting only one arbitrary run if the folder holds multiple
+        # sources with identical model hash/state; force explicit reconciliation.
         for path in sorted(stage.glob(state+"/*/*/02_RESULTS/NBC105_Modal_V111.json"))[:40]:
             if not _local_source(root,path):
                 continue
             try:
                 value=_read_obj(path)
-                claim=value.get("model_sha256")
-                valid=(data_sha is not None and claim==data_sha
-                       and str(value.get("limit_state",state)).upper()==state)
-                candidates.append((path,state,valid,value))
+                scanned.append((path,value))
             except (OSError,ValueError,UnicodeError):
                 continue
-    matched=[entry for entry in candidates if entry[2]]
-    if len(matched)!=1:
-        return ({"status":"MODEL_SHA_MISMATCH_NOT_REUSED" if candidates and not matched
-                 else "AMBIGUOUS_MATCHED_MODAL_SOURCES_NOT_REUSED" if len(matched)>1
-                 else "NO_MATCHING_SAVED_MODAL",
-                 "candidate_count":len(candidates),
-                 "matched_count":len(matched)},None)
-    path,state,_,result=matched[0]
-    rows=result.get("rows",[])
-    if not isinstance(rows,list):
-        rows=[]
-    clean=[]
-    for item in rows:
-        if not isinstance(item,dict):
+        seen+=len(scanned)
+        matching=[(p,v) for p,v in scanned if (data_sha is not None
+                  and v.get("model_sha256")==data_sha
+                  and str(v.get("limit_state",state)).upper()==state)]
+        if len(matching)>1:
+            ambiguous.append(state)
             continue
-        clean.append({key:item.get(key) for key in
-                      ("mode","period_s","UX_cumulative_percent","UY_cumulative_percent")})
-    summary={
-        "source":str(path),"limit_state":state,"mode_count":len(clean),
-        "cumulative_UX_percent":next((r["UX_cumulative_percent"] for r in reversed(clean)
-                                     if _finite_number(r["UX_cumulative_percent"]) is not None),None),
-        "cumulative_UY_percent":next((r["UY_cumulative_percent"] for r in reversed(clean)
-                                     if _finite_number(r["UY_cumulative_percent"]) is not None),None),
-        "periods_first_three_s":[r["period_s"] for r in clean[:3]],
-        "meaning":"ELASTIC_MODAL_SOURCE_MATCH_ONLY_NOT_NONLINEAR_INITIAL_STIFFNESS",
-    }
-    return {"status":"MATCHED_SERIALIZED_MODEL_REVIEW_REQUIRED",
-            "source":_source_record(path),"limit_state":state},summary
+        if len(matching)!=1:
+            continue
+        path,result=matching[0]
+        rows=result.get("rows",[])
+        if not isinstance(rows,list):
+            rows=[]
+        clean=[]
+        for item in rows:
+            if isinstance(item,dict):
+                clean.append({key:item.get(key) for key in
+                    ("mode","period_s","UX_cumulative_percent","UY_cumulative_percent")})
+        valid_by_state[state]={
+            "source":str(path),"limit_state":state,"mode_count":len(clean),
+            "cumulative_UX_percent":next((r["UX_cumulative_percent"] for r in reversed(clean)
+                if _finite_number(r["UX_cumulative_percent"]) is not None),None),
+            "cumulative_UY_percent":next((r["UY_cumulative_percent"] for r in reversed(clean)
+                if _finite_number(r["UY_cumulative_percent"]) is not None),None),
+            "periods_first_three_s":[r["period_s"] for r in clean[:3]],
+            "meaning":"ELASTIC_MODAL_SOURCE_MATCH_ONLY_NOT_NONLINEAR_INITIAL_STIFFNESS",
+        }
+        source_by_state[state]=_source_record(path)
+    if ambiguous and not valid_by_state:
+        status="AMBIGUOUS_MATCHED_MODAL_SOURCES_NOT_REUSED"
+    elif valid_by_state:
+        status=("PARTIAL_MODAL_MATCH_OTHER_STATE_AMBIGUOUS_REVIEW_REQUIRED" if ambiguous
+                else "MATCHED_SERIALIZED_MODEL_REVIEW_REQUIRED")
+    else:
+        status="MODEL_SHA_MISMATCH_NOT_REUSED" if seen else "NO_MATCHING_SAVED_MODAL"
+    return {
+        "status":status,
+        "source_by_state":source_by_state,
+        "ambiguous_states":ambiguous,
+        "candidate_count":seen,
+        "matched_state_count":len(valid_by_state),
+    },valid_by_state
 
 
 def collect_available_project_values(model_script) -> dict:
@@ -182,10 +200,14 @@ def collect_available_project_values(model_script) -> dict:
             "source_edb_sha256","source_edb_path") if key in metadata}
     serialized= root/"OpenSees_Complete_Model_Data_V118.json"
     sha=sources.get(serialized.name,{}).get("sha256")
-    modal_ref,modal_summary=_modal_candidate(root,sha)
-    if modal_summary is not None:
-        values["modal_mass_screen"]=modal_summary
-        sources["MATCHED_MODAL_REFERENCE"]=modal_ref["source"]
+    modal_ref,modal_by_state=_modal_candidate(root,sha)
+    if modal_by_state:
+        values["modal_mass_screen_by_state"]=modal_by_state
+        # Preserve the single-state convenience field for earlier consumers.
+        if len(modal_by_state)==1:
+            values["modal_mass_screen"]=next(iter(modal_by_state.values()))
+        for state,record in modal_ref["source_by_state"].items():
+            sources["MATCHED_MODAL_"+state]=record
     from components.nonlinear_time_history.material_source_sets import peer_single_source, peer_fsam_panel_values
     peer=peer_single_source()
     fsam=peer_fsam_panel_values()
