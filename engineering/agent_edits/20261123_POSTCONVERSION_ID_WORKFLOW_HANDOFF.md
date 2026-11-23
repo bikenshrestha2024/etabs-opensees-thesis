@@ -1,0 +1,15 @@
+# Agent edit and source handoff — 23 November 2026
+
+**Actual editor:** OpenAI ChatGPT GPT-6 using user's GitHub connector; user-uploaded local XLSX read offline using `artifact_tool`, 143-line pasted load audit read as UTF-8. **No native ETABS COM nor 25-storey OpenSees solver session executed.** Original EDB, local workbook and sensitive logs were never uploaded to GitHub.
+
+**Read-first contract checked before source edits:** `AGENTS.md`, `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md`, `.agents/skills/etabs-opensees-read-first/SKILL.md`, `engineering/rules/CORE_RULES.md`, `engineering/rules/ENGINEERING_GATES.md`, `engineering/migration/README.md`, `docs/programs/00_PROGRAM_INDEX.md`, relevant source guides and current `REVIEW_MAIN/02_MODEL/20261122_NATIVE_ETABS_OPENSEES_CONVERSION_AUDIT.md`.
+
+**Source baseline:** public GitHub main `b98410a0feab7527d5c5e52dec59a5d7f11893ae`; current 23 November local EDB SHA = **UNAVAILABLE**, native comparison workbook SHA = **UNAVAILABLE**. Structural preflight: 32 physical foundation support joints, 44 wall-mesh transfer points, 2×12 m X walls with openings, separate full-gravity 1D+1L and NBC 105:2025 seismic mass. None altered.
+
+**Inspected current uploaded workbook:** seven property groups, 2,092 ETABS source objects, 55 zero-solver-tag storey-0 `BEAM/UNASSIGNED` records, 14,262 actual assembled elements (BEAM 3300, COLUMN 450, BRACE 112, SHEAR WALL 3400, FLOOR 7000), 11,097 mapped nodes, 286419.758231 kN downward load, distinct 284691.556185 kN active seismic weight. Original pasted audit contains 112 individual My/Mz release warnings; all retained in source report.
+
+**Root causes and corrections:** `id_audit.py` reused the frame assembled-tag dictionary for area objects. `mapping_gui.py` regenerated XLSX on each open and selected `NODE:1` automatically. Tk-to-Plotly URL lacked frame/area dimension. `MappingGUI.populate` scanned solver list anew for every tag. `mapping_audit.collect` did not expose the difference between source-only topology and assembled solver tags. All are diagnosed in `REVIEW_MAIN/01_ETABS_IMPORT/20261123_POSTCONVERSION_ID_MAPPING_WORKFLOW_AUDIT.md`, with compatibility-preserving code changes and tests.
+
+**TDD evidence:** test-only commits `78fa595673434b55635b152f8add46c9fc0ecf08`, `95b0e43d404f3e194599fb852db78315bab36e74` failed headless CI with missing expected helper/behavior before implementation; subsequent source fixes passed source CI at `e0cc94d4b7c079d22fec1aef705a0c160700da9c`. Follow-up tests before dimensional URL fix at `b2dcea8ad5c8c9c552ee00502f422a326980e1ab` and `24b1af8db3f3d04a3e78f14133ca6dcab460832b`. Must check final-head CI before merging.
+
+**Unresolved engineering gates:** old 32-support local ETABS/OpenSees pointwise reaction mismatch (different archived case), source-specific native 44 wall-mesh MPC transfer, actual physical purpose of 55 source-only beams, current exact EDB hash comparison, complete nonlinear M0–M6 histories. No tests here certify them.
