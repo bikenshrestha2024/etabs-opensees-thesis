@@ -38,6 +38,7 @@ def publish_case_evidence_zip(source_run, *, filename, files, category=None,
     """Create an atomic archive with an SHA256 manifest and no implicit file crawl.
 
     files is an iterable of (archive_relative_path, absolute_source_path).
+    [REF docs/source/components/inputs/evidence_archive.py.md]
     Only explicitly selected files are included; duplicate or unsafe archive
     paths and symlinks fail closed. Do not package sensitive source files unless
     the user has explicitly selected the local evidence package for review.
