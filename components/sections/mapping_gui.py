@@ -9,6 +9,61 @@ import webbrowser
 from OpenSees_Mapping_Audit_V125 import collect,library,save_assignment,export_excel
 
 
+
+def plotly_query_for_key(key,data):
+    """[REF docs/source/components/sections/mapping_gui.py.md]
+    Carry ETABS frame/area namespace across the Tk-to-Plotly 3D handoff.
+    Solver segments retain their actual parent source-object dimension.
+    """
+    elements={row['key']:row for row in data['elements']}
+    solver_by_tag={str(row['solver_tag']):row for row in data['solver_elements']}
+    if key.startswith('SOLVER:'):
+        source=solver_by_tag.get(key.split(':',1)[1])
+        if source is None:
+            raise ValueError('No assembled solver element for '+key)
+        parent=elements.get(source['key'])
+        if parent is None:
+            raise ValueError('No current parent ETABS source for '+key)
+        return dict(idKind='solver',idValue=key.split(':',1)[1],
+                    category='frame' if parent['dimension']=='line_2_node' else 'area')
+    source=elements.get(key)
+    if source is None:
+        raise ValueError('No selected current ETABS source object for '+key)
+    if source['dimension'] not in ('line_2_node','area_polygon'):
+        raise ValueError('Unsupported ETABS topology dimension: '+str(source['dimension']))
+    return dict(idKind='object',idValue=str(source['etabs_object']),
+                category='frame' if source['dimension']=='line_2_node' else 'area')
+
+
+def inline_source_keys(kind,value,data):
+    """[REF docs/source/components/sections/mapping_gui.py.md]
+    Resolve exact inline namespace or reject ambiguous ETABS numeric IDs.
+    """
+    value=str(value).strip()
+    if not value:
+        return []
+    if kind=='OpenSees node':
+        if not any(str(n['opensees_node_tag'])==value for n in data['nodes']):
+            raise ValueError('No source or mesh node with OpenSees tag '+value)
+        return ['NODE:'+value]
+    if kind=='OpenSees solver element':
+        if not any(str(row['solver_tag'])==value for row in data['solver_elements']):
+            raise ValueError('No assembled solver element tag '+value)
+        return ['SOLVER:'+value]
+    kinds={'ETABS frame object':'line_2_node','ETABS area object':'area_polygon'}
+    if kind not in (*kinds,'ETABS object'):
+        raise ValueError('Unknown source identifier namespace: '+str(kind))
+    matches=[row for row in data['elements']
+             if str(row['etabs_object'])==value and
+             (kind=='ETABS object' or row['dimension']==kinds[kind])]
+    if kind=='ETABS object' and len({r['dimension'] for r in matches})>1:
+        raise ValueError('Ambiguous ETABS object ID '+value+
+                         ': choose ETABS frame object or ETABS area object')
+    if not matches:
+        raise ValueError('No ETABS source object in selected namespace: '+value)
+    return [r['key'] for r in matches]
+
+
 class MappingGUI:
     def __init__(self,parent,folder):
         from OpenSees_Research_UI_V123 import scrollable_form
@@ -52,7 +107,7 @@ class MappingGUI:
         self.selected_points=[]
         pick=ttk.Frame(outer);pick.pack(fill='x',pady=3)
         self.id_kind=tk.StringVar(value='OpenSees node');self.id_value=tk.StringVar(value='')
-        ttk.Combobox(pick,textvariable=self.id_kind,values=('OpenSees node','OpenSees solver element','ETABS object'),state='readonly',width=24).pack(side='left')
+        ttk.Combobox(pick,textvariable=self.id_kind,values=('OpenSees node','OpenSees solver element','ETABS frame object','ETABS area object','ETABS object'),state='readonly',width=24).pack(side='left')
         ttk.Entry(pick,textvariable=self.id_value,width=14).pack(side='left',padx=5)
         ttk.Button(pick,text='Highlight ID',command=self.highlight_inline_id).pack(side='left')
         controls=ttk.LabelFrame(outer,text='Mapping and device library',padding=7);controls.pack(fill='x',pady=5)
@@ -286,10 +341,11 @@ class MappingGUI:
         if not value:
             self.highlight_keys([])
             return
-        if kind=='OpenSees node':keys=['NODE:'+value]
-        elif kind=='OpenSees solver element':keys=['SOLVER:'+value]
-        else:keys=[r['key'] for r in self.data['elements'] if r['etabs_object']==value]
-        self.highlight_keys(keys)
+        try:
+            self.highlight_keys(inline_source_keys(kind,value,self.data))
+        except ValueError as exc:
+            self.highlight_keys([])
+            self.status.set(str(exc))
 
     def reference(self):
         row=next(r for r in library() if r['name']==self.target.get())
@@ -299,9 +355,16 @@ class MappingGUI:
         from urllib.parse import urlencode
         keys=self.selected_keys()
         if not keys:return
-        key=keys[0];kind='solver' if key.startswith('SOLVER:') else 'object';value=key.split(':')[1]
+        try:
+            query=plotly_query_for_key(keys[0],self.data)
+        except ValueError as exc:
+            self.status.set(str(exc))
+            return
         path=self.folder/'OpenSees_Element_Connectivity_3D.html'
-        if path.is_file():webbrowser.open(path.resolve().as_uri()+'?'+urlencode(dict(idKind=kind,idValue=value)))
+        if path.is_file():
+            webbrowser.open(path.resolve().as_uri()+'?'+urlencode(query))
+        else:
+            self.status.set('Source-connected 3D HTML is missing: '+str(path))
 
     def excel(self):
         import os
