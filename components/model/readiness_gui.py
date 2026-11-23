@@ -22,6 +22,30 @@ def _is_reviewed_evidence_reference(value):
     ))
 
 
+def review_metadata_problems(checks, evidence, reviewers, review_dates):
+    """[REF docs/source/components/model/readiness_gui.py.md]
+    Validate human-entered reviewer / ISO calendar date for checked items.
+    This is a UI documentation gate, not independent source certification.
+    """
+    from datetime import date
+    issues=[]
+    for key,flag in checks.items():
+        if not flag:
+            continue
+        if not _is_reviewed_evidence_reference(evidence.get(key, '')):
+            issues.append(key+': reviewer-cited evidence reference is required')
+        who=str(reviewers.get(key,'')).strip()
+        when=str(review_dates.get(key,'')).strip()
+        if not who:
+            issues.append(key+': named reviewer is required')
+        try:
+            if not when or date.fromisoformat(when).isoformat()!=when:
+                raise ValueError('not an ISO date')
+        except ValueError:
+            issues.append(key+': review date must be ISO YYYY-MM-DD')
+    return issues
+
+
 def prepare(model_script,template=None):
     """Create or reuse the model-bound UNAPPROVED draft (shared non-GUI implementation)."""
     from components.model.readiness import bind_readiness_draft
@@ -167,20 +191,51 @@ def launch(parent,model_script,readiness_variable):
     if stale_notice:ttk.Label(win,text=stale_notice,wraplength=1100,foreground='#b00020').pack(anchor='w')
     from OpenSees_Research_UI_V123 import scrollable_form
     footer=ttk.Frame(win);footer.pack(side='bottom',fill='x',padx=8,pady=8)
-    body=ttk.Frame(win);body.pack(fill='both',expand=True);form=scrollable_form(body,min_width=850);checks={};evidence={}
-    for key,value in data['checks'].items():
-        checks[key]=tk.BooleanVar(value=value is True);evidence[key]=tk.StringVar(value=data.get('evidence',{}).get(key,''));ttk.Checkbutton(form,text=key.replace('_',' '),variable=checks[key]).pack(anchor='w');ttk.Entry(form,textvariable=evidence[key],width=110).pack(fill='x')
+    body=ttk.Frame(win);body.pack(fill='both',expand=True);form=scrollable_form(body,min_width=850)
+    checks={};evidence={};reviewers={};review_dates={};hints={}
+    from components.model.readiness import READINESS_CHECK_KEYS
+    checked_data=data.get('checks') or {};raw_evidence=data.get('evidence') or {}
+    previous_reviews=data.get('review_metadata') or {}
+    for key in READINESS_CHECK_KEYS:
+        record=previous_reviews.get(key,{}) if isinstance(previous_reviews,dict) else {}
+        checks[key]=tk.BooleanVar(value=checked_data.get(key) is True)
+        evidence[key]=tk.StringVar(value=raw_evidence.get(key,'') if isinstance(raw_evidence,dict) else '')
+        reviewers[key]=tk.StringVar(value=record.get('reviewer',''))
+        review_dates[key]=tk.StringVar(value=record.get('reviewed_on',''))
+        hints[key]=tk.StringVar(value='No evidence indexed; refresh discovery.')
+        ttk.Checkbutton(form,text=key.replace('_',' '),variable=checks[key]).pack(anchor='w',pady=(5,0))
+        ttk.Label(form,text='Available evidence (not reviewed, does not fill sign-off):').pack(anchor='w')
+        ttk.Entry(form,textvariable=hints[key],state='readonly').pack(fill='x')
+        ttk.Label(form,text='Reviewer-cited source / calculation / evidence reference:').pack(anchor='w')
+        ttk.Entry(form,textvariable=evidence[key]).pack(fill='x')
+        person=ttk.Frame(form);person.pack(fill='x')
+        ttk.Label(person,text='Reviewer').pack(side='left',padx=(0,4))
+        ttk.Entry(person,textvariable=reviewers[key],width=35).pack(side='left',padx=(0,18))
+        ttk.Label(person,text='Review date (YYYY-MM-DD)').pack(side='left',padx=(0,4))
+        ttk.Entry(person,textvariable=review_dates[key],width=16).pack(side='left')
     def refresh_evidence():
+        # Discovery is not sign-off: NEVER set editable evidence/reviewer fields.
         available=available_evidence(model)
-        populated=0
-        for key,value in available.items():
-            if key in evidence and not evidence[key].get().strip():evidence[key].set(value);populated+=1
-        from OpenSees_Workflow_V144 import GUIDE
-        for key,var in evidence.items():
-            if not var.get().strip():var.set('INPUT / REVIEW REQUIRED: '+GUIDE.get(key,'Open step 2 workflow inventory; inspect source model, analysis results and applicable project evidence for this exact requirement. No saved evidence was found.'))
+        for key,var in hints.items():
+            var.set(available.get(key,'INPUT / REVIEW REQUIRED: No source-specific evidence discovered.'))
         win._available_evidence=available
-        return populated
-    ttk.Button(footer,text='Refresh available evidence references (does not approve checks)',command=refresh_evidence).pack(anchor='w')
+        return len(available)
+    ttk.Button(footer,text='Refresh evidence suggestions (does not change review)',command=refresh_evidence).pack(anchor='w')
+    def export_evidence_index():
+        from tkinter import filedialog
+        try:
+            index=evidence_inventory(model)
+            target=filedialog.asksaveasfilename(parent=win,title='Save local unapproved readiness evidence index',
+                initialfile='NLTHA_Readiness_Evidence_UNAPPROVED.json',
+                defaultextension='.json',filetypes=[('JSON','*.json')])
+            if not target:return
+            Path(target).write_text(json.dumps(index,indent=2),encoding='utf-8')
+            messagebox.showinfo('Local evidence index saved',
+                'Discovery only: source hashes and model identity recorded; no check approved.\\n'+str(target),parent=win)
+        except Exception as exc:
+            messagebox.showerror('Evidence index export',str(exc),parent=win)
+    ttk.Button(footer,text='Export local evidence index JSON (unapproved)',
+               command=export_evidence_index).pack(anchor='w')
     ttk.Button(footer,text='Available parameter values + how to obtain missing inputs',command=lambda:__import__('OpenSees_Workflow_V144').launch(win,model.parent)).pack(anchor='w')
     refresh_evidence()
     approved=tk.BooleanVar(value=data.get('approved_for_nltha') is True);ttk.Checkbutton(footer,text='I have reviewed the evidence and approve this specific nonlinear model for NLTHA',variable=approved).pack(anchor='w')
@@ -195,8 +250,12 @@ def launch(parent,model_script,readiness_variable):
     ttk.Button(footer,text='Rebind changed model as UNAPPROVED draft',command=rebind_draft).pack(anchor='w')
     def save():
         try:
-            missing=[k for k,v in checks.items() if v.get() and not _is_reviewed_evidence_reference(evidence[k].get())]
-            if missing:raise ValueError('Checked items require independently reviewed references, not auto-discovered AVAILABLE FOR REVIEW/INPUT placeholders: '+', '.join(missing))
+            issues=review_metadata_problems(
+                {k:v.get() for k,v in checks.items()},
+                {k:v.get() for k,v in evidence.items()},
+                {k:v.get() for k,v in reviewers.items()},
+                {k:v.get() for k,v in review_dates.items()})
+            if issues:raise ValueError('Human source review is incomplete:\\n'+'\\n'.join(issues))
             if approved.get() and not all(v.get() for v in checks.values()):raise ValueError('Approval requires every prerequisite checked and evidenced')
             if approved.get():
                 from components.model.readiness import approval_binding_problems
@@ -207,7 +266,7 @@ def launch(parent,model_script,readiness_variable):
                 for var in checks.values():var.set(False)
                 approved.set(False);path.write_text(json.dumps(data,indent=2),encoding='utf-8')
                 raise ValueError(binding_change_notice(late)+'\nNothing was approved; review and save again.')
-            data.update(model_script=str(model),model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),approved_for_nltha=approved.get(),checks={k:v.get() for k,v in checks.items()},evidence={k:v.get().strip() for k,v in evidence.items()})
+            data.update(model_script=str(model),model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),approved_for_nltha=approved.get(),checks={k:v.get() for k,v in checks.items()},evidence={k:v.get().strip() for k,v in evidence.items()},review_metadata={k:{'reviewer':reviewers[k].get().strip(),'reviewed_on':review_dates[k].get().strip()} for k in checks})
             from components.model.readiness import record_binding
             record_binding(data,model);path.write_text(json.dumps(data,indent=2),encoding='utf-8');readiness_variable.set(str(path));messagebox.showinfo('Readiness saved','Draft saved. Missing model/material prerequisites are not bypassed.',parent=win)
         except Exception as e:messagebox.showerror('Readiness input',str(e),parent=win)
