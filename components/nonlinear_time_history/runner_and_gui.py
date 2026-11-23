@@ -68,8 +68,8 @@ from OpenSees_Input_Records_V130 import (
 def _require_nonlinear_readiness(config):
     """Require an explicit, model-specific checklist before nonlinear NLTHA."""
     model = Path(config["model_script"]).expanduser().resolve()
-    path = Path(config.get("model_readiness_json") or
-                model.with_name("OpenSees_Model_Readiness_V116.json")).expanduser().resolve()
+    from components.model.readiness import readiness_manifest_for_run
+    path = readiness_manifest_for_run(model,config.get("model_readiness_json"))
     if not path.is_file():
         raise FileNotFoundError(f"Missing NLTHA readiness manifest: {path}. Complete OpenSees_Model_Readiness_Template_V116.json beside the model script.")
     data = json.loads(path.read_text(encoding="utf-8-sig"))
