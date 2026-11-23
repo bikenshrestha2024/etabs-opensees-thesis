@@ -380,13 +380,13 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "ops.algorithm('Newton')",
         "ops.integrator('LoadControl', 0.1)",
         "ops.analysis('Static')",
+        "_esm_lateral_started = time.perf_counter()",
         "ESM_BASE_CURVE=[]",
         "def _record_esm_state():",
         "    ops.reactions()",
         "    reaction=sum(float(ops.nodeReaction(n,DOF)) for n in ESM_SUPPORT_NODES)-BASE_REACTION_BEFORE_KN",
         "    roof=max(ESM_LOADS,key=lambda x:float(x['height_m']))",
         "    ESM_BASE_CURVE.append({'load_factor':float(ops.getLoadFactor(ESM_LOAD_PATTERN_TAG)), 'time_s':float(ops.getTime()), 'base_shear_kN':-reaction, 'roof_displacement_m':float(ops.nodeDisp(roof['master_node_tag'],DOF)-GRAVITY_BASELINE_U[roof['master_node_tag']])})",
-        "_esm_lateral_started = time.perf_counter()",
         "ok=0",
         "for _step in range(10):",
         "    ok=ops.analyze(1)",
@@ -594,7 +594,9 @@ def verify_generated_esm_result(script_path, export_dir):
     timing_status = "LEGACY_NO_PERFORMANCE_TIMING"
     phase_times = {}
     if requires_timing:
-        timing_path = required("NBC105_ESM_Case_Timings_"+case+".json")
+        timing_path = output / ("NBC105_ESM_Case_Timings_"+case+".json")
+        if not timing_path.is_file() or timing_path.stat().st_size==0:
+            raise ValueError("ESM timing evidence missing or empty: "+timing_path.name)
         timing = json.loads(timing_path.read_text(encoding="utf-8-sig"))
         if (not isinstance(timing,dict)
                 or timing.get("schema")!="esm-case-timing-v1"
