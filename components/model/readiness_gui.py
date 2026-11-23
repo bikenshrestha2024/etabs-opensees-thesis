@@ -236,6 +236,42 @@ def launch(parent,model_script,readiness_variable):
             messagebox.showerror('Evidence index export',str(exc),parent=win)
     ttk.Button(footer,text='Export local evidence index JSON (unapproved)',
                command=export_evidence_index).pack(anchor='w')
+
+    def load_available_project_values():
+        """Read real project/PEER research numbers, never tick human review."""
+        from tkinter.scrolledtext import ScrolledText
+        from components.model.readiness_available_values import collect_available_project_values
+        try:
+            snapshot=collect_available_project_values(model)
+            viewer=tk.Toplevel(win)
+            viewer.title("Available project and PEER literature values — UNAPPROVED")
+            viewer.geometry("1040x720")
+            ttk.Label(viewer,text=("Source values are taken directly from this selected model's export "
+                "and the installed cited PEER research cards. No checklist item or material-config "
+                "approval is changed. Missing inputs remain explicit."),
+                wraplength=990,foreground="#8a3412").pack(anchor='w',padx=9,pady=8)
+            area=ScrolledText(viewer,wrap='none',font=('Consolas',10))
+            area.pack(fill='both',expand=True,padx=8,pady=4)
+            area.insert('1.0',json.dumps(snapshot,indent=2))
+            area.configure(state='disabled')
+            def save_values():
+                from components.model.readiness_available_values import attach_available_values_to_draft
+                try:
+                    saved=attach_available_values_to_draft(model,path)
+                    # Reflect only this unapproved snapshot in GUI's local state.
+                    data['available_project_values']=snapshot
+                    messagebox.showinfo("Existing values bound to draft",
+                        "Stored source-backed values in the current UNAPPROVED readiness draft.\n"+
+                        str(saved)+"\n\nNo material or checklist review flags changed.",parent=viewer)
+                except Exception as exc:
+                    messagebox.showerror("Cannot attach existing values",str(exc),parent=viewer)
+            ttk.Button(viewer,text="Use these available values in UNAPPROVED draft",
+                       command=save_values).pack(anchor='w',padx=9,pady=9)
+        except Exception as exc:
+            messagebox.showerror("Source values unavailable",str(exc),parent=win)
+    ttk.Button(footer,text='Load existing project + PEER research values (no manual re-entry)',
+               command=load_available_project_values).pack(anchor='w')
+
     ttk.Button(footer,text='Available parameter values + how to obtain missing inputs',command=lambda:__import__('OpenSees_Workflow_V144').launch(win,model.parent)).pack(anchor='w')
     refresh_evidence()
     approved=tk.BooleanVar(value=data.get('approved_for_nltha') is True);ttk.Checkbutton(footer,text='I have reviewed the evidence and approve this specific nonlinear model for NLTHA',variable=approved).pack(anchor='w')
