@@ -43,8 +43,24 @@ Area integration now has **two separate evidence exports**.
 1. Export area inventory (Excel + JSON + ZIP) packages source topology and assignments. It is a source-only preview; no OpenSees domain was built.
 2. Export saved instantiated element ZIP packages an already-saved area-element instantiation audit, including explicit ShellMITC4 / E_SFI_MVLEM_3D element counts, tags and provenance, plus the selected source topology, assignments and config. It requires the report and verifies that the recorded source paths, category counts and element tags agree; otherwise it fails closed. It does NOT rebuild elements or run gravity or NLTHA.
 
-Relative audit_output_json filenames in the area config now save under the selected config's directory rather than the launcher's working directory. Legacy outputs in unrelated directories are not silently selected. Evidence is published case-locally under 07_EXPORT_ZIP/AREA_INTEGRATION and includes SHA-256 with an NOT_VERIFIED engineering-acceptance status.
+Relative audit_output_json filenames in the area config now save under the selected config's directory rather than the launcher's working directory. Legacy outputs in unrelated directories are not silently selected. Evidence is published with SHA-256 and an NOT_VERIFIED engineering-acceptance status. Historical packages remain readable at their original locations.
 
 Native ETABS constraint/MPC equivalence, material/FSAM calibration, element response, diaphragm compatibility, mass transfer, and full-building NLTHA remain separate unresolved gates.
 
 Synthetic test: tests/test_area_instantiation_evidence_zip_20261123.py.
+
+## 2026-11-23 — model-owned output and nested-folder guard
+
+New area inventory and instantiated-element archives belong under the *same* selected model stage:
+
+```text
+<ETABS export>/02_MODEL/AREA_INTEGRATION/
+  excel/                 # source-only inventory workbook
+  json/                  # source-only inventory and provenance
+  PYTHON/                # inactive integration-call template
+  07_EXPORT_ZIP/         # area inventory and instantiated-element packages
+```
+
+`model_area_directory` recovers the original export root from selections inside `02_MODEL`, `AREA_INTEGRATION`, and `07_EXPORT_ZIP`; callers must not append another `02_MODEL` to an existing module path. New area ZIPs are no longer published under `<export>/07_EXPORT_ZIP/AREA_INTEGRATION`. Existing archives are left intact and are not deleted or moved. The archive manifest still contains source SHA-256 provenance and `NOT_VERIFIED` acceptance. **This fixes output ownership, not element numerical equivalence or NLTHA readiness.**
+
+Regression coverage: `tests/test_model_stage_mesh_area_inventory.py`, `tests/test_area_instantiation_evidence_zip_20261123.py`, and `tests/test_area_folder_and_hinged_brace_review.py`.
