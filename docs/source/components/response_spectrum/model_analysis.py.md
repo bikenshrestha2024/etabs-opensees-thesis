@@ -107,3 +107,29 @@ generalized mass, six-component foundation cuts, stiffness, ETABS
 modal participation, CQC combination and code acceptance still require
 independent numerical validation. Red regression at `24498fe9`: one
 new test failed on a tampered support case while 1,781 prior tests passed.
+
+
+## 2026-11-23 — MRSM support-reaction recorder consistency
+
+After building its active model, MRSM previously verified the selected
+32/76/97 solver support profile, but **reselected reaction nodes from the
+raw `data['supports']` export**. That source dictionary may contain
+76 mixed physical-foundation and shear-wall mesh point IDs while
+`PHYSICAL_32` is the live solver model. `run_model_spectrum` now
+reuses the centralized `components.model.support_case_contract.
+solver_reaction_support_tags(built, selected_support)` for the
+`nodeReaction` modal baseline, incremental reaction envelopes and
+CSV output node labels. The exported original source mapping remains
+untouched and is not used to decide supported solver nodes.
+
+The correction **does not imply** that OpenSees and ETABS reactions match:
+the 32 real foundation pointwise gravity residual, wall shell
+edge/MPC transfer, omitted/verified rigid offsets and independent
+six-component common-cut comparisons remain open. See
+`docs/validation/20261122_REBUILT_ELASTIC_768KN_RESIDUAL_AUDIT.md`.
+Generalized MRSM inertia terms still read the serialized source
+`nodal_mass`; if `STORY_LUMPED_NBC` changes the executed mass operator,
+a source-matched native/generalized-mass audit is required before
+using those responses for engineering decisions.
+
+Synthetic regression: `tests/test_shared_solver_support_recovery_20261123.py`.
