@@ -179,6 +179,12 @@ def populate_spectrum(app, gui):
         if source in values:getattr(app,target).set(str(values[source]))
     if hasattr(app,'omegas') and 'omegas' in values:app.omegas.set(str(values['omegas']))
     for attr in ('t1x','t1y','tnx','tny'):getattr(app,attr).set(getattr(gui,attr).get())
+    if hasattr(app,'source_folder'):
+        app.source_folder.set(str(Path(gui.model.get()).expanduser().parent))
+    if hasattr(app,'period_source'):
+        app.period_source.set('Adopted X/Y T1 transferred from selected history-model source; '
+                              'NBC §5.1.3 provenance is in the history input audit. '
+                              'Elastic modal Tn is independent of adopted T1.')
     app.status.set('Imported current project parameters and matching analysis periods. Review soil evidence and record matching procedure. '+ ' '.join(inputs['notes']))
 
 
