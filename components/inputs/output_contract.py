@@ -54,6 +54,33 @@ def safe_component(value):
     return part
 
 
+def compact_case_id(stage, scope, source_sha256, *, max_length=48):
+    """[REF docs/source/components/inputs/output_contract.py.md]
+    Source-bound compact case label for NEW runs, never historical renaming.
+
+    The full original SHA and source filename belong in immutable provenance.
+    This is opt-in so a stage can migrate its readers and writers together.
+    """
+    import hashlib
+    key=str(stage).strip().upper()
+    if key not in ("MODEL","GRAVITY","ESM","MODAL","MRSM","LTHA","NLTHA"):
+        raise ValueError("Unknown analysis stage for compact case ID")
+    if not isinstance(source_sha256,str) or not re.fullmatch(r"[a-fA-F0-9]{64}",source_sha256):
+        raise ValueError("Compact case ID requires exact source SHA256")
+    if not isinstance(max_length,int) or isinstance(max_length,bool) or not 24<=max_length<=64:
+        raise ValueError("Compact case ID length must be between 24 and 64")
+    raw=str(scope)
+    if not raw.strip() or raw in (".",".."):
+        raise ValueError("Compact case ID requires a named scope")
+    label=re.sub(r"[^A-Za-z0-9]+","_",raw).strip("_") or "CASE"
+    # Include full scope in compact digest to distinguish same-prefix scopes.
+    scope_token=hashlib.sha256(raw.encode("utf-8")).hexdigest()[:6]
+    suffix=source_sha256.lower()[:12]
+    budget=max_length-len(key)-len(scope_token)-len(suffix)-3
+    label=label[:budget].rstrip("_") or "CASE"
+    return safe_component(f"{key}_{label}_{scope_token}_{suffix}")
+
+
 def _refuse_linked_output_target(target):
     """Refuse pre-existing symbolic links in the destination path chain.
 
@@ -338,15 +365,16 @@ def prepare_history_run(model_script, stage, state, scope, *, model_length_unit)
     if state.upper() not in ("ULS","SLS"):
         raise ValueError("One ULS or SLS stiffness source is required per history case")
     scope=safe_component(scope)
-    # An explicit model file stem differentiates independent case scenarios;
-    # original file SHA is separately recorded as an unaltered source digest.
-    case_id=safe_component((method+"_"+scope+"_"+model.stem)[:120].rstrip("._"))
+    # Short source-fingerprinted ID: retain the full model filename and digest
+    # in HISTORY_INPUT_PROVENANCE instead of building a >120-char run folder.
+    model_digest=hashlib.sha256(model.read_bytes()).hexdigest()
+    case_id=compact_case_id(method,scope,model_digest)
     export=export_root_for(model.parent)
     run=create_case_run(export,method,case_id,state=state,
                         units="kN-m-s" if model_length_unit=="m" else "kN-mm-s")
     atomic_json(run/"00_INPUT_SOURCE"/"HISTORY_INPUT_PROVENANCE.json",{
         "model_script":str(model),
-        "model_script_sha256":hashlib.sha256(model.read_bytes()).hexdigest(),
+        "model_script_sha256":model_digest,
         "assembled_model_sha256":None,
         "source_edb_sha256":None,
         "state":state,
