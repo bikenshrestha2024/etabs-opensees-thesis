@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 import unittest
 from openpyxl import load_workbook
-from components.sections.area_elements import export_area_integration_inventory, default_area_integration_script_path
+from components.sections.area_elements import (export_area_integration_inventory, default_area_integration_script_path, model_area_directory)
 
 
 class AreaInventoryTests(unittest.TestCase):
@@ -38,7 +38,7 @@ class AreaInventoryTests(unittest.TestCase):
             self.assertEqual(m['source_quad_counts']['FLOOR'],1)
             self.assertEqual(m['sha256']['topology'],hashlib.sha256(topology.read_bytes()).hexdigest())
             self.assertFalse(m['analysis_ready'])
-            archived=root/'07_EXPORT_ZIP'/'AREA_INTEGRATION'/(workbook.stem+'.zip')
+            archived=root/'02_MODEL'/'AREA_INTEGRATION'/'07_EXPORT_ZIP'/(workbook.stem+'.zip')
             self.assertTrue(archived.is_file(), 'Area inventory must publish a real ZIP')
             with ZipFile(archived) as archive:
                 self.assertIsNone(archive.testzip())
@@ -51,6 +51,18 @@ class AreaInventoryTests(unittest.TestCase):
             self.assertEqual(wb['Area objects']['F2'].value,4.0)
             self.assertIn('NOT VERIFIED',wb['Summary']['B3'].value)
             wb.close()
+
+    def test_repeated_selection_of_model_stage_never_creates_nested_stage(self):
+        with TemporaryDirectory() as td:
+            root=Path(td).resolve()
+            expected=root/'02_MODEL'/'AREA_INTEGRATION'
+            for selected in (root,root/'02_MODEL', expected,
+                             root/'02_MODEL'/'07_EXPORT_ZIP',
+                             expected/'07_EXPORT_ZIP'):
+                self.assertEqual(model_area_directory(selected),expected)
+                self.assertEqual(default_area_integration_script_path(selected).parent,
+                                 expected/'PYTHON')
+            self.assertFalse(expected.exists(), 'Resolver must be read-only')
 
     def test_invalid_geometry_is_not_auto_approved(self):
         with TemporaryDirectory() as td:

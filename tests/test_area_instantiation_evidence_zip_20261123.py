@@ -59,7 +59,7 @@ class InstantiatedAreaEvidenceTests(TestCase):
             self.assertTrue(report.is_file(), 'Report must belong to selected source, not cwd')
             archive=package_area_instantiation_audit(topology_json=topology,
                 area_assignment_csv=audit,config_json=config,output_dir=root)
-            self.assertEqual(archive.parent,root/'07_EXPORT_ZIP'/'AREA_INTEGRATION')
+            self.assertEqual(archive.parent,root/'02_MODEL'/'AREA_INTEGRATION'/'07_EXPORT_ZIP')
             with ZipFile(archive) as zipped:
                 self.assertIsNone(zipped.testzip())
                 self.assertIn('02_MODEL/AREA_INTEGRATION/INSTALLED_ELEMENTS/'+report.name,zipped.namelist())
