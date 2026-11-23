@@ -600,17 +600,22 @@ def launch(parent,folder):
                 operation_bar.start(12)
             else:operation_bar.stop()
         win.after(0,render)
-    # Reopen status is sourced from a saved case ledger, not an assumed PASS.
-    previous_status=output/'MRSM_Batch_Status_V151.json'
-    if previous_status.is_file():
-        try:
-            previous=json.loads(previous_status.read_text(encoding='utf-8-sig'))
-            cases=previous.get('cases',[])
-            solved=sum(row.get('status')=='COMPLETED' for row in cases)
-            operation_status.set('SAVED RUN | '+str(solved)+'/'+str(len(cases))+
-                                 ' numerical cases completed; source/code checks remain separate')
-        except (OSError,ValueError,KeyError) as exc:
-            operation_status.set('REVIEW | Saved case ledger unreadable: '+str(exc))
+    # A saved process ledger is not a numeric-completeness certificate.
+    # Only display same-source, same-state, same-input numeric completion.
+    import os
+    selected_gui_fields={k:v.get() for k,v in fields.items()}
+    selected_gui_fields['gravity_profile']=os.environ.get(
+        'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+    prior=review_saved_mrsm_batch(output,folder,selected_gui_fields)
+    if prior['status']=='SAVED_NUMERICALLY_COMPLETE_SOURCE_MATCHED':
+        operation_status.set(
+            'SAVED NUMERIC REVIEW | '+str(prior['numerical_cases_verified'])+
+            '/6 cases revalidated; native ETABS equivalence remains open')
+    elif prior['status']!='NOT_RUN':
+        operation_status.set(
+            'REVIEW | '+prior['status']+' | previously reported '+
+            str(prior['reported_completed'])+
+            ' process completions; current numerical case acceptance is pending')
     log_value=tk.StringVar()
     from OpenSees_Research_UI_V123 import copyable_log
     from components.shared.case_status import panel,CaseLedger
@@ -622,6 +627,15 @@ def launch(parent,folder):
     def run():
         try:
             cfg={k:v.get() for k,v in fields.items()}
+            cfg['gravity_profile']=os.environ.get(
+                'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+            selected_gui_fields=dict(cfg)
+            selected_input_sha=mrsm_input_signature(selected_gui_fields)
+            data_file=Path(folder)/'OpenSees_Complete_Model_Data_V118.json'
+            if data_file.is_symlink() or not data_file.is_file():
+                raise FileNotFoundError('MRSM selected source model JSON missing or linked')
+            with data_file.open('rb') as source_stream:
+                selected_model_sha=hashlib.file_digest(source_stream,'sha256').hexdigest()
             require_source_state(folder,cfg['limit_state'])
             # [REF NBC105-2025 §5.1.3, §7.5] name blank inputs instead of
             # failing with "could not convert string to float: ''".
@@ -635,7 +649,14 @@ def launch(parent,folder):
             for k in ['Z','I','rmu','omegau','omegas','T1_X','T1_Y','damping']:cfg[k]=float(cfg[k])
             states=[cfg['limit_state']];button.configure(state='disabled')
             operation('RUNNING','Gravity → eigenmodes → CQC responses for '+', '.join(states))
-            ledger=CaseLedger(output/"MRSM_Batch_Status_V151.json",[state+" "+axis+"_"+ecc for state in states for axis in ("X","Y") for ecc in ("E0","Eplus","Eminus")]);board["ledger"]=ledger;board["cancelled"]=False
+            ledger=CaseLedger(
+                output/"MRSM_Batch_Status_V151.json",
+                [state+" "+axis+"_"+ecc for state in states for axis in ("X","Y")
+                 for ecc in ("E0","Eplus","Eminus")],
+                provenance=dict(model_sha256=selected_model_sha,
+                                state=cfg['limit_state'],
+                                input_sha256=selected_input_sha))
+            board["ledger"]=ledger;board["cancelled"]=False
             def worker():
                 try:
                     append('[BATCH PLAN] '+', '.join(states)+'; each state runs X and Y, centered and +/-5% eccentricity.\n')
@@ -644,13 +665,17 @@ def launch(parent,folder):
                         if board.get("cancelled"):break
                         append('[STATE START] '+state+' | gravity/preload, eigenanalysis, modal RSA, CQC, force scaling, drift and export.\n')
                         operation('RUNNING',state+' | gravity and modal CQC stages underway')
-                        current=dict(cfg,limit_state=state,gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
+                        current=dict(cfg,limit_state=state,
+                                     gravity_profile=cfg['gravity_profile'])
                         data_file=Path(folder)/'OpenSees_Complete_Model_Data_V118.json'
-                        if not data_file.is_file():
-                            raise FileNotFoundError('MRSM source model data not found: '+str(data_file))
+                        if not data_file.is_file() or data_file.is_symlink():
+                            raise FileNotFoundError('MRSM source model data missing or linked: '+str(data_file))
                         model_hash=hashlib.sha256(data_file.read_bytes()).hexdigest()
+                        if model_hash!=selected_model_sha:
+                            raise ValueError('MRSM source model changed after batch selection; select current source again')
                         run_root=create_case_run(folder,'MRSM','MRSM_'+current['gravity_profile'],
                                                  state=state,model_sha256=model_hash)
+                        ledger.set_provenance(run_dir=str(run_root))
                         latest_result['run']=run_root
                         out=run_root/'02_RESULTS'
                         latest_result['folder']=out
@@ -683,6 +708,8 @@ def launch(parent,folder):
                                     if key.startswith(state+' ') and row['status']!='COMPLETED':ledger.set(key,'FAILED','State child exit '+str(rc)+'; inspect log. Next state will run independently.')
                             else:
                                 try:
+                                    if hashlib.sha256(data_file.read_bytes()).hexdigest()!=model_hash:
+                                        raise ValueError('MRSM source model changed during solver execution; native output source invalid')
                                     gate=validate_mrsm_case_output(out,state=state,
                                                                  expected_model_sha256=model_hash)
                                     atomic_json(run_root/'06_REVIEW'/'SAVED_CASE_COMPLETENESS.json',gate)
@@ -711,6 +738,16 @@ def launch(parent,folder):
                     append('[FAILED] '+str(e)+'\n')
                 finally:
                     ledger.finish_pending("Batch interrupted or case completion was not reported; inspect state log")
+                    # Keep the exact process ledger with its immutable run
+                    # alongside the stage-level latest-run pointer.
+                    current_run=latest_result.get('run')
+                    if current_run is not None:
+                        try:
+                            import shutil
+                            shutil.copy2(ledger.path,
+                                current_run/'06_REVIEW'/'MRSM_Batch_Status_V151.json')
+                        except (OSError,ValueError) as snapshot_error:
+                            append('[MRSM_LEDGER_SNAPSHOT_FAILED] '+str(snapshot_error)+'\n')
                     # Automatically consolidate real MRSM output in a single
                     # upload folder/ZIP, clearly separated from ETABS native
                     # responses. No missing native case is inferred.
@@ -724,9 +761,14 @@ def launch(parent,folder):
                         append("[MRSM_AUTO_REVIEW_ZIP] "+package["zip"]+"\\n")
                     except Exception as pack_exc:
                         append("[MRSM_REVIEW_PACKAGING_FAILED] "+str(pack_exc)+"\\n")
-                    statuses=[row['status'] for row in ledger.rows.values()]
-                    stage=('COMPLETED' if statuses and all(x=='COMPLETED' for x in statuses) else 'REVIEW REQUIRED')
-                    operation(stage,str(sum(x=='COMPLETED' for x in statuses))+'/'+str(len(statuses))+' numerical cases completed; native ETABS equivalence remains separate')
+                    reopened=review_saved_mrsm_batch(
+                        output,folder,selected_gui_fields)
+                    stage=('COMPLETED' if
+                        reopened['status']=='SAVED_NUMERICALLY_COMPLETE_SOURCE_MATCHED'
+                        else 'REVIEW REQUIRED')
+                    operation(stage,str(reopened['numerical_cases_verified'])+
+                        '/6 saved numeric cases source-rechecked; '+
+                        reopened['status']+'; ETABS equivalence unverified')
                     try:win.after(0,lambda:button.configure(state='normal'))
                     except (tk.TclError,RuntimeError):pass
             threading.Thread(target=worker,daemon=True).start()
