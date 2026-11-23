@@ -12,7 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from components.model.id_audit import export_id_audit
-from components.sections.mapping_audit import collect
+from components.sections.mapping_audit import collect, save_assignment, summarize_assembly_warnings
 from components.sections import mapping_gui
 
 
@@ -111,3 +111,27 @@ def test_load_audit_popup_does_not_export_excel_without_button_click():
     assert "\n    export_excel(folder)\n" not in source
     ui=inspect.getsource(mapping_gui.MappingGUI.__init__)
     assert "self.id_value=tk.StringVar(value='')" in ui
+
+
+def test_research_override_cannot_target_source_only_unassembled_member():
+    with tempfile.TemporaryDirectory() as td:
+        folder=_fixture(Path(td))
+        try:
+            save_assignment(folder,["FRAME:55"],"RC_BEAM_600x800_FIBER")
+        except ValueError as exc:
+            assert "not assembled" in str(exc).lower()
+        else:
+            raise AssertionError("A source-only unassigned frame cannot be an active solver material mapping")
+
+
+def test_warning_digest_keeps_raw_id_specific_diagnostics_in_source():
+    warnings=[
+        "SOURCE_ONLY wall supports: mesh transfer not verified.",
+        "ETABS frame unique ID 1308 | OpenSees topology tag 25049 | OpenSees elastic element tags [103751]: assembled with source My/Mz end releases and zero torsional transfer.",
+        "ETABS frame unique ID 1309 | OpenSees topology tag 25050 | OpenSees elastic element tags [103752]: assembled with source My/Mz end releases and zero torsional transfer.",
+    ]
+    digest=summarize_assembly_warnings(warnings)
+    assert len(digest)==2
+    assert any("2 frame" in line and "1308" in line and "1309" in line for line in digest)
+    assert any("mesh transfer" in line for line in digest)
+    assert len(warnings)==3
