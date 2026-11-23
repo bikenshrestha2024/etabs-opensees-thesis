@@ -386,6 +386,7 @@ def apply_etabs_area_uniform_loads(ops, *, load_assignment_csv: str | Path,
 def model_area_directory(export_dir):
     """Canonical model-owned area outputs; read-only and idempotent.
 
+    [REF docs/source/components/sections/area_elements.py.md]
     Accepts the export root, 02_MODEL, AREA_INTEGRATION or their ZIP
     descendants. Never create nested 02_MODEL/02_MODEL or 07_EXPORT_ZIP
     siblings. Existing historical ZIPs are not moved or deleted.
