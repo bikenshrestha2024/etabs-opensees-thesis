@@ -7,3 +7,8 @@ V144 numbered workflow navigation now uses canonical program names. It searches 
 Unit regression: `tests/test_export_workflow_roles.py` and `tests/test_import01_audit_and_workflow.py`. This does not establish full motion duration, model SHA identity, source mass equivalence or native ETABS/OpenSees validation.
 
 The record-pair checklist displays the same NBC gravity constant as the transient runtime. In a metre-based model, Acc(g) uses 9.81 m/s² per g once. Input already in m/s² uses 1. The numerical motion scale is a separate, dimensionless input. An inventory records the review instructions and leaves checklist approval to the reviewer.
+
+
+## 2026-11-23 — direct available values in workflow inventory
+
+`inventory(folder)` includes `direct_available_values` from `components.model.readiness_available_values.collect_available_project_values` when the current nonlinear model builder exists. The data are read only from the selected local export and installed, cited PEER specimen cards. Incomplete source values remain missing and the snapshot explicitly states `UNAPPROVED`. Existing steps and GUIDE remain intact; no source-input, approval, material or FSAM field is changed.
