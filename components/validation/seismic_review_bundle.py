@@ -144,12 +144,19 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
     output=Path(analysis_output).resolve()
     if not source.is_dir() or not output.is_dir():
         raise FileNotFoundError("Model source and analysis output folders must exist")
-    from components.inputs.output_layout import stage_review_owner
+    from components.inputs.output_layout import stage_review_owner, export_root_for
     review_owner=stage_review_owner(source,output,method)
-    # Existing canonical run uses its own seventh ZIP section; a legacy
-    # all-stage results folder publishes new review material in 03_ESM/05_MRSM.
-    review_root=(output/"Seismic_Review_Packages" if review_owner==output
-                 else review_owner/"REVIEW_SNAPSHOTS")
+    # ESM uses a single module-level review folder, even when the selected
+    # response was a long-named 03_ESM/RUNS/ULS or SLS case. This prevents
+    # fresh review packages and ZIPs appearing at different locations.
+    # MRSM keeps its established case-local 07_EXPORT_ZIP contract.
+    model_root=export_root_for(source)
+    stage_scoped_esm=(method=="ESM" and
+                      (output==model_root or model_root in output.parents))
+    if stage_scoped_esm:
+        review_owner=model_root/"03_ESM"
+    review_root=(review_owner/"REVIEW_SNAPSHOTS" if stage_scoped_esm or review_owner!=output
+                 else output/"Seismic_Review_Packages")
     review_root.mkdir(parents=True,exist_ok=True)
     stamp=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     package=review_root/(method+"_Review_"+stamp)
