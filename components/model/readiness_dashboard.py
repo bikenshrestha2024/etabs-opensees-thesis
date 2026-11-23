@@ -161,12 +161,17 @@ def _load_draft(model):
         if data.get("approved_for_nltha") is True:
             from components.model.readiness import (
                 BINDING_FIELDS, BindingUnreadableError,
-                binding_mismatches, approval_binding_problems,
+                current_binding, approval_binding_problems,
             )
             if any(key not in data for key in BINDING_FIELDS):
                 return None, "INPUT_BINDING_NOT_RECORDED"
             try:
-                if binding_mismatches(data, model):
+                # Use the production binding hash calculation directly:
+                # binding_mismatches() intentionally filters unreadable
+                # inputs out of its mismatch-only result for run-gate use.
+                # A dashboard must instead report unreadable inputs clearly.
+                now = current_binding(model)
+                if any(data[key] != now[key] for key in BINDING_FIELDS):
                     return None, "INPUT_BINDING_MISMATCH"
                 if approval_binding_problems(model):
                     return None, "INPUT_BINDING_INCOMPLETE"
