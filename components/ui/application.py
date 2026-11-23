@@ -2575,9 +2575,7 @@ class App:
         self.log("Select the ETABS EDB and run ETABS → OpenSeesPy Import + Audit. ETABS is closed without saving. The generated connectivity/load audit is not a fully load-complete analysis model; review self-weight multipliers and all skipped load records before analysis.")
     def _open_spectrum_diagnostics(self):
         from NBC105_Spectrum_Scaling_V115 import launch_spectrum_gui
-        app=launch_spectrum_gui(self.root)
-        from OpenSees_Linear_Autofill_V124 import populate_site
-        populate_site(app,self.out.get())
+        app=launch_spectrum_gui(self.root, self.out.get())
         return app
 
     def _open_step13_basis(self):
