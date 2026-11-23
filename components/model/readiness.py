@@ -14,7 +14,7 @@ import csv
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 # Source registry used by the project workflow; the full annotated bibliography
 # and learning-resource notes are in REFERENCES_AND_LEARNING_RESOURCES_V116.md.
