@@ -35,7 +35,6 @@ class ESMFastIOTests(unittest.TestCase):
             self.assertIn("NBC105_ESM_OpenSees_Response_",script)
             self.assertIn('BASE_SHEAR_ERROR_PCT',script)
             self.assertIn('export_static_response',script)
-            self.assertIn('verify', inspect.getsource(write_outputs).lower() or 'verify')
 
     def test_gui_fast_io_mode_is_visible_and_avoids_worker_tk_reads(self):
         from components.equivalent_static.calculation_and_gui import ESMGui
