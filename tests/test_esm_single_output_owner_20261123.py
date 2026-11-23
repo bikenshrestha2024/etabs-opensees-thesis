@@ -47,7 +47,7 @@ class ESMOneOutputOwnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             export=Path(tmp)/"export"
             export.mkdir()
-            expected=export/"03_ESM"/"LOGS_AND_STATUS"/"ESM_Runner_Status"
+            expected=export/"03_ESM"/"STATUS"
             for selected in (export, export/"03_ESM",export/"02_MODEL",
                              analysis_output_folder(export,"ULS",stage="ESM"),
                              analysis_output_folder(export,"SLS",stage="ESM")):
