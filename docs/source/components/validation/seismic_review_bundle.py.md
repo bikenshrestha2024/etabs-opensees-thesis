@@ -25,3 +25,8 @@ The ESM solver now exports original-point crosswalk plus all-node displacement i
 ## Security and packaging
 
 No cloud upload occurs. The ZIP is created locally, not automatically published. Original source data, EDB and users' other private folders are not mutated. The reconstruction helper verifies SHA256 before copying content. Exclude previous evidence bundles and long-recursive scanner paths to avoid runaway copies and incorrectly inflated uploads.
+
+
+## 2026-11-23 — Stage-owned new review files from legacy selections
+
+The selected native/legacy analysis-output folder remains a **read-only source** for historical case evidence. `stage_review_owner(export_dir, selected_output, stage)` maps new review publication under the owning `03_ESM` or `05_MRSM` stage when the GUI selected an old `OpenSees_Analysis_Results` location or another stage within the same export. Existing canonical run folders preserve their own local `07_EXPORT_ZIP`; explicit outside-export custom locations remain opt-in overrides. The ESM legacy route comparison writes to `03_ESM/COMPARISONS`, and seismic review ZIPs to `<stage>/07_EXPORT_ZIP` with snapshots in `<stage>/REVIEW_SNAPSHOTS`. No existing files are moved or invalidated; see `tests/test_stage_owned_seismic_legacy_routing.py`. This is **folder provenance only**, not native structural acceptance.
