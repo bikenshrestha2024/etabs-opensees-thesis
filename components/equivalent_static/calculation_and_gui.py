@@ -1825,8 +1825,16 @@ class ESMGui:
             self.outdir.set(str(analysis_output_folder(self.export_dir,self.state.get(),stage='ESM')))
             self._load_story_metadata(p)
     def _browse_out(self):
-        p=filedialog.askdirectory(title="Select output folder",initialdir=self.outdir.get())
-        if p:self._output_is_automatic=False;self.outdir.set(p)
+        p=filedialog.askdirectory(title="Select ESM output folder",initialdir=self.outdir.get())
+        if not p:
+            return
+        from components.inputs.project_workbooks import esm_case_output_directory
+        chosen=esm_case_output_directory(self.export_dir,self.state.get(),p)
+        automatic=analysis_output_folder(self.export_dir,self.state.get(),stage='ESM').resolve()
+        self._output_is_automatic=(chosen==automatic)
+        self.outdir.set(str(chosen))
+        if self._output_is_automatic and Path(p).resolve()!=chosen:
+            self.status.set("Output normalized to the current 03_ESM model/state run. Other module folders cannot receive ESM results.")
     def _browse_model(self):
         p=filedialog.askopenfilename(title="Select complete OpenSeesPy model builder",initialdir=self.outdir.get(),filetypes=[("Python script","*.py"),("All files","*.*")])
         if p: self.model_script.set(p)
@@ -1975,8 +1983,19 @@ class ESMGui:
             if show_error: messagebox.showerror("ETABS modal results unavailable",f"ETABS comparison periods could not be refreshed. This does not invalidate the separate workbook-adopted or Rayleigh periods already shown. To refresh ETABS references, run a modal case in ETABS and retry.\n\n{exc}")
             else: self.status.set('Excel/source inputs loaded. ETABS modal refresh unavailable: '+str(exc))
     def _open_export_folder(self):
-        try: os.startfile(self.outdir.get())
-        except Exception as e: messagebox.showerror("Could not open export folder",str(e))
+        try:
+            from components.inputs.output_layout import export_root_for
+            root=export_root_for(self.export_dir)
+            chosen=Path(self.outdir.get()).expanduser().resolve()
+            # The navigation action opens ONE module root, not whichever
+            # ULS/SLS case-specific directory happens to be displayed.
+            target=(root/"03_ESM" if chosen==root or root in chosen.parents
+                    else chosen)
+            if not target.is_dir():
+                raise FileNotFoundError("No ESM output folder has been generated: "+str(target))
+            os.startfile(str(target))
+        except Exception as e:
+            messagebox.showerror("Could not open ESM output folder",str(e))
     def _open_csv(self):
         if not self.path.get(): self._browse(); return
         try: os.startfile(self.path.get())
@@ -2126,7 +2145,8 @@ class ESMGui:
                     for polarity in polarities:
                         for ecc_sign in ecc_signs:
                             breadth=(bdim,ecc_sign)
-                            state_outdir=analysis_output_folder(self.export_dir,state,stage='ESM') if self._output_is_automatic else Path(self.outdir.get())
+                            from components.inputs.project_workbooks import esm_case_output_directory
+                            state_outdir=esm_case_output_directory(self.export_dir,state,self.outdir.get())
                             output_paths=write_outputs(self.path.get(),rows,result,self.direction.get(),polarity,self.include_torsion.get(),breadth,state_outdir,self.model_script.get(),self.support_case_var.get(),self.seismic_mass_policy.get())
                             made.extend(output_paths); self.last_runners.append(str(output_paths[2]))
                             summaries.append(f"{state} {self.direction.get()}{'+' if polarity>0 else '-'} E{('+' if ecc_sign>0 else '-') if self.include_torsion.get() and ecc_sign else '0'}: V={result['base_shear_kN']:.3f} kN, k={result['period_exponent_k']:.4f}")
@@ -2215,7 +2235,8 @@ class ESMGui:
         self.status.set("Starting ESM child-process batch; progress and errors saved per case.")
         import datetime
         batch_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        batch_folder = output / "ESM_Runner_Status" / batch_id
+        from components.equivalent_static.organized_exports import esm_batch_status_root
+        batch_folder = esm_batch_status_root(self.export_dir, output) / batch_id
         batch_folder.mkdir(parents=True, exist_ok=False)
         state_file = batch_folder / "CASE_STATUS.json"
         def worker():
