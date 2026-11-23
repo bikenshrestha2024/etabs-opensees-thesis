@@ -130,15 +130,29 @@ class ReadinessTests(unittest.TestCase):
             root = Path(d)
             model = root / "model.py"
             model.write_text("pass\n")
+            # This fixture deliberately includes a complete, source-bound
+            # synthetic approval claim. A legacy unbound signature cannot
+            # represent a current-source NLTHA review after this correction.
+            from components.model.readiness import record_binding
+            materials = root / "synthetic_materials.json"
+            materials.write_text('{"synthetic":true}', encoding="utf-8")
+            (root / "OpenSees_Complete_Model_Config_V118.json").write_text(
+                json.dumps({
+                    "nonlinear_materials_file": materials.name,
+                    "nonlinear_wall_fsam_tags": {"W1": {"tag": 1}},
+                    "nonlinear_parameters_reviewed": True,
+                }), encoding="utf-8")
             required = set(k for group in GROUPS for k in
                 __import__("components.model.readiness_dashboard",
                            fromlist=["REVIEW_KEYS"]).REVIEW_KEYS.get(group[0],()))
             draft = root / "OpenSees_Model_Readiness_Draft_model_V134.json"
-            draft.write_text(json.dumps(dict(
+            data = dict(
                 model_script=str(model),
                 model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),
                 approved_for_nltha=True, checks={k: True for k in required},
-                evidence={k: "Reviewed source file/path by engineer" for k in required})))
+                evidence={k: "Reviewed source file/path by engineer" for k in required})
+            record_binding(data, model)
+            draft.write_text(json.dumps(data))
             result = audit(root, model)
             self.assertTrue(result["approved_for_nltha"])
             self.assertEqual(result["readiness_level"],

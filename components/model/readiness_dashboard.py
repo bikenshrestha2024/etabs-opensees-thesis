@@ -155,6 +155,28 @@ def _load_draft(model):
             return None, "MODEL_PATH_MISMATCH"
         if data.get("model_script_sha256") != _sha256(model):
             return None, "MODEL_SHA_MISMATCH"
+        # The production NLTHA gate also binds config/material/FSAM inputs.
+        # A review claim cannot outlive changes to those same inputs merely
+        # because the builder Python script itself has not changed.
+        if data.get("approved_for_nltha") is True:
+            from components.model.readiness import (
+                BINDING_FIELDS, BindingUnreadableError,
+                current_binding, approval_binding_problems,
+            )
+            if any(key not in data for key in BINDING_FIELDS):
+                return None, "INPUT_BINDING_NOT_RECORDED"
+            try:
+                # Use the production binding hash calculation directly:
+                # binding_mismatches() intentionally filters unreadable
+                # inputs out of its mismatch-only result for run-gate use.
+                # A dashboard must instead report unreadable inputs clearly.
+                now = current_binding(model)
+                if any(data[key] != now[key] for key in BINDING_FIELDS):
+                    return None, "INPUT_BINDING_MISMATCH"
+                if approval_binding_problems(model):
+                    return None, "INPUT_BINDING_INCOMPLETE"
+            except BindingUnreadableError:
+                return None, "INPUT_BINDING_UNREADABLE"
         return data, "MODEL_BOUND_DRAFT_LOADED"
     except (OSError, ValueError, TypeError, KeyError):
         return None, "INVALID_DRAFT"

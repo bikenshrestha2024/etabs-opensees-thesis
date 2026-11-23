@@ -159,3 +159,63 @@ iteration. `SOURCE_CHECKED`, `NUMERICALLY_CONVERGED`,
 `ETABS_OPENSEES_MATCHED`, `EXPERIMENT_VALIDATED` and `CODE_ACCEPTED`
 must remain separate. This patch fixes recorder identification, not
 the outstanding numerical or nonlinear model-validation failures.
+
+
+## 2026-11-23 — NLTHA readiness dashboard versus production run gate
+
+**Baseline:** `main@1af9eb89501ddee5cb9153a80407fe4b41081d7a`.
+PR #165. The previous code-integration review covers the whole module
+graph, while this follow-up focuses on one verified model-input handoff
+defect. It does **not** claim a complete line-by-line semantic review
+of all active files.
+
+**Observed difference:** production NLTHA already fingerprints the
+model config JSON, external nonlinear material source and wall FSAM
+tags with `components.model.readiness` binding checks; the read-only
+dashboard checked only the saved model-script SHA before displaying a
+human sign-off claim. Synthetic tests demonstrate that config, material,
+FSAM and even removed material source could change without invalidating
+the dashboard's claimed approval, creating a confusing contradiction
+between the readiness screen and the actual run gate.
+
+**Correction:** the dashboard now reuses the existing source-binding
+and approval-prerequisite functions to accept only a current, fully
+bound signed draft. The original draft and original model remain
+unchanged; legacy or stale signatures stay inspectable as evidence,
+but cannot be promoted to current-model approved status. The UI's
+existing `draft_state` and `readiness_level` fields communicate the
+rejection; the background evidence scanner continues to function.
+
+**Red reproducibility:** full GitHub workflow at `c2a33ed8`: six
+intended failures, 1,788 other tests passed. Additional unreadable-input
+classification at `fc179f4d`: one intended failure, 1,794 other
+tests passed. Latest-head CI required before success claims.
+
+### All-module next priority (unchanged physical obligations)
+
+- **ETABS import/model:** bind the exact EDB/workbook/source sheet
+  digests and reconcile two 12m X walls, wall auto-edge/MPC
+  interpolation and native rigid-end offsets with assembled geometry.
+- **Gravity/P-Delta:** full 1.0D+1.0L, 32 actual foundation supports
+  and 44 separate mesh points; investigate the separately reported
+  768.045-kN max pointwise elastic reaction difference, not just the
+  global sum. Keep signed PDelta source cases separate from seismic mass.
+- **Modal/ESM/MRSM:** source-bound ULS/SLS stiffness, Vs30 and modal
+  response. MRSM raw nodal-mass generalized forces under opt-in
+  `STORY_LUMPED_NBC` still require native executed-mass operator checks.
+  ESM ULS high-rise reference-only if method eligibility is absent.
+- **LTHA/NLTHA:** preserve complete XY/YX pair SHA/dt/time-grid/units,
+  actual gravity-frozen state and independent full-duration records.
+  First-step X-wall nonfinite response and full M0–M6 matrix remain open.
+- **GUI/outputs:** preserve per-stage unique run manifests and data
+  ownership; verify every saved case writer + reader while keeping
+  heavy Excel/ZIP/3D outputs optional. The readiness dashboard already
+  uses a background worker and per-refresh SHA reuse for repeated
+  evidence files.
+- **Acceptance:** independent flags SOURCE_CHECKED,
+  NUMERICALLY_CONVERGED, ETABS_OPENSEES_MATCHED,
+  EXPERIMENT_VALIDATED, CODE_ACCEPTED remain NOT_VERIFIED without
+  native model-specific evidence.
+
+No physical solver, source model, load, mass, support, wall,
+period, code coefficient or user-owned export files were modified.
