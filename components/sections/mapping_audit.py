@@ -104,9 +104,9 @@ def summarize_assembly_warnings(warnings):
     remaining=[]
     for message in warnings:
         matched=re.fullmatch(
-            r"ETABS frame unique ID (\\S+) \\| OpenSees topology tag \\S+ "
-            r"\\| OpenSees elastic element tags \\[.*?\\]: assembled with source "
-            r"My/Mz end releases and zero torsional transfer\\.",
+            r"ETABS frame unique ID (\S+) \| OpenSees topology tag \S+ "
+            r"\| OpenSees elastic element tags \[.*?\]: assembled with source "
+            r"My/Mz end releases and zero torsional transfer\.",
             str(message))
         if matched:
             releases.append(matched.group(1))
