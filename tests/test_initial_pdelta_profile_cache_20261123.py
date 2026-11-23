@@ -63,6 +63,13 @@ class InitialPDeltaIdentityTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self._digest(inp,src,limit_state="UNKNOWN")
 
+    def test_initial_signed_check_basis_is_explicitly_separate_from_sls_modal_state(self):
+        # Initial signed IS16700 reference uses ULS by default; SLS modal
+        # environment must not silently alter the initial combination basis.
+        source=inspect.getsource(initial_pdelta.ensure_initial_checks)
+        self.assertIn("OPENSEES_INITIAL_PDELTA_LIMIT_STATE",source)
+        self.assertNotIn("os.environ.get('OPENSEES_LIMIT_STATE'",source)
+
     def test_signed_checks_use_built_32_reaction_tags_not_raw_76_source(self):
         original={str(x):[1]*6 for x in range(1,77)}
         actual=sorted(PROJECT_PRIMARY_32)
