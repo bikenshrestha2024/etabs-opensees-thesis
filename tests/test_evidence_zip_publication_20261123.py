@@ -60,4 +60,30 @@ class EvidenceZipTests(unittest.TestCase):
                 publish_case_evidence_zip(root,filename='unsafe.zip',files=[('inputs/link.json',link)])
 
 
+    def test_existing_modal_run_is_packaged_without_solver(self):
+        from components.modal.gui_and_reports import package_modal_evidence
+        with TemporaryDirectory() as td:
+            root=Path(td)
+            for name in ('00_INPUT_SOURCE','01_LOGS','02_RESULTS','03_EXCEL','04_FIGURES','07_EXPORT_ZIP'):
+                (root/name).mkdir()
+            (root/'00_INPUT_SOURCE'/'CASE_MANIFEST.json').write_text('{"solver_status":"COMPLETED_SOLVER_ONLY"}')
+            (root/'01_LOGS'/'NBC105_Modal_V111_run.log').write_text('EIGEN RETURN')
+            (root/'02_RESULTS'/'NBC105_Modal_V111.json').write_text('{"limit_state":"ULS","returned_modes":40}')
+            (root/'03_EXCEL'/'NBC105_Modal_V111.csv').write_text('mode,period\n1,2.4\n')
+            zipped=package_modal_evidence(root,'ULS',canonical=True)
+            self.assertEqual(zipped.parent,root/'07_EXPORT_ZIP')
+            with ZipFile(zipped) as z:
+                self.assertIn('02_RESULTS/NBC105_Modal_V111.json',z.namelist())
+                self.assertIn('01_LOGS/NBC105_Modal_V111_run.log',z.namelist())
+                self.assertIn('03_EXCEL/NBC105_Modal_V111.csv',z.namelist())
+                self.assertIsNone(z.testzip())
+
+    def test_modal_package_fails_without_result_json(self):
+        from components.modal.gui_and_reports import package_modal_evidence
+        with TemporaryDirectory() as td:
+            root=Path(td)
+            (root/'02_RESULTS').mkdir()
+            with self.assertRaises(FileNotFoundError):
+                package_modal_evidence(root,'ULS',canonical=True)
+
 if __name__ == '__main__': unittest.main()
