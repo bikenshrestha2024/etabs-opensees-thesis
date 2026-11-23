@@ -232,6 +232,31 @@ def analysis_output_folder(export_dir,limit_state='ULS', *, stage=None):
     raise ValueError('analysis_output_folder stage must be ESM or LEGACY')
 
 
+
+def esm_case_output_directory(export_dir, limit_state, selected_output=None):
+    """[REF docs/source/components/inputs/project_workbooks.py.md]
+    Route in-project ESM output choices to the exact model and state owner.
+
+    A selected 02_MODEL folder, generic 03_ESM root, an old ULS run or legacy
+    shared-results path must not silently receive newly generated ESM cases.
+    An explicit directory outside the export root is preserved unchanged.
+    Read-only resolver: no files are moved and no paths created.
+    """
+    from components.inputs.output_layout import export_root_for
+    source = Path(export_dir).expanduser()
+    if any(part.is_symlink() for part in (source, *source.parents)):
+        raise ValueError("Refusing linked ESM export root")
+    root = export_root_for(source)
+    candidate = root if selected_output is None or not str(selected_output).strip() else (
+        Path(selected_output).expanduser())
+    if any(part.is_symlink() for part in (candidate, *candidate.parents)):
+        raise ValueError("Refusing linked ESM output selection")
+    chosen = candidate.resolve()
+    if chosen == root or root in chosen.parents:
+        return analysis_output_folder(root, limit_state, stage="ESM").resolve()
+    return chosen
+
+
 def _wall_aw_from_lines(height_m, lines):
     height=float(height_m)
     if not math.isfinite(height) or height<=0:raise ValueError('Seismic height must be finite and positive.')
