@@ -49,3 +49,14 @@ This is an **application source-integrity fix only**. A matching SHA and six com
 - **MRSM saved evidence:** source/config/ULS/SLS identity, per-run canonical manifest and six numeric-case completeness; no changes to `run_model_spectrum()` mathematical calculations or solver algorithm.
 - **Red GitHub CI observation:** at `dc505037`, five new tests failed due to missing gate while 1,775 existing passed; additional CI results must be taken from **latest PR head**, not historic runs.
 - **Native status:** NO local EDB/Excel/Windows ETABS v23 analysis, full OpenSees solve, Vs30 test, wall-edge transfer comparison or nonlinear full-record acceptance executed in this review. **Not engineering-approved.**
+
+
+### GUI readback cost and verification (2026-11-23)
+
+MRSM saved numeric revalidation may open a large source results JSON. It is
+offloaded to a daemon worker; UI updates are marshalled through Tk `after`
+and dropped when the user edits inputs or begins a new case. This is a
+**responsiveness** correction, not a measured wall-clock speed-up of native
+MRSM computation. The saved-source fingerprint and native-reaction gates remain
+unchanged. Test-first failure at `6d4d17a4`: one new UI thread-placement
+regression failed, with 1780 prior tests passing. Verify final head separately.
