@@ -383,6 +383,24 @@ def apply_etabs_area_uniform_loads(ops, *, load_assignment_csv: str | Path,
             "analysis_ready": False}
 
 
+def model_area_directory(export_dir):
+    """Canonical model-owned area outputs; read-only and idempotent.
+
+    Accepts the export root, 02_MODEL, AREA_INTEGRATION or their ZIP
+    descendants. Never create nested 02_MODEL/02_MODEL or 07_EXPORT_ZIP
+    siblings. Existing historical ZIPs are not moved or deleted.
+    """
+    from components.inputs.output_layout import export_root_for
+    selected=Path(export_dir).expanduser()
+    if any(p.is_symlink() for p in (selected,*selected.parents)):
+        raise ValueError('Refusing symlinked model output selection')
+    root=export_root_for(selected)
+    target=root/'02_MODEL'/'AREA_INTEGRATION'
+    if any(p.is_symlink() for p in (root,root/'02_MODEL',target)):
+        raise ValueError('Refusing symlinked area output destination')
+    return target
+
+
 def export_area_integration_inventory(*, topology_json, area_assignment_csv,
                                       config_json, output_dir):
     """Source-only Excel + JSON inventory; does not mutate an OpenSees model.
@@ -409,7 +427,7 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
     cfg=json.loads(paths['config'].read_text(encoding='utf-8-sig'))
     checksums={name:hashlib.sha256(path.read_bytes()).hexdigest() for name,path in paths.items()}
     case=checksums['topology'][:10]
-    base=Path(output_dir).expanduser().resolve()/'02_MODEL'/'AREA_INTEGRATION'
+    base=model_area_directory(output_dir)
     excel=base/'excel';json_dir=base/'json'
     excel.mkdir(parents=True,exist_ok=True);json_dir.mkdir(parents=True,exist_ok=True)
     wb=Workbook();summary=wb.active;summary.title='Summary'
@@ -494,8 +512,7 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
     # unrelated model's archive folder. Do not include any other case files.
     from components.inputs.evidence_archive import publish_case_evidence_zip
     publish_case_evidence_zip(
-        output_dir, filename=f'Area_Integration_Inventory_{case}.zip',
-        category='AREA_INTEGRATION',
+        base, filename=f'Area_Integration_Inventory_{case}.zip',
         status='SOURCE_ONLY_TOPOLOGY_NOT_NATIVE_SOLVER_VALIDATED',
         files=[
             ('00_INPUT_SOURCE/OpenSees_Element_Connectivity.json',paths['topology']),
@@ -558,8 +575,10 @@ def package_area_instantiation_audit(*, topology_json, area_assignment_csv,
         sum(str(item.get('category','')).upper()=='SHEAR WALL' for item in areas)!=wall):
         raise ValueError('Area element categories disagree with recorded counts')
     source_sha=hashlib.sha256(report_path.read_bytes()).hexdigest()[:12]
+    base=model_area_directory(output_dir)
+    base.mkdir(parents=True,exist_ok=True)
     return publish_case_evidence_zip(
-        output_dir,category='AREA_INTEGRATION',
+        base,
         filename='Area_Instantiated_Elements_'+source_sha+'.zip',
         status='SAVED_ELEMENT_INSTANTIATION_REPORT_NOT_ANALYSIS_ACCEPTANCE',
         files=[
@@ -586,12 +605,11 @@ def area_output_directory(export_dir=None, *, topology_json=None, generated_outp
         export=Path(topology_json).expanduser().resolve().parent
     else:
         raise ValueError("Select an ETABS export directory or topology JSON")
-    if not export.is_dir():
-        raise FileNotFoundError(f"Selected ETABS export folder is absent: {export}")
-    target=export/"02_MODEL"/"AREA_INTEGRATION"
-    if target.is_symlink() or (export/"02_MODEL").is_symlink():
-        raise ValueError("Refusing symlinked area-integration output location")
-    return target if target.is_dir() else export
+    target=model_area_directory(export)
+    source_root=target.parent.parent
+    if not source_root.is_dir():
+        raise FileNotFoundError(f"Selected ETABS export folder is absent: {source_root}")
+    return target if target.is_dir() else source_root
 
 
 def default_area_integration_script_path(export_dir):
@@ -602,11 +620,9 @@ def default_area_integration_script_path(export_dir):
 
     [REF docs/source/components/sections/area_elements.py.md]
     """
-    root=Path(export_dir).expanduser().resolve()
-    target=root/"02_MODEL"/"AREA_INTEGRATION"/"PYTHON"/"OpenSees_Area_Integration_Call_V116.py"
-    if any(p.is_symlink() for p in (root,root/"02_MODEL",
-                                   root/"02_MODEL"/"AREA_INTEGRATION",
-                                   target.parent,target)):
+    area_root=model_area_directory(export_dir)
+    target=area_root/"PYTHON"/"OpenSees_Area_Integration_Call_V116.py"
+    if any(p.is_symlink() for p in (target.parent,target)):
         raise ValueError("Refusing linked area-integration Python output")
     return target
 
@@ -707,8 +723,7 @@ def launch_area_integration_gui(parent=None, export_dir=None):
                 topology_json=paths['topology'].get(),
                 area_assignment_csv=paths['audit'].get(),
                 config_json=paths['config'].get(),output_dir=destination)
-            from components.inputs.review_zip_paths import review_zip_directory
-            zipfile=review_zip_directory(destination)/'AREA_INTEGRATION'/(
+            zipfile=model_area_directory(destination)/'07_EXPORT_ZIP'/(
                 workbook.stem+'.zip')
             messagebox.showinfo('Source inventory + ZIP saved',
                 f'Excel: {workbook}\\nJSON: {manifest}\\nZIP: {zipfile}\\n\\nSOURCE REVIEW ONLY: no elements, loads or dynamic analysis executed.',parent=win)
