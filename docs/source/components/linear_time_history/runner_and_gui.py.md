@@ -27,3 +27,18 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 The GUI now runs a pure `parse_linear_gui_numeric_inputs` preflight **before constructing a run directory or calling `_read_inputs`**. It validates the current source's ULS/SLS against the user-selected state before parsing any number; the user screenshot selected SLS against a ULS source. Empty `Rayleigh period 1/2`, `T1 X/Y`, `Tn X/Y`, mode count or scale input is reported using the actual UI label instead of exposing `could not convert string to float: ''`. Validations reject NaN, infinities, nonpositive periods, damping above 5%, and identical Rayleigh calibration periods. A purely X-only diagnostic may leave Y T1/Tn blank; paired 3D cannot.
 
 No source-unverified Rayleigh/modal periods are invented. For ULS exported EDB select **ULS**; for SLS select a real SLS export with its own source-matched modal and Rayleigh inputs. A syntactically valid configuration is not evidence that NBC §8.1.1 P-Delta initialization, motions and native stiffness/mass equivalence are accepted.
+
+
+## 2026-11-23 — Saved-modal to Linear TH support/mass identity
+
+A saved modal reference can populate Linear TH damping and Tn fields only when
+**all** of its current model JSON SHA, ULS/SLS state, selected runtime physical
+support profile (`PHYSICAL_32`, `SOURCE_76`, `WALL_BASE_97`), seismic-mass
+operator policy (`SOURCE_DISTRIBUTED` or `STORY_LUMPED_NBC`), and accepted
+numerical implementation fingerprint are compatible. Missing legacy support or
+mass-policy metadata is a rejected starting reference, not a presumed match.
+
+Changing the Linear TH GUI's support or mass choice queues a refresh, clearing
+old damping/Tn fields until exact compatible modal evidence is found. No native
+ETABS/OpenSees equivalence or nonlinear material validation is inferred.
+Regression: `tests/test_modal_history_policy_handoff.py`.
