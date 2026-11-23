@@ -139,9 +139,6 @@ def workflow_evidence_status(folder):
                              "Candidate: "+str(path)+" | This is review/export evidence, "
                              "not a solver run. Select completed stage RUNS evidence."))
             continue
-        run=next((parent for parent in path.parents
-                  if parent.parent.name=="RUNS" or (
-                      len(parent.parents)>2 and parent.parents[2].name=="RUNS")),None)
         # Recognize only canonical <stage>/RUNS/<state>/<case>/<run-id>/02_RESULTS/file
         try:
             relative=path.relative_to(stage_dir)
