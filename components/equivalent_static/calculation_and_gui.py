@@ -588,9 +588,41 @@ def verify_generated_esm_result(script_path, export_dir):
         if not all(math.isfinite(float(row[k])) for k in (
                  "height_m","U_elastic_m","U_design_m","design_drift_ratio")):
             raise ValueError("ESM result has nonfinite height/displacement/drift")
+    # A newly instrumented runner must produce source-bound timing evidence.
+    # Legacy saved runners remain readable but cannot claim measured speedups.
+    requires_timing = "NBC105_ESM_Case_Timings_" in runner.read_text(encoding="utf-8-sig")
+    timing_status = "LEGACY_NO_PERFORMANCE_TIMING"
+    phase_times = {}
+    if requires_timing:
+        timing_path = required("NBC105_ESM_Case_Timings_"+case+".json")
+        timing = json.loads(timing_path.read_text(encoding="utf-8-sig"))
+        if (not isinstance(timing,dict)
+                or timing.get("schema")!="esm-case-timing-v1"
+                or timing.get("response_case")!=case
+                or timing.get("limit_state")!=state
+                or timing.get("axis")!=axis
+                or timing.get("model_sha256")!=digest
+                or timing.get("support_case")!=selected_profile
+                or (calculation.get("seismic_mass_policy") is not None and
+                    timing.get("seismic_mass_policy")!=calculation["seismic_mass_policy"])):
+            raise ValueError("ESM timing evidence differs from current source, support, mass or case")
+        keys=("initial_signed_checks_s","model_build_gravity_s",
+              "lateral_solver_s","response_export_s","total_elapsed_s")
+        for key in keys:
+            try:
+                v=float(timing[key])
+            except (KeyError,TypeError,ValueError) as exc:
+                raise ValueError("ESM timing evidence missing or invalid: "+key) from exc
+            if not math.isfinite(v) or v<0:
+                raise ValueError("ESM timing evidence nonfinite/negative: "+key)
+            phase_times[key]=v
+        if sum(phase_times[x] for x in keys[:-1])>phase_times["total_elapsed_s"]+0.1:
+            raise ValueError("ESM timing phases exceed total elapsed time")
+        timing_status="SOURCE_MATCHED_PERFORMANCE_EVIDENCE"
     return {"status":"COMPLETE_SAVED_RESPONSE_ONLY",
             "case":case,"state":state,"axis":axis,"model_sha256":digest,
             "stories":len(responses),"support_count":len(supports),
+            "timing_status":timing_status,"timings":phase_times,
             "engineering_acceptance":"NOT_VERIFIED"}
 
 
