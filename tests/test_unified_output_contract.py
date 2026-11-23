@@ -54,6 +54,23 @@ class UnifiedOutputContractTests(unittest.TestCase):
                 {root/"04_MODAL",root/"03_ESM"})
             self.assertFalse((root/"OpenSees_Analysis_Results").exists())
 
+    def test_every_stage_excludes_all_other_stage_selected_folders(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            selected={
+                stage:root/folder/"REVIEW_SNAPSHOTS"/"sample"
+                for stage,folder in STAGE_FOLDERS.items()
+            }
+            for path in selected.values():
+                path.mkdir(parents=True)
+            for wanted,wanted_folder in STAGE_FOLDERS.items():
+                for passed,selected_path in selected.items():
+                    with self.subTest(wanted=wanted,selected_stage=passed):
+                        roots=result_roots(selected_path,stages=(wanted,),
+                                           include_legacy=False)
+                        self.assertEqual(roots,(root/wanted_folder,))
+                        self.assertTrue(all(wanted_folder in str(p) for p in roots))
+
     def test_unstructured_export_root_does_not_invent_modal_results(self):
         with tempfile.TemporaryDirectory() as td:
             external=Path(td)/"scratch"
