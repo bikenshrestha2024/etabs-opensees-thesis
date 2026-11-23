@@ -1,6 +1,6 @@
 # Structural model and physical load assembly
 
-**Active owner:** `components/model/` · **Current Python modules:** 25 · **Status:** module navigation only; engineering acceptance requires independent evidence.
+**Active owner:** `components/model/` · **Current Python modules:** 26 · **Status:** module navigation only; engineering acceptance requires independent evidence.
 
 ## Responsibilities and interfaces
 
@@ -30,6 +30,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [nonlinear_preflight.py](nonlinear_preflight.py)
 - [physical_weight_modifiers.py](physical_weight_modifiers.py)
 - [readiness.py](readiness.py)
+- [readiness_available_values.py](readiness_available_values.py)
 - [readiness_dashboard.py](readiness_dashboard.py)
 - [readiness_dashboard_gui.py](readiness_dashboard_gui.py)
 - [readiness_gui.py](readiness_gui.py)

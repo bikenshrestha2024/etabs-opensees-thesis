@@ -40,6 +40,15 @@ def inventory(folder):
         d=json.loads(data.read_text(encoding='utf-8-sig'));facts['model_counts']={k:len(d.get(k,[])) for k in ['nodes','frames','shells','diaphragms']};facts['gravity_by_pattern_kN']=d.get('gravity_by_pattern_kN');facts['total_downward_load_kN']=d.get('total_downward_load_kN')
     from OpenSees_Readiness_GUI_V134 import available_evidence
     facts['available_evidence']=available_evidence(folder/'OpenSees_Complete_Nonlinear_Model.py');facts['how_to_obtain_missing_values']=GUIDE
+    # Reuse project inputs and cited PEER values directly, but do not infer a
+    # review check, auto-approve NLTHA, or alter the configured material file.
+    builder=folder/'OpenSees_Complete_Nonlinear_Model.py'
+    if builder.is_file():
+        from components.model.readiness_available_values import collect_available_project_values
+        try:
+            facts['direct_available_values']=collect_available_project_values(builder)
+        except (OSError,ValueError,KeyError,TypeError) as exc:
+            facts['direct_available_values_error']=str(exc)
     return facts
 
 def workflow_status(folder):
