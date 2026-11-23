@@ -610,22 +610,51 @@ def launch(parent,folder):
                 operation_bar.start(12)
             else:operation_bar.stop()
         win.after(0,render)
-    # A saved process ledger is not a numeric-completeness certificate.
-    # Only display same-source, same-state, same-input numeric completion.
+    # Reading a large saved MRSM result must not block Tk startup.
+    # Only a same-source, same-state, same-input current numeric run may
+    # display as verified; fields changed while checking invalidate it.
     import os
     selected_gui_fields={k:v.get() for k,v in fields.items()}
     selected_gui_fields['gravity_profile']=os.environ.get(
         'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
-    prior=review_saved_mrsm_batch(output,folder,selected_gui_fields)
-    if prior['status']=='SAVED_NUMERICALLY_COMPLETE_SOURCE_MATCHED':
-        operation_status.set(
-            'SAVED NUMERIC REVIEW | '+str(prior['numerical_cases_verified'])+
-            '/6 cases revalidated; native ETABS equivalence remains open')
-    elif prior['status']!='NOT_RUN':
-        operation_status.set(
-            'REVIEW | '+prior['status']+' | previously reported '+
-            str(prior['reported_completed'])+
-            ' process completions; current numerical case acceptance is pending')
+    previous_status=output/'MRSM_Batch_Status_V151.json'
+    check_label='CHECKING SAVED RUN | validating selected source and six numeric cases'
+    def invalidate_saved_review(*unused):
+        text=operation_status.get()
+        if text.startswith(('CHECKING SAVED RUN','SAVED NUMERIC REVIEW')):
+            operation_status.set(
+                'REVIEW | MRSM inputs changed; reopen or rerun for current selection')
+    for selected in fields.values():
+        selected.trace_add('write',invalidate_saved_review)
+    if previous_status.is_file() or previous_status.is_symlink():
+        operation_status.set(check_label)
+        def inspect_previous_saved():
+            prior=review_saved_mrsm_batch(output,folder,selected_gui_fields)
+            def render_prior():
+                if operation_status.get()!=check_label:
+                    # The user may have edited inputs or started a new run.
+                    return
+                current={k:v.get() for k,v in fields.items()}
+                current['gravity_profile']=os.environ.get(
+                    'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+                if current!=selected_gui_fields:
+                    operation_status.set(
+                        'REVIEW | MRSM source inputs changed during saved check')
+                elif prior['status']=='SAVED_NUMERICALLY_COMPLETE_SOURCE_MATCHED':
+                    operation_status.set(
+                        'SAVED NUMERIC REVIEW | '+
+                        str(prior['numerical_cases_verified'])+
+                        '/6 cases source-rechecked; ETABS parity still open')
+                else:
+                    operation_status.set(
+                        'REVIEW | '+prior['status']+
+                        ' | previously reported '+str(prior['reported_completed'])+
+                        ' process completions; current numeric acceptance pending')
+            try:
+                win.after(0,render_prior)
+            except (tk.TclError,RuntimeError):
+                pass
+        threading.Thread(target=inspect_previous_saved,daemon=True).start()
     log_value=tk.StringVar()
     from OpenSees_Research_UI_V123 import copyable_log
     from components.shared.case_status import panel,CaseLedger
