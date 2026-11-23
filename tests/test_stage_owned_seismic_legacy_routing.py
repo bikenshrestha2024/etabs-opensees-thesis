@@ -50,3 +50,12 @@ def test_explicit_external_output_is_preserved(tmp_path):
     export=tmp_path/"export";export.mkdir()
     external=tmp_path/"external";external.mkdir()
     assert stage_review_owner(export,external,"ESM")==external
+
+
+def test_stage_review_owner_contract_all_active_modules(tmp_path):
+    from components.inputs.output_layout import STAGE_FOLDERS
+    export=tmp_path/"export"
+    legacy=export/"OpenSees_Analysis_Results"/"case"
+    legacy.mkdir(parents=True)
+    for stage,folder in STAGE_FOLDERS.items():
+        assert stage_review_owner(export,legacy,stage)==export/folder
