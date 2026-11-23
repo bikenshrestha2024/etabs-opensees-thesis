@@ -1,0 +1,12 @@
+# 2026-11-23 — actual OpenSees solver support reaction tag integration
+
+- **Editor:** OpenAI ChatGPT GPT-6 using connected GitHub and installed Superpowers skill guidance. Actual model user: not inferred from Git commit metadata.
+- **Base Git:** `main@db6ad42fba354299348967d96c78cf813f29e207`. **Branch:** `fix/shared-solver-support-reaction-tags-20261123`. **PR:** #164.
+- **Read-first contracts:** `AGENTS.md`, `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md`, `.agents/skills/etabs-opensees-read-first/SKILL.md`, CORE_RULES, ENGINEERING_GATES, MODULE_BOUNDARIES, program index, model/MRSM/NLTHA source guides, existing all-module review.
+- **Root cause verified at source:** `MRSM run_model_spectrum` derived support reactions from raw `data['supports']` despite successful runtime check of `PHYSICAL_32`, while NLTHA already extracted actual `gravity_base_support_tags` from the built model report.
+- **Changed source:** `components/model/support_case_contract.py` (single actual solver reaction tag owner), `components/nonlinear_time_history/source_model_handoff.py` (backwards-compatible delegation), `components/response_spectrum/model_analysis.py` (verified builder support reaction indices); synthetic `tests/test_shared_solver_support_recovery_20261123.py`; relevant module guides and this audit.
+- **RED CI:** headless run `45165435684`, base regression commit `76333982b4f16e21ecf2afad063f37ebd456228f`: 4 intended failures and 1783 existing tests passed, 5 skipped.
+- **GREEN evidence:** use final PR #164 head CI logs, not earlier commits, for full-suite PASS. No native ETABS/OpenSees runs included.
+- **Unchanged:** 32 actual foundations plus 44 wall-mesh points; 76/97 diagnostic profile options; original source data; 2×12m X walls; 3×6m Y walls; full 1.0D+1.0L gravity; NBC §5.2 seismic weight; geometry, stiffness, mass, materials, floors, periods, ground motions, solver algorithms and derived spectrum formulae.
+- **Native EDB/workbook/result SHA:** unavailable here. **True reactions/ETABS parity:** NOT VERIFIED. Current best source-matched elastic gravity residual max |ΔRz| = 768.045 kN remains unresolved, as do native wall edge/MPC transfer, frame rigid-end offsets, modal generalized masses and first-step X-wall NLTHA failure. No numerical convergence or design certification claimed.
+- **No private files:** no EDB, native XLSX, motion time-series or personal paths committed.
