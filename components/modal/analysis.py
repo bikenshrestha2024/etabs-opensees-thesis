@@ -31,9 +31,10 @@ def modal_model_basis_report(model_data, config, limit_state, period_inputs=None
 
     [REF engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md]
     [REF NBC105-2025 §7.3 printed p.40; §5.1 printed p.28]
-    The project has 32 physical foundation supports plus 44 additional
-    shear-wall mesh points in its 76-ID source export. Treat the latter as
-    source/analytical mesh DOF evidence, NEVER extra physical foundations.
+    The selected project has 32 user-confirmed physical foundation supports.
+    Other mapped source IDs may be shear-wall mesh/constraint-transfer points;
+    their number varies with the diagnostic source and must be computed, not
+    hard-coded as 44. They are NEVER extra physical foundations.
     This does not modify, remove or create a solver support or MPC relation.
     """
     from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
@@ -78,14 +79,15 @@ def modal_model_basis_report(model_data, config, limit_state, period_inputs=None
         warnings.append("No assembled source support mapping available; modal physical restraint equivalence NOT VERIFIED.")
     elif source_n!=32 or extra or missing:
         warnings.append(
-            str(source_n)+" mapped exported restraint IDs; intended 32 physical foundation supports"
-            +" plus 44 shear-wall mesh points (current model only). "
-            +"The "+str(len(extra))+" nonprimary source IDs are NOT independent physical foundations; "
-            +"native shell-edge/MPC and runtime constraints require validation.")
+            str(source_n)+" mapped exported restraint IDs; expected 32 physical foundation tags; "
+            +str(len(expected-source_tags))+" expected tags missing, "
+            +str(len(extra))+" nonprimary mapped IDs. These additional source IDs are NOT "
+            +"independent physical foundations; native shell-edge/MPC and runtime "
+            +"constraints require validation.")
     if missing:
         warnings.append("User-confirmed physical tags missing in this source: "+", ".join(missing))
     if stiffness=="LEGACY_GROSS_SHELL":
-        warnings.append("LEGACY_GROSS_SHELL: the ETABS-elastic 768.045-kN rebuilt conversion is not this stiffness model.")
+        warnings.append("LEGACY_GROSS_SHELL: source-consistent ETABS elastic stiffness and model equivalence have not been demonstrated for this selected case.")
     if any(v is not None for v in ray_inputs.values()):
         warnings.append("Rayleigh periods were provided via GUI inputs; this modal eigen run did NOT compute NBC §5.1.1 Rayleigh work sums.")
     return {
