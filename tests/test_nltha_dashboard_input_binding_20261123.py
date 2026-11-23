@@ -8,6 +8,7 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from components.model.readiness import BINDING_FIELDS, record_binding
 from components.model.readiness_dashboard import audit, REVIEW_KEYS
@@ -100,6 +101,16 @@ class NLTHADashboardBindingTests(unittest.TestCase):
             material.unlink()
             report=audit(root,model)
             self.assertEqual(report["draft_state"],"INPUT_BINDING_MISMATCH")
+            self.assertFalse(report["approved_for_nltha"])
+
+    def test_unreadable_bound_source_reports_specific_read_error(self):
+        from components.model.readiness import BindingUnreadableError
+        with tempfile.TemporaryDirectory() as td:
+            root,model,material,config,draft=signed_synthetic_project(td)
+            with patch("components.model.readiness._file_sha256",
+                       side_effect=BindingUnreadableError("synthetic locked file")):
+                report=audit(root,model)
+            self.assertEqual(report["draft_state"],"INPUT_BINDING_UNREADABLE")
             self.assertFalse(report["approved_for_nltha"])
 
     def test_missing_material_at_signoff_is_not_approvable_even_with_none_hash(self):
