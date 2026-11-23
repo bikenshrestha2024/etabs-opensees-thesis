@@ -1045,7 +1045,7 @@ class ESMGui:
         ttk.Button(runbox,text="Browse…",command=self._browse_python).grid(row=1,column=2,padx=4)
         runbox.columnconfigure(1,weight=1)
         ttk.Label(runbox,text="The runner starts a fresh Python process and builds the model. Before NBC ESM it requires the model builder to attest that both IS 16700:2023 §7.2(d) initial P-Delta cases converged and were reviewed (1.2DL + 0.5IL ± 1.5EL/WL). It then freezes the reviewed gravity state, checks diaphragm masters, applies NBC floor forces/torsion, and reports reactions, drift and storey stiffness. This prerequisite does not replace NBC §3.6 combinations; a partial topology exporter is not a complete analysis model.",foreground="#8a341c",wraplength=1100).grid(row=2,column=0,columnspan=3,sticky="w",padx=5,pady=4)
-        out=ttk.LabelFrame(top,text="6. Output folder (model/state/floor-specific default under OpenSees_Analysis_Results)",padding=8); out.pack(fill="x",pady=5)
+        out=ttk.LabelFrame(top,text="6. ESM case output (default: 03_ESM/RUNS/<state>/<case>; existing legacy folders remain readable)",padding=8); out.pack(fill="x",pady=5)
         ttk.Entry(out,textvariable=self.outdir).pack(side="left",fill="x",expand=True,padx=4); ttk.Button(out,text="Browse…",command=self._browse_out).pack(side="left",padx=4)
         from OpenSees_Research_UI_V123 import copyable_log
         self.run_log=copyable_log(top,self.status)
