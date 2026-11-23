@@ -1677,11 +1677,24 @@ def autoselect_inputs(gui, export_dir, role):
         var=getattr(gui,attr,None)
         if var is not None: var.set(str(output_folder))
     for attr,key in (('stories','story_master_csv'),('readiness','readiness_manifest')):
-        var=getattr(gui,attr,None); target=folder/manifest.get(key,'')
-        draft=folder/('OpenSees_Model_Readiness_Draft_'+model.stem+'_V134.json')
-        if attr=='readiness' and draft.is_file():target=draft
-        if attr=='readiness' and (folder/'OpenSees_Model_Readiness_V116.json').is_file():target=folder/'OpenSees_Model_Readiness_V116.json'
-        if var is not None and target.is_file(): var.set(str(target))
+        var=getattr(gui,attr,None)
+        if var is None:
+            continue
+        if attr=='readiness':
+            # An unbound V116 TEMPLATE must never shadow the model-bound V134
+            # draft. Also clear a previous model's readiness selection.
+            from components.model.readiness import select_model_bound_readiness
+            draft=folder/('OpenSees_Model_Readiness_Draft_'+model.stem+'_V134.json')
+            manifest_name=manifest.get(key)
+            from_manifest=folder/manifest_name if manifest_name else None
+            candidate=select_model_bound_readiness(model,(
+                draft,from_manifest,folder/'OpenSees_Model_Readiness_V116.json'))
+            var.set(str(candidate) if candidate else '')
+        else:
+            name=manifest.get(key)
+            target=folder/name if name else None
+            if target is not None and target.is_file():
+                var.set(str(target))
     unit_var=getattr(gui,'model_length_unit',None)
     if unit_var is not None:unit_var.set('m')  # These manifest entries are generated in kN-m-s.
     path_var=getattr(gui,'path',None)

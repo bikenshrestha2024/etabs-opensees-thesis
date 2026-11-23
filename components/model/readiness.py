@@ -14,7 +14,7 @@ import csv
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 # Source registry used by the project workflow; the full annotated bibliography
 # and learning-resource notes are in REFERENCES_AND_LEARNING_RESOURCES_V116.md.
@@ -536,8 +536,7 @@ def diagnose_nonlinear_readiness(config: Dict[str, Any]) -> Dict[str, Any]:
             "model_script_missing", "No nonlinear model script is selected.",
             "Select the exact OpenSees_Complete_Nonlinear_Model.py to run.")]}
     model = Path(model_value).expanduser().resolve()
-    path = Path(config.get("model_readiness_json") or
-                model.with_name("OpenSees_Model_Readiness_V116.json")).expanduser().resolve()
+    path = readiness_manifest_for_run(model,config.get("model_readiness_json"))
     data: Optional[Dict[str, Any]] = None
     bound_ok = False
     if not path.is_file():
@@ -717,6 +716,67 @@ def material_prerequisite_notice(diagnosis: Dict[str, Any]) -> str:
              "does not raise on these for an unapproved or legacy manifest, so resolve them before relying on a gate pass):"]
     lines += [f"  - [{b['code']}] {b['message']}" for b in items]
     return "\n".join(lines)
+
+
+
+def select_model_bound_readiness(model_script: Union[str, Path],
+                                 candidates: Iterable[Union[str, Path]]) -> Optional[Path]:
+    """[REF docs/NLTHA_READINESS_WORKFLOW.md section 3 (selected model binding)]
+
+    Choose a saved, exact-model + SHA-bound readiness file for *display* only.
+
+    An unbound V116 template, wrong-model file, stale draft or unreadable JSON
+    can never win merely because its filename happens to exist. The caller
+    supplies the priority order (normally model-specific V134 draft first).
+    Selection does not create files, change review flags, or grant approval.
+    """
+    import hashlib
+    model = Path(model_script).expanduser().resolve()
+    if not model.is_file():
+        return None
+    model_digest = hashlib.sha256(model.read_bytes()).hexdigest()
+    for raw in candidates:
+        if not raw:
+            continue
+        path = Path(raw).expanduser().resolve()
+        if not path.is_file() or path.suffix.lower() != ".json":
+            continue
+        try:
+            obj = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError, UnicodeError):
+            continue
+        if not isinstance(obj, dict):
+            continue
+        recorded = obj.get("model_script")
+        if not isinstance(recorded, str) or not recorded.strip():
+            continue
+        resolved = Path(recorded).expanduser()
+        if not resolved.is_absolute():
+            resolved = path.parent / resolved
+        if (resolved.resolve() == model
+                and obj.get("model_script_sha256") == model_digest):
+            return path
+    return None
+
+
+
+def readiness_manifest_for_run(model_script: Union[str, Path],
+                               explicit_path: Union[str, Path, None] = None) -> Path:
+    """[REF docs/NLTHA_READINESS_WORKFLOW.md section 3 (selected model binding)]
+    Find a bound draft for an implicit run; never replace an explicit selection.
+
+    A caller-provided file (including a bad or unbound template) is returned
+    unchanged for the normal fail-closed gate to diagnose. Only when no file
+    was specified may a SHA/path-bound model-specific V134 draft win over the
+    legacy V116 path. This function never creates or edits approvals.
+    """
+    model=Path(model_script).expanduser().resolve()
+    if explicit_path:
+        return Path(explicit_path).expanduser().resolve()
+    draft=model.with_name('OpenSees_Model_Readiness_Draft_'+model.stem+'_V134.json')
+    legacy=model.with_name('OpenSees_Model_Readiness_V116.json')
+    return select_model_bound_readiness(model,(draft,legacy)) or legacy
+
 
 
 def bind_readiness_draft(template_path: Union[str, Path], model_script: Union[str, Path],

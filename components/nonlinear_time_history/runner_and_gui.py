@@ -68,8 +68,8 @@ from OpenSees_Input_Records_V130 import (
 def _require_nonlinear_readiness(config):
     """Require an explicit, model-specific checklist before nonlinear NLTHA."""
     model = Path(config["model_script"]).expanduser().resolve()
-    path = Path(config.get("model_readiness_json") or
-                model.with_name("OpenSees_Model_Readiness_V116.json")).expanduser().resolve()
+    from components.model.readiness import readiness_manifest_for_run
+    path = readiness_manifest_for_run(model,config.get("model_readiness_json"))
     if not path.is_file():
         raise FileNotFoundError(f"Missing NLTHA readiness manifest: {path}. Complete OpenSees_Model_Readiness_Template_V116.json beside the model script.")
     data = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -887,6 +887,7 @@ class NonlinearTimeHistoryGUI:
         # ULS/SLS changes into one deferred source-specific period refresh.
         # Modal elastic periods remain references, not NLTHA stiffness approval.
         self._period_refresh_queued = False
+        self._readiness_selection_model = None
         self.model.trace_add('write',lambda *_:self._queue_period_refresh())
         self.ls.trace_add('write',lambda *_:self._queue_period_refresh())
 
@@ -898,7 +899,31 @@ class NonlinearTimeHistoryGUI:
 
     def _apply_period_refresh(self):
         self._period_refresh_queued = False
+        self._sync_readiness_for_selected_model()
         self._refresh_known()
+
+    def _sync_readiness_for_selected_model(self):
+        """[REF docs/source/components/nonlinear_time_history/runner_and_gui.py.md]
+        On builder changes, never retain an unrelated approved/template manifest.
+        Do not overwrite any human-saved readiness evidence or signoff.
+        """
+        model=Path(self.model.get()).expanduser() if self.model.get() else None
+        selected=str(model.resolve()) if model is not None and model.is_file() else ''
+        if selected == self._readiness_selection_model:
+            return
+        self._readiness_selection_model=selected
+        if not selected:
+            self.readiness.set('')
+            return
+        from components.model.readiness import select_model_bound_readiness
+        draft=model.with_name('OpenSees_Model_Readiness_Draft_'+model.stem+'_V134.json')
+        reviewed=select_model_bound_readiness(model,(
+            draft,model.with_name('OpenSees_Model_Readiness_V116.json')))
+        self.readiness.set(str(reviewed) if reviewed else '')
+        if hasattr(self,'log'):
+            self.log.insert('end','[NLTHA READINESS SOURCE] '+(
+                str(reviewed) if reviewed else 'No exact-model and SHA-bound readiness draft found; '
+                'use Prepare / inspect readiness checklist.')+'\\n')
 
     def _refresh_known(self):
         """[REF components/inputs/analysis_autofill.py] Recompute source-bound periods."""

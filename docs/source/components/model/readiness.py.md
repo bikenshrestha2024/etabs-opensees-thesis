@@ -21,3 +21,7 @@ Relevant register IDs: R01 R02 R10 R12. Consult [research reference register](..
 Review source syntax and imports, create a focused unit test, then run an isolated OpenSeesPy component or ETABS-comparison benchmark where applicable. For full-building NLTHA require all [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)
+
+## 2026-11-23 — exact-source selection of a readiness draft
+
+`select_model_bound_readiness(model_script, candidates)` chooses the first valid existing JSON file in caller priority order with an exact resolved nonlinear-builder path and matching `model_script_sha256`. A generic V116 template, wrong project, changed Python source, unreadable document and absent file are not selectable. It does **not** create a replacement, reset a checklist, validate engineering approval, or modify source materials. The main model auto-selector chooses the bound V134 draft before any legacy V116 manifest. Regression: `tests/test_readiness_model_selection_20261123.py`.
