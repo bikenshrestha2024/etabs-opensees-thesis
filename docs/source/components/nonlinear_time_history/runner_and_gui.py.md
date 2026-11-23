@@ -37,3 +37,7 @@ Original upstream reference: `nirajkyadav/Framework_for_Seismic_Assessment_of_RC
 When `diagnostic_first_step_wall=true`, `record_accepted` saves the first focused element/node snapshot and chronology report before writing any accepted history row. `require_accepted_focused_step` rejects nonfinite wall responses or missing requested solver tags, rather than recording an apparent success. For diagnostic-only watched tag `110280`, use a **matching live** `OpenSees_Complete_Element_Map_V118.json`; a historical X-wall tag is not assumed valid across versions.
 
 This is a headless software regression and an **incomplete physical verification**. Require native zero, X, Y, XY, YX first-step controls, independent wall material and coupling-beam patch tests, and full-duration XY/YX runs before claiming solved M0–M6 or NBC §9.3 compliance.
+
+## 2026-11-23 — builder-change readiness selection safety
+
+The NLTHA GUI now synchronizes the readiness selection when the selected nonlinear builder changes. It verifies the candidate V134 draft or legacy V116 manifest against the new model path and script SHA, clears the former model's selected file if neither matches and logs the selected source. An unchanged builder does not disturb a manually chosen readiness file. The source-bound readiness gate remains fail-closed; human review flags and the original source model are not changed. Headless synthetic coverage: `tests/test_readiness_model_selection_20261123.py`.
