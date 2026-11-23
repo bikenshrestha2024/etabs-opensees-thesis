@@ -300,6 +300,7 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "# Freeze the verified gravity stage before running this lateral case. This file does not create slabs/walls/elements/materials.",
         "import json, openseespy.opensees as ops",
         "import os, csv, time, traceback, sys",
+        "_esm_case_started = time.perf_counter()",
         "os.environ['OPENSEES_SUPPORT_CASE'] = "+repr(support_case),
         "os.environ['OPENSEES_SEISMIC_MASS_POLICY'] = "+repr(mass_policy),
         "OUTPUT_DIR = "+repr(str(out.resolve())),
@@ -329,9 +330,13 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "MODEL_WORKDIR=os.path.dirname(MODEL_BUILDER_SCRIPT)",
         "os.chdir(MODEL_WORKDIR)",
         "from OpenSees_Initial_PDelta_V124 import ensure_initial_checks",
+        "_esm_pdelta_started = time.perf_counter()",
         "ensure_initial_checks(MODEL_WORKDIR)",
+        "_esm_pdelta_elapsed = time.perf_counter() - _esm_pdelta_started",
         "os.environ['OPENSEES_LIMIT_STATE'] = "+repr(result["limit_state"]),
+        "_esm_build_started = time.perf_counter()",
         "_MODEL_NAMESPACE = runpy.run_path(MODEL_BUILDER_SCRIPT, run_name='__main__')",
+        "_esm_build_elapsed = time.perf_counter() - _esm_build_started",
         "from components.model.support_case_contract import require_runtime_support_case",
         "SUPPORT_CASE_VERIFICATION = require_runtime_support_case(os.environ['OPENSEES_SUPPORT_CASE'], _MODEL_NAMESPACE.get('MODEL_REPORT'))",
         "print('[SELECTED SUPPORT CASE VERIFIED]', SUPPORT_CASE_VERIFICATION,flush=True)",
@@ -375,6 +380,7 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "ops.algorithm('Newton')",
         "ops.integrator('LoadControl', 0.1)",
         "ops.analysis('Static')",
+        "_esm_lateral_started = time.perf_counter()",
         "ESM_BASE_CURVE=[]",
         "def _record_esm_state():",
         "    ops.reactions()",
@@ -403,6 +409,8 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "    raise RuntimeError(f'NBC ESM static analysis did not converge; OpenSees return code={ok}. Review model, sections, gravity state, constraints, and solver log.')",
         "if abs(float(ops.getLoadFactor(ESM_LOAD_PATTERN_TAG)) - 1.0) > 1.0e-8:",
         "    raise RuntimeError('ESM did not reach the intended load factor 1.0; response output suppressed.')",
+        "_esm_lateral_elapsed = time.perf_counter() - _esm_lateral_started",
+        "_esm_output_started = time.perf_counter()",
         "ops.reactions()",
         "ESM_RESPONSE = []",
         "KD = "+repr(result["deflection_scale_factor_kd"]),
@@ -480,13 +488,16 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "    wr=wb.create_sheet('OpenSees Response'); wr.append(list(ESM_RESPONSE[0]) if ESM_RESPONSE else []); [wr.append([r.get(k) for k in ESM_RESPONSE[0]]) for r in ESM_RESPONSE]",
         "    wb.save(os.path.join(OUTPUT_DIR,'NBC105_ESM_OpenSees_Response_'+ESM_CASE+'.xlsx'))",
         "except ImportError: print('ESM response workbook deferred or openpyxl unavailable.')",
-        "_processing_timer.finish('completed')",
         "print('OpenSees ESM elapsed (s):', round(time.perf_counter()-_run_started,3))",
         "print('Run log:', LOG_PATH)",
         "print('NBC ESM case completed:', ESM_CASE, '| stories:', len(ESM_RESPONSE), '| design V (kN):', "+repr(result["base_shear_kN"])+")",
         "print('Base reaction (kN):', BASE_REACTION_KN, '| applied shear (kN):', APPLIED_BASE_SHEAR_KN, '| equilibrium error (%):', BASE_SHEAR_ERROR_PCT)",
         "from OpenSees_Response_Checks_V132 import export_static_response",
         "export_static_response(ops,MODEL_BUILDER_SCRIPT,OUTPUT_DIR,ESM_RESPONSE,LIMIT_STATE,ALL_GRAVITY_U,(R_MU if LIMIT_STATE=='ULS' else 1.)*KD)",
+        "ESM_CASE_TIMING={'schema':'esm-case-timing-v1','response_case':ESM_CASE,'limit_state':LIMIT_STATE,'axis':ESM_DIRECTION,'model_sha256':_digest,'support_case':os.environ['OPENSEES_SUPPORT_CASE'],'seismic_mass_policy':os.environ['OPENSEES_SEISMIC_MASS_POLICY'],'initial_signed_checks_s':round(_esm_pdelta_elapsed,3),'model_build_gravity_s':round(_esm_build_elapsed,3),'lateral_solver_s':round(_esm_lateral_elapsed,3),'response_export_s':round(time.perf_counter()-_esm_output_started,3),'total_elapsed_s':round(time.perf_counter()-_esm_case_started,3),'engineering_acceptance':'NOT_VERIFIED'}",
+        "with open(os.path.join(OUTPUT_DIR,'NBC105_ESM_Case_Timings_'+ESM_CASE+'.json'),'w',encoding='utf-8') as stream: json.dump(ESM_CASE_TIMING,stream,indent=2)",
+        "print('[ESM CASE TIMING]',json.dumps(ESM_CASE_TIMING),flush=True)",
+        "_processing_timer.finish('completed')",
         "print('Master-node displacement/drift results saved under', OUTPUT_DIR)",
         "# Interpret displacements using NBC 105:2025 §§5.5.1, 5.5.3, 6.5 and effective stiffness per §3.4.",
     ]
@@ -577,9 +588,43 @@ def verify_generated_esm_result(script_path, export_dir):
         if not all(math.isfinite(float(row[k])) for k in (
                  "height_m","U_elastic_m","U_design_m","design_drift_ratio")):
             raise ValueError("ESM result has nonfinite height/displacement/drift")
+    # A newly instrumented runner must produce source-bound timing evidence.
+    # Legacy saved runners remain readable but cannot claim measured speedups.
+    requires_timing = "NBC105_ESM_Case_Timings_" in runner.read_text(encoding="utf-8-sig")
+    timing_status = "LEGACY_NO_PERFORMANCE_TIMING"
+    phase_times = {}
+    if requires_timing:
+        timing_path = output / ("NBC105_ESM_Case_Timings_"+case+".json")
+        if not timing_path.is_file() or timing_path.stat().st_size==0:
+            raise ValueError("ESM timing evidence missing or empty: "+timing_path.name)
+        timing = json.loads(timing_path.read_text(encoding="utf-8-sig"))
+        if (not isinstance(timing,dict)
+                or timing.get("schema")!="esm-case-timing-v1"
+                or timing.get("response_case")!=case
+                or timing.get("limit_state")!=state
+                or timing.get("axis")!=axis
+                or timing.get("model_sha256")!=digest
+                or timing.get("support_case")!=selected_profile
+                or (calculation.get("seismic_mass_policy") is not None and
+                    timing.get("seismic_mass_policy")!=calculation["seismic_mass_policy"])):
+            raise ValueError("ESM timing evidence differs from current source, support, mass or case")
+        keys=("initial_signed_checks_s","model_build_gravity_s",
+              "lateral_solver_s","response_export_s","total_elapsed_s")
+        for key in keys:
+            try:
+                v=float(timing[key])
+            except (KeyError,TypeError,ValueError) as exc:
+                raise ValueError("ESM timing evidence missing or invalid: "+key) from exc
+            if not math.isfinite(v) or v<0:
+                raise ValueError("ESM timing evidence nonfinite/negative: "+key)
+            phase_times[key]=v
+        if sum(phase_times[x] for x in keys[:-1])>phase_times["total_elapsed_s"]+0.1:
+            raise ValueError("ESM timing phases exceed total elapsed time")
+        timing_status="SOURCE_MATCHED_PERFORMANCE_EVIDENCE"
     return {"status":"COMPLETE_SAVED_RESPONSE_ONLY",
             "case":case,"state":state,"axis":axis,"model_sha256":digest,
             "stories":len(responses),"support_count":len(supports),
+            "timing_status":timing_status,"timings":phase_times,
             "engineering_acceptance":"NOT_VERIFIED"}
 
 
