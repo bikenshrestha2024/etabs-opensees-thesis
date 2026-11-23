@@ -498,8 +498,6 @@ def package_area_integration_evidence(*, topology_json, area_assignment_csv,
     import hashlib
     import uuid
     import zipfile
-    from components.inputs.review_zip_paths import ensure_review_zip_directory
-
     required = {
         "source/OpenSees_Element_Connectivity.json": topology_json,
         "source/OpenSees_Area_Section_Assignment_Audit.csv": area_assignment_csv,
@@ -727,9 +725,14 @@ def launch_area_integration_gui(parent=None, export_dir=None):
         try:
             destination = (Path(export_dir).resolve() if export_dir
                            else Path(paths["topology"].get()).resolve().parent)
-            # Inventory and scripts are included only when they exist and were
-            # generated for the current selected source inputs.
-            extra = {}
+            # Explicit ZIP click generates a fresh source-bound inventory,
+            # rather than attaching any existing potentially stale workbook.
+            inventory_excel, inventory_json = export_area_integration_inventory(
+                topology_json=paths["topology"].get(),
+                area_assignment_csv=paths["audit"].get(),
+                config_json=paths["config"].get(), output_dir=destination)
+            extra = {"inventory_json": inventory_json,
+                     "inventory_excel": inventory_excel}
             candidate = paths["output"].get().strip()
             if candidate:
                 extra["integration_script"] = candidate
