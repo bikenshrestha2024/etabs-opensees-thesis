@@ -12,3 +12,10 @@ The record-pair checklist displays the same NBC gravity constant as the transien
 ## 2026-11-23 — direct available values in workflow inventory
 
 `inventory(folder)` includes `direct_available_values` from `components.model.readiness_available_values.collect_available_project_values` when the current nonlinear model builder exists. The data are read only from the selected local export and installed, cited PEER specimen cards. Incomplete source values remain missing and the snapshot explicitly states `UNAPPROVED`. Existing steps and GUIDE remain intact; no source-input, approval, material or FSAM field is changed.
+
+
+## 2026-11-23 — Evidence-aware status in the 1–9 GUI
+
+The original `workflow_status()` remains a **filename discovery API**, returning nine candidate/no-file pairs unchanged for compatibility. The GUI uses `workflow_evidence_status()` to distinguish source-only and review-snapshot ESM files from canonical stage solver results. For a candidate under a true `<stage>/RUNS/<state>/<case>/<run-id>/02_RESULTS/` directory, it inspects `CASE_MANIFEST.json` through the central `inspect_case_manifest` and checks the full recorded model SHA against the selected current `OpenSees_Complete_Model_Data_V118.json`. Missing model source, changed SHA, malformed/misfiled manifest, or non-completed solver status are explicitly distinguished and remain unverified.
+
+Even a matching model SHA and `COMPLETED_SOLVER_ONLY` status produce only **MANIFEST COMPLETED - NUMERICAL EVIDENCE UNVERIFIED**, not native structural equivalence or full physical record completion. A file under `REVIEW_SNAPSHOTS` is a review artifact, not a solved ESM analysis. Historical legacy results remain visible with no false approval. Non-discovery means **no file discovered in searched locations**, not proof no run exists. Linear TH remains optional for NLTHA. Synthetic tests: `tests/test_workflow_evidence_status.py`. No engineering models, recorded support fixes, or source EDB changed.

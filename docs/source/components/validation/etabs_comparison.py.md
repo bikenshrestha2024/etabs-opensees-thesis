@@ -40,3 +40,8 @@ To make an actual comparison with populated `etabs_value`, use **Direct ETABS AP
 **Critical stage identity:** older MRSM JSONs may have the correct geometry model SHA but lack *executed* `support_case`, `seismic_mass_policy` and actual runtime evidence. `source_execution_identity` and `compare` label those historical responses **NOT_COMPARABLE** even where a numeric native result has exactly the same semantic key. The comparison GUI now allows filtering the **32 physical support** case (default), 76/97 diagnostic sensitivities and distributed/optional story-lumped mass. Never infer native physical parity from geometry SHA or model name.
 
 The three 2026-11-22 uploaded MRSM evidence ZIPs did not contain native analyzed ETABS responses. Live Windows ETABS v23 extraction is not performed by Linux CI and remains a native acceptance requirement.
+
+
+## 2026-11-23 — Blank ETABS values: diagnostic presentation
+
+The ETABS comparison window shows native `etabs_value` only when actual matching ETABS data have been loaded. If no normalized CSV / approved Direct ETABS API extraction is present, the OpenSees rows receive the **GUI-only** status `ETABS_DATA_NOT_LOADED` with a source-specific instruction; ETABS numeric values and percentage differences remain null, never zero. The underlying saved OpenSees response CSV and numeric comparison policy are unchanged. After a reviewed exact-source ETABS case/story mapping is applied using **Direct ETABS API / EDB…**, the window reports how many rows have matched native values and how many remain unmatched. Unmapped raw signed ETABS reactions must never be silently inserted into CQC-scaled MRSM fields. Synthetic tests: `tests/test_comparison_missing_native_status.py`.
