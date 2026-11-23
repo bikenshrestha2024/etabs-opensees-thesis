@@ -28,6 +28,18 @@ class ModalPhysicalBasisEvidenceTests(unittest.TestCase):
         self.assertEqual(audit["rayleigh_period_provenance"],"EXTERNAL_GUI_INPUT_NOT_COMPUTED_BY_MODAL_SOLVER")
         self.assertIn("76",audit["warnings"][0])
 
+    def test_97_mapped_ids_report_actual_extra_mesh_count(self):
+        supports={str(i):[1,1,1,1,1,1] for i in PROJECT_PRIMARY_32}
+        supports.update({str(2000+i):[1,1,1,1,1,1] for i in range(65)})
+        audit=modal_model_basis_report(
+            {"supports": supports}, {"linear_shell_stiffness_policy":"LEGACY_GROSS_SHELL"},
+            "ULS", {})
+        self.assertEqual(audit['exported_restraint_point_count'],97)
+        self.assertEqual(audit['extra_exported_restrained_point_count'],65)
+        self.assertIn('65 nonprimary',audit['warnings'][0])
+        self.assertNotIn('plus 44',audit['warnings'][0])
+        self.assertNotIn('768.045','\n'.join(audit['warnings']))
+
     def test_32_compatible_export_still_cannot_claim_native_model_equivalence(self):
         support={str(i):[1,1,1,1,1,1] for i in PROJECT_PRIMARY_32}
         result=modal_model_basis_report(
