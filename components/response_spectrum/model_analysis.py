@@ -224,7 +224,8 @@ def run_model_spectrum(folder,config,output_dir):
     return results
 
 
-def validate_mrsm_case_output(output, *, state, expected_model_sha256=None):
+def validate_mrsm_case_output(output, *, state, expected_model_sha256=None,
+                              expected_support_case=None, expected_mass_policy=None):
     """[REF docs/source/components/response_spectrum/model_analysis.py.md]
     Verify exact, independently saved six-case MRSM output before solver-only
     completion status. This verifies *file completeness*, not physical validity.
@@ -252,6 +253,19 @@ def validate_mrsm_case_output(output, *, state, expected_model_sha256=None):
             raise ValueError("MRSM state mismatch: "+key)
         if result.get("axis")!=key[0]:
             raise ValueError("MRSM response direction mismatch: "+key)
+        # A serialized model SHA does not encode the runtime-selected
+        # foundation constraints or mass operator. Require those identities
+        # whenever this is a saved current-run numerical-completeness gate.
+        if expected_support_case is not None:
+            if result.get("support_case")!=expected_support_case:
+                raise ValueError("MRSM executed support profile mismatch: "+key)
+            evidence=result.get("support_case_evidence")
+            if (not isinstance(evidence,dict)
+                    or evidence.get("selected_profile")!=expected_support_case):
+                raise ValueError("MRSM runtime support evidence mismatch: "+key)
+        if (expected_mass_policy is not None
+                and result.get("seismic_mass_policy")!=expected_mass_policy):
+            raise ValueError("MRSM executed seismic mass operator mismatch: "+key)
         if not isinstance(result.get("stories"),list) or not result["stories"]:
             raise ValueError("MRSM case has no storey results: "+key)
         # A six-case JSON with only drift values is not a complete response.
@@ -538,7 +552,9 @@ def review_saved_mrsm_batch(output_root, source_folder, selected_fields):
         # statuses or a copied review ZIP.
         inspected = validate_mrsm_case_output(
             run / "02_RESULTS", state=state,
-            expected_model_sha256=model_sha)
+            expected_model_sha256=model_sha,
+            expected_support_case=selected_fields["support_case"],
+            expected_mass_policy=selected_fields["seismic_mass_policy"])
         if inspected.get("case_count") != len(required):
             return reviewed("NUMERIC_EVIDENCE_INCOMPLETE",
                             "Saved numeric case count differs from configured six cases")
@@ -749,8 +765,11 @@ def launch(parent,folder):
                                 try:
                                     if hashlib.sha256(data_file.read_bytes()).hexdigest()!=model_hash:
                                         raise ValueError('MRSM source model changed during solver execution; native output source invalid')
-                                    gate=validate_mrsm_case_output(out,state=state,
-                                                                 expected_model_sha256=model_hash)
+                                    gate=validate_mrsm_case_output(
+                                        out,state=state,
+                                        expected_model_sha256=model_hash,
+                                        expected_support_case=current["support_case"],
+                                        expected_mass_policy=current["seismic_mass_policy"])
                                     atomic_json(run_root/'06_REVIEW'/'SAVED_CASE_COMPLETENESS.json',gate)
                                     record_case_status(run_root,'COMPLETED_SOLVER_ONLY',
                                         message='Six saved MRSM cases found; physical equivalence unverified')
