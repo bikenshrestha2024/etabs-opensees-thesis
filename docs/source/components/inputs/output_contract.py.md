@@ -103,3 +103,19 @@ The read-only `inspect_case_manifest` function now checks the **unresolved** run
 `tools/audit_stage_output_migration.py` checks every canonical `RUNS/<state>/<case>/<run>/00_INPUT_SOURCE/CASE_MANIFEST.json` location without following links. A symlinked `00_INPUT_SOURCE` directory is inventoried as `SYMLINKED_RUN_INPUT_SOURCE_REFUSED`; a symlinked manifest is reported as `SYMLINKED_RUN_MANIFEST_REFUSED`. Previously the depth walk could silently treat these files as present while the `rglob` step skipped them, producing an inaccurate zero-issue output. Both are excluded from run counts, included in linked-path totals, and do not count as solver evidence. Deterministic filesystem-only tests cover the cases. No user ETABS file or structural result is migrated by this audit.
 
 Manifest inspection reports INVALID_SOLVER_STATUS and returns UNKNOWN for malformed or unrecognized solver status values, including JSON arrays and objects.
+
+
+## 2026-11-23 — Compact, source-hashed new history case directories
+
+The optional shared `compact_case_id(stage, scope, source_sha256)` produces a
+Windows-portable **48-character-or-shorter** identifier using a shortened stage,
+a sanitized, truncated human scope, a six-hex full-scope disambiguator and 12
+hex characters of the verified source SHA256. It fails for missing/invalid SHA,
+unsupported stages or invalid lengths. The full original model script filename,
+complete 64-character source SHA, analysis state, units, and acceptance status
+remain in `HISTORY_INPUT_PROVENANCE.json` and `CASE_MANIFEST.json`. This
+helper is opt-in for later module writer+reader migrations; `prepare_history_run`
+now uses it for **new LTHA and NLTHA** runs only. Existing long folders are
+never moved or renamed. Filename/12-hex ID alone is not engineering/model
+acceptance: downstream readers must check the full manifest and source SHA.
+Synthetic tests: `tests/test_history_run_output_contract.py`.
