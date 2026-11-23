@@ -30,3 +30,11 @@ No cloud upload occurs. The ZIP is created locally, not automatically published.
 ## 2026-11-23 — Stage-owned new review files from legacy selections
 
 The selected native/legacy analysis-output folder remains a **read-only source** for historical case evidence. `stage_review_owner(export_dir, selected_output, stage)` maps new review publication under the owning `03_ESM` or `05_MRSM` stage when the GUI selected an old `OpenSees_Analysis_Results` location or another stage within the same export. Existing canonical run folders preserve their own local `07_EXPORT_ZIP`; explicit outside-export custom locations remain opt-in overrides. The ESM legacy route comparison writes to `03_ESM/COMPARISONS`, and seismic review ZIPs to `<stage>/07_EXPORT_ZIP` with snapshots in `<stage>/REVIEW_SNAPSHOTS`. No existing files are moved or invalidated; see `tests/test_stage_owned_seismic_legacy_routing.py`. This is **folder provenance only**, not native structural acceptance.
+
+## 2026-11-23 — canonical ESM versus case-local MRSM evidence ZIPs
+
+For the source export's `03_ESM/RUNS/ULS|SLS/<model>` selected response directory, automatic **ESM** evidence now publishes review snapshots to `<export>/03_ESM/REVIEW_SNAPSHOTS` and ZIPs to `<export>/03_ESM/07_EXPORT_ZIP`. An arbitrary selected subdirectory inside the same ETABS export cannot create a fresh `Seismic_Review_Packages` or `07_EXPORT_ZIP` under an ESM solver-run folder. This restores the same stage-level output owner used by ESM's combined exporter.
+
+**MRSM is intentionally unchanged**: a manifested MRSM solver run retains its case-local `07_EXPORT_ZIP` and review folder. An explicitly selected external output directory remains an override, and existing source or legacy ZIPs are not moved, deleted, repackaged or implicitly accepted.
+
+The folder correction is verified only by temporary-filesystem regression `tests/test_stage_owned_seismic_legacy_routing.py` and source code checks. Native ETABS/OpenSees numerical comparison and engineering acceptance remain open.

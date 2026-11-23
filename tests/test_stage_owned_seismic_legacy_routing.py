@@ -32,6 +32,25 @@ def test_legacy_selected_esms_publish_under_03_esm(tmp_path):
     assert not (legacy/"07_EXPORT_ZIP").exists()
 
 
+
+def test_canonical_esm_review_zip_and_snapshot_use_one_stage_root(tmp_path):
+    export=tmp_path/"export"
+    case=export/"03_ESM"/"RUNS"/"ULS"/"modelA"
+    case.mkdir(parents=True)
+    (export/"OpenSees_Complete_Model_Config_V118.json").write_text("{}")
+    calculation=case/"NBC105_ESM_Calculation_ULS_X+_E0_V111.json"
+    calculation.write_text(json.dumps(
+        {"response_case":"ULS_X+_E0","limit_state":"ULS"}))
+    result=bundle_seismic_review(
+        export,case,method="ESM",include_comparison_template=False)
+    assert Path(result["folder"]).parent==export/"03_ESM"/"REVIEW_SNAPSHOTS"
+    assert Path(result["zip"]).parent==export/"03_ESM"/"07_EXPORT_ZIP"
+    assert calculation.is_file()
+    assert not (case/"Seismic_Review_Packages").exists()
+    assert not (case/"07_EXPORT_ZIP").exists()
+
+
+
 def test_canonical_case_preserves_local_review_owner(tmp_path):
     export=tmp_path/"export"
     case=export/"05_MRSM"/"RUNS"/"ULS"/"caseA"
