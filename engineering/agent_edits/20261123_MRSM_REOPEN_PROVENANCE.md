@@ -11,3 +11,6 @@
 - **Model and workbook source digests:** unavailable here; no private project files uploaded or guessed.
 - **Native model/ETABS parity, code compliance, 768kN reaction residual and NLTHA wall failure:** unverified, open blockers.
 - **Latest CI:** check workflow run IDs associated with PR #163 final head; old RED and intermediate failures are not claimed to pass.
+
+
+- **Additional GUI performance gate:** Initial direct saved JSON validation on Tk initialization was detected in code review after source tests passed; synthetic AST regression committed at `6d4d17a4`, verified red 1/1781. Review moved to a background thread with Tk event-loop callback and input-change invalidation. No speedup in native solver computation is claimed.
