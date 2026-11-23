@@ -550,6 +550,25 @@ def verify_generated_esm_result(script_path, export_dir):
         supports=list(csv.DictReader(stream))
     if not supports:
         raise ValueError("ESM support reactions missing/empty")
+    # Source export has 76 restraint entries; this case's selected runtime
+    # profile controls saved physical reaction evidence instead.
+    selected_profile=calculation.get("support_case")
+    if selected_profile is not None:
+        from components.model.support_case_contract import normalize_support_case
+        profile=normalize_support_case(selected_profile)
+        expected_count={"PHYSICAL_32":32,"SOURCE_76":76,"WALL_BASE_97":97}[profile]
+        try:
+            recorded_tags=[int(row["node_tag"]) for row in supports]
+        except (ValueError,TypeError,KeyError) as exc:
+            raise ValueError("ESM support reaction node tags missing or invalid") from exc
+        if (len(recorded_tags)!=expected_count or len(set(recorded_tags))!=expected_count):
+            raise ValueError(
+                "ESM saved support reaction count/identity differs from selected "
+                +profile+": expected "+str(expected_count)+", recorded "+str(len(recorded_tags)))
+        if profile=="PHYSICAL_32":
+            from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
+            if set(recorded_tags)!={int(tag) for tag in PROJECT_PRIMARY_32}:
+                raise ValueError("ESM saved support reaction tags differ from physical32 foundation identity")
     for row in responses:
         if row.get("response_case")!=case:
             raise ValueError("ESM response case mismatch within story rows")
