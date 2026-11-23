@@ -129,7 +129,9 @@ class ESMCombinedExportTests(unittest.TestCase):
             status_dir.mkdir(parents=True)
             first = "OpenSees_NBC105_ESM_Load_And_Static_Analysis_ULS_X+_E0_V111.py"
             (status_dir / "CASE_STATUS.json").write_text(json.dumps([
-                {"case": first, "status": "SUCCESS", "return_code": 0}
+                {"case": first, "status": "SUCCESS", "return_code": 0,
+                 "runner_path": str(root/first),
+                 "runner_sha256": hashlib.sha256((root/first).read_bytes()).hexdigest()}
             ]), encoding="utf-8")
             result = build_combined_esm_export(root)
             self.assertEqual(result["solver_batch_status"], "PARTIAL_OR_FAILED")
