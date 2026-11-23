@@ -205,7 +205,9 @@ def prepare_canonical_modal_run(export_dir, limit_state, model_script):
 
 
 def package_modal_evidence(run_folder, limit_state, *, canonical=True):
-    """Archive one completed modal case; never rerun gravity or eigenanalysis."""
+    """[REF docs/source/components/modal/gui_and_reports.py.md]
+    Archive one completed modal case; never rerun gravity or eigenanalysis.
+    """
     from components.inputs.evidence_archive import publish_case_evidence_zip
     root=Path(run_folder).expanduser()
     state=str(limit_state).strip().upper()
