@@ -491,6 +491,7 @@ def package_area_integration_evidence(*, topology_json, area_assignment_csv,
                                       inventory_excel=None, integration_script=None):
     """Create a source-only, verified local ZIP; never run or approve a model.
 
+    [REF docs/source/components/sections/area_elements.py.md]
     Only explicitly selected files are included. A missing required input,
     unsafe linked path or changed source aborts publication. The manifest has
     relative archive names and digests, not private host filesystem paths.
