@@ -9,6 +9,61 @@ import webbrowser
 from OpenSees_Mapping_Audit_V125 import collect,library,save_assignment,export_excel
 
 
+
+def plotly_query_for_key(key,data):
+    """[REF docs/source/components/sections/mapping_gui.py.md]
+    Carry ETABS frame/area namespace across the Tk-to-Plotly 3D handoff.
+    Solver segments retain their actual parent source-object dimension.
+    """
+    elements={row['key']:row for row in data['elements']}
+    solver_by_tag={str(row['solver_tag']):row for row in data['solver_elements']}
+    if key.startswith('SOLVER:'):
+        source=solver_by_tag.get(key.split(':',1)[1])
+        if source is None:
+            raise ValueError('No assembled solver element for '+key)
+        parent=elements.get(source['key'])
+        if parent is None:
+            raise ValueError('No current parent ETABS source for '+key)
+        return dict(idKind='solver',idValue=key.split(':',1)[1],
+                    category='frame' if parent['dimension']=='line_2_node' else 'area')
+    source=elements.get(key)
+    if source is None:
+        raise ValueError('No selected current ETABS source object for '+key)
+    if source['dimension'] not in ('line_2_node','area_polygon'):
+        raise ValueError('Unsupported ETABS topology dimension: '+str(source['dimension']))
+    return dict(idKind='object',idValue=str(source['etabs_object']),
+                category='frame' if source['dimension']=='line_2_node' else 'area')
+
+
+def inline_source_keys(kind,value,data):
+    """[REF docs/source/components/sections/mapping_gui.py.md]
+    Resolve exact inline namespace or reject ambiguous ETABS numeric IDs.
+    """
+    value=str(value).strip()
+    if not value:
+        return []
+    if kind=='OpenSees node':
+        if not any(str(n['opensees_node_tag'])==value for n in data['nodes']):
+            raise ValueError('No source or mesh node with OpenSees tag '+value)
+        return ['NODE:'+value]
+    if kind=='OpenSees solver element':
+        if not any(str(row['solver_tag'])==value for row in data['solver_elements']):
+            raise ValueError('No assembled solver element tag '+value)
+        return ['SOLVER:'+value]
+    kinds={'ETABS frame object':'line_2_node','ETABS area object':'area_polygon'}
+    if kind not in (*kinds,'ETABS object'):
+        raise ValueError('Unknown source identifier namespace: '+str(kind))
+    matches=[row for row in data['elements']
+             if str(row['etabs_object'])==value and
+             (kind=='ETABS object' or row['dimension']==kinds[kind])]
+    if kind=='ETABS object' and len({r['dimension'] for r in matches})>1:
+        raise ValueError('Ambiguous ETABS object ID '+value+
+                         ': choose ETABS frame object or ETABS area object')
+    if not matches:
+        raise ValueError('No ETABS source object in selected namespace: '+value)
+    return [r['key'] for r in matches]
+
+
 class MappingGUI:
     def __init__(self,parent,folder):
         from OpenSees_Research_UI_V123 import scrollable_form
@@ -26,9 +81,9 @@ class MappingGUI:
         ttk.Button(tools,text='Highlight selected ID in 3D',command=self.highlight).pack(side='left')
         ttk.Button(tools,text='Parameter citations',command=lambda:show_parameter_sources(self.win)).pack(side='left',padx=5)
         pane=ttk.Frame(outer);pane.pack(fill='both',expand=True)
-        self.tree=ttk.Treeview(pane,columns=('category','etabs','topology','solver','nodes','target'),height=18,selectmode='extended')
+        self.tree=ttk.Treeview(pane,columns=('category','etabs','topology','solver','nodes','assembly','target'),height=18,selectmode='extended')
         self.tree.heading('#0',text='Property / source object / solver segment');self.tree.column('#0',width=310)
-        for key,title,width in [('category','Type',90),('etabs','ETABS ID',85),('topology','Display / topology tag',165),('solver','Solver tag(s)',130),('nodes','Node tags',140),('target','Selected target',210)]:
+        for key,title,width in [('category','Type',90),('etabs','ETABS ID',85),('topology','Display / topology tag',165),('solver','Solver tag(s)',130),('nodes','Node tags',140),('assembly','Solver status',210),('target','Selected target',210)]:
             self.tree.heading(key,text=title);self.tree.column(key,width=width)
         sy=ttk.Scrollbar(pane,orient='vertical',command=self.tree.yview);sx=ttk.Scrollbar(pane,orient='horizontal',command=self.tree.xview)
         self.tree.configure(yscrollcommand=sy.set,xscrollcommand=sx.set)
@@ -51,8 +106,8 @@ class MappingGUI:
         self.chart.get_tk_widget().bind('<MouseWheel>',lambda event:'break',add='+')
         self.selected_points=[]
         pick=ttk.Frame(outer);pick.pack(fill='x',pady=3)
-        self.id_kind=tk.StringVar(value='OpenSees node');self.id_value=tk.StringVar(value='1')
-        ttk.Combobox(pick,textvariable=self.id_kind,values=('OpenSees node','OpenSees solver element','ETABS object'),state='readonly',width=24).pack(side='left')
+        self.id_kind=tk.StringVar(value='OpenSees node');self.id_value=tk.StringVar(value='')
+        ttk.Combobox(pick,textvariable=self.id_kind,values=('OpenSees node','OpenSees solver element','ETABS frame object','ETABS area object','ETABS object'),state='readonly',width=24).pack(side='left')
         ttk.Entry(pick,textvariable=self.id_value,width=14).pack(side='left',padx=5)
         ttk.Button(pick,text='Highlight ID',command=self.highlight_inline_id).pack(side='left')
         controls=ttk.LabelFrame(outer,text='Mapping and device library',padding=7);controls.pack(fill='x',pady=5)
@@ -77,31 +132,41 @@ class MappingGUI:
 
     def reload(self):
         try:
-            self.data=collect(self.folder);self.active.set(self.data['selections'].get('active',False));self.populate();self.draw_source();self.highlight_inline_id()
-            path=export_excel(self.folder)
-            self.status.set(f"Loaded {len(self.data['properties'])} source property groups and {len(self.data['elements'])} objects. Excel audit populated: {path}")
+            self.data=collect(self.folder);self.active.set(self.data['selections'].get('active',False))
+            self.populate();self.draw_source();self.highlight_keys([])
+            unassembled=sum(r['assembly_status']=='SOURCE_TOPOLOGY_ONLY_NO_SOLVER_ELEMENT'
+                            for r in self.data['elements'])
+            self.status.set(
+                f"Loaded {len(self.data['properties'])} property groups, "
+                f"{len(self.data['elements'])} source objects, "
+                f"{len(self.data['solver_elements'])} solver elements; "
+                f"{unassembled} source-only objects without solver tags. "
+                "Excel export is on demand using the button above.")
         except Exception as exc:self.status.set(str(exc))
 
     def populate(self):
         if not hasattr(self,'data'):return
         self.tree.delete(*self.tree.get_children());self.item_keys={};self.record_items={}
         groups={};self.bykey={r['key']:r for r in self.data['elements']}
+        property_by_group={p['group']:p for p in self.data['properties']}
+        solver_by_tag={s['solver_tag']:s for s in self.data['solver_elements']}
+        search=self.search.get().strip().lower()
         for r in self.data['elements']:
             if self.category.get()!='All' and r['category']!=self.category.get():continue
-            if self.search.get().strip().lower() not in json.dumps(r).lower():continue
+            if search and search not in json.dumps(r).lower():continue
             group=r['category']+' / '+r['property']
             if group not in groups:
-                prop=next(p for p in self.data['properties'] if p['group']==group)
+                prop=property_by_group[group]
                 title=f"{group} ({prop['count']} objects) | {prop['material'] or 'material pending'}"
                 groups[group]=self.tree.insert('','end',text=title,open=True);self.item_keys[groups[group]]=[]
             parent=groups[group];self.item_keys[parent].append(r['key'])
             label=r.get('display_label') or 'UNCLASSIFIED_MEMBER'
-            iid=self.tree.insert(parent,'end',text=f"{label} / {r['key']} / Storey {r['storey']}",values=(r['category'],r['etabs_object'],f"{label} ({r['topology_tag']})",','.join(map(str,r['solver_tags'])),','.join(map(str,r['node_tags'])),r['target']))
+            iid=self.tree.insert(parent,'end',text=f"{label} / {r['key']} / Storey {r['storey']}",values=(r['category'],r['etabs_object'],f"{label} ({r['topology_tag']})",','.join(map(str,r['solver_tags'])),','.join(map(str,r['node_tags'])),r['assembly_status'],r['target']))
             self.item_keys[iid]=[r['key']];self.record_items[iid]=r
             for tag in r['solver_tags']:
-                sr=next((s for s in self.data['solver_elements'] if s['solver_tag']==tag),None)
+                sr=solver_by_tag.get(tag)
                 target=self.data['selections'].get('assignments',{}).get(f'SOLVER:{tag}',{}).get('target',r['target'])
-                child=self.tree.insert(iid,'end', text=f"{label} / solver element {tag}",values=(r['category'],r['etabs_object'],f"{label} ({r['topology_tag']})",tag,','.join(map(str,sr['node_tags'])) if sr else '',target))
+                child=self.tree.insert(iid,'end', text=f"{label} / solver element {tag}",values=(r['category'],r['etabs_object'],f"{label} ({r['topology_tag']})",tag,','.join(map(str(sr['node_tags']))) if sr else '','ASSEMBLED_SOLVER_ELEMENT',target))
                 self.item_keys[child]=[f'SOLVER:{tag}'];self.record_items[child]=r
 
     def parameter_template(self):
@@ -139,7 +204,12 @@ class MappingGUI:
             prop=next((p for p in self.data['properties'] if p['property']==r.get('property') and p['category']==r.get('category')), {})
             target=r.get('target','KEEP_SOURCE_ELASTIC')
             active=bool(self.data.get('selections',{}).get('active'))
-            if r.get('dimension')=='line_2_node' and target=='KEEP_SOURCE_ELASTIC':
+            if not r.get('solver_tags'):
+                implementation=('Source-only topology object: NO ASSEMBLED SOLVER ELEMENT. '
+                                'Preview tags and KEEP_SOURCE_ELASTIC are labels, not a '
+                                'constitutive assignment or solved stiffness. Verify the '
+                                'ETABS source property and regenerate a source-backed model.')
+            elif r.get('dimension')=='line_2_node' and target=='KEEP_SOURCE_ELASTIC':
                 implementation=('Elastic run: source E/G/A/Iy/Iz/J are passed directly to elasticBeamColumn; '
                                 'there is no uniaxial material tag. Nonlinear run: this target supplies no fiber '
                                 'section, so a separate nonlinear section mapping is required.')
@@ -268,10 +338,14 @@ class MappingGUI:
     def highlight_inline_id(self):
         if not hasattr(self,'data'):return
         value=self.id_value.get().strip();kind=self.id_kind.get()
-        if kind=='OpenSees node':keys=['NODE:'+value]
-        elif kind=='OpenSees solver element':keys=['SOLVER:'+value]
-        else:keys=[r['key'] for r in self.data['elements'] if r['etabs_object']==value]
-        self.highlight_keys(keys)
+        if not value:
+            self.highlight_keys([])
+            return
+        try:
+            self.highlight_keys(inline_source_keys(kind,value,self.data))
+        except ValueError as exc:
+            self.highlight_keys([])
+            self.status.set(str(exc))
 
     def reference(self):
         row=next(r for r in library() if r['name']==self.target.get())
@@ -281,9 +355,16 @@ class MappingGUI:
         from urllib.parse import urlencode
         keys=self.selected_keys()
         if not keys:return
-        key=keys[0];kind='solver' if key.startswith('SOLVER:') else 'object';value=key.split(':')[1]
+        try:
+            query=plotly_query_for_key(keys[0],self.data)
+        except ValueError as exc:
+            self.status.set(str(exc))
+            return
         path=self.folder/'OpenSees_Element_Connectivity_3D.html'
-        if path.is_file():webbrowser.open(path.resolve().as_uri()+'?'+urlencode(dict(idKind=kind,idValue=value)))
+        if path.is_file():
+            webbrowser.open(path.resolve().as_uri()+'?'+urlencode(query))
+        else:
+            self.status.set('Source-connected 3D HTML is missing: '+str(path))
 
     def excel(self):
         import os
@@ -317,11 +398,11 @@ def show_load_audit(parent,folder):
     text.insert('end','SOURCE EDB\n'+str(data['source_edb'])+'\n\n')
     text.insert('end','ASSEMBLED MODEL\n'+json.dumps({key:report.get(key) for key in ('elastic_assembled','assembly_errors','total_downward_load_kN','active_horizontal_seismic_weight_kN','gravity_by_pattern_kN')},indent=2)+'\n\n')
     text.insert('end','The assembled export integrates source frame/area loads and geometric self-weight using source pattern multipliers. The topology-only preview is a separate audit. Compare reactions, source weight conventions and mass against ETABS.\n\n')
-    text.insert('end','WARNINGS\n'+'\n'.join(report.get('warnings',[])))
+    from OpenSees_Mapping_Audit_V125 import summarize_assembly_warnings
+    text.insert('end','WARNINGS (grouped for readability; full source-specific list is saved in the export report)\n'+'\n'.join(summarize_assembly_warnings(report.get('warnings',[]))))
     bar=ttk.Frame(outer);bar.pack(fill='x',pady=5)
     ttk.Button(bar,text='Populate / open Excel audit',command=lambda:os.startfile(export_excel(folder))).pack(side='left')
     ttk.Button(bar,text='Property and individual-element mapping',command=lambda:launch(win,folder)).pack(side='left',padx=5)
     ttk.Button(bar,text='3D loads with ID highlight',command=lambda:os.startfile(Path(folder)/'OpenSees_Load_Assignment_3D.html')).pack(side='left')
     ttk.Button(bar,text='Copy text',command=lambda:(win.clipboard_clear(),win.clipboard_append(text.get('1.0','end-1c')))).pack(side='left')
-    export_excel(folder)
     return win

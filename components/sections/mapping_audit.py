@@ -92,6 +92,35 @@ def validation_inventory():
         dict(subsystem='Slab vertical transfer',evidence='ShellMITC4 + shared refined beam/slab nodes; Q=q*A equivalent nodal vectors',validation='V141 regression benchmark and mesh study; project mesh convergence still required')]
 
 
+
+
+def summarize_assembly_warnings(warnings):
+    """[REF docs/source/components/sections/mapping_audit.py.md]
+    Collapse repeated per-frame release messages for a readable summary.
+    Keep the untouched source-report list as full element-specific evidence.
+    """
+    import re
+    releases=[]
+    remaining=[]
+    for message in warnings:
+        matched=re.fullmatch(
+            r"ETABS frame unique ID (\S+) \| OpenSees topology tag \S+ "
+            r"\| OpenSees elastic element tags \[.*?\]: assembled with source "
+            r"My/Mz end releases and zero torsional transfer\.",
+            str(message))
+        if matched:
+            releases.append(matched.group(1))
+        else:
+            remaining.append(str(message))
+    if releases:
+        remaining.append(
+            f"{len(releases)} frame release warning(s): source My/Mz end "
+            f"releases and zero torsional transfer; ETABS IDs first "
+            f"{releases[0]}, last {releases[-1]}. Original per-object "
+            f"messages are preserved in OpenSees_Complete_Export_Report_V118.json.")
+    return remaining
+
+
 def collect(folder):
     folder=Path(folder)
     topology=read(folder,'OpenSees_Element_Connectivity.json')
@@ -144,10 +173,16 @@ def collect(folder):
         section=section or a.get('assigned_section' if is_frame else 'assigned_property') or 'UNASSIGNED'
         category=e.get('category','UNKNOWN');group=category+' / '+section
         target=selections.get('assignments',{}).get(key,{}).get('target','KEEP_SOURCE_ELASTIC')
+        solver_tags=element_map.get(key,[])
+        status=('ASSEMBLED_SOLVER_ELEMENT' if solver_tags else
+                'SOURCE_TOPOLOGY_ONLY_NO_SOLVER_ELEMENT'
+                if report.get('elastic_assembled') is True else
+                'ASSEMBLY_NOT_VERIFIED_NO_SOLVER_ELEMENT')
         record=dict(key=key,property=section,category=category,dimension=e['dimension'],etabs_object=obj,
                     display_label=display_labels.get(str(e['dimension'])+':'+obj,'UNCLASSIFIED_MEMBER'),
-                    topology_tag=e.get('element_tag'),solver_tags=element_map.get(key,[]),node_tags=e.get('node_tags',[]),
-                    etabs_points=e.get('node_names',[]),storey=e.get('storey_number'),target=target)
+                    topology_tag=e.get('element_tag'),solver_tags=solver_tags,node_tags=e.get('node_tags',[]),
+                    etabs_points=e.get('node_names',[]),storey=e.get('storey_number'),target=target,
+                    assembly_status=status)
         rows.append(record)
         if group not in properties:
             physical=next((r['properties'] for r in solver_rows if r['key']==key),{})
@@ -170,6 +205,12 @@ def save_assignment(folder, keys, target, parameters=None, citation='', active=F
         owner=key if not key.startswith('SOLVER:') else next((r['key'] for r in data['solver_elements'] if r['solver_tag']==int(key.split(':')[1])),None)
         if owner not in bykey:raise ValueError('No current element for '+key)
         r=bykey[owner];kind=definitions[target]['kind']
+        if (target!='KEEP_SOURCE_ELASTIC'
+                and r['assembly_status']=='SOURCE_TOPOLOGY_ONLY_NO_SOLVER_ELEMENT'):
+            raise ValueError(
+                f"{owner} has no assembled solver element in the selected source. "
+                "A candidate mapping cannot act on a not assembled object; "
+                "review its ETABS property and rebuild from an evidenced source.")
         if kind not in ('ANY','FRAME') and r['category']!=kind:
             raise ValueError(f"{r['category']} cannot map to {target}; device assignments require a BRACE.")
         if target=='KEEP_SOURCE_ELASTIC':assignments.pop(key,None);continue
@@ -241,7 +282,22 @@ def export_excel(folder,path=None):
     sheet('Pattern ledger',[dict(pattern=k,gravity_kN=v) for k,v in data['assembly'].get('gravity_by_pattern_kN',{}).items()])
     sheet('Library parameters',data['parameters'])
     sheet('Device selections',[dict(key=k,**v) for k,v in data['selections'].get('assignments',{}).items()])
-    sheet('Scope',[dict(item='Source EDB',value=data['source_edb']),dict(item='Device activation',value=data['selections'].get('active',False)),dict(item='Material assumptions',value='RC template values are not calibrated project values. See Library parameters.'),dict(item='Assembly warnings',value=data['assembly'].get('warnings',[]))])
+    source_only=[row for row in data['elements']
+                 if row['assembly_status']=='SOURCE_TOPOLOGY_ONLY_NO_SOLVER_ELEMENT']
+    sheet('Scope',[
+        dict(item='Source EDB (path; not an EDB SHA)',value=data['source_edb']),
+        dict(item='Elastic assembled report flag',value=data['assembly'].get('elastic_assembled')),
+        dict(item='Topology/source object count',value=len(data['elements'])),
+        dict(item='Objects with no solver tags',value=len(source_only)),
+        dict(item='Assembled solver element count',value=len(data['solver_elements'])),
+        dict(item='Assembly status meaning',value='Source topology-only objects are visible but are NOT solver elements; they cannot be assigned nonlinear devices.'),
+        dict(item='Load purpose',value='Source load case from selected export; compare full 1D+1L only against identical ETABS load patterns, not NBC seismic mass.'),
+        dict(item='Device activation',value=data['selections'].get('active',False)),
+        dict(item='Material assumptions',value='RC template values are not project-calibrated; PEER literature research is separately documented.'),
+        dict(item='Assembly warning digest',value=summarize_assembly_warnings(
+            data['assembly'].get('warnings',[]))),
+        dict(item='Raw assembly warnings preserved',value='OpenSees_Complete_Export_Report_V118.json'),
+        ])
     # A user may have the prior Excel audit open. Do not fail the review or
     # overwrite that workbook: preserve it and create a timestamped sibling.
     try:
