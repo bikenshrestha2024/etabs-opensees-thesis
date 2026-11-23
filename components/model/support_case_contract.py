@@ -120,3 +120,36 @@ def require_runtime_support_case(case, report):
     return dict(status="MATCHED_SELECTED_CASE_NOT_NATIVE_EQUIVALENT",
                 selected_profile=profile,actual_supports=len(actual),
                 native_wall_edge_mpc_equivalence="NOT_VERIFIED")
+
+def solver_reaction_support_tags(report, support_case=DEFAULT_SUPPORT_CASE):
+    """[REF docs/source/components/model/support_case_contract.py.md]
+    Recover reaction recorder nodes from ACTUAL assembled OpenSees supports.
+
+    A source export can contain 76 mixed foundation/wall-mesh restraint IDs
+    even when the model builder selected 32 physical foundation supports.
+    This identifies runtime nodes only; edge/MPC transfer and ETABS numeric
+    reaction equivalence remain explicitly NOT_VERIFIED.
+    """
+    if not isinstance(report, dict):
+        raise ValueError("Actual solver model-build report is required")
+    raw = report.get("gravity_base_support_tags")
+    if not isinstance(raw, (list, tuple)) or not raw:
+        raise ValueError("Actual solver support tag list missing")
+    tags = []
+    for value in raw:
+        if isinstance(value, bool):
+            raise ValueError("Boolean solver support tag invalid")
+        if isinstance(value, int):
+            tag = value
+        elif isinstance(value, str) and value.isdecimal():
+            tag = int(value)
+        else:
+            raise ValueError("Invalid solver support tag: " + repr(value))
+        if tag <= 0:
+            raise ValueError("Invalid nonpositive solver support tag")
+        tags.append(tag)
+    if len(set(tags)) != len(tags):
+        raise ValueError("Duplicate actual solver support tag")
+    profile = normalize_support_case(support_case)
+    require_runtime_support_case(profile, report)
+    return sorted(tags)
