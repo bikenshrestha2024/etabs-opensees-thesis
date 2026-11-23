@@ -227,7 +227,15 @@ def instantiate_area_elements(ops, *, topology_json: str | Path,
               "wall_panel_formulation": "nonlinear E_SFI_MVLEM_3D with multiple axial macro-fibers per exported ETABS wall quad",
               "floor_shell_count": floor_count, "nonlinear_wall_panel_count": wall_count,
               "element_audit": element_audit, "warnings": warnings, "analysis_ready": False}
-    Path(cfg["audit_output_json"]).write_text(json.dumps(report, indent=2), encoding="utf-8")
+    # Keep an unqualified audit filename under the selected config/source folder,
+    # never in the launcher's unrelated working directory.
+    audit_path=Path(cfg["audit_output_json"]).expanduser()
+    if not audit_path.is_absolute():
+        if '..' in audit_path.parts:
+            raise ValueError("Relative area audit output must not escape the selected configuration folder")
+        audit_path=Path(config_json).expanduser().resolve().parent/audit_path
+    audit_path.parent.mkdir(parents=True,exist_ok=True)
+    audit_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return report
 
 
@@ -499,6 +507,69 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
     return out,json_path
 
 
+
+def package_area_instantiation_audit(*, topology_json, area_assignment_csv,
+                                     config_json, output_dir):
+    """[REF docs/source/components/sections/area_elements.py.md]
+    Export evidence of already-instantiated area panels, without running a solver.
+
+    A valid saved area-instantiation report is required. The source-only Excel
+    inventory is a separate package and is not mistaken for this report.
+    The ZIP is NOT an ETABS physical equivalence or NLTHA acceptance certificate.
+    """
+    import hashlib
+    from components.inputs.evidence_archive import publish_case_evidence_zip
+    raw_paths={'topology':Path(topology_json).expanduser(),
+               'assignments':Path(area_assignment_csv).expanduser(),
+               'config':Path(config_json).expanduser()}
+    for role,path in raw_paths.items():
+        if not path.is_file() or path.is_symlink():
+            raise FileNotFoundError('Missing or linked '+role+' input: '+str(path))
+    cfg=json.loads(raw_paths['config'].read_text(encoding='utf-8-sig'))
+    selected=cfg.get('audit_output_json')
+    if not isinstance(selected,str) or not selected.strip():
+        raise ValueError('Area config has no selected audit_output_json')
+    report_path=Path(selected).expanduser()
+    if not report_path.is_absolute():
+        if '..' in report_path.parts:
+            raise ValueError('Area audit report cannot escape selected config folder')
+        report_path=raw_paths['config'].resolve().parent/report_path
+    if not report_path.is_file() or report_path.is_symlink():
+        raise FileNotFoundError('No instantiated area element audit to export: '+str(report_path))
+    report=json.loads(report_path.read_text(encoding='utf-8-sig'))
+    if not isinstance(report,dict):
+        raise ValueError('Area element audit must be an object')
+    if (str(Path(str(report.get('source_topology',''))).expanduser().resolve())
+            !=str(raw_paths['topology'].resolve()) or
+        str(Path(str(report.get('source_area_assignment_audit',''))).expanduser().resolve())
+            !=str(raw_paths['assignments'].resolve())):
+        raise ValueError('Saved area-instantiation audit belongs to different topology/assignment sources')
+    areas=report.get('element_audit')
+    if not isinstance(areas,list):
+        raise ValueError('No detailed area element records in saved instantiation audit')
+    floor=int(report.get('floor_shell_count',0))
+    wall=int(report.get('nonlinear_wall_panel_count',0))
+    if floor<0 or wall<0 or floor+wall==0 or len(areas)!=floor+wall:
+        raise ValueError('Saved area element counts are missing, zero, or inconsistent')
+    tags=[int(item['tag']) for item in areas]
+    if len(set(tags))!=len(tags):
+        raise ValueError('Duplicate OpenSees element tag in saved area audit')
+    if (sum(str(item.get('category','')).upper()=='FLOOR' for item in areas)!=floor or
+        sum(str(item.get('category','')).upper()=='SHEAR WALL' for item in areas)!=wall):
+        raise ValueError('Area element categories disagree with recorded counts')
+    source_sha=hashlib.sha256(report_path.read_bytes()).hexdigest()[:12]
+    return publish_case_evidence_zip(
+        output_dir,category='AREA_INTEGRATION',
+        filename='Area_Instantiated_Elements_'+source_sha+'.zip',
+        status='SAVED_ELEMENT_INSTANTIATION_REPORT_NOT_ANALYSIS_ACCEPTANCE',
+        files=[
+            ('00_INPUT_SOURCE/OpenSees_Element_Connectivity.json',raw_paths['topology']),
+            ('00_INPUT_SOURCE/OpenSees_Area_Section_Assignment_Audit.csv',raw_paths['assignments']),
+            ('00_INPUT_SOURCE/OpenSees_Area_Model_Config_V116.json',raw_paths['config']),
+            ('02_MODEL/AREA_INTEGRATION/INSTALLED_ELEMENTS/'+report_path.name,report_path),
+        ])
+
+
 def area_output_directory(export_dir=None, *, topology_json=None, generated_output=None):
     """Resolve the existing area-integration output folder for GUI browsing.
 
@@ -643,6 +714,25 @@ def launch_area_integration_gui(parent=None, export_dir=None):
                 f'Excel: {workbook}\\nJSON: {manifest}\\nZIP: {zipfile}\\n\\nSOURCE REVIEW ONLY: no elements, loads or dynamic analysis executed.',parent=win)
         except Exception as exc:messagebox.showerror('Area inventory',str(exc),parent=win)
     ttk.Button(root,text="Export area inventory (Excel + JSON + ZIP)",command=export_inventory).pack(anchor="w",pady=4)
+    def export_instantiated_evidence():
+        if not all(paths[k].get().strip() for k in ('topology','audit','config')):
+            messagebox.showerror('Source inputs required',
+                'Select source topology, assignment CSV and the area config.',parent=win)
+            return
+        try:
+            destination=Path(export_dir).resolve() if export_dir else Path(paths['topology'].get()).resolve().parent
+            archive=package_area_instantiation_audit(
+                topology_json=paths['topology'].get(),
+                area_assignment_csv=paths['audit'].get(),
+                config_json=paths['config'].get(),output_dir=destination)
+            messagebox.showinfo('Instantiated area evidence ZIP saved',
+                f'ZIP: {archive}\\n\\nThe saved element-instantiation audit was packaged, not rerun. '
+                'Gravity, MPC, mass and nonlinear structural acceptance remain NOT VERIFIED.',
+                parent=win)
+        except Exception as exc:
+            messagebox.showerror('Instantiated area ZIP export',str(exc),parent=win)
+    ttk.Button(root,text='Export saved instantiated element ZIP',
+               command=export_instantiated_evidence).pack(anchor='w',pady=4)
     def open_output_folder():
         try:
             import os
