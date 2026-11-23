@@ -85,7 +85,15 @@ def export_id_audit(folder, payload=None, report=None):
     for index,element in enumerate((payload or {}).get('shells',[]),100001+len((payload or {}).get('frames',[]))):
         assembled_area.setdefault(str(element.get('object')),[]).append(index)
     for e in elements:
-        rows.append([str(e.get("etabs_object","")),e.get("dimension"),e.get("category"),e.get("storey_number"),e.get("assigned_section",e.get("assigned_property","")),e.get("element_tag"),json.dumps(e.get("node_names",[])),json.dumps(e.get("node_tags",[])),json.dumps(assembled.get(str(e.get("etabs_object")),[])) if payload else "NOT ASSEMBLED",e.get("display_label","UNCLASSIFIED_MEMBER"),e.get("member_family","UNCLASSIFIED"),e.get("brace_role",""),e.get("display_category","UNCLASSIFIED")])
+        # ETABS frame and area object names occupy DIFFERENT namespaces.
+        # Both can legitimately be "1"; resolving every row through the
+        # frame map silently fabricates a solver tag for an area object.
+        dimension=e.get("dimension")
+        solver_index=(assembled if dimension=="line_2_node" else
+                      assembled_area if dimension=="area_polygon" else {})
+        solver_tags=(json.dumps(solver_index.get(str(e.get("etabs_object")),[]))
+                     if payload is not None else "NOT ASSEMBLED")
+        rows.append([str(e.get("etabs_object","")),dimension,e.get("category"),e.get("storey_number"),e.get("assigned_section",e.get("assigned_property","")),e.get("element_tag"),json.dumps(e.get("node_names",[])),json.dumps(e.get("node_tags",[])),solver_tags,e.get("display_label","UNCLASSIFIED_MEMBER"),e.get("member_family","UNCLASSIFIED"),e.get("brace_role",""),e.get("display_category","UNCLASSIFIED")])
     wb=Workbook();ws=wb.active;ws.title="Read me"
     for row in [["ETABS / OpenSees identifier audit"],["ETABS unique object name is not an OpenSees element tag."],["Preview tags describe exported topology; assembled tags describe solver elements."],["Gravity support input uses OpenSees node tags, never ETABS point names."],["Support rows are source restraints even if assembly fails; they do not prove a runnable model."],["Assembly errors",json.dumps((report or {}).get("assembly_errors",[]))]]:ws.append(row)
     def sheet(name,headers,data):
@@ -94,7 +102,7 @@ def export_id_audit(folder, payload=None, report=None):
         s.freeze_panes="A2";s.auto_filter.ref=s.dimensions
         for c in s[1]:c.font=Font(bold=True,color="FFFFFF");c.fill=PatternFill("solid",fgColor="17365D")
         for column in s.columns:s.column_dimensions[column[0].column_letter].width=min(65,max(18,max(len(str(c.value or "")) for c in column)+2))
-    headers=["ETABS unique object name","Dimension","Category","Storey number","ETABS section","OpenSees topology preview tag","ETABS end point names","OpenSees end node tags","Assembled frame element tags","Display label (not solver tag)","Main family","Brace role","Display prefix"]
+    headers=["ETABS unique object name","Dimension","Category","Storey number","ETABS section","OpenSees topology preview tag","ETABS end point names","OpenSees end node tags","Assembled solver element tags (frame or area)","Display label (not solver tag)","Main family","Brace role","Display prefix"]
     sheet("Elements",headers,rows)
     sheet("Nodes",["ETABS point name","OpenSees node tag","Storey","X m","Y m","Z m","Display label (not solver tag)"],[[n["etabs_point_name"],n["opensees_node_tag"],n.get("etabs_storey_number"),*n["coordinates_m"],n.get("display_label","UNCLASSIFIED_LEVEL")] for n in nodes])
     sheet("Supports",["OpenSees node tag","ETABS point name","UX fixed","UY fixed","UZ fixed","RX fixed","RY fixed","RZ fixed"],[[int(tag),reverse.get(str(tag),"generated mesh node"),*flags] for tag,flags in metadata.get("supports",{}).items() if any(flags)])
