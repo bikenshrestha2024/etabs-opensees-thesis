@@ -31,3 +31,39 @@ Relative `snapshot_path` values use forward slashes and match ZIP member names o
 ## ESM route identity and reviewed wall basis
 
 Combined snapshots include the calculation comparison and ESM case-specific deformation, drift, irregularity and recorder-index sidecars. Legacy and route-prefixed runners for the same case are reconciled by the batch status.
+
+
+## 2026-11-23 — Split legacy GUI path and canonical ESM case evidence
+
+**Observed workflow:** ESM case calculations are written to the exact model/state
+`03_ESM/RUNS/ULS/<case>` while a legacy selected GUI output remains under
+`OpenSees_Analysis_Results/<case>`. Earlier `_exact_calculation_roots`
+located JSON/CSV in the canonical sibling, but `_source_files` omitted the
+canonical runner, plot, response CSV/Excel and recorder sidecars; likewise
+`_latest_batch_status` compared legacy `CASE_STATUS.json` only with
+legacy-local runners. This made valid canonical outputs disappear from a
+combined ZIP or appear as missing solver cases.
+
+**Correction:** Both the copy-only evidence enumerator and the
+`COMPLETE_SOLVER_ONLY` process-status checker now take the exact
+same-model, same-state calculation roots. No recursive search across other
+model variants, states or older saved cases is introduced. The saved batch
+still has to match every expected runner exactly, including duplicate,
+missing and unexpected-case checks. Results are never inferred from a JSON
+calculation or a zero solver exit alone. Historical source files are not moved.
+
+**Regression:** `tests/test_esm_legacy_canonical_split.py` constructs
+synthetic legacy and canonical roots, plus a same-level unrelated model,
+checks all current-case artifacts in the combined manifest, and requires an
+exact script/status match. Run alongside
+`tests/test_esm_organized_export_gui.py` and
+`tests/test_canonical_esm_output_routing.py`. This is a filesystem/software
+correctness fix only; no native ETABS/OpenSees gravity, stiffness, mass,
+source-wall or code compliance acceptance is implied.
+
+**Outstanding:** Auto-generated seismic review ZIPs in the separate
+`bundle_seismic_review` workflow need a source-aligned run-directory
+manifest and an explicit distinction between pre-solver force packages and
+post-solver response packages. A historical success row with an unchanged
+runner filename still requires an executed-runner SHA256 before its solver
+status is treated as belonging to newly generated inputs.
