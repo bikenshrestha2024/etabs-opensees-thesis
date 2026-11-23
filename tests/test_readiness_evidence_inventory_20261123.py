@@ -30,7 +30,9 @@ def test_model_hash_and_stale_modal_identity_visible_without_approval(tmp_path):
 def test_source_provenance_respects_actual_modal_model_hash(tmp_path):
     model=tmp_path/"OpenSees_Complete_Nonlinear_Model.py"
     model.write_text("# model")
-    current=hashlib.sha256(model.read_bytes()).hexdigest()
+    source_payload=tmp_path/"OpenSees_Complete_Model_Data_V118.json"
+    source_payload.write_text('{"nodes":{}}')
+    current=hashlib.sha256(source_payload.read_bytes()).hexdigest()
     result=tmp_path/"04_MODAL"/"RUNS"/"ULS"/"a"/"run"/"02_RESULTS"/"NBC105_Modal_V111.json"
     result.parent.mkdir(parents=True)
     result.write_text(json.dumps({"model_sha256":current,"limit_state":"ULS","rows":[{"mode":1}]}))
