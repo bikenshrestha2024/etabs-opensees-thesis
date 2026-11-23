@@ -469,6 +469,14 @@ def review_saved_mrsm_batch(output_root, source_folder, selected_fields):
                         "Saved process rows lack a model and input fingerprint")
     try:
         state = str(selected_fields["limit_state"]).strip().upper()
+        # Source-state/config mismatches take precedence over a case-name
+        # count: a saved ULS row viewed in SLS is stale, not an incomplete
+        # current-state batch.
+        if (provenance.get("state") != state
+                or provenance.get("input_sha256") !=
+                    mrsm_input_signature(selected_fields)):
+            return reviewed("SOURCE_OR_INPUT_MISMATCH",
+                            "Saved MRSM ledger belongs to another selected state or input configuration")
         required = {state + " " + axis + "_" + ecc
                     for axis in ("X", "Y")
                     for ecc in ("E0", "Eplus", "Eminus")}
