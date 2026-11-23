@@ -40,7 +40,7 @@ def design_cd(T,cfg):
 def run_model_spectrum(folder,config,output_dir):
     import openseespy.opensees as ops
     from OpenSees_Complete_Export_V118 import build_complete_model
-    from components.model.support_case_contract import (normalize_support_case, require_runtime_support_case)
+    from components.model.support_case_contract import (normalize_support_case, require_runtime_support_case, solver_reaction_support_tags)
     from NBC105_Analysis_Settings_V109 import calculate_esm
     from OpenSees_Earthquake_Analysis_NBC105_V111 import read_story_csv
     from OpenSees_Modal_Analysis_NBC105_V111 import run_nbc105_modal_audit
@@ -99,7 +99,10 @@ def run_model_spectrum(folder,config,output_dir):
         rows=modal['rows'];props=ops.modalProperties('-return')
         if float(modal['cumulative_U'+axis+'_percent'] or 0)<90:raise ValueError(axis+' modal mass is below 90 percent; increase modes.')
         if modal['modes_at_or_above_33_Hz']:raise ValueError('Returned modes at/above 33 Hz require a reviewed missing-mass correction, not implemented by this MRSM engine. No design result exported.')
-        ns=sorted(map(int,data['nodes']));elements=sorted(ops.getEleTags());support_tags=sorted(int(n) for n,v in data['supports'].items() if any(v))
+        # Actual assembled supports, never the unfiltered exported 76-point
+        # source map, determine MRSM reaction recorder node identities.
+        # 32 real foundations remain primary; 76/97 are diagnostic only.
+        ns=sorted(map(int,data['nodes']));elements=sorted(ops.getEleTags());support_tags=solver_reaction_support_tags(built,selected_support)
         display_nodes=dict(data['nodes'],**{str(g['master_tag']):g['master_xyz'] for g in groups});display_ns=sorted(map(int,display_nodes))
         for ecc_sign in ((0,1,-1) if config.get('accidental_torsion',True) else (0,)):
             case_axis=axis+('_Eplus' if ecc_sign==1 else '_Eminus' if ecc_sign==-1 else '_E0')
