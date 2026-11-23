@@ -15,3 +15,15 @@ Derives foundation recorder node IDs from the actual returned `build_complete_mo
 Source section names, counts, wall concrete class and wall thickness come from the actual local model. Solver section tags and current illustrative RC fiber cards come from `components.sections.definitions`. Unmapped frame sections or inconsistent wall property dimensions fail, rather than silently mapping all to one nominal card. Returns `RESEARCH_TEMPLATE_UNCALIBRATED` for incomplete actual material/rebar/FSAM mappings. Reference R01: PEER 2015/12 ConcreteCM/SteelMPF/FSAM specimen formulation; R02: E-SFI-MVLEM-3D 2023 doi:10.1016/j.engstruct.2023.116700. These are formulation sources only. Original source concrete M45 vs illustrative fiber concrete M35 is a documented unresolved transfer, not a verified material conversion.
 
 **Tests:** `tests/test_direct_existing_nltha_20261122.py` stages exact topology bytes, rejects missing topology/mapping, verifies geometry counts, uses active 32 supports even when raw export has 76 and rejects mismatched solver support case. No live ETABS/OpenSees solver is represented by these unit tests.
+
+
+## 2026-11-23 — Shared physical-support tag recovery
+
+The public `solver_reaction_support_tags` import remains available
+under this NLTHA source-handoff module, but now delegates to the single
+shared owner in `components.model.support_case_contract`. This keeps
+existing NLTHA callers stable while preventing MRSM and NLTHA from
+independently interpreting the 76-point raw export as a support set.
+The shared owner checks actual builder tags for the selected 32/76/97
+case, duplicates and malformed IDs. All native force, gravity,
+wall-MPC and nonlinear acceptance gates remain unchanged.

@@ -81,22 +81,15 @@ def stage_existing_model_sources(source, destination):
 
 def solver_reaction_support_tags(report, support_case="PHYSICAL_32"):
     """[REF docs/source/components/nonlinear_time_history/source_model_handoff.py.md]
-    Use only actual assembled OpenSees base supports; not 76 exported point rows.
+    Compatibility import for the shared model's runtime reaction tag selector.
 
-    Native ETABS edge/MPC transfer remains unverified even if tags match.
+    NLTHA and MRSM use the same actual supported nodes; historical callers
+    keep the original NLTHA import path. Native ETABS parity is unverified.
     """
     from components.model.support_case_contract import (
-        normalize_support_case, require_runtime_support_case
+        solver_reaction_support_tags as shared_solver_reaction_support_tags
     )
-    selected=normalize_support_case(support_case)
-    require_runtime_support_case(selected,report)
-    raw=report["gravity_base_support_tags"]
-    if any(isinstance(tag,bool) for tag in raw):
-        raise ValueError("Boolean solver support tag invalid")
-    tags=sorted(int(tag) for tag in raw)
-    if len(set(tags))!=len(tags):
-        raise ValueError("Duplicate actual solver support tag")
-    return tags
+    return shared_solver_reaction_support_tags(report, support_case)
 
 
 def literature_section_inventory(data, config):

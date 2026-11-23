@@ -78,3 +78,84 @@ equivalence tests.
 The separate raw-source `support_tags`/generalized-mass calculations
 remain explicitly queued for a source-matched engineering review.
 They were not silently redefined as part of this source-status patch.
+
+
+## 2026-11-23 later review — actual-solver support reaction source, all-stage implications
+
+**Current iteration:** PR #164 on `main@db6ad42fba354299348967d96c78cf813f29e207`.
+All earlier reviews remain historical evidence. This iteration inspected the
+current `components/model/support_case_contract.py`,
+`components/nonlinear_time_history/source_model_handoff.py`,
+`components/response_spectrum/model_analysis.py`,
+their source guides, existing handoff/readiness and stage result contracts,
+plus synthetic regression tests. This is a **targeted module-boundary
+review**, not exhaustive semantic validation of every active Python file.
+No 2026-11-23 native EDB/Excel/32-support source-run evidence was available.
+
+### Root cause and bounded code correction
+
+MRSM already enforced `require_runtime_support_case(selected_support,built)`
+immediately after its model build, but then sourced its reaction node array from
+`data['supports']`, a **raw exporter restraint dictionary** that may list
+76 base/mesh points. Source-support count is different from actual
+`build_complete_model(...)` returned `gravity_base_support_tags`.
+This affects which node reactions are sampled into `Modal_Force_Equilibrium`
+and `Support_Reactions` CSVs; it is **not** itself a proof that spectral
+force values were numerically wrong or that the archived 768.045-kN gravity
+difference is explained.
+
+The current branch moves the existing NLTHA runtime support selector into
+the authoritative `components/model/support_case_contract.py`, retains
+NLTHA's original public import as a wrapper, and makes MRSM use the
+selected model-builder actual tags. All 32/76/97 conditions and source
+model/physical profiles remain exactly as selected. Duplicate/malformed
+runtime tags fail closed. Old files and private native EDB are preserved.
+
+**TDD RED at `76333982`:** four focused failures on the original
+code; 1,783 other headless tests passed, five skipped. Latest success must
+be taken from the PR's final commit CI, not inferred from this red baseline.
+Synthetic tag selection is not independent reaction equilibrium evidence.
+
+### Module-by-module next engineering/software gates
+
+| Current stage | Latest bounded review classification | Acceptance work still required |
+| --- | --- | --- |
+| ETABS input / converter | Existing source export + exact model data writers | Freeze actual EDB SHA, workbook/SF and beam-force split manifests; verify all source members/loads and provenance on the same native model |
+| Node/element model assembly | Native object-to-solver ID audit present; raw supports ≠ physical supports | Prove two 12m X walls with openings; wall edge/MPC transfers; frame rigid end offsets, local releases and 32-foundation six-component common cut |
+| Gravity and P-Delta | Source-equivalent 1.0D+1.0L remains separate from NBC §5.2 seismic mass | Reproduce the current native 32-support **768.045 kN** maximum pointwise gravity residual, category-by-category selfweight and source nodal loads; verify signed initial PDelta cases |
+| Modal/Rayleigh | Directional and ULS/SLS source-state isolation implemented | Validate 32-support mass/stiffness operator, eigenmode shapes and Rayleigh periods against the *same* ETABS model; do not reuse 76-restraint results |
+| ESM | 12 generated cases and case/runner SHA evidence are software safeguards | High-rise ULS ESM stays reference-only; site Vs30, full ±e response/torsion and independent code applicability acceptance still needed |
+| MRSM | **This branch corrects reaction recorder IDs** using selected actual runtime supports; saved-run SHA/status checks already exist | Independently validate CQC generalized modal mass under distributed versus STORY_LUMPED_NBC, actual recovered section-cut reactions, modal response scale, unscaled drift and source ETABS spectra |
+| LTHA | Independent XY/YX runs and full-history case-status parsing already exist | Source-matched motion dt/unit/SHA, original pair scaling, true full duration, exact frozen gravity/PDelta and 32-support reaction equilibrium |
+| NLTHA / M0–M6 | NLTHA compatibility wrapper now shares actual support node semantics | Reproduce first-step X-wall nonfinite element 110280 with ZERO/X/Y tests; verify published specimen parameter applicability, nonlinear wall energy and 224 intended full-duration runs |
+| NBC 105 | Existing clause modules, separate ULS/SLS and independent acceptance flags | Verify geology/site, irregularity, load combinations, detailing, and all relevant clause/footnote implementation against approved design basis |
+| GUIs / outputs / comparison | Immutable stage runs, manifest, read-only audits, on-demand optional workbooks are present | Finish coordinated writer+reader migration (issue #141), stale-result rejection across viewers, six-DOF source ETABS response comparisons; no automatic pass from a solver exit code |
+
+### Efficiency rules for measured improvements
+
+1. **Keep analysis state physically isolated:** X/Y and history
+   orientations may reuse read-only source parsing and hashes, but never
+   reuse a modified `ops` domain without numerical equivalence evidence.
+2. **Cache only source-verified immutable inputs:** EDB/JSON/sections,
+   ULS/SLS gravity case, support/mass policy, ground-motion pair and config
+   hash must all match; a model JSON SHA alone does **not** encode runtime
+   32/76/97 or mass-operator decisions.
+3. **Avoid repeated expensive default exports:** preserve source CSV/JSON
+   status and produce multi-sheet Excel, Plotly 3D, PNG, ZIP on demand.
+   Prior conversion audit found workbook preparation as a major bottleneck,
+   but a fresh same-source timing comparison is required before claiming
+   speedup.
+4. **Use actual run manifests for every view:** source metadata,
+   unique run ID and saved result SHA must be checked before an artifact
+   is reused in cross-stage plots or force comparison.
+5. **Preserve raw source for independent comparison:** the original
+   76-point ETABS export remains valid source evidence, but may not be
+   silently treated as 76 physical foundation supports or actual solver
+   reaction output nodes for a 32-support build.
+
+**Engineering gate:** No native Windows ETABS 23/OpenSees model run or
+new foundation section-cut validation was performed in this GitHub-only
+iteration. `SOURCE_CHECKED`, `NUMERICALLY_CONVERGED`,
+`ETABS_OPENSEES_MATCHED`, `EXPERIMENT_VALIDATED` and `CODE_ACCEPTED`
+must remain separate. This patch fixes recorder identification, not
+the outstanding numerical or nonlinear model-validation failures.
