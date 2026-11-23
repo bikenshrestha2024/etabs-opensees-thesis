@@ -3,7 +3,10 @@
 Synthetic temporary inputs only; no ETABS native EDB, OpenSees execution,
 private model files or source workbook contents.
 """
+import ast
 import hashlib
+import inspect
+import textwrap
 import json
 import tempfile
 import unittest
@@ -86,6 +89,30 @@ def build_synthetic_workspace(tmp):
 
 
 class MRSMReopenSourceGateTests(unittest.TestCase):
+    def test_saved_numeric_readback_does_not_block_tk_launch_thread(self):
+        """Reviewing potentially large MRSM JSON is worker work, not Tk init."""
+        syntax = ast.parse(textwrap.dedent(inspect.getsource(mrsm.launch)))
+        root = syntax.body[0]
+        parents = {}
+        for node in ast.walk(root):
+            for child in ast.iter_child_nodes(node):
+                parents[child] = node
+        calls = [node for node in ast.walk(root)
+                 if isinstance(node, ast.Call)
+                 and isinstance(node.func, ast.Name)
+                 and node.func.id == "review_saved_mrsm_batch"]
+        self.assertTrue(calls, "MRSM saved-source status must be checked")
+        synchronous = []
+        for call in calls:
+            cursor = parents[call]
+            while cursor is not root and not isinstance(
+                    cursor, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                cursor = parents[cursor]
+            if cursor is root:
+                synchronous.append(call.lineno)
+        self.assertEqual(synchronous, [],
+                         "Saved numeric report parsing must not block Tk initialization")
+
     def test_legacy_completed_rows_are_not_current_numeric_completions(self):
         with tempfile.TemporaryDirectory() as tmp:
             source, stage, run, digest = build_synthetic_workspace(tmp)
