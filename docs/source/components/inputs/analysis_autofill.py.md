@@ -44,3 +44,18 @@ The historical `OpenSees_Linear_Autofill_V124.py` root launcher executes this co
 ## 2026-11-21 clause 5 period routing and DEVIATION
 
 `workbook_adopted_period(height_m, aw_m2, rayleigh_s, factor)` applies the NBC 105:2025 §5.1 lesser-of rule through the [clause 5 module](../nbc105/clause_05_dynamic_characteristics.py.md). When the workbook `period_factor` is not 1.25 it returns no period and a DEVIATION note, and `populate_linear` clears the T1 field (including any value pre-filled from `workbook_adopted_t*`) instead of adopting a non-NBC period. Test: `tests/test_nbc105_clause5_callsites.py`.
+
+
+## 2026-11-23 — Saved-modal to Linear TH support/mass identity
+
+A saved modal reference can populate Linear TH damping and Tn fields only when
+**all** of its current model JSON SHA, ULS/SLS state, selected runtime physical
+support profile (`PHYSICAL_32`, `SOURCE_76`, `WALL_BASE_97`), seismic-mass
+operator policy (`SOURCE_DISTRIBUTED` or `STORY_LUMPED_NBC`), and accepted
+numerical implementation fingerprint are compatible. Missing legacy support or
+mass-policy metadata is a rejected starting reference, not a presumed match.
+
+Changing the Linear TH GUI's support or mass choice queues a refresh, clearing
+old damping/Tn fields until exact compatible modal evidence is found. No native
+ETABS/OpenSees equivalence or nonlinear material validation is inferred.
+Regression: `tests/test_modal_history_policy_handoff.py`.
