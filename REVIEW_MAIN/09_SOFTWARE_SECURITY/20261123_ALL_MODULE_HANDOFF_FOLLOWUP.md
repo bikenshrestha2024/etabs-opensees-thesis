@@ -60,3 +60,21 @@ and dropped when the user edits inputs or begins a new case. This is a
 MRSM computation. The saved-source fingerprint and native-reaction gates remain
 unchanged. Test-first failure at `6d4d17a4`: one new UI thread-placement
 regression failed, with 1780 prior tests passing. Verify final head separately.
+
+
+### Important MRSM runtime identity gap fixed in this PR
+
+After the initial saved-case SHA fix, the saved numeric output validator
+still compared the serialized JSON model hash but not the **actual selected**
+physical support profile or seismic mass operator inside every computed
+case. The runtime model builder already writes both fields and a
+`support_case_evidence` profile into each MRSM result. This stage now
+requires exact matches for all six responses when presenting a saved
+current numerical run as complete, and when confirming the just-solved
+MRSM batch. The verification is metadata correctness only, not a
+replacement for the 32-foundation native edge/MPC and dynamic mass
+equivalence tests.
+
+The separate raw-source `support_tags`/generalized-mass calculations
+remain explicitly queued for a source-matched engineering review.
+They were not silently redefined as part of this source-status patch.
