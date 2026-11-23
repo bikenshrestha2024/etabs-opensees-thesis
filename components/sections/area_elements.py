@@ -642,7 +642,7 @@ def launch_area_integration_gui(parent=None, export_dir=None):
             messagebox.showinfo('Source inventory + ZIP saved',
                 f'Excel: {workbook}\\nJSON: {manifest}\\nZIP: {zipfile}\\n\\nSOURCE REVIEW ONLY: no elements, loads or dynamic analysis executed.',parent=win)
         except Exception as exc:messagebox.showerror('Area inventory',str(exc),parent=win)
-    ttk.Button(root,text="Export area-object inventory (Excel + JSON)",command=export_inventory).pack(anchor="w",pady=4)
+    ttk.Button(root,text="Export area inventory (Excel + JSON + ZIP)",command=export_inventory).pack(anchor="w",pady=4)
     def open_output_folder():
         try:
             import os
