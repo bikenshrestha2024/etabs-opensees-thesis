@@ -52,3 +52,8 @@ populate_site(app, folder) requires an existing selected export folder. It reads
 matching_modal_reference() still requires model SHA and state matches for modal mass-derived Tn. The history-window path through populate_spectrum retains selected-source T1/Tn values and updates the site-spectrum provenance label. Actual Rayleigh / Aw and ETABS/OpenSees physical identity remain acceptance gates, not auto-certified by GUI import.
 
 Regression: tests/test_site_spectrum_period_autofill_20261123.py.
+
+
+## 2026-11-23 — policy-bound modal evidence for transient analysis
+
+Saved modal eigenperiods imported by Linear TH must match source model JSON SHA, ULS/SLS, runtime selected support profile (32/76/97), seismic mass policy, and numerical implementation. Missing policy evidence is not trusted. The Linear TH GUI refreshes on support/mass changes; unrelated source periods remain empty. This is software provenance, not native ETABS equivalence. Synthetic regression: `tests/test_modal_history_policy_handoff.py`.
