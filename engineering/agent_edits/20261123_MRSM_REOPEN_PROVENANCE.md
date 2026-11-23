@@ -14,3 +14,6 @@
 
 
 - **Additional GUI performance gate:** Initial direct saved JSON validation on Tk initialization was detected in code review after source tests passed; synthetic AST regression committed at `6d4d17a4`, verified red 1/1781. Review moved to a background thread with Tk event-loop callback and input-change invalidation. No speedup in native solver computation is claimed.
+
+
+- **Additional support/mass identity check:** Test-first failure at `24498fe9` exposed that a saved MRSM result with matching model SHA could carry a different executed 32/76 support profile or source/lumped mass policy. Added optional exact-match support/mass checks to existing six-case validator for both runtime completion and saved readback; solver math unchanged. Verify latest CI head before claiming PASS.
