@@ -1,6 +1,6 @@
 # Source files, project provenance and output contracts
 
-**Active owner:** `components/inputs/` · **Current Python modules:** 19 · **Status:** module navigation only; engineering acceptance requires independent evidence.
+**Active owner:** `components/inputs/` · **Current Python modules:** 20 · **Status:** module navigation only; engineering acceptance requires independent evidence.
 
 ## Responsibilities and interfaces
 
@@ -20,6 +20,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [etabs_periods.py](etabs_periods.py)
 - [etabs_table_bundle.py](etabs_table_bundle.py)
 - [export_mirror.py](export_mirror.py)
+- [evidence_archive.py](evidence_archive.py)
 - [folder_audit.py](folder_audit.py)
 - [gravity_evidence_stage.py](gravity_evidence_stage.py)
 - [grouped_wall_aw.py](grouped_wall_aw.py)

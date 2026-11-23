@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from zipfile import ZipFile
 import unittest
 from openpyxl import load_workbook
 from components.sections.area_elements import export_area_integration_inventory, default_area_integration_script_path
@@ -37,6 +38,14 @@ class AreaInventoryTests(unittest.TestCase):
             self.assertEqual(m['source_quad_counts']['FLOOR'],1)
             self.assertEqual(m['sha256']['topology'],hashlib.sha256(topology.read_bytes()).hexdigest())
             self.assertFalse(m['analysis_ready'])
+            archived=root/'07_EXPORT_ZIP'/'AREA_INTEGRATION'/(workbook.stem+'.zip')
+            self.assertTrue(archived.is_file(), 'Area inventory must publish a real ZIP')
+            with ZipFile(archived) as archive:
+                self.assertIsNone(archive.testzip())
+                self.assertIn('00_INPUT_SOURCE/OpenSees_Element_Connectivity.json',archive.namelist())
+                self.assertIn('02_MODEL/AREA_INTEGRATION/excel/'+workbook.name,archive.namelist())
+                zip_manifest=json.loads(archive.read('EVIDENCE_MANIFEST.json'))
+                self.assertEqual(zip_manifest['engineering_acceptance'],'NOT_VERIFIED')
             wb=load_workbook(workbook,read_only=True,data_only=False)
             self.assertEqual(wb['Area objects']['D2'].value,'SLAB150')
             self.assertEqual(wb['Area objects']['F2'].value,4.0)

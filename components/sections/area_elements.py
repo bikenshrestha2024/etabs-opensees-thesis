@@ -482,6 +482,20 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
         'analysis_ready':False}
     json_path=json_dir/f'Area_Integration_Inventory_{case}.json'
     json_path.write_text(json.dumps(manifest,indent=2),encoding='utf-8')
+    # A source-only evidence ZIP belongs to this selected export, not an
+    # unrelated model's archive folder. Do not include any other case files.
+    from components.inputs.evidence_archive import publish_case_evidence_zip
+    publish_case_evidence_zip(
+        output_dir, filename=f'Area_Integration_Inventory_{case}.zip',
+        category='AREA_INTEGRATION',
+        status='SOURCE_ONLY_TOPOLOGY_NOT_NATIVE_SOLVER_VALIDATED',
+        files=[
+            ('00_INPUT_SOURCE/OpenSees_Element_Connectivity.json',paths['topology']),
+            ('00_INPUT_SOURCE/OpenSees_Area_Section_Assignment_Audit.csv',paths['area_assignments']),
+            ('00_INPUT_SOURCE/OpenSees_Area_Model_Config_V116.json',paths['config']),
+            ('02_MODEL/AREA_INTEGRATION/excel/'+out.name,out),
+            ('02_MODEL/AREA_INTEGRATION/json/'+json_path.name,json_path),
+        ])
     return out,json_path
 
 
@@ -622,10 +636,13 @@ def launch_area_integration_gui(parent=None, export_dir=None):
                 topology_json=paths['topology'].get(),
                 area_assignment_csv=paths['audit'].get(),
                 config_json=paths['config'].get(),output_dir=destination)
-            messagebox.showinfo('Source inventory saved',
-                f'Excel: {workbook}\\nJSON: {manifest}\\n\\nSOURCE REVIEW ONLY: no elements, loads or dynamic analysis executed.',parent=win)
+            from components.inputs.review_zip_paths import review_zip_directory
+            zipfile=review_zip_directory(destination)/'AREA_INTEGRATION'/(
+                workbook.stem+'.zip')
+            messagebox.showinfo('Source inventory + ZIP saved',
+                f'Excel: {workbook}\\nJSON: {manifest}\\nZIP: {zipfile}\\n\\nSOURCE REVIEW ONLY: no elements, loads or dynamic analysis executed.',parent=win)
         except Exception as exc:messagebox.showerror('Area inventory',str(exc),parent=win)
-    ttk.Button(root,text="Export area-object inventory (Excel + JSON)",command=export_inventory).pack(anchor="w",pady=4)
+    ttk.Button(root,text="Export area inventory (Excel + JSON + ZIP)",command=export_inventory).pack(anchor="w",pady=4)
     def open_output_folder():
         try:
             import os

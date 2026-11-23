@@ -204,6 +204,41 @@ def prepare_canonical_modal_run(export_dir, limit_state, model_script):
     return run
 
 
+def package_modal_evidence(run_folder, limit_state, *, canonical=True):
+    """[REF docs/source/components/modal/gui_and_reports.py.md]
+    Archive one completed modal case; never rerun gravity or eigenanalysis.
+    """
+    from components.inputs.evidence_archive import publish_case_evidence_zip
+    root=Path(run_folder).expanduser()
+    state=str(limit_state).strip().upper()
+    if state not in ('ULS','SLS'):
+        raise ValueError('A single reviewed ULS or SLS state is required')
+    result=(root/'02_RESULTS'/'NBC105_Modal_V111.json' if canonical
+            else root/'NBC105_Modal_V111.json')
+    if not result.is_file():
+        raise FileNotFoundError(f'No completed modal result to package: {result}')
+    result_data=json.loads(result.read_text(encoding='utf-8-sig'))
+    if result_data.get('limit_state') and result_data['limit_state'] != state:
+        raise ValueError('Requested ZIP state differs from saved modal state')
+    if not result_data.get('returned_modes',0):
+        raise ValueError('No completed eigenmodes in saved modal report')
+    sections=(('00_INPUT_SOURCE','01_LOGS','02_RESULTS','03_EXCEL','04_FIGURES','06_REVIEW')
+              if canonical else ('',))
+    allowed={'.json','.csv','.xlsx','.txt','.log','.png','.pdf'}
+    files=[]
+    for section in sections:
+        folder=root/section if section else root
+        if not folder.is_dir():
+            continue
+        for source in sorted(folder.iterdir()):
+            if source.is_file() and source.suffix.lower() in allowed:
+                name=f'{section}/{source.name}' if section else source.name
+                files.append((name,source))
+    return publish_case_evidence_zip(
+        root,filename=f'NBC105_Modal_{state}_Evidence.zip',files=files,
+        status='COMPLETED_EIGEN_AUDIT_NATIVE_MODEL_EQUIVALENCE_NOT_VERIFIED')
+
+
 class ModalAuditGUI:
     def __init__(self, parent=None):
         self._owns_root = parent is None
@@ -299,6 +334,7 @@ class ModalAuditGUI:
         tk.Checkbutton(form, text="I reviewed the model script, mass source, constraints and gravity preload for this modal run.", variable=self.confirm, wraplength=840, anchor="w", justify="left").pack(anchor="w", pady=5)
         run_row=ttk.Frame(outer);run_row.pack(anchor="w", pady=10)
         self.run_button=ttk.Button(run_row, text="Run selected SLS / ULS modal audit", command=self._run);self.run_button.pack(side="left")
+        ttk.Button(run_row,text="Export saved modal ZIP",command=self._export_saved_zip).pack(side="left",padx=5)
         add_open_output_button(run_row,lambda:self._last_result_folder or self.output.get(),window=self.root,padx=8)
         self._last_result_folder=None
         self.stop_button=ttk.Button(outer,text="Stop modal solver and skip pending states",
@@ -380,8 +416,36 @@ class ModalAuditGUI:
 
     def _view_plot(self):
         from OpenSees_Results_UI_V127 import modal_results
-        try:modal_results(self.root,self.output.get())
+        try:modal_results(self.root,self._last_result_folder or self.output.get())
         except Exception as exc:messagebox.showerror('Modal results',str(exc),parent=self.root)
+
+    def _export_saved_zip(self):
+        """Package an earlier completed case without re-running the modal solver."""
+        chosen=filedialog.askdirectory(parent=self.root,
+            title="Select completed modal run (or its 02_RESULTS / 07_EXPORT_ZIP)",
+            initialdir=self._last_result_folder or self.output.get())
+        if not chosen:
+            return
+        try:
+            root=Path(chosen).expanduser()
+            if root.name in ('00_INPUT_SOURCE','01_LOGS','02_RESULTS','03_EXCEL',
+                             '04_FIGURES','06_REVIEW','07_EXPORT_ZIP'):
+                root=root.parent
+            canonical=(root/'00_INPUT_SOURCE'/'CASE_MANIFEST.json').is_file()
+            result=(root/'02_RESULTS'/'NBC105_Modal_V111.json' if canonical
+                    else root/'NBC105_Modal_V111.json')
+            data=json.loads(result.read_text(encoding='utf-8-sig'))
+            state=str(data.get('limit_state') or '').upper()
+            if not state and canonical:
+                case=json.loads((root/'00_INPUT_SOURCE'/'CASE_MANIFEST.json').read_text(encoding='utf-8-sig'))
+                state=str(case.get('state') or '').upper()
+            archive=package_modal_evidence(root,state,canonical=canonical)
+            messagebox.showinfo('Modal evidence ZIP created',
+                f'ZIP: {archive}\n\nThe saved solver results were not rerun. '
+                'This archive is review evidence only; native ETABS equivalence remains NOT VERIFIED.',
+                parent=self.root)
+        except Exception as exc:
+            messagebox.showerror('Modal ZIP export failed',str(exc),parent=self.root)
 
     def _pick_python(self):
         p = filedialog.askopenfilename(parent=self.root, filetypes=[("Python", "python.exe"), ("All files", "*.*")])
@@ -512,8 +576,17 @@ class ModalAuditGUI:
                                 message="Eigenanalysis completed; physical equivalence unverified.")
                         else:
                             shutil.copy2(output/'NBC105_Modal_V111.json',state_output/'NBC105_Modal_V111.json')
+                        # ZIP is a separate evidence-publication gate; do not silently call it success.
+                        evidence_zip=None
+                        try:
+                            evidence_zip=package_modal_evidence(
+                                run_root or output,state,canonical=bool(run_root))
+                        except Exception as exc:
+                            export_warnings.append("Modal evidence ZIP FAILED: "+str(exc))
                         msg = (f"Finished {state}: {len(result.get('rows',[]))} eigenmodes. UX cumulative={result['cumulative_UX_percent']:.3f}%; UY cumulative={result['cumulative_UY_percent']:.3f}%. Modal mass coverage is not a section design PASS. "
                                f"Review CSV/JSON/TXT outputs and log in {output}.")
+                        if evidence_zip:
+                            msg += f" Evidence ZIP: {evidence_zip}."
                         if export_warnings:
                             msg += "\n" + "\n".join(export_warnings)
                     ledger.set(state,exit_state,msg)
