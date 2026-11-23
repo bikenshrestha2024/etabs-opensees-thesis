@@ -135,3 +135,17 @@ def test_warning_digest_keeps_raw_id_specific_diagnostics_in_source():
     assert any("2 frame" in line and "1308" in line and "1309" in line for line in digest)
     assert any("mesh transfer" in line for line in digest)
     assert len(warnings)==3
+
+
+def test_3d_plotly_handoff_has_dimension_even_for_same_numeric_id():
+    from components.sections.mapping_gui import plotly_query_for_key
+    with tempfile.TemporaryDirectory() as td:
+        data=collect(_fixture(Path(td)))
+        assert plotly_query_for_key("FRAME:1",data)=={
+            "idKind":"object","idValue":"1","category":"frame"}
+        assert plotly_query_for_key("AREA:1",data)=={
+            "idKind":"object","idValue":"1","category":"area"}
+        assert plotly_query_for_key("SOLVER:100002",data)=={
+            "idKind":"solver","idValue":"100002","category":"area"}
+        assert plotly_query_for_key("SOLVER:100001",data)=={
+            "idKind":"solver","idValue":"100001","category":"frame"}
