@@ -92,3 +92,8 @@ current script after a success before saving source evidence.
 workbook can still change between runs; their own SHA/case manifests must be
 validated independently. A file content digest before/after execution
 is not an immutable process image and does not prove solver physics.
+
+
+## 2026-11-23 — Reading canonical ESM comparison after legacy output relocation
+
+For old saved ESM cases located in `OpenSees_Analysis_Results/<case>`, the combined reviewer may discover new comparison workbook/JSON pairs under the same project's `03_ESM/COMPARISONS`. It must check the current on-disk source EDB SHA-256 and require every compared case to be represented by the selected calculation JSON. If the EDB file, its identity or the matching case is unavailable, the comparison is excluded rather than imported by `latest` timestamp. Existing source and solver outputs are never moved. Synthetic tests: `tests/test_esm_comparison_stage_reader.py`. No ETABS/OpenSees engineering validation is implied.
