@@ -144,3 +144,26 @@ The GUI captures Python executable, support/mass policy and optional-output choi
 **Performance scope:** this avoids optional report serialization and some log I/O; it does **not** remove the dominant repeated `runpy.run_path(MODEL_BUILDER_SCRIPT)` model construction, gravity preload and initial P-Delta checks. No elapsed-time reduction has been benchmarked on native Windows/OpenSees, and the observed 114-second model/gravity build per case remains a separate potential cost. Any future shared model-state optimization must be established through exact source hashes and independent X/Y/±/E0, support, mass, initial P-Delta, reaction and drift equivalence checks. Do not pass a reused nonlinear domain as a fresh independent solved case.
 
 Regression: `tests/test_esm_fast_io_option_20261123.py` (synthetic script/GUI contracts only); native Windows timing and complete 12-case batch remain to be verified.
+
+## 2026-11-23 — one source-export-owned ESM output location
+
+A new ESM case previously could be written directly into a folder selected from another module (e.g. `02_MODEL`), and the GUI always wrote `ESM_Runner_Status` beneath its currently selected (often ULS-only) case directory even if the batch included SLS scripts. This split case output, status and combined-export discovery. Source review confirmed the live writer in `_calculate_axis`, GUI selection in `_browse_out`, and batch-status writer in `_run_generated`.
+
+**New canonical in-project layout:**
+
+```text
+<selected ETABS export>/
+  03_ESM/
+    RUNS/
+      ULS/<source-matched-model>/{calculation, runner, solver response, timings}
+      SLS/<source-matched-model>/{calculation, runner, solver response, timings}
+    LOGS_AND_STATUS/
+      ESM_Runner_Status/<batch-id>/{CASE_STATUS.json, GUI_Run_*.log}
+    REVIEW_SNAPSHOTS/<snapshot-id>/{review copies, Excel, ZIP}
+```
+
+`esm_case_output_directory` maps an in-export arbitrary folder to the exact selected state/model under `03_ESM/RUNS`. The GUI preserves an **explicit external custom** directory only; no other internal module can silently receive an ESM case. `esm_batch_status_root` maps all in-export selected cases to the same `03_ESM/LOGS_AND_STATUS/ESM_Runner_Status` (including mixed ULS/SLS). The existing combined reader searches this canonical location **and** historical case-local `ESM_Runner_Status` files without moving or deleting them. The GUI **Open output folder** action opens the one `03_ESM` module folder for in-export outputs.
+
+Each individual generated runner still writes its own exact source-state response directory; this change does not merge ULS and SLS physical runs or change cases, stiffness, supports, gravity, P-Delta or solver equations. A review SNAPSHOT is deliberately separate from original solver data. Project-specific native verification and fully source-matched across-state combined exporting remain open independently.
+
+Regression: `tests/test_esm_single_output_owner_20261123.py`. Existing result paths are left in place.
