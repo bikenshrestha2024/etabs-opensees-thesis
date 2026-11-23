@@ -31,3 +31,10 @@ The uploaded V125 workbook contains 2,092 source objects, of which 55 `BEAM / UN
 **Performance:** `MappingGUI.reload()` and `show_load_audit()` no longer automatically generate the large workbook. `Export / open Excel audit` remains an explicit user-requested action, keeping the locked-workbook timestamped fallback. `MappingGUI.populate()` uses indexed solver-tag/property lookup. The inline node picker starts blank, so opening the inspector no longer falsely highlights `NODE:1`. Exact Plotly source IDs and separate solver tags remain available.
 
 Reference: [23 November source-grounded handoff report](https://github.com/bikenshrestha2024/etabs-opensees-thesis/blob/main/REVIEW_MAIN/01_ETABS_IMPORT/20261123_POSTCONVERSION_ID_MAPPING_WORKFLOW_AUDIT.md). Tests: `tests/test_postconversion_handoff_20261123.py`, `tests/verify_v125.py`, `tests/test_shared_3d_prefix_selector.py`. These checks are not a new native ETABS–OpenSees equivalence or NLTHA run.
+
+
+### Explicit frame/area visual selection
+
+`plotly_query_for_key(key,data)` carries exact ETABS **dimension** to the common Plotly HTML inspector through `category=frame/area`, so frame ID 1 is never mistaken for area ID 1. `SOLVER:` elements derive the category from their actual parent mapping. `inline_source_keys` supports separate ETABS frame/area selectors and reports an ambiguous legacy number rather than highlighting both. `Highlight selected ID in 3D` now reports a missing saved HTML file to the GUI rather than silently doing nothing.
+
+Regression: `tests/test_postconversion_handoff_20261123.py`.
