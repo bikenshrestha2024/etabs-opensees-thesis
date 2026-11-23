@@ -36,6 +36,11 @@ def numeric_cases(model_sha):
     return {
         axis + "_" + ecc: {
             "axis": axis, "limit_state": "ULS", "model_sha256": model_sha,
+            "support_case": "PHYSICAL_32",
+            "seismic_mass_policy": "SOURCE_DISTRIBUTED",
+            "support_case_evidence": {
+                "selected_profile": "PHYSICAL_32", "actual_supports": 32,
+            },
             "unscaled_modal_base_shear_kN": 100.,
             "reference_ESM_base_shear_kN": 120.,
             "force_scale": 1.2, "scaled_modal_base_shear_kN": 120.,
@@ -189,6 +194,41 @@ class MRSMReopenSourceGateTests(unittest.TestCase):
             result = mrsm.review_saved_mrsm_batch(stage, source, fields)
             self.assertEqual(result["status"], "NUMERIC_EVIDENCE_INCOMPLETE")
             self.assertEqual(result["numerical_cases_verified"], 0)
+
+    def test_saved_numeric_case_must_match_executed_support_and_mass_policy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source, stage, run, digest = build_synthetic_workspace(tmp)
+            fields = selected_fields()
+            ledger = CaseLedger(
+                stage / "MRSM_Batch_Status_V151.json", IDS,
+                provenance={
+                    "model_sha256": digest, "state": "ULS",
+                    "input_sha256": mrsm.mrsm_input_signature(fields),
+                    "run_dir": str(run),
+                })
+            for case in IDS:
+                ledger.set(case, "COMPLETED", "Stored process-only row")
+            result_file = run / "02_RESULTS" / "MRSM_Results_V132.json"
+            rows = numeric_cases(digest)
+            rows["Y_Eplus"]["support_case"] = "SOURCE_76"
+            result_file.write_text(json.dumps(rows), encoding="utf-8")
+            wrong_support = mrsm.review_saved_mrsm_batch(stage, source, fields)
+            self.assertEqual(wrong_support["status"], "NUMERIC_EVIDENCE_INCOMPLETE")
+            self.assertEqual(wrong_support["numerical_cases_verified"], 0)
+
+            rows = numeric_cases(digest)
+            rows["Y_Eplus"]["seismic_mass_policy"] = "STORY_LUMPED_NBC"
+            result_file.write_text(json.dumps(rows), encoding="utf-8")
+            wrong_mass = mrsm.review_saved_mrsm_batch(stage, source, fields)
+            self.assertEqual(wrong_mass["status"], "NUMERIC_EVIDENCE_INCOMPLETE")
+            self.assertEqual(wrong_mass["numerical_cases_verified"], 0)
+
+            rows = numeric_cases(digest)
+            rows["Y_Eplus"]["support_case_evidence"]["selected_profile"] = "SOURCE_76"
+            result_file.write_text(json.dumps(rows), encoding="utf-8")
+            wrong_runtime = mrsm.review_saved_mrsm_batch(stage, source, fields)
+            self.assertEqual(wrong_runtime["status"], "NUMERIC_EVIDENCE_INCOMPLETE")
+            self.assertEqual(wrong_runtime["numerical_cases_verified"], 0)
 
     def test_foreign_run_dir_is_not_accepted(self):
         with tempfile.TemporaryDirectory() as tmp:
