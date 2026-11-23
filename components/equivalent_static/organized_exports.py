@@ -60,6 +60,59 @@ def _exact_calculation_roots(root):
     return tuple(roots)
 
 
+def _stage_comparison_sources(root, calculation_roots):
+    """[REF docs/source/components/equivalent_static/organized_exports.py.md]
+    Discover stage-owned comparison only for an exact legacy source EDB/case.
+
+    Never copy a different model's latest comparison into this case snapshot.
+    Missing EDB or unknown case identity means no comparison is imported.
+    """
+    from components.inputs.output_layout import export_root_for
+    from components.inputs.project_workbooks import _source_edb_path
+    selected=Path(root).resolve()
+    if not any(p.name.casefold()=="opensees_analysis_results"
+               for p in (selected,*selected.parents)):
+        return
+    export_root=export_root_for(selected)
+    edb=_source_edb_path(export_root)
+    if not edb or not Path(edb).is_file():
+        return
+    current_digest=_sha256(edb)
+    exact_cases=set()
+    for case_root in calculation_roots:
+        for file in Path(case_root).glob("NBC105_ESM_Calculation_*_V111.json"):
+            try:
+                source=json.loads(file.read_text(encoding="utf-8-sig"))
+                if isinstance(source,dict):
+                    case=source.get("direction_case") or source.get("response_case")
+                    if case and source.get("limit_state") in ("ULS","SLS"):
+                        exact_cases.add(case)
+            except (OSError,ValueError,TypeError):
+                continue
+    if not exact_cases:
+        return
+    folder=export_root/"03_ESM"/"COMPARISONS"
+    if not folder.is_dir() or folder.is_symlink():
+        return
+    for file in sorted(folder.glob("ETABS_Linked_vs_OpenSees_Direct_ESM_*.json")):
+        if file.is_symlink():
+            continue
+        try:
+            evidence=json.loads(file.read_text(encoding="utf-8-sig"))
+            rows=evidence.get("rows")
+            compared={item["case"] for item in rows if isinstance(item,dict)}
+            valid=(evidence.get("source_edb_sha256")==current_digest
+                   and bool(compared) and compared.issubset(exact_cases))
+        except (OSError,ValueError,KeyError,TypeError,AttributeError):
+            valid=False
+        if not valid:
+            continue
+        yield "comparison",file
+        workbook=file.with_suffix(".xlsx")
+        if workbook.is_file() and not workbook.is_symlink():
+            yield "comparison",workbook
+
+
 def _source_files(root, calculation_roots=()):
     """Yield ESM sources, including the exact matched case's calculations."""
     for source in sorted(root.iterdir()):
@@ -321,6 +374,7 @@ def build_combined_esm_export(output_root, *, allow_incomplete=False):
     root = Path(output_root).expanduser().resolve(strict=True)
     calc_roots = _exact_calculation_roots(root)
     selected = list(_source_files(root, calc_roots))
+    selected.extend(_stage_comparison_sources(root, calc_roots))
     if not selected:
         raise ValueError("No ESM source output files found. Calculate and export a case first.")
     datetime_token = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
