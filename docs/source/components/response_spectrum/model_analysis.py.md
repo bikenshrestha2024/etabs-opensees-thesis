@@ -40,3 +40,70 @@ The MRSM GUI now offers `PHYSICAL_32` primary and explicitly diagnostic `SOURCE_
 ## 2026-11-22: executed MRSM support/mass identity attached to results
 
 Each new MRSM case result now records actual `support_case`, `seismic_mass_policy`, and `support_case_evidence` obtained after the model builder's runtime verification. The assembled *geometry* model SHA alone does not encode the selected 32-versus-76-versus-97 physical restraints or modified dynamic mass operator. Existing six-case ULS review packages created before the change are preserved, but marked incomplete execution provenance when compared with the primary 32-support reference. Reanalyze from the refreshed exact same source EDB/runtime to obtain genuinely identical model-basis ETABS/OpenSees comparisons.
+
+
+## 2026-11-23 — MRSM reopen identity and numerical-evidence gate
+
+The original `launch()` counted `COMPLETED` rows in
+`05_MRSM/MRSM_Batch_Status_V151.json` on reopening without matching
+the current `OpenSees_Complete_Model_Data_V118.json`, selected ULS/SLS,
+32/76/97 support profile, source-distributed/floor-lumped mass, periods,
+hazard configuration or stored per-run numeric outputs.
+
+New `mrsm_input_signature(fields)` hashes the exact UI input selection,
+including selected gravity profile, seismic mass/support policy, ULS/SLS,
+soil, hazard, spectral/period parameters and modes. It is **not** an EDB
+or workbook fingerprint. `review_saved_mrsm_batch(...)` checks the
+latest stage ledger's model SHA, state and input digest, requires an exact
+canonical `05_MRSM/RUNS/<state>/<case>/<run-id>` directory and valid
+`CASE_MANIFEST.json` with `COMPLETED_SOLVER_ONLY`, then reopens the
+six X/Y E0/Eplus/Eminus actual `MRSM_Results_V132.json` cases using
+the existing `validate_mrsm_case_output()`. Missing or mismatched
+evidence reports `LEGACY_UNVERIFIED`, `SOURCE_OR_INPUT_MISMATCH`
+or `NUMERIC_EVIDENCE_INCOMPLETE`, with zero verified saved numeric
+cases; the older process-row count remains visible.
+
+The GUI saves provenance into its stage ledger and copies a snapshot to the
+unique run's `06_REVIEW` folder. The worker captures source SHA before
+launch and rejects a model JSON changed during processing. A runtime
+model/SHA/period/analysis result match is still **not** native ETABS
+equivalence, actual Vs30 geotechnical verification or NBC design approval.
+
+**Remaining:** exact EDB and workbook source hashes, original mass,
+constraints and wall-edge force transfer; independent 32-support cut
+comparison, modal CQC/scaling/drift and nonlinearity. This software
+change does not alter spectrum equations, stiffening, damping, mass,
+support selection, gravity/P-Delta preload or calculated responses.
+
+
+### Nonblocking saved-run readback
+
+`launch()` now performs only an inexpensive existence check before showing
+the MRSM window. It reviews large saved JSON response files on a background
+thread and schedules the status label update through `win.after` on the
+Tk UI thread. The initial label is `CHECKING SAVED RUN`. If an analysis
+input changes while this runs, or a new analysis starts, the earlier
+saved numeric-review message cannot overwrite the new state. Any later
+edit to a currently displayed saved-review selection invalidates that
+label. Synthetic AST regression:
+`tests/test_mrsm_reopen_source_gate.py::test_saved_numeric_readback_does_not_block_tk_launch_thread`.
+The user does not need to wait for a large historical result to open the GUI.
+
+
+### Saved numerical support/mass operator identity
+
+The optional `validate_mrsm_case_output(..., expected_support_case=...,
+expected_mass_policy=...)` contract now checks **every** X/Y E0/Eplus/Eminus
+saved result for the executed `support_case`,
+`support_case_evidence.selected_profile`, and
+`seismic_mass_policy`. A matching `model_sha256` is not sufficient
+to establish identical 32/76/97 runtime restraints or distributed versus
+floor-lumped dynamic mass. The saved-run reopen gate and new-run
+completion checkpoint pass both selected values to the same validator;
+older unrelated callers may omit them for historical comparison.
+
+This is a source-identity check only. The native wall mesh-edge MPC,
+generalized mass, six-component foundation cuts, stiffness, ETABS
+modal participation, CQC combination and code acceptance still require
+independent numerical validation. Red regression at `24498fe9`: one
+new test failed on a tampered support case while 1,781 prior tests passed.

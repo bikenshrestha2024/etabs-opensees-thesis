@@ -39,3 +39,20 @@ Review source syntax and imports, create a focused unit test, then run an isolat
 - Both linear and nonlinear GUI wrappers now use this gate for their summary log, `CASE_MANIFEST.json` solver status, and whether to auto-open/combine the saved results. Original solver source/motions and existing runs are unchanged.
 
 CI regression: `tests/test_history_batch_completion_gate_v7.py`.
+
+
+## 2026-11-23 — Optional source-provenance in shared CaseLedger
+
+`CaseLedger(path, ids, provenance={...})` accepts an optional dictionary of
+source/run identifiers, and `set_provenance(**fields)` atomically updates
+the same current-run ledger. Existing LTHA/NLTHA callers without metadata
+retain their original JSON format, log statuses and completion behavior.
+The new MRSM caller records source model JSON SHA, stiffness state, selected
+configuration digest and created unique run directory.
+
+**A `COMPLETED` case row is a process/log status, not numeric or structural
+equivalence evidence.** Consuming modules must independently reopen matching
+numeric results and original source-identity records. Historical ledgers
+without provenance remain readable but do not certify current-source cases.
+Synthetic regression: `tests/test_mrsm_reopen_source_gate.py` plus
+`tests/test_history_batch_completion_gate_v7.py`.

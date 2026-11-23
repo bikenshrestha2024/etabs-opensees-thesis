@@ -11,11 +11,29 @@ _CASE_TRUNCATED=re.compile(r'^\[TRUNCATED\]\s+([^:]+):\s+analyzed\s+([\d.eE+-]+)
 
 
 class CaseLedger:
- def __init__(self,path,ids):
-  self.path=Path(path);self.lock=threading.RLock();self.rows={i:dict(case=i,status='QUEUED',stage='Waiting',elapsed_s=0.) for i in ids};self.save()
+ def __init__(self,path,ids,*,provenance=None):
+  if provenance is not None and not isinstance(provenance,dict):
+   raise ValueError('Case ledger provenance must be a dictionary')
+  self.path=Path(path);self.lock=threading.RLock()
+  self.provenance=dict(provenance or {})
+  self.rows={i:dict(case=i,status='QUEUED',stage='Waiting',elapsed_s=0.) for i in ids}
+  self.save()
  def save(self):
   self.path.parent.mkdir(parents=True,exist_ok=True)
-  temp=self.path.with_suffix('.tmp');temp.write_text(json.dumps(dict(updated_at=datetime.datetime.now().astimezone().isoformat(),cases=list(self.rows.values())),indent=2),encoding='utf8');temp.replace(self.path)
+  payload=dict(updated_at=datetime.datetime.now().astimezone().isoformat(),
+               cases=list(self.rows.values()))
+  # Older history ledgers have no provenance field and remain readable.
+  if self.provenance:payload['provenance']=dict(self.provenance)
+  temp=self.path.with_suffix('.tmp')
+  temp.write_text(json.dumps(payload,indent=2),encoding='utf8')
+  temp.replace(self.path)
+ def set_provenance(self,**values):
+  """Attach the exact created run to an existing saved batch, atomically."""
+  if any(not isinstance(key,str) or not key for key in values):
+   raise ValueError('Invalid provenance field name')
+  with self.lock:
+   self.provenance.update(values)
+   self.save()
  def set(self,key,status,stage):
   with self.lock:
    row=self.rows[key]

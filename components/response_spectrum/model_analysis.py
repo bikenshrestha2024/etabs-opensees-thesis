@@ -224,7 +224,8 @@ def run_model_spectrum(folder,config,output_dir):
     return results
 
 
-def validate_mrsm_case_output(output, *, state, expected_model_sha256=None):
+def validate_mrsm_case_output(output, *, state, expected_model_sha256=None,
+                              expected_support_case=None, expected_mass_policy=None):
     """[REF docs/source/components/response_spectrum/model_analysis.py.md]
     Verify exact, independently saved six-case MRSM output before solver-only
     completion status. This verifies *file completeness*, not physical validity.
@@ -252,6 +253,19 @@ def validate_mrsm_case_output(output, *, state, expected_model_sha256=None):
             raise ValueError("MRSM state mismatch: "+key)
         if result.get("axis")!=key[0]:
             raise ValueError("MRSM response direction mismatch: "+key)
+        # A serialized model SHA does not encode the runtime-selected
+        # foundation constraints or mass operator. Require those identities
+        # whenever this is a saved current-run numerical-completeness gate.
+        if expected_support_case is not None:
+            if result.get("support_case")!=expected_support_case:
+                raise ValueError("MRSM executed support profile mismatch: "+key)
+            evidence=result.get("support_case_evidence")
+            if (not isinstance(evidence,dict)
+                    or evidence.get("selected_profile")!=expected_support_case):
+                raise ValueError("MRSM runtime support evidence mismatch: "+key)
+        if (expected_mass_policy is not None
+                and result.get("seismic_mass_policy")!=expected_mass_policy):
+            raise ValueError("MRSM executed seismic mass operator mismatch: "+key)
         if not isinstance(result.get("stories"),list) or not result["stories"]:
             raise ValueError("MRSM case has no storey results: "+key)
         # A six-case JSON with only drift values is not a complete response.
@@ -402,6 +416,156 @@ def mrsm_period_defaults(folder, values, state='ULS'):
             "1.25×directional empirical wall period). Verify Aw and model hash."+aw_note)
 
 
+
+_MRSM_INPUT_FIELDS = (
+    "limit_state", "soil", "Z", "I", "rmu", "omegau", "omegas",
+    "T1_X", "T1_Y", "nmodes", "damping", "support_case",
+    "seismic_mass_policy", "gravity_profile",
+)
+
+
+def mrsm_input_signature(fields):
+    """[REF docs/source/components/response_spectrum/model_analysis.py.md]
+    Stable fingerprint of the selected MRSM GUI analysis inputs.
+
+    Model JSON, EDB and source workbook keep separate source fingerprints.
+    String-preserving comparison is intentionally conservative; changing
+    an input's representation triggers a saved-case review, never silent reuse.
+    """
+    import hashlib
+    if not isinstance(fields, dict):
+        raise ValueError("MRSM selected inputs must be a mapping")
+    values = {}
+    for key in _MRSM_INPUT_FIELDS:
+        item = fields.get(key)
+        if item is None or isinstance(item, bool) or not str(item).strip():
+            raise ValueError("Missing selected MRSM input: " + key)
+        values[key] = str(item).strip()
+    encoded = json.dumps(values, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def review_saved_mrsm_batch(output_root, source_folder, selected_fields):
+    """[REF docs/source/components/response_spectrum/model_analysis.py.md]
+    Read-only saved MRSM GUI status, never a physics or NBC approval.
+
+    A legacy/stale case-status ledger alone cannot prove that the current
+    source model, selected ULS/SLS inputs and six numeric results agree.
+    Re-open only the exact recorded canonical run; never discover a nearby
+    result through a latest-file scan or historic snapshot.
+    """
+    import hashlib
+    from components.inputs.output_contract import inspect_case_manifest
+    stage = Path(output_root).expanduser()
+    ledger_file = stage / "MRSM_Batch_Status_V151.json"
+    base = {"reported_completed": 0, "numerical_cases_verified": 0,
+            "engineering_acceptance": "NOT_VERIFIED"}
+    def reviewed(status, reason, **values):
+        return dict(base, status=status, reason=reason, **values)
+
+    if ledger_file.is_symlink():
+        return reviewed("NUMERIC_EVIDENCE_INCOMPLETE", "Linked batch ledger is not trusted")
+    if not ledger_file.is_file():
+        return reviewed("NOT_RUN", "No MRSM batch ledger recorded")
+    try:
+        payload = json.loads(ledger_file.read_text(encoding="utf-8-sig"))
+        rows = payload.get("cases") if isinstance(payload, dict) else None
+        if not isinstance(rows, list) or any(
+                not isinstance(row, dict) for row in rows):
+            raise ValueError("Invalid MRSM case rows")
+        completed = sum(row.get("status") == "COMPLETED" for row in rows)
+    except (OSError, ValueError, TypeError) as exc:
+        return reviewed("INVALID_LEDGER", str(exc))
+    base["reported_completed"] = completed
+    provenance = payload.get("provenance")
+    if not isinstance(provenance, dict) or not provenance:
+        return reviewed("LEGACY_UNVERIFIED",
+                        "Saved process rows lack a model and input fingerprint")
+    try:
+        state = str(selected_fields["limit_state"]).strip().upper()
+        # Source-state/config mismatches take precedence over a case-name
+        # count: a saved ULS row viewed in SLS is stale, not an incomplete
+        # current-state batch.
+        if (provenance.get("state") != state
+                or provenance.get("input_sha256") !=
+                    mrsm_input_signature(selected_fields)):
+            return reviewed("SOURCE_OR_INPUT_MISMATCH",
+                            "Saved MRSM ledger belongs to another selected state or input configuration")
+        required = {state + " " + axis + "_" + ecc
+                    for axis in ("X", "Y")
+                    for ecc in ("E0", "Eplus", "Eminus")}
+        actual = [row.get("case") for row in rows]
+        if (len(actual) != len(required) or len(set(actual)) != len(actual)
+                or set(actual) != required or completed != len(required)):
+            return reviewed("SAVED_PROCESS_INCOMPLETE",
+                            "Six distinct X/Y eccentricity process completions required")
+        source = Path(source_folder).expanduser()
+        model_file = source / "OpenSees_Complete_Model_Data_V118.json"
+        if model_file.is_symlink() or not model_file.is_file():
+            return reviewed("SOURCE_UNAVAILABLE",
+                            "Current serialized model JSON is missing or linked")
+        with model_file.open("rb") as stream:
+            model_sha = hashlib.file_digest(stream, "sha256").hexdigest()
+        selected_input_sha = mrsm_input_signature(selected_fields)
+        if (provenance.get("model_sha256") != model_sha
+                or provenance.get("state") != state
+                or provenance.get("input_sha256") != selected_input_sha):
+            return reviewed("SOURCE_OR_INPUT_MISMATCH",
+                            "Saved MRSM ledger belongs to another source, state or input selection")
+        location = provenance.get("run_dir")
+        if not isinstance(location, str) or not location.strip():
+            return reviewed("NUMERIC_EVIDENCE_INCOMPLETE",
+                            "Saved ledger has no exact created MRSM run directory")
+        run_raw = Path(location).expanduser()
+        if any(piece.is_symlink() for piece in (run_raw, *run_raw.parents)):
+            return reviewed("NUMERIC_EVIDENCE_INCOMPLETE",
+                            "Linked MRSM saved run is not accepted")
+        run = run_raw.resolve()
+        exact_stage = stage.resolve()
+        if (len(run.parents) < 4 or run.parents[3] != exact_stage
+                or run.parents[2].name != "RUNS"
+                or run.parents[1].name != state):
+            return reviewed("NUMERIC_EVIDENCE_INCOMPLETE",
+                            "Saved MRSM run is outside the selected stage/state")
+        checked = inspect_case_manifest(run, expected_stage="MRSM")
+        if (not checked["valid"]
+                or checked["solver_status"] != "COMPLETED_SOLVER_ONLY"):
+            return reviewed("NUMERIC_EVIDENCE_INCOMPLETE",
+                            "Canonical saved MRSM case manifest is missing, incomplete or inconsistent")
+        case_manifest = json.loads(
+            (run / "00_INPUT_SOURCE" / "CASE_MANIFEST.json").read_text(encoding="utf-8-sig"))
+        if case_manifest.get("model_sha256") != model_sha:
+            return reviewed("SOURCE_OR_INPUT_MISMATCH",
+                            "Saved numerical run model SHA differs from selected model")
+        gate_file = run / "06_REVIEW" / "SAVED_CASE_COMPLETENESS.json"
+        if not gate_file.is_file() or gate_file.is_symlink():
+            return reviewed("NUMERIC_EVIDENCE_INCOMPLETE",
+                            "Saved-case numeric completeness checkpoint missing")
+        gate = json.loads(gate_file.read_text(encoding="utf-8-sig"))
+        if (not isinstance(gate, dict)
+                or gate.get("status") != "COMPLETE_SAVED_CASES_ONLY"
+                or gate.get("model_sha256") != model_sha
+                or gate.get("case_count") != len(required)):
+            return reviewed("NUMERIC_EVIDENCE_INCOMPLETE",
+                            "Saved-case completeness checkpoint inconsistent")
+        # Revalidate the six actual numeric responses, not only their log
+        # statuses or a copied review ZIP.
+        inspected = validate_mrsm_case_output(
+            run / "02_RESULTS", state=state,
+            expected_model_sha256=model_sha,
+            expected_support_case=selected_fields["support_case"],
+            expected_mass_policy=selected_fields["seismic_mass_policy"])
+        if inspected.get("case_count") != len(required):
+            return reviewed("NUMERIC_EVIDENCE_INCOMPLETE",
+                            "Saved numeric case count differs from configured six cases")
+        return reviewed("SAVED_NUMERICALLY_COMPLETE_SOURCE_MATCHED",
+                        "Six exact-source saved cases passed numeric completeness screening; ETABS parity/code approval unverified",
+                        numerical_cases_verified=len(required), run_dir=str(run))
+    except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
+        return reviewed("NUMERIC_EVIDENCE_INCOMPLETE",
+                        "Saved MRSM evidence could not be revalidated: " + str(exc))
+
+
 def launch(parent,folder):
     import tkinter as tk
     from tkinter import ttk,messagebox
@@ -462,17 +626,51 @@ def launch(parent,folder):
                 operation_bar.start(12)
             else:operation_bar.stop()
         win.after(0,render)
-    # Reopen status is sourced from a saved case ledger, not an assumed PASS.
+    # Reading a large saved MRSM result must not block Tk startup.
+    # Only a same-source, same-state, same-input current numeric run may
+    # display as verified; fields changed while checking invalidate it.
+    import os
+    selected_gui_fields={k:v.get() for k,v in fields.items()}
+    selected_gui_fields['gravity_profile']=os.environ.get(
+        'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
     previous_status=output/'MRSM_Batch_Status_V151.json'
-    if previous_status.is_file():
-        try:
-            previous=json.loads(previous_status.read_text(encoding='utf-8-sig'))
-            cases=previous.get('cases',[])
-            solved=sum(row.get('status')=='COMPLETED' for row in cases)
-            operation_status.set('SAVED RUN | '+str(solved)+'/'+str(len(cases))+
-                                 ' numerical cases completed; source/code checks remain separate')
-        except (OSError,ValueError,KeyError) as exc:
-            operation_status.set('REVIEW | Saved case ledger unreadable: '+str(exc))
+    check_label='CHECKING SAVED RUN | validating selected source and six numeric cases'
+    def invalidate_saved_review(*unused):
+        text=operation_status.get()
+        if text.startswith(('CHECKING SAVED RUN','SAVED NUMERIC REVIEW')):
+            operation_status.set(
+                'REVIEW | MRSM inputs changed; reopen or rerun for current selection')
+    for selected in fields.values():
+        selected.trace_add('write',invalidate_saved_review)
+    if previous_status.is_file() or previous_status.is_symlink():
+        operation_status.set(check_label)
+        def inspect_previous_saved():
+            prior=review_saved_mrsm_batch(output,folder,selected_gui_fields)
+            def render_prior():
+                if operation_status.get()!=check_label:
+                    # The user may have edited inputs or started a new run.
+                    return
+                current={k:v.get() for k,v in fields.items()}
+                current['gravity_profile']=os.environ.get(
+                    'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+                if current!=selected_gui_fields:
+                    operation_status.set(
+                        'REVIEW | MRSM source inputs changed during saved check')
+                elif prior['status']=='SAVED_NUMERICALLY_COMPLETE_SOURCE_MATCHED':
+                    operation_status.set(
+                        'SAVED NUMERIC REVIEW | '+
+                        str(prior['numerical_cases_verified'])+
+                        '/6 cases source-rechecked; ETABS parity still open')
+                else:
+                    operation_status.set(
+                        'REVIEW | '+prior['status']+
+                        ' | previously reported '+str(prior['reported_completed'])+
+                        ' process completions; current numeric acceptance pending')
+            try:
+                win.after(0,render_prior)
+            except (tk.TclError,RuntimeError):
+                pass
+        threading.Thread(target=inspect_previous_saved,daemon=True).start()
     log_value=tk.StringVar()
     from OpenSees_Research_UI_V123 import copyable_log
     from components.shared.case_status import panel,CaseLedger
@@ -484,6 +682,15 @@ def launch(parent,folder):
     def run():
         try:
             cfg={k:v.get() for k,v in fields.items()}
+            cfg['gravity_profile']=os.environ.get(
+                'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+            selected_gui_fields=dict(cfg)
+            selected_input_sha=mrsm_input_signature(selected_gui_fields)
+            data_file=Path(folder)/'OpenSees_Complete_Model_Data_V118.json'
+            if data_file.is_symlink() or not data_file.is_file():
+                raise FileNotFoundError('MRSM selected source model JSON missing or linked')
+            with data_file.open('rb') as source_stream:
+                selected_model_sha=hashlib.file_digest(source_stream,'sha256').hexdigest()
             require_source_state(folder,cfg['limit_state'])
             # [REF NBC105-2025 §5.1.3, §7.5] name blank inputs instead of
             # failing with "could not convert string to float: ''".
@@ -497,7 +704,14 @@ def launch(parent,folder):
             for k in ['Z','I','rmu','omegau','omegas','T1_X','T1_Y','damping']:cfg[k]=float(cfg[k])
             states=[cfg['limit_state']];button.configure(state='disabled')
             operation('RUNNING','Gravity → eigenmodes → CQC responses for '+', '.join(states))
-            ledger=CaseLedger(output/"MRSM_Batch_Status_V151.json",[state+" "+axis+"_"+ecc for state in states for axis in ("X","Y") for ecc in ("E0","Eplus","Eminus")]);board["ledger"]=ledger;board["cancelled"]=False
+            ledger=CaseLedger(
+                output/"MRSM_Batch_Status_V151.json",
+                [state+" "+axis+"_"+ecc for state in states for axis in ("X","Y")
+                 for ecc in ("E0","Eplus","Eminus")],
+                provenance=dict(model_sha256=selected_model_sha,
+                                state=cfg['limit_state'],
+                                input_sha256=selected_input_sha))
+            board["ledger"]=ledger;board["cancelled"]=False
             def worker():
                 try:
                     append('[BATCH PLAN] '+', '.join(states)+'; each state runs X and Y, centered and +/-5% eccentricity.\n')
@@ -506,13 +720,17 @@ def launch(parent,folder):
                         if board.get("cancelled"):break
                         append('[STATE START] '+state+' | gravity/preload, eigenanalysis, modal RSA, CQC, force scaling, drift and export.\n')
                         operation('RUNNING',state+' | gravity and modal CQC stages underway')
-                        current=dict(cfg,limit_state=state,gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
+                        current=dict(cfg,limit_state=state,
+                                     gravity_profile=cfg['gravity_profile'])
                         data_file=Path(folder)/'OpenSees_Complete_Model_Data_V118.json'
-                        if not data_file.is_file():
-                            raise FileNotFoundError('MRSM source model data not found: '+str(data_file))
+                        if not data_file.is_file() or data_file.is_symlink():
+                            raise FileNotFoundError('MRSM source model data missing or linked: '+str(data_file))
                         model_hash=hashlib.sha256(data_file.read_bytes()).hexdigest()
+                        if model_hash!=selected_model_sha:
+                            raise ValueError('MRSM source model changed after batch selection; select current source again')
                         run_root=create_case_run(folder,'MRSM','MRSM_'+current['gravity_profile'],
                                                  state=state,model_sha256=model_hash)
+                        ledger.set_provenance(run_dir=str(run_root))
                         latest_result['run']=run_root
                         out=run_root/'02_RESULTS'
                         latest_result['folder']=out
@@ -545,8 +763,13 @@ def launch(parent,folder):
                                     if key.startswith(state+' ') and row['status']!='COMPLETED':ledger.set(key,'FAILED','State child exit '+str(rc)+'; inspect log. Next state will run independently.')
                             else:
                                 try:
-                                    gate=validate_mrsm_case_output(out,state=state,
-                                                                 expected_model_sha256=model_hash)
+                                    if hashlib.sha256(data_file.read_bytes()).hexdigest()!=model_hash:
+                                        raise ValueError('MRSM source model changed during solver execution; native output source invalid')
+                                    gate=validate_mrsm_case_output(
+                                        out,state=state,
+                                        expected_model_sha256=model_hash,
+                                        expected_support_case=current["support_case"],
+                                        expected_mass_policy=current["seismic_mass_policy"])
                                     atomic_json(run_root/'06_REVIEW'/'SAVED_CASE_COMPLETENESS.json',gate)
                                     record_case_status(run_root,'COMPLETED_SOLVER_ONLY',
                                         message='Six saved MRSM cases found; physical equivalence unverified')
@@ -573,6 +796,16 @@ def launch(parent,folder):
                     append('[FAILED] '+str(e)+'\n')
                 finally:
                     ledger.finish_pending("Batch interrupted or case completion was not reported; inspect state log")
+                    # Keep the exact process ledger with its immutable run
+                    # alongside the stage-level latest-run pointer.
+                    current_run=latest_result.get('run')
+                    if current_run is not None:
+                        try:
+                            import shutil
+                            shutil.copy2(ledger.path,
+                                current_run/'06_REVIEW'/'MRSM_Batch_Status_V151.json')
+                        except (OSError,ValueError) as snapshot_error:
+                            append('[MRSM_LEDGER_SNAPSHOT_FAILED] '+str(snapshot_error)+'\n')
                     # Automatically consolidate real MRSM output in a single
                     # upload folder/ZIP, clearly separated from ETABS native
                     # responses. No missing native case is inferred.
@@ -586,9 +819,14 @@ def launch(parent,folder):
                         append("[MRSM_AUTO_REVIEW_ZIP] "+package["zip"]+"\\n")
                     except Exception as pack_exc:
                         append("[MRSM_REVIEW_PACKAGING_FAILED] "+str(pack_exc)+"\\n")
-                    statuses=[row['status'] for row in ledger.rows.values()]
-                    stage=('COMPLETED' if statuses and all(x=='COMPLETED' for x in statuses) else 'REVIEW REQUIRED')
-                    operation(stage,str(sum(x=='COMPLETED' for x in statuses))+'/'+str(len(statuses))+' numerical cases completed; native ETABS equivalence remains separate')
+                    reopened=review_saved_mrsm_batch(
+                        output,folder,selected_gui_fields)
+                    stage=('COMPLETED' if
+                        reopened['status']=='SAVED_NUMERICALLY_COMPLETE_SOURCE_MATCHED'
+                        else 'REVIEW REQUIRED')
+                    operation(stage,str(reopened['numerical_cases_verified'])+
+                        '/6 saved numeric cases source-rechecked; '+
+                        reopened['status']+'; ETABS equivalence unverified')
                     try:win.after(0,lambda:button.configure(state='normal'))
                     except (tk.TclError,RuntimeError):pass
             threading.Thread(target=worker,daemon=True).start()
