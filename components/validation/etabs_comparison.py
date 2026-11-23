@@ -228,6 +228,30 @@ def compare(rows, etabs, policy=None):
     return results
 
 
+def comparison_display_rows(rows, *, native_loaded):
+    """[REF docs/source/components/validation/etabs_comparison.py.md]
+    Explain absent native ETABS evidence in the GUI without synthesizing values.
+
+    This changes presentation only. Comparison CSV and engineering eligibility
+    retain the original normalized, source-bound calculations.
+    """
+    display=[]
+    for original in rows:
+        item=dict(original)
+        if (not native_loaded and item.get("etabs_value") is None
+                and not item.get("status")):
+            item["etabs_value"]=None
+            item["percent_difference"]=None
+            item["status"]="ETABS_DATA_NOT_LOADED"
+            item["note"]=(
+                "No native ETABS comparison dataset loaded. Use Direct ETABS API "
+                "with reviewed same-EDB case/story mapping; raw reaction preview "
+                "is not a verified CQC comparison."
+            )
+        display.append(item)
+    return display
+
+
 def save(folder,etabs_path=None,etabs_rows=None,policy=None,*,results_root=None, expected_support_case='PHYSICAL_32', expected_mass_policy='SOURCE_DISTRIBUTED'):
     """Export source-normalized CSV and Excel comparisons.
 
@@ -702,7 +726,8 @@ def launch(parent,folder,results_root=None):
               else save(folder,results_root=results_root,
                         expected_support_case=support_filter.get(),
                         expected_mass_policy=mass_filter.get())))
-   show_rows(rows)
+   native_loaded=bool(path.get() or latest['etabs_rows'] is not None)
+   show_rows(comparison_display_rows(rows,native_loaded=native_loaded))
    if not rows:
     audit=out/'Comparison_Source_Exclusions.json'
     reasons=json.loads(audit.read_text(encoding='utf-8')) if audit.is_file() else []
@@ -715,7 +740,13 @@ def launch(parent,folder,results_root=None):
         'Reasons: '+json.dumps(reasons,indent=2),encoding='utf-8')
    else:
     native_count=sum(r.get('etabs_value') is not None for r in rows)
-    status.set(f'{native_count} ETABS values shown | {len(rows)} total rows | Report: {out}')
+    if not native_loaded:
+     status.set('0 ETABS values: no native ETABS data loaded. Select the exact '
+                'analyzed EDB → Direct ETABS API / EDB… → reviewed case/story mapping. '
+                'OpenSees results are shown only; no comparison percentages. | '+str(out))
+    else:
+     status.set(f'{native_count} matched ETABS values / {len(rows)} rows | '
+                f'{len(rows)-native_count} unmatched or unavailable | Report: {out}')
   except Exception as e:messagebox.showerror('Comparison inputs',str(e),parent=win)
  def plot():
   selected=tree.selection()
