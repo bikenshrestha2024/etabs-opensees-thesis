@@ -1,0 +1,12 @@
+# 2026-11-23 — ESM split-output evidence discovery
+- **Editor:** ChatGPT GPT-6, using connected GitHub repository actions.
+- **Initial branch/commit:** main @ 3a81ec8cf3581e39d7387afa16821df1aa0d2e36.
+- **Target:** software-only ESM organized export discovery and process-batch status.
+- **Read-first:** AGENTS.md; engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md; .agents/skills/etabs-opensees-read-first/SKILL.md; CORE_RULES.md; ENGINEERING_GATES.md; source guides and tests.
+- **Changed:** components/equivalent_static/organized_exports.py, tests/test_esm_legacy_canonical_split.py, matching source guide and REVIEW_MAIN/02_ESM bounded review.
+- **Preserved:** 32 physical supports + 44 wall-mesh nodes; full 1.0D+1.0L gravity; Table 5-1 purpose-specific seismic weight; X 2 × 12m source opening geometry; all native EDB/XLSX, OpenSees model and analysis algorithms.
+- **Test method:** synthetic temp-folder cases and GitHub Actions, not the user's Windows EDB. Tests must be read from CI before a PASS claim.
+- **Source EDB/workbook SHA:** UNAVAILABLE.
+- **Native ETABS/OpenSees:** NOT EXECUTED, source-equivalence NOT VERIFIED.
+- **Remaining blocker:** automatic review package/runner SHA identity, native mesh-edge/physical support transfer, code-eligibility and geotechnical Vs30 evidence.
+- **Private data:** no project-specific Windows paths or native model file bytes committed.

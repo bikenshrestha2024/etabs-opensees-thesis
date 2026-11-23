@@ -70,14 +70,25 @@ def _source_files(root, calculation_roots=()):
             if source.suffix.lower() in _CATEGORIES and not source.name.endswith(".processing.json"):
                 yield "opensees", source
     for case_root in calculation_roots:
-        if Path(case_root).resolve() == root.resolve():
+        case_root = Path(case_root).resolve()
+        if case_root == root.resolve():
             continue
-        # No archive/global search: same case folder and state only.
-        for pattern in ("NBC105_ESM_Calculation_*.json",
-                        "NBC105_ESM_Storey_Forces_*.csv"):
-            for source in sorted(Path(case_root).glob(pattern)):
-                if source.is_file() and not source.is_symlink():
-                    yield "opensees", source
+        # A legacy UI selection can have its exact matching calculation,
+        # runner and response files in the canonical ESM stage directory.
+        # Never scan sibling model variants, limit states or archives.
+        if not case_root.is_dir() or case_root.is_symlink():
+            continue
+        for source in sorted(case_root.iterdir()):
+            if not (source.is_file() and not source.is_symlink()
+                    and source.name.startswith(_DIRECT_PREFIXES)
+                    and source.suffix.lower() in _CATEGORIES
+                    and not source.name.endswith(".processing.json")):
+                continue
+            if (source.name.startswith(("Deformation_", "Drift_Check_",
+                    "Floor_Edge_Drift_", "Irregularity_", "Response_Recorder_Index_"))
+                    and not _CASE.search(source.name)):
+                continue
+            yield "opensees", source
     for subfolder, role in (("ETABS_Linked_ESM", "etabs"),
                             ("ESM_Runner_Status", "opensees"),
                             ("ESM_Route_Comparison", "comparison")):
@@ -212,8 +223,12 @@ def _combined_workbook(target, cases, stories, manifest):
     wb.save(target)
 
 
-def _latest_batch_status(root):
-    """Read one newest ESM solver batch. Never equate calculation files with solved cases."""
+def _latest_batch_status(root, calculation_roots=()):
+    """Read newest ESM batch against exact-case legacy and canonical runners.
+
+    A legacy GUI can store CASE_STATUS under OpenSees_Analysis_Results while
+    generating runners under 03_ESM/RUNS. This is process evidence only.
+    """
     directory = root / "ESM_Runner_Status"
     candidates = sorted(directory.glob("*/CASE_STATUS.json")) if directory.is_dir() else []
     if not candidates:
@@ -227,8 +242,13 @@ def _latest_batch_status(root):
             if not isinstance(item, dict) or not isinstance(item.get("case"), str):
                 raise ValueError("CASE_STATUS contains invalid case row")
         recorded = [item["case"] for item in records]
-        expected = {file.name for file in root.glob(
-            "OpenSees_*NBC105_ESM_Load_And_Static_Analysis_*.py")}
+        expected = {
+            file.name
+            for folder in (root, *calculation_roots)
+            for file in Path(folder).glob(
+                "OpenSees_*NBC105_ESM_Load_And_Static_Analysis_*.py")
+            if file.is_file() and not file.is_symlink()
+        }
         # Historical and route-prefixed runners for the same case can coexist.
         # Prefer the spelling actually executed in this batch.
         normalized = {}
@@ -295,7 +315,7 @@ def build_combined_esm_export(output_root, *, allow_incomplete=False):
             "module": _MODULES[module], "state": state, "case": case,
         })
     cases, stories = _data_rows(root, calc_roots)
-    batch = _latest_batch_status(root)
+    batch = _latest_batch_status(root, calc_roots)
     calculation_status = "CALCULATION_JSON_AVAILABLE" if cases else "NO_CALCULATION_JSON"
     if not cases and not allow_incomplete:
         raise ValueError("ESM artifacts were found, but no calculation JSON is available; "
