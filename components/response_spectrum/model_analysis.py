@@ -411,7 +411,8 @@ _MRSM_INPUT_FIELDS = (
 
 
 def mrsm_input_signature(fields):
-    """Stable fingerprint of the selected MRSM GUI analysis inputs.
+    """[REF docs/source/components/response_spectrum/model_analysis.py.md]
+    Stable fingerprint of the selected MRSM GUI analysis inputs.
 
     Model JSON, EDB and source workbook keep separate source fingerprints.
     String-preserving comparison is intentionally conservative; changing
@@ -431,7 +432,8 @@ def mrsm_input_signature(fields):
 
 
 def review_saved_mrsm_batch(output_root, source_folder, selected_fields):
-    """Read-only saved MRSM GUI status, never a physics or NBC approval.
+    """[REF docs/source/components/response_spectrum/model_analysis.py.md]
+    Read-only saved MRSM GUI status, never a physics or NBC approval.
 
     A legacy/stale case-status ledger alone cannot prove that the current
     source model, selected ULS/SLS inputs and six numeric results agree.
