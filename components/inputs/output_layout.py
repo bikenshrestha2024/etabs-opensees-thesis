@@ -157,6 +157,29 @@ def owned_run_destination(export_dir, stage, case_id, *, selected=None):
     return destination
 
 
+def stage_review_owner(export_dir, selected_output, stage):
+    """[REF docs/source/components/inputs/output_layout.py.md]
+    Keep NEW review artefacts in their owning module, reading originals in place.
+
+    If a GUI still points inside an export's legacy all-stage results or a
+    different module, publish beneath <export>/<stage>. A correctly selected
+    stage/run path remains case-local. Explicit locations outside this export
+    remain explicit user overrides. No files are moved or folders created.
+    """
+    export_root = export_root_for(export_dir).resolve()
+    selected = Path(selected_output).expanduser()
+    for part in (selected, *selected.parents):
+        if part.is_symlink():
+            raise ValueError("Refusing symlinked review output location")
+    selected = selected.resolve()
+    stage_root = export_root / canonical_stage_folder(stage)
+    if selected == stage_root or stage_root in selected.parents:
+        return selected
+    if selected == export_root or export_root in selected.parents:
+        return stage_root
+    return selected
+
+
 def review_snapshots_for(source_path, stage):
     """[REF docs/source/components/inputs/output_layout.py.md]\n    Return the single canonical copy-only review parent for a known stage."""
     key = str(stage).upper()
