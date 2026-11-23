@@ -100,10 +100,27 @@ def result_roots(source_path, *, stages=None, include_legacy=True):
         candidates.append(root / folder)
         candidates.extend(root / alias for alias, stage in LEGACY_STAGE_ALIASES.items()
                           if STAGE_FOLDERS[stage] == folder)
-    # A specific user-selected case that is outside the above trees is valid,
-    # but don't re-scan it when its parent is already in the roots.
+    # A selected directory must not bypass the requested stage filter.
+    # For example, a 03_ESM/REVIEW_SNAPSHOTS selection cannot become an
+    # additional MRSM or MODAL source simply because it was selected in a GUI.
+    # Legacy shared results are included only when explicitly permitted.
     if source != root and source.is_dir():
-        candidates.append(source)
+        relative=source.relative_to(root)
+        first=relative.parts[0]
+        all_stage_names={
+            *(folder.casefold() for folder in ALL_STAGE_FOLDERS.values()),
+            *(alias.casefold() for alias in LEGACY_STAGE_ALIASES),
+            *(folder.casefold() for folder in PROJECT_ROOT_FOLDERS),
+        }
+        permitted={canonical_stage_folder(key).casefold() for key in keys}
+        permitted.update(
+            alias.casefold() for alias, stage in LEGACY_STAGE_ALIASES.items()
+            if STAGE_FOLDERS[stage].casefold() in permitted
+        )
+        if include_legacy:
+            permitted.add(_LEGACY_ROOT)
+        if first.casefold() not in all_stage_names | {_LEGACY_ROOT} or first.casefold() in permitted:
+            candidates.append(source)
     found = []
     seen = set()
     for candidate in candidates:
