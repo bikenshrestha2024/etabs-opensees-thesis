@@ -100,10 +100,27 @@ def result_roots(source_path, *, stages=None, include_legacy=True):
         candidates.append(root / folder)
         candidates.extend(root / alias for alias, stage in LEGACY_STAGE_ALIASES.items()
                           if STAGE_FOLDERS[stage] == folder)
-    # A specific user-selected case that is outside the above trees is valid,
-    # but don't re-scan it when its parent is already in the roots.
+    # A selected directory must not bypass the requested stage filter.
+    # For example, a 03_ESM/REVIEW_SNAPSHOTS selection cannot become an
+    # additional MRSM or MODAL source simply because it was selected in a GUI.
+    # Legacy shared results are included only when explicitly permitted.
     if source != root and source.is_dir():
-        candidates.append(source)
+        relative=source.relative_to(root)
+        first=relative.parts[0]
+        all_stage_names={
+            *(folder.casefold() for folder in ALL_STAGE_FOLDERS.values()),
+            *(alias.casefold() for alias in LEGACY_STAGE_ALIASES),
+            *(folder.casefold() for folder in PROJECT_ROOT_FOLDERS),
+        }
+        permitted={canonical_stage_folder(key).casefold() for key in keys}
+        permitted.update(
+            alias.casefold() for alias, stage in LEGACY_STAGE_ALIASES.items()
+            if STAGE_FOLDERS[stage].casefold() in permitted
+        )
+        if include_legacy:
+            permitted.add(_LEGACY_ROOT)
+        if first.casefold() not in all_stage_names | {_LEGACY_ROOT} or first.casefold() in permitted:
+            candidates.append(source)
     found = []
     seen = set()
     for candidate in candidates:
@@ -155,6 +172,29 @@ def owned_run_destination(export_dir, stage, case_id, *, selected=None):
            if x == root or root in x.parents):
         raise ValueError("Refusing linked output stage destination")
     return destination
+
+
+def stage_review_owner(export_dir, selected_output, stage):
+    """[REF docs/source/components/inputs/output_layout.py.md]
+    Keep NEW review artefacts in their owning module, reading originals in place.
+
+    If a GUI still points inside an export's legacy all-stage results or a
+    different module, publish beneath <export>/<stage>. A correctly selected
+    stage/run path remains case-local. Explicit locations outside this export
+    remain explicit user overrides. No files are moved or folders created.
+    """
+    export_root = export_root_for(export_dir).resolve()
+    selected = Path(selected_output).expanduser()
+    for part in (selected, *selected.parents):
+        if part.is_symlink():
+            raise ValueError("Refusing symlinked review output location")
+    selected = selected.resolve()
+    stage_root = export_root / canonical_stage_folder(stage)
+    if selected == stage_root or stage_root in selected.parents:
+        return selected
+    if selected == export_root or export_root in selected.parents:
+        return stage_root
+    return selected
 
 
 def review_snapshots_for(source_path, stage):

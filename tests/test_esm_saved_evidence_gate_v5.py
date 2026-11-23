@@ -51,6 +51,23 @@ class ESMEvidenceGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"metadata differs"):
                 verify_generated_esm_result(script,root)
 
+    def test_primary32_saved_response_cannot_claim_76_reaction_nodes(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            script=self.build_case(root)
+            case="ULS_X+_E0"
+            calculation=root/("NBC105_ESM_Calculation_"+case+"_V111.json")
+            metadata=json.loads(calculation.read_text())
+            metadata["support_case"]="PHYSICAL_32"
+            calculation.write_text(json.dumps(metadata))
+            reaction=root/("NBC105_ESM_Support_Reactions_"+case+".csv")
+            with reaction.open("w",encoding="utf-8",newline="") as stream:
+                writer=csv.DictWriter(stream,fieldnames=("node_tag","Fx_kN"))
+                writer.writeheader()
+                writer.writerows({"node_tag":i+1,"Fx_kN":-100/76} for i in range(76))
+            with self.assertRaisesRegex(ValueError,"support reaction"):
+                verify_generated_esm_result(script,root)
+
     def test_missing_or_mismatched_production_output_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)

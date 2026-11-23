@@ -354,7 +354,9 @@ def write_outputs(template_path, rows, result, direction, polarity, accidental, 
         "MODEL_DATA_PATH=os.path.join(os.path.dirname(MODEL_BUILDER_SCRIPT),'OpenSees_Complete_Model_Data_V118.json')",
         "if not os.path.isfile(MODEL_DATA_PATH): raise FileNotFoundError('ESM reaction recording requires '+MODEL_DATA_PATH)",
         "with open(MODEL_DATA_PATH,encoding='utf-8-sig') as _stream: MODEL_DATA=json.load(_stream)",
-        "ESM_SUPPORT_NODES=[int(n) for n,v in MODEL_DATA['supports'].items() if any(bool(x) for x in v[:3])]",
+        "# Reactions must follow the actual assembled solver restraints, not the 76-node source export.",
+        "from components.model.support_case_contract import solver_reaction_support_tags",
+        "ESM_SUPPORT_NODES=solver_reaction_support_tags(_MODEL_NAMESPACE.get('MODEL_REPORT'), os.environ['OPENSEES_SUPPORT_CASE'])",
         "if not ESM_SUPPORT_NODES: raise ValueError('No support nodes found for ESM reaction recording')",
         "ops.reactions()",
         "BASE_REACTION_BEFORE_KN = sum(ops.nodeReaction(n, DOF) for n in ESM_SUPPORT_NODES)",
@@ -548,6 +550,25 @@ def verify_generated_esm_result(script_path, export_dir):
         supports=list(csv.DictReader(stream))
     if not supports:
         raise ValueError("ESM support reactions missing/empty")
+    # Source export has 76 restraint entries; this case's selected runtime
+    # profile controls saved physical reaction evidence instead.
+    selected_profile=calculation.get("support_case")
+    if selected_profile is not None:
+        from components.model.support_case_contract import normalize_support_case
+        profile=normalize_support_case(selected_profile)
+        expected_count={"PHYSICAL_32":32,"SOURCE_76":76,"WALL_BASE_97":97}[profile]
+        try:
+            recorded_tags=[int(row["node_tag"]) for row in supports]
+        except (ValueError,TypeError,KeyError) as exc:
+            raise ValueError("ESM support reaction node tags missing or invalid") from exc
+        if (len(recorded_tags)!=expected_count or len(set(recorded_tags))!=expected_count):
+            raise ValueError(
+                "ESM saved support reaction count/identity differs from selected "
+                +profile+": expected "+str(expected_count)+", recorded "+str(len(recorded_tags)))
+        if profile=="PHYSICAL_32":
+            from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
+            if set(recorded_tags)!={int(tag) for tag in PROJECT_PRIMARY_32}:
+                raise ValueError("ESM saved support reaction tags differ from physical32 foundation identity")
     for row in responses:
         if row.get("response_case")!=case:
             raise ValueError("ESM response case mismatch within story rows")
@@ -1045,7 +1066,7 @@ class ESMGui:
         ttk.Button(runbox,text="Browse…",command=self._browse_python).grid(row=1,column=2,padx=4)
         runbox.columnconfigure(1,weight=1)
         ttk.Label(runbox,text="The runner starts a fresh Python process and builds the model. Before NBC ESM it requires the model builder to attest that both IS 16700:2023 §7.2(d) initial P-Delta cases converged and were reviewed (1.2DL + 0.5IL ± 1.5EL/WL). It then freezes the reviewed gravity state, checks diaphragm masters, applies NBC floor forces/torsion, and reports reactions, drift and storey stiffness. This prerequisite does not replace NBC §3.6 combinations; a partial topology exporter is not a complete analysis model.",foreground="#8a341c",wraplength=1100).grid(row=2,column=0,columnspan=3,sticky="w",padx=5,pady=4)
-        out=ttk.LabelFrame(top,text="6. Output folder (model/state/floor-specific default under OpenSees_Analysis_Results)",padding=8); out.pack(fill="x",pady=5)
+        out=ttk.LabelFrame(top,text="6. ESM case output (default: 03_ESM/RUNS/<state>/<case>; existing legacy folders remain readable)",padding=8); out.pack(fill="x",pady=5)
         ttk.Entry(out,textvariable=self.outdir).pack(side="left",fill="x",expand=True,padx=4); ttk.Button(out,text="Browse…",command=self._browse_out).pack(side="left",padx=4)
         from OpenSees_Research_UI_V123 import copyable_log
         self.run_log=copyable_log(top,self.status)

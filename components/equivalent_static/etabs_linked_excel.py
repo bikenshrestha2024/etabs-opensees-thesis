@@ -415,7 +415,10 @@ def publish_route_comparison(output, export_dir, verify_result, *, scripts=None)
                              direct_minus_linked=b-a,linked_provenance=str(path)))
     if not rows:
         raise ValueError("; ".join(pending))
-    folder=output/"ESM_Route_Comparison"
+    from components.inputs.output_layout import stage_review_owner
+    owner=stage_review_owner(export_dir,output,"ESM")
+    folder=(output/"ESM_Route_Comparison" if owner==output
+            else owner/"COMPARISONS")
     status="PARTIAL_CALCULATION_COMPARISON" if pending else "COMPLETE_CALCULATION_COMPARISON"
     data=dict(status=status,scope="NBC calculation inputs and coefficients; native ETABS response requires mapped solver results",
               source_edb_sha256=edb_hash,rows=rows,pending=pending)

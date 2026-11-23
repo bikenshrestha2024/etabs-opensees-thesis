@@ -32,6 +32,52 @@ class UnifiedOutputContractTests(unittest.TestCase):
                             result_roots(root, stages=(stage,), include_legacy=False),
                             (legacy.resolve(),))
 
+    def test_selected_folder_inside_wrong_stage_is_not_discovered(self):
+        # An ESM review snapshot or results subfolder must never re-enter a
+        # Modal/MRSM-only search as an arbitrary user-selected source.
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            modal=root/"04_MODAL"/"RUNS"/"ULS"/"one"
+            mrsm=root/"05_MRSM"/"RUNS"/"ULS"/"two"
+            esm=root/"03_ESM"/"REVIEW_SNAPSHOTS"/"old"
+            for path in (modal,mrsm,esm):
+                path.mkdir(parents=True)
+            self.assertEqual(
+                result_roots(esm,stages=("MODAL",),include_legacy=False),
+                (root/"04_MODAL",))
+            self.assertEqual(
+                result_roots(modal,stages=("MRSM",),include_legacy=False),
+                (root/"05_MRSM",))
+            self.assertEqual(
+                set(result_roots(esm,stages=("MODAL","ESM"),
+                                 include_legacy=False)),
+                {root/"04_MODAL",root/"03_ESM"})
+            self.assertFalse((root/"OpenSees_Analysis_Results").exists())
+
+    def test_every_stage_excludes_all_other_stage_selected_folders(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            selected={
+                stage:root/folder/"REVIEW_SNAPSHOTS"/"sample"
+                for stage,folder in STAGE_FOLDERS.items()
+            }
+            for path in selected.values():
+                path.mkdir(parents=True)
+            for wanted,wanted_folder in STAGE_FOLDERS.items():
+                for passed,selected_path in selected.items():
+                    with self.subTest(wanted=wanted,selected_stage=passed):
+                        roots=result_roots(selected_path,stages=(wanted,),
+                                           include_legacy=False)
+                        self.assertEqual(roots,(root/wanted_folder,))
+                        self.assertTrue(all(wanted_folder in str(p) for p in roots))
+
+    def test_unstructured_export_root_does_not_invent_modal_results(self):
+        with tempfile.TemporaryDirectory() as td:
+            external=Path(td)/"scratch"
+            external.mkdir()
+            self.assertEqual(result_roots(external,stages=("MODAL",),
+                                          include_legacy=False),())
+
     def test_canonical_aliases_and_no_side_effects(self):
         self.assertEqual(canonical_stage_folder("06_LINEAR_TH"), "06_LINEAR_TIME_HISTORY")
         self.assertEqual(canonical_stage_folder("07_NONLINEAR_TH"), "07_NONLINEAR_TIME_HISTORY")

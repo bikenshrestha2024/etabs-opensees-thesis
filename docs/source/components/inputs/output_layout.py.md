@@ -25,3 +25,13 @@ The optional `write_stage_index(export_dir)` writes atomically to `01_ETABS_EXPO
 
 
 `result_roots()` resolves legacy linear and nonlinear history folders consistently for a stage key, canonical folder name, or legacy alias. When both layouts exist, discovery returns the canonical stage before the corresponding legacy stage.
+
+
+## 2026-11-23 — Stage-owned new review files from legacy selections
+
+The selected native/legacy analysis-output folder remains a **read-only source** for historical case evidence. `stage_review_owner(export_dir, selected_output, stage)` maps new review publication under the owning `03_ESM` or `05_MRSM` stage when the GUI selected an old `OpenSees_Analysis_Results` location or another stage within the same export. Existing canonical run folders preserve their own local `07_EXPORT_ZIP`; explicit outside-export custom locations remain opt-in overrides. The ESM legacy route comparison writes to `03_ESM/COMPARISONS`, and seismic review ZIPs to `<stage>/07_EXPORT_ZIP` with snapshots in `<stage>/REVIEW_SNAPSHOTS`. No existing files are moved or invalidated; see `tests/test_stage_owned_seismic_legacy_routing.py`. This is **folder provenance only**, not native structural acceptance.
+
+
+## 2026-11-23 — Stage-filtered saved result discovery
+
+The read-only `result_roots(source, stages=..., include_legacy=...)` honors the requested owning stage even when the user GUI passes a selected directory nested under a different module. A selection inside `03_ESM/REVIEW_SNAPSHOTS` must not be appended to a `MODAL`-only or `MRSM`-only search, because that could mix response evidence from independent stages. A selected case beneath the requested canonical stage, its compatible LTHA/NLTHA aliases, or an explicitly included legacy shared results tree remains discoverable. Unknown unstructured directories are not treated as solved cases solely because they exist. Only directories are selected, never engineering-approved responses: model SHA, support policy, mass policy, state and solver completeness remain reader acceptance gates. This change does not rename, copy or delete any existing results. Regression: `tests/test_unified_output_contract.py`.
