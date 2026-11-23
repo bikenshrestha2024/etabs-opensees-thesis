@@ -48,3 +48,10 @@ The user-provided **`OpenSees_Property_Element_Load_Audit_V125(10).xlsx`** and 1
 **Unverified by this audit:** Windows Tk responsiveness on actual workstation, a regenerated real project's complete ID workbook, native ETABS source object assignment, 44 mesh-node force paths, local reaction equivalence, automated original EDB SHA match, or a full successful 25-storey nonlinear history. No EDB, solver stiffness, load factors, wall openings, seismic mass or device parameters are changed.
 
 **Authoritative contracts:** `AGENTS.md`, `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md`, `REVIEW_MAIN/02_MODEL/20261122_NATIVE_ETABS_OPENSEES_CONVERSION_AUDIT.md`, `engineering/rules/ENGINEERING_GATES.md`.
+
+
+### Explicit three-dimensional selection fix
+
+The Tk inspector used to generate `?idKind=object&idValue=<ID>` without supplying `category`. The Plotly HTML selector's query parser defaults to `frame`, so selecting a wall (`AREA:1`) could highlight an unrelated column (`FRAME:1`). The corrected `plotly_query_for_key` supplies **`category=area` or `category=frame`**, including correct parent dimensions for individual `SOLVER:<tag>` entries. This changes only the visual query and cannot modify analysis connectivity. The inline exact-ID widget also explicitly supports `ETABS frame object` and `ETABS area object`; the legacy unqualified `ETABS object` input refuses a number occurring in both namespaces instead of visually combining unrelated objects.
+
+Tests: `tests/test_postconversion_handoff_20261123.py::test_3d_plotly_handoff_has_dimension_even_for_same_numeric_id`, `test_inline_etabs_lookup_disambiguates_frame_and_area_numeric_collisions`. Note: this is a source-level regression; live Windows Tk/Chrome remains a user-side acceptance check.
