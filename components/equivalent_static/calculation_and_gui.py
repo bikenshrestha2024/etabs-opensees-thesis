@@ -12,7 +12,7 @@ from __future__ import annotations
 
 __release__ = '134'
 from OpenSees_Timing_V130 import timed_outputs
-import csv, json, math, os, sys, time, traceback, subprocess, threading
+import csv, json, math, os, sys, time, traceback, subprocess, threading, hashlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -2149,9 +2149,13 @@ class ESMGui:
                     started = time.monotonic()
                     log_path = batch_folder / ("GUI_Run_" + script.stem + ".log")
                     proc = None
+                    runner_sha256 = None
                     timeout_seconds = 7200  # fail visibly instead of waiting forever
                     timed_out = False
                     try:
+                        # Bind the current batch to the runner bytes launched.
+                        # A same-named script regenerated later is not this run.
+                        runner_sha256 = hashlib.sha256(script.read_bytes()).hexdigest()
                         args = [self.python_exe.get(), "-u", str(script)]
                         env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "OPENSEES_SUPPORT_CASE": self.support_case_var.get(), "OPENSEES_SEISMIC_MASS_POLICY": self.seismic_mass_policy.get()}
                         proc = subprocess.Popen(args, cwd=str(output),
@@ -2195,6 +2199,8 @@ class ESMGui:
                         message = str(log_path)
                         if status=="SUCCESS":
                             try:
+                                if hashlib.sha256(script.read_bytes()).hexdigest() != runner_sha256:
+                                    raise ValueError("Runner script changed during execution; saved process evidence invalid.")
                                 evidence=verify_generated_esm_result(script,self.export_dir)
                                 from components.inputs.output_contract import atomic_json
                                 atomic_json(batch_folder/("SAVED_RESULT_"+script.stem+".json"),evidence)
@@ -2207,7 +2213,8 @@ class ESMGui:
                         rc, status, message = -999, "FAILED", str(exc)
                     finally:
                         self._esm_active_proc = None
-                    entry = {"case": script.name, "runner_path": str(script), "status": status,
+                    entry = {"case": script.name, "runner_path": str(script),
+                             "runner_sha256": runner_sha256, "status": status,
                              "return_code": rc, "log": str(log_path),
                              "elapsed_s": round(time.monotonic() - started, 3),
                              "error": message if status in ("FAILED","INCOMPLETE") else ""}
