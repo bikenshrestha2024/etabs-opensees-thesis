@@ -276,14 +276,43 @@ def _combined_workbook(target, cases, stories, manifest):
     wb.save(target)
 
 
+
+def esm_batch_status_root(export_dir, selected_output=None):
+    """[REF docs/source/components/equivalent_static/organized_exports.py.md]
+    One source-export-owned status directory for all ESM X/Y/ULS/SLS cases.
+
+    In-project selections use 03_ESM/LOGS_AND_STATUS. An explicitly selected
+    external directory remains an override. Does not create or migrate paths.
+    """
+    from components.inputs.output_layout import export_root_for
+    source=Path(export_dir).expanduser()
+    if any(part.is_symlink() for part in (source, *source.parents)):
+        raise ValueError("Refusing linked ESM export source")
+    export_root=export_root_for(source)
+    chosen=export_root if selected_output is None else Path(selected_output).expanduser()
+    if any(part.is_symlink() for part in (chosen,*chosen.parents)):
+        raise ValueError("Refusing linked ESM status output")
+    chosen=chosen.resolve()
+    if chosen==export_root or export_root in chosen.parents:
+        return export_root/"03_ESM"/"LOGS_AND_STATUS"/"ESM_Runner_Status"
+    return chosen/"ESM_Runner_Status"
+
+
 def _latest_batch_status(root, calculation_roots=()):
     """Read newest ESM batch against exact-case legacy and canonical runners.
 
     A legacy GUI can store CASE_STATUS under OpenSees_Analysis_Results while
     generating runners under 03_ESM/RUNS. This is process evidence only.
     """
-    directory = root / "ESM_Runner_Status"
-    candidates = sorted(directory.glob("*/CASE_STATUS.json")) if directory.is_dir() else []
+    root = Path(root).expanduser().resolve()
+    historical = root / "ESM_Runner_Status"
+    canonical = esm_batch_status_root(root, root)
+    # Read existing case-local batches in place; write new batches in 03_ESM.
+    # Do not cross-match successful runs to differently hashed runner scripts.
+    candidates = sorted({item for directory in (historical, canonical)
+                         if directory.is_dir() and not directory.is_symlink()
+                         for item in directory.glob("*/CASE_STATUS.json")
+                         if item.is_file() and not item.is_symlink()})
     if not candidates:
         return {"status": "NOT_RUN", "completed": 0, "records": [], "status_file": None}
     path = max(candidates, key=lambda p: (p.stat().st_mtime_ns, str(p)))
