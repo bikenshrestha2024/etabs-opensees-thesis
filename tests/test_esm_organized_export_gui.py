@@ -1,6 +1,7 @@
 """ESM combined export and GUI safety (synthetic files, no ETABS/solver)."""
 import ast
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -101,6 +102,9 @@ class ESMCombinedExportTests(unittest.TestCase):
                 path.write_text(json.dumps(rows), encoding="utf-8")
                 return build_combined_esm_export(root)
             success = {"case": run_name, "status": "SUCCESS",
+                       "runner_path": str(root/run_name),
+                       "runner_sha256": hashlib.sha256(
+                           (root/run_name).read_bytes()).hexdigest(),
                        "return_code": 0, "elapsed_s": 140.0}
             result = export_with([success])
             self.assertEqual(result["solver_batch_status"], "COMPLETE_SOLVER_ONLY")
@@ -125,7 +129,9 @@ class ESMCombinedExportTests(unittest.TestCase):
             status_dir.mkdir(parents=True)
             first = "OpenSees_NBC105_ESM_Load_And_Static_Analysis_ULS_X+_E0_V111.py"
             (status_dir / "CASE_STATUS.json").write_text(json.dumps([
-                {"case": first, "status": "SUCCESS", "return_code": 0}
+                {"case": first, "status": "SUCCESS", "return_code": 0,
+                 "runner_path": str(root/first),
+                 "runner_sha256": hashlib.sha256((root/first).read_bytes()).hexdigest()}
             ]), encoding="utf-8")
             result = build_combined_esm_export(root)
             self.assertEqual(result["solver_batch_status"], "PARTIAL_OR_FAILED")

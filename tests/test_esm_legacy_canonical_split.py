@@ -3,6 +3,7 @@
 Synthetic filesystem only; no ETABS, OpenSees, EDB or private workbook.
 """
 import json
+import hashlib
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -75,6 +76,8 @@ class ESMCanonicalLegacySplitTests(unittest.TestCase):
             batch.mkdir(parents=True)
             status = batch / "CASE_STATUS.json"
             row = {"case": RUNNER, "runner_path": str(canonical / RUNNER),
+                   "runner_sha256": hashlib.sha256(
+                       (canonical / RUNNER).read_bytes()).hexdigest(),
                    "status": "SUCCESS", "return_code": 0, "elapsed_s": 90}
             status.write_text(json.dumps([row]), encoding="utf-8")
             roots = _exact_calculation_roots(legacy)

@@ -242,13 +242,19 @@ def _latest_batch_status(root, calculation_roots=()):
             if not isinstance(item, dict) or not isinstance(item.get("case"), str):
                 raise ValueError("CASE_STATUS contains invalid case row")
         recorded = [item["case"] for item in records]
-        expected = {
-            file.name
-            for folder in (root, *calculation_roots)
-            for file in Path(folder).glob(
-                "OpenSees_*NBC105_ESM_Load_And_Static_Analysis_*.py")
-            if file.is_file() and not file.is_symlink()
-        }
+        # Match the exact saved script path AND SHA, not just a case
+        # filename: re-exporting a runner can otherwise inherit an old
+        # successful process status from the same-named previous batch.
+        paths_by_name = {}
+        for folder in (root, *calculation_roots):
+            folder = Path(folder)
+            if not folder.is_dir() or folder.is_symlink():
+                continue
+            for candidate in folder.glob(
+                    "OpenSees_*NBC105_ESM_Load_And_Static_Analysis_*.py"):
+                if candidate.is_file() and not candidate.is_symlink():
+                    paths_by_name.setdefault(candidate.name, []).append(candidate)
+        expected = set(paths_by_name)
         # Historical and route-prefixed runners for the same case can coexist.
         # Prefer the spelling actually executed in this batch.
         normalized = {}
@@ -258,14 +264,36 @@ def _latest_batch_status(root, calculation_roots=()):
                 normalized[key] = name
         expected = set(normalized.values())
         unique_recorded = set(recorded)
-        # Do not certify completion on count alone: duplicates or an unrelated
-        # older run can otherwise hide a missing X/Y eccentricity case.
-        successes = {
-            item["case"] for item in records
-            if item["case"] in expected
-            and item.get("status") == "SUCCESS"
-            and item.get("return_code") == 0
-        }
+        # A historical status without a bound runner SHA remains viewable,
+        # but cannot certify a new export. This is solver identity only.
+        runner_identity_issues = []
+        successes = set()
+        for item in records:
+            name = item["case"]
+            if (name not in expected or item.get("status") != "SUCCESS"
+                    or item.get("return_code") != 0):
+                continue
+            digest = item.get("runner_sha256")
+            if not isinstance(digest, str) or not re.fullmatch(
+                    r"[0-9a-fA-F]{64}", digest):
+                runner_identity_issues.append(name + ": MISSING_RUNNER_SHA256")
+                continue
+            recorded_path = item.get("runner_path")
+            if not isinstance(recorded_path, str) or not recorded_path.strip():
+                runner_identity_issues.append(name + ": MISSING_RUNNER_PATH")
+                continue
+            selected = Path(recorded_path).expanduser()
+            if any(part.is_symlink() for part in (selected, *selected.parents)):
+                runner_identity_issues.append(name + ": LINKED_RUNNER_PATH")
+                continue
+            allowed = paths_by_name.get(name, [])
+            if not any(selected.resolve() == file.resolve() for file in allowed):
+                runner_identity_issues.append(name + ": RUNNER_PATH_OUTSIDE_CURRENT_CASE")
+                continue
+            if not selected.is_file() or _sha256(selected) != digest.lower():
+                runner_identity_issues.append(name + ": STALE_RUNNER_SHA256")
+                continue
+            successes.add(name)
         duplicates = sorted({name for name in recorded if recorded.count(name) > 1})
         missing = sorted(expected - successes)
         unexpected = sorted(unique_recorded - expected)
@@ -277,8 +305,10 @@ def _latest_batch_status(root, calculation_roots=()):
         return {"status": state, "completed": len(successes),
                 "record_count": len(records), "expected_scripts": len(expected),
                 "missing_cases": missing, "duplicate_cases": duplicates,
-                "unexpected_cases": unexpected, "records": records,
-                "status_file": str(path), "status_sha256": _sha256(path)}
+                "unexpected_cases": unexpected,
+                "runner_identity_issues": runner_identity_issues,
+                "records": records, "status_file": str(path),
+                "status_sha256": _sha256(path)}
     except (OSError, ValueError, TypeError) as exc:
         return {"status": "INVALID_CASE_STATUS", "completed": 0, "records": [],
                 "status_file": str(path), "error": str(exc)}
@@ -330,7 +360,7 @@ def build_combined_esm_export(output_root, *, allow_incomplete=False):
     for key in ("status", "completed", "record_count", "expected_scripts", "status_file", "error"):
         if key in batch:
             status_sheet.append((key, str(batch[key])))
-    for key in ("missing_cases", "duplicate_cases", "unexpected_cases", "status_sha256"):
+    for key in ("missing_cases", "duplicate_cases", "unexpected_cases", "runner_identity_issues", "status_sha256"):
         if key in batch:
             status_sheet.append((key, ", ".join(batch[key]) if isinstance(batch[key], list) else str(batch[key])))
     status_sheet.append(())

@@ -96,3 +96,21 @@ The empirical `0.075H^.75/sqrt(Aw)` and the 1.25 amplification are evaluated by 
 ## 2026-11-22 — exact stage ESM JSON recovery, supports and mass
 
 The ESM combined exporter now finds its numeric `NBC105_ESM_Calculation_*.json` in the **exact** `03_ESM/RUNS/<state>/<same case name>` source path as well as the output root. GUI combined export is permitted to produce a manifest-only Excel+ZIP when no calculation JSON exists, expressly labelled `NO_CALCULATION_JSON`, with no invented base shear, story loads, or engineering approval. Legacy strict API still fails without JSON by default. ESM UI exposes 32 physical supports (default), 76 source restraint points or 97 wall-base idealization (diagnostics), plus an explicit distributed-vs-floor-lumped mass policy. Each script pins those settings and fails if the copied `OpenSees_Runtime_V118` executes a different actual support case. Compare against private native ETABS evidence before design use.
+
+## 2026-11-23 — Exact executed ESM runner process identity
+
+`ESMGui._run_generated` writes the SHA256 of each selected runner file
+into the corresponding `CASE_STATUS.json` row as `runner_sha256` with
+the original `runner_path`. It rechecks script bytes after the child
+process terminates; a changed script is `INCOMPLETE` instead of a
+successful recovered response, even if the process exited 0. This source
+fingerprint is process evidence only and must not be confused with the
+independent `model_sha256` written to ESM response metadata, the original
+EDB SHA or original Excel workbook source identity.
+
+Existing `CASE_STATUS` files without a runner hash remain readable but
+do not count toward a newly certified `COMPLETE_SOLVER_ONLY` export.
+The complete synthetic regression is in
+`tests/test_esm_runner_sha_identity.py`. No changes were made to
+`calculate_esm`, seismic mass, gravity, support topology, wall Aw,
+Rayleigh periods, initial P-Delta or OpenSees solver algorithms.
