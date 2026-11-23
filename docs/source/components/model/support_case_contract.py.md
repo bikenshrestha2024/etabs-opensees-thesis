@@ -27,3 +27,31 @@ The active `components/model/assembly.py::build_complete_model` resolves `OPENSE
 ## 2026-11-22 stale packaged-runtime gate
 
 `require_runtime_support_case(profile, build_report)` compares the selected profile and **actual build-returned** `gravity_base_support_tags`, then requires matching `support_case_evidence.profile`. A stale exported `OpenSees_Runtime_V118` that ignores a new GUI support choice now triggers a clear **REFRESH THE EXPORTED RUNTIME** error instead of producing mislabeled 76/97 source results for a selected 32-case. This check is called after model construction by ESM, Modal, MRSM, LTHA and NLTHA, using the same project tag contract. The check verifies a source software selector, **not** native ETABS analytical edge interpolation, 768-kN gravity reaction parity or code design acceptance.
+
+
+## 2026-11-23 — Single actual-solver reaction tag owner
+
+New `solver_reaction_support_tags(report, support_case)` retrieves
+`gravity_base_support_tags` **from the actual built model report**, validates
+their positive-integer, unique identity, calls
+`require_runtime_support_case` to verify the exact chosen 32 / diagnostic
+76 / diagnostic 97 profile, then returns sorted node tags for solver
+reactions and response records. This is a shared function, not an
+independently reconstructed support assumption.
+
+**Changed call sites:** `components/response_spectrum/model_analysis.py`
+MRSM uses the actual builder report for reaction baselines, modal reaction
+envelopes, and CSV node tags. The pre-existing public import in
+`components/nonlinear_time_history/source_model_handoff.py` delegates to
+this function to avoid a backward-incompatible NLTHA change.
+
+**Conservative limits:** 32 actual supports versus 44 extra wall-mesh
+points is still the user-confirmed source policy. The model's shell/MPC
+edge transfer, rigid-end offsets and pointwise reaction agreement
+remain unverified. This correction changes which recorder nodes are read,
+not solver stiffness, loads, mass, boundary conditions or spectral
+combination equations.
+
+**Regression:** `tests/test_shared_solver_support_recovery_20261123.py`
+verifies primary and diagnostic profiles, rejects duplicate/bool/invalid
+tags, checks NLTHA public import and MRSM AST reaction-tag call site.
