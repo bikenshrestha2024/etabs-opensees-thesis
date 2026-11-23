@@ -83,3 +83,26 @@ def test_approved_model_specific_manifest_can_be_selected_without_mutation(tmp_p
     assert select_model_bound_readiness(model,[template])==template
     assert auto(tmp_path).readiness.get()==str(template)
     assert template.read_bytes()==original
+
+def test_manual_nonlinear_builder_change_clears_old_manifest(tmp_path):
+    # Compile this single instance method, without tkinter/native OpenSees.
+    import ast
+    source=(ROOT/"components/nonlinear_time_history/runner_and_gui.py").read_text(encoding="utf-8")
+    cl=next(n for n in ast.parse(source).body if isinstance(n,ast.ClassDef)
+            and n.name=="NonlinearTimeHistoryGUI")
+    method=next(n for n in cl.body if isinstance(n,ast.FunctionDef)
+                and n.name=="_sync_readiness_for_selected_model")
+    ns={"Path":Path}
+    exec(compile(ast.Module(body=[method],type_ignores=[]),"nltha_sync","exec"),ns)
+    a=tmp_path/"a";b=tmp_path/"b"
+    model_a,_=project(a);model_b,_=project(b)
+    draft_a=bind_readiness_draft(TEMPLATE,model_a)
+    before=draft_a.read_bytes()
+    gui=SimpleNamespace(model=Variable(str(model_a)),readiness=Variable(""),_readiness_selection_model=None)
+    sync=ns["_sync_readiness_for_selected_model"]
+    sync(gui)
+    assert gui.readiness.get()==str(draft_a)
+    gui.model.set(str(model_b))
+    sync(gui)
+    assert gui.readiness.get()==""
+    assert draft_a.read_bytes()==before
