@@ -42,6 +42,24 @@ class ModalToHistoryPolicyTests(unittest.TestCase):
                     root,"ULS",sha,support_case="SOURCE_76",
                     seismic_mass_policy="STORY_LUMPED_NBC"))
 
+    def test_support_mismatch_rejected_when_mass_matches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);sha,_=self._fixture(root,support="SOURCE_76",
+                                                mass="SOURCE_DISTRIBUTED")
+            with patch("components.inputs.output_layout.result_roots",return_value=[root/"04_MODAL"]):
+                self.assertIsNone(matching_modal_reference(
+                    root,"ULS",sha,support_case="PHYSICAL_32",
+                    seismic_mass_policy="SOURCE_DISTRIBUTED"))
+
+    def test_mass_mismatch_rejected_when_support_matches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);sha,_=self._fixture(root,support="PHYSICAL_32",
+                                                mass="STORY_LUMPED_NBC")
+            with patch("components.inputs.output_layout.result_roots",return_value=[root/"04_MODAL"]):
+                self.assertIsNone(matching_modal_reference(
+                    root,"ULS",sha,support_case="PHYSICAL_32",
+                    seismic_mass_policy="SOURCE_DISTRIBUTED"))
+
     def test_missing_policy_metadata_is_not_trusted_as_matching(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);sha,path=self._fixture(root)
