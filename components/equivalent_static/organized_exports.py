@@ -281,7 +281,7 @@ def esm_batch_status_root(export_dir, selected_output=None):
     """[REF docs/source/components/equivalent_static/organized_exports.py.md]
     One source-export-owned status directory for all ESM X/Y/ULS/SLS cases.
 
-    In-project selections use 03_ESM/LOGS_AND_STATUS. An explicitly selected
+    In-project selections use the compact 03_ESM/STATUS directory. An explicitly selected
     external directory remains an override. Does not create or migrate paths.
     """
     from components.inputs.output_layout import export_root_for
@@ -294,7 +294,7 @@ def esm_batch_status_root(export_dir, selected_output=None):
         raise ValueError("Refusing linked ESM status output")
     chosen=chosen.resolve()
     if chosen==export_root or export_root in chosen.parents:
-        return export_root/"03_ESM"/"LOGS_AND_STATUS"/"ESM_Runner_Status"
+        return export_root/"03_ESM"/"STATUS"
     return chosen/"ESM_Runner_Status"
 
 
