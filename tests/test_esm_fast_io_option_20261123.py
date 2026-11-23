@@ -17,9 +17,9 @@ class ESMFastIOTests(unittest.TestCase):
     def test_generated_script_has_opt_in_optional_reports_and_keeps_core(self):
         stories=[
             dict(height_m=4.,story_number=1,story_name="S1",master_node_tag=101,
-                 dead_load_kN=1000.,storage_live_load_kN=0.,other_live_load_kN=100.),
+                 dead_load_kN=1000.,storage_live_load_kN=0.,other_live_load_kN=100.,roof_live_load_kN_ignored=0.),
             dict(height_m=8.,story_number=2,story_name="S2",master_node_tag=102,
-                 dead_load_kN=900.,storage_live_load_kN=0.,other_live_load_kN=100.),
+                 dead_load_kN=900.,storage_live_load_kN=0.,other_live_load_kN=100.,roof_live_load_kN_ignored=0.),
         ]
         result=calculate_esm(
             stories,limit_state='ULS',period_s=1.5,soil_type='C',
