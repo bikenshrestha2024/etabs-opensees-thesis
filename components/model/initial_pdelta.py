@@ -58,7 +58,9 @@ def ensure_initial_checks(folder):
     from components.inputs.output_contract import atomic_json
     selected_case=normalize_support_case(os.environ.get('OPENSEES_SUPPORT_CASE','PHYSICAL_32'))
     selected_mass_policy=os.environ.get('OPENSEES_SEISMIC_MASS_POLICY','SOURCE_DISTRIBUTED').strip().upper()
-    selected_state=os.environ.get('OPENSEES_LIMIT_STATE','ULS').strip().upper()
+    # Initial signed IS16700 preflight is ULS by default, independent of
+    # a subsequent SLS modal/ESM stiffness run; never inherit OPENSEES_LIMIT_STATE.
+    selected_state=os.environ.get('OPENSEES_INITIAL_PDELTA_LIMIT_STATE','ULS').strip().upper()
     digest=_initial_pdelta_fingerprint(
         [folder/name for name in names],
         [Path(globals().get('_component_source',__file__)),
