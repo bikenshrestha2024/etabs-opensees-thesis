@@ -172,7 +172,11 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
     diagnostics={} if diagnostics is None else diagnostics
     fallback_algorithms = ("Newton", "NewtonLineSearch", "KrylovNewton", "ModifiedNewton")
     if diagnostics.get("efficient_recovery") and depth < max_depth:
-        algorithms = ("Newton",)
+        # The research runner formerly waited until the smallest dt to try
+        # another algorithm. Try two tangent strategies at the original
+        # interval first, retaining Newton-only subdivision below it.
+        algorithms = (fallback_algorithms[:3] if depth == 0 and
+                      diagnostics.get("early_algorithm_fallback") else ("Newton",))
     else:
         algorithms = fallback_algorithms
     for algorithm in algorithms:
@@ -183,6 +187,9 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
             raise RuntimeError('Nonfinite analysis clock before nonlinear transient retry; fresh-domain review required.')
         diagnostics['attempts']=diagnostics.get('attempts',0)+1
         diagnostics['algorithm_'+algorithm]=diagnostics.get('algorithm_'+algorithm,0)+1
+        if diagnostics.get("report_recovery") and (depth or algorithm != "Newton"):
+            print(f"[NLTHA RECOVERY] algorithm={algorithm} start_s={attempt_start:.12g} "
+                  f"dt_s={float(dt):.12g} depth={depth}/{max_depth}",flush=True)
         try:
             ops.test("NormDispIncr", 1.0e-7, 40, 0)
             ops.algorithm(algorithm)
@@ -223,6 +230,13 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
         diagnostics['last_failed_dt_s']=float(dt)
         diagnostics['last_failed_return_code']=rc
         diagnostics['last_failed_step_start_s']=attempt_start
+        try:
+            diagnostics['last_failed_iterations']=int(ops.testIter())
+        except (AttributeError, TypeError, ValueError, OverflowError):
+            diagnostics['last_failed_iterations']=None
+        if diagnostics.get("report_recovery"):
+            print(f"[NLTHA RECOVERY] rejected algorithm={algorithm} start_s={attempt_start:.12g} "
+                  f"dt_s={float(dt):.12g} depth={depth}/{max_depth} rc={rc}",flush=True)
         # Do not retry a domain whose trial state already contains NaN/Inf.
         # Such a retry can propagate a failed linear solve into every element;
         # it does not constitute a convergence recovery.

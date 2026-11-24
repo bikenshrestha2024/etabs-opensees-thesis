@@ -176,6 +176,25 @@ class FailureEvidenceTests(unittest.TestCase):
         self.assertEqual(diagnostics["bisections"], 1)
         self.assertEqual(diagnostics["failed_attempts"], 1)
 
+    def test_early_alternatives_recover_without_unnecessary_subdivision(self):
+        ops = FakeOps([-3, 0])
+        diagnostics = {"efficient_recovery": True, "early_algorithm_fallback": True}
+        accepted = _advance_nonlinear_interval(
+            ops, 0.005, max_depth=5, diagnostics=diagnostics)
+        self.assertEqual(accepted, 1)
+        self.assertEqual(ops.algorithms, ["Newton", "NewtonLineSearch"])
+        self.assertAlmostEqual(ops.getTime(), 0.005)
+        self.assertEqual(diagnostics.get("bisections", 0), 0)
+        self.assertEqual(diagnostics["failed_attempts"], 1)
+
+    def test_early_alternatives_still_abort_nonfinite_failure(self):
+        ops = FakeOps([-3], nonfinite=True)
+        with self.assertRaisesRegex(RuntimeError, "Non-finite element"):
+            _advance_nonlinear_interval(ops, 0.005, diagnostics={
+                "efficient_recovery": True, "early_algorithm_fallback": True})
+        self.assertEqual(ops.algorithms, ["Newton"])
+        self.assertEqual(ops.getTime(), 0.0)
+
     def test_efficient_recovery_keeps_algorithm_fallbacks_at_depth_limit(self):
         ops = FakeOps([-3, 0])
         accepted = _advance_nonlinear_interval(

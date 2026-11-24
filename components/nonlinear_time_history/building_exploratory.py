@@ -314,6 +314,9 @@ def _run(config):
         raise ValueError('diagnostic_excitation must be XY, X, Y or ZERO')
     if config.get('diagnostic_zero_damping') and config.get('diagnostic_mass_damping'):
         raise ValueError('Select only one diagnostic damping override')
+    recovery_strategy=config.get('recovery_strategy','EARLY_ALTERNATIVES')
+    if recovery_strategy not in ('EARLY_ALTERNATIVES','BISECTION_FIRST'):
+        raise ValueError('recovery_strategy must be EARLY_ALTERNATIVES or BISECTION_FIRST')
     max_subdivision_depth=config.get('max_subdivision_depth',5)
     if isinstance(max_subdivision_depth,bool) or not isinstance(max_subdivision_depth,int) or not 0<=max_subdivision_depth<=8:
         raise ValueError('max_subdivision_depth must be an integer from 0 through 8')
@@ -740,6 +743,9 @@ def _run(config):
             'element_map_path':str(model/'OpenSees_Complete_Element_Map_V118.json'),
             'suspect_tags':suspect_tags if suspect_tags else None,
             'efficient_recovery':True,
+            'early_algorithm_fallback':recovery_strategy=='EARLY_ALTERNATIVES',
+            'report_recovery':True,
+            'recovery_strategy':recovery_strategy,
             'max_subdivision_depth':max_subdivision_depth,
         };rows=[];last=time.perf_counter();case_start=last
         stories=[dict(node=g['master_tag'],story_name='Storey_'+str(g['storey_number']),height=g['master_xyz'][2]-(groups[i-1]['master_xyz'][2] if i else data['base_z_m'])) for i,g in enumerate(groups)]
@@ -863,13 +869,13 @@ def _run(config):
             # record has consumed hours of CPU time. A zero solver return
             # code does NOT imply every recorder response is finite.
             verify_numeric_accepted_row(row, row_index=len(rows))
-            rows.append(row)
             if suspect_tags and config.get('analysis_intent','RESEARCH_DIAGNOSTIC')!='THESIS_NLTHA':
                 from components.nonlinear_time_history.failure_evidence import snapshot_selected_state
                 snapshot_selected_state(ops,
                     case/'Last_Accepted_Wall_State.json',
                     suspect_tags=suspect_tags,
                     stage="LAST_ACCEPTED_COMMITTED")
+            rows.append(row)
             timing["capture_s"]+=time.perf_counter()-capture_started
             timing["accepted_rows"]+=1
         history=case/'Building_Nonlinear_history.csv'
@@ -881,10 +887,17 @@ def _run(config):
             try:
                 while ops.getTime()<end-1e-10:
                     before=len(rows); tick=time.perf_counter(); capture_before=timing['capture_s']
-                    _advance_nonlinear_interval(ops,min(dt,end-ops.getTime()),max_depth=max_subdivision_depth,on_accept=capture,diagnostics=diag)
-                    timing['solver_and_recovery_s']+=max(0.,time.perf_counter()-tick-(timing['capture_s']-capture_before))
-                    timing['intervals']+=1
-                    tick=time.perf_counter();writer.writerows(rows[before:]);timing['csv_s']+=time.perf_counter()-tick
+                    try:
+                        _advance_nonlinear_interval(ops,min(dt,end-ops.getTime()),max_depth=max_subdivision_depth,on_accept=capture,diagnostics=diag)
+                    finally:
+                        # A left half can commit before the right half fails.
+                        # Preserve every validated row even on terminal failure.
+                        timing['solver_and_recovery_s']+=max(0.,time.perf_counter()-tick-(timing['capture_s']-capture_before))
+                        timing['intervals']+=1
+                        tick=time.perf_counter()
+                        writer.writerows(rows[before:])
+                        stream.flush()
+                        timing['csv_s']+=time.perf_counter()-tick
                     if time.perf_counter()-last>5:
                         last=time.perf_counter();stream.flush()
                         minimum_dt=diag.get('minimum_accepted_dt_s')
@@ -900,6 +913,9 @@ def _run(config):
                             flush=True)
             except Exception as exc:
                 try:
+                    (case/'Transient_Performance.json').write_text(json.dumps(dict(
+                        timing,status='INCOMPLETE',physical_time_s=rows[-1]['time_s'],
+                        target_time_s=end,estimated_remaining_s=None),indent=2),encoding='utf-8')
                     _write_failure_report(
                         case,config,exc,filename='FAILED.json',
                         details=dict(orientation=orientation,time_s=ops.getTime(),

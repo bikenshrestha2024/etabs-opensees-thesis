@@ -98,6 +98,14 @@ def launch(parent,model_folder,output_folder=None):
     ttk.Label(settings,text='SparseGeneral gravity is diagnostic-only; a full-wall test exited natively.',foreground='#8a3412').pack(side='left',padx=4)
     ttk.Label(settings,text='Transient solver').pack(side='left',padx=(10,2))
     ttk.Combobox(settings,textvariable=transient_system,values=['UmfPack','SparseGeneral'],state='readonly',width=14).pack(side='left')
+    recovery=ttk.LabelFrame(win,text='Convergence recovery');recovery.pack(fill='x',padx=8,pady=(4,0))
+    recovery_strategy=tk.StringVar(value='EARLY_ALTERNATIVES')
+    subdivision_depth=tk.StringVar(value='5')
+    ttk.Label(recovery,text='Recovery strategy').grid(row=0,column=0,sticky='w',padx=4,pady=3)
+    ttk.Combobox(recovery,textvariable=recovery_strategy,values=['EARLY_ALTERNATIVES','BISECTION_FIRST'],state='readonly',width=23).grid(row=0,column=1,sticky='w')
+    ttk.Label(recovery,text='Maximum halvings').grid(row=0,column=2,sticky='w',padx=(12,4))
+    ttk.Combobox(recovery,textvariable=subdivision_depth,values=['3','4','5','6','7','8'],state='readonly',width=4).grid(row=0,column=3,sticky='w')
+    ttk.Label(recovery,text='Early alternatives tries line search and Krylov before halving. Tolerance stays 1e-7; failed or nonfinite states are not accepted.',wraplength=950,justify='left').grid(row=1,column=0,columnspan=4,sticky='w',padx=4,pady=(0,4))
     tracked=tk.StringVar(value='100001');ttk.Label(settings,text='Tracked frame solver tag').pack(side='left');ttk.Entry(settings,textvariable=tracked,width=9).pack(side='left')
     tracked_members=tk.StringVar(value='')
     ttk.Label(settings,text='Additional brace/device tags (comma-separated)').pack(side='left',padx=(8,2))
@@ -311,6 +319,7 @@ def launch(parent,model_folder,output_folder=None):
                 energy_balance=energy.get(),energy_tolerance=energy_tol.get(),variant=variant.get(),
                 pair_label=pair.get())
             config.update(options)
+            config.update(recovery_strategy=recovery_strategy.get(),max_subdivision_depth=int(subdivision_depth.get()))
             run_states=('ULS','SLS') if ls.get()=='Both' else (ls.get(),)
             if run_sensitivity:
                 values=[float(value.strip()) for value in sensitivity_values.get().split(',') if value.strip()]
@@ -482,6 +491,12 @@ def launch(parent,model_folder,output_folder=None):
             progress_context['case']=prefix+(progress_context['state'] or 'ULS')+'/'+case_orientation
             if progress_context['case'] in ledger.rows:
                 ledger.set(progress_context['case'],'RUNNING','Model build, gravity, modal check, then transient response')
+        if line.startswith('[NLTHA RECOVERY]'):
+            detail=line[len('[NLTHA RECOVERY]'):].strip()
+            status.set('Convergence recovery | '+detail)
+            case=progress_context.get('case')
+            if case in ledger.rows:
+                ledger.set(case,'RUNNING','Recovery | '+detail)
         progress_match=re.search(
             r'\[EXPLORATORY PROGRESS\]\s+(XY|YX):\s+t=([\d.eE+-]+)/([\d.eE+-]+)s',line)
         if progress_match:
