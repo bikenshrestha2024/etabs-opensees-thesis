@@ -40,7 +40,11 @@ def _long_case_directories(root):
     parents=[(key,root/folder/"RUNS") for key,folder in ALL_STAGE_FOLDERS.items()]
     parents.append(("LEGACY",selected))
     for stage,runs in parents:
-        if runs.is_symlink() or not runs.is_dir():
+        # A stage symlink can hide above the RUNS component. Do not follow
+        # it merely because the child RUNS path itself is not a symlink.
+        if (runs.is_symlink() or
+                (stage!="LEGACY" and runs.parent.is_symlink()) or
+                not runs.is_dir()):
             continue
         if stage=="LEGACY":
             cases=sorted(runs.iterdir(),key=lambda p:p.name.casefold())
