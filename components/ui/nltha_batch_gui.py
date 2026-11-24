@@ -52,14 +52,13 @@ def launch(parent, model_folder):
             plan.write_text(json.dumps({"jobs":selected},indent=2),encoding="utf-8")
             root=Path(batch_execution.__file__).resolve().parents[2]
             log=parent_dir/(label+"_Scheduler.log")
-            # Validate inputs before launching; scheduler repeats the same checks.
-            batch_execution.prepare_jobs(plan,dest)
+            # Hash and validate large model inputs in the scheduler, not Tk's event loop.
             with log.open("w",encoding="utf-8") as stream:
                 proc=subprocess.Popen([sys.executable,"-u","-m",
                     "components.nonlinear_time_history.batch_execution","--plan",str(plan),
                     "--output",str(dest),"--workers",workers.get()],cwd=str(root),
                     stdout=stream,stderr=subprocess.STDOUT)
-            active.update(proc=proc,output=dest,log=log)
+            active.update(proc=proc,output=dest,log=log,closing=False)
             choose.configure(state="disabled");selector.configure(state="disabled");run.configure(state="disabled")
             status.set("Batch running: "+str(dest))
         except Exception as exc:
