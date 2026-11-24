@@ -43,3 +43,10 @@ The workbook NBC Summary now distinguishes source-based model restraint count, s
 ## 2026-11-22 — foundation and seismic-mass operator controls
 
 Modal GUI now offers the shared `PHYSICAL_32`, `SOURCE_76`, `WALL_BASE_97` case selector and `SOURCE_DISTRIBUTED` vs optional `STORY_LUMPED_NBC` dynamic mass operator. Generated modal runner freezes settings to avoid reused GUI state changing a previous run, then validates model builder's returned actual support tags and `support_case_evidence` to detect an old copied runtime. These settings affect actual modal eigenphysics; historical periods, mass participation, Rayleigh external input and native ETABS validation remain separate.
+
+
+## 2026-11-24 — compact Modal run bound to model script fingerprint
+
+`prepare_canonical_modal_run` now checks that the selected builder is an existing `.py` file, SHA-256 hashes the script contents once, and passes that checksum as **`source_script_sha256`** to the shared `create_case_run`. It saves the exact same checksum in `00_INPUT_SOURCE/MODAL_INPUT_PROVENANCE.json`. A long `ULS_Floor_3_...` case label is compacted to at most 48 characters beneath `04_MODAL/RUNS/<ULS|SLS>/<case-id>/<unique-run-id>`; subsequent script source changes select a distinct new parent without moving previously created runs. No EDB name or `latest` fallback becomes an artificial script fingerprint. For a short label, original name remains unchanged.
+
+**Provenance status:** `model_script_sha256` identifies a source code file, NOT the assembled-model SHA, original EDB SHA, stiffness state, reinforcement/material calibration or a numerically equivalent ETABS model. `assembled_model_sha256` and `source_edb_sha256` remain `null` when native evidence is unavailable. Saved Modal result consumers still use the established state-specific result and manifest paths; old long cases remain discoverable. This is only filesystem/source-identity verification. `tests/test_modal_script_case_provenance_20261124.py` and `tests/test_modal_canonical_output_v2.py` cover the new and existing reader behavior.

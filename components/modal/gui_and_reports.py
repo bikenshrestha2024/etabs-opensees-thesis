@@ -191,11 +191,15 @@ def prepare_canonical_modal_run(export_dir, limit_state, model_script):
     if state not in ("ULS","SLS"):
         raise ValueError("Single ULS/SLS state required")
     model=Path(model_script).expanduser().resolve(strict=True)
+    if not model.is_file() or model.suffix.casefold() != ".py":
+        raise ValueError("Modal source must be an existing model-builder Python file")
+    script_sha256=hashlib.sha256(model.read_bytes()).hexdigest()
     case_name=analysis_output_folder(export,state).name
-    run=create_case_run(export,"MODAL",case_name,state=state)
+    run=create_case_run(export,"MODAL",case_name,state=state,
+                        source_script_sha256=script_sha256)
     atomic_json(run/"00_INPUT_SOURCE"/"MODAL_INPUT_PROVENANCE.json",{
         "source_model_script":str(model),
-        "model_script_sha256":hashlib.sha256(model.read_bytes()).hexdigest(),
+        "model_script_sha256":script_sha256,
         "assembled_model_sha256":None,
         "source_edb_sha256":None,
         "limit_state":state,

@@ -206,7 +206,8 @@ def style_workbook(workbook):
 
 def create_case_run(export_dir, stage, case_id, *,
                     state="AS_CONFIGURED", model_sha256=None,
-                    source_edb_sha256=None, units="kN-m-s"):
+                    source_edb_sha256=None, source_script_sha256=None,
+                    units="kN-m-s"):
     """[REF docs/source/components/inputs/output_contract.py.md]
     Create an explicitly identified RUNS/<state>/<case>/<unique-id> directory.
 
@@ -219,9 +220,11 @@ def create_case_run(export_dir, stage, case_id, *,
     stage_folder = canonical_stage_folder(stage)
     state = safe_component(state)
     original_case_id = safe_component(case_id)
-    for digest in (model_sha256, source_edb_sha256):
-        if digest is not None and not re.fullmatch("[a-fA-F0-9]{64}", digest):
-            raise ValueError("Source/model SHA256 must contain exactly 64 hexadecimal characters")
+    for digest in (model_sha256, source_edb_sha256, source_script_sha256):
+        if digest is not None and (
+                not isinstance(digest, str)
+                or not re.fullmatch("[a-fA-F0-9]{64}", digest)):
+            raise ValueError("Source/model/script SHA256 must contain exactly 64 hexadecimal characters")
     if not isinstance(units, str) or units not in ("kN-m-s", "kN-mm-s"):
         raise ValueError("Declare explicitly reviewed source units: kN-m-s or kN-mm-s")
     # Shorten only source-fingerprinted NEW case runs. Preserve the complete
@@ -231,7 +234,7 @@ def create_case_run(export_dir, stage, case_id, *,
     case_label_mode = "EXACT"
     compact_source_basis = None
     if len(original_case_id) > 48:
-        digest = model_sha256 or source_edb_sha256
+        digest = model_sha256 or source_edb_sha256 or source_script_sha256
         if digest is not None:
             stage_key = next((key for key, folder in ALL_STAGE_FOLDERS.items()
                               if folder == stage_folder), None)
@@ -240,8 +243,9 @@ def create_case_run(export_dir, stage, case_id, *,
             case_id = compact_case_id(stage_key, original_case_id, digest)
             case_label_mode = "COMPACT_SOURCE_BOUND"
             compact_source_basis = (
-                "MODEL_SHA256" if model_sha256 is not None
-                else "SOURCE_EDB_SHA256")
+                "MODEL_SHA256" if model_sha256 is not None else
+                "SOURCE_EDB_SHA256" if source_edb_sha256 is not None else
+                "SOURCE_SCRIPT_SHA256")
     # Refuse existing linked ancestors rather than writing outside the
     # selected export case through a redirected stage/state/case folder.
     # Only inspect paths below the already resolved case root; older results
@@ -265,6 +269,7 @@ def create_case_run(export_dir, stage, case_id, *,
         "compact_source_basis": compact_source_basis,
         "run_id": run_id, "created_utc": now.isoformat(),
         "units": units, "source_edb_sha256": source_edb_sha256,
+        "source_script_sha256": source_script_sha256,
         "model_sha256": model_sha256, "solver_status": "CREATED",
         "structural_acceptance": "NOT_VERIFIED",
         "files": [],
@@ -341,7 +346,7 @@ def inspect_case_manifest(run_dir, *, expected_stage=None):
     if expected_stage is not None:
         if data.get("stage")!=canonical_stage_folder(expected_stage):
             issues.append("WRONG_STAGE")
-    for field in ("model_sha256","source_edb_sha256"):
+    for field in ("model_sha256","source_edb_sha256","source_script_sha256"):
         value=data.get(field)
         if value is not None and (not isinstance(value,str)
                  or re.fullmatch("[a-fA-F0-9]{64}",value) is None):
@@ -370,6 +375,7 @@ def inspect_case_manifest(run_dir, *, expected_stage=None):
                     basis_field = {
                         "MODEL_SHA256": "model_sha256",
                         "SOURCE_EDB_SHA256": "source_edb_sha256",
+                        "SOURCE_SCRIPT_SHA256": "source_script_sha256",
                     }.get(basis)
                     stage_key = next(
                         (key for key, folder in ALL_STAGE_FOLDERS.items()
@@ -429,6 +435,7 @@ def prepare_history_run(model_script, stage, state, scope, *, model_length_unit)
     case_id=compact_case_id(method,scope,model_digest)
     export=export_root_for(model.parent)
     run=create_case_run(export,method,case_id,state=state,
+                        source_script_sha256=model_digest,
                         units="kN-m-s" if model_length_unit=="m" else "kN-mm-s")
     atomic_json(run/"00_INPUT_SOURCE"/"HISTORY_INPUT_PROVENANCE.json",{
         "model_script":str(model),
