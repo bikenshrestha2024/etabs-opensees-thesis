@@ -526,6 +526,67 @@ def export_area_integration_inventory(*, topology_json, area_assignment_csv,
 
 
 
+def inspect_instantiated_area_evidence(*, config_json):
+    """Read-only distinction between source inventory and saved area elements.
+
+    This is a GUI explanation, NOT an instantiation, source approval, material
+    validation, or ZIP acceptance check. package_area_instantiation_audit
+    remains the authoritative count/source/tag verification before export.
+    [REF docs/source/components/sections/area_elements.py.md]
+    """
+    config_path=Path(config_json).expanduser().resolve()
+    if not config_path.is_file():
+        raise FileNotFoundError('Area integration config does not exist: '+str(config_path))
+    cfg=json.loads(config_path.read_text(encoding='utf-8-sig'))
+    if not isinstance(cfg,dict):
+        raise ValueError('Area integration config must be a JSON object')
+    selected=cfg.get('audit_output_json')
+    if not isinstance(selected,str) or not selected.strip():
+        raise ValueError('Area config has no selected audit_output_json')
+    audit=Path(selected).expanduser()
+    if not audit.is_absolute():
+        if '..' in audit.parts:
+            raise ValueError('Area audit report cannot escape selected config folder')
+        audit=config_path.parent/audit
+    audit=audit.resolve()
+    # A file on disk can still be stale or forged. Its physical solver/source
+    # identity is established ONLY by the existing packaging validator.
+    exists=audit.is_file() and not audit.is_symlink()
+    wall_definitions=cfg.get('opensees_wall_sections') or {}
+    if not isinstance(wall_definitions,dict):
+        raise ValueError('opensees_wall_sections must be a dictionary')
+    missing=[]
+    for name,definition in wall_definitions.items():
+        tag=definition.get('fsam_material_tag') if isinstance(definition,dict) else None
+        try:
+            valid=int(tag)>0 if tag is not None and not isinstance(tag,bool) else False
+        except (TypeError,ValueError):
+            valid=False
+        if not valid:missing.append(str(name))
+    reviewed=cfg.get('source_reviewed_by_user') is True
+    guidance=(
+        'Source inventory and an assembled elastic ShellMITC4 mesh do not '
+        'automatically produce this optional area-instantiation audit. '
+        'Do not add duplicate floor or wall elements to an already assembled '
+        'OpenSees model. Review the original ETABS source, define and validate '
+        'real project FSAM/ConcreteCM/SteelMPF materials, then run the '
+        'area-instantiation helper only in a compatible model without those '
+        'elements and preserve its source-matched report. A saved report is '
+        'not proof of gravity, nonlinear convergence or design acceptance.'
+    )
+    return {
+        'status':('SAVED_REPORT_PRESENT_NOT_VALIDATED' if exists else
+                  'SOURCE_ONLY_NO_INSTANTIATION_REPORT'),
+        'report_path':str(audit),
+        'saved_report_present':bool(exists),
+        'source_reviewed_by_user':reviewed,
+        'missing_fsam_targets':sorted(missing),
+        'analysis_ready':False,
+        'engineering_accepted':False,
+        'guidance':guidance,
+    }
+
+
 def package_area_instantiation_audit(*, topology_json, area_assignment_csv,
                                      config_json, output_dir):
     """[REF docs/source/components/sections/area_elements.py.md]
@@ -736,6 +797,26 @@ def launch_area_integration_gui(parent=None, export_dir=None):
                 'Select source topology, assignment CSV and the area config.',parent=win)
             return
         try:
+            evidence=inspect_instantiated_area_evidence(
+                config_json=paths['config'].get())
+            if not evidence['saved_report_present']:
+                blockers=[]
+                if not evidence['source_reviewed_by_user']:
+                    blockers.append('ETABS source review is not approved in the selected config.')
+                if evidence['missing_fsam_targets']:
+                    blockers.append('Missing project FSAM material tag for: '+
+                                    ', '.join(evidence['missing_fsam_targets']))
+                messagebox.showwarning(
+                    'Area source inventory only — no saved instantiation audit',
+                    'No saved audit from the optional area-element instantiation '
+                    'step exists at:\\n'+evidence['report_path']+
+                    '\\n\\n'+('\\n'.join(blockers)+'\\n\\n' if blockers else '')+
+                    evidence['guidance']+
+                    '\\n\\nUse Export area inventory (Excel + JSON + ZIP) '
+                    'for the existing source evidence. This ZIP button will '
+                    'not create or certify solver elements.',
+                    parent=win)
+                return
             destination=Path(export_dir).resolve() if export_dir else Path(paths['topology'].get()).resolve().parent
             archive=package_area_instantiation_audit(
                 topology_json=paths['topology'].get(),
@@ -747,6 +828,7 @@ def launch_area_integration_gui(parent=None, export_dir=None):
                 parent=win)
         except Exception as exc:
             messagebox.showerror('Instantiated area ZIP export',str(exc),parent=win)
+    ttk.Label(root, text="A source inventory is not instantiated solver evidence. Export saved instantiated element ZIP only after the optional area-element helper has run in a compatible model and saved a source-matched audit; the main elastic mesh export does not create this audit.",wraplength=1000,foreground="#8a3412").pack(anchor="w",pady=(0,4))
     ttk.Button(root,text='Export saved instantiated element ZIP',
                command=export_instantiated_evidence).pack(anchor='w',pady=4)
     def open_output_folder():
