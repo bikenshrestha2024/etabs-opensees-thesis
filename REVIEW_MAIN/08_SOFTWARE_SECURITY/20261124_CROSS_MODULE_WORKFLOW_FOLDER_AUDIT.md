@@ -53,7 +53,7 @@
   90_UPLOAD_PACKAGES/
 ```
 
-This is an **ownership illustration**, not a claim that every stage currently uses `create_case_run`. The seven standard per-run subfolders remain `00_INPUT_SOURCE` to `07_EXPORT_ZIP` as defined by `RUN_SUBFOLDERS`; stage-level `STATUS` is an ESM-specific existing convention. Keep the non-destructive `OpenSees_Analysis_Results` legacy directory until all readers and outputs are positively matched by SHA.
+This is an **ownership illustration**, not a claim that every stage currently uses `create_case_run`. The eight standard per-run subfolders remain `00_INPUT_SOURCE` to `07_EXPORT_ZIP` as defined by `RUN_SUBFOLDERS`; stage-level `STATUS` is an ESM-specific existing convention. Keep the non-destructive `OpenSees_Analysis_Results` legacy directory until all readers and outputs are positively matched by SHA.
 
 ## Next validation / remaining work (not implemented by this audit)
 
