@@ -10,7 +10,8 @@ from unittest import TestCase
 from zipfile import ZipFile
 
 from components.sections.area_elements import (
-    instantiate_area_elements, package_area_instantiation_audit)
+    instantiate_area_elements, package_area_instantiation_audit,
+    inspect_instantiated_area_evidence)
 
 
 class FakeOps:
@@ -45,6 +46,60 @@ def inputs(root):
 
 
 class InstantiatedAreaEvidenceTests(TestCase):
+    def test_missing_saved_area_report_is_explained_not_fabricated(self):
+        with TemporaryDirectory() as td:
+            root=Path(td)
+            topology,audit,config=inputs(root)
+            cfg=json.loads(config.read_text())
+            cfg['source_reviewed_by_user']=False
+            cfg['opensees_wall_sections']={
+                'RC_WALL_600':{'fsam_material_tag':None}}
+            config.write_text(json.dumps(cfg),encoding='utf-8')
+            original=config.read_bytes()
+            info=inspect_instantiated_area_evidence(config_json=config)
+            self.assertEqual(info['status'],'SOURCE_ONLY_NO_INSTANTIATION_REPORT')
+            self.assertFalse(info['saved_report_present'])
+            self.assertFalse(info['analysis_ready'])
+            self.assertFalse(info['source_reviewed_by_user'])
+            self.assertEqual(info['missing_fsam_targets'],['RC_WALL_600'])
+            self.assertIn('OpenSees_Area_Element_Integration_Audit_V116.json',
+                          info['report_path'])
+            self.assertIn('not automatically',info['guidance'].lower())
+            self.assertEqual(config.read_bytes(),original)
+            self.assertEqual(list(root.glob('*.zip')),[])
+            self.assertFalse((root/cfg['audit_output_json']).exists())
+
+    def test_saved_report_presence_is_not_approved_or_packaged_by_preflight(self):
+        with TemporaryDirectory() as td:
+            root=Path(td)
+            topology,audit,config=inputs(root)
+            before=inspect_instantiated_area_evidence(config_json=config)
+            self.assertFalse(before['saved_report_present'])
+            report=root/'OpenSees_Area_Element_Integration_Audit_V116.json'
+            report.write_text(json.dumps({'element_audit':[{'tag':1}],
+                'floor_shell_count':1,'nonlinear_wall_panel_count':0}),
+                encoding='utf-8')
+            after=inspect_instantiated_area_evidence(config_json=config)
+            self.assertEqual(after['status'],'SAVED_REPORT_PRESENT_NOT_VALIDATED')
+            self.assertTrue(after['saved_report_present'])
+            self.assertFalse(after['analysis_ready'])
+            self.assertFalse(after['engineering_accepted'])
+            with self.assertRaises(ValueError):
+                package_area_instantiation_audit(
+                    topology_json=topology,area_assignment_csv=audit,
+                    config_json=config,output_dir=root)
+            self.assertFalse((root/'02_MODEL').exists())
+
+    def test_instantiation_preflight_rejects_parent_relative_output(self):
+        with TemporaryDirectory() as td:
+            root=Path(td)
+            _,_,config=inputs(root)
+            cfg=json.loads(config.read_text())
+            cfg['audit_output_json']='../OTHER/AUDIT.json'
+            config.write_text(json.dumps(cfg))
+            with self.assertRaises(ValueError):
+                inspect_instantiated_area_evidence(config_json=config)
+
     def test_actual_element_report_is_source_local_and_zip_is_nonempty(self):
         with TemporaryDirectory() as td:
             root=Path(td)
