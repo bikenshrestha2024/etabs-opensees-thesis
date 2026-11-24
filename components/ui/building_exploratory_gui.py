@@ -488,9 +488,17 @@ def launch(parent,model_folder,output_folder=None):
             case=prefix+(progress_context['state'] or 'ULS')+'/'+case_orientation
             current=float(progress_match.group(2));duration=float(progress_match.group(3))
             percent=100.*current/duration if duration>0 else 0.
+            eta_match=re.search(r'eta_s=([\d.eE+-]+)',line)
+            wall_match=re.search(r'wall=([\d.eE+-]+)s',line)
+            eta=float(eta_match.group(1)) if eta_match else (
+                float(wall_match.group(1))*max(0.,duration-current)/current
+                if wall_match and current>0 else None)
+            detail=f'Transient physical time {current:g}/{duration:g} s ({percent:.2f}%)'
+            if eta is not None and eta>=0:
+                detail+=f' | estimated remaining {eta/3600:.2f} h'
+            status.set(detail+' | '+case)
             if case in ledger.rows:
-                ledger.set(case,'RUNNING',
-                           f'Transient physical time {current:g}/{duration:g} s ({percent:.1f}%)')
+                ledger.set(case,'RUNNING',detail)
         complete_match=re.search(r'\[EXPLORATORY COMPLETE\]\s+(\{.*\})\s*$',line)
         if complete_match:
             result=json.loads(complete_match.group(1))
