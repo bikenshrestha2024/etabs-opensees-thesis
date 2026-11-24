@@ -20,7 +20,7 @@ from numbers import Integral, Real
 from pathlib import Path
 from uuid import uuid4
 
-from components.inputs.output_layout import canonical_stage_folder, export_root_for
+from components.inputs.output_layout import ALL_STAGE_FOLDERS, canonical_stage_folder, export_root_for
 
 # Same layout for every newly adopted producing stage; existing consumers may
 # continue reading their original paths until complete migration.
@@ -63,7 +63,7 @@ def compact_case_id(stage, scope, source_sha256, *, max_length=48):
     """
     import hashlib
     key=str(stage).strip().upper()
-    if key not in ("MODEL","GRAVITY","ESM","MODAL","MRSM","LTHA","NLTHA"):
+    if key not in ALL_STAGE_FOLDERS:
         raise ValueError("Unknown analysis stage for compact case ID")
     if not isinstance(source_sha256,str) or not re.fullmatch(r"[a-fA-F0-9]{64}",source_sha256):
         raise ValueError("Compact case ID requires exact source SHA256")
@@ -217,12 +217,31 @@ def create_case_run(export_dir, stage, case_id, *,
     if not root.is_dir():
         raise NotADirectoryError(str(root))
     stage_folder = canonical_stage_folder(stage)
-    state, case_id = safe_component(state), safe_component(case_id)
+    state = safe_component(state)
+    original_case_id = safe_component(case_id)
     for digest in (model_sha256, source_edb_sha256):
         if digest is not None and not re.fullmatch("[a-fA-F0-9]{64}", digest):
             raise ValueError("Source/model SHA256 must contain exactly 64 hexadecimal characters")
     if not isinstance(units, str) or units not in ("kN-m-s", "kN-mm-s"):
         raise ValueError("Declare explicitly reviewed source units: kN-m-s or kN-mm-s")
+    # Shorten only source-fingerprinted NEW case runs. Preserve the complete
+    # human label and source identity in the immutable input manifest. Existing
+    # short/unfingerprinted/historical case folders retain their exact names.
+    case_id = original_case_id
+    case_label_mode = "EXACT"
+    compact_source_basis = None
+    if len(original_case_id) > 48:
+        digest = model_sha256 or source_edb_sha256
+        if digest is not None:
+            stage_key = next((key for key, folder in ALL_STAGE_FOLDERS.items()
+                              if folder == stage_folder), None)
+            if stage_key is None:
+                raise ValueError("Unknown compact case stage")
+            case_id = compact_case_id(stage_key, original_case_id, digest)
+            case_label_mode = "COMPACT_SOURCE_BOUND"
+            compact_source_basis = (
+                "MODEL_SHA256" if model_sha256 is not None
+                else "SOURCE_EDB_SHA256")
     # Refuse existing linked ancestors rather than writing outside the
     # selected export case through a redirected stage/state/case folder.
     # Only inspect paths below the already resolved case root; older results
@@ -241,7 +260,10 @@ def create_case_run(export_dir, stage, case_id, *,
         (run / name).mkdir()
     manifest = {
         "schema": SCHEMA, "stage": stage_folder, "state": state,
-        "case_id": case_id, "run_id": run_id, "created_utc": now.isoformat(),
+        "case_id": case_id, "original_case_id": original_case_id,
+        "case_label_mode": case_label_mode,
+        "compact_source_basis": compact_source_basis,
+        "run_id": run_id, "created_utc": now.isoformat(),
         "units": units, "source_edb_sha256": source_edb_sha256,
         "model_sha256": model_sha256, "solver_status": "CREATED",
         "structural_acceptance": "NOT_VERIFIED",
@@ -328,6 +350,42 @@ def inspect_case_manifest(run_dir, *, expected_stage=None):
         sub=run/folder
         if not sub.is_dir() or sub.is_symlink():
             issues.append("MISSING_"+folder)
+    # New labels carry an exact full-name/hash proof rather than relying on
+    # truncated directory names. Older manifests lacking these optional fields
+    # remain readable without rewriting any historical run.
+    compact_fields = ("case_label_mode", "original_case_id", "compact_source_basis")
+    if any(field in data for field in compact_fields):
+        mode = data.get("case_label_mode")
+        original = data.get("original_case_id")
+        basis = data.get("compact_source_basis")
+        if not isinstance(original, str):
+            issues.append("COMPACT_CASE_ID_MISMATCH")
+        else:
+            try:
+                original = safe_component(original)
+                if mode == "EXACT":
+                    if original != data.get("case_id") or basis is not None:
+                        issues.append("COMPACT_CASE_ID_MISMATCH")
+                elif mode == "COMPACT_SOURCE_BOUND":
+                    basis_field = {
+                        "MODEL_SHA256": "model_sha256",
+                        "SOURCE_EDB_SHA256": "source_edb_sha256",
+                    }.get(basis)
+                    stage_key = next(
+                        (key for key, folder in ALL_STAGE_FOLDERS.items()
+                         if folder == data.get("stage")), None)
+                    source_digest = data.get(basis_field) if basis_field else None
+                    if (not stage_key or not isinstance(source_digest, str)
+                            or not re.fullmatch(r"[a-fA-F0-9]{64}", source_digest)
+                            or len(original) <= 48
+                            or compact_case_id(stage_key, original, source_digest)
+                            != data.get("case_id")):
+                        issues.append("COMPACT_CASE_ID_MISMATCH")
+                else:
+                    issues.append("COMPACT_CASE_ID_MISMATCH")
+            except ValueError:
+                issues.append("COMPACT_CASE_ID_MISMATCH")
+
     acceptance=data.get("structural_acceptance","NOT_VERIFIED")
     if acceptance not in ("NOT_VERIFIED","VERIFIED_BY_ENGINEERING_REVIEW"):
         issues.append("UNKNOWN_ACCEPTANCE_STATUS")
