@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0,str(ROOT))
-from tools.audit_live_output_writers import scan_source
+from tools.audit_live_output_writers import scan_source, source_files
 from components.inputs.output_layout import canonical_stage_folder
 
 SOURCE_OWNERS={
@@ -157,9 +157,6 @@ def audit(repo=ROOT):
         legacy=[x["line"] for x in item["occurrences"]
                 if x["kind"]=="LITERAL_PATH_MARKER" and x.get("legacy")]
         counts[owner]+=count
-        # Every directly declared output-stage call belongs in the inventory,
-        # not just the subset used by hardcoded GUI/ESM enforcement checks.
-        declared_run_stage_calls.extend(_declared_stage_calls(path,repo,owner))
         if legacy and count:
             review_queue.append({
                 "path":path,"owner":owner,"possible_write_calls":count,
@@ -168,6 +165,19 @@ def audit(repo=ROOT):
                 "status":"STATIC_REVIEW_WRITER_READER_AND_SOURCE_IDENTITY",
             })
     review_queue.sort(key=lambda x:(-x["legacy_references"],x["path"]))
+    # scan_source()["files"] deliberately excludes ASTs lacking WRITE/READ
+    # calls or path literals. That optimization is valid for its purpose but
+    # would silently omit a create_case_run call. Use the shared FULL active
+    # source enumerator here, and leave unreadable source in parse_errors.
+    for file in source_files(repo):
+        path=file.relative_to(repo).as_posix()
+        owner=next((stage for prefix,stage in SOURCE_OWNERS.items()
+                    if path.startswith(prefix)),"ROOT_OR_OTHER")
+        try:
+            declared_run_stage_calls.extend(
+                _declared_stage_calls(path,repo,owner))
+        except (UnicodeError,OSError,SyntaxError):
+            continue
     violations=[]
     for p,stage in REQUIRED_GUARDS.items():
         if not (repo/p).is_file():
