@@ -80,6 +80,9 @@ class MappingGUI:
         ttk.Button(tools,text='Export / open Excel audit',command=self.excel).pack(side='left',padx=5)
         ttk.Button(tools,text='Highlight selected ID in 3D',command=self.highlight).pack(side='left')
         ttk.Button(tools,text='Parameter citations',command=lambda:show_parameter_sources(self.win)).pack(side='left',padx=5)
+        self.load_banner=tk.StringVar(value='Loading source mapping and geometry…')
+        ttk.Label(outer,textvariable=self.load_banner,foreground='#8a3412',
+                  wraplength=1150,justify='left').pack(anchor='w',pady=(1,4))
         pane=ttk.Frame(outer);pane.pack(fill='both',expand=True)
         self.tree=ttk.Treeview(pane,columns=('category','etabs','topology','solver','nodes','assembly','target'),height=18,selectmode='extended')
         self.tree.heading('#0',text='Property / source object / solver segment');self.tree.column('#0',width=310)
@@ -126,48 +129,156 @@ class MappingGUI:
         self.details=tk.Text(outer,height=10,wrap='word');self.details.pack(fill='x')
         self.status=tk.StringVar();ttk.Label(outer,textvariable=self.status,wraplength=1150).pack(anchor='w')
         self.tree.bind('<<TreeviewSelect>>',self.selection_details)
+        self.tree.bind('<<TreeviewOpen>>',self.expand_tree_node)
         self.category.trace_add('write',lambda *_:self.populate());self.search.trace_add('write',lambda *_:self.populate())
         self.target.trace_add('write',lambda *_:self.parameter_template())
         self.reload();self.parameter_template()
 
     def reload(self):
+        """Load source evidence without leaving an incomplete tree as if mapped.
+
+        The source ETABS/OpenSees mappings are unchanged. Tree failure and
+        missing 3D geometry are reported at the top of the window rather than
+        swallowed in the bottom status widget.
+        """
         try:
-            self.data=collect(self.folder);self.active.set(self.data['selections'].get('active',False))
-            self.populate();self.draw_source();self.highlight_keys([])
-            unassembled=sum(r['assembly_status']=='SOURCE_TOPOLOGY_ONLY_NO_SOLVER_ELEMENT'
-                            for r in self.data['elements'])
-            self.status.set(
-                f"Loaded {len(self.data['properties'])} property groups, "
+            self.data=collect(self.folder)
+            self.active.set(self.data['selections'].get('active',False))
+        except Exception as exc:
+            message='SOURCE MAPPING LOAD FAILED: '+str(exc)
+            self.status.set(message)
+            if hasattr(self,'load_banner'):self.load_banner.set(message)
+            return
+        errors=[]
+        try:
+            self.populate()
+        except Exception as exc:
+            # A partial tree is dangerously misleading. Preserve loaded data,
+            # but never show only the first source object as a complete map.
+            self.tree.delete(*self.tree.get_children())
+            errors.append('property tree: '+str(exc))
+        try:
+            self.draw_source()
+        except Exception as exc:
+            errors.append('3D source geometry: '+str(exc))
+        try:
+            self.highlight_keys([])
+        except Exception as exc:
+            errors.append('selection highlight: '+str(exc))
+        if errors:
+            message='MAPPING DISPLAY INCOMPLETE — '+ ' | '.join(errors)
+            self.status.set(message)
+            if hasattr(self,'load_banner'):self.load_banner.set(message)
+            return
+        unassembled=sum(r['assembly_status']=='SOURCE_TOPOLOGY_ONLY_NO_SOLVER_ELEMENT'
+                        for r in self.data['elements'])
+        status=(f"Loaded {len(self.data['properties'])} property groups, "
                 f"{len(self.data['elements'])} source objects, "
                 f"{len(self.data['solver_elements'])} solver elements; "
                 f"{unassembled} source-only objects without solver tags. "
-                "Excel export is on demand using the button above.")
-        except Exception as exc:self.status.set(str(exc))
+                "Expand a property group, then a source object, to view "
+                "individual solver segments. Excel export is on demand.")
+        self.status.set(status)
+        if hasattr(self,'load_banner'):self.load_banner.set(status)
 
     def populate(self):
+        """Render the small property index; defer source and solver row creation.
+
+        A full 25-storey model can have >14,000 solver segments. Inserting
+        each row before drawing the 3D preview blocks Tk and leaves a partial
+        display if even one entry fails. Group/object selection still maps to
+        the exact source keys, with solver rows created only on expansion.
+        """
         if not hasattr(self,'data'):return
-        self.tree.delete(*self.tree.get_children());self.item_keys={};self.record_items={}
-        groups={};self.bykey={r['key']:r for r in self.data['elements']}
+        self.tree.delete(*self.tree.get_children())
+        self.item_keys={}
+        self.record_items={}
+        self._pending_groups={}
+        self._pending_solver={}
+        self.bykey={r['key']:r for r in self.data['elements']}
+        self.solver_by_tag={str(s['solver_tag']):s
+                            for s in self.data['solver_elements']}
         property_by_group={p['group']:p for p in self.data['properties']}
-        solver_by_tag={s['solver_tag']:s for s in self.data['solver_elements']}
+        grouped={}
         search=self.search.get().strip().lower()
+        category=self.category.get()
         for r in self.data['elements']:
-            if self.category.get()!='All' and r['category']!=self.category.get():continue
+            if category!='All' and r['category']!=category:continue
             if search and search not in json.dumps(r).lower():continue
             group=r['category']+' / '+r['property']
-            if group not in groups:
-                prop=property_by_group[group]
-                title=f"{group} ({prop['count']} objects) | {prop['material'] or 'material pending'}"
-                groups[group]=self.tree.insert('','end',text=title,open=True);self.item_keys[groups[group]]=[]
-            parent=groups[group];self.item_keys[parent].append(r['key'])
-            label=r.get('display_label') or 'UNCLASSIFIED_MEMBER'
-            iid=self.tree.insert(parent,'end',text=f"{label} / {r['key']} / Storey {r['storey']}",values=(r['category'],r['etabs_object'],f"{label} ({r['topology_tag']})",','.join(map(str,r['solver_tags'])),','.join(map(str,r['node_tags'])),r['assembly_status'],r['target']))
-            self.item_keys[iid]=[r['key']];self.record_items[iid]=r
-            for tag in r['solver_tags']:
-                sr=solver_by_tag.get(tag)
-                target=self.data['selections'].get('assignments',{}).get(f'SOLVER:{tag}',{}).get('target',r['target'])
-                child=self.tree.insert(iid,'end', text=f"{label} / solver element {tag}",values=(r['category'],r['etabs_object'],f"{label} ({r['topology_tag']})",tag,','.join(map(str(sr['node_tags']))) if sr else '','ASSEMBLED_SOLVER_ELEMENT',target))
-                self.item_keys[child]=[f'SOLVER:{tag}'];self.record_items[child]=r
+            grouped.setdefault(group,[]).append(r)
+        for group,rows in grouped.items():
+            prop=property_by_group.get(group)
+            if prop is None:
+                raise ValueError('Property group absent from source audit: '+group)
+            material=prop.get('material') or 'material pending'
+            title=f"{group} ({len(rows)} shown / {prop['count']} source objects) | {material}"
+            iid=self.tree.insert('','end',text=title,open=False)
+            self.item_keys[iid]=[r['key'] for r in rows]
+            self._pending_groups[iid]=rows
+            self.tree.insert(iid,'end',
+                text=f"Expand to display {len(rows)} source objects")
+
+    def expand_tree_node(self,_event=None):
+        """Expand source hierarchy on demand without inventing solver tags."""
+        if not hasattr(self,'_pending_groups'):return
+        iid=self.tree.focus()
+        if iid in self._pending_groups:
+            records=self._pending_groups.pop(iid)
+            self.tree.delete(*self.tree.get_children(iid))
+            try:
+                for r in records:
+                    label=r.get('display_label') or 'UNCLASSIFIED_MEMBER'
+                    values=(r['category'],r['etabs_object'],
+                            f"{label} ({r['topology_tag']})",
+                            ','.join(map(str,r['solver_tags'])),
+                            ','.join(map(str,r['node_tags'])),
+                            r['assembly_status'],r['target'])
+                    child=self.tree.insert(
+                        iid,'end',
+                        text=f"{label} / {r['key']} / Storey {r['storey']}",
+                        values=values)
+                    self.item_keys[child]=[r['key']]
+                    self.record_items[child]=r
+                    if r['solver_tags']:
+                        self._pending_solver[child]=r
+                        self.tree.insert(child,'end',
+                            text=f"Expand to display {len(r['solver_tags'])} solver segments")
+            except Exception as exc:
+                self.tree.delete(*self.tree.get_children(iid))
+                self._pending_groups[iid]=records
+                self._mapping_expand_error(exc)
+        elif iid in self._pending_solver:
+            record=self._pending_solver.pop(iid)
+            self.tree.delete(*self.tree.get_children(iid))
+            try:
+                label=record.get('display_label') or 'UNCLASSIFIED_MEMBER'
+                assignments=self.data.get('selections',{}).get('assignments',{})
+                if not isinstance(assignments,dict):
+                    raise ValueError('Malformed device assignments in selected export')
+                for tag in record['solver_tags']:
+                    sr=self.solver_by_tag.get(str(tag))
+                    if sr is None:
+                        raise ValueError(f"Solver tag {tag} absent from assembled mapping")
+                    target=assignments.get(f'SOLVER:{tag}',{}).get(
+                        'target',record['target'])
+                    child=self.tree.insert(iid,'end',
+                        text=f"{label} / solver element {tag}",
+                        values=(record['category'],record['etabs_object'],
+                                f"{label} ({record['topology_tag']})",tag,
+                                ','.join(map(str,sr['node_tags'])),
+                                'ASSEMBLED_SOLVER_ELEMENT',target))
+                    self.item_keys[child]=[f'SOLVER:{tag}']
+                    self.record_items[child]=record
+            except Exception as exc:
+                self.tree.delete(*self.tree.get_children(iid))
+                self._pending_solver[iid]=record
+                self._mapping_expand_error(exc)
+
+    def _mapping_expand_error(self,exc):
+        message='MAPPING DISPLAY INCOMPLETE — '+str(exc)
+        self.status.set(message)
+        if hasattr(self,'load_banner'):self.load_banner.set(message)
 
     def parameter_template(self):
         target=self.target.get()
@@ -237,7 +348,15 @@ class MappingGUI:
             points=[self.xyz[str(n)] for n in r['node_tags'] if str(n) in self.xyz]
             if len(points)>2:points.append(points[0])
             if len(points)>1:paths.append(points)
-        if paths:self.axis.add_collection3d(Line3DCollection(paths,colors='#94a3b8',linewidths=.3,alpha=.45))
+        if not paths:
+            self.axis.text2D(.06,.53,"3D geometry unavailable: no source edges resolved",
+                             transform=self.axis.transAxes,color='#8a3412')
+            self.chart.draw_idle()
+            raise ValueError(
+                f"No source edges resolved from {len(self.data['elements'])} "
+                f"objects and {len(self.xyz)} node coordinates")
+        self.axis.add_collection3d(
+            Line3DCollection(paths,colors='#94a3b8',linewidths=.3,alpha=.45))
         self.selection_line=Line3DCollection([],colors='#d00080',linewidths=3);self.axis.add_collection3d(self.selection_line,autolim=False)
         if self.xyz:
             spans=[]
