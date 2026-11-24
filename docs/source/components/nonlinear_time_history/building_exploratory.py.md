@@ -35,3 +35,20 @@ After the current gravity-preloaded **nonlinear** model is built, the explorator
 The user's 2026-11-12 full-model exploratory trial gave initial-period list beginning **2.211471682 s, 1.540590680 s, 1.023394633 s**. These are unverified *nonlinear initial-tangent eigenperiods*, not NBC 105 §5.1.1 Rayleigh period (previously 3.8985/5.5904 s), not empirical design adopted 1.98128/1.92198 s, and **not directional Tn90** absent modalProperties evidence. Native OpenSees E-SFI nonlinear simulation needs a Windows run to verify actual cumulative participation values and Rayleigh damping ratios.
 
 The saved `TRUNCATED_DIAGNOSTIC` `0.1/45.29 s` result with 21 finite accepted steps has **physical-time completion 0.22%**, not completed NLTHA. It is useful as a finite-state solver smoke test. It does not prove realistic cyclic behavior, peak drift, residual drift or full-record convergence. Source material selection, group identity and first-step characterization are strictly separate from code design acceptance.
+
+## Convergence settings and failure-report safety (2026-11-24)
+
+**Evidence:** an exploratory Kobe XY run (wall draft materials, UmfPack, 5 ms) reached t = 2.386 s of 40.94 s (488 accepted rows, about 85 min) and stopped. At the deepest subdivision (0.156 ms) Newton, NewtonLineSearch, KrylovNewton and ModifiedNewton all returned -3 against the fixed `NormDispIncr` 1e-7 / 40 test, with final norms from 1.08e-7 upward. No non-finite node or element value was found, the peak storey drift was 0.16 % and wall panel strains were about 1e-6, so the model was nearly elastic. This points to a numerical convergence floor, not a physical collapse. It is an observation of one run, not a proven cause.
+
+**New optional RunConfig keys (defaults reproduce the previous behaviour exactly):**
+
+| Key | Default | Meaning |
+|---|---|---|
+| `transient_max_iterations` | 40 | Newton iteration cap, integer 1–200 |
+| `final_relaxed_tolerance` | none | If set (above 1e-7, at most 1e-5), after all four algorithms fail at the **deepest** subdivision, one more Newton attempt uses this `NormDispIncr` tolerance. Every step accepted this way is counted in `relaxed_tolerance_steps`, with `relaxed_tolerance_value` and `relaxed_tolerance_first_time_s` in the solver diagnostics. |
+
+A run that used the relaxed tolerance is still `EXPLORATORY`; report the count with the result. Validation lives in `validate_convergence_settings` (tests: `tests/test_nltha_relaxed_final_tolerance_20261124.py`).
+
+**Failure-report fix:** `_write_failure_report` and the failure-path messages use `_safe_print`. Previously an `OSError` ("Invalid argument") from `print` while reporting replaced the real `RuntimeError` in `INCOMPLETE.json` and crashed `run`.
+
+**Not verified:** that the relaxed tolerance clears the 2.386 s stall. That needs a rerun to and past t = 2.386 s.

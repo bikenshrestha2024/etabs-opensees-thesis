@@ -179,7 +179,16 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
                       diagnostics.get("early_algorithm_fallback") else ("Newton",))
     else:
         algorithms = fallback_algorithms
-    for algorithm in algorithms:
+    base_tol=float(diagnostics.get("convergence_tolerance",1.0e-7))
+    base_iters=int(diagnostics.get("convergence_max_iterations",40))
+    relaxed_tol=diagnostics.get("final_relaxed_tolerance")
+    # Opt-in only. After every strict attempt has failed at the deepest
+    # subdivision, one Newton retry at a bounded looser displacement-increment
+    # tolerance; any step accepted this way is counted, never hidden.
+    attempts=[(a,base_tol,False) for a in algorithms]
+    if relaxed_tol is not None and depth >= max_depth:
+        attempts.append(("Newton",float(relaxed_tol),True))
+    for algorithm, tolerance, relaxed in attempts:
         # [REF components/nonlinear_time_history/full_record_gate.py]
         # The solver's return code is NOT an accepted physical time step.
         attempt_start=float(ops.getTime())
@@ -191,12 +200,12 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
             print(f"[NLTHA RECOVERY] algorithm={algorithm} start_s={attempt_start:.12g} "
                   f"dt_s={float(dt):.12g} depth={depth}/{max_depth}",flush=True)
         try:
-            ops.test("NormDispIncr", 1.0e-7, 40, 0)
+            ops.test("NormDispIncr", tolerance, base_iters, 0)
             ops.algorithm(algorithm)
             rc = int(ops.analyze(1, float(dt)))
         except Exception as exc:
             rc = -999
-            failures.append(f"{algorithm}: {exc}")
+            failures.append(f"{algorithm}{'@relaxed' if relaxed else ''}: {exc}")
         else:
             if rc == 0:
                 from components.nonlinear_time_history.full_record_gate import (
@@ -216,6 +225,10 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
                     diagnostics.get('minimum_accepted_dt_s',accepted_clock['accepted_dt_s']))
                 diagnostics['accepted_steps']=diagnostics.get('accepted_steps',0)+1
                 diagnostics['last_accepted_time_s']=accepted_clock['end_time_s']
+                if relaxed:
+                    diagnostics['relaxed_tolerance_steps']=diagnostics.get('relaxed_tolerance_steps',0)+1
+                    diagnostics['relaxed_tolerance_value']=float(tolerance)
+                    diagnostics.setdefault('relaxed_tolerance_first_time_s',accepted_clock['end_time_s'])
                 diagnostics.setdefault('first_accepted_step',{
                     **accepted_clock,'algorithm':algorithm,'subdivision_depth':depth,
                     'previous_failed_attempts':diagnostics.get('failed_attempts',0)})
@@ -223,7 +236,7 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
                     ops.testIter(),diagnostics.get('max_convergence_iterations',0))
                 except (AttributeError,TypeError):pass
                 return 1
-            failures.append(f"{algorithm}: return code {rc}")
+            failures.append(f"{algorithm}{'@relaxed' if relaxed else ''}: return code {rc}")
         diagnostics['failed_attempts']=diagnostics.get('failed_attempts',0)+1
         diagnostics['last_failed_algorithm']=algorithm
         diagnostics['last_failed_time_s']=float(ops.getTime())

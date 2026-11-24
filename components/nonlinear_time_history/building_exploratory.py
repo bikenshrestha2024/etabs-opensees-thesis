@@ -15,6 +15,41 @@ PROFILE='LITERATURE_FRAME_NL_ELASTIC_WALL_V138'
 TRANSIENT_SYSTEMS=('UmfPack','SparseGeneral')
 _RUN_CONTEXT={}
 
+
+def _safe_print(*args):
+    """Print without letting a closed/invalid stdout (Windows OSError 22) raise.
+
+    [REF 2026-11-24 run: an OSError from print() in the failure path replaced
+    the real solver RuntimeError in INCOMPLETE.json]
+    """
+    try:
+        print(*args,flush=True)
+    except (OSError,ValueError):
+        pass
+
+
+def validate_convergence_settings(config):
+    """Return (tolerance, max_iterations, final_relaxed_tolerance or None).
+
+    [REF OpenSees NormDispIncr test; repo evidence 2026-11-24] Defaults keep the
+    historical strict 1e-7 / 40. ``final_relaxed_tolerance`` is opt-in, must be
+    above the strict tolerance and at most 1e-5 (10 micrometres of increment).
+    """
+    def num(value,name):
+        if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(float(value)):
+            raise ValueError(name+' must be a finite number')
+        return float(value)
+    tol=1e-7
+    iters=config.get('transient_max_iterations',40)
+    if isinstance(iters,bool) or not isinstance(iters,int) or not 1<=iters<=200:
+        raise ValueError('transient_max_iterations must be an integer from 1 through 200')
+    relaxed=config.get('final_relaxed_tolerance')
+    if relaxed is not None:
+        relaxed=num(relaxed,'final_relaxed_tolerance')
+        if not tol<relaxed<=1e-5:
+            raise ValueError('final_relaxed_tolerance must be above 1e-7 and at most 1e-5')
+    return tol,iters,relaxed
+
 def _initial_nonlinear_mode_audit(periods, props, *, model_sha256=None):
     """Document initial-tangent eigenperiods and exact per-axis 90% mass mode.
 
@@ -99,7 +134,7 @@ def _write_failure_report(folder,config,exc,*,filename='INCOMPLETE.json',details
         try:
             validate_output_separation(source,output)
         except ValueError:
-            print('[FAILURE REPORT NOT WRITTEN] Output directory must be separate from the source model folder.',flush=True)
+            _safe_print('[FAILURE REPORT NOT WRITTEN] Output directory must be separate from the source model folder.')
             return None
     folder=Path(folder)
     folder.mkdir(parents=True,exist_ok=True)
@@ -118,7 +153,7 @@ def _write_failure_report(folder,config,exc,*,filename='INCOMPLETE.json',details
         report.update(details)
     target=folder/filename
     target.write_text(json.dumps(report,indent=2,default=str),encoding='utf-8')
-    print('[FAILURE REPORT]',str(target),flush=True)
+    _safe_print('[FAILURE REPORT]',str(target))
     return target
 
 def run(config):
@@ -132,7 +167,7 @@ def run(config):
         try:
             _write_failure_report(config.get('output_dir') or '.',config,exc)
         except OSError as report_error:
-            print('[FAILURE REPORT ERROR]',repr(report_error),flush=True)
+            _safe_print('[FAILURE REPORT ERROR]',repr(report_error))
         raise
 
 
@@ -317,6 +352,7 @@ def _run(config):
     recovery_strategy=config.get('recovery_strategy','EARLY_ALTERNATIVES')
     if recovery_strategy not in ('EARLY_ALTERNATIVES','BISECTION_FIRST'):
         raise ValueError('recovery_strategy must be EARLY_ALTERNATIVES or BISECTION_FIRST')
+    convergence_tol,convergence_iters,final_relaxed_tol=validate_convergence_settings(config)
     max_subdivision_depth=config.get('max_subdivision_depth',5)
     if isinstance(max_subdivision_depth,bool) or not isinstance(max_subdivision_depth,int) or not 0<=max_subdivision_depth<=8:
         raise ValueError('max_subdivision_depth must be an integer from 0 through 8')
@@ -747,6 +783,9 @@ def _run(config):
             'report_recovery':True,
             'recovery_strategy':recovery_strategy,
             'max_subdivision_depth':max_subdivision_depth,
+            'convergence_tolerance':convergence_tol,
+            'convergence_max_iterations':convergence_iters,
+            'final_relaxed_tolerance':final_relaxed_tol,
         };rows=[];last=time.perf_counter();case_start=last
         stories=[dict(node=g['master_tag'],story_name='Storey_'+str(g['storey_number']),height=g['master_xyz'][2]-(groups[i-1]['master_xyz'][2] if i else data['base_z_m'])) for i,g in enumerate(groups)]
         wall_tags=[100001+len(data['frames'])+i for i,e in enumerate(data['shells']) if e['category']=='SHEAR WALL']
@@ -923,7 +962,7 @@ def _run(config):
                                      accepted_history_rows=len(rows),
                                      solver_diagnostics=diag,analysis_scope=assumptions['scope']))
                 except OSError as report_error:
-                    print('[FAILURE REPORT ERROR]',repr(report_error),flush=True)
+                    _safe_print('[FAILURE REPORT ERROR]',repr(report_error))
                 raise
         (case/'Transient_Performance.json').write_text(json.dumps(dict(timing,physical_time_s=ops.getTime(),target_time_s=end,estimated_remaining_s=0.),indent=2),encoding='utf-8')
         _set_run_stage('response_postprocessing',orientation=orientation,case_output_dir=str(case),
