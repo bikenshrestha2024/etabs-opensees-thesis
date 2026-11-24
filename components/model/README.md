@@ -14,6 +14,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 
 ## Current Python source files
 
+- [active_model_selection.py](active_model_selection.py)
 - [analysis_basis.py](analysis_basis.py)
 - [assembly.py](assembly.py)
 - [beam_weight_convention.py](beam_weight_convention.py)

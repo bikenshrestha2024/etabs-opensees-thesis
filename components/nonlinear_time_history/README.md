@@ -14,6 +14,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 
 ## Current Python source files
 
+- [batch_execution.py](batch_execution.py)
 - [building_exploratory.py](building_exploratory.py)
 - [direct_existing_model.py](direct_existing_model.py)
 - [damping_regions.py](damping_regions.py)

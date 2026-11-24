@@ -24,6 +24,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [history_review_tools.py](history_review_tools.py)
 - [literature_demo_gui.py](literature_demo_gui.py)
 - [nbc105_settings_panel.py](nbc105_settings_panel.py)
+- [nltha_batch_gui.py](nltha_batch_gui.py)
 - [organized_results.py](organized_results.py)
 - [output_folder.py](output_folder.py)
 - [plot_utilities.py](plot_utilities.py)

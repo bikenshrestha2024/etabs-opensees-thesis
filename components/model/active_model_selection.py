@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 def validate_clear_beam_model(root, selected):
+    """Validate rebuild identity, not engineering acceptance. [REF docs/source/components/model/active_model_selection.py.md]"""
     root=Path(root).resolve()
     model=Path(selected).resolve()
     base=root/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"

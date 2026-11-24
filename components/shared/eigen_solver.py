@@ -109,6 +109,9 @@ def solve_eigen(ops, modes, solver='PythonSparse'):
 def solve_eigen_until_coverage(ops, audit, *, initial=40, maximum=80, increment=20):
     """Expand a fresh domain's eigenbasis, retaining the last complete audit.
 
+    [REF docs/source/components/nonlinear_time_history/building_exploratory.py.md]
+    [REF components/nonlinear_time_history/building_exploratory.py _initial_nonlinear_mode_audit]
+
     audit(values) must return a dict with ninety_percent_both_axes; never
     reuse elastic eigenvectors on a nonlinear domain or alter damping modes.
     """

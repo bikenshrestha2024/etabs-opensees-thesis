@@ -18,6 +18,7 @@ from components.nonlinear_time_history.source_model_handoff import (
 )
 
 def prepare_jobs(plan_path, output):
+    """Bind unique research jobs to their source inputs. [REF docs/source/components/nonlinear_time_history/batch_execution.py.md]"""
     plan_path=Path(plan_path).resolve()
     output=Path(output).resolve()
     plan=json.loads(plan_path.read_text(encoding="utf-8-sig"))
@@ -67,6 +68,7 @@ def prepare_jobs(plan_path, output):
     return jobs
 
 def verify_inputs(job):
+    """Reject changed job input hashes before launch. [REF components/nonlinear_time_history/source_model_handoff.py]"""
     cfg=job["config"]; source=Path(cfg["model_folder"])
     for name,expected in job["inputs"].items():
         path=Path(cfg[name]) if name in ("x_path","y_path","approved_frame_reinforcement_csv","wall_openings_manifest") else source/name
@@ -74,6 +76,7 @@ def verify_inputs(job):
             raise ValueError("Batch input changed before launch: "+str(path))
 
 def execute_batch(plan_path, output, workers=1):
+    """Run independent exploratory processes with bounded workers. [REF docs/source/components/nonlinear_time_history/batch_execution.py.md]"""
     if type(workers) is not int or not 1<=workers<=4:
         raise ValueError("workers must be an integer from 1 to 4")
     output=Path(output).resolve()
@@ -140,6 +143,7 @@ def execute_batch(plan_path, output, workers=1):
     return jobs
 
 def main():
+    """Expose the research batch CLI. [REF docs/source/components/nonlinear_time_history/batch_execution.py.md]"""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan",required=True)
     parser.add_argument("--output",required=True)

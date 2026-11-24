@@ -7,6 +7,7 @@ import sys
 import uuid
 
 def launch(parent, model_folder):
+    """Open the independent research job manager. [REF docs/source/components/ui/nltha_batch_gui.py.md]"""
     import tkinter as tk
     from tkinter import ttk, filedialog, messagebox
     from components.inputs.output_layout import owned_run_destination
