@@ -1828,7 +1828,7 @@ def convert_model(edb, outdir, log, include_live=True):
         # Use the model's minimum Z rather than hard-coding zero, with a small tolerance.
         for name in base_nodes:
             ops.fix(node_tag[name], 1, 1, 1, 1, 1, 1)
-        log(f"Fixed base supports applied: {len(base_nodes)} nodes at Z={base_z:.6g} m; all 6 DOFs fixed.")
+        log(f"Topology preview only: {len(base_nodes)} lowest-elevation mapped points at Z={base_z:.6g} m temporarily fixed in 6 DOFs. Not the physical foundation support selection.")
         # --------------------------------------------------------------------
         # SECTION 10 — ETABS LOADS → OPENSEES LOAD AUDIT / EQUIVALENT FORCES
         # Area/frame load conversions below are for auditing only. In the next
@@ -2296,8 +2296,8 @@ def convert_model(edb, outdir, log, include_live=True):
         log(f"OpenSees topology stage: {len(node_tag)} node tags created; {len(element_records)} element tags reserved in mapping; ETABS section/property names carried into tagged topology and 3D section filters.")
         log(f"Area assignments extracted={len(area_loads)}, applied={len(applied)}, skipped={len(skipped)}")
         log(f"Frame distributed assignments extracted={len(frame_loads)}; equivalent nodal loads applied={frame_equiv_count}; skipped={len(skipped_frame_loads)}.")
-        log(f"Base supports: {len(base_nodes)} nodes fully fixed (UX, UY, UZ, RX, RY, RZ) at Z={base_z:.6g} m.")
-        log("NOTE: Load/connectivity audit preserved. Review/edit frame properties inside this program using the integrated Section Mapping/Library and Fiber Section Builder windows. The generated OpenSees_Section_Review_GUI.py is retained as an optional standalone reviewer. NONLINEAR ANALYSIS BLOCKED until fiber-section inputs and reinforcing-bar coordinates are completed, checked, and calibrated against a documented reference.")
+        log(f"Load-only audit preview: {len(base_nodes)} mapped base points at Z={base_z:.6g} m fixed in 6 DOFs; actual connected analysis uses the selected support profile. For the thesis model, 32 physical supports are primary; 44 additional mapped mesh points require verified wall-base transfer.")
+        log("Load/connectivity audit saved. Review section assignments and reinforcing-bar coordinates in the integrated section tools. Reviewed production NLTHA requires verified material and section evidence; the separate literature-based exploratory NLTHA route is research-only and does not approve the model.")
         log("Outputs:")
         for p in (out_py,audit_json,csv_path,html_structure,html_connectivity_3d,html_loads,os.path.join(outdir,"OpenSees_Load_Assignment_Floor_Plan.html"),connectivity_csv,connectivity_json,connectivity_py,tagged_model_py,section_audit_csv,section_audit_json,section_gui_path,fiber_template_csv,bar_template_csv,esm_template_csv,esm_template_json): log("  "+p)
         log("Review skipped assignments and the audit JSON before any structural analysis.")

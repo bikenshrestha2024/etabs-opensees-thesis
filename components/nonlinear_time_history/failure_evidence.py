@@ -115,9 +115,14 @@ def snapshot_selected_state(ops, output_path, *, suspect_tags,
 
 def snapshot_failed_step(
     ops, output_path, *, algorithm, dt, return_code,
-    element_map_path=None, maximum_findings=150, suspect_tags=None,
+    element_map_path=None, maximum_findings=150, suspect_tags=None, scan_all=False,
 ):
-    """Write observed non-finite responses without treating missing responses as zero."""
+    """Write observed non-finite responses without treating missing responses as zero.
+
+    A standalone focused snapshot can restrict queries. Recovery callers must
+    use scan_all=True: focus then only prioritizes selected live element tags.
+    [REF docs/source/components/nonlinear_time_history/failure_evidence.py.md]
+    """
     _validate_capture_limits(maximum_findings)
     out = Path(output_path)
     inverse = {}
@@ -175,7 +180,15 @@ def snapshot_failed_step(
 
     focus=set(_focus_tags(suspect_tags)) if suspect_tags is not None else None
     report["focused_element_tags"]=sorted(focus) if focus is not None else None
-    for tag in ([] if focus is not None else ops.getNodeTags()):
+    report["scan_scope"]="FULL_DOMAIN" if scan_all or focus is None else "FOCUSED_ONLY"
+    if scan_all:
+        live_tags=set(map(int,ops.getEleTags()))
+        prioritized=sorted((focus or set()) & live_tags)
+        report["missing_focused_element_tags"]=sorted((focus or set())-live_tags)
+        element_tags=prioritized+sorted(live_tags-set(prioritized))
+    else:
+        element_tags=sorted(focus) if focus is not None else ops.getEleTags()
+    for tag in (ops.getNodeTags() if scan_all or focus is None else []):
         report["nodes_scanned"] += 1
         try:
             values = _numbers(ops.nodeDisp(tag))
@@ -187,7 +200,7 @@ def snapshot_failed_step(
             if len(report["query_errors"]) < maximum_findings:
                 report["query_errors"].append({"node": int(tag), "error": str(exc)})
 
-    for tag in (sorted(focus) if focus is not None else ops.getEleTags()):
+    for tag in element_tags:
         report["elements_scanned"] += 1
         source = inverse.get(int(tag))
         queries = [
