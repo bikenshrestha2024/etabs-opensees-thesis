@@ -592,11 +592,23 @@ def _run(config):
         if full_wall:
             shutil.copy2(model/'Research_Material_Assignment_V161.json',case/'Research_Material_Assignment_V161.json')
         groups=sorted(data['diaphragms'],key=lambda r:r['master_xyz'][2]);baseline={g['master_tag']:list(ops.nodeDisp(g['master_tag'])) for g in groups}
-        print('[EXPLORATORY MODAL] Computing 20 initial nonlinear modes; transient has not started',flush=True)
+        print('[EXPLORATORY MODAL] Computing initial nonlinear modes with bounded coverage expansion; transient has not started',flush=True)
         _set_run_stage('modal_analysis',orientation=orientation,case_output_dir=str(case))
-        from components.shared.eigen_solver import solve_eigen
-        eigenvalues=solve_eigen(ops,20);periods=[2*math.pi/math.sqrt(v) for v in eigenvalues if v>0]
-        if len(periods)!=20:raise ValueError('Inspected nonlinear modes incomplete')
+        from components.shared.eigen_solver import solve_eigen, validated_mode_count
+        count=validated_mode_count(config.get('initial_modes',40))
+        cap=validated_mode_count(config.get('maximum_initial_modes',80))
+        if not count<=cap<=160:raise ValueError('Require initial_modes <= maximum_initial_modes <= 160')
+        while True:
+            eigenvalues=solve_eigen(ops,count)
+            periods=[2*math.pi/math.sqrt(v) for v in eigenvalues if v>0]
+            if len(periods)!=count:raise ValueError('Inspected nonlinear modes incomplete')
+            try:
+                coverage=_initial_nonlinear_mode_audit(periods,ops.modalProperties('-return'))
+            except Exception:
+                break
+            if coverage['ninety_percent_both_axes'] or count>=cap:break
+            count=min(cap,count+20)
+            print('[EXPLORATORY MODAL] Expanding initial mode count to',count,flush=True)
         # [REF NBC 105:2025 §7.3; OpenSees modalProperties -return]
         # Fresh nonlinear initial-tangent mass participation, not the
         # saved elastic MRSM modal fingerprint and not the Rayleigh period.
@@ -644,7 +656,7 @@ def _run(config):
         else:
             if thesis_intent:
                 raise ValueError('Thesis requires audited damping reference modes')
-            damping_periods=(max(periods),min(periods))
+            damping_periods=(periods[0],periods[min(19,len(periods)-1)])
             (case/'Soil_C_Selected_Modal_Damping_and_Time_Step.json').write_text(
                 json.dumps(dict(status='EXPLORATORY_UNREVIEWED_FIRST_LAST_MODE_DAMPING',
                     damping_reference_periods_s=damping_periods,
@@ -782,7 +794,9 @@ def _run(config):
                 alpha_m=alpha,beta_k=beta)
         from components.nonlinear_time_history.full_record_gate import (
             verify_numeric_accepted_row)
+        timing=dict(solver_and_recovery_s=0.,capture_s=0.,csv_s=0.,intervals=0,accepted_rows=0)
         def capture():
+            capture_started=time.perf_counter()
             row={'time_s':ops.getTime()};previous=[0.]*6
             ground_xy=applied_ground_acceleration(
                 records,time_s=row['time_s'],orientation=orientation,
@@ -848,6 +862,8 @@ def _run(config):
                     case/'Last_Accepted_Wall_State.json',
                     suspect_tags=suspect_tags,
                     stage="LAST_ACCEPTED_COMMITTED")
+            timing["capture_s"]+=time.perf_counter()-capture_started
+            timing["accepted_rows"]+=1
         history=case/'Building_Nonlinear_history.csv'
         _set_run_stage('transient_analysis',orientation=orientation,case_output_dir=str(case),
                        requested_duration_s=end,record_duration_s=record_end,
@@ -856,16 +872,23 @@ def _run(config):
             capture();writer=csv.DictWriter(stream,fieldnames=list(rows[0]));writer.writeheader();writer.writerow(rows[-1]);stream.flush()
             try:
                 while ops.getTime()<end-1e-10:
-                    before=len(rows);_advance_nonlinear_interval(ops,min(dt,end-ops.getTime()),max_depth=max_subdivision_depth,on_accept=capture,diagnostics=diag)
-                    writer.writerows(rows[before:])
+                    before=len(rows); tick=time.perf_counter(); capture_before=timing['capture_s']
+                    _advance_nonlinear_interval(ops,min(dt,end-ops.getTime()),max_depth=max_subdivision_depth,on_accept=capture,diagnostics=diag)
+                    timing['solver_and_recovery_s']+=max(0.,time.perf_counter()-tick-(timing['capture_s']-capture_before))
+                    timing['intervals']+=1
+                    tick=time.perf_counter();writer.writerows(rows[before:]);timing['csv_s']+=time.perf_counter()-tick
                     if time.perf_counter()-last>5:
                         last=time.perf_counter();stream.flush()
                         minimum_dt=diag.get('minimum_accepted_dt_s')
+                        current=ops.getTime()
+                        eta=(last-case_start)*max(0.,end-current)/current if current>0 else None
+                        (case/'Transient_Performance.json').write_text(json.dumps(dict(timing,physical_time_s=current,target_time_s=end,estimated_remaining_s=eta),indent=2),encoding='utf-8')
                         print(
                             f'[EXPLORATORY PROGRESS] {orientation}: t={ops.getTime():.3f}/{end:.3f}s '
                             f'| wall={last-case_start:.1f}s | failed_attempts={diag.get("failed_attempts",0)} '
                             f'| bisections={diag.get("bisections",0)} '
-                            f'| min_accepted_dt={minimum_dt if minimum_dt is not None else "n/a"}',
+                            f'| min_accepted_dt={minimum_dt if minimum_dt is not None else "n/a"} '
+                            f'| eta_s={eta:.1f} | solver_s={timing["solver_and_recovery_s"]:.2f} | capture_s={timing["capture_s"]:.2f}',
                             flush=True)
             except Exception as exc:
                 try:
@@ -878,6 +901,7 @@ def _run(config):
                 except OSError as report_error:
                     print('[FAILURE REPORT ERROR]',repr(report_error),flush=True)
                 raise
+        (case/'Transient_Performance.json').write_text(json.dumps(dict(timing,physical_time_s=ops.getTime(),target_time_s=end,estimated_remaining_s=0.),indent=2),encoding='utf-8')
         _set_run_stage('response_postprocessing',orientation=orientation,case_output_dir=str(case),
                        accepted_history_rows=len(rows),completed_time_s=ops.getTime())
         (case/'NBC105_Exploratory_Time_History_RunConfig_V138.json').write_text(json.dumps(dict(model_script='../isolated_model/OpenSees_Complete_Model_Data_V118.json',scope=assumptions['scope'])),encoding='utf-8')
