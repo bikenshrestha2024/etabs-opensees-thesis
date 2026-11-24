@@ -304,6 +304,8 @@ def launch(parent,model_folder,output_folder=None):
             dest.mkdir(parents=True,exist_ok=False)
             extra_tags=[int(value.strip()) for value in tracked_members.get().split(',') if value.strip()]
             config=dict(model_folder=str(source),output_dir=str(dest),x_path=x.get(),y_path=y.get(),dt_s=float(dt.get()),duration_s=float(duration.get()) or None,scale=float(scale.get()),orientations=['XY','YX'] if orientation.get()=='XY + YX' else [orientation.get()],limit_state=ls.get(),tracked_frame_tag=int(tracked.get()),tracked_element_tags=extra_tags,nonlinear_walls=full.get(),material_basis=basis.get(),steelmpf_transition=steel_transition.get(),gravity_system=gravity_system.get(),transient_system=transient_system.get(),material_overrides={'brace.fy_mpa':float(brace_fy.get()),'brace.b':float(brace_b.get())})
+            from components.nonlinear_time_history.source_model_handoff import source_sha256
+            config['expected_model_sha256']=source_sha256(source/'OpenSees_Complete_Model_Data_V118.json')
             options=build_options(excitation=excitation.get(),damping_mode=damping_mode.get(),
                 ratio=damping_ratio.get(),allow_above_2_5=allow_high.get(),reference_modes=reference_modes.get(),
                 energy_balance=energy.get(),energy_tolerance=energy_tol.get(),variant=variant.get(),
