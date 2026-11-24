@@ -356,6 +356,10 @@ def run_existing_model_nltha(config, *, check_only=False, executor=None):
     generate fake peak drifts, report completion, or push private model files.
     """
     preflight=preflight_existing_model(config)
+    current_sha=preflight["model_files_sha256"]["OpenSees_Complete_Model_Data_V118.json"]
+    if config.get("expected_model_sha256") not in (None,current_sha):
+        raise ValueError("Selected model differs from the previously bound model SHA256")
+    config=dict(config,expected_model_sha256=current_sha)
     output=Path(config["output_dir"]).expanduser().resolve()
     # An existing case may contain a successful XY/YX run or first-failure
     # snapshots. Never mix a rerun into those immutable scientific records.
