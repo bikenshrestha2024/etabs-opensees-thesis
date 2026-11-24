@@ -330,7 +330,14 @@ def define_building_materials(ops,data,folder,material_overrides=None):
                          source_region=('PEER_B3_WEB_NOT_BOUNDARY' if single else 'UNVERIFIED_LAYOUT'),
                          research_transfer_only=bool(single)))
     brace=brace_steel_parameters(material_overrides)
+    from components.nonlinear_time_history.source_model_handoff import source_sha256
+    source_cards=[ROOT/'Material_Catalog'/wall_file,ROOT/'Material_Catalog'/'Official_Concrete01.json']
+    source_cards.append(Path(__import__(
+        'components.nonlinear_time_history.material_source_sets',
+        fromlist=['peer_single_source']).__file__))
     report=dict(basis=basis,scope='LITERATURE_INFORMED_RESEARCH_NOT_PROJECT_CALIBRATION',
+        source_card_sha256={card.name:source_sha256(card) for card in source_cards},
+        serialized_model_sha256=source_sha256(Path(folder)/'OpenSees_Complete_Model_Data_V118.json'),
         wall_constitutive_source=wall['source'],wall_source_locator=wall['citation'],
         wall_concrete=c,wall_steel=s,fsam=wall['fsam'],wall_regions=rows,
         material_overrides=material_overrides,
