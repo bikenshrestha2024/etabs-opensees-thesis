@@ -31,3 +31,6 @@ A malformed, absent, symlinked, or duplicate-conflicting `element_map_path` now 
 Tests: `tests/verify_failure_evidence.py`; added to NLTHA Python quality workflow invocation. The test uses synthetic FakeOps and is not a reproduced 25-storey E-SFI solver failure.
 
 **Native engineering reproduction remains open:** original affected element tag (historically 110280), exact source mesh SHA and wall/quad mapping, P-Delta/gravity preload state, ConcreteCM/SteelMPF/FSAM parameters, actual first accepted step/time and log traceback, isolated zero/X/Y/XY tests, connected-bay interface actions, and independent material calibration. Do not treat this recording fix as proof of root-cause resolution.
+
+## Recovery guard scope
+The shared nonlinear interval recovery caller sets `scan_all=True` even when `suspect_tags` is supplied. Selected live tags are queried first for evidence, but all live element tags and nodal displacement responses are screened before retry. Missing focused tags are reported. Standalone focused snapshots retain their narrower semantics. Unsupported/error responses are not proof of finite material states; this is a bounded numerical screen, not native constitutive validation.

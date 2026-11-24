@@ -246,7 +246,7 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
             report = snapshot_failed_step(
                 ops, evidence_path, algorithm=algorithm, dt=dt, return_code=rc,
                 element_map_path=diagnostics.get("element_map_path"),
-                suspect_tags=diagnostics.get("suspect_tags"))
+                suspect_tags=diagnostics.get("suspect_tags"),scan_all=True)
             if report["nonfinite_nodes"] or report["nonfinite_elements"]:
                 raise RuntimeError(
                     "Non-finite trial response after nonlinear solver failure; "

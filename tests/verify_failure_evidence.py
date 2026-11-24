@@ -77,6 +77,42 @@ class FailureEvidenceTests(unittest.TestCase):
             self.assertEqual(report["nonfinite_elements"][0]["tag"], 110280)
             self.assertTrue(report["warning"].startswith("Post-failure responses"))
 
+    def test_recovery_guard_detects_nonfinite_node_outside_focus(self):
+        class ContaminatedNode(FakeOps):
+            def nodeDisp(self, tag):
+                return [math.nan] if tag == 1 else [0.0] * 6
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "Failure.json"
+            ops = ContaminatedNode([-3, 0])
+            with self.assertRaisesRegex(RuntimeError, "evidence saved to"):
+                _advance_nonlinear_interval(ops, 0.005, diagnostics={
+                    "evidence_output_path": str(path),
+                    "suspect_tags": [110280]})
+            report = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(report["focused_element_tags"], [110280])
+            self.assertEqual(report["nodes_scanned"], 1)
+            self.assertEqual(report["nonfinite_nodes"][0]["tag"], 1)
+            self.assertEqual(ops.getTime(), 0.0)
+            self.assertEqual(ops.algorithms, ["Newton"])
+
+    def test_recovery_guard_detects_nonfinite_element_outside_focus(self):
+        class ContaminatedElement(FakeOps):
+            def getEleTags(self):
+                return [110280, 110281]
+            def eleResponse(self, tag, *args):
+                return [math.nan] if tag == 110281 and args == ("localForce",) else [0.0]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "Failure.json"
+            ops = ContaminatedElement([-3, 0])
+            with self.assertRaisesRegex(RuntimeError, "evidence saved to"):
+                _advance_nonlinear_interval(ops, 0.005, diagnostics={
+                    "evidence_output_path": str(path),
+                    "suspect_tags": [110280]})
+            report = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(report["elements_scanned"], 2)
+            self.assertEqual(report["nonfinite_elements"][0]["tag"], 110281)
+            self.assertEqual(ops.algorithms, ["Newton"])
+
     def test_nonfinite_failure_clock_preserves_evidence(self):
         from components.nonlinear_time_history.failure_evidence import (
             snapshot_failed_step, snapshot_selected_state)

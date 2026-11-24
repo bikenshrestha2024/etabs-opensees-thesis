@@ -41,3 +41,6 @@ This is a headless software regression and an **incomplete physical verification
 ## 2026-11-23 — builder-change readiness selection safety
 
 The NLTHA GUI now synchronizes the readiness selection when the selected nonlinear builder changes. It verifies the candidate V134 draft or legacy V116 manifest against the new model path and script SHA, clears the former model's selected file if neither matches and logs the selected source. An unchanged builder does not disturb a manually chosen readiness file. The source-bound readiness gate remains fail-closed; human review flags and the original source model are not changed. Headless synthetic coverage: `tests/test_readiness_model_selection_20261123.py`.
+
+## Full-domain failure screen during retries
+Focused diagnostics no longer restrict the shared recovery safety check. The full-domain observed response screen is applied after a failed attempt before retry. No algorithm ordering, tolerance, convergence criterion or physical property is altered by this change.
