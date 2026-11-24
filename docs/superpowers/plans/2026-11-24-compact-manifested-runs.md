@@ -31,3 +31,10 @@
 - Defer separate ESM legacy `analysis_output_folder`/reader migration until a deterministic model hash and all legacy readers are pinned and tested. Never silently retarget prior solver artifacts.
 
 **Acceptance:** new manifested run paths portable/short, exact source-bound full name retained, no name ambiguity or historical rename, mixed load/support model unaffected. `SOURCE_CHECKED`, `NUMERICALLY_CONVERGED`, `ETABS_OPENSEES_MATCHED`, `EXPERIMENT_VALIDATED`, `CODE_ACCEPTED`: **NOT_VERIFIED** by this patch.
+
+## Additional tested task — read-only legacy long-case inventory
+
+- Added a new `tests/test_folder_audit.py` regression first: all canonical and auxiliary stage RUNS directories, plus the legacy result root, must report long (>48-character) case components without reading files.
+- Extended the **existing** `components/inputs/folder_audit.py` writer+reader/Markdown summary instead of duplicating an audit module. No migration, renaming or ETABS model reads.
+- Added symlink-leak regression: an external path reached through a linked stage parent must not enter the audit. RED test observed an unwanted external case name, then scanner was corrected.
+- Output is local-only, read-only by default, with `LONG_CASE_DIRECTORY_NAMES` as an ORGANIZATION review finding, not a structural failure. No native ETABS source can be certified from filenames.
