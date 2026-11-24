@@ -104,3 +104,28 @@ def solve_eigen(ops, modes, solver='PythonSparse'):
                 ) from exc
     print(f'[EIGEN RETURN] elapsed={time.perf_counter()-started:.3f}s modes={len(values)}',flush=True)
     return values
+
+
+def solve_eigen_until_coverage(ops, audit, *, initial=40, maximum=80, increment=20):
+    """Expand a fresh domain's eigenbasis, retaining the last complete audit.
+
+    audit(values) must return a dict with ninety_percent_both_axes; never
+    reuse elastic eigenvectors on a nonlinear domain or alter damping modes.
+    """
+    initial=validated_mode_count(initial)
+    maximum=validated_mode_count(maximum)
+    increment=validated_mode_count(increment)
+    if not initial<=maximum<=160:
+        raise ValueError('Require initial <= maximum <= 160')
+    count=initial
+    history=[]
+    while True:
+        values=list(solve_eigen(ops,count))
+        if len(values)!=count or any(not math.isfinite(v) or v<=0 for v in values):
+            raise ValueError('Incomplete or invalid eigenbasis')
+        report=audit(values)
+        history.append(dict(modes=count,coverage_met=report.get('ninety_percent_both_axes') is True))
+        if history[-1]['coverage_met'] or count>=maximum:
+            return values,report,history
+        count=min(maximum,count+increment)
+        print('[EIGEN COVERAGE] Expanding to',count,flush=True)
