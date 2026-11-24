@@ -165,6 +165,22 @@ class FolderAuditTests(unittest.TestCase):
             self.assertNotIn("PRIVATE.EDB",str(report))
             self.assertEqual((outside/"PRIVATE.EDB").read_bytes(),b"not for inspection")
 
+    def test_symlinked_stage_parent_does_not_leak_external_case_names(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)/"export"
+            outside=Path(tmp)/"outside"
+            root.mkdir()
+            hidden=outside/"RUNS"/"ULS"/("PRIVATE_LONG_CASE_"*8)
+            hidden.mkdir(parents=True)
+            try:
+                (root/"03_ESM").symlink_to(outside,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Directory symlinks unavailable")
+            report=audit_export_structure(root,verify_copies=False)
+            self.assertEqual(report["long_case_directories"],[])
+            self.assertNotIn("PRIVATE_LONG_CASE_",str(report))
+            self.assertIn("03_ESM",report["symlinked_stage_directories"])
+
     def test_saved_audit_is_local_and_contains_no_compliance_claim(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
