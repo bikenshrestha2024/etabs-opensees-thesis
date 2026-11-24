@@ -1,0 +1,19 @@
+# 2026-11-24 compact manifested run-output edit
+
+**Repository:** `bikenshrestha2024/etabs-opensees-thesis` public; base `main=1cd4fcadfa4ffda40ca73443d6830548e45ddad7`. **Editor:** ChatGPT via installed GitHub connector; **PR:** #190; **Issue:** #177. No ETABS export or workbook contents uploaded to GitHub.
+
+**Read-first sources actually reviewed:** `AGENTS.md`, `engineering/rules/READ_FIRST_PHYSICAL_MODEL_CONTRACT.md`, `.agents/skills/etabs-opensees-read-first/SKILL.md`, `engineering/rules/CORE_RULES.md`, `ENGINEERING_GATES.md`, `MODULE_BOUNDARIES.md`, `engineering/migration/README.md`, `engineering/registry/CANONICAL_MODULES.csv`, `docs/review/00_CANONICAL_RUN_ORDER_AND_NAMING.md`, current `components/inputs/output_contract.py`, `components/inputs/output_layout.py`, current tests and module guide. Source EDB SHA, V10.7 workbook SHA, selected M0–M6 source variant: **UNAVAILABLE**. No native ETABS, conda, Windows OpenSeesPy, 12-case run or local working-tree inspection accessible through this GitHub connector.
+
+**Preserved physical invariants:** 32 real physical foundations, 44 additional mesh transfer points; 76 is a mixed mapped ID inventory; full source-matched gravity `GRAVITY_1.0D_1.0L`; separate NBC 105:2025 §5.2 Table 5-1 seismic mass; adopted 2×12m opening-bearing X walls and 3×6m Y walls. No changes to solver, support restraints, model builder, load selection, mass, stiffness, spectra, ground motion, FVD/BRB or material mapping.
+
+**Measured repository inventory at base SHA via GitHub recursive tree:** 4,079 tracked entries, 947 Python files including archives, 131 root Python files and duplicate numeric launcher prefixes; 242 component-tree entries, 335 tests-tree entries, 1,183 docs-tree entries. Tree was not truncated. This is discovery, **not full semantic validation**.
+
+**Change classification:** EXTEND existing authoritative `components/inputs/output_contract.py`; test existing loader/manifest and shared stage registry. No new parallel implementation, no bulk rename, and no movement of existing result folders.
+
+**TDD:** first commit added `tests/test_compact_manifested_runs_20261124.py` before changing source. Headless Github Actions on RED commit `b5f26d3`: expected feature failures including 18 failed assertions/subtests, while 1,877 tests passed, 5 skipped. Implemented compact label conversion and revalidation against exact full source hash. Require fresh full CI on GREEN head and update this record with verified results rather than assuming.
+
+**Engineering gate statuses:** SOURCE_CHECKED=NOT_VERIFIED_FOR_NATIVE_MODEL, NUMERICALLY_CONVERGED=NOT_VERIFIED, ETABS_OPENSEES_MATCHED=NOT_VERIFIED, EXPERIMENT_VALIDATED=NOT_VERIFIED, CODE_ACCEPTED=NOT_VERIFIED. Prior 768.045-kN versus 3041.266-kN residuals are distinct historical stiffness cases; joint/native MPC transfer and first-step X-wall NLTHA failure remain unresolved.
+
+**Outstanding:** The older ESM `analysis_output_folder` creates long `ULS_Floor_3_...` direct case directories without `create_case_run`; cross-module writer/read migration needed. Some Modal run owners provide a model-script SHA only in a separate provenance file, not the assembled-model digest; the shared helper will not invent a source SHA to shorten them. Full semantic function-level engineering review remains OPEN.
+
+**Additional folder-audit regression:** `tests/test_folder_audit.py` covers every registered stage's long case names, an old legacy case and symlinked stage/child. Github Actions deep output integrity RED (test-only `aad52254`) produced missing `long_case_directories`; after adding scanner, the stage-parent symlink test RED (`a7b66ef8`) showed an external case name leaked through a linked `03_ESM` parent. The bounded audit was amended to skip such paths. No confidential model bytes or paths were used in tests; synthetic `PRIVATE_LONG_CASE_` fixture only. Full branch CI pending and must be verified after the final source head.

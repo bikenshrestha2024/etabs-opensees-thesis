@@ -119,3 +119,14 @@ now uses it for **new LTHA and NLTHA** runs only. Existing long folders are
 never moved or renamed. Filename/12-hex ID alone is not engineering/model
 acceptance: downstream readers must check the full manifest and source SHA.
 Synthetic tests: `tests/test_history_run_output_contract.py`.
+
+
+## 2026-11-24 — Source-bound shortening for **new manifested run folders**
+
+The existing `compact_case_id(stage, scope, sha256)` is now recognized for every canonical/auxiliary stage in `ALL_STAGE_FOLDERS`, including MODEL, ETABS_COMPARISONS, SOFTWARE_DIAGNOSTICS and UPLOAD_PACKAGES. No stage directory itself is renamed. When `create_case_run` is given a valid portable human case label **longer than 48 characters** and a complete 64-hex `model_sha256` or `source_edb_sha256`, it produces the established max-48-character stage/scope-token/source-token name. The full original input remains in `00_INPUT_SOURCE/CASE_MANIFEST.json` as `original_case_id`, along with `case_label_mode=COMPACT_SOURCE_BOUND` and `compact_source_basis` (MODEL_SHA256 preferred over SOURCE_EDB_SHA256). No new input files or solver models are read to guess a hash.
+
+Short names and unfingerprinted long labels retain their exact existing paths with `case_label_mode=EXACT` and `original_case_id` equal to their directory case label. Missing source SHA is **not silently replaced by a hash of a filename**. Historical manifests lacking all three new keys remain valid and readable.
+
+`inspect_case_manifest` now recomputes the source-bound compact name from the saved full label, recorded stage and declared source hash. Tampered original labels, changed declared hashes, missing source basis or altered label modes produce `COMPACT_CASE_ID_MISMATCH`; `record_case_status` then refuses status updates. New runs continue to use unique run IDs beneath `RUNS/<STATE>/<CASE_ID>/<RUN_ID>`, and historical result files are not moved or deleted.
+
+This improves path lengths for source-hashed manifested runs across analysis stages. **It does not change legacy ESM calculations written directly by `analysis_output_folder` / `write_outputs`**, which require a separate writer-plus-reader migration under Issue #177. A 12-hex token labels a case; engineering acceptance still requires complete source, support, load, mass, material and result identities. Tests: `tests/test_compact_manifested_runs_20261124.py`, existing output-contract and saved-case suites. Native ETABS/OpenSees evidence was unavailable for this filesystem-only patch.

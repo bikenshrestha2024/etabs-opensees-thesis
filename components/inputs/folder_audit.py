@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from components.inputs.export_mirror import EXTS, PRIVATE_NAMES, classification, _digest
-from components.inputs.output_layout import STAGE_FOLDERS, AUXILIARY_FOLDERS, export_root_for
+from components.inputs.output_layout import ALL_STAGE_FOLDERS, STAGE_FOLDERS, AUXILIARY_FOLDERS, export_root_for
 
 STAGE_NAMES = set(STAGE_FOLDERS.values())
 KNOWN_PROJECT_FOLDERS = (STAGE_NAMES | set(AUXILIARY_FOLDERS.values())
@@ -26,6 +26,51 @@ STAGE_HINTS = {
     "06_LINEAR_TIME_HISTORY": ("linear_time_history", "linear_th", "ltha"),
     "07_NONLINEAR_TIME_HISTORY": ("nonlinear_time_history", "nonlinear_th", "nltha"),
 }
+
+
+def _long_case_directories(root):
+    """List only immediate RUNS/<state>/<case> directory metadata.
+
+    Never traverse a source EDB/Excel file, symlink or solver result tree.
+    The 220-character threshold is an advisory Windows path budget, not a
+    fixed OS prohibition; existing long case folders remain unchanged.
+    """
+    found=[]
+    selected=(root/"OpenSees_Analysis_Results")
+    parents=[(key,root/folder/"RUNS") for key,folder in ALL_STAGE_FOLDERS.items()]
+    parents.append(("LEGACY",selected))
+    for stage,runs in parents:
+        # A stage symlink can hide above the RUNS component. Do not follow
+        # it merely because the child RUNS path itself is not a symlink.
+        if (runs.is_symlink() or
+                (stage!="LEGACY" and runs.parent.is_symlink()) or
+                not runs.is_dir()):
+            continue
+        if stage=="LEGACY":
+            cases=sorted(runs.iterdir(),key=lambda p:p.name.casefold())
+        else:
+            cases=[]
+            for state in sorted(runs.iterdir(),key=lambda p:p.name.casefold()):
+                if state.is_dir() and not state.is_symlink():
+                    cases.extend(sorted(state.iterdir(),key=lambda p:p.name.casefold()))
+        for case in cases:
+            if not case.is_dir() or case.is_symlink():
+                continue
+            component_chars=len(case.name)
+            full_chars=len(str(case))
+            if component_chars<=48 and full_chars<=220:
+                continue
+            found.append({
+                "stage":stage,
+                "case_name":case.name,
+                "path":case.relative_to(root).as_posix(),
+                "case_component_length":component_chars,
+                "path_length":full_chars,
+                "reason":("LONG_CASE_LABEL" if component_chars>48
+                          else "WINDOWS_PATH_BUDGET_REVIEW"),
+                "status":"REVIEW_ONLY_NO_FILES_CHANGED",
+            })
+    return sorted(found,key=lambda x:(x["stage"],x["path"]))
 
 
 def audit_export_structure(export_dir, *, verify_copies=True):
@@ -102,7 +147,13 @@ def audit_export_structure(export_dir, *, verify_copies=True):
                                 if p.is_dir() and not p.is_symlink()
                                 and p.name not in KNOWN_PROJECT_FOLDERS
                                 and p.name not in LEGACY_COMPAT_FOLDERS)
+    long_case_directories=_long_case_directories(root)
     findings = []
+    if long_case_directories:
+        findings.append({"id":"LONG_CASE_DIRECTORY_NAMES",
+                         "severity":"ORGANIZATION",
+                         "count":len(long_case_directories),
+                         "action":"Prefer the source-hashed compact new-run naming contract. Keep existing long case directories intact until writers and readers are migrated together."})
     if unsafe_mirror_paths:
         findings.append({"id":"UNSAFE_EXPORT_MIRROR_LINK",
                          "severity":"BLOCKED",
@@ -162,6 +213,7 @@ def audit_export_structure(export_dir, *, verify_copies=True):
         "legacy_analysis_case_folders": legacy_cases,
         "symlinked_legacy_analysis_root": linked_legacy_analysis,
         "unexpected_top_level_folders": unexpected_folders,
+        "long_case_directories": long_case_directories,
         "stages": stage_details,
         "loose_stage_outputs": loose_stage_files,
         "symlinked_stage_directories": symlinked_stages,
@@ -201,6 +253,7 @@ def write_folder_audit(export_dir, *, verify_copies=True):
         f"- Registered stage/auxiliary directories: {len(report['stages'])}",
         f"- Loose files at stage roots: {sum(item['count'] for item in report['loose_stage_outputs'])}",
         f"- Unregistered top-level directories: {len(report['unexpected_top_level_folders'])}",
+        f"- Long/Windows-path-budget case directories (review only): {len(report['long_case_directories'])}",
         f"- Refused symlinked stage directories: {len(report['symlinked_stage_directories'])}",
         "", "## Canonical stages", "",
         "| Stage | Directory present | Subfolders | Loose files |",
