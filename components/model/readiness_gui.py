@@ -275,6 +275,46 @@ def launch(parent,model_script,readiness_variable):
     ttk.Button(footer,text='Available parameter values + how to obtain missing inputs',command=lambda:__import__('OpenSees_Workflow_V144').launch(win,model.parent)).pack(anchor='w')
     refresh_evidence()
     approved=tk.BooleanVar(value=data.get('approved_for_nltha') is True);ttk.Checkbutton(footer,text='I have reviewed the evidence and approve this specific nonlinear model for NLTHA',variable=approved).pack(anchor='w')
+    def bulk_accept():
+        """Record one explicit human attestation for all checklist items."""
+        from datetime import date
+        from tkinter import simpledialog
+        who=simpledialog.askstring('Accept all reviewed checks','Reviewer name:',parent=win)
+        if not who or not who.strip():return
+        reference=simpledialog.askstring('Accept all reviewed checks',
+            'Reference to your completed review covering all 16 checks (report or evidence index):',parent=win)
+        if not _is_reviewed_evidence_reference(reference):
+            messagebox.showwarning('Evidence required','Enter a real review reference covering every check.',parent=win)
+            return
+        when=simpledialog.askstring('Accept all reviewed checks','Review date (YYYY-MM-DD):',
+            initialvalue=date.today().isoformat(),parent=win)
+        if when is None:return
+        issues=review_metadata_problems({k:True for k in checks},
+            {k:reference for k in checks},{k:who for k in checks},{k:when for k in checks})
+        if issues:
+            messagebox.showerror('Invalid review date',issues[0],parent=win)
+            return
+        if not messagebox.askyesno('Confirm bulk review',
+            'I attest that I personally reviewed all 16 requirements against the cited evidence. '
+            'This does not create missing materials, verify solver results, or bypass model binding. '
+            'Continue?',parent=win):return
+        for key in checks:
+            checks[key].set(True)
+            if not _is_reviewed_evidence_reference(evidence[key].get()):
+                evidence[key].set(reference.strip())
+            reviewers[key].set(who.strip())
+            review_dates[key].set(when)
+        approved.set(False)
+        from components.model.readiness import approval_binding_problems
+        problems=approval_binding_problems(model)
+        if problems:
+            messagebox.showwarning('Checks filled; model approval blocked',
+                'Missing model prerequisites remain:\n'+'\n'.join(problems),parent=win)
+        else:
+            approved.set(messagebox.askyesno('Approve bound model',
+                'Also approve this specific model for NLTHA? Your attestation will be saved.',parent=win))
+        save()
+    ttk.Button(footer,text='Accept all reviewed checks (single sign-off)',command=bulk_accept).pack(anchor='w')
     def rebind_draft():
         data.update(model_script_sha256=hashlib.sha256(model.read_bytes()).hexdigest(),approved_for_nltha=False,checks={k:False for k in checks})
         from components.model.readiness import record_binding
