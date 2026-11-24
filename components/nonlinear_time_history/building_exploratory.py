@@ -602,6 +602,8 @@ def _run(config):
             material_report=json.loads(material_file.read_text(encoding='utf-8'))
             if material_report.get('basis')!=config.get('material_basis','PUBLISHED_REFERENCE'):
                 raise ValueError('Assembled material basis differs from requested literature source')
+            if material_report.get('serialized_model_sha256')!=stage_hashes['OpenSees_Complete_Model_Data_V118.json']:
+                raise ValueError('Material assignment refers to a different serialized model')
             (case/'Material_Model_Binding.json').write_text(json.dumps(dict(
                 source_model_sha256=stage_hashes['OpenSees_Complete_Model_Data_V118.json'],
                 model_config_sha256=stage_hashes['OpenSees_Complete_Model_Config_V118.json'],
