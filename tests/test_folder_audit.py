@@ -122,6 +122,49 @@ class FolderAuditTests(unittest.TestCase):
                           {item["id"] for item in result["findings"]})
             self.assertFalse((root/"01_ETABS_EXPORT").exists())
 
+    def test_reports_long_case_folders_all_stages_without_scanning_private_files(self):
+        from components.inputs.output_layout import ALL_STAGE_FOLDERS
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)/"source_export"
+            root.mkdir()
+            long_name="ULS_Floor_3_"+"MODEL_LONG_"*8
+            short_name="ESM_ULS_a1b2c3"
+            for stage,folder in ALL_STAGE_FOLDERS.items():
+                (root/folder/"RUNS"/"ULS"/long_name).mkdir(parents=True)
+                (root/folder/"RUNS"/"ULS"/short_name).mkdir(parents=True)
+            (root/"OpenSees_Analysis_Results"/long_name).mkdir(parents=True)
+            report=audit_export_structure(root,verify_copies=False)
+            risks=report["long_case_directories"]
+            self.assertEqual(len(risks),len(ALL_STAGE_FOLDERS)+1)
+            self.assertEqual({r["case_name"] for r in risks},{long_name})
+            self.assertEqual(
+                {r["stage"] for r in risks},
+                set(ALL_STAGE_FOLDERS)|{"LEGACY"})
+            self.assertTrue(all(r["case_component_length"]>48 for r in risks))
+            self.assertTrue(all(r["status"]=="REVIEW_ONLY_NO_FILES_CHANGED"
+                                for r in risks))
+            self.assertIn("LONG_CASE_DIRECTORY_NAMES",
+                          {v["id"] for v in report["findings"]})
+            self.assertFalse((root/"01_ETABS_EXPORT"/"00_MANIFEST").exists())
+
+    def test_linked_case_folder_is_not_followed_by_length_audit(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)/"selected"
+            outside=Path(tmp)/"private"
+            root.mkdir()
+            outside.mkdir()
+            (outside/"PRIVATE.EDB").write_bytes(b"not for inspection")
+            state=root/"03_ESM"/"RUNS"/"ULS"
+            state.mkdir(parents=True)
+            try:
+                (state/"UNTRUSTED").symlink_to(outside,target_is_directory=True)
+            except (OSError,NotImplementedError):
+                self.skipTest("Directory symlinks unavailable")
+            report=audit_export_structure(root,verify_copies=False)
+            self.assertEqual(report["long_case_directories"],[])
+            self.assertNotIn("PRIVATE.EDB",str(report))
+            self.assertEqual((outside/"PRIVATE.EDB").read_bytes(),b"not for inspection")
+
     def test_saved_audit_is_local_and_contains_no_compliance_claim(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
