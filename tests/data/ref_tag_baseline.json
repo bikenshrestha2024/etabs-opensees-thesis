@@ -131,7 +131,6 @@
   "components/nonlinear_time_history/device_recording.py::baseline_axial_projection",
   "components/nonlinear_time_history/device_recording.py::device_sample",
   "components/nonlinear_time_history/device_recording.py::summarize_device_demands",
-  "components/nonlinear_time_history/failure_evidence.py::snapshot_failed_step",
   "components/nonlinear_time_history/failure_evidence.py::snapshot_selected_state",
   "components/nonlinear_time_history/full_record_gate.py::compare_time_step_results",
   "components/nonlinear_time_history/full_record_gate.py::verify_accepted_history",
