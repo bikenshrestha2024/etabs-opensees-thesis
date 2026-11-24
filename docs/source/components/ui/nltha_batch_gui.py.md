@@ -1,0 +1,2 @@
+# NLTHA independent batch GUI
+Available from the main nonlinear workflow. Select saved job JSON configurations and choose 1–4 independent workers. Separate XY and YX configurations permit parallel orientations; M0–M6 are separate source models. Status follows the scheduler's Batch_Status.json; logs remain in the job folders. Stop requests retain partial results and never approve an interrupted run.
