@@ -12,6 +12,73 @@ from components.inputs.output_layout import owned_run_destination
 
 
 class StageOwnershipTests(unittest.TestCase):
+    def test_static_run_stage_call_inventory_covers_all_modules_and_dynamic_stages(self):
+        from tools.audit_output_stage_ownership import audit
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            snippets={
+                "components/equivalent_static/output.py": """
+create_case_run(root, 'ESM', 'same')
+create_case_run(root, 'GRAVITY', 'other')
+create_case_run(root, stage_variable, 'dynamic')
+""",
+                "components/gravity/beam.py": """
+create_case_run(root, 'ETABS_EXPORT', 'BEAM_FORCES')
+""",
+                "components/modal/modal.py": """
+create_case_run(root, 'MODAL', 'same')
+""",
+                "components/inputs/autofill.py": """
+analysis_output_folder(root, 'ULS')
+""",
+                "components/linear_time_history/runner.py": """
+owned_run_destination(root, 'LTHA', 'correct')
+""",
+                "components/ui/controller.py": """
+create_case_run(root, 'MRSM', 'viewer')
+""",
+            }
+            for name,content in snippets.items():
+                path=root/name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content,encoding="utf-8")
+            report=audit(root)
+            self.assertIn("declared_run_stage_calls",report)
+            self.assertIn("cross_owner_run_stage_review",report)
+            self.assertIn("dynamic_run_stage_review",report)
+            calls=report["declared_run_stage_calls"]
+            self.assertEqual(len(calls),8)
+            by_path={}
+            for item in calls:
+                by_path.setdefault(item["path"],[]).append(item)
+                self.assertGreaterEqual(item["line"],1)
+                self.assertIn(item["api"],(
+                    "create_case_run","owned_run_destination",
+                    "analysis_output_folder"))
+            esm=by_path["components/equivalent_static/output.py"]
+            self.assertEqual([i["status"] for i in esm],
+                             ["OWNER_MATCHED","CROSS_OWNER_REVIEW","DYNAMIC_STAGE_REVIEW"])
+            self.assertEqual([i["stage"] for i in esm],
+                             ["ESM","GRAVITY",None])
+            self.assertEqual(esm[1]["source_owner"],"ESM")
+            cross=report["cross_owner_run_stage_review"]
+            self.assertEqual({(i["path"],i["stage"]) for i in cross},{
+                ("components/equivalent_static/output.py","GRAVITY"),
+                ("components/gravity/beam.py","ETABS_EXPORT"),
+            })
+            self.assertEqual(len(report["dynamic_run_stage_review"]),1)
+            self.assertEqual(by_path["components/inputs/autofill.py"][0]["status"],
+                             "LEGACY_DEFAULT_REVIEW")
+            self.assertEqual(by_path["components/ui/controller.py"][0]["status"],
+                             "SHARED_OWNER_REVIEW")
+            self.assertEqual(by_path["components/modal/modal.py"][0]["status"],
+                             "OWNER_MATCHED")
+            self.assertEqual(by_path["components/linear_time_history/runner.py"][0]["status"],
+                             "OWNER_MATCHED")
+            self.assertNotIn("CROSS_OWNER_REVIEW",
+                 {v["reason"] for v in report["contract_violations"]})
+            self.assertFalse((root/"audit").exists())
+
     def test_all_canonical_stages(self):
         stages={"GRAVITY":"02_GRAVITY", "ESM":"03_ESM", "MODAL":"04_MODAL",
                 "MRSM":"05_MRSM", "LTHA":"06_LINEAR_TIME_HISTORY",
