@@ -2528,6 +2528,7 @@ class App:
         action(group_4_0,text="OpenSees nonlinear paired time history — V116 gate",command=self._open_nonlinear_time_history)
         action(group_4_1,text="Literature nonlinear demo - run, compare + animate",command=lambda:__import__("OpenSees_Literature_Demo_GUI_V137").launch(self.root))
         action(group_4_1,text="Building nonlinear research - frames + FSAM walls",command=lambda:__import__("OpenSees_Building_Exploratory_GUI_V138").launch(self.root,self.out.get()))
+        action(group_4_1,text="NLTHA independent model / record batch",command=lambda:__import__("components.ui.nltha_batch_gui",fromlist=["launch"]).launch(self.root,self.out.get()))
         action(group_1_1,text="ETABS area mesh → OpenSees floors/wall panels",command=self._open_area_integration)
         action(group_4_1,text="OpenSees stability + outrigger case progression",command=self._open_project_progression)
         action(group_6_1,text="OpenSees result interpretation + mode shapes",command=self._open_result_interpretation)
