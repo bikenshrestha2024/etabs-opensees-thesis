@@ -395,7 +395,14 @@ def _run(config):
     from components.nonlinear_time_history.source_model_handoff import (
         stage_existing_model_sources, literature_section_inventory,
         solver_reaction_support_tags)
+    expected=config.get('expected_model_sha256')
+    if expected:
+        actual=hashlib.sha256((source/'OpenSees_Complete_Model_Data_V118.json').read_bytes()).hexdigest()
+        if actual!=expected:
+            raise ValueError('Selected model changed since job configuration; reselect and review model.')
     stage_hashes=stage_existing_model_sources(source,model)
+    if expected and stage_hashes['OpenSees_Complete_Model_Data_V118.json']!=expected:
+        raise ValueError('Model identity changed during staging.')
     # An explicitly selected source register must be copied into the isolated model
     # and its SHA and reviewer kept with each case. Never auto-approve bar schedules.
     register=config.get('approved_frame_reinforcement_csv')
@@ -590,40 +597,39 @@ def _run(config):
                 indent=2,allow_nan=False),encoding='utf-8')
         base_reaction_reference=support_resultants(ops,support_nodes)
         if full_wall:
-            shutil.copy2(model/'Research_Material_Assignment_V161.json',case/'Research_Material_Assignment_V161.json')
+            material_file=case/'Research_Material_Assignment_V161.json'
+            shutil.copy2(model/'Research_Material_Assignment_V161.json',material_file)
+            material_report=json.loads(material_file.read_text(encoding='utf-8'))
+            if material_report.get('basis')!=config.get('material_basis','PUBLISHED_REFERENCE'):
+                raise ValueError('Assembled material basis differs from requested literature source')
+            (case/'Material_Model_Binding.json').write_text(json.dumps(dict(
+                source_model_sha256=stage_hashes['OpenSees_Complete_Model_Data_V118.json'],
+                model_config_sha256=stage_hashes['OpenSees_Complete_Model_Config_V118.json'],
+                assignment_sha256=hashlib.sha256(material_file.read_bytes()).hexdigest(),
+                basis=material_report['basis'],scope='RESEARCH_ASSIGNMENT_NOT_CALIBRATION',
+                approval=False),indent=2),encoding='utf-8')
         groups=sorted(data['diaphragms'],key=lambda r:r['master_xyz'][2]);baseline={g['master_tag']:list(ops.nodeDisp(g['master_tag'])) for g in groups}
         print('[EXPLORATORY MODAL] Computing initial nonlinear modes with bounded coverage expansion; transient has not started',flush=True)
         _set_run_stage('modal_analysis',orientation=orientation,case_output_dir=str(case))
-        from components.shared.eigen_solver import solve_eigen, validated_mode_count
-        count=validated_mode_count(config.get('initial_modes',40))
-        cap=validated_mode_count(config.get('maximum_initial_modes',80))
-        if not count<=cap<=160:raise ValueError('Require initial_modes <= maximum_initial_modes <= 160')
-        while True:
-            eigenvalues=solve_eigen(ops,count)
-            periods=[2*math.pi/math.sqrt(v) for v in eigenvalues if v>0]
-            if len(periods)!=count:raise ValueError('Inspected nonlinear modes incomplete')
+        from components.shared.eigen_solver import solve_eigen_until_coverage
+        def audit_initial(values):
+            periods=[2*math.pi/math.sqrt(v) for v in values]
             try:
-                coverage=_initial_nonlinear_mode_audit(periods,ops.modalProperties('-return'))
-            except Exception:
-                break
-            if coverage['ninety_percent_both_axes'] or count>=cap:break
-            count=min(cap,count+20)
-            print('[EXPLORATORY MODAL] Expanding initial mode count to',count,flush=True)
-        # [REF NBC 105:2025 §7.3; OpenSees modalProperties -return]
-        # Fresh nonlinear initial-tangent mass participation, not the
-        # saved elastic MRSM modal fingerprint and not the Rayleigh period.
-        try:
-            modal_props=ops.modalProperties('-return')
-            initial_modes=_initial_nonlinear_mode_audit(
-                periods,modal_props,
-                model_sha256=assumptions['source_model_sha256'])
-        except Exception as exc:
-            initial_modes=dict(status='NOT_VERIFIED',
-                model_sha256=assumptions['source_model_sha256'],
-                mode_count=len(periods),periods_s=periods,
-                model_period_T1_s=periods[0],
-                Tn90_X_s=None,Tn90_Y_s=None,ninety_percent_both_axes=False,
-                error=str(exc),acceptance='NO MASS-PARTICIPATION VERIFICATION')
+                return _initial_nonlinear_mode_audit(
+                    periods,ops.modalProperties('-return'),
+                    model_sha256=assumptions['source_model_sha256'])
+            except Exception as exc:
+                return dict(status='NOT_VERIFIED',
+                    model_sha256=assumptions['source_model_sha256'],
+                    mode_count=len(periods),periods_s=periods,
+                    model_period_T1_s=periods[0],
+                    Tn90_X_s=None,Tn90_Y_s=None,ninety_percent_both_axes=False,
+                    error=str(exc),acceptance='NO MASS-PARTICIPATION VERIFICATION')
+        eigenvalues,initial_modes,coverage_history=solve_eigen_until_coverage(
+            ops,audit_initial,initial=config.get('initial_modes',40),
+            maximum=config.get('maximum_initial_modes',80))
+        periods=initial_modes['periods_s']
+        initial_modes['coverage_attempts']=coverage_history
         (case/'Nonlinear_Initial_Modal_Audit.json').write_text(
             json.dumps(initial_modes,indent=2,allow_nan=False),encoding='utf-8')
         print('[NONLINEAR INITIAL MODAL]',
