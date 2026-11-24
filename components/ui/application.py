@@ -2384,6 +2384,10 @@ class App:
         ttk.Label(source,text="OpenSees export folder").grid(row=1,column=0,sticky="w",padx=(0,8),pady=3)
         ttk.Entry(source,textvariable=self.out).grid(row=1,column=1,sticky="ew",pady=3)
         ttk.Button(source,text="Browse…",command=self._browse_dir).grid(row=1,column=2,padx=(8,0),pady=3)
+        ttk.Button(source,text="Select verified clear-beam model…",
+                   command=self._select_clear_beam_model).grid(row=4,column=0,columnspan=2,sticky="w",pady=4)
+        ttk.Label(source,text="All analysis stages use the selected folder; do not mix model variants.",
+                  wraplength=850).grid(row=5,column=0,columnspan=3,sticky="w")
         self.include_live.set(True)
         ttk.Checkbutton(source,text="Include live area load in ETABS load audit preview",variable=self.include_live).grid(row=2,column=0,columnspan=2,sticky="w",pady=(4,0))
         ttk.Checkbutton(source,text="Also create SHA-verified categorized copies (optional; slower on large exports)",variable=self.categorize_export).grid(row=3,column=0,columnspan=3,sticky="w",pady=(4,0))
@@ -3122,6 +3126,29 @@ class App:
     def _browse_file(self):
         p=filedialog.askopenfilename(title="Select ETABS model",filetypes=[("ETABS model","*.edb"),("All files","*.*")]);
         if p:self.edb.set(p)
+    def _select_clear_beam_model(self):
+        """Use one explicit verified model folder for all subsequently launched stages."""
+        if getattr(self,"_conversion_process",None) is not None:
+            messagebox.showwarning("Conversion running","Finish conversion before switching models.",parent=self.root)
+            return
+        from components.inputs.output_layout import export_root_for
+        root=export_root_for(Path(self.out.get()).expanduser().resolve())
+        base=root/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"
+        selected=filedialog.askdirectory(parent=self.root,title="Select completed clear-beam rebuild",
+                                         initialdir=str(base if base.is_dir() else root))
+        if not selected:return
+        try:
+            from components.model.active_model_selection import validate_clear_beam_model
+            identity=validate_clear_beam_model(root,selected)
+            self.out.set(identity["folder"])
+            messagebox.showinfo("Active analysis model",
+                "Selected for all newly opened analysis stages:\n"+identity["folder"]+
+                "\nSHA256: "+identity["model_sha256"]+
+                "\nClose previously opened analysis windows; rerun model-specific results. "
+                "Beam quantity verification is not native engineering acceptance.",parent=self.root)
+        except Exception as exc:
+            messagebox.showerror("Model selection",str(exc),parent=self.root)
+
     def _browse_dir(self):
         p=filedialog.askdirectory(title="Select output folder");
         if p:self.out.set(p)
@@ -3302,6 +3329,9 @@ class App:
         the same output folder while a new conversion is running.
         """
         output = Path(self.out.get().strip()).expanduser()
+        if (output/"CLEAR_BEAM_REBUILD_STATUS.json").is_file():
+            messagebox.showerror("Immutable model variant","Select the original export folder before importing ETABS.",parent=self.root)
+            return
         target = output / "OpenSees_ID_Lookup.html"
         workbook = output / "OpenSees_ID_and_Support_Audit.xlsx"
         if getattr(self, "_conversion_process", None) is not None:
@@ -3631,6 +3661,8 @@ class App:
             # [REF docs/source/components/model/single_count_self_weight.py.md]
             from OpenSees_Release_Health_V142 import repair
             selected=Path(self.out.get()).resolve()
+            if (selected/"CLEAR_BEAM_REBUILD_STATUS.json").is_file():
+                raise ValueError("Verified rebuilds are immutable; select original export and create a new rebuild.")
             if not (selected/'OpenSees_Complete_Model_Data_V118.json').is_file():
                 raise ValueError('Select the exported model folder with the saved '
                                  'OpenSees_Complete_Model_Data_V118.json first.')
