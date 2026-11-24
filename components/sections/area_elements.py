@@ -532,6 +532,7 @@ def inspect_instantiated_area_evidence(*, config_json):
     This is a GUI explanation, NOT an instantiation, source approval, material
     validation, or ZIP acceptance check. package_area_instantiation_audit
     remains the authoritative count/source/tag verification before export.
+    [REF docs/source/components/sections/area_elements.py.md]
     """
     config_path=Path(config_json).expanduser().resolve()
     if not config_path.is_file():
