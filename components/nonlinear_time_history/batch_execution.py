@@ -91,7 +91,11 @@ def execute_batch(plan_path, output, workers=1):
     save()
     try:
         while pending or active:
+            if (output/'STOP_REQUESTED').is_file():
+                break
             while pending and len(active)<workers:
+                if (output/'STOP_REQUESTED').is_file():
+                    break
                 job=pending.pop(0)
                 try:
                     verify_inputs(job)
