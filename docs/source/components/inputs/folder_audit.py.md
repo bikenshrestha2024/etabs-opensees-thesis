@@ -34,3 +34,12 @@ A large source mirror incurs I/O cost; avoid running the `--mirror` step on an a
 ## Legacy symlink audit hardening (2026-11-15)
 
 The read-only folder auditor now refuses to traverse `OpenSees_Analysis_Results` when this legacy directory is a symbolic link. It reports `symlinked_legacy_analysis_root=true` and a blocked `SYMLINKED_LEGACY_ANALYSIS_ROOT_BLOCKED` finding. Previously the legacy enumeration relied on `Path.is_dir()`, which follows directory symlinks and could expose names of projects outside the selected ETABS export. A synthetic temporary-folder test checks non-disclosure and absence of derived output writes. The directory itself remains untouched; no solver calculations or legacy result layouts are altered.
+
+
+## 2026-11-24 — compact-case path risks across every owning stage
+
+`audit_export_structure` now reports `long_case_directories` for the immediate `RUNS/<state>/<case>` path of **every** canonical/auxiliary stage from `ALL_STAGE_FOLDERS`, plus direct historical `OpenSees_Analysis_Results/<case>` directories. This is a bounded metadata-only scan: it does not descend into solver outputs, ZIPs, EDBs, Excel, linked stages, linked state folders or linked cases. It refuses to read through symlinked case directories.
+
+A case is flagged when its folder component exceeds **48 characters** or its path exceeds **220 characters**; 220 is an advisory Windows path budget reserved for future run ID and result filenames, not a claim that Windows always rejects the path. Each report row records source stage, relative folder, case label length, lexical path length, reason and status `REVIEW_ONLY_NO_FILES_CHANGED`. Summary includes `LONG_CASE_DIRECTORY_NAMES` as an ORGANIZATION finding, never structural or solver failure. `write_folder_audit` adds the total to the local Markdown audit.
+
+Use this inventory when checking old 95 m ETABS/ULS long run folders. The folder audit does not shorten or migrate them. A source SHA is required to derive the documented compact new-manifested-run label, and old solver readers/Windows scripts must remain intact until their own migration is validated. **Never commit a generated local audit:** it can contain identifying project paths. Tests: `tests/test_folder_audit.py`.
