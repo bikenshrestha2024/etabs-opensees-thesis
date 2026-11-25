@@ -1,0 +1,30 @@
+{
+ "model_folder": "D:\\Thesis Opensees\\ETABS 11-24-2026\\2\\02_MODEL\\REBUILDS\\VERIFIED_CLEAR_BEAM\\20261124T142839_121849Z",
+ "output_dir": "D:\\Thesis Opensees\\ETABS 11-24-2026\\2\\07_NONLINEAR_TIME_HISTORY\\RUNS\\EXPLORATORY_ULS\\EXPLORATORY_FRAME_NL_20261124_204907_CLEARBEAM_V2",
+ "x_path": "C:\\Users\\User\\Downloads\\etabs-opensees-thesis-main\\Input_Records_V141\\RSN1120_KOBE_TAK000\\X.txt",
+ "y_path": "C:\\Users\\User\\Downloads\\etabs-opensees-thesis-main\\Input_Records_V141\\RSN1120_KOBE_TAK000\\Y.txt",
+ "dt_s": 0.005,
+ "scale": 1.0,
+ "orientations": [
+  "XY",
+  "YX"
+ ],
+ "limit_state": "ULS",
+ "tracked_frame_tag": 100001,
+ "tracked_element_tags": [],
+ "nonlinear_walls": true,
+ "material_basis": "PEER_2015_12_SINGLE_SOURCE",
+ "steelmpf_transition": "PEER_APPENDIX_EXACT",
+ "gravity_system": "UmfPack",
+ "transient_system": "UmfPack",
+ "material_overrides": {
+  "brace.fy_mpa": 345.0,
+  "brace.b": 0.01
+ },
+ "diagnostic_excitation": "XY",
+ "inherent_damping_ratio": 0.025,
+ "inherent_damping_five_percent": false,
+ "variant_id": "UNASSIGNED",
+ "pair_id": "Kobe",
+ "final_relaxed_tolerance": 1e-06
+}
