@@ -55,3 +55,6 @@ A run that used the relaxed tolerance is still `EXPLORATORY`; report the count w
 
 ## 2026-11-25 post-Claude integration follow-up
 The optional final relaxed NormDispIncr tolerance remains available to exploratory runs but is rejected for explicit THESIS_NLTHA intent at configuration validation. The strict default and all physical inputs are unchanged. Exploratory status/progress messages use the existing best-effort logger so a closed Windows stdout does not by itself abort a native run. Solver, file and validation exceptions are not suppressed. Full-duration convergence remains unverified.
+
+## 2026-11-25 default tolerance decision
+New policy (user decision 2026-11-25, supersedes the earlier default): new exploratory configurations use `convergence_tolerance: 1e-6` at every attempt, `transient_max_iterations: 40`, `final_relaxed_tolerance: null`. Strict opt-in sets `convergence_tolerance: 1e-7` and leaves the final fallback null. Old configs explicitly containing only `final_relaxed_tolerance` retain their original strict-first base, even if the value is null. THESIS_NLTHA continues to require 1e-7 and no relaxed fallback. Effective values are persisted in RunConfig and diagnostics. NormDispIncr is a displacement-increment norm, not a residual-force check; native convergence and sensitivity remain required.

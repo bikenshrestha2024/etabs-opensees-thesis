@@ -32,15 +32,24 @@ def _safe_print(*args, **kwargs):
 def validate_convergence_settings(config):
     """Return (tolerance, max_iterations, final_relaxed_tolerance or None).
 
-    [REF OpenSees NormDispIncr test; repo evidence 2026-11-24] Defaults keep the
-    historical strict 1e-7 / 40. ``final_relaxed_tolerance`` is opt-in, must be
-    above the strict tolerance and at most 1e-5 (10 micrometres of increment).
+    [REF OpenSees NormDispIncr test; repo evidence 2026-11-24]
+    New exploratory runs default to 1e-6 / 40; 1e-7 is strict opt-in.
+    Reviewed THESIS_NLTHA remains strict. An older configuration explicitly
+    specifying final_relaxed_tolerance (including null) retains its original
+    1e-7 base unless convergence_tolerance is explicitly provided.
+    A legacy final fallback must exceed the base and be at most 1e-5.
     """
     def num(value,name):
         if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(float(value)):
             raise ValueError(name+' must be a finite number')
         return float(value)
-    tol=1e-7
+    thesis=config.get('analysis_intent')=='THESIS_NLTHA'
+    default_tol=1e-7 if thesis or 'final_relaxed_tolerance' in config else 1e-6
+    tol=num(config.get('convergence_tolerance',default_tol),'convergence_tolerance')
+    if tol not in (1e-7,1e-6):
+        raise ValueError('convergence_tolerance must be 1e-6 (exploratory) or 1e-7 (strict)')
+    if thesis and tol!=1e-7:
+        raise ValueError('THESIS_NLTHA requires strict convergence_tolerance=1e-7')
     iters=config.get('transient_max_iterations',40)
     if isinstance(iters,bool) or not isinstance(iters,int) or not 1<=iters<=200:
         raise ValueError('transient_max_iterations must be an integer from 1 through 200')
@@ -50,7 +59,7 @@ def validate_convergence_settings(config):
             raise ValueError('THESIS_NLTHA requires strict convergence; final_relaxed_tolerance is exploratory only')
         relaxed=num(relaxed,'final_relaxed_tolerance')
         if not tol<relaxed<=1e-5:
-            raise ValueError('final_relaxed_tolerance must be above 1e-7 and at most 1e-5')
+            raise ValueError('final_relaxed_tolerance must exceed convergence_tolerance and be at most 1e-5')
     return tol,iters,relaxed
 
 def _initial_nonlinear_mode_audit(periods, props, *, model_sha256=None):
@@ -356,6 +365,13 @@ def _run(config):
     if recovery_strategy not in ('EARLY_ALTERNATIVES','BISECTION_FIRST'):
         raise ValueError('recovery_strategy must be EARLY_ALTERNATIVES or BISECTION_FIRST')
     convergence_tol,convergence_iters,final_relaxed_tol=validate_convergence_settings(config)
+    # Freeze resolved defaults in the actual RunConfig for reproducibility.
+    config=dict(config,convergence_tolerance=convergence_tol,
+                transient_max_iterations=convergence_iters,
+                final_relaxed_tolerance=final_relaxed_tol)
+    _safe_print('[NLTHA CONVERGENCE]',f'NormDispIncr={convergence_tol:g}',
+                f'max_iterations={convergence_iters}',f'final_fallback={final_relaxed_tol}',
+                'research-only; not a force-equilibrium or design acceptance criterion')
     max_subdivision_depth=config.get('max_subdivision_depth',5)
     if isinstance(max_subdivision_depth,bool) or not isinstance(max_subdivision_depth,int) or not 0<=max_subdivision_depth<=8:
         raise ValueError('max_subdivision_depth must be an integer from 0 through 8')
@@ -769,7 +785,7 @@ def _run(config):
                 raise ValueError('Source unit/rotation mapping mismatch')
             ops.timeSeries('Path',tag,'-dt',step,'-values',*values.tolist(),'-factor',factor)
             ops.pattern('UniformExcitation',tag,direction,'-accel',tag)
-        _configure_nonlinear_transient(ops)
+        _configure_nonlinear_transient(ops,tolerance=convergence_tol,max_iterations=convergence_iters)
         configure_transient_system(ops,transient_system)
         suspect_tags=config.get('diagnostic_suspect_tags',[])
         if not isinstance(suspect_tags,list) or len(suspect_tags)>16:
@@ -950,6 +966,7 @@ def _run(config):
                             f'[EXPLORATORY PROGRESS] {orientation}: t={ops.getTime():.3f}/{end:.3f}s '
                             f'| wall={last-case_start:.1f}s | failed_attempts={diag.get("failed_attempts",0)} '
                             f'| bisections={diag.get("bisections",0)} '
+                            f'| tol={convergence_tol:g} | relaxed_steps={diag.get("relaxed_tolerance_steps",0)} '
                             f'| min_accepted_dt={minimum_dt if minimum_dt is not None else "n/a"} '
                             f'| eta_s={eta:.1f} | solver_s={timing["solver_and_recovery_s"]:.2f} | capture_s={timing["capture_s"]:.2f}',
                             flush=True)

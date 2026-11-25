@@ -19,13 +19,15 @@ from components.nonlinear_time_history.source_model_handoff import (
 
 def make_research_nltha_config(*, model_folder, x_path, y_path, output_dir,
                                event, variant_id, limit_state="ULS",
-                               dt_s=0.005, trial_duration_s=0.0):
+                               dt_s=0.005, trial_duration_s=0.0, strict_tolerance=False):
     """[REF docs/source/components/nonlinear_time_history/direct_existing_model.py.md]
     Prepare actual existing-source XY/YX NLTHA using PEER research material law.
 
     Never silently label transferred specimen cards as THESIS_NLTHA approval.
     All earthquake components act simultaneously, both orientations rebuilt.
     """
+    if type(strict_tolerance) is not bool:
+        raise ValueError("strict_tolerance must be boolean")
     if limit_state not in ("ULS","SLS"):
         raise ValueError("limit_state must be ULS or SLS")
     if isinstance(dt_s,bool) or not isinstance(dt_s,(int,float)) or not math.isfinite(dt_s) or dt_s<=0 or dt_s>0.01:
@@ -53,6 +55,8 @@ def make_research_nltha_config(*, model_folder, x_path, y_path, output_dir,
         soil_type="C",soil_c_primary_nltha=True,
         duration_s=float(trial_duration_s),
         dt_s=float(dt_s),max_subdivision_depth=5,
+        convergence_tolerance=1e-7 if strict_tolerance else 1e-6,
+        final_relaxed_tolerance=None,
         research_basis_not_project_approval=True,
         material_parameter_status="PEER_SPECIMEN_TRANSFER_UNCALIBRATED",
     )
@@ -441,6 +445,8 @@ def main(argv=None):
     p.add_argument("--dt-s",type=float,default=0.005)
     p.add_argument("--trial-duration-s",type=float,default=0.,
                    help="0 means full record; >0 is an explicit diagnostic trial")
+    p.add_argument("--strict-tolerance",action="store_true",
+                   help="Use strict NormDispIncr 1e-7 instead of exploratory default 1e-6")
     p.add_argument("--check-only",action="store_true",
                    help="Write input/section preflight only; no OpenSees solver call")
     opts=p.parse_args(argv)
@@ -449,7 +455,7 @@ def main(argv=None):
         y_path=opts.y_path,output_dir=opts.output_dir,
         event=opts.event,variant_id=opts.variant_id,
         limit_state=opts.limit_state,dt_s=opts.dt_s,
-        trial_duration_s=opts.trial_duration_s)
+        trial_duration_s=opts.trial_duration_s,strict_tolerance=opts.strict_tolerance)
     result=run_existing_model_nltha(config,check_only=opts.check_only)
     print(json.dumps(result,indent=2,allow_nan=False))
     return result

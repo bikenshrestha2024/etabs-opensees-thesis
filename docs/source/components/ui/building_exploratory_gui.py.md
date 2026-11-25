@@ -30,3 +30,6 @@ The 1-wall-quadrilateral diagnostic worker launches `python -m components.nonlin
 
 ## 2026-11-25 exploratory convergence settings
 The convergence recovery panel exposes the research-only final 1e-6 tolerance as an unchecked option and maximum iterations per attempt (default 40). The shared engine validates both before launch. The saved configuration records the choice, and completed/truncated case messages report the number of relaxed steps. No relaxation is enabled by default. GUI rendering and native convergence remain unverified.
+
+## 2026-11-25 default tolerance decision
+The unchecked Strict tolerance (1e-7) option selects 1e-6 by default and 1e-7 when checked, with no final fallback in either new GUI mode. The saved config and completion count identify actual tolerance policy. This replaces the previous opt-in relaxation checkbox.

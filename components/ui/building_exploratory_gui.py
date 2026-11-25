@@ -101,16 +101,16 @@ def launch(parent,model_folder,output_folder=None):
     recovery=ttk.LabelFrame(win,text='Convergence recovery');recovery.pack(fill='x',padx=8,pady=(4,0))
     recovery_strategy=tk.StringVar(value='EARLY_ALTERNATIVES')
     subdivision_depth=tk.StringVar(value='5')
-    relaxed_recovery=tk.BooleanVar(value=False)
+    strict_recovery=tk.BooleanVar(value=False)
     transient_iterations=tk.StringVar(value='40')
     ttk.Label(recovery,text='Recovery strategy').grid(row=0,column=0,sticky='w',padx=4,pady=3)
     ttk.Combobox(recovery,textvariable=recovery_strategy,values=['EARLY_ALTERNATIVES','BISECTION_FIRST'],state='readonly',width=23).grid(row=0,column=1,sticky='w')
     ttk.Label(recovery,text='Maximum halvings').grid(row=0,column=2,sticky='w',padx=(12,4))
     ttk.Combobox(recovery,textvariable=subdivision_depth,values=['3','4','5','6','7','8'],state='readonly',width=4).grid(row=0,column=3,sticky='w')
-    ttk.Checkbutton(recovery,text='Allow final 1e-6 tolerance (exploratory only)',variable=relaxed_recovery).grid(row=1,column=0,columnspan=2,sticky='w',padx=4,pady=3)
+    ttk.Checkbutton(recovery,text='Strict tolerance (1e-7)',variable=strict_recovery).grid(row=1,column=0,columnspan=2,sticky='w',padx=4,pady=3)
     ttk.Label(recovery,text='Max iterations / attempt').grid(row=1,column=2,sticky='w',padx=(12,4))
     ttk.Entry(recovery,textvariable=transient_iterations,width=5).grid(row=1,column=3,sticky='w')
-    ttk.Label(recovery,text='Strict tolerance: 1e-7. Opt-in relaxation is tried only at the deepest subdivision; relaxed steps are counted. Nonfinite states remain rejected.',wraplength=950,justify='left').grid(row=2,column=0,columnspan=4,sticky='w',padx=4,pady=(0,4))
+    ttk.Label(recovery,text='Default exploratory tolerance: 1e-6. Select strict for 1e-7 at every attempt. No automatic relaxation in strict mode; relaxed steps are counted. Nonfinite states remain rejected.',wraplength=950,justify='left').grid(row=2,column=0,columnspan=4,sticky='w',padx=4,pady=(0,4))
     tracked=tk.StringVar(value='100001');ttk.Label(settings,text='Tracked frame solver tag').pack(side='left');ttk.Entry(settings,textvariable=tracked,width=9).pack(side='left')
     tracked_members=tk.StringVar(value='')
     ttk.Label(settings,text='Additional brace/device tags (comma-separated)').pack(side='left',padx=(8,2))
@@ -327,7 +327,8 @@ def launch(parent,model_folder,output_folder=None):
             config.update(recovery_strategy=recovery_strategy.get(),
                           max_subdivision_depth=int(subdivision_depth.get()),
                           transient_max_iterations=int(transient_iterations.get()),
-                          final_relaxed_tolerance=1e-6 if relaxed_recovery.get() else None)
+                          convergence_tolerance=1e-7 if strict_recovery.get() else 1e-6,
+                          final_relaxed_tolerance=None)
             from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
             validate_convergence_settings(config)
             run_states=('ULS','SLS') if ls.get()=='Both' else (ls.get(),)

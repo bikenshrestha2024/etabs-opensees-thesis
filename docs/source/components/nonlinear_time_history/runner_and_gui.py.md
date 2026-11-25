@@ -47,3 +47,6 @@ Focused diagnostics no longer restrict the shared recovery safety check. The ful
 
 ## 2026-11-25 recovery log resilience
 A failed write to stdout in the recovery progress messages increments recovery_log_errors and no longer interrupts recovery. The active tolerance and relaxed flag are printed on recovery attempts; tolerance, solver algorithms and native failure checks otherwise follow the existing configuration. This is not a guarantee of numerical convergence.
+
+## 2026-11-25 default tolerance decision
+The shared interval solver preserves the strict default for reviewed callers; the exploratory caller now explicitly supplies 1e-6 by default. All accepted steps using tolerance above 1e-7 are counted in relaxed_tolerance_steps, including ordinary nominal intervals. Clock, finite response and rejected-state protections are unchanged.
