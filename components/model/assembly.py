@@ -1671,11 +1671,14 @@ def autoselect_inputs(gui, export_dir, role):
             value=str(variable.get()).strip().upper()
             state='ULS' if value=='BOTH' else value
             break
-    from components.inputs.project_workbooks import analysis_output_folder
-    output_folder=analysis_output_folder(folder,state)
-    for attr in ('output_var','output','outdir'):
-        var=getattr(gui,attr,None)
-        if var is not None: var.set(str(output_folder))
+    if role == 'gravity_model_script' and hasattr(gui, '_update_auto_gravity_output'):
+        gui._update_auto_gravity_output()
+    else:
+        from components.inputs.project_workbooks import analysis_output_folder
+        output_folder=analysis_output_folder(folder,state)
+        for attr in ('output_var','output','outdir'):
+            var=getattr(gui,attr,None)
+            if var is not None: var.set(str(output_folder))
     for attr,key in (('stories','story_master_csv'),('readiness','readiness_manifest')):
         var=getattr(gui,attr,None)
         if var is None:

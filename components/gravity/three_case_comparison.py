@@ -155,6 +155,28 @@ def join_source_etabs_reactions(available, reaction_rows):
     return rows, summary
 
 
+def latest_case_comparison(output_root, result, model, profile, digest):
+    """[REF docs/source/components/gravity/three_case_comparison.py.md] Find a digest-matched comparison."""
+    from components.gravity.output_ownership import section
+
+    if not model or not profile or not digest:
+        return None
+    base = section(output_root, 'COMPARISONS') / 'Gravity_Case_Comparison'
+    for path in sorted(base.glob('*/Case_Comparison.json'), reverse=True):
+        if path.is_symlink() or path.parent.is_symlink():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding='utf-8-sig'))
+            if (Path(data['model_script']).resolve() == Path(model).resolve()
+                    and data.get('gravity_profile') == profile
+                    and any(Path(row['result_path']).resolve() == Path(result).resolve()
+                            and row.get('result_sha256') == digest for row in data['summary'])):
+                return path.parent
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return None
+
+
 def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L"):
     """[REF docs/source/components/gravity/three_case_comparison.py.md]
 
@@ -188,6 +210,7 @@ def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L")
             "equilibrium_error_percent": entry["equilibrium_error_percent"],
             "min_uz_m": min(uz), "max_uz_m": max(uz),
             "result_path": entry["result_path"],
+            "result_sha256": entry.get("result_sha256"),
             "status": "SOLVER_EQUILIBRIUM_ONLY_NOT_ETABS_EQUIVALENCE"
         })
     all_tags = sorted(set().union(*(r.keys() for r in reactions_by_case.values())))
@@ -274,19 +297,29 @@ def export_case_comparison(output_root, model_path, profile="GRAVITY_1.0D_1.0L")
     from matplotlib.figure import Figure
     fig = Figure(figsize=(11, 6), layout="constrained")
     left, right = fig.subplots(1, 2)
+    story_file = Path(model_path).parent / 'OpenSees_Complete_Story_Masters_V118.csv'
+    story_levels = set()
+    if story_file.is_file():
+        with story_file.open(encoding='utf-8-sig', newline='') as stream:
+            story_levels = {round(float(row['elevation_m']), 6) for row in csv.DictReader(stream)}
     for label, (_, data) in available.items():
         reactions = sorted(data["reactions"], key=lambda r: int(r["node_tag"]))
         left.plot([int(r["node_tag"]) for r in reactions],
                   [float(r["rz_kN"]) for r in reactions], ".", label=label + " supports")
-        nodes = sorted(data["nodes"], key=lambda n: float(n["z_m"]))
-        levels = sorted(set(float(n["z_m"]) for n in nodes))
-        shortening = [min(float(n["uz_m"]) for n in nodes if float(n["z_m"]) == z) * 1000
-                      for z in levels]
-        right.plot(shortening, levels, label=label + " supports")
+        min_uz = {}
+        base = min(float(node['z_m']) for node in data['nodes'])
+        for node in data['nodes']:
+            level = round(float(node['z_m']) - base, 6)
+            if story_levels and level != 0.0 and level not in story_levels:
+                continue
+            displacement = 1000 * float(node['uz_m'])
+            min_uz[level] = min(min_uz.get(level, displacement), displacement)
+        levels = sorted(min_uz)
+        right.plot([min_uz[level] for level in levels], levels, '.', label=label + ' supports')
     left.set(xlabel="OpenSees support node tag", ylabel="Solved vertical reaction (kN)",
              title="Native solver reactions (not ETABS equivalence)")
-    right.set(xlabel="Most negative nodal Uz at level (mm)", ylabel="Elevation (m)",
-              title="Solved gravity shortening")
+    right.set(xlabel="Minimum nodal Uz at level (mm)", ylabel="Height above base (m)",
+              title="Gravity displacement by storey" if story_levels else "Gravity displacement by mesh level")
     for ax in (left, right):
         ax.grid(alpha=0.3)
         ax.legend()

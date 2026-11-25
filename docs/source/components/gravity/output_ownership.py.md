@@ -30,3 +30,8 @@ The registry binds source model hash, input fingerprints, support-set identity, 
 Old `OpenSees_Analysis_Results`, `02_GRAVITY/<support strategy>`, legacy root indexes and `REVIEW_SNAPSHOTS` are **read-only compatibility evidence**. Do not automatically remove, move, hard-link or repackage them as fresh runs. New organized case indexes store one JSON pointer to the source response and do **not** create duplicate PNG folders. Native Windows test must verify GUI output location, historical reads, 32/76/97 case selection and source SHA consistency before merging.
 
 Use `tests/test_gravity_single_owner_layout.py` and the existing gravity evidence/registry tests. The output routing controls no numerical model properties and implies no NBC 105 certification.
+# Saved rebuilds and their gravity workspace
+
+The original export keeps `02_GRAVITY/RUNS/<model-stem>`. A model under `02_MODEL/REBUILDS/VERIFIED_CLEAR_BEAM/<rebuild-id>` uses the sibling workspace `02_GRAVITY/RUNS/<model-stem>__<rebuild-id>`. New runs, comparisons, reviews and ZIPs use that workspace. A saved case in the legacy shared workspace can be reopened only after the selected model path, all model input fingerprints and the exact result digest are verified.
+
+Within each gravity workspace, `05_COMPARISONS` contains derived plots and tables, `06_REVIEW/Gravity_Evidence` contains expanded evidence, and `07_EXPORT_ZIP` contains archives. The navigation pointer keeps the result digest and links to its actual registry. These paths let existing solver runs and historical ZIPs remain readable in their original locations.

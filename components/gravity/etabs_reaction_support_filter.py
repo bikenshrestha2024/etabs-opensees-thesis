@@ -115,6 +115,60 @@ def classify_supports(etabs_table, connectivity, original_supports, *, tolerance
                          "and internal wall-edge mesh constraints for acceptance.")
     return selected,audit
 
+def matched_primary_32_workbook_comparison(gravity_dir, result):
+    """[REF docs/source/components/gravity/comparison_bundle.py.md] Verify saved workbook-derived FZ evidence."""
+    from components.inputs.project_output_layout import sha256_file
+
+    if result.get('wall_support_strategy') != MODE or result.get('gravity_profile') != 'GRAVITY_1.0D_1.0L':
+        return None
+    folder = Path(gravity_dir)
+    report_path = folder / 'Primary_32_ETABS_OpenSees_Reactions.json'
+    audit_path = folder / 'ETABS_Nonzero_Reaction_Support_Audit.json'
+    try:
+        report = json.loads(report_path.read_text(encoding='utf-8-sig'))
+        audit = json.loads(audit_path.read_text(encoding='utf-8-sig'))
+        workbook = Path(audit['source_table'])
+        if (audit['case'] != PROFILE or report['original_ETABS_case'] != PROFILE
+                or audit.get('user_confirmed_32_exact_match') is not True
+                or audit['source_sha256'] != report['original_etabs_table_sha256']
+                or workbook.is_symlink() or sha256_file(workbook) != audit['source_sha256']):
+            return None
+        original_reactions = read_etabs_joint_reactions(workbook, PROFILE)
+        if sha256_file(workbook) != audit['source_sha256']:
+            return None
+        support = set(PROJECT_PRIMARY_32)
+        solved = {int(row['node_tag']): float(row['rz_kN']) for row in result['reactions']}
+        mapping = {int(row['opensees_node']): row for row in audit['mapping'] if row['selected'] is True}
+        rows = {int(row['opensees_node']): row for row in report['node_reactions']}
+        if (set(map(int, result['support_node_tags'])) != support or len(result['reactions']) != len(support)
+                or len(report['node_reactions']) != len(support) or not support == solved.keys() == mapping.keys() == rows.keys()):
+            return None
+        discrepancies = []
+        native_points = set()
+        etabs_total = 0.0
+        for tag in sorted(support):
+            reference = float(mapping[tag]['etabs_FZ_kN'])
+            saved = rows[tag]
+            point = str(mapping[tag]['etabs_unique'])
+            native_fz = float(original_reactions[point]['etabs_FZ_kN'])
+            if (point in native_points or not point or not all(map(math.isfinite, (reference, solved[tag])))
+                    or not math.isclose(native_fz, reference, rel_tol=0, abs_tol=1e-8)
+                    or str(saved['etabs_unique_name']) != point
+                    or not math.isclose(float(saved['opensees_FZ_kN']), solved[tag], rel_tol=0, abs_tol=1e-8)
+                    or not math.isclose(float(saved['etabs_FZ_kN']), reference, rel_tol=0, abs_tol=1e-8)):
+                return None
+            native_points.add(point)
+            etabs_total += reference
+            discrepancies.append(dict(etabs_point=point, opensees_node=tag,
+                etabs_global_rz_kN=reference, abs_delta_kN=abs(solved[tag]-reference)))
+        discrepancies.sort(key=lambda row: row['abs_delta_kN'], reverse=True)
+        return dict(etabs_base_FZ_kN=etabs_total, opensees_support_FZ_kN=sum(solved.values()),
+            node_comparison={'valid_one_to_one_global_z_count': len(support)},
+            top_node_discrepancies=discrepancies, evidence_path=report_path)
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
+
+
 def export_primary_32_comparison(gravity_result, audit_json, output_dir):
     """Compare solved 32-node reaction values with original ETABS source FZ.
 

@@ -162,8 +162,8 @@ class GravityAnalysisGUI:
         self.model_var.trace_add("write", lambda *_: self._update_auto_gravity_output())
         def populate_saved():
             from OpenSees_Complete_Export_V118 import autoselect_inputs
-            folder=Path(self.model_var.get()).parent if self.model_var.get() else Path(r'D:/Thesis Opensees/Etabs Nodes Export')
-            autoselect_inputs(self,folder,'gravity_model_script')
+            if not self.model_var.get():
+                autoselect_inputs(self,Path(r'D:/Thesis Opensees/Etabs Nodes Export'),'gravity_model_script')
         self.win.after_idle(populate_saved)
 
     def _update_auto_gravity_output(self):
@@ -184,8 +184,8 @@ class GravityAnalysisGUI:
         if not model.is_file():
             self.output_var.set("")
             return
-        from components.inputs.output_layout import owned_run_destination
-        destination=owned_run_destination(model.parent,"GRAVITY",model.stem)
+        from components.gravity.output_ownership import model_workspace
+        destination=model_workspace(model)
         if self.output_var.get()!=str(destination):
             self.output_var.set(str(destination))
 
@@ -643,11 +643,19 @@ class GravityAnalysisGUI:
         if not model.is_file():
             messagebox.showerror("Select source model","Select the current exported model first.",parent=self.win)
             return
+        from components.gravity.output_ownership import rebuild_source_folder
+        try:
+            source = rebuild_source_folder(model)
+        except (OSError, ValueError, TypeError) as exc:
+            messagebox.showerror('Select a source export', str(exc), parent=self.win)
+            return
         settings=None
         if elastic_comparison:
+            reference = _runtime_repo_root() / 'docs' / 'validation'
             settings=filedialog.askopenfilename(
                 parent=self.win,title="Select ETABS elastic comparison settings",
-                filetypes=[("Elastic stiffness settings","*.json")])
+                initialdir=str(reference if reference.is_dir() else source),
+                filetypes=[("Elastic stiffness settings","*.json"), ("All files","*.*")])
             if not settings:
                 return
         native=self.etabs_native_assignment_var.get().strip()
@@ -680,26 +688,8 @@ class GravityAnalysisGUI:
         # Save a new immutable variant in this source export's 02_MODEL stage.
         # Do not create independent sibling exports which lose ownership of
         # current geometry, source hashes and module result references.
-        source=model.resolve().parent
-        if source.name.casefold().startswith("verified_clear_beam_"):
-            messagebox.showerror("Historical sibling model",
-                "The selected model is inside a historical "
-                "Verified_Clear_Beam sibling export. Select the original "
-                "ETABS source export folder (e.g. 1) before making a new "
-                "module-owned rebuild. Original files remain unchanged.",
-                parent=self.win)
-            return
-        from components.inputs.output_layout import export_root_for
-        export=export_root_for(source)
-        if export!=source:
-            messagebox.showerror("Choose original model export",
-                "Rebuild must start from the original ETABS export root. "
-                "Rebuilt variants cannot be recursively rebuilt in another "
-                "variant folder; open the original export and select its model.",
-                parent=self.win)
-            return
         import datetime as _dt
-        new=(export/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"/
+        new=(source/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"/
              _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ"))
         # In an exported copy the runtime contains components but not tools.
         # Run the rebuilt source implementation from the current updated repo.
@@ -787,10 +777,6 @@ class GravityAnalysisGUI:
                     self._gravity_busy=False
                     if success:
                         self.model_var.set(str(new/"OpenSees_Complete_Gravity_Model.py"))
-                        if self._output_is_automatic:
-                            from components.inputs.output_layout import owned_run_destination
-                            self.output_var.set(str(owned_run_destination(
-                                new, "GRAVITY", "OpenSees_Complete_Gravity_Model")))
                         self._set_gravity_operation("FINISHED",
                             "New source ready; gravity not yet solved | "+str(new))
                         self.status_var.set("NEW verified clear-beam source selected. "
@@ -1142,7 +1128,7 @@ class GravityAnalysisGUI:
                     "Direct gravity comparison saved; structural equivalence "
                     "NOT CERTIFIED: "+str(out))
             try:
-                self._publish_gravity_evidence()
+                self._publish_gravity_evidence(single_run=gravity.parent)
             except Exception as pack_exc:
                 self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
                     "ETABS direct extraction saved; automatic ZIP failed: "+str(pack_exc))
@@ -1223,19 +1209,18 @@ class GravityAnalysisGUI:
             if not model.is_file():
                 raise FileNotFoundError('Choose the current generated OpenSees gravity model.')
             gravity=Path(self.output_var.get()).expanduser().resolve()
-            if not gravity.is_dir():
-                raise FileNotFoundError('Current model gravity output workspace missing: '+str(gravity))
-            # Only this selected model's gravity workspace is authoritative.
-            # Including the old shared result root a second time would ZIP
-            # the same case evidence twice under different source labels.
-            from components.inputs.output_layout import review_snapshots_for
-            destination_parent=review_snapshots_for(model.parent,'GRAVITY')
+            result=self._selected_result_path()
+            from components.gravity.output_ownership import section
+            from components.gravity.three_case_comparison import latest_case_comparison
+            from components.inputs.project_output_layout import sha256_file
+            destination_parent=section(gravity,'REVIEWS',create=True)/'Organized'
+            comparison=latest_case_comparison(gravity,result,model,self.gravity_profile_var.get(),sha256_file(result))
             report=publish_organized_results(
-                gravity,
+                result.parent, gravity_root=comparison,
                 destination_parent=destination_parent,
                 selected_modules=('Gravity','Comparisons'),
                 bundle_name='GRAVITY_REVIEW',
-                archive_only=True)
+                archive_only=True, archive_destination=section(gravity,'UPLOADS',create=True))
             self._gravity_action_log('ORGANIZED_GRAVITY_ZIP',
                                      report['zip_files']['GRAVITY_REVIEW'])
             self.status_var.set('Gravity review ZIP: '+report['zip_files']['GRAVITY_REVIEW'])
@@ -1275,10 +1260,6 @@ class GravityAnalysisGUI:
         p = filedialog.askopenfilename(parent=self.win, title="Select generated OpenSeesPy model script", filetypes=[("Python scripts", "*.py"), ("All files", "*.*")])
         if p:
             self.model_var.set(p)
-            if self._output_is_automatic:
-                from components.inputs.output_layout import owned_run_destination
-                self.output_var.set(str(owned_run_destination(
-                    Path(p).parent, "GRAVITY", Path(p).stem)))
             self._read_code_inputs(show_error=False)
 
     def _selected_gravity_evidence(self, model):
@@ -1713,14 +1694,13 @@ class GravityAnalysisGUI:
         if model.name.startswith('OpenSees_Complete_') and report_path.is_file():
             errors = json.loads(report_path.read_text(encoding='utf-8-sig')).get('assembly_errors', [])
             if errors: raise ValueError('Model assembly blocked: ' + '; '.join(errors) + '. Rebuild with the latest exporter. Manual support inputs cannot repair assembly.')
-        from components.inputs.output_layout import owned_run_destination
+        from components.gravity.output_ownership import model_workspace
         output_choice=self.output_var.get().strip()
         if not output_choice and not self._output_is_automatic:
             raise ValueError("Explicit gravity output directory is empty")
         # Selected export root or a legacy/wrong in-project stage must never
         # receive fresh gravity solver files. Explicit external overrides remain.
-        out=owned_run_destination(model.parent, "GRAVITY", model.stem,
-                                  selected=(output_choice
+        out=model_workspace(model, selected=(output_choice
                                             if not self._output_is_automatic else None))
         self.output_var.set(str(out))
         py = Path(self.python_var.get()).expanduser().resolve()
