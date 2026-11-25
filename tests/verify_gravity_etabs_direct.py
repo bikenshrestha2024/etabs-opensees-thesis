@@ -298,7 +298,9 @@ class GravityDirectAPITests(unittest.TestCase):
             source=Path(tmp)/"long_original_name.EDB"
             source.write_bytes(b'etabs native model fixture')
             original=hashlib.sha256(source.read_bytes()).hexdigest()
-            with patch.dict('os.environ',{'ETABS_GRAVITY_TEMP_ROOT':str(Path(tmp)/'short')}):
+            env = dict(g.os.environ, ETABS_GRAVITY_TEMP_ROOT=str(Path(tmp) / 'short'))
+            # Restoring os.environ key by key drops empty Windows values from child processes.
+            with patch.object(g.os, 'environ', env):
                 messages=[]
                 copy_path=g._short_etabs_working_copy(
                     source,original,

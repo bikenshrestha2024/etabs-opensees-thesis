@@ -55,6 +55,9 @@ def test_batch_jobs_have_unique_destinations_and_detect_changed_source(tmp_path)
     jobs=batch.prepare_jobs(plan,tmp_path/"new")
     assert len(jobs)==2 and jobs[0]["identity"]!=jobs[1]["identity"]
     assert jobs[0]["config"]["output_dir"]!=jobs[1]["config"]["output_dir"]
+    assert all(job["config"]["convergence_tolerance"] == 1e-6 for job in jobs)
+    assert all(job["config"]["transient_max_iterations"] == 40 for job in jobs)
+    assert all(job["config"]["final_relaxed_tolerance"] is None for job in jobs)
     batch.verify_inputs(jobs[0])
     x.write_text("changed")
     with pytest.raises(ValueError,match="changed"):batch.verify_inputs(jobs[0])
@@ -67,3 +70,37 @@ def test_batch_duplicate_and_source_overwrite_rejected(tmp_path):
     plan=tmp_path/"plan.json";plan.write_text(json.dumps({"jobs":[str(cfg),str(cfg)]}))
     with pytest.raises(ValueError,match="Duplicate"):batch.prepare_jobs(plan,tmp_path/"new")
     with pytest.raises(ValueError,match="overwrite"):batch.prepare_jobs(plan,source)
+
+
+@pytest.mark.parametrize("strict", [False, True])
+def test_batch_job_identity_uses_effective_tolerance(tmp_path, strict):
+    source = write_source(tmp_path / "source")
+    x = tmp_path / "a.txt"
+    y = tmp_path / "b.txt"
+    x.write_text("0", encoding="utf-8")
+    y.write_text("1", encoding="utf-8")
+    config = dict(model_folder=str(source), x_path=str(x), y_path=str(y))
+    default = tmp_path / "default.json"
+    explicit = tmp_path / "explicit.json"
+    default.write_text(json.dumps(config), encoding="utf-8")
+    explicit.write_text(json.dumps(dict(config, convergence_tolerance=1e-7 if strict else 1e-6,
+                                        final_relaxed_tolerance=None)), encoding="utf-8")
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps({"jobs": [default.name, explicit.name]}), encoding="utf-8")
+    if strict:
+        jobs = batch.prepare_jobs(plan, tmp_path / "runs")
+        assert [job["config"]["convergence_tolerance"] for job in jobs] == [1e-6, 1e-7]
+        assert jobs[0]["identity"] != jobs[1]["identity"]
+    else:
+        with pytest.raises(ValueError, match="Duplicate batch job"):
+            batch.prepare_jobs(plan, tmp_path / "runs")
+
+
+def test_batch_rejects_invalid_tolerance_before_accessing_model_inputs(tmp_path):
+    config = tmp_path / "invalid.json"
+    config.write_text(json.dumps({"convergence_tolerance": 1e-4}), encoding="utf-8")
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps({"jobs": [config.name]}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid.json.*convergence_tolerance"):
+        batch.prepare_jobs(plan, tmp_path / "runs")

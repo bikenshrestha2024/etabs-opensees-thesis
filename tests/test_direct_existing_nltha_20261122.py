@@ -8,12 +8,13 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from components.nonlinear_time_history.source_model_handoff import (
     stage_existing_model_sources, solver_reaction_support_tags, literature_section_inventory
 )
 from components.nonlinear_time_history.direct_existing_model import (
-    make_research_nltha_config, preflight_existing_model
+    main, make_research_nltha_config, preflight_existing_model
 )
 from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
 
@@ -107,6 +108,19 @@ class ExistingModelNLTHATests(unittest.TestCase):
             self.assertEqual(cfg["scale"],1.)
             self.assertTrue(cfg["soil_c_primary_nltha"], "Direct primary thesis run must verify registered Soil-C pair by SHA256")
             self.assertFalse(cfg.get("approved_for_thesis",False))
+
+    def test_stage38_cli_defaults_to_relaxed_and_can_opt_into_strict(self):
+        argv = ["--model-folder", "model", "--x-path", "Kobe_A.txt", "--y-path", "Kobe_B.txt",
+                "--output-dir", "output", "--event", "Kobe", "--variant-id", "UNVERIFIED"]
+        for flags, expected in (([], 1e-6), (["--strict-tolerance"], 1e-7)):
+            with self.subTest(flags=flags), patch(
+                "components.nonlinear_time_history.direct_existing_model.run_existing_model_nltha",
+                return_value={},
+            ) as execute:
+                main(argv + flags)
+                config = execute.call_args.args[0]
+                self.assertEqual(config["convergence_tolerance"], expected)
+                self.assertIsNone(config["final_relaxed_tolerance"])
 
     def test_missing_waveforms_cannot_be_reported_as_run_completion(self):
         with tempfile.TemporaryDirectory() as td:

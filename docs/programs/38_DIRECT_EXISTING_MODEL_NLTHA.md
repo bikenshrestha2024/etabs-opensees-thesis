@@ -64,6 +64,8 @@ python tools/run_existing_nltha.py --model-folder "D:\Thesis\OpenSees_Exports\CU
 
 For an intentionally **truncated diagnostic** transient, append `--trial-duration-s 0.02`. The result status explicitly says `EXPLORATORY_TRUNCATED_TRIAL_ONLY`, and it must **never** be treated as a complete earthquake history.
 
+Stage 38 uses `NormDispIncr=1e-6` by default. Append `--strict-tolerance` for `1e-7` at every attempt. Run strict and relaxed comparisons in separate output folders and verify the applied value in `RunConfig.json`. `NormDispIncr` measures the displacement-increment norm. Reserve reviewed production execution for a source-approved model.
+
 Current default `dt_s=0.005 s` is only a preliminary selection and is rejected if greater than the actual matched record's digitization interval. A modal `T1/100` or `Tn` smaller than this also governs; confirm NBC §9.3.2.4 with actual nonlinear modal values. No auto doubling/re-matching or secondary scaling: already spectrum-matched inputs have nominal additional scale `1.0` and require independent original SeismoMatch factor evidence. Actual source waveforms must be available and distinguishable by SHA before an executable case begins.
 
 ## 5. Full analysis sequence and outputs

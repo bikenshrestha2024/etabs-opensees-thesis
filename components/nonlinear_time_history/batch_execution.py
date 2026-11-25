@@ -19,6 +19,8 @@ from components.nonlinear_time_history.source_model_handoff import (
 
 def prepare_jobs(plan_path, output):
     """Bind unique research jobs to their source inputs. [REF docs/source/components/nonlinear_time_history/batch_execution.py.md]"""
+    from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
+
     plan_path=Path(plan_path).resolve()
     output=Path(output).resolve()
     plan=json.loads(plan_path.read_text(encoding="utf-8-sig"))
@@ -34,6 +36,12 @@ def prepare_jobs(plan_path, output):
         cfg=json.loads(path.read_text(encoding="utf-8-sig"))
         if cfg.get("analysis_intent")=="THESIS_NLTHA":
             raise ValueError("This scheduler is for exploratory research jobs only")
+        try:
+            tolerance, max_iterations, final_tolerance = validate_convergence_settings(cfg)
+        except ValueError as exc:
+            raise ValueError(f"Invalid convergence settings in {path.name}: {exc}") from exc
+        cfg.update(convergence_tolerance=tolerance, transient_max_iterations=max_iterations,
+                   final_relaxed_tolerance=final_tolerance)
         for key in ("model_folder","x_path","y_path"):
             value=Path(cfg[key]).expanduser()
             if not value.is_absolute():
