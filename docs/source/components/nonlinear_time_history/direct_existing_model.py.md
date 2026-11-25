@@ -31,3 +31,6 @@ The runner's `OpenSees_Bidirectional_Input_Commands.json` per `XY/` or `YX/` is 
 Canonical numbered launch alias: `38_DIRECT_EXISTING_NLTHA.py`. This is equivalent to `tools/run_existing_nltha.py` and imports the **same** `main` function. No second NLTHA implementation is introduced.
 
 Sources: OpenSees UniformExcitation official documentation https://opensees.github.io/OpenSeesDocumentation/user/manual/model/pattern/uniformExcitationPattern.html and NBC 105:2025 §§9.3.2.2–9.3.2.3. The 25-storey original source config has no reliable M0–M6 source-state identifier; keep `--variant-id UNVERIFIED` until independently source-attributed.
+
+## 2026-11-25 default tolerance decision
+Stage 38 now uses explicit exploratory convergence_tolerance 1e-6, or 1e-7 with --strict-tolerance. The reviewed-production route is unchanged.

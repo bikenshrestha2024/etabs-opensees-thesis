@@ -26,5 +26,6 @@
  "inherent_damping_five_percent": false,
  "variant_id": "UNASSIGNED",
  "pair_id": "Kobe",
- "final_relaxed_tolerance": 1e-06
+ "convergence_tolerance": 1e-06,
+ "final_relaxed_tolerance": null
 }

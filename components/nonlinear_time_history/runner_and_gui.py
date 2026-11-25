@@ -182,10 +182,10 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
     base_tol=float(diagnostics.get("convergence_tolerance",1.0e-7))
     base_iters=int(diagnostics.get("convergence_max_iterations",40))
     relaxed_tol=diagnostics.get("final_relaxed_tolerance")
-    # Opt-in only. After every strict attempt has failed at the deepest
-    # subdivision, one Newton retry at a bounded looser displacement-increment
-    # tolerance; any step accepted this way is counted, never hidden.
-    attempts=[(a,base_tol,False) for a in algorithms]
+    # The exploratory caller supplies its resolved base tolerance. The
+    # shared reviewed solver remains strict by default. Count every accepted
+    # step at a tolerance above 1e-7, not merely a final fallback.
+    attempts=[(a,base_tol,base_tol>1e-7) for a in algorithms]
     if relaxed_tol is not None and depth >= max_depth:
         attempts.append(("Newton",float(relaxed_tol),True))
     def recovery_log(message):
@@ -239,6 +239,7 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
                     diagnostics.setdefault('relaxed_tolerance_first_time_s',accepted_clock['end_time_s'])
                 diagnostics.setdefault('first_accepted_step',{
                     **accepted_clock,'algorithm':algorithm,'subdivision_depth':depth,
+                    'convergence_tolerance':tolerance,'relaxed_tolerance':relaxed,
                     'previous_failed_attempts':diagnostics.get('failed_attempts',0)})
                 try:diagnostics['max_convergence_iterations']=max(
                     ops.testIter(),diagnostics.get('max_convergence_iterations',0))
