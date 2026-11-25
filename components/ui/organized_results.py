@@ -182,7 +182,8 @@ def _walk(root, *, destination, excluded_roots=()):
 def publish_organized_results(results_root, *, gravity_root=None,
                               include_unclassified=True, destination_parent=None,
                               selected_modules=None, bundle_name="ALL_MODULES",
-                              mrsm_case_layout=False, archive_only=False):
+                              mrsm_case_layout=False, archive_only=False,
+                              archive_destination=None):
     """[REF docs/source/components/ui/organized_results.py.md] Create dated folder and ZIPs.
 
     results_root is the existing source/model/state output folder (e.g. ULS...).
@@ -308,7 +309,7 @@ def publish_organized_results(results_root, *, gravity_root=None,
     # Review ZIPs are owned by the exact selected case, not a hidden
     # 06_REVIEW/Organized_Results/<timestamp>/ZIP_Exports directory.
     from components.inputs.review_zip_paths import ensure_review_zip_directory
-    zipdir = ensure_review_zip_directory(root)
+    zipdir = ensure_review_zip_directory(archive_destination or root)
     archives = {}
 
     # The full, absolute-path evidence manifest stays LOCAL. Every upload ZIP
@@ -331,7 +332,8 @@ def publish_organized_results(results_root, *, gravity_root=None,
         for item in manifest["skipped"]
     ]
     def archive(name, entries):
-        target = zipdir / (name + "_Review_UPLOAD.zip")
+        stem = name + ('_'+stamp if archive_only else '') + '_Review_UPLOAD'
+        target = zipdir / (stem + '.zip')
         visible = {item["snapshot"] for item in entries}
         subset_counts = {module: 0 for module in MODULES}
         for entry in entries:

@@ -73,6 +73,11 @@ def create_gravity_scorecard(export_dir,gravity_dir,comparison_root,missing,over
                 comparison_root/"Gravity_ETABS_OpenSees_Direct"/"Direct_Gravity_Comparison.json"]
     direct_path=next((p for p in candidates if p.is_file()),candidates[0])
     direct=_read(direct_path)
+    if direct is None and run:
+        from components.gravity.etabs_reaction_support_filter import matched_primary_32_workbook_comparison
+        direct=matched_primary_32_workbook_comparison(gravity_dir,run)
+        if direct is not None:
+            direct_path=direct['evidence_path']
 
     rows=[]
     def add(key,label,value,status,reason,evidence):

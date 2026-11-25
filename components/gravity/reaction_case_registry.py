@@ -141,7 +141,7 @@ def publish_gravity_case_index(output_root, record):
     atomic_json(stage/"00_INDEXES"/"LATEST_GRAVITY_CASES.json",{
         "status":"INDEX_POINTER_ONLY_NOT_ETABS_VALIDATED",
         "last_case":str(pointer),
-        "case_index":str(Path(output_root).resolve()/"00_INDEXES"/INDEX_NAME),
+        "case_index":str(record.get('registry_path') or Path(output_root).resolve()/"00_INDEXES"/INDEX_NAME),
     })
     return pointer
 
@@ -225,26 +225,43 @@ def current_case_diagnostic(output_root, model_path, *, scenario, profile,
     sum as evidence of file identity or promote a mismatched 32/76/97 case.
     Codes distinguish NEVER_INDEXED from a previous completed-but-stale run.
     """
-    from components.gravity.output_ownership import existing_index
+    from components.gravity.output_ownership import existing_index, model_workspace
+    from components.inputs.output_layout import owned_run_destination
     if scenario not in SCENARIO_SUPPORTS:
         return {"status":"INVALID_SUPPORT_SCENARIO",
                 "reason":"Unknown 32/76/97 scenario","result":None}
     index=existing_index(output_root,INDEX_NAME)
-    if not index.is_file():
-        return {"status":"NO_CASE_INDEX","reason":
-                "No saved reaction index at "+str(index),"result":None}
     try:
-        entries=json.loads(index.read_text(encoding="utf-8-sig"))
-        if not isinstance(entries,dict):
-            raise ValueError("Index is not a JSON object")
-        entry=entries.get(scenario+"|"+profile)
+        model = Path(model_path).expanduser().resolve()
+        indices = [index]
+        if model.is_file():
+            workspace = model_workspace(model)
+            legacy = owned_run_destination(model.parent, 'GRAVITY', model.stem)
+            if workspace != legacy and Path(output_root).resolve() == workspace:
+                indices.append(existing_index(legacy, INDEX_NAME))
+        entry = None
+        found = False
+        for path in indices:
+            if not path.is_file():
+                continue
+            index = path
+            found = True
+            entries = json.loads(index.read_text(encoding='utf-8-sig'))
+            if not isinstance(entries, dict):
+                raise ValueError('Index is not a JSON object')
+            key = scenario+'|'+profile
+            if key in entries:
+                entry = entries[key]
+                if not isinstance(entry, dict):
+                    raise ValueError('Case index record is not an object')
+                break
+        if not found:
+            return {"status":"NO_CASE_INDEX","reason":
+                    "No saved reaction index at "+str(index),"result":None}
         if entry is None:
             return {"status":"CASE_NOT_INDEXED","reason":
                     "No saved run indexed for this exact support case and gravity profile",
                     "index":str(index),"result":None}
-        if not isinstance(entry,dict):
-            raise ValueError("Case index record is not an object")
-        model=Path(model_path).expanduser().resolve()
         if not model.is_file():
             return {"status":"MODEL_NOT_FOUND","reason":
                     "Selected model file is missing","index":str(index),"result":None}
@@ -294,7 +311,7 @@ def current_case_diagnostic(output_root, model_path, *, scenario, profile,
         return {"status":"SOLVED_VERIFIED_INDEX","reason":
                 "Completed native OpenSees solver case; ETABS pointwise equivalence NOT certified",
                 "index":str(index),
-                "result":dict(verified,result_path=str(target))}
+                "result":dict(verified,result_path=str(target),result_sha256=digest,registry_path=str(index))}
     except (OSError,ValueError,KeyError,TypeError,OverflowError) as exc:
         return {"status":"SAVED_CASE_VALIDATION_BLOCKED",
                 "reason":str(exc),"index":str(index),"result":None}

@@ -74,7 +74,6 @@ SOURCE_EXTRA = (
     "CANDIDATE_PROVENANCE.json",
     "ISOLATED_CANDIDATE_PROVENANCE.json",
     "ETABS_Beam_Material_List_Reviewed.csv",
-    "Slab_Load_Path_Formulas_V141.xlsx",
     "OpenSees_Element_Connectivity.json",
     "OpenSees_Source_Model_Metadata_V118.json",
     "OpenSees_Complete_Gravity_Model.py",
@@ -152,8 +151,54 @@ def _csv(path, rows, cols):
 def _safe_relative(path, root):
     return path.resolve().is_relative_to(root.resolve())
 
+def _selected_slab_workbook(export_dir):
+    """Find a formula workbook bound to this assembled model and configuration."""
+    config = export_dir / 'OpenSees_Complete_Model_Config_V118.json'
+    model = export_dir / 'OpenSees_Complete_Model_Data_V118.json'
+    if not config.is_file() or not model.is_file():
+        return None
+    from components.gravity.mesh_cases import validated_mesh_size
+
+    try:
+        config_sha = digest(config)
+        config_data = json.loads(config.read_text(encoding='utf-8-sig'))
+        mesh_size = validated_mesh_size(config_data.get('floor_subdivisions', 4))
+    except (OSError, ValueError, AttributeError):
+        return None
+    directory = export_dir / '02_MODEL' / 'SLAB_LOAD_PATH' / f'MESH_{mesh_size:02d}'
+    candidates = sorted((directory/'JSON').glob('Slab_Load_Path_*_MANIFEST.json'), reverse=True)
+    if not candidates:
+        return None
+    try:
+        model_bytes = model.read_bytes()
+        if json.loads(model_bytes.decode('utf-8-sig')).get('config_sha256') != config_sha:
+            return None
+    except (OSError, ValueError, AttributeError):
+        return None
+    for manifest in candidates:
+        try:
+            proof = json.loads(manifest.read_text(encoding='utf-8-sig'))
+            if not isinstance(proof,dict):
+                continue
+            workbook = directory/'EXCEL'/(manifest.name.removesuffix('_MANIFEST.json')+'_V141.xlsx')
+            if (not any(path.is_symlink() for path in (manifest, workbook, *workbook.parents))
+                    and proof.get('config_sha256') == config_sha
+                    and proof.get('mesh_subdivisions') == mesh_size
+                    and Path(proof['assembled_model']).resolve() == model
+                    and Path(proof['workbook']).resolve() == workbook
+                    and digest(workbook) == proof.get('workbook_sha256')):
+                recorded_model = proof.get('assembled_model_sha256')
+                if recorded_model is not None and recorded_model != hashlib.sha256(model_bytes).hexdigest():
+                    continue
+                return workbook, manifest, recorded_model is not None
+        except (OSError, ValueError, TypeError, KeyError):
+            continue
+    return None
+
+
 def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
-                  max_file_mb=40, dual_run_dir=None, comparison_root=None):
+                  max_file_mb=40, dual_run_dir=None, comparison_root=None,
+                  zip_output_dir=None):
     """Save an uploadable ZIP and an uncompressed evidence folder.
 
     [REF docs/review/GRAVITY_ETABS_COMPARISON.md] Required same-model case evidence.
@@ -197,7 +242,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
     # Build in staging area; existing bundle is never overwritten by failed exports.
     output_dir.mkdir(parents=True,exist_ok=True)
     from components.inputs.review_zip_paths import ensure_review_zip_directory
-    zip_dir=ensure_review_zip_directory(output_dir)
+    zip_dir=ensure_review_zip_directory(zip_output_dir or output_dir)
     # Keep previous evidence immutable; choose one unused revision for BOTH
     # extracted folder and upload ZIP. Do not overwrite or reuse old data.
     base_name="Gravity_ETABS_OpenSees_Evidence"
@@ -296,6 +341,14 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             return True
         for name in SELECTED+SOURCE_EXTRA:
             add(export_dir/name,"source/"+name)
+        slab = _selected_slab_workbook(export_dir)
+        if slab:
+            workbook, manifest, model_bound = slab
+            scope = 'current' if model_bound else 'legacy_config_bound'
+            for file in (workbook, manifest):
+                add(file, 'source/slab_load_path/'+scope+'/'+file.name)
+        else:
+            add(export_dir/'Slab_Load_Path_Formulas_V141.xlsx', 'source/Slab_Load_Path_Formulas_V141.xlsx')
         for name in EXTRA:
             # The central root log is included separately; a dual run has
             # no reason to have another copy inside each case subfolder.
@@ -308,6 +361,13 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
         # its own archive namespace; never substitute its reactions for the
         # 76-source or 97-continuous results.
         from components.gravity.output_ownership import section
+        from components.gravity.three_case_comparison import latest_case_comparison
+        selected_comparison=latest_case_comparison(comparison_root,result,
+            payload.get('model_script'),payload.get('gravity_profile'),digest(result))
+        if selected_comparison is not None:
+            for file in sorted(selected_comparison.iterdir()):
+                if file.is_file() and not file.is_symlink():
+                    add(file,'saved_support_comparison/'+file.name)
         diag_base=section(comparison_root,"SOLVER")/"ETABS_NONZERO_REACTION_DIAGNOSTIC"/"GRAVITY_1.0D_1.0L"
         if not diag_base.is_dir():
             diag_base=comparison_root/"Gravity_Reaction_Diagnostic"
@@ -320,6 +380,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                 try:
                     result_doc=json.loads(result_file.read_text(encoding="utf-8-sig"))
                     if (result_doc.get("ok") is True and
+                            result_doc.get("model_script") == payload.get("model_script") and
                             result_doc.get("wall_support_strategy") ==
                             "ETABS_NONZERO_REACTION_DIAGNOSTIC" and
                             result_doc.get("gravity_profile") ==
@@ -484,8 +545,14 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                               if dual_run_dir is not None else None)
         has_offline=(offline_native_index is not None and
                      offline_native_index.is_file())
+        from components.gravity.etabs_reaction_support_filter import MODE, matched_primary_32_workbook_comparison
+        primary_scope = payload.get('wall_support_strategy') == MODE
+        has_primary_workbook = matched_primary_32_workbook_comparison(gravity_dir,payload) is not None
         if etabs_json:
             add(etabs_json,"etabs/etabs_gravity.json",required=True)
+        elif has_primary_workbook:
+            missing.append({"file":"etabs/etabs_gravity.json","required":False,
+                            "reason":"Primary 32 workbook-derived FZ comparison supplied under opensees; native COM JSON is optional for that screening"})
         elif has_offline:
             # Offline original full-table ETABS evidence is independent of
             # COM extraction; no fictional ETABS gravity JSON is created.
@@ -544,7 +611,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                                   encoding="utf-8")
             if audit76["missing_or_unverified"]:
                 missing.append({"file":"node_audit_76/ETABS_REACTION_MATCHES",
-                    "required":True,
+                    "required":not primary_scope or audit_case_source=="dual_run/ETABS_SOURCE_SUPPORTS",
                     "reason":str(audit76["missing_or_unverified"])+
                          " of 76 source support points unverified; actual case="+
                          audit_case_source+"; see status per row."})
@@ -559,7 +626,8 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                         "and source boundary conditions; no reaction was altered."})
         except (OSError,ValueError,TypeError,KeyError,ImportError) as exc:
             missing.append({"file":"node_audit_76/Gravity_76_Source_Support_Reactions.csv",
-                "required":True,"reason":type(exc).__name__+": "+str(exc)})
+                "required":not primary_scope or dual_run_dir is not None,
+                "reason":type(exc).__name__+": "+str(exc)})
         for key,cols in (("nodes",NODE_COLS),("reactions",REACT_COLS),("local_forces",FORCE_COLS)):
             entries=payload.get(key)
             if not isinstance(entries,list) or not entries:
@@ -610,7 +678,7 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
                "not_produced_optional": [x for x in missing if not x.get("required")],
                "missing_is_not_synonymous_with_packaging_failure":True,
                "packaged_files":package_members,
-               "output_zip":str(output_dir/(bundle_name+".zip")),
+               "output_zip":str(zip_dir/(bundle_name+".zip")),
                "output_folder":str(dest),
                "node_count":len(payload.get("nodes",[])) if isinstance(payload.get("nodes"),list) else None,
                "reaction_count":len(payload.get("reactions",[])) if isinstance(payload.get("reactions"),list) else None,
@@ -627,25 +695,25 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             unresolved_gates=scorecard["unresolved_gates"])
         (stage/"EVIDENCE_MANIFEST.json").write_text(json.dumps(audit,indent=2,allow_nan=False),encoding="utf-8")
         with (stage/"EVIDENCE_FILE_PATHS.txt").open("w",encoding="utf8") as stream:
-            stream.write("GRAVITY EVIDENCE INPUTS AND PACKAGE FILES\\n")
-            stream.write("UPLOAD ZIP: "+str(zip_dir/(bundle_name+".zip"))+"\\n")
-            stream.write("EXTRACTED REVIEW FOLDER: "+str(dest)+"\\n")
-            stream.write("SOURCE EXPORT: "+str(export_dir)+"\\n")
-            stream.write("GRAVITY ROOT: "+str(gravity_dir)+"\\n")
-            stream.write("DUAL RUN: "+str(dual_run_dir or "NOT SUPPLIED")+"\\n")
-            stream.write("COMPARISON ROOT: "+str(comparison_root)+"\\n")
-            stream.write("PACKAGED FILES:\\n")
-            for item in files:stream.write("  "+item["file"]+" <- "+item["source"]+"\\n")
-            stream.write("GENERATED AND COPIED PACKAGE MEMBERS:\\n")
+            stream.write("GRAVITY EVIDENCE INPUTS AND PACKAGE FILES\n")
+            stream.write("UPLOAD ZIP: "+str(zip_dir/(bundle_name+".zip"))+"\n")
+            stream.write("EXTRACTED REVIEW FOLDER: "+str(dest)+"\n")
+            stream.write("SOURCE EXPORT: "+str(export_dir)+"\n")
+            stream.write("GRAVITY ROOT: "+str(gravity_dir)+"\n")
+            stream.write("DUAL RUN: "+str(dual_run_dir or "NOT SUPPLIED")+"\n")
+            stream.write("COMPARISON ROOT: "+str(comparison_root)+"\n")
+            stream.write("PACKAGED FILES:\n")
+            for item in files:stream.write("  "+item["file"]+" <- "+item["source"]+"\n")
+            stream.write("GENERATED AND COPIED PACKAGE MEMBERS:\n")
             for item in package_members:
-                stream.write("  "+item["extracted_path"]+"\\n")
-            stream.write("MISSING FILES:\\n")
-            for item in missing:stream.write("  "+str(item)+"\\n")
-            stream.write("OVERSIZE OMITTED:\\n")
-            for item in oversize:stream.write("  "+str(item)+"\\n")
+                stream.write("  "+item["extracted_path"]+"\n")
+            stream.write("MISSING FILES:\n")
+            for item in missing:stream.write("  "+str(item)+"\n")
+            stream.write("OVERSIZE OMITTED:\n")
+            for item in oversize:stream.write("  "+str(item)+"\n")
         (stage/"REVIEW_76_NODES_FIRST.txt").write_text(
             "ETABS / OpenSees FOUNDATION REACTION REVIEW — READ FIRST\n"
-            "1. This archive uses the original ETABS_SOURCE_SUPPORTS analysis for tags 1–76.\n"
+            "1. The 76-ID inventory contains 32 physical supports and 44 wall mesh points. Check its selected_result_source for the actual solver scenario.\n"
             "2. Open node_audit_76/Gravity_76_Source_Support_Reactions.xlsx, Nodes 1-76.\n"
             "3. Review Critical nodes ranked for the largest ABSOLUTE Rz discrepancies.\n"
             "4. Follow the ETABS point ID map and coordinates, not identical integer IDs.\n"
@@ -663,10 +731,16 @@ def export_bundle(export_dir, gravity_dir, output_dir, *, etabs_json=None,
             "Inspect EVIDENCE_MANIFEST.json for MISSING and SKIPPED files.\n"
             "No missing physical responses are inferred.\n",encoding="utf8")
         zip_path=zip_dir/(bundle_name+".zip")
-        with zipfile.ZipFile(zip_path,"w",compression=zipfile.ZIP_DEFLATED) as z:
+        staged_zip=Path(tmp)/zip_path.name
+        with zipfile.ZipFile(staged_zip,"w",compression=zipfile.ZIP_DEFLATED) as z:
             for file in stage.rglob("*"):
                 if file.is_file(): z.write(file,file.relative_to(stage.parent).as_posix())
+        with zipfile.ZipFile(staged_zip) as z:
+            invalid=z.testzip()
+            if invalid:
+                raise IOError('Gravity ZIP failed CRC verification: '+invalid)
         stage.rename(dest)
+        staged_zip.replace(zip_path)
     audit["output_folder"]=str(dest)
     audit["output_zip"]=str(zip_path)
     return audit,zip_path

@@ -46,6 +46,39 @@ def section(root, kind, *, create=False):
     return dest
 
 
+def model_workspace(model_path, *, selected=None):
+    """[REF docs/source/components/gravity/output_ownership.py.md] Choose the gravity workspace for a model."""
+    from components.inputs.output_layout import export_root_for, owned_run_destination
+
+    model = _unlinked(model_path)
+    root = export_root_for(model.parent)
+    variants = root / '02_MODEL' / 'REBUILDS' / 'VERIFIED_CLEAR_BEAM'
+    label = model.stem
+    if model.parent.parent == variants:
+        label += '__' + model.parent.name
+    return owned_run_destination(model.parent, 'GRAVITY', label, selected=selected)
+
+
+def rebuild_source_folder(model_path):
+    """[REF docs/source/components/gravity/output_ownership.py.md] Recover the source of a bound rebuild."""
+    import json
+    from components.inputs.output_layout import export_root_for
+
+    source = _unlinked(model_path).parent
+    root = export_root_for(source)
+    if source == root and not source.name.casefold().startswith('verified_clear_beam_'):
+        return root
+    variants = root / '02_MODEL' / 'REBUILDS' / 'VERIFIED_CLEAR_BEAM'
+    status = source / 'CLEAR_BEAM_REBUILD_STATUS.json'
+    if source.parent == variants and status.is_file() and not status.is_symlink():
+        evidence = json.loads(status.read_text(encoding='utf-8-sig'))
+        original = evidence.get('original_source_dir') if isinstance(evidence,dict) else None
+        if (original and evidence.get('status') == 'EXPORT_VERIFIED_NOT_GRAVITY_SOLVED'
+                and _unlinked(original) == root):
+            return root
+    raise ValueError('Select the original ETABS export or a saved rebuild with matching source provenance.')
+
+
 def case_directory(root, scenario, profile, token, *, create=False):
     """[REF docs/source/components/gravity/output_ownership.py.md]
     Return an immutable run folder; never overwrite a previous run."""

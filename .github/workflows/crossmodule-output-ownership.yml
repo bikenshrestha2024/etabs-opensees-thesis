@@ -4,6 +4,7 @@ on:
     paths:
       - 'components/inputs/output_layout.py'
       - 'components/gravity/gui_and_reports.py'
+      - 'components/gravity/output_ownership.py'
       - 'components/model/readiness_dashboard_gui.py'
       - 'components/model/readiness_gui.py'
       - 'components/model/readiness_dashboard.py'
@@ -26,6 +27,7 @@ on:
     paths:
       - 'components/inputs/output_layout.py'
       - 'components/gravity/gui_and_reports.py'
+      - 'components/gravity/output_ownership.py'
       - 'components/model/readiness_dashboard_gui.py'
       - 'components/model/readiness_gui.py'
       - 'components/model/readiness_dashboard.py'

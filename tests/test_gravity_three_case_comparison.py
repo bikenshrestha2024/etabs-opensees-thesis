@@ -41,6 +41,7 @@ class TestThreeCaseGravity(unittest.TestCase):
         self.assertIn("97", missing[0])
 
     def test_partial_cases_export_missing_as_blank_not_keyerror(self):
+        (self.root/'OpenSees_Complete_Story_Masters_V118.csv').write_text('elevation_m\n3.8\n',encoding='utf-8')
         def current(_root, _model, *, scenario, profile):
             if scenario == "CONTINUOUS_WALL_BASE_FIXED":
                 return None
@@ -51,7 +52,7 @@ class TestThreeCaseGravity(unittest.TestCase):
                 "reactions": [{"node_tag": i, "rz_kN": 100.0 / n}
                               for i in range(n)],
                 "nodes": [{"tag": i, "ux_m": 0.0, "uy_m": 0.0,
-                           "uz_m": -0.001, "z_m": 0.0}
+                           "uz_m": -0.001, "z_m": [0., 1.9, 3.8][i%3]}
                           for i in range(n)]
             }))
             return {"result_path": str(result), "applied_load_kN": 100.0,
@@ -63,6 +64,8 @@ class TestThreeCaseGravity(unittest.TestCase):
                        "status":"CASE_NOT_INDEXED",
                        "reason":"fixture 97 missing"}):
             report, directory, _figure = export_case_comparison(self.root, self.model)
+        self.assertEqual(list(_figure.axes[1].lines[0].get_ydata()), [0.0, 3.8])
+        self.assertEqual(_figure.axes[1].lines[0].get_linestyle(), 'None')
         self.assertEqual(set(report["available_cases"]), {"32", "76"})
         import csv
         with (directory / "Support_Reactions_32_76_97.csv").open(encoding="utf-8-sig") as fp:

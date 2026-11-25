@@ -45,6 +45,37 @@ class ReactionCaseRegistryTests(unittest.TestCase):
                 self.assertAlmostEqual(result["summed_reaction_kN"],320047.788933,places=5)
                 self.assertAlmostEqual(result["applied_load_kN"],320047.788933,places=5)
 
+    def test_republished_index_retains_verified_result_digest(self):
+        from components.gravity.reaction_case_registry import publish_gravity_case_index
+        mode = 'ETABS_NONZERO_REACTION_DIAGNOSTIC'
+        profile = 'GRAVITY_1.0D_1.0L'
+        result = self.write(self.payload(mode))
+        registered = register_case(self.output, result, self.model, scenario=mode, profile=profile)
+        verified = current_case(self.output, self.model, scenario=mode, profile=profile)
+        pointer = publish_gravity_case_index(self.output, verified)
+        self.assertEqual(json.loads(pointer.read_text())['case_result_sha256'], registered['result_sha256'])
+
+    def test_rebuilt_variants_use_separate_workspaces_and_read_legacy_exact_case(self):
+        from components.gravity.output_ownership import model_workspace
+        mode = 'ETABS_NONZERO_REACTION_DIAGNOSTIC'
+        profile = 'GRAVITY_1.0D_1.0L'
+        root_model = self.model
+        legacy = model_workspace(root_model)
+        variants = self.root/'02_MODEL'/'REBUILDS'/'VERIFIED_CLEAR_BEAM'
+        self.model = variants/'20261125T134049_439725Z'/root_model.name
+        self.model.parent.mkdir(parents=True)
+        self.model.write_text(root_model.read_text())
+        result = self.write(self.payload(mode))
+        register_case(legacy, result, self.model, scenario=mode, profile=profile)
+        variant = model_workspace(self.model)
+        self.assertNotEqual(variant, legacy)
+        self.assertEqual(variant.parent, legacy.parent)
+        other = 'ETABS_SOURCE_SUPPORTS'
+        variant_result = self.write(self.payload(other), filename='variant_source_76.json')
+        register_case(variant, variant_result, self.model, scenario=other, profile=profile)
+        self.assertEqual(current_case(variant, self.model, scenario=mode, profile=profile)['result_path'], str(result.resolve()))
+        self.assertIsNone(current_case(variant, root_model, scenario=mode, profile=profile))
+
     def test_distinguishes_missing_case_from_solved_result_and_stale_model(self):
         mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
         initial=current_case_diagnostic(

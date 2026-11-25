@@ -220,7 +220,7 @@ create_case_run(root, 'MRSM', 'viewer')
     def test_run_gui_source_contract_contains_guard(self):
         repo=Path(__file__).resolve().parents[1]
         sources={
-            "components/gravity/gui_and_reports.py":"GRAVITY",
+            "components/gravity/output_ownership.py":"GRAVITY",
             "components/linear_time_history/runner_and_gui.py":"LTHA",
             "components/nonlinear_time_history/runner_and_gui.py":"NLTHA",
         }
@@ -233,6 +233,10 @@ create_case_run(root, 'MRSM', 'viewer')
             self.assertTrue(any(
                 isinstance(arg,ast.Constant) and arg.value==stage
                 for c in calls for arg in c.args),name+" wrong stage")
+        gui=ast.parse((repo/'components/gravity/gui_and_reports.py').read_text(encoding='utf-8-sig'))
+        inputs=next(node for node in ast.walk(gui) if isinstance(node, ast.FunctionDef) and node.name=='_inputs')
+        self.assertTrue(any(isinstance(node,ast.Call) and isinstance(node.func,ast.Name)
+                            and node.func.id=='model_workspace' for node in ast.walk(inputs)))
 
 
 if __name__=="__main__":

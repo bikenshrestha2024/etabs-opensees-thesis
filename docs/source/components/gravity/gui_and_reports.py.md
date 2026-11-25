@@ -54,3 +54,8 @@ The initial 76-node gravity GUI default was too definitive because actual ETABS 
 ## 2026-11-15 clear-beam rebuild tool location
 
 The optional clear-beam rebuild GUI previously inferred its Python script search root from `Path(__file__).parents[2]`, which is wrong when this component is exec-loaded via `OpenSees_Gravity_GUI_V110.py`. `_runtime_repo_root()` now resolves the actual `components/gravity/gui_and_reports.py` source through `_component_source` if a facade is active, preserving the existing exported-runtime and downloaded-repository fallbacks when no live `tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py` is present. No source EDB, output result or gravity load quantity was changed by this correction.
+# Gravity and NBC handoff
+
+The launcher shows the selected export for Gravity and NBC. Gravity chooses the workspace from the selected model and preserves verified saved cases from the earlier shared layout. Rebuild actions can use the original export recorded by a saved canonical rebuild. The elastic comparison picker opens at the repository's available review JSON folder or the selected export and still requires explicitly reviewed settings.
+
+The saved comparison plots use the minimum nodal vertical displacement at each storey, with separate markers. Legacy exports without storey metadata show mesh levels. This plot represents an elevation envelope, so adjacent points can come from different nodes.

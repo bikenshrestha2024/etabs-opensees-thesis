@@ -2452,7 +2452,10 @@ class App:
         stage_tabs.add(stage_2,text="3. Gravity / NBC")
         stage_2.columnconfigure(0,weight=1,uniform="stagecols")
         stage_2.columnconfigure(1,weight=1,uniform="stagecols")
-        ttk.Label(stage_2,text="Validate gravity loads, mass, combinations and initial P-Delta before seismic response.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
+        gravity_header = ttk.Frame(stage_2)
+        gravity_header.grid(row=0,column=0,columnspan=2,sticky="ew",padx=10,pady=(4,8))
+        ttk.Label(gravity_header,text="Review gravity, seismic mass, combinations and initial P-Delta.").pack(anchor="w")
+        ttk.Label(gravity_header,textvariable=self.out,wraplength=980).pack(anchor="w",pady=(2,0))
         group_2_0=make_group(stage_2,"Gravity verification","Gravity & NBC setup",0)
         group_2_1=make_group(stage_2,"NBC prerequisites","Gravity & NBC setup",1)
         stage_frames.append(stage_2)
@@ -2507,8 +2510,8 @@ class App:
         action(group_1_0,text="OpenSees RC fiber section builder — Concrete01 + Steel02",command=self._open_fiber_section_builder)
         action(group_1_0,text="ETABS RC column size / bar review",command=self._open_column_section_review)
         action(group_1_1,text='Slab load path / mesh + Excel formulas',command=self._open_slab_mesh_stage)
-        action(group_2_1,text='ULS/SLS drift / deflection + combination / PDelta review',command=lambda:__import__('OpenSees_Case_Review_V142').launch(self.root,self.out.get()))
-        action(group_2_1,text='NBC settings audit - values and unresolved inputs',command=lambda:__import__('components.validation.settings_audit',fromlist=['launch']).launch(self.root,self.out.get()))
+        action(group_2_1,text='ULS/SLS drift / deflection + combination / PDelta review',command=lambda:self._open_gravity_nbc_review('OpenSees_Case_Review_V142'))
+        action(group_2_1,text='NBC settings audit - values and unresolved inputs',command=lambda:self._open_gravity_nbc_review('components.validation.settings_audit'))
         action(group_6_0,text='ETABS comparison - modal / ESM / MRSM',command=lambda:__import__('components.validation.etabs_comparison',fromlist=['launch']).launch(self.root,self.out.get()))
         action(group_5_0,text='Literature profiles - exact values / formulation / run',command=lambda:__import__('components.validation.material_catalog',fromlist=['launch']).launch(self.root,self.out.get()))
         action(group_5_1,text='Saved component graphs - all 8 materials / devices',command=lambda:__import__('components.validation.research_results_gui',fromlist=['launch']).launch(self.root))
@@ -2522,7 +2525,7 @@ class App:
         action(group_2_0,text="OpenSees gravity analysis — run, plot + report",command=self._open_gravity_analysis)
         action(group_2_0,text="Generate detailed storey-gravity Excel from saved model (no ETABS)",command=self._generate_storey_gravity_excel)
         action(group_2_1,text="NBC 105: load combinations, stiffness + mass source",command=self._open_nbc105_settings)
-        action(group_2_1,text="ULS / SLS design checks - combinations, drift, sections",command=lambda:__import__("OpenSees_Design_Checks_V135").launch(self.root,self.out.get()))
+        action(group_2_1,text="ULS / SLS design checks - combinations, drift, sections",command=lambda:self._open_gravity_nbc_review('OpenSees_Design_Checks_V135'))
         action(group_2_1,text="NBC 105 formula reference — periods, ELF + drift",command=self._open_nbc105_formula_reference)
         action(group_2_0,text="P-Delta initial cases, stiffness + damping (legacy module 13)",command=self._open_step13_basis)
         action(group_3_0,text="OpenSees equivalent static analysis — ULS/SLS",command=self._open_nbc105_esm)
@@ -2735,24 +2738,22 @@ class App:
 
     def _open_gravity_analysis(self):
         """Open the gravity-analysis runner and reporting GUI."""
-        gui_path=Path(__file__).resolve().with_name("OpenSees_Gravity_GUI_V110.py")
-        if not gui_path.exists():
-            messagebox.showerror("Gravity GUI missing",f"Keep OpenSees_Gravity_GUI_V110.py beside this program.\n\n{gui_path}")
+        folder = self._model_review_folder()
+        if folder is None:
             return
         try:
             from components.inputs.project_workbooks import _source_edb_path
             selected=self.edb.get().strip()
-            exported=_source_edb_path(self.out.get())
+            exported=_source_edb_path(folder)
             if selected and (not exported or Path(selected).resolve()!=Path(exported).resolve()):
                 raise ValueError("The selected EDB does not match this OpenSees export. "
                                  "Run ETABS import for the selected EDB before opening Gravity.")
-            spec=importlib.util.spec_from_file_location("opensees_gravity_gui",gui_path)
-            module=importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            from components.gravity.gui_and_reports import launch
             from OpenSees_Complete_Export_V118 import autoselect_inputs
-            gui=module.launch(self.root)
+            gui=launch(self.root)
             gui.etabs_edb_path.set(selected or exported)
-            autoselect_inputs(gui,self.out.get(),'gravity_model_script')
+            autoselect_inputs(gui,folder,'gravity_model_script')
+            return gui
         except Exception as exc:
             messagebox.showerror("Could not open gravity GUI",str(exc),parent=self.root)
 
@@ -2816,11 +2817,24 @@ class App:
         """[REF docs/source/components/ui/nbc105_settings_panel.py.md]
         Launch the source-aware NBC/project/solver reference, not a giant table.
         """
+        folder = self._model_review_folder()
+        if folder is None:
+            return
         try:
             from components.ui.nbc105_settings_panel import launch
-            return launch(self.root,self.out.get())
+            return launch(self.root, folder)
         except Exception as exc:
-            messagebox.showerror("Could not open NBC analysis settings",
+            messagebox.showerror('Could not open NBC analysis settings', str(exc), parent=self.root)
+
+    def _open_gravity_nbc_review(self, module_name):
+        folder = self._model_review_folder()
+        if folder is None:
+            return
+        try:
+            from importlib import import_module
+            return import_module(module_name).launch(self.root, folder)
+        except Exception as exc:
+            messagebox.showerror("Could not open Gravity / NBC review",
                                  str(exc),parent=self.root)
 
 

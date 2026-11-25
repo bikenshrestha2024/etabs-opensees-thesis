@@ -42,7 +42,7 @@ SOURCE_OWNERS={
 # These three caller/writer pairs previously bypassed canonical stage routing.
 # The branch must not regress after fixing them; full native tests are separate.
 REQUIRED_GUARDS={
-    "components/gravity/gui_and_reports.py":"GRAVITY",
+    "components/gravity/output_ownership.py":"GRAVITY",
     "components/linear_time_history/runner_and_gui.py":"LTHA",
     "components/nonlinear_time_history/runner_and_gui.py":"NLTHA",
     "components/model/readiness_dashboard_gui.py":"SOFTWARE_DIAGNOSTICS",
@@ -58,13 +58,18 @@ REQUIRED_ESM={
 LEGACY="opensees_analysis_results"
 
 
-def _guarded_caller(path,repo):
+def _guarded_caller(path,repo, *, function=None):
     tree=ast.parse((repo/path).read_text(encoding="utf-8-sig"))
+    if function is not None:
+        tree=next((node for node in ast.walk(tree)
+                   if isinstance(node,ast.FunctionDef) and node.name==function),None)
+        if tree is None:
+            return []
     uses=[]
     for n in ast.walk(tree):
         if not isinstance(n,ast.Call) or not isinstance(n.func,ast.Name):
             continue
-        if n.func.id not in ("analysis_output_folder","owned_run_destination"):
+        if n.func.id not in ("analysis_output_folder","owned_run_destination","model_workspace"):
             continue
         stages=[k.value.value for k in n.keywords
                 if k.arg=="stage" and isinstance(k.value,ast.Constant)]
@@ -183,10 +188,14 @@ def audit(repo=ROOT):
         if not (repo/p).is_file():
             violations.append({"path":p,"reason":"REQUIRED_GUI_MISSING"})
             continue
-        calls=_guarded_caller(p,repo)
+        calls=_guarded_caller(p,repo,function='model_workspace' if stage=='GRAVITY' else None)
         if not any(fn=="owned_run_destination" and stage in positional
                    for _,fn,_,positional in calls):
             violations.append({"path":p,"reason":"NO_CANONICAL_USER_OUTPUT_GUARD"})
+    gravity_gui='components/gravity/gui_and_reports.py'
+    if (not (repo/gravity_gui).is_file() or not any(
+            name=='model_workspace' for _,name,_,_ in _guarded_caller(gravity_gui,repo,function='_inputs'))):
+        violations.append({"path":gravity_gui,"reason":"GRAVITY_GUI_NOT_ROUTED_THROUGH_WORKSPACE_OWNER"})
     checks="components/validation/response_checks.py"
     if (repo/checks).is_file():
         tree=ast.parse((repo/checks).read_text(encoding="utf-8-sig"))

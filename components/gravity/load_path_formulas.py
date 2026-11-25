@@ -335,7 +335,8 @@ def export(folder, *, output_root=None, progress=None):
     if not cfg_path.is_file() or not model_path.is_file():
         raise ValueError('Source configuration and assembled model missing. Use "Build selected mesh + export workbook" to create an isolated current mesh run.')
     cfg=json.loads(cfg_path.read_text(encoding='utf-8-sig'))
-    data=json.loads(model_path.read_text(encoding='utf-8-sig'))
+    model_bytes=model_path.read_bytes()
+    data=json.loads(model_bytes.decode('utf-8-sig'))
     from components.gravity.mesh_cases import validated_mesh_size
     n=validated_mesh_size(cfg.get('floor_subdivisions',4))
     actual=hashlib.sha256(cfg_path.read_bytes()).hexdigest()
@@ -364,6 +365,7 @@ def export(folder, *, output_root=None, progress=None):
         progress('Excel: validated .xlsx workbook atomically saved successfully')
     record=dict(mesh_subdivisions=n,config_sha256=actual,
                 assembled_model=str(model_path),workbook=str(path),
+                assembled_model_sha256=hashlib.sha256(model_bytes).hexdigest(),
                 workbook_sha256=workbook_sha256,
                 floor_shell_cells=sum(e.get('category')=='FLOOR' for e in data.get('shells',[])),
                 total_shell_cells=len(data.get('shells',[])),

@@ -38,6 +38,37 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
         (self.gravity/"Gravity_Load_Plots.pdf").write_bytes(b"example PDF")
         (self.source/"OpenSees_Complete_Model_Config_V118.json").write_text("{}")
         (self.source/"OpenSees_Element_Connectivity.json").write_text("{}")
+    def test_primary_workbook_screen_rechecks_native_rows(self):
+        from hashlib import sha256
+        from components.gravity.etabs_reaction_support_filter import (
+            MODE, PROFILE, PROJECT_PRIMARY_32, matched_primary_32_workbook_comparison,
+        )
+        workbook = self.root/'original.csv'
+        workbook.write_text('Story,Label,Unique Name,Output Case,FZ\n'+''.join(
+            f'Base,J{tag},{tag},{PROFILE},10\n' for tag in PROJECT_PRIMARY_32), encoding='utf-8')
+        fingerprint = sha256(workbook.read_bytes()).hexdigest()
+        audit = dict(case=PROFILE, user_confirmed_32_exact_match=True,
+                     source_table=str(workbook), source_sha256=fingerprint,
+                     mapping=[dict(opensees_node=tag, etabs_unique=str(tag), selected=True,
+                                   etabs_FZ_kN=10.) for tag in PROJECT_PRIMARY_32])
+        evidence = dict(original_ETABS_case=PROFILE, original_etabs_table_sha256=fingerprint,
+                        node_reactions=[dict(opensees_node=tag, etabs_unique_name=str(tag),
+                                         etabs_FZ_kN=10., opensees_FZ_kN=20.) for tag in PROJECT_PRIMARY_32])
+        result = dict(wall_support_strategy=MODE, gravity_profile='GRAVITY_1.0D_1.0L',
+                      support_node_tags=PROJECT_PRIMARY_32,
+                      reactions=[dict(node_tag=tag, rz_kN=20.) for tag in PROJECT_PRIMARY_32])
+        audit_path=self.gravity/'ETABS_Nonzero_Reaction_Support_Audit.json'
+        evidence_path=self.gravity/'Primary_32_ETABS_OpenSees_Reactions.json'
+        audit_path.write_text(json.dumps(audit),encoding='utf-8')
+        evidence_path.write_text(json.dumps(evidence),encoding='utf-8')
+        matched = matched_primary_32_workbook_comparison(self.gravity,result)
+        self.assertEqual(matched['etabs_base_FZ_kN'], 320.)
+        audit['mapping'][0]['etabs_FZ_kN']=5.
+        evidence['node_reactions'][0]['etabs_FZ_kN']=5.
+        audit_path.write_text(json.dumps(audit),encoding='utf-8')
+        evidence_path.write_text(json.dumps(evidence),encoding='utf-8')
+        self.assertIsNone(matched_primary_32_workbook_comparison(self.gravity,result))
+
     def _dual(self):
         base=self.gravity/"Gravity_Wall_Base_Comparison"/"20261108_111122"
         for mode in ("ETABS_SOURCE_SUPPORTS","CONTINUOUS_WALL_BASE_FIXED"):
@@ -62,6 +93,8 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
         self.assertEqual(Path(paths["upload_zip"]).parent,
                          self.gravity/"07_EXPORT_ZIP"/"Gravity_Evidence_Upload")
         manifest=Path(paths["evidence_manifest"])
+        self.assertTrue(manifest.is_relative_to(self.gravity/"06_REVIEW"/"Gravity_Evidence"))
+        self.assertEqual(json.loads(manifest.read_text())['output_zip'], paths['upload_zip'])
         index=Path(paths["exact_file_paths"])
         pointer=Path(paths["latest_upload_pointer"])
         self.assertTrue(pointer.is_file())
@@ -69,8 +102,8 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
         self.assertIn(paths["exact_file_paths"],pointer.read_text())
         self.assertTrue(manifest.is_file())
         self.assertTrue(index.is_file())
-        self.assertIn(str(self.gravity),index.read_text())
-        self.assertIn(str(self.source),index.read_text())
+        self.assertIn(str(self.gravity.resolve()),index.read_text())
+        self.assertIn(str(self.source.resolve()),index.read_text())
         with zipfile.ZipFile(paths["upload_zip"]) as f:
             names=f.namelist()
             self.assertTrue(any(x.endswith("Gravity_GUI_Actions.log") for x in names))
@@ -86,7 +119,7 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
         report,paths=package_gravity_review(self.script,self.gravity,
               dual_run=dual,single_run=dual/"ETABS_SOURCE_SUPPORTS")
         self.assertEqual(latest_dual_run(self.gravity),dual)
-        self.assertEqual(report["dual_run_dir"],str(dual))
+        self.assertEqual(Path(report["dual_run_dir"]),dual)
         with zipfile.ZipFile(paths["upload_zip"]) as f:
             names=f.namelist()
             for tail in (

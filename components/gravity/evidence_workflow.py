@@ -137,7 +137,13 @@ def package_gravity_review(model_script, gravity_root, *,
         _require_same_model_run(dual/"CONTINUOUS_WALL_BASE_FIXED"/"Gravity_Result_V110.json",
                                 model,scenario="CONTINUOUS_WALL_BASE_FIXED")
     from components.gravity.output_ownership import uploads_parent, index_path, section
-    output=uploads_parent(root,create=True)
+    uploads=uploads_parent(root,create=True)
+    if uploads.is_symlink():
+        raise ValueError('Refusing linked gravity ZIP directory')
+    uploads.mkdir(exist_ok=True)
+    output=section(root,'REVIEWS',create=True)/'Gravity_Evidence'
+    if output.is_symlink():
+        raise ValueError('Refusing linked gravity evidence directory')
     source_etabs=None
     if etabs_json:
         path=Path(etabs_json).expanduser().resolve()
@@ -148,7 +154,8 @@ def package_gravity_review(model_script, gravity_root, *,
         etabs_json=source_etabs,
         dual_run_dir=dual,
         comparison_root=root,
-        max_file_mb=max_file_mb)
+        max_file_mb=max_file_mb,
+        zip_output_dir=uploads)
     folder=Path(report["output_folder"])
     paths={
         "latest_upload_pointer":str(index_path(root,"LATEST_GRAVITY_UPLOAD.txt",create=True)),
@@ -156,7 +163,7 @@ def package_gravity_review(model_script, gravity_root, *,
         "gravity_root":str(root),
         "selected_gravity_run":str(gravity),
         "selected_dual_run":str(dual) if dual else None,
-        "upload_folder":str(output),
+        "upload_folder":str(uploads),
         "upload_zip":str(zip_path),
         "extracted_evidence_folder":str(folder),
         "evidence_manifest":str(folder/"EVIDENCE_MANIFEST.json"),
