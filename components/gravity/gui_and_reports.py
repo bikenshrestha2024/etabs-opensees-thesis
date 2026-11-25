@@ -652,9 +652,12 @@ class GravityAnalysisGUI:
         settings=None
         if elastic_comparison:
             reference = _runtime_repo_root() / 'docs' / 'validation'
+            reviewed = reference / '20261121_native_gravity_uls.json'
+            # Suggest the historical ULS reference, never auto-apply it to a different EDB.
             settings=filedialog.askopenfilename(
                 parent=self.win,title="Select ETABS elastic comparison settings",
                 initialdir=str(reference if reference.is_dir() else source),
+                initialfile=reviewed.name if reviewed.is_file() else '',
                 filetypes=[("Elastic stiffness settings","*.json"), ("All files","*.*")])
             if not settings:
                 return

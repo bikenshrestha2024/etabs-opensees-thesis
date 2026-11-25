@@ -59,3 +59,8 @@ The optional clear-beam rebuild GUI previously inferred its Python script search
 The launcher shows the selected export for Gravity and NBC. Gravity chooses the workspace from the selected model and preserves verified saved cases from the earlier shared layout. Rebuild actions can use the original export recorded by a saved canonical rebuild. The elastic comparison picker opens at the repository's available review JSON folder or the selected export and still requires explicitly reviewed settings.
 
 The saved comparison plots use the minimum nodal vertical displacement at each storey, with separate markers. Legacy exports without storey metadata show mesh levels. This plot represents an elevation envelope, so adjacent points can come from different nodes.
+
+
+## 2026-11-25 — elastic settings file discovery
+
+The existing elastic rebuild dialog suggests `docs/validation/20261121_native_gravity_uls.json` if it exists in the active repository. This is a historical ULS reference only: the user must explicitly select the file and confirm source/model suitability; it is never applied automatically. The existing rebuild, workbook, source ownership and native stiffness checks are unchanged. The reviewed file has no rigid-end offset mapping; see `docs/validation/20261122_REBUILT_ELASTIC_768KN_RESIDUAL_AUDIT.md`.
