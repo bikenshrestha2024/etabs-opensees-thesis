@@ -78,7 +78,29 @@ class ConvergenceSettingValidation(unittest.TestCase):
             v({'transient_max_iterations':0})
 
 
+    def test_thesis_intent_rejects_relaxed_recovery(self):
+        from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
+        with self.assertRaisesRegex(ValueError, "THESIS_NLTHA"):
+            validate_convergence_settings({
+                "analysis_intent": "THESIS_NLTHA",
+                "final_relaxed_tolerance": 1e-6})
+        self.assertEqual(validate_convergence_settings({
+            "analysis_intent": "THESIS_NLTHA"}), (1e-7, 40, None))
+
+
 class FailureReportPrintSafety(unittest.TestCase):
+    def test_recovery_logging_failure_does_not_abort_solver(self):
+        from unittest.mock import patch
+        solver = ToleranceSolver(needed=1e-6)
+        diag = {"report_recovery": True, "final_relaxed_tolerance": 1e-6}
+        with patch("builtins.print", side_effect=OSError(22, "Invalid argument")):
+            accepted = _advance_nonlinear_interval(solver, .005, max_depth=0,
+                                                   diagnostics=diag)
+        self.assertEqual(accepted, 1)
+        self.assertEqual(diag["relaxed_tolerance_steps"], 1)
+        self.assertAlmostEqual(solver.clock, .005)
+
+
     def test_closed_stdout_must_not_mask_the_real_solver_error(self):
         from components.nonlinear_time_history import building_exploratory as be
         real_print=builtins.print

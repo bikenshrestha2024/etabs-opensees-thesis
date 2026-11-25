@@ -44,3 +44,6 @@ The NLTHA GUI now synchronizes the readiness selection when the selected nonline
 
 ## Full-domain failure screen during retries
 Focused diagnostics no longer restrict the shared recovery safety check. The full-domain observed response screen is applied after a failed attempt before retry. No algorithm ordering, tolerance, convergence criterion or physical property is altered by this change.
+
+## 2026-11-25 recovery log resilience
+A failed write to stdout in the recovery progress messages increments recovery_log_errors and no longer interrupts recovery. The active tolerance and relaxed flag are printed on recovery attempts; tolerance, solver algorithms and native failure checks otherwise follow the existing configuration. This is not a guarantee of numerical convergence.

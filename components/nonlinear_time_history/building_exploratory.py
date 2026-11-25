@@ -16,14 +16,15 @@ TRANSIENT_SYSTEMS=('UmfPack','SparseGeneral')
 _RUN_CONTEXT={}
 
 
-def _safe_print(*args):
+def _safe_print(*args, **kwargs):
     """Print without letting a closed/invalid stdout (Windows OSError 22) raise.
 
     [REF 2026-11-24 run: an OSError from print() in the failure path replaced
     the real solver RuntimeError in INCOMPLETE.json]
     """
     try:
-        print(*args,flush=True)
+        kwargs.setdefault('flush',True)
+        print(*args,**kwargs)
     except (OSError,ValueError):
         pass
 
@@ -45,6 +46,8 @@ def validate_convergence_settings(config):
         raise ValueError('transient_max_iterations must be an integer from 1 through 200')
     relaxed=config.get('final_relaxed_tolerance')
     if relaxed is not None:
+        if config.get('analysis_intent')=='THESIS_NLTHA':
+            raise ValueError('THESIS_NLTHA requires strict convergence; final_relaxed_tolerance is exploratory only')
         relaxed=num(relaxed,'final_relaxed_tolerance')
         if not tol<relaxed<=1e-5:
             raise ValueError('final_relaxed_tolerance must be above 1e-7 and at most 1e-5')
@@ -243,7 +246,7 @@ def _run_material_sensitivity(config):
             'fingerprints, orientation, input dt and gravity must still be compared.'))
     (output/'Sensitivity_Parameter_Provenance.json').write_text(
         json.dumps(provenance,indent=2),encoding='utf-8')
-    print('[SENSITIVITY SOURCE]',parameter,provenance['source_value_status'],
+    _safe_print('[SENSITIVITY SOURCE]',parameter,provenance['source_value_status'],
           '| source row(s)',len(matches),flush=True)
 
     rows = []
@@ -255,7 +258,7 @@ def _run_material_sensitivity(config):
         case_config.pop('sensitivity_values', None)
         case_config['material_overrides'] = {**base_overrides, parameter: value}
         case_config['output_dir'] = str(output / case_name)
-        print(f'[MATERIAL SENSITIVITY] {index}/{len(candidates)} {parameter}={value:g}', flush=True)
+        _safe_print(f'[MATERIAL SENSITIVITY] {index}/{len(candidates)} {parameter}={value:g}', flush=True)
         try:
             result = run(case_config)
         except Exception as exc:
@@ -334,7 +337,7 @@ def _run(config):
     if config.get('limit_state')=='Both':
         base=Path(config['output_dir']);base.mkdir(parents=True,exist_ok=True);results={}
         for state in ('ULS','SLS'):
-            print('[RESEARCH STATE START]',state,flush=True)
+            _safe_print('[RESEARCH STATE START]',state,flush=True)
             results[state]=run(dict(config,limit_state=state,output_dir=str(base/state)))
             (base/'Research_Batch_Summary_V161.json').write_text(json.dumps(results,indent=2),encoding='utf8')
         return results
@@ -574,7 +577,7 @@ def _run(config):
         units=[r['source_units'] for r in input_quality['records']],
         scale=scale,source_processing=matching_preflight['status']),sort_keys=True).encode('utf-8')).hexdigest()
     (out/'NLTHA_Input_Quality.json').write_text(json.dumps(input_quality,indent=2,allow_nan=False),encoding='utf-8')
-    print('[NLTHA INPUT QUALITY] finite records, matching sampling and file hashes verified',flush=True)
+    _safe_print('[NLTHA INPUT QUALITY] finite records, matching sampling and file hashes verified',flush=True)
     if abs(records[0][1]-records[1][1])>1e-10 or len(records[0][0])!=len(records[1][0]):raise ValueError('Pair duration/digitization mismatch; reconcile records explicitly')
     record_end=(len(records[0][0])-1)*records[0][1];end=record_end if not config.get('duration_s') else min(float(config['duration_s']),record_end)
     if end<=0:raise ValueError('Duration must be positive')
@@ -610,7 +613,7 @@ def _run(config):
     (out/'ASSUMPTIONS_NOT_DESIGN.json').write_text(json.dumps(assumptions,indent=2),encoding='utf-8');(out/'RunConfig.json').write_text(json.dumps(config,indent=2),encoding='utf-8');summary=[]
     for orientation in config.get('orientations',['XY','YX']):
         if orientation not in ('XY','YX'):raise ValueError('Orientation must be XY or YX')
-        case=out/orientation;case.mkdir(exist_ok=True);print('[EXPLORATORY START]',orientation,'no calibration or design approval implied',flush=True)
+        case=out/orientation;case.mkdir(exist_ok=True);_safe_print('[EXPLORATORY START]',orientation,'no calibration or design approval implied',flush=True)
         _set_run_stage('model_build_and_gravity',orientation=orientation,case_output_dir=str(case))
         assembled_report=build_complete_model(
             model, mode='nonlinear', preload=True,
@@ -650,7 +653,7 @@ def _run(config):
                 basis=material_report['basis'],scope='RESEARCH_ASSIGNMENT_NOT_CALIBRATION',
                 approval=False),indent=2),encoding='utf-8')
         groups=sorted(data['diaphragms'],key=lambda r:r['master_xyz'][2]);baseline={g['master_tag']:list(ops.nodeDisp(g['master_tag'])) for g in groups}
-        print('[EXPLORATORY MODAL] Computing initial nonlinear modes with bounded coverage expansion; transient has not started',flush=True)
+        _safe_print('[EXPLORATORY MODAL] Computing initial nonlinear modes with bounded coverage expansion; transient has not started',flush=True)
         _set_run_stage('modal_analysis',orientation=orientation,case_output_dir=str(case))
         from components.shared.eigen_solver import solve_eigen_until_coverage
         def audit_initial(values):
@@ -673,7 +676,7 @@ def _run(config):
         initial_modes['coverage_attempts']=coverage_history
         (case/'Nonlinear_Initial_Modal_Audit.json').write_text(
             json.dumps(initial_modes,indent=2,allow_nan=False),encoding='utf-8')
-        print('[NONLINEAR INITIAL MODAL]',
+        _safe_print('[NONLINEAR INITIAL MODAL]',
               'T1='+str(initial_modes.get('model_period_T1_s')),
               'Tn90_X='+str(initial_modes.get('Tn90_X_s')),
               'Tn90_Y='+str(initial_modes.get('Tn90_Y_s')),
@@ -722,7 +725,7 @@ def _run(config):
         # configured zeta at the first mode (was a fixed 0.05).
         if config.get('diagnostic_mass_damping'):alpha,beta=2*zeta*min(math.sqrt(v) for v in eigenvalues),0.
         if config.get('diagnostic_zero_damping'):alpha,beta=0.,0.
-        print('[TRANSIENT PROBE]', 'excitation='+excitation, 'zero_damping='+str(bool(config.get('diagnostic_zero_damping'))), 'system='+transient_system, 'inherent_zeta='+format(zeta,'g'), flush=True)
+        _safe_print('[TRANSIENT PROBE]', 'excitation='+excitation, 'zero_damping='+str(bool(config.get('diagnostic_zero_damping'))), 'system='+transient_system, 'inherent_zeta='+format(zeta,'g'), flush=True)
         # [REF Charney 2008; Zareian & Medina 2010] Rayleigh only on frame,
         # core-wall and slab elements; FVD/BRB/brace trusses excluded. The
         # GLOBAL_LEGACY scope reproduces the previous ops.rayleigh call and is
@@ -943,7 +946,7 @@ def _run(config):
                         current=ops.getTime()
                         eta=(last-case_start)*max(0.,end-current)/current if current>0 else None
                         (case/'Transient_Performance.json').write_text(json.dumps(dict(timing,physical_time_s=current,target_time_s=end,estimated_remaining_s=eta),indent=2),encoding='utf-8')
-                        print(
+                        _safe_print(
                             f'[EXPLORATORY PROGRESS] {orientation}: t={ops.getTime():.3f}/{end:.3f}s '
                             f'| wall={last-case_start:.1f}s | failed_attempts={diag.get("failed_attempts",0)} '
                             f'| bisections={diag.get("bisections",0)} '
@@ -1013,7 +1016,7 @@ def _run(config):
         if energy_recorder is not None:
             energy_summary=energy_recorder.write(
                 case,tolerance=float(config.get('energy_balance_tolerance',0.05)))
-            print('[ENERGY BALANCE]',orientation,energy_summary['status'],
+            _safe_print('[ENERGY BALANCE]',orientation,energy_summary['status'],
                   'max_relative_error='+format(energy_summary.get('max_relative_error',float('nan')),'.4g'),flush=True)
         if device_rows:
             write_rows(case/'Device_Accepted_Step_History.csv',device_rows)
@@ -1127,7 +1130,7 @@ def _run(config):
             diagnostics=diag,scope=assumptions['scope'])
         from OpenSees_Building_Response_V144 import plot_response
         plot_response(history,case,tracked)
-        (case/'Case_Summary.json').write_text(json.dumps(result,indent=2));summary.append(result);print('[EXPLORATORY COMPLETE]',json.dumps(result),flush=True);ops.wipe()
+        (case/'Case_Summary.json').write_text(json.dumps(result,indent=2));summary.append(result);_safe_print('[EXPLORATORY COMPLETE]',json.dumps(result),flush=True);ops.wipe()
     from components.nonlinear_time_history.thesis_quality import write_quality_report
     write_quality_report(out,summary)
     result=dict(cases=summary,elapsed_s=time.perf_counter()-start,scope=assumptions['scope']);(out/'Exploratory_Summary.json').write_text(json.dumps(result,indent=2));_set_run_stage('completed',output_dir=str(out));return result
