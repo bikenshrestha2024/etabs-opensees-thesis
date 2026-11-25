@@ -27,3 +27,6 @@ Unit/metadata tests, isolated material or wall benchmarks, complete solver log, 
 ## 2026-11-15 one-storey probe process working directory
 
 The 1-wall-quadrilateral diagnostic worker launches `python -m components.nonlinear_time_history.one_storey_wall_probe`. The historical root facade changes `__file__`, which previously made the derived subprocess `cwd` point outside the actual runtime. The new `_runtime_repo_root()` uses the facade's `_component_source` when present and the direct component path otherwise. This only corrects the module-search directory, not wall topology, loads, material values, condensation or nonlinear solver behavior. The isolated element probe is **not** full-building NLTHA.
+
+## 2026-11-25 exploratory convergence settings
+The convergence recovery panel exposes the research-only final 1e-6 tolerance as an unchecked option and maximum iterations per attempt (default 40). The shared engine validates both before launch. The saved configuration records the choice, and completed/truncated case messages report the number of relaxed steps. No relaxation is enabled by default. GUI rendering and native convergence remain unverified.
