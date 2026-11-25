@@ -69,7 +69,9 @@ class RelaxedFinalTolerance(unittest.TestCase):
 class ConvergenceSettingValidation(unittest.TestCase):
     def test_validation(self):
         from components.nonlinear_time_history.building_exploratory import validate_convergence_settings as v
-        self.assertEqual(v({}),(1e-7,40,None))
+        self.assertEqual(v({}),(1e-6,40,None))
+        self.assertEqual(v({'convergence_tolerance':1e-7}),(1e-7,40,None))
+        self.assertEqual(v({'final_relaxed_tolerance':None}),(1e-7,40,None))
         self.assertEqual(v({'final_relaxed_tolerance':1e-6}),(1e-7,40,1e-6))
         for bad in (True,0,-1e-6,1e-7,5e-8,2e-5,'1e-6',float('nan')):
             with self.assertRaises(ValueError,msg=repr(bad)):
@@ -77,6 +79,38 @@ class ConvergenceSettingValidation(unittest.TestCase):
         with self.assertRaises(ValueError):
             v({'transient_max_iterations':0})
 
+
+    def test_exploratory_default_accepts_at_nominal_step_and_is_counted(self):
+        from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
+        tol, iters, final = validate_convergence_settings({})
+        diag = dict(convergence_tolerance=tol, convergence_max_iterations=iters,
+                    final_relaxed_tolerance=final)
+        solver = ToleranceSolver(needed=1e-6)
+        self.assertEqual(_advance_nonlinear_interval(solver,.005,max_depth=0,diagnostics=diag),1)
+        self.assertEqual(solver.tolerances,[1e-6])
+        self.assertEqual(diag['relaxed_tolerance_steps'],1)
+        self.assertAlmostEqual(solver.clock,.005)
+
+    def test_strict_opt_in_has_no_relaxed_fallback(self):
+        from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
+        tol, iters, final = validate_convergence_settings({'convergence_tolerance':1e-7})
+        solver = ToleranceSolver(needed=1e-6)
+        with self.assertRaisesRegex(RuntimeError,"Nonlinear step failed"):
+            _advance_nonlinear_interval(solver,.005,max_depth=0,diagnostics=dict(
+                convergence_tolerance=tol, convergence_max_iterations=iters,
+                final_relaxed_tolerance=final))
+        self.assertEqual(set(solver.tolerances),{1e-7})
+
+    def test_explicit_relaxed_base_forbidden_for_thesis(self):
+        from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
+        with self.assertRaisesRegex(ValueError,"THESIS_NLTHA"):
+            validate_convergence_settings({'analysis_intent':'THESIS_NLTHA','convergence_tolerance':1e-6})
+
+    def test_invalid_base_tolerances_are_rejected(self):
+        from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
+        for value in (True,None,0,1e-5,1e-8,'1e-6',float('nan')):
+            with self.assertRaises(ValueError,msg=repr(value)):
+                validate_convergence_settings({'convergence_tolerance':value})
 
     def test_thesis_intent_rejects_relaxed_recovery(self):
         from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
