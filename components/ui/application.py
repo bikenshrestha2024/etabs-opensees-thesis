@@ -2441,7 +2441,10 @@ class App:
         stage_tabs.add(stage_1,text="2. Model")
         stage_1.columnconfigure(0,weight=1,uniform="stagecols")
         stage_1.columnconfigure(1,weight=1,uniform="stagecols")
-        ttk.Label(stage_1,text="Reconcile ETABS geometry, connectivity, sections, walls and device assignments.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
+        model_header = ttk.Frame(stage_1)
+        model_header.grid(row=0,column=0,columnspan=2,sticky="ew",padx=10,pady=(4,8))
+        ttk.Label(model_header,text="Review source mappings, materials and the assembled mesh.").pack(anchor="w")
+        ttk.Label(model_header,textvariable=self.out,wraplength=980).pack(anchor="w",pady=(2,0))
         group_1_0=make_group(stage_1,"Sections and reinforcement","Build the model",0)
         group_1_1=make_group(stage_1,"Load path and devices","Build the model",1)
         stage_frames.append(stage_1)
@@ -2489,6 +2492,10 @@ class App:
         for label,name in [('3D connectivity','OpenSees_Element_Connectivity_3D.html'),('3D structural frames / storeys','OpenSees_Structural_Elements_By_Storey.html'),('3D area + frame loads','OpenSees_Load_Assignment_3D.html'),('Floor load / diaphragm plan','OpenSees_Load_Assignment_Floor_Plan.html')]:
             action(group_0_0,text=label,command=lambda name=name:open_saved(name))
         action(group_0_1,text='Numbered workflow / input values',command=lambda:__import__('OpenSees_Workflow_V144').launch(self.root,self.out.get()))
+        def review_selected_export():
+            if self._model_review_folder() is not None:
+                stage_tabs.select(stage_1)
+        action(group_0_1,text='Review selected export in Model',command=review_selected_export)
         action(group_0_0,text="Open ETABS connectivity + load views",command=self._show_last_exports)
         action(group_0_0,text="Refresh saved 3D view controls (no ETABS/model assembly)",command=self._refresh_saved_source_views)
         action(group_0_0,text="3D actual assembled 4×4 mesh (on demand; no ETABS rerun)",command=self._open_assembled_mesh_view)
@@ -2796,13 +2803,12 @@ class App:
 
     def _open_area_integration(self):
         """Open the area-element stage that consumes the exported ETABS quad mesh."""
-        gui_path=Path(__file__).resolve().with_name("OpenSees_Area_Element_Integration_V116.py")
-        if not gui_path.is_file():
-            messagebox.showerror("Area integration GUI missing",f"Keep {gui_path.name} beside this program.",parent=self.root); return
+        folder = self._model_review_folder()
+        if folder is None:
+            return
         try:
-            spec=importlib.util.spec_from_file_location("opensees_area_element_integration_v116",gui_path)
-            module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
-            module.launch_area_integration_gui(self.root, export_dir=self.out.get())
+            from components.sections.area_elements import launch_area_integration_gui
+            return launch_area_integration_gui(self.root, export_dir=folder)
         except Exception as exc:
             messagebox.showerror("Could not open area integration GUI",str(exc),parent=self.root)
 
@@ -3120,9 +3126,25 @@ class App:
         refresh_from_define_section()
         redraw()
 
+    def _model_review_folder(self):
+        """Return the selected model export once its Import worker is idle."""
+        if getattr(self, '_conversion_process', None) is not None:
+            messagebox.showwarning('Import in progress',
+                'Wait for the current import to finish before opening its model files.', parent=self.root)
+            return None
+        selected = self.out.get().strip()
+        if not selected or not Path(selected).expanduser().is_dir():
+            messagebox.showwarning('Select a saved export',
+                'Choose the folder that contains the ETABS export.', parent=self.root)
+            return None
+        return str(Path(selected).expanduser().resolve())
+
     def _open_section_mapping(self):
+        folder = self._model_review_folder()
+        if folder is None:
+            return
         from OpenSees_Mapping_GUI_V125 import launch
-        return launch(self.root,self.out.get())
+        return launch(self.root,folder)
 
     def _browse_file(self):
         p=filedialog.askopenfilename(title="Select ETABS model",filetypes=[("ETABS model","*.edb"),("All files","*.*")]);
@@ -3208,17 +3230,10 @@ class App:
             except Exception as exc: messagebox.showerror("Could not open ETABS load view",str(exc),parent=self.root)
     def _open_slab_mesh_stage(self):
         """[REF docs/source/components/ui/application.py.md] Prevent concurrent model writes."""
-        if getattr(self, "_conversion_process", None) is not None:
-            messagebox.showwarning(
-                "Complete ETABS import first",
-                "A conversion is still writing the selected export. Building a "
-                "separate 4/8/16 mesh case or formula workbook simultaneously "
-                "would compete for disk/CPU and may read incomplete input files. "
-                "Use the actual assembled 3D viewer after conversion, or "
-                "start an independent mesh case from a completed saved export.",
-                parent=self.root)
+        folder = self._model_review_folder()
+        if folder is None:
             return
-        return __import__('OpenSees_Load_Path_V141').launch(self.root,self.out.get())
+        return __import__('OpenSees_Load_Path_V141').launch(self.root,folder)
 
     def _generate_storey_gravity_excel(self):
         """[REF docs/source/components/ui/application.py.md] Optional post-export Excel."""
@@ -3584,11 +3599,12 @@ class App:
                     "needs_review": "Categorized copy needs review. See the conversion worker log.",
                 }.get(mirror_status, "Check the worker log for categorized copy status.")
                 self.conversion_progress.set(
-                    "Export completed. " + mirror_message
+                    "Export files saved. Review the model before analysis. " + mirror_message
                 )
                 self.log("[WORKER COMPLETE] Report: " + str(result.get("report")))
+                worker_export = self._conversion_log_file.parent.parent
                 self._last_exports = (
-                    None, str(Path(self.out.get()) / "OpenSees_Load_Assignment_3D.html")
+                    None, str(worker_export / "OpenSees_Load_Assignment_3D.html")
                 )
                 if result.get("assembly_errors"):
                     self.log("[ENGINEERING REVIEW] " +
@@ -3597,7 +3613,8 @@ class App:
                     "ETABS conversion finished",
                     "The conversion worker completed.\n\n"
                     + mirror_message + "\n\n"
-                    "Engineering equivalence and nonlinear readiness require separate checks.\n\n"
+                    "Open Review selected export in Model to inspect the selected model. "
+                    "ETABS equivalence and nonlinear readiness require engineering evidence.\n\n"
                     "Report: " + str(result.get("report")), parent=self.root
                 )
             else:

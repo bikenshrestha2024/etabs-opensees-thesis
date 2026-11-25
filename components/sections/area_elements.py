@@ -38,6 +38,7 @@ import math
 from pathlib import Path
 from typing import Any
 
+from components.inputs.project_output_layout import sha256_file
 from components.nbc105.constants import GRAVITY_M_S2
 
 AREA_BUILDER_EXECUTION_DEFAULT = False
@@ -95,6 +96,28 @@ def _quad_geometry(node_tags: list[int], xyz: dict[int, tuple[float, float, floa
             "normal_z": unit[2], "warpage_m": plane_error}
 
 
+def _area_audit_path(config_path, config):
+    selected = config.get('audit_output_json')
+    if not isinstance(selected, str) or not selected.strip():
+        raise ValueError('Area config has no selected audit_output_json')
+    path = Path(selected).expanduser()
+    if not path.is_absolute():
+        if '..' in path.parts:
+            raise ValueError('Area audit report cannot escape selected config folder')
+        path = config_path.resolve().parent / path
+    if any(candidate.is_symlink() for candidate in (path, *path.parents)):
+        raise ValueError('Refusing a linked area-instantiation audit path')
+    return path
+
+
+def _section_mapping_path(config_path, config):
+    selected = config.get('section_mapping_json')
+    if not selected:
+        return None
+    path = Path(selected).expanduser()
+    return path if path.is_absolute() else config_path.resolve().parent / path
+
+
 def instantiate_area_elements(ops, *, topology_json: str | Path,
                               area_assignment_csv: str | Path,
                               config_json: str | Path,
@@ -106,15 +129,20 @@ def instantiate_area_elements(ops, *, topology_json: str | Path,
     Floor sections are linear shell sections. Wall panels use E-SFI-MVLEM_3D
     with one macro-fiber per ETABS quad, and require pre-defined FSAM tags.
     """
-    xyz, records = _load_topology(topology_json)
-    assignment = _area_assignments(area_assignment_csv)
-    cfg = json.loads(Path(config_json).read_text(encoding="utf-8-sig"))
+    sources = {role: Path(path).expanduser() for role, path in (
+        ('topology', topology_json), ('assignments', area_assignment_csv), ('config', config_json),
+    )}
+    source_sha256 = {role: sha256_file(path) for role, path in sources.items()}
+    cfg = json.loads(sources['config'].read_text(encoding="utf-8-sig"))
     if cfg.get("coordinate_units") != "m" or cfg.get("force_units") != "kN":
         raise ValueError("Area integration expects coordinates in metres and forces in kN; convert/confirm ETABS units first.")
-    if not cfg.get("source_reviewed_by_user", False):
+    if cfg.get("source_reviewed_by_user") is not True:
         raise ValueError("Set source_reviewed_by_user=true only after reviewing the ETABS units, assignments, section/material values and modeling choice.")
     if not (floor_shells or nonlinear_wall_panels):
         return {"floor_shells": 0, "wall_panels": 0, "analysis_ready": False}
+    xyz, records = _load_topology(sources['topology'])
+    assignment = _area_assignments(sources['assignments'])
+    audit_path = _area_audit_path(sources['config'], cfg)
 
     floor_sections = cfg.get("floor_sections", {})
     wall_properties = cfg.get("wall_properties", {})
@@ -122,26 +150,35 @@ def instantiate_area_elements(ops, *, topology_json: str | Path,
     # definition. Keep this separate from line-member section mappings.
     etabs_wall_map = cfg.get("etabs_to_opensees_wall_mapping", {})
     wall_library = cfg.get("opensees_wall_sections", {})
-    mapping_file = cfg.get("section_mapping_json")
-    if mapping_file:
-        map_path = Path(mapping_file)
-        if not map_path.is_absolute():
-            map_path = Path(config_json).resolve().parent / map_path
+    map_path = _section_mapping_path(sources['config'], cfg)
+    if map_path is not None:
         if not map_path.is_file():
             raise FileNotFoundError(f"Configured ETABS-to-OpenSees section mapping JSON was not found: {map_path}")
+        sources['section_mapping'] = map_path
+        source_sha256['section_mapping'] = sha256_file(map_path)
         map_data = json.loads(map_path.read_text(encoding="utf-8-sig"))
         # GUI export is authoritative for the ETABS area-property -> named
         # OpenSees wall definition link when a mapping file is configured.
         etabs_wall_map = map_data.get("etabs_to_openseespy_wall_area_mapping", etabs_wall_map)
+    if audit_path.resolve() in {path.resolve() for path in sources.values()}:
+        raise ValueError('Area audit report must be separate from its source inputs')
+    if audit_path.exists() and not audit_path.is_file():
+        raise ValueError('Area audit report path is not a file')
+    selected_categories = set()
+    if floor_shells:
+        selected_categories.add('FLOOR')
+    if nonlinear_wall_panels:
+        selected_categories.add('SHEAR WALL')
     used_tags = set(int(t) for t in ops.getEleTags())
     section_defs: dict[str, int] = {}
     floor_count = wall_count = 0
     warnings: list[str] = []
     element_audit: list[dict[str, Any]] = []
+    commands = []
 
     for rec in records:
         category = str(rec.get("category", "")).upper()
-        if rec.get("dimension") != "area_polygon":
+        if rec.get("dimension") != "area_polygon" or category not in selected_categories:
             continue
         obj = str(rec.get("etabs_object", ""))
         nodes = [int(n) for n in rec.get("node_tags", [])]
@@ -149,7 +186,7 @@ def instantiate_area_elements(ops, *, topology_json: str | Path,
         tag = int(rec.get("opensees_element_tag") or rec.get("element_tag"))
         if tag in used_tags:
             raise ValueError(f"Reserved area element tag {tag} for ETABS area {obj} is already in use.")
-        if category == "FLOOR" and floor_shells:
+        if category == "FLOOR":
             geom = _quad_geometry(nodes, xyz, horizontal=True)
             if geom["normal_z"] < 0.0:
                 nodes.reverse()  # horizontal quad only: normalize shell normal to +Z
@@ -166,13 +203,13 @@ def instantiate_area_elements(ops, *, topology_json: str | Path,
                 sec_tag = int(spec["section_tag"])
                 if sec_tag in section_defs.values():
                     sec_tag = max(section_defs.values()) + 1
-                ops.section("ElasticMembranePlateSection", sec_tag, e, nu, thickness, 0.0)
+                commands.append((ops.section, ("ElasticMembranePlateSection", sec_tag, e, nu, thickness, 0.0)))
                 section_defs[sec_key] = sec_tag
-            ops.element("ShellMITC4", tag, *nodes, section_defs[sec_key])
+            commands.append((ops.element, ("ShellMITC4", tag, *nodes, section_defs[sec_key])))
             used_tags.add(tag); floor_count += 1
             element_audit.append({"object": obj, "tag": tag, "category": category, "property": prop,
                                   "nodes": nodes, "area_m2": geom["area_m2"], "section_tag": section_defs[sec_key]})
-        elif category == "SHEAR WALL" and nonlinear_wall_panels:
+        else:
             geom = _quad_geometry(nodes, xyz, horizontal=False)
             target_name = etabs_wall_map.get(prop)
             spec = wall_library.get(target_name) if target_name else None
@@ -195,12 +232,12 @@ def instantiate_area_elements(ops, *, topology_json: str | Path,
             # Multiple separated axial fibers are required to represent flexure.
             fibers=int(spec.get("macro_fibers",5))
             if fibers<2:raise ValueError("Use at least two separated E_SFI axial fibers; verify discretization convergence")
-            ops.element("E_SFI_MVLEM_3D", tag, *nodes, fibers,
+            commands.append((ops.element, ("E_SFI_MVLEM_3D", tag, *nodes, fibers,
                         "-thick", *[thickness]*fibers, "-width", *[geom["edge_ij_m"]/fibers]*fibers,
                         "-mat", *[fsam]*fibers, "-CoR", float(spec.get("center_of_rotation", 0.4)),
                         "-ThickMod", float(spec.get("out_of_plane_thickness_modifier", 0.63)),
                         "-Poisson", float(spec.get("poisson_ratio", 0.25)),
-                        "-Density", 0.0)
+                        "-Density", 0.0)))
             used_tags.add(tag); wall_count += 1
             element_audit.append({"object": obj, "tag": tag, "category": category, "property": prop,
                                   "opensees_wall_section": target_name,
@@ -220,21 +257,19 @@ def instantiate_area_elements(ops, *, topology_json: str | Path,
         "Rigid diaphragms plus shell slabs need a deliberate compatibility/constraint review. Do not assign both shell mass and master-node mass for the same weight.",
         "E-SFI wall panels require an OpenSees build with E_SFI_MVLEM_3D, FSAM, ConcreteCM and SteelMPF; run a material and single-panel benchmark before full-building NLTHA.",
     ]
-    report = {"source_topology": str(Path(topology_json).resolve()),
-              "source_area_assignment_audit": str(Path(area_assignment_csv).resolve()),
+    report = {"source_topology": str(sources['topology'].resolve()),
+              "source_area_assignment_audit": str(sources['assignments'].resolve()),
+              "source_sha256": source_sha256,
               "area_element_method": "ETABS four-node area mesh; missing wall panels remain gaps",
               "floor_shell_formulation": "linear ElasticMembranePlateSection + ShellMITC4; no shell mass",
               "wall_panel_formulation": "nonlinear E_SFI_MVLEM_3D with multiple axial macro-fibers per exported ETABS wall quad",
               "floor_shell_count": floor_count, "nonlinear_wall_panel_count": wall_count,
               "element_audit": element_audit, "warnings": warnings, "analysis_ready": False}
-    # Keep an unqualified audit filename under the selected config/source folder,
-    # never in the launcher's unrelated working directory.
-    audit_path=Path(cfg["audit_output_json"]).expanduser()
-    if not audit_path.is_absolute():
-        if '..' in audit_path.parts:
-            raise ValueError("Relative area audit output must not escape the selected configuration folder")
-        audit_path=Path(config_json).expanduser().resolve().parent/audit_path
+    if any(sha256_file(path) != source_sha256[role] for role, path in sources.items()):
+        raise ValueError('Area source files changed during instantiation preflight')
     audit_path.parent.mkdir(parents=True,exist_ok=True)
+    for command, arguments in commands:
+        command(*arguments)
     audit_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return report
 
@@ -540,18 +575,10 @@ def inspect_instantiated_area_evidence(*, config_json):
     cfg=json.loads(config_path.read_text(encoding='utf-8-sig'))
     if not isinstance(cfg,dict):
         raise ValueError('Area integration config must be a JSON object')
-    selected=cfg.get('audit_output_json')
-    if not isinstance(selected,str) or not selected.strip():
-        raise ValueError('Area config has no selected audit_output_json')
-    audit=Path(selected).expanduser()
-    if not audit.is_absolute():
-        if '..' in audit.parts:
-            raise ValueError('Area audit report cannot escape selected config folder')
-        audit=config_path.parent/audit
-    audit=audit.resolve()
+    audit=_area_audit_path(config_path, cfg)
     # A file on disk can still be stale or forged. Its physical solver/source
     # identity is established ONLY by the existing packaging validator.
-    exists=audit.is_file() and not audit.is_symlink()
+    exists=audit.is_file()
     wall_definitions=cfg.get('opensees_wall_sections') or {}
     if not isinstance(wall_definitions,dict):
         raise ValueError('opensees_wall_sections must be a dictionary')
@@ -596,7 +623,6 @@ def package_area_instantiation_audit(*, topology_json, area_assignment_csv,
     inventory is a separate package and is not mistaken for this report.
     The ZIP is NOT an ETABS physical equivalence or NLTHA acceptance certificate.
     """
-    import hashlib
     from components.inputs.evidence_archive import publish_case_evidence_zip
     raw_paths={'topology':Path(topology_json).expanduser(),
                'assignments':Path(area_assignment_csv).expanduser(),
@@ -605,16 +631,10 @@ def package_area_instantiation_audit(*, topology_json, area_assignment_csv,
         if not path.is_file() or path.is_symlink():
             raise FileNotFoundError('Missing or linked '+role+' input: '+str(path))
     cfg=json.loads(raw_paths['config'].read_text(encoding='utf-8-sig'))
-    selected=cfg.get('audit_output_json')
-    if not isinstance(selected,str) or not selected.strip():
-        raise ValueError('Area config has no selected audit_output_json')
-    report_path=Path(selected).expanduser()
-    if not report_path.is_absolute():
-        if '..' in report_path.parts:
-            raise ValueError('Area audit report cannot escape selected config folder')
-        report_path=raw_paths['config'].resolve().parent/report_path
-    if not report_path.is_file() or report_path.is_symlink():
+    report_path=_area_audit_path(raw_paths['config'], cfg)
+    if not report_path.is_file():
         raise FileNotFoundError('No instantiated area element audit to export: '+str(report_path))
+    report_sha = sha256_file(report_path)
     report=json.loads(report_path.read_text(encoding='utf-8-sig'))
     if not isinstance(report,dict):
         raise ValueError('Area element audit must be an object')
@@ -636,19 +656,32 @@ def package_area_instantiation_audit(*, topology_json, area_assignment_csv,
     if (sum(str(item.get('category','')).upper()=='FLOOR' for item in areas)!=floor or
         sum(str(item.get('category','')).upper()=='SHEAR WALL' for item in areas)!=wall):
         raise ValueError('Area element categories disagree with recorded counts')
-    source_sha=hashlib.sha256(report_path.read_bytes()).hexdigest()[:12]
+    recorded_sha = report.get('source_sha256')
+    if not isinstance(recorded_sha, dict):
+        raise ValueError('Saved area audit has no source digests. Generate a new audit in a compatible model.')
+    archive_names = {
+        'topology': '00_INPUT_SOURCE/OpenSees_Element_Connectivity.json',
+        'assignments': '00_INPUT_SOURCE/OpenSees_Area_Section_Assignment_Audit.csv',
+        'config': '00_INPUT_SOURCE/OpenSees_Area_Model_Config_V116.json',
+    }
+    mapping = _section_mapping_path(raw_paths['config'], cfg)
+    if mapping is not None:
+        raw_paths['section_mapping'] = mapping
+        archive_names['section_mapping'] = '00_INPUT_SOURCE/Section_Mapping.json'
+    if recorded_sha != {role: sha256_file(path) for role, path in raw_paths.items()}:
+        raise ValueError('Area source files changed since instantiation. Select the original inputs or generate a new audit.')
+    report_name = '02_MODEL/AREA_INTEGRATION/INSTALLED_ELEMENTS/' + report_path.name
+    files = [(archive_names[role], path) for role, path in raw_paths.items()]
+    files.append((report_name, report_path))
+    expected_sha256 = {archive_names[role]: recorded_sha[role] for role in raw_paths}
+    expected_sha256[report_name] = report_sha
     base=model_area_directory(output_dir)
     base.mkdir(parents=True,exist_ok=True)
     return publish_case_evidence_zip(
         base,
-        filename='Area_Instantiated_Elements_'+source_sha+'.zip',
+        filename='Area_Instantiated_Elements_'+report_sha[:12]+'.zip',
         status='SAVED_ELEMENT_INSTANTIATION_REPORT_NOT_ANALYSIS_ACCEPTANCE',
-        files=[
-            ('00_INPUT_SOURCE/OpenSees_Element_Connectivity.json',raw_paths['topology']),
-            ('00_INPUT_SOURCE/OpenSees_Area_Section_Assignment_Audit.csv',raw_paths['assignments']),
-            ('00_INPUT_SOURCE/OpenSees_Area_Model_Config_V116.json',raw_paths['config']),
-            ('02_MODEL/AREA_INTEGRATION/INSTALLED_ELEMENTS/'+report_path.name,report_path),
-        ])
+        files=files, expected_sha256=expected_sha256)
 
 
 def area_output_directory(export_dir=None, *, topology_json=None, generated_output=None):
@@ -709,8 +742,8 @@ def launch_area_integration_gui(parent=None, export_dir=None):
         ("Reviewed integration config", "config", "Select OpenSees_Area_Model_Config_V116.json"),
     )
     root = ttk.Frame(win, padding=14); root.pack(fill="both", expand=True)
-    ttk.Label(root, text="AREA ELEMENT INTEGRATION — V116", font=("Segoe UI", 15, "bold")).pack(anchor="w")
-    ttk.Label(root, text="Reads source area topology; preview counts reflect the selected export. This writes a call to add elastic ShellMITC4 floor panels and nonlinear E-SFI-MVLEM_3D wall panels to your existing OpenSees model after nodes and materials are defined. The ETABS wall mesh is preserved; missing quads remain opening gaps.", wraplength=1000).pack(anchor="w", pady=(6, 12))
+    ttk.Label(root, text="Area integration", font=("Segoe UI", 15, "bold")).pack(anchor="w")
+    ttk.Label(root, text="Review the ETABS area inventory before preparing an optional floor or nonlinear wall script. The source mesh preserves opening gaps.", wraplength=940).pack(anchor="w", pady=(6, 12))
     for label, key, title in rows:
         row = ttk.Frame(root); row.pack(fill="x", pady=4)
         ttk.Label(row, text=label, width=28).pack(side="left")
@@ -775,7 +808,6 @@ def launch_area_integration_gui(parent=None, export_dir=None):
         Path(target).write_text(source, encoding="utf-8")
         paths["output"].set(target)
         messagebox.showinfo("Integration call created", f"Review and insert this block into your model-builder after all ETABS nodes and FSAM materials are defined:\n\n{target}\n\nThis helper does not create gravity loads, total seismic mass, P-Delta preload, or an NLTHA-ready model.", parent=win)
-    ttk.Button(root, text="Write reviewed area-stage call", command=write_call).pack(anchor="w", pady=8)
     def export_inventory():
         if not all(paths[k].get().strip() for k in ("topology","audit","config")):
             messagebox.showerror('Source files required','Select topology, section audit and config.',parent=win);return
@@ -788,9 +820,10 @@ def launch_area_integration_gui(parent=None, export_dir=None):
             zipfile=model_area_directory(destination)/'07_EXPORT_ZIP'/(
                 workbook.stem+'.zip')
             messagebox.showinfo('Source inventory + ZIP saved',
-                f'Excel: {workbook}\\nJSON: {manifest}\\nZIP: {zipfile}\\n\\nSOURCE REVIEW ONLY: no elements, loads or dynamic analysis executed.',parent=win)
+                f'Excel: {workbook}\nJSON: {manifest}\nZIP: {zipfile}\n\nSource inventory saved for review.',parent=win)
         except Exception as exc:messagebox.showerror('Area inventory',str(exc),parent=win)
     ttk.Button(root,text="Export area inventory (Excel + JSON + ZIP)",command=export_inventory).pack(anchor="w",pady=4)
+    ttk.Button(root, text="Save inactive area script", command=write_call).pack(anchor="w", pady=4)
     def export_instantiated_evidence():
         if not all(paths[k].get().strip() for k in ('topology','audit','config')):
             messagebox.showerror('Source inputs required',
@@ -807,14 +840,9 @@ def launch_area_integration_gui(parent=None, export_dir=None):
                     blockers.append('Missing project FSAM material tag for: '+
                                     ', '.join(evidence['missing_fsam_targets']))
                 messagebox.showwarning(
-                    'Area source inventory only — no saved instantiation audit',
-                    'No saved audit from the optional area-element instantiation '
-                    'step exists at:\\n'+evidence['report_path']+
-                    '\\n\\n'+('\\n'.join(blockers)+'\\n\\n' if blockers else '')+
-                    evidence['guidance']+
-                    '\\n\\nUse Export area inventory (Excel + JSON + ZIP) '
-                    'for the existing source evidence. This ZIP button will '
-                    'not create or certify solver elements.',
+                    'No saved area-instantiation report',
+                    '\n'.join(['Use Export area inventory for the current ETABS evidence.',
+                               '', *blockers, '', 'Expected report', evidence['report_path']]),
                     parent=win)
                 return
             destination=Path(export_dir).resolve() if export_dir else Path(paths['topology'].get()).resolve().parent
@@ -823,12 +851,11 @@ def launch_area_integration_gui(parent=None, export_dir=None):
                 area_assignment_csv=paths['audit'].get(),
                 config_json=paths['config'].get(),output_dir=destination)
             messagebox.showinfo('Instantiated area evidence ZIP saved',
-                f'ZIP: {archive}\\n\\nThe saved element-instantiation audit was packaged, not rerun. '
-                'Gravity, MPC, mass and nonlinear structural acceptance remain NOT VERIFIED.',
+                f'ZIP: {archive}\n\nSaved element evidence packaged for engineering review.',
                 parent=win)
         except Exception as exc:
             messagebox.showerror('Instantiated area ZIP export',str(exc),parent=win)
-    ttk.Label(root, text="A source inventory is not instantiated solver evidence. Export saved instantiated element ZIP only after the optional area-element helper has run in a compatible model and saved a source-matched audit; the main elastic mesh export does not create this audit.",wraplength=1000,foreground="#8a3412").pack(anchor="w",pady=(0,4))
+    ttk.Label(root, text="A saved element ZIP requires a matching audit from the optional area script. Import and elastic mesh review use the source inventory.",wraplength=940).pack(anchor="w",pady=(8,4))
     ttk.Button(root,text='Export saved instantiated element ZIP',
                command=export_instantiated_evidence).pack(anchor='w',pady=4)
     def open_output_folder():

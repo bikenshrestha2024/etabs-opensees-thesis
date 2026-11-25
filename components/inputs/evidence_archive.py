@@ -34,7 +34,8 @@ def _sha256(path: Path) -> str:
 
 
 def publish_case_evidence_zip(source_run, *, filename, files, category=None,
-                              status='REVIEW_EVIDENCE_NOT_ENGINEERING_ACCEPTANCE') -> Path:
+                              status='REVIEW_EVIDENCE_NOT_ENGINEERING_ACCEPTANCE',
+                              expected_sha256=None) -> Path:
     """Create an atomic archive with an SHA256 manifest and no implicit file crawl.
 
     files is an iterable of (archive_relative_path, absolute_source_path).
@@ -42,6 +43,7 @@ def publish_case_evidence_zip(source_run, *, filename, files, category=None,
     Only explicitly selected files are included; duplicate or unsafe archive
     paths and symlinks fail closed. Do not package sensitive source files unless
     the user has explicitly selected the local evidence package for review.
+    expected_sha256 optionally binds every archive path to a previously reviewed digest.
     """
     root = Path(source_run).expanduser()
     _refuse_linked_path(root)
@@ -75,6 +77,9 @@ def publish_case_evidence_zip(source_run, *, filename, files, category=None,
         entries.append({'archive_path': archive_name.as_posix(),
                         'path': path, 'bytes': path.stat().st_size,
                         'sha256': _sha256(path)})
+    if expected_sha256 is not None and expected_sha256 != {
+            entry['archive_path']: entry['sha256'] for entry in entries}:
+        raise ValueError('Evidence changed after its source digests were verified')
     destination = ensure_review_zip_directory(root)
     if category:
         destination /= category

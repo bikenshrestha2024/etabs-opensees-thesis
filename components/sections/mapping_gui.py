@@ -9,6 +9,22 @@ import webbrowser
 from OpenSees_Mapping_Audit_V125 import collect,library,save_assignment,export_excel
 
 
+def _open_mapping_review_excel(folder, parent):
+    import os
+    from datetime import datetime
+    from uuid import uuid4
+    from components.inputs.output_layout import owned_run_destination
+
+    try:
+        review_root = owned_run_destination(folder, 'MODEL', 'SECTION_MAPPING')
+        run = review_root / (datetime.now().strftime('%Y%m%d_%H%M%S') + '_' + uuid4().hex[:8])
+        run.mkdir(parents=True, exist_ok=False)
+        workbook = export_excel(folder, run / 'OpenSees_Property_Element_Load_Audit_V125.xlsx',
+                                write_library=False)
+        os.startfile(workbook)
+    except Exception as exc:
+        messagebox.showerror('Excel audit', str(exc), parent=parent)
+
 
 def plotly_query_for_key(key,data):
     """[REF docs/source/components/sections/mapping_gui.py.md]
@@ -77,7 +93,7 @@ class MappingGUI:
         ttk.Combobox(tools,textvariable=self.category,values=('All','BRACE','SHEAR WALL','FLOOR','BEAM','COLUMN'),state='readonly',width=17).pack(side='left')
         ttk.Entry(tools,textvariable=self.search,width=28).pack(side='left',padx=5)
         ttk.Button(tools,text='Reload source audit',command=self.reload).pack(side='left')
-        ttk.Button(tools,text='Export / open Excel audit',command=self.excel).pack(side='left',padx=5)
+        ttk.Button(tools,text='Save and open review Excel',command=self.excel).pack(side='left',padx=5)
         ttk.Button(tools,text='Highlight selected ID in 3D',command=self.highlight).pack(side='left')
         ttk.Button(tools,text='Parameter citations',command=lambda:show_parameter_sources(self.win)).pack(side='left',padx=5)
         self.load_banner=tk.StringVar(value='Loading source mapping and geometry…')
@@ -486,9 +502,7 @@ class MappingGUI:
             self.status.set('Source-connected 3D HTML is missing: '+str(path))
 
     def excel(self):
-        import os
-        try:os.startfile(export_excel(self.folder))
-        except Exception as exc:messagebox.showerror('Excel audit',str(exc),parent=self.win)
+        _open_mapping_review_excel(self.folder, self.win)
 
 
 def launch(parent,folder):return MappingGUI(parent,folder)
@@ -520,7 +534,7 @@ def show_load_audit(parent,folder):
     from OpenSees_Mapping_Audit_V125 import summarize_assembly_warnings
     text.insert('end','WARNINGS (grouped for readability; full source-specific list is saved in the export report)\n'+'\n'.join(summarize_assembly_warnings(report.get('warnings',[]))))
     bar=ttk.Frame(outer);bar.pack(fill='x',pady=5)
-    ttk.Button(bar,text='Populate / open Excel audit',command=lambda:os.startfile(export_excel(folder))).pack(side='left')
+    ttk.Button(bar,text='Save and open review Excel',command=lambda:_open_mapping_review_excel(folder,win)).pack(side='left')
     ttk.Button(bar,text='Property and individual-element mapping',command=lambda:launch(win,folder)).pack(side='left',padx=5)
     ttk.Button(bar,text='3D loads with ID highlight',command=lambda:os.startfile(Path(folder)/'OpenSees_Load_Assignment_3D.html')).pack(side='left')
     ttk.Button(bar,text='Copy text',command=lambda:(win.clipboard_clear(),win.clipboard_append(text.get('1.0','end-1c')))).pack(side='left')

@@ -5,8 +5,11 @@ They check the GUI's process isolation and worker invocation contracts.
 """
 from __future__ import annotations
 import ast
+import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "components/ui/application.py"
@@ -90,6 +93,31 @@ class TestConversionGuiIsolation(unittest.TestCase):
     def test_source_has_single_export_button_binding(self):
         self.assertEqual(self.app_source.count("command=self._run)"), 1)
         self.assertIn("command=self._cancel_conversion", self.app_source)
+
+    def test_completed_export_view_remains_bound_to_the_worker_folder(self):
+        from components.ui import application
+
+        with TemporaryDirectory() as directory:
+            original = Path(directory) / 'original'
+            current = Path(directory) / 'different_selection'
+            worker_log = original / '09_SOFTWARE_DIAGNOSTICS' / 'worker.log'
+            worker_log.parent.mkdir(parents=True)
+            result = {'report': str(original / 'OpenSees_Complete_Export_Report_V118.json'),
+                      'assembly_errors': [], 'categorized_mirror': {'status': 'completed'}}
+            worker_log.write_text('[WORKER_RESULT] ' + json.dumps(result), encoding='utf-8')
+            gui = Mock()
+            gui.out.get.return_value = str(current)
+            gui._conversion_process.poll.return_value = 0
+            gui._conversion_log_file = worker_log
+            gui._conversion_log_offset = 0
+            gui._conversion_started_at = 0
+            gui._conversion_last_activity = 0
+            gui._conversion_cancel_requested = False
+            with patch.object(application.messagebox, 'showinfo'):
+                application.App._poll_conversion_worker(gui)
+            self.assertEqual(Path(gui._last_exports[1]).parent, original)
+            self.assertIn('Review the model', gui.conversion_progress.set.call_args.args[0])
+            gui.out.set.assert_not_called()
 
 
 if __name__ == "__main__":

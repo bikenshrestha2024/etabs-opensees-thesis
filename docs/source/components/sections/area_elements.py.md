@@ -75,3 +75,9 @@ The new **read-only** `inspect_instantiated_area_evidence(config_json=...)` retu
 **Do not simply enable** `AREA_STAGE_EXECUTION` in the saved Python call on an already assembled model with floor/wall shells. The optional additive `instantiate_area_elements` is only valid in a compatible domain that does not already contain those same elements, after verified source, material and constraint review. Config templates and literature references are not calibration. Area gravity loads and seismic mass are still separate, and the 32-physical-support + 44-mesh-transfer distinction remains unaffected.
 
 Regression: `tests/test_area_instantiation_evidence_zip_20261123.py` now covers missing report/false approval/null FSAM, read-only source state, untrusted present report and rejected directory traversal. No private EDB, source workbook, active model JSON or Windows absolute path is committed. Native ETABS/OpenSees comparison, wall cyclic validation and NLTHA remain NOT_VERIFIED.
+
+## Source binding in instantiated area evidence
+
+The optional helper checks selected area categories, geometry, tags, inputs and audit destination before issuing the planned OpenSees commands. Floor tags are outside the collision check when only walls are selected. If the solver fails after command execution starts, rebuild the domain before retrying. Use **Export area inventory** for source review, then **Save inactive area script** if the inputs and receiving domain warrant instantiation.
+
+An instantiated area ZIP uses the topology, assignment table, area config and optional section-mapping file digests recorded by the successful helper. The packager checks the saved files against those digests and verifies the ZIP payload before publication. Existing archives remain readable. A legacy report without source digests requires a new run in a compatible domain for packaging. Gravity, seismic mass, wall calibration and NLTHA still require independent evidence.
