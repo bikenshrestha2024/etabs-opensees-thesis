@@ -52,3 +52,6 @@ A run that used the relaxed tolerance is still `EXPLORATORY`; report the count w
 **Failure-report fix:** `_write_failure_report` and the failure-path messages use `_safe_print`. Previously an `OSError` ("Invalid argument") from `print` while reporting replaced the real `RuntimeError` in `INCOMPLETE.json` and crashed `run`.
 
 **Not verified:** that the relaxed tolerance clears the 2.386 s stall. That needs a rerun to and past t = 2.386 s.
+
+## 2026-11-25 post-Claude integration follow-up
+The optional final relaxed NormDispIncr tolerance remains available to exploratory runs but is rejected for explicit THESIS_NLTHA intent at configuration validation. The strict default and all physical inputs are unchanged. Exploratory status/progress messages use the existing best-effort logger so a closed Windows stdout does not by itself abort a native run. Solver, file and validation exceptions are not suppressed. Full-duration convergence remains unverified.

@@ -188,6 +188,13 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
     attempts=[(a,base_tol,False) for a in algorithms]
     if relaxed_tol is not None and depth >= max_depth:
         attempts.append(("Newton",float(relaxed_tol),True))
+    def recovery_log(message):
+        try:
+            print(message,flush=True)
+        except (OSError,ValueError):
+            # A broken GUI pipe is not a failed integration step.
+            diagnostics['recovery_log_errors']=diagnostics.get('recovery_log_errors',0)+1
+
     for algorithm, tolerance, relaxed in attempts:
         # [REF components/nonlinear_time_history/full_record_gate.py]
         # The solver's return code is NOT an accepted physical time step.
@@ -197,8 +204,9 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
         diagnostics['attempts']=diagnostics.get('attempts',0)+1
         diagnostics['algorithm_'+algorithm]=diagnostics.get('algorithm_'+algorithm,0)+1
         if diagnostics.get("report_recovery") and (depth or algorithm != "Newton"):
-            print(f"[NLTHA RECOVERY] algorithm={algorithm} start_s={attempt_start:.12g} "
-                  f"dt_s={float(dt):.12g} depth={depth}/{max_depth}",flush=True)
+            recovery_log(f"[NLTHA RECOVERY] algorithm={algorithm} start_s={attempt_start:.12g} "
+                         f"dt_s={float(dt):.12g} depth={depth}/{max_depth} "
+                         f"tol={tolerance:.6g} relaxed={relaxed}")
         try:
             ops.test("NormDispIncr", tolerance, base_iters, 0)
             ops.algorithm(algorithm)
@@ -248,8 +256,9 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
         except (AttributeError, TypeError, ValueError, OverflowError):
             diagnostics['last_failed_iterations']=None
         if diagnostics.get("report_recovery"):
-            print(f"[NLTHA RECOVERY] rejected algorithm={algorithm} start_s={attempt_start:.12g} "
-                  f"dt_s={float(dt):.12g} depth={depth}/{max_depth} rc={rc}",flush=True)
+            recovery_log(f"[NLTHA RECOVERY] rejected algorithm={algorithm} start_s={attempt_start:.12g} "
+                         f"dt_s={float(dt):.12g} depth={depth}/{max_depth} rc={rc} "
+                         f"tol={tolerance:.6g} relaxed={relaxed}")
         # Do not retry a domain whose trial state already contains NaN/Inf.
         # Such a retry can propagate a failed linear solve into every element;
         # it does not constitute a convergence recovery.
