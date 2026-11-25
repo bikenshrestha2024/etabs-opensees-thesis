@@ -53,6 +53,30 @@ class LauncherWorkflowLayoutTests(unittest.TestCase):
                           '4. Linear','5. Nonlinear','6. Materials','7. Results'):
             self.assertIn(short_tab,self.code)
 
+    def test_elastic_settings_shortcut_reuses_bound_gravity_model(self):
+        self.assertIn('command=self._open_elastic_comparison_settings',self.code)
+        funcs={n.name:n for n in ast.walk(self.tree) if isinstance(n,ast.FunctionDef)}
+        shortcut=ast.get_source_segment(self.code,funcs['_open_elastic_comparison_settings'])
+        self.assertIn('_open_gravity_analysis(require_manifest=True)',shortcut)
+        self.assertIn('_rebuild_verified_clear_beam(elastic_comparison=True)',shortcut)
+        gravity=ast.get_source_segment(self.code,funcs['_open_gravity_analysis'])
+        self.assertIn('if require_manifest and not bound:',gravity)
+
+    def test_linear_and_nonlinear_launchers_use_selected_folder(self):
+        funcs={n.name:n for n in ast.walk(self.tree) if isinstance(n,ast.FunctionDef)}
+        for name in ('_open_nbc105_esm','_open_modal_audit',
+                     '_open_linear_time_history','_open_nonlinear_time_history'):
+            source=ast.get_source_segment(self.code,funcs[name])
+            self.assertIn('folder = self._model_review_folder()',source)
+            self.assertIn('if folder is None:',source)
+        for name,role in (('_open_modal_audit','modal_model_script'),
+                          ('_open_linear_time_history','linear_model_script'),
+                          ('_open_nonlinear_time_history','nonlinear_model_script')):
+            source=ast.get_source_segment(self.code,funcs[name])
+            self.assertIn("if not autoselect_inputs(gui, folder, '"+role+"'):",source)
+        self.assertIn('ttk.Label(linear_header,textvariable=self.out',self.code)
+        self.assertIn('ttk.Label(nonlinear_header,textvariable=self.out',self.code)
+
     def test_log_keeps_copy_and_two_axes_of_scrolling(self):
         for item in ('orient="vertical",command=self.logbox.yview',
                      'orient="horizontal",command=self.logbox.xview',

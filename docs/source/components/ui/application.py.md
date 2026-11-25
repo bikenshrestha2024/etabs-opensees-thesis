@@ -100,3 +100,8 @@ Lowest-elevation six-DOF fixities in the topology/load-only preview are explicit
 ## Import to Model handoff
 
 Use **Review selected export in Model** to continue from Import. Model shows the current export folder and passes it to the mapping, slab mesh and area integration tools. These actions wait for the active Import worker to finish. The completed worker's saved load view stays associated with the folder used for that worker, even if the folder field changes before completion. Read the worker's report separately for assembly errors and engineering readiness.
+
+
+## 2026-11-25 — discoverable elastic comparison and selected-model handoff
+
+The Gravity / NBC tab now exposes a searchable `Elastic comparison settings — select JSON + rebuild` action. It reuses the existing gravity launcher, requires successful manifest auto-selection, then invokes the existing elastic rebuild dialog. A completed rebuild must be explicitly selected using the main `Select verified clear-beam model` button; previously opened analysis windows must be closed. Linear and Nonlinear tabs display the selected model folder. ESM, modal, LTH and NLTH launchers use the selected-folder/import-in-progress guard; modal/LTH automatic execution is not started if the model manifest cannot be selected. This is launcher navigation only, not native equivalence or a new solver. Native Windows GUI and project results remain unverified.
