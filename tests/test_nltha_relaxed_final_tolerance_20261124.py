@@ -11,7 +11,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
+from components.nonlinear_time_history import runner_and_gui as reviewed
 from components.nonlinear_time_history.runner_and_gui import _advance_nonlinear_interval
 
 
@@ -36,15 +38,14 @@ class ToleranceSolver:
 
 
 class RelaxedFinalTolerance(unittest.TestCase):
-    def test_default_stays_strict_and_fails_like_before(self):
+    def test_shared_default_accepts_the_step_at_1e_6(self):
         solver=ToleranceSolver(needed=1e-6)
-        with self.assertRaisesRegex(RuntimeError,"Nonlinear step failed"):
-            _advance_nonlinear_interval(solver,.005,max_depth=0,diagnostics={})
-        self.assertEqual(set(solver.tolerances),{1e-7})
+        self.assertEqual(_advance_nonlinear_interval(solver,.005,max_depth=0),1)
+        self.assertEqual(solver.tolerances,[1e-6])
 
     def test_relaxed_tolerance_accepts_and_is_counted_not_hidden(self):
         solver=ToleranceSolver(needed=1e-6)
-        diag={'final_relaxed_tolerance':1e-6}
+        diag={'convergence_tolerance':1e-7,'final_relaxed_tolerance':1e-6}
         _advance_nonlinear_interval(solver,.005,max_depth=0,diagnostics=diag)
         self.assertEqual(diag['relaxed_tolerance_steps'],1)
         self.assertEqual(solver.tolerances[:4],[1e-7]*4)  # strict tried first
@@ -53,7 +54,7 @@ class RelaxedFinalTolerance(unittest.TestCase):
 
     def test_relaxed_only_at_deepest_subdivision(self):
         solver=ToleranceSolver(needed=1e-6)
-        diag={'final_relaxed_tolerance':1e-6,'efficient_recovery':True}
+        diag={'convergence_tolerance':1e-7,'final_relaxed_tolerance':1e-6,'efficient_recovery':True}
         _advance_nonlinear_interval(solver,.005,max_depth=1,diagnostics=diag)
         self.assertEqual(diag['relaxed_tolerance_steps'],2)  # two half-steps
         self.assertAlmostEqual(solver.clock,.005)
@@ -71,8 +72,9 @@ class ConvergenceSettingValidation(unittest.TestCase):
         from components.nonlinear_time_history.building_exploratory import validate_convergence_settings as v
         self.assertEqual(v({}),(1e-6,40,None))
         self.assertEqual(v({'convergence_tolerance':1e-7}),(1e-7,40,None))
-        self.assertEqual(v({'final_relaxed_tolerance':None}),(1e-7,40,None))
-        self.assertEqual(v({'final_relaxed_tolerance':1e-6}),(1e-7,40,1e-6))
+        self.assertEqual(v({'final_relaxed_tolerance':None}),(1e-6,40,None))
+        self.assertEqual(v({'final_relaxed_tolerance':1e-6}),(1e-6,40,None))
+        self.assertEqual(v({'convergence_tolerance':1e-7,'final_relaxed_tolerance':1e-6}),(1e-7,40,1e-6))
         for bad in (True,0,-1e-6,1e-7,5e-8,2e-5,'1e-6',float('nan')):
             with self.assertRaises(ValueError,msg=repr(bad)):
                 v({'final_relaxed_tolerance':bad})
@@ -101,10 +103,25 @@ class ConvergenceSettingValidation(unittest.TestCase):
                 final_relaxed_tolerance=final))
         self.assertEqual(set(solver.tolerances),{1e-7})
 
-    def test_explicit_relaxed_base_forbidden_for_thesis(self):
+    def test_reviewed_runner_accepts_default_and_explicit_strict_tolerances(self):
         from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
-        with self.assertRaisesRegex(ValueError,"THESIS_NLTHA"):
-            validate_convergence_settings({'analysis_intent':'THESIS_NLTHA','convergence_tolerance':1e-6})
+        for tolerance in (1e-6,1e-7):
+            self.assertEqual(validate_convergence_settings({
+                'analysis_intent':'THESIS_NLTHA','convergence_tolerance':tolerance}), (tolerance,40,None))
+
+    def test_reviewed_initial_setup_defaults_to_1e_6(self):
+        ops = Mock()
+        reviewed._configure_nonlinear_transient(ops)
+        ops.test.assert_called_once_with("NormDispIncr", 1e-6, 40, 0)
+
+    def test_reviewed_cli_strict_selection_overrides_the_saved_tolerance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'run.json'
+            config.write_text('{"convergence_tolerance": 1e-6}', encoding='utf-8')
+            with patch('sys.argv', ['nltha', '--run', str(config), '--strict-tolerance']), \
+                    patch.object(reviewed, '_run_analysis') as execute:
+                reviewed.main()
+            self.assertEqual(execute.call_args.args[0]['convergence_tolerance'], 1e-7)
 
     def test_invalid_base_tolerances_are_rejected(self):
         from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
@@ -119,14 +136,15 @@ class ConvergenceSettingValidation(unittest.TestCase):
                 "analysis_intent": "THESIS_NLTHA",
                 "final_relaxed_tolerance": 1e-6})
         self.assertEqual(validate_convergence_settings({
-            "analysis_intent": "THESIS_NLTHA"}), (1e-7, 40, None))
+            "analysis_intent": "THESIS_NLTHA"}), (1e-6, 40, None))
 
 
 class FailureReportPrintSafety(unittest.TestCase):
     def test_recovery_logging_failure_does_not_abort_solver(self):
         from unittest.mock import patch
         solver = ToleranceSolver(needed=1e-6)
-        diag = {"report_recovery": True, "final_relaxed_tolerance": 1e-6}
+        diag = {"report_recovery": True, "convergence_tolerance": 1e-7,
+                "final_relaxed_tolerance": 1e-6}
         with patch("builtins.print", side_effect=OSError(22, "Invalid argument")):
             accepted = _advance_nonlinear_interval(solver, .005, max_depth=0,
                                                    diagnostics=diag)

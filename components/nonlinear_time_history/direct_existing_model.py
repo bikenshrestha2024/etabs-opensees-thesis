@@ -16,6 +16,9 @@ from pathlib import Path
 from components.nonlinear_time_history.source_model_handoff import (
     required_source_files, source_sha256, literature_section_inventory
 )
+from components.nonlinear_time_history.thesis_quality import (
+    DEFAULT_CONVERGENCE_TOLERANCE, STRICT_CONVERGENCE_TOLERANCE,
+)
 
 def make_research_nltha_config(*, model_folder, x_path, y_path, output_dir,
                                event, variant_id, limit_state="ULS",
@@ -55,7 +58,7 @@ def make_research_nltha_config(*, model_folder, x_path, y_path, output_dir,
         soil_type="C",soil_c_primary_nltha=True,
         duration_s=float(trial_duration_s),
         dt_s=float(dt_s),max_subdivision_depth=5,
-        convergence_tolerance=1e-7 if strict_tolerance else 1e-6,
+        convergence_tolerance=STRICT_CONVERGENCE_TOLERANCE if strict_tolerance else DEFAULT_CONVERGENCE_TOLERANCE,
         final_relaxed_tolerance=None,
         research_basis_not_project_approval=True,
         material_parameter_status="PEER_SPECIMEN_TRANSFER_UNCALIBRATED",

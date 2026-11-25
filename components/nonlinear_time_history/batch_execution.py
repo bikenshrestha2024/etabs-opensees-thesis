@@ -19,7 +19,7 @@ from components.nonlinear_time_history.source_model_handoff import (
 
 def prepare_jobs(plan_path, output):
     """Bind unique research jobs to their source inputs. [REF docs/source/components/nonlinear_time_history/batch_execution.py.md]"""
-    from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
+    from components.nonlinear_time_history.thesis_quality import validate_convergence_settings
 
     plan_path=Path(plan_path).resolve()
     output=Path(output).resolve()

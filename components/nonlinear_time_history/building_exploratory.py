@@ -7,6 +7,9 @@
 This does not approve or modify the calibrated production-model workflow.
 """
 from components.nbc105.constants import GRAVITY_M_S2
+from components.nonlinear_time_history.thesis_quality import (
+    STRICT_CONVERGENCE_TOLERANCE, validate_convergence_settings,
+)
 from pathlib import Path
 import json,math,time,csv,shutil,hashlib,datetime
 import traceback
@@ -28,39 +31,6 @@ def _safe_print(*args, **kwargs):
     except (OSError,ValueError):
         pass
 
-
-def validate_convergence_settings(config):
-    """Return (tolerance, max_iterations, final_relaxed_tolerance or None).
-
-    [REF OpenSees NormDispIncr test; repo evidence 2026-11-24]
-    New exploratory runs default to 1e-6 / 40; 1e-7 is strict opt-in.
-    Reviewed THESIS_NLTHA remains strict. An older configuration explicitly
-    specifying final_relaxed_tolerance (including null) retains its original
-    1e-7 base unless convergence_tolerance is explicitly provided.
-    A legacy final fallback must exceed the base and be at most 1e-5.
-    """
-    def num(value,name):
-        if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(float(value)):
-            raise ValueError(name+' must be a finite number')
-        return float(value)
-    thesis=config.get('analysis_intent')=='THESIS_NLTHA'
-    default_tol=1e-7 if thesis or 'final_relaxed_tolerance' in config else 1e-6
-    tol=num(config.get('convergence_tolerance',default_tol),'convergence_tolerance')
-    if tol not in (1e-7,1e-6):
-        raise ValueError('convergence_tolerance must be 1e-6 (exploratory) or 1e-7 (strict)')
-    if thesis and tol!=1e-7:
-        raise ValueError('THESIS_NLTHA requires strict convergence_tolerance=1e-7')
-    iters=config.get('transient_max_iterations',40)
-    if isinstance(iters,bool) or not isinstance(iters,int) or not 1<=iters<=200:
-        raise ValueError('transient_max_iterations must be an integer from 1 through 200')
-    relaxed=config.get('final_relaxed_tolerance')
-    if relaxed is not None:
-        if config.get('analysis_intent')=='THESIS_NLTHA':
-            raise ValueError('THESIS_NLTHA requires strict convergence; final_relaxed_tolerance is exploratory only')
-        relaxed=num(relaxed,'final_relaxed_tolerance')
-        if not tol<relaxed<=1e-5:
-            raise ValueError('final_relaxed_tolerance must exceed convergence_tolerance and be at most 1e-5')
-    return tol,iters,relaxed
 
 def _initial_nonlinear_mode_audit(periods, props, *, model_sha256=None):
     """Document initial-tangent eigenperiods and exact per-axis 90% mass mode.
@@ -1185,5 +1155,11 @@ def recover_saved_report(folder,output_dir):
 
 if __name__=='__main__':
     import argparse
-    p=argparse.ArgumentParser();p.add_argument('--config',required=True);a=p.parse_args();config=json.loads(Path(a.config).read_text(encoding='utf-8-sig'))
+    p = argparse.ArgumentParser()
+    p.add_argument('--config', required=True)
+    p.add_argument('--strict-tolerance', action='store_true', help='Use NormDispIncr 1e-7 for every attempt')
+    args = p.parse_args()
+    config = json.loads(Path(args.config).read_text(encoding='utf-8-sig'))
+    if args.strict_tolerance:
+        config.update(convergence_tolerance=STRICT_CONVERGENCE_TOLERANCE, final_relaxed_tolerance=None)
     run(config)

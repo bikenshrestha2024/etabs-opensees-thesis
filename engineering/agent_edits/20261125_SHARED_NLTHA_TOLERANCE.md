@@ -1,0 +1,5 @@
+# Apply a shared convergence default to building NLTHA
+
+Editor OpenAI Codex desktop. Base `b33370d063aa4e3730ad7d64bd0562b7c2b87ec0`. The shared displacement-increment default is `1e-6`. Both building GUIs offer strict `1e-7`, and their CLI launchers accept `--strict-tolerance`. Reviewed model readiness and the ban on a separate reviewed final fallback still apply. The selected value propagates through solver setup, retries and saved output diagnostics.
+
+Test-first reproduction found six failures covering the shared solver, reviewed CLI and saved-config policy. After the change, 62 targeted tests and 14 subtests passed. Both Tk controls opened unchecked and toggled in both directions. Native OpenSeesPy 3.8.0 independently accepted one `0.005 s` step of a synthetic elastic oscillator under each tolerance. The verified clear-beam Kobe run started before this edit and already uses `1e-6`. Material qualification, full-record convergence and ETABS equivalence remain unverified. No original model or motion was edited.

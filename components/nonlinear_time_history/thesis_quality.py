@@ -10,6 +10,29 @@ import math
 from pathlib import Path
 
 SUPPORTED_UNITS = {"g", "m/s2"}
+DEFAULT_CONVERGENCE_TOLERANCE = 1e-6
+STRICT_CONVERGENCE_TOLERANCE = 1e-7
+
+
+def validate_convergence_settings(config):
+    """Resolve the NLTHA NormDispIncr settings. [REF docs/source/components/nonlinear_time_history/thesis_quality.py.md]"""
+    tolerance = config.get("convergence_tolerance", DEFAULT_CONVERGENCE_TOLERANCE)
+    if (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
+            or tolerance not in (DEFAULT_CONVERGENCE_TOLERANCE, STRICT_CONVERGENCE_TOLERANCE)):
+        raise ValueError("convergence_tolerance must be 1e-6 (default) or 1e-7 (strict)")
+    iterations = config.get("transient_max_iterations", 40)
+    if type(iterations) is not int or not 1 <= iterations <= 200:
+        raise ValueError("transient_max_iterations must be an integer from 1 through 200")
+    fallback = config.get("final_relaxed_tolerance")
+    if fallback is not None:
+        if config.get("analysis_intent") == "THESIS_NLTHA":
+            raise ValueError("THESIS_NLTHA does not permit final_relaxed_tolerance")
+        if (isinstance(fallback, bool) or not isinstance(fallback, (int, float))
+                or not STRICT_CONVERGENCE_TOLERANCE < fallback <= 1e-5):
+            raise ValueError("final_relaxed_tolerance must be above 1e-7 and at most 1e-5")
+        # Legacy fallback values already covered by the selected base need no retry.
+        fallback = float(fallback) if fallback > tolerance else None
+    return float(tolerance), iterations, fallback
 
 
 def audit_ground_motion_pair(records, source_paths):

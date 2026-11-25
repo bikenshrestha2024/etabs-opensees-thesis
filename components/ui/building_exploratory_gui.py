@@ -31,6 +31,9 @@ def launch(parent,model_folder,output_folder=None):
     from tkinter import ttk,filedialog,messagebox
     from OpenSees_Input_Records_V130 import LTH_DEFAULT_PEER_PAIRS
     from components.inputs.output_layout import owned_run_destination
+    from components.nonlinear_time_history.thesis_quality import (
+        DEFAULT_CONVERGENCE_TOLERANCE, STRICT_CONVERGENCE_TOLERANCE, validate_convergence_settings,
+    )
     # [REF components/ui/plot_utilities.py scrollable_form] the window was
     # taller than a laptop screen; scroll instead of clipping the controls.
     top=tk.Toplevel(parent);top.title('Building nonlinear research history - frames / FSAM walls')
@@ -327,9 +330,8 @@ def launch(parent,model_folder,output_folder=None):
             config.update(recovery_strategy=recovery_strategy.get(),
                           max_subdivision_depth=int(subdivision_depth.get()),
                           transient_max_iterations=int(transient_iterations.get()),
-                          convergence_tolerance=1e-7 if strict_recovery.get() else 1e-6,
+                          convergence_tolerance=STRICT_CONVERGENCE_TOLERANCE if strict_recovery.get() else DEFAULT_CONVERGENCE_TOLERANCE,
                           final_relaxed_tolerance=None)
-            from components.nonlinear_time_history.building_exploratory import validate_convergence_settings
             validate_convergence_settings(config)
             run_states=('ULS','SLS') if ls.get()=='Both' else (ls.get(),)
             if run_sensitivity:

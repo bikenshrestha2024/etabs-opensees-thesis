@@ -16,6 +16,9 @@ from __future__ import annotations
 
 __release__ = '134'
 from components.nbc105.constants import GRAVITY_M_S2
+from components.nonlinear_time_history.thesis_quality import (
+    DEFAULT_CONVERGENCE_TOLERANCE, STRICT_CONVERGENCE_TOLERANCE, validate_convergence_settings,
+)
 from OpenSees_Timing_V130 import timed_outputs
 from OpenSees_Transient_Runtime_V133 import CaseProfiler,save_workload,history_metadata,HistoryStream,acceleration_conversion
 
@@ -152,7 +155,7 @@ def _analysis_duration_s(motion, orientation, requested_duration_s):
     return duration, full_duration, status
 
 
-def _configure_nonlinear_transient(ops, algorithm="Newton", tolerance=1.0e-7, max_iterations=40,
+def _configure_nonlinear_transient(ops, algorithm="Newton", tolerance=DEFAULT_CONVERGENCE_TOLERANCE, max_iterations=40,
                                    linear_solver="UmfPack"):
     if linear_solver not in LINEAR_SYSTEMS:
         raise ValueError("linear_solver must be one of: " + ", ".join(LINEAR_SYSTEMS))
@@ -179,13 +182,11 @@ def _advance_nonlinear_interval(ops, dt, depth=0, max_depth=5, on_accept=None, d
                       diagnostics.get("early_algorithm_fallback") else ("Newton",))
     else:
         algorithms = fallback_algorithms
-    base_tol=float(diagnostics.get("convergence_tolerance",1.0e-7))
+    base_tol=float(diagnostics.get("convergence_tolerance",DEFAULT_CONVERGENCE_TOLERANCE))
     base_iters=int(diagnostics.get("convergence_max_iterations",40))
     relaxed_tol=diagnostics.get("final_relaxed_tolerance")
-    # The exploratory caller supplies its resolved base tolerance. The
-    # shared reviewed solver remains strict by default. Count every accepted
-    # step at a tolerance above 1e-7, not merely a final fallback.
-    attempts=[(a,base_tol,base_tol>1e-7) for a in algorithms]
+    # Count accepted steps above the strict tolerance, including ordinary intervals.
+    attempts=[(a,base_tol,base_tol>STRICT_CONVERGENCE_TOLERANCE) for a in algorithms]
     if relaxed_tol is not None and depth >= max_depth:
         attempts.append(("Newton",float(relaxed_tol),True))
     def recovery_log(message):
@@ -332,6 +333,8 @@ def _run_analysis(config):
         raise RuntimeError("Execution is OFF by default. Enable nonlinear time history only after completing the model-readiness manifest.")
     if config.get("linear_solver", "UmfPack") not in LINEAR_SYSTEMS:
         raise ValueError("linear_solver must be one of: " + ", ".join(LINEAR_SYSTEMS))
+    convergence_tol, max_iterations, _ = validate_convergence_settings(
+        dict(config, analysis_intent="THESIS_NLTHA"))
     readiness = _require_nonlinear_readiness(config)
     start = time.perf_counter()
     out = Path(config["output_dir"]); out.mkdir(parents=True, exist_ok=True)
@@ -357,6 +360,7 @@ def _run_analysis(config):
     with (out / "NBC105_Nonlinear_Time_History_Input_Record_Audit_V116.csv").open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=list(audit_rows[0])); writer.writeheader(); writer.writerows(audit_rows)
     print('[UNITS] Source accelerations are converted once to '+model_acceleration_unit+'; g=%g m/s2. Motion scale is separate. See Input_Record_Audit total Path factors.'%GRAVITY_M_S2,flush=True)
+    print(f'[NLTHA CONVERGENCE] NormDispIncr={convergence_tol:g} max_iterations={max_iterations}', flush=True)
     print('[SCOPE] '+('PRELIMINARY setup check' if config.get('preliminary_selection') else 'Selected suite')+' | pairs: '+', '.join(m['pair_id'] for m in motions)+' | each pair runs XY and YX',flush=True)
     records = []
     for pair_index, motion in enumerate(motions, 1):
@@ -371,6 +375,8 @@ def _run_analysis(config):
             model = Path(config["model_script"]).resolve()
             if not model.is_file(): raise FileNotFoundError(model)
             profiler.solver_diagnostics.update({
+                "convergence_tolerance": convergence_tol,
+                "convergence_max_iterations": max_iterations,
                 "evidence_output_path": str(out / f"{case}_First_Step_Failure_Evidence.json"),
                 "element_map_path": str(
                     model.parent / "OpenSees_Complete_Element_Map_V118.json"
@@ -541,7 +547,8 @@ def _run_analysis(config):
                 # SECTION 18.4 — Nonlinear Newmark. NBC §9.3.2.4 keeps Tn as
                 # an independent step bound; it is not Tn/100.
                 linear_solver = config.get("linear_solver", "UmfPack")
-                _configure_nonlinear_transient(ops, linear_solver=linear_solver)
+                _configure_nonlinear_transient(ops, tolerance=convergence_tol,
+                                               max_iterations=max_iterations, linear_solver=linear_solver)
                 if first_step_diagnostic:
                     write_focus("BEFORE_EXCITATION")
                 # Record every accepted adaptive substep, including intermediate peaks.
@@ -793,6 +800,7 @@ def _run_analysis(config):
         "clauses": ["3.2.3", "8.1.1", "8.1.2", "8.1.3", "9.3.2", "9.3.3"],
         "model_script": config["model_script"], "model_readiness_manifest": readiness, "limit_state_context": config["limit_state"], "torsion_sensitive": config["torsion_sensitive"],
         "linear_solver": config.get("linear_solver", "UmfPack"),
+        "convergence_tolerance": convergence_tol, "transient_max_iterations": max_iterations,
         "record_pairs": len(motions) if config.get("motion_mode") != "X_ONLY_SCREENING" else 0,
         "individual_record_count": len(motions), "motion_case_count": len(records),
         "pair_aggregation_guidance": "For each orthogonal pair, the two required swapped-orientation analyses are enveloped by taking the larger peak demand for each response quantity. NBC §8.1.3 then selects maximum for fewer than 7 pairs or arithmetic mean for more than 7 pairs. The supplied combined suite has 8 pairs; near-field (6) and far-field (2) subgroup statistics are reported separately for comparison. Exactly 7 is left flagged because the clause wording does not specify it.",
@@ -902,6 +910,7 @@ class NonlinearTimeHistoryGUI:
         self.manifest = tk.StringVar(); self.stories = tk.StringVar(); self.output = tk.StringVar(); self.readiness = tk.StringVar()
         self.damping_model=tk.StringVar(value="Rayleigh committed")
         self.linear_solver=tk.StringVar(value="UmfPack")
+        self.strict_tolerance = tk.BooleanVar(value=False)
         # [REF PEER TBI 2017; LATBSDC 2020] default 2.5%; 5% needs explicit opt-in.
         self.damping = tk.StringVar(value="2.5"); self.p1 = tk.StringVar(); self.p2 = tk.StringVar()
         self.damping_five_percent = tk.BooleanVar(value=False)
@@ -1054,6 +1063,11 @@ class NonlinearTimeHistoryGUI:
         ttk.Label(solver_row,text="Sparse linear equation solver").pack(side="left")
         ttk.Combobox(solver_row,textvariable=self.linear_solver,values=LINEAR_SYSTEMS,state="readonly",width=20).pack(side="left",padx=6)
         ttk.Label(solver_row,text="UmfPack is the default. Compare SparseGeneral or BandGeneral on this model; runtime depends on size and sparsity. Mumps is unavailable in the tested OpenSeesPy 3.8.0 environment.",wraplength=760).pack(side="left",padx=6)
+        tolerance_row = ttk.Frame(params)
+        tolerance_row.pack(fill="x", pady=3)
+        ttk.Label(tolerance_row, text="Convergence tolerance defaults to 1e-6").pack(side="left")
+        ttk.Checkbutton(tolerance_row, text="Strict tolerance (1e-7)",
+                        variable=self.strict_tolerance).pack(side="left", padx=10)
         grid = ttk.Frame(params); grid.pack(fill="x")
         fields = [("ULS/SLS context", self.ls), ("Damping target (%) — max 5", self.damping), ("Rayleigh period 1 (s)", self.p1), ("Rayleigh period 2 (s)", self.p2),
                   ("T1 X (s)", self.t1x), ("T1 Y (s)", self.t1y), ("Tn X (s), ≥90% mass", self.tnx), ("Tn Y (s), ≥90% mass", self.tny), ("Modes to check for ζ≤5%", self.nmodes)]
@@ -1308,6 +1322,8 @@ class NonlinearTimeHistoryGUI:
                 "execute_nonlinear_time_history": True, "record_matching_metadata": LTH_MATCHING_METADATA}
             if not x_only:values.update(self.pair_selector.config())
             values["damping_model"]=self.damping_model.get()
+            values["convergence_tolerance"] = (STRICT_CONVERGENCE_TOLERANCE if self.strict_tolerance.get()
+                                               else DEFAULT_CONVERGENCE_TOLERANCE)
             values["inherent_damping_five_percent"]=bool(self.damping_five_percent.get())
             required = ["model_script", "python", "story_nodes_csv", "output_dir", "model_readiness_json"]
             if not x_only and not use_preloaded_pairs: required.append("motion_manifest")
@@ -1448,10 +1464,19 @@ def launch_nonlinear_time_history_gui(parent=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument("--run", help="Run an analysis config JSON"); args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run", help="Run an analysis config JSON")
+    parser.add_argument("--strict-tolerance", action="store_true", help="Use NormDispIncr 1e-7 with --run")
+    args = parser.parse_args()
+    if args.strict_tolerance and not args.run:
+        parser.error("--strict-tolerance requires --run")
     if args.run:
         run_started = time.perf_counter()
-        try: _run_analysis(json.loads(Path(args.run).read_text(encoding="utf-8")))
+        try:
+            config = json.loads(Path(args.run).read_text(encoding="utf-8"))
+            if args.strict_tolerance:
+                config.update(convergence_tolerance=STRICT_CONVERGENCE_TOLERANCE, final_relaxed_tolerance=None)
+            _run_analysis(config)
         except Exception as exc:
             elapsed = time.perf_counter() - run_started
             print(f"[FAILED after {elapsed:.2f}s] {exc}\n{traceback.format_exc()}", flush=True)
