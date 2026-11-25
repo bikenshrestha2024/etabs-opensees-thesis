@@ -46,6 +46,69 @@ def inputs(root):
 
 
 class InstantiatedAreaEvidenceTests(TestCase):
+    def test_walls_only_leaves_an_existing_floor_with_a_reserved_source_tag(self):
+        with TemporaryDirectory() as td:
+            topology, audit, config = inputs(Path(td))
+            data = json.loads(topology.read_text())
+            data['node_map'].extend([
+                {'opensees_node_tag':5,'coordinates_m':[0,0,6]},
+                {'opensees_node_tag':6,'coordinates_m':[2,0,6]},
+            ])
+            data['elements'].append({'dimension':'area_polygon','category':'SHEAR WALL',
+                'etabs_object':'W01','opensees_element_tag':10002,'node_tags':[1,2,6,5]})
+            topology.write_text(json.dumps(data), encoding='utf-8')
+            with audit.open('a', encoding='utf-8') as stream:
+                stream.write('W01,WALL600\n')
+            cfg = json.loads(config.read_text())
+            cfg['wall_properties'] = {'WALL600':{'thickness_m':.6,'fsam_material_tag':5,
+                'material_calibration_source':'Synthetic fixture'}}
+            config.write_text(json.dumps(cfg), encoding='utf-8')
+            ops = FakeOps()
+            ops.getEleTags = lambda: [10001]
+            result = instantiate_area_elements(ops, topology_json=topology,
+                area_assignment_csv=audit, config_json=config, floor_shells=False)
+            self.assertEqual(result['floor_shell_count'], 0)
+            self.assertEqual(result['nonlinear_wall_panel_count'], 1)
+            self.assertEqual(ops.elements[0][:2], ('E_SFI_MVLEM_3D',10002))
+
+    def test_saved_report_rejects_in_place_changes_to_each_input(self):
+        with TemporaryDirectory() as td:
+            root = Path(td)
+            topology, audit, config = inputs(root)
+            mapping = root / 'section_mapping.json'
+            mapping.write_text('{}', encoding='utf-8')
+            payload = json.loads(config.read_text())
+            payload['section_mapping_json'] = mapping.name
+            config.write_text(json.dumps(payload), encoding='utf-8')
+            instantiate_area_elements(FakeOps(), topology_json=topology,
+                area_assignment_csv=audit, config_json=config, nonlinear_wall_panels=False)
+            archive = package_area_instantiation_audit(topology_json=topology,
+                area_assignment_csv=audit, config_json=config, output_dir=root)
+            with ZipFile(archive) as zipped:
+                self.assertEqual(zipped.read('00_INPUT_SOURCE/Section_Mapping.json'), b'{}')
+            for source in (topology, audit, config, mapping):
+                with self.subTest(source=source.name):
+                    content = source.read_bytes()
+                    source.write_bytes(content + b'\n')
+                    try:
+                        with self.assertRaisesRegex(ValueError, 'changed.*instantiation'):
+                            package_area_instantiation_audit(topology_json=topology,
+                                area_assignment_csv=audit, config_json=config, output_dir=root)
+                    finally:
+                        source.write_bytes(content)
+
+    def test_string_false_cannot_approve_the_source(self):
+        with TemporaryDirectory() as td:
+            topology, audit, config = inputs(Path(td))
+            payload = json.loads(config.read_text())
+            payload['source_reviewed_by_user'] = 'false'
+            config.write_text(json.dumps(payload), encoding='utf-8')
+            ops = FakeOps()
+            with self.assertRaisesRegex(ValueError, 'source_reviewed_by_user=true'):
+                instantiate_area_elements(ops, topology_json=topology,
+                    area_assignment_csv=audit, config_json=config, nonlinear_wall_panels=False)
+            self.assertEqual(ops.elements, [])
+
     def test_missing_saved_area_report_is_explained_not_fabricated(self):
         with TemporaryDirectory() as td:
             root=Path(td)

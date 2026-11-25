@@ -113,6 +113,24 @@ def test_load_audit_popup_does_not_export_excel_without_button_click():
     assert "self.id_value=tk.StringVar(value='')" in ui
 
 
+def test_mapping_workbook_review_preserves_import_artifacts():
+    with tempfile.TemporaryDirectory() as td:
+        folder = _fixture(Path(td))
+        workbook = folder / 'OpenSees_Property_Element_Load_Audit_V125.xlsx'
+        library = folder / 'OpenSees_Device_and_Parameter_Library_V125.json'
+        workbook.write_bytes(b'original import workbook')
+        library.write_bytes(b'original import material library')
+        gui = SimpleNamespace(folder=folder, win=None)
+        with patch('os.startfile', create=True) as opened:
+            mapping_gui.MappingGUI.excel(gui)
+        opened.assert_called_once()
+        review_path = Path(opened.call_args.args[0])
+        assert review_path.is_file()
+        assert (folder / '02_MODEL') in review_path.parents
+        assert workbook.read_bytes() == b'original import workbook'
+        assert library.read_bytes() == b'original import material library'
+
+
 def test_research_override_cannot_target_source_only_unassembled_member():
     with tempfile.TemporaryDirectory() as td:
         folder=_fixture(Path(td))

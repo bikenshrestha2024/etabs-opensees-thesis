@@ -20,3 +20,5 @@
 **No physical model approval:** A correctly packed archive is only evidence transport. Native shell-edge/MPC restraints (32 primary vs 44 mesh nodes), ETABS/OpenSees equivalence, Rayleigh verification, area panel load/mass transfer, FSAM calibration and nonlinear convergence remain separate checks. Do not treat a SOURCE_ONLY inventory or modal mass coverage as a design or NLTHA PASS.
 
 **Regressions:** \`python -m unittest -v tests.test_evidence_zip_publication_20261123 tests.test_model_stage_mesh_area_inventory\`; then run the repository's headless CI and Windows smoke tests. The tests do not execute native ETABS/OpenSees.
+
+Callers with source-bound evidence may supply `expected_sha256` keyed by archive entry. The provided keys must exactly match the file list. The publisher checks the source digests and verifies the staged ZIP against its manifest before atomic publication.

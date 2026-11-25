@@ -256,12 +256,17 @@ def validate_device(selection):
     if target=='BRB_STEEL02' and (min(p['core_area'],p['Fy'],p['E0'],p['R0'],p['cR1'],p['cR2'])<=0 or not 0<=p['b']<1):raise ValueError('Invalid BRB core area, strengths, stiffness or hardening parameters')
 
 
-@timed_outputs('Mapping and load audit workbook','folder')
-def export_excel(folder,path=None):
+def export_excel(folder,path=None, *, write_library=True):
     """[REF docs/source/components/sections/mapping_audit.py.md] Copy-safe audit; use timestamped sibling when original is locked."""
+    target = Path(path or Path(folder)/'OpenSees_Property_Element_Load_Audit_V125.xlsx')
+    return _write_excel(folder, target, write_library=write_library)
+
+
+@timed_outputs('Mapping and load audit workbook', 'path')
+def _write_excel(folder, path, *, write_library):
     from openpyxl import Workbook
     from openpyxl.styles import Font,PatternFill,Alignment
-    data=collect(folder);path=Path(path or Path(folder)/'OpenSees_Property_Element_Load_Audit_V125.xlsx')
+    data=collect(folder)
     wb=Workbook();wb.remove(wb.active)
     def sheet(name,records):
         ws=wb.create_sheet(name)
@@ -315,5 +320,6 @@ def export_excel(folder,path=None):
                 "Close Excel or choose a writable output directory."
             ) from second
         path=alternate
-    Path(folder,'OpenSees_Device_and_Parameter_Library_V125.json').write_text(json.dumps(dict(library=library(),parameter_sources=parameter_sources()),indent=2),encoding='utf-8')
+    if write_library:
+        Path(folder,'OpenSees_Device_and_Parameter_Library_V125.json').write_text(json.dumps(dict(library=library(),parameter_sources=parameter_sources()),indent=2),encoding='utf-8')
     return path

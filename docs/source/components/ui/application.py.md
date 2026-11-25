@@ -96,3 +96,7 @@ The Import tab's source audits group now includes **Generate full gravity load-p
 
 ## Import audit terminology
 Lowest-elevation six-DOF fixities in the topology/load-only preview are explicitly preview-only. The connected solver chooses its own support profile. The primary thesis model retains 32 physical supports and 44 additional wall mesh points pending source-matched edge transfer. Production readiness and literature-based exploratory execution are distinct; import success does not approve either physical model.
+
+## Import to Model handoff
+
+Use **Review selected export in Model** to continue from Import. Model shows the current export folder and passes it to the mapping, slab mesh and area integration tools. These actions wait for the active Import worker to finish. The completed worker's saved load view stays associated with the folder used for that worker, even if the folder field changes before completion. Read the worker's report separately for assembly errors and engineering readiness.
