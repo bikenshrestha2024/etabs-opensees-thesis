@@ -22,3 +22,6 @@ Editor Claude Code (model label UNKNOWN). Branch `feat/nbc105-normative-sentence
 
 ## Ruling 6: modal mass coverage
 `clause_07_modal_response_spectrum.py` (`modal_mass_participation_profile`, `modal_mass_participation_by_direction`, `MODAL_MASS_THRESHOLD_PERCENT`), `components/modal/analysis.py` (result fields `mass_coverage`, `reached_90_at_mode`, `reached_100_at_mode`, row region flags), `tests/test_nbc105_followup_modal_mass.py`, row N7-0016.
+
+## Ruling 11: scope update, DEFERRED_DESIGN_PHASE
+`components/nbc105/normative_register.py` and `tools/nbc105_normative_extract.py` (new disposition in vocabulary, notes required, counted as open external), `DISPOSITION_RULES.csv` (27 Annex B rules rewritten: 156 rows PROJECT_NOT_APPLICABLE -> DEFERRED_DESIGN_PHASE; 9.2 pushover notes record the user declaration; the file round-trips byte-identically through csv), `PROJECT_DECLARATIONS.md` section 6, guide, `tests/test_nbc105_normative_register.py::DeferredDesignPhase`. Gate stays fail-closed and never certified.

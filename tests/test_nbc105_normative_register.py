@@ -170,3 +170,40 @@ class Wiring(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeferredDesignPhase(unittest.TestCase):
+    """Owner ruling 11: DEFERRED_DESIGN_PHASE is a valid, open, never-certified disposition."""
+
+    def test_vocabulary_and_note_required(self):
+        self.assertIn("DEFERRED_DESIGN_PHASE", N.DISPOSITIONS)
+        self.assertIn("DEFERRED_DESIGN_PHASE", X.DISPOSITIONS)
+        p = N.validate_register([_row(1, disp="DEFERRED_DESIGN_PHASE")], check_references=False)
+        self.assertEqual(p["missing_note"], ["N1-0001"])
+        self.assertEqual(p["invalid_disposition"], [])
+
+    def test_gate_stays_closed_and_never_certified(self):
+        rows = [_row(1, disp="DEFERRED_DESIGN_PHASE", evidence_note="deferred design phase"),
+                _row(2, disp="DEFERRED_DESIGN_PHASE", evidence_note="deferred design phase")]
+        g = N.normative_register_gate(rows, check_references=False)
+        self.assertFalse(g["certified"])
+        self.assertEqual(g["status"], "REGISTER_REVIEWED_EXTERNAL_GATES_OPEN")
+        self.assertEqual(g["open_external_rows"]["DEFERRED_DESIGN_PHASE"], 2)
+        self.assertEqual(len(g["external_gates"]), 3)
+
+    def test_annex_b_rows_are_deferred_not_not_applicable(self):
+        import csv
+        reg = list(csv.DictReader(open(N.register_path(), encoding="utf-8", newline="")))
+        b = [r for r in reg if r["clause"] == "B"]
+        self.assertFalse([r["id"] for r in b if r["disposition"] == "PROJECT_NOT_APPLICABLE"])
+        deferred = [r for r in b if r["disposition"] == "DEFERRED_DESIGN_PHASE"]
+        self.assertEqual(len(deferred), 156)
+        self.assertTrue(all("outrigger braces and BRBs ARE steel members" in r["evidence_note"] for r in deferred))
+
+    def test_pushover_rows_record_user_declaration(self):
+        import csv
+        reg = list(csv.DictReader(open(N.register_path(), encoding="utf-8", newline="")))
+        push = [r for r in reg if r["clause"] == "9" and r["subclause"].startswith("9.2") and r["disposition"] == "PROJECT_NOT_APPLICABLE"]
+        self.assertEqual(len(push), 13)
+        self.assertTrue(all("nonlinear time history only" in r["evidence_note"] and "USER_DECLARED 2026-11-26" in r["evidence_note"] for r in push))
+

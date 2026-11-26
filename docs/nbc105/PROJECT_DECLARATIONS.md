@@ -66,3 +66,12 @@ USER_DECLARED 2026-11-26: the project uses 8 ground motions. `components/nbc105/
 Printed rule re-read (printed p. 42, 8.1.3; printed pp. 47, 9.3.3): "If less than 7 numbers of ground motion records are used, maximum values of the response quantities ... shall be used. If the number of ground motions used is more than 7, then average values of the considered number of ground motions shall be used." Exactly 7 is not defined in the print.
 
 Consequence in code (`project_record_set_evaluation`, `nonlinear_time_history/nbc105_2025_audit.py::project_response_aggregation`): all 8 accepted -> AVERAGE; fewer than 7 accepted -> MAXIMUM (status `OK_BUT_DECLARED_COUNT_NOT_MET`); exactly 7 accepted (for example one of the 8 failed or did not converge) -> `BLOCKED`, fail-closed as printed. The owner phrase "average for >= 7" is not applied to 7 because the print does not say so. Failed or non-converged records never enter the accepted set.
+
+## 6. Scope update: outrigger braces are steel members; design phases deferred; pushover out of scope
+
+USER_DECLARED 2026-11-26. Supersedes the earlier register reading that Annex B was `PROJECT_NOT_APPLICABLE` because the project had no steel lateral members.
+
+- The outrigger braces and BRBs ARE steel members. Annex B (steel structures) therefore applies to the project. All Annex B rows that were `PROJECT_NOT_APPLICABLE` (156) are now `DEFERRED_DESIGN_PHASE`.
+- Roadmap: (1) make the nonlinear time-history analysis work; (2) then the Annex A and Annex B design parts. Only Annex C (seismic zoning factor, Table C-1 and Figure 4-3) is required now. Annex A rows keep their existing dispositions (mostly `MANUAL_PROJECT_CHECK`); they are design-phase items on the same roadmap.
+- Pushover (nonlinear static) analysis is not in the current scope: nonlinear time history only. The 13 pushover rows of 9.2 stay `PROJECT_NOT_APPLICABLE` and their note records this declaration.
+- `DEFERRED_DESIGN_PHASE` is part of the register vocabulary and of the gate (`components/nbc105/normative_register.py`, `tools/nbc105_normative_extract.py`). A deferred row is open work: it never counts as accepted, the gate stays `REGISTER_REVIEWED_EXTERNAL_GATES_OPEN` at best and `certified` is always false.

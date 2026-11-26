@@ -57,7 +57,8 @@ KINDS = ("SHALL", "SHOULD", "MAY", "LIMIT", "STATEMENT", "CLAUSE", "TABLE",
          "DEFINITION")
 DISPOSITIONS = ("IMPLEMENTED_AND_TESTED", "IMPLEMENTED_UNTESTED",
                 "MANUAL_PROJECT_CHECK", "PROJECT_NOT_APPLICABLE",
-                "DEFINITION_ONLY", "EXTERNAL_DATA_REQUIRED", "UNVERIFIED_GAP")
+                "DEFINITION_ONLY", "EXTERNAL_DATA_REQUIRED", "UNVERIFIED_GAP",
+                "DEFERRED_DESIGN_PHASE")
 REGISTER_COLUMNS = (
     "id", "clause", "subclause", "printed_page", "kind", "locator", "sha256",
     "topic", "inherited_kind", "disposition", "implementation_ref",

@@ -18,9 +18,10 @@ Review columns: `disposition` (exactly one value below), `implementation_ref` (`
 | PROJECT_NOT_APPLICABLE | not applicable to the declared project; the note gives the reason |
 | DEFINITION_ONLY | definition, symbol list, heading or explanation without its own requirement |
 | EXTERNAL_DATA_REQUIRED | needs data not transcribed here (Figure 4-3 contours, Table C-1) |
+| DEFERRED_DESIGN_PHASE | applies to the project but its design is deferred to a later phase by the owner (Annex B steel design after the nonlinear time-history analysis works); open work, never accepted |
 | UNVERIFIED_GAP | not reviewed or not resolved; always visible and blocks the gate |
 
-Project reasons used: 25-storey, about 95 m RC dual wall-frame with damped outriggers, Kathmandu (Kirtipur), no basement, no steel moment/braced frame, no masonry, no base isolation (see [project declarations](PROJECT_DECLARATIONS.md); these are user declarations, not verified here).
+Project reasons used: 25-storey, about 95 m RC dual wall-frame with damped outriggers, Kathmandu (Kirtipur), no basement, no steel moment/braced frame as the primary system (the outrigger braces are steel members, so Annex B is DEFERRED_DESIGN_PHASE, see declarations section 6), no masonry, no base isolation (see [project declarations](PROJECT_DECLARATIONS.md); these are user declarations, not verified here).
 
 ## Workflow
 
