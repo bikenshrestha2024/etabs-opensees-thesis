@@ -303,6 +303,14 @@ def run_nbc105_modal_audit(ops, *, nmodes=30, output_dir=".",
         else:
             profile = {"status": "NOT_EVALUATED", "reason": "missing per-mode participation values"}
         mass_coverage[axis] = profile
+    from components.nbc105.clause_07_missing_mass import missing_mass_gate
+    mm_gate = {}
+    for axis, seq in (("X", ux_pct), ("Y", uy_pct)):
+        # [REF NBC105-2025 §7.3, printed p. 41] gate for the 33 Hz missing-mass correction (arithmetic on the returned modes)
+        try:
+            mm_gate[axis] = missing_mass_gate(freqs, seq) if all(v is not None for v in seq) and all(f is not None for f in freqs) else {"status": "NOT_EVALUATED", "missing": ["PER_MODE_PARTICIPATION_AND_FREQUENCY"]}
+        except ValueError as exc:
+            mm_gate[axis] = {"status": "NOT_EVALUATED", "missing": [str(exc)]}
     result = {
         "standard": "NBC 105:2025",
         "clauses": ["7.3 Number of Modes to be Considered", "7.4 Combination of Modal Effects", "7.5 Scale Factor for Design Values of the Combined Response"],
@@ -317,6 +325,7 @@ def run_nbc105_modal_audit(ops, *, nmodes=30, output_dir=".",
         "UY_90_percent_reached": bool(uy_ok),
         "first_mode_reaching_target": first90,
         "mass_coverage": mass_coverage,
+        "missing_mass_gate": mm_gate,
         "reached_90_at_mode": {k: v.get("reached_90_at_mode") for k, v in mass_coverage.items()},
         "reached_100_at_mode": {k: v.get("reached_100_at_mode") for k, v in mass_coverage.items()},
         "NBC_5_1_period_check": period_check,

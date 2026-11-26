@@ -89,7 +89,10 @@ def run_model_spectrum(folder,config,output_dir):
         cache_timer.finish('completed')
         rows=modal['rows'];props=ops.modalProperties('-return')
         if float(modal['cumulative_U'+axis+'_percent'] or 0)<90:raise ValueError(axis+' modal mass is below 90 percent; increase modes.')
-        if modal['modes_at_or_above_33_Hz']:raise ValueError('Returned modes at/above 33 Hz require a reviewed missing-mass correction, not implemented by this MRSM engine. No design result exported.')
+        # [REF NBC105-2025 §7.3, printed p. 41] production gate: modes at/above 33 Hz need the missing-mass correction (clause_07_missing_mass); its integration here (storey mode shapes + ZPA coefficient) is still open, so the gate stays closed with the exact missing inputs.
+        from components.nbc105.clause_07_missing_mass import missing_mass_gate
+        gate=missing_mass_gate([r['frequency_Hz'] for r in rows],[r['U'+axis+'_participation_percent'] for r in rows])
+        if gate['status'].startswith('BLOCKED'):raise ValueError('Returned modes at/above 33 Hz require the NBC 7.3 missing-mass correction, whose model-data integration is not wired in this MRSM engine (missing inputs: '+', '.join(gate['missing'])+'). No design result exported.')
         ns=sorted(map(int,data['nodes']));elements=sorted(ops.getEleTags());support_tags=sorted(int(n) for n,v in data['supports'].items() if any(v))
         display_nodes=dict(data['nodes'],**{str(g['master_tag']):g['master_xyz'] for g in groups});display_ns=sorted(map(int,display_nodes))
         for ecc_sign in ((0,1,-1) if config.get('accidental_torsion',True) else (0,)):

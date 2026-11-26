@@ -23,3 +23,7 @@ Still not proven: native modal shape identity, cumulative 90% directional mass a
 ## Owner ruling 6 (2026-11-26)
 
 7.3, p. 40: cumulative modal mass per direction to 100 percent with `reached_90_at_mode`, `reached_100_at_mode` and highlighted 90 percent region (`modal_mass_participation_profile`); compliance threshold remains 90 percent. Tests `tests/test_nbc105_followup_modal_mass.py`.
+
+## Owner ruling 9a: 33 Hz missing-mass correction (2026-11-26)
+
+7.3, p. 41: `components/nbc105/clause_07_missing_mass.py` (residual rigid mass x ZPA coefficient at T = 1/33 s, SRSS with the modal response, gate). Guide `docs/source/components/nbc105/clause_07_missing_mass.py.md`; tests `tests/test_nbc105_followup_missing_mass.py`. Open: passing storey mode shapes and the ZPA coefficient from the eigen solve into `run_model_spectrum` (the engine stays closed for modes at or above 33 Hz and lists the missing inputs).
