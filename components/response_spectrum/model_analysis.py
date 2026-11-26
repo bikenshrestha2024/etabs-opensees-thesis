@@ -633,14 +633,17 @@ def launch(parent,folder):
     # Only a same-source, same-state, same-input current numeric run may
     # display as verified; fields changed while checking invalidate it.
     import os
-    selected_gui_fields={k:v.get() for k,v in fields.items()}
-    selected_gui_fields['gravity_profile']=os.environ.get(
-        'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+    def current_inputs():
+        return dict({key:value.get() for key,value in fields.items()},
+                    gravity_profile=os.environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'))
+
+    selected_gui_fields=current_inputs()
     previous_status=output/'MRSM_Batch_Status_V151.json'
     check_label='CHECKING SAVED RUN | validating selected source and six numeric cases'
     def invalidate_saved_review(*unused):
         text=operation_status.get()
         if text.startswith(('CHECKING SAVED RUN','SAVED NUMERIC REVIEW')):
+            latest_result.update(folder=None,run=None)
             operation_status.set(
                 'REVIEW | MRSM inputs changed; reopen or rerun for current selection')
     for selected in fields.values():
@@ -653,13 +656,14 @@ def launch(parent,folder):
                 if operation_status.get()!=check_label:
                     # The user may have edited inputs or started a new run.
                     return
-                current={k:v.get() for k,v in fields.items()}
-                current['gravity_profile']=os.environ.get(
-                    'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+                current=current_inputs()
                 if current!=selected_gui_fields:
                     operation_status.set(
                         'REVIEW | MRSM source inputs changed during saved check')
                 elif prior['status']=='SAVED_NUMERICALLY_COMPLETE_SOURCE_MATCHED':
+                    latest_result['run']=Path(prior['run_dir'])
+                    latest_result['folder']=latest_result['run']/'02_RESULTS'
+                    latest_result['input_sha256']=mrsm_input_signature(current)
                     operation_status.set(
                         'SAVED NUMERIC REVIEW | '+
                         str(prior['numerical_cases_verified'])+
@@ -684,9 +688,7 @@ def launch(parent,folder):
         except (tk.TclError,RuntimeError):pass
     def run():
         try:
-            cfg={k:v.get() for k,v in fields.items()}
-            cfg['gravity_profile']=os.environ.get(
-                'OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED')
+            cfg=current_inputs()
             selected_gui_fields=dict(cfg)
             selected_input_sha=mrsm_input_signature(selected_gui_fields)
             data_file=Path(folder)/'OpenSees_Complete_Model_Data_V118.json'
@@ -716,6 +718,7 @@ def launch(parent,folder):
                                 input_sha256=selected_input_sha))
             board["ledger"]=ledger;board["cancelled"]=False
             def worker():
+                current_run=None
                 try:
                     append('[BATCH PLAN] '+', '.join(states)+'; each state runs X and Y, centered and +/-5% eccentricity.\n')
                     from components.inputs.project_workbooks import analysis_output_folder
@@ -733,10 +736,12 @@ def launch(parent,folder):
                             raise ValueError('MRSM source model changed after batch selection; select current source again')
                         run_root=create_case_run(folder,'MRSM','MRSM_'+current['gravity_profile'],
                                                  state=state,model_sha256=model_hash)
+                        current_run=run_root
                         ledger.set_provenance(run_dir=str(run_root))
                         latest_result['run']=run_root
                         out=run_root/'02_RESULTS'
                         latest_result['folder']=out
+                        latest_result['input_sha256']=selected_input_sha
                         record_case_status(run_root,'RUNNING')
                         path=run_root/'00_INPUT_SOURCE'/'MRSM_Config_V132.json'
                         atomic_json(path,current)
@@ -792,7 +797,6 @@ def launch(parent,folder):
                                             ledger.set(key,'FAILED',
                                                 'Saved case validation failed after child exit: '+str(exc))
                 except Exception as e:
-                    current_run=latest_result.get('run')
                     if current_run is not None:
                         try:record_case_status(current_run,'FAILED',message=str(e))
                         except (OSError,ValueError):pass
@@ -801,7 +805,6 @@ def launch(parent,folder):
                     ledger.finish_pending("Batch interrupted or case completion was not reported; inspect state log")
                     # Keep the exact process ledger with its immutable run
                     # alongside the stage-level latest-run pointer.
-                    current_run=latest_result.get('run')
                     if current_run is not None:
                         try:
                             import shutil
@@ -815,11 +818,10 @@ def launch(parent,folder):
                     operation('EXPORTING','Case execution ended; collecting auditable MRSM evidence ZIP')
                     try:
                         from components.validation.seismic_review_bundle import bundle_seismic_review
-                        target=latest_result.get('folder')
-                        if target is None:
+                        if current_run is None:
                             raise ValueError('No MRSM output created')
-                        package=bundle_seismic_review(folder,target,method="MRSM")
-                        append("[MRSM_AUTO_REVIEW_ZIP] "+package["zip"]+"\\n")
+                        package=bundle_seismic_review(folder,current_run/'02_RESULTS',method="MRSM")
+                        append("[MRSM_AUTO_REVIEW_ZIP] "+package["zip"]+"\n")
                     except Exception as pack_exc:
                         append("[MRSM_REVIEW_PACKAGING_FAILED] "+str(pack_exc)+"\\n")
                     reopened=review_saved_mrsm_batch(
@@ -835,12 +837,33 @@ def launch(parent,folder):
             threading.Thread(target=worker,daemon=True).start()
         except Exception as e:messagebox.showerror('MRSM inputs',str(e),parent=win)
     button=ttk.Button(actions,text='Run selected state(s)',command=run);button.pack(side='left')
+    def selected_evidence_folder():
+        selected=latest_result.get('folder')
+        from components.inputs.output_contract import inspect_case_manifest
+        if (selected is None or latest_result.get('input_sha256')!=mrsm_input_signature(current_inputs())
+                or not (selected/'MRSM_Results_V132.json').is_file()):
+            raise ValueError('Open a saved MRSM case matching the current inputs, or run the selected state first.')
+        case=inspect_case_manifest(selected.parent,expected_stage='MRSM')
+        if not case['valid'] or case['solver_status']!='COMPLETED_SOLVER_ONLY':
+            raise ValueError('The selected MRSM case has no valid completion manifest.')
+        manifest=json.loads((selected.parent/'00_INPUT_SOURCE'/'CASE_MANIFEST.json')
+                            .read_text(encoding='utf-8-sig'))
+        model=Path(folder)/'OpenSees_Complete_Model_Data_V118.json'
+        if (model.is_symlink() or not model.is_file()
+                or hashlib.sha256(model.read_bytes()).hexdigest()!=manifest.get('model_sha256')):
+            raise ValueError('The current model export differs from the saved MRSM case.')
+        return selected
+
     def export_zip():
+        try:
+            selected=selected_evidence_folder()
+        except (OSError,ValueError) as exc:
+            messagebox.showerror('MRSM review ZIP',str(exc),parent=win)
+            return
         operation('EXPORTING','Creating MRSM review ZIP from existing saved results')
         def worker():
             try:
                 from components.validation.seismic_review_bundle import bundle_seismic_review
-                selected=latest_result.get('folder') or output
                 package=bundle_seismic_review(folder,selected,method='MRSM')
                 append('[MRSM_REVIEW_ZIP] '+package['zip']+'\n')
                 operation('EXPORTED','MRSM review ZIP: '+package['zip'])
@@ -851,10 +874,14 @@ def launch(parent,folder):
     ttk.Button(actions,text='Export full evidence ZIP',command=export_zip).pack(side='left')
     def export_organized_zip():
         """[REF docs/source/components/ui/organized_results.py.md] Keep legacy MRSM paths."""
+        try:
+            selected=selected_evidence_folder()
+        except (OSError,ValueError) as exc:
+            messagebox.showerror('Organized MRSM review ZIP',str(exc),parent=win)
+            return
         def worker():
             try:
                 from components.ui.organized_results import publish_mrsm_review
-                selected=latest_result.get('folder') or output
                 result=publish_mrsm_review(selected)
                 append('[ORGANIZED_MRSM_RUN_ZIP] '+
                        result['zip_files']['MRSM_RUN']+'\n')

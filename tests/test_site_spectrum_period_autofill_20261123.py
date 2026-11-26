@@ -91,11 +91,15 @@ class SoilSpectrumSourcePeriodTests(TestCase):
             self.assertEqual(app.t1y.get(),'1.6')
 
     def test_main_launcher_passes_selected_export_before_loading(self):
-        from pathlib import Path
-        source=(Path(__file__).resolve().parents[1]/
-                'components/ui/application.py').read_text(encoding='utf-8')
-        self.assertIn('launch_spectrum_gui(self.root, self.out.get())',source)
-        self.assertNotIn('populate_site(app,self.out.get())',source)
+        from components.ui.application import App
+        with TemporaryDirectory() as td:
+            root=Path(td).resolve()
+            launcher=App.__new__(App)
+            launcher.root=object()
+            launcher.out=Var(root)
+            with patch('NBC105_Spectrum_Scaling_V115.launch_spectrum_gui') as launch:
+                self.assertIs(launcher._open_spectrum_diagnostics(),launch.return_value)
+                launch.assert_called_once_with(launcher.root,str(root))
 
     def test_launcher_without_folder_does_not_import_from_legacy_fallback(self):
         from components.response_spectrum.site_spectrum_and_scaling import launch_spectrum_gui

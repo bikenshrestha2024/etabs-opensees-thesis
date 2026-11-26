@@ -437,10 +437,11 @@ def _run_analysis(config):
             os.environ['OPENSEES_LIMIT_STATE']=config['limit_state']
             try:
                 _model_scope=runpy.run_path(str(model), run_name="opensees_ltha_model")
-                from components.model.support_case_contract import require_runtime_support_case
-                verified_case=require_runtime_support_case(
-                    config.get('support_case','PHYSICAL_32'),_model_scope.get('MODEL_REPORT'))
-                print('[HISTORY SELECTED SUPPORT CASE VERIFIED]',verified_case,flush=True)
+                from components.model.support_case_contract import solver_reaction_support_tags
+                support_nodes=solver_reaction_support_tags(
+                    _model_scope.get('MODEL_REPORT'),os.environ['OPENSEES_SUPPORT_CASE'])
+                print('[HISTORY SELECTED SUPPORT CASE VERIFIED]',
+                      os.environ['OPENSEES_SUPPORT_CASE'],len(support_nodes),flush=True)
             except BaseException as exc:
                 profiler.add('model_and_gravity',phase_clock);profiler.finish('failed',str(exc));raise
             profiler.add('model_and_gravity',phase_clock)
@@ -565,18 +566,14 @@ def _run_analysis(config):
                     active_device_catalog, baseline_axial_projection,
                     device_sample, summarize_device_demands)
                 source_model_data_path=model.parent/"OpenSees_Complete_Model_Data_V118.json"
-                support_nodes=[]
+                if not set(support_nodes).issubset(node_tags):
+                    raise ValueError("Verified reaction support tags are missing from the assembled model.")
                 devices=[]
                 device_baselines={}
                 device_history=[]
                 missing_recorder_evidence=[]
                 if source_model_data_path.is_file():
                     source_model_data=json.loads(source_model_data_path.read_text(encoding="utf-8-sig"))
-                    support_nodes=[int(n) for n,flags in source_model_data.get("supports",{}).items()
-                                   if any(bool(q) for q in flags[:3])]
-                    if not support_nodes or not set(support_nodes).issubset(node_tags):
-                        missing_recorder_evidence.append("Source support mapping absent or inconsistent with active OpenSees nodes")
-                        support_nodes=[]
                     devices=active_device_catalog(model.parent,source_model_data.get("frames",[]))
                     for device in devices:
                         if device["tag"] not in ops.getEleTags():
@@ -584,7 +581,7 @@ def _run_analysis(config):
                         device_baselines[device["tag"]]=baseline_axial_projection(
                             ops,device,source_model_data["nodes"])
                 else:
-                    missing_recorder_evidence.append("OpenSees_Complete_Model_Data_V118.json unavailable: base shear/device channels not recorded")
+                    missing_recorder_evidence.append("OpenSees_Complete_Model_Data_V118.json unavailable: device channels not recorded")
                 base_reaction_reference=(support_resultants(ops,support_nodes)
                                          if support_nodes else None)
                 csv_path=out / f"NBC105_NLTHA_{case}_history.csv"
@@ -926,9 +923,8 @@ class NonlinearTimeHistoryGUI:
         self.y_record_paths = list(LTH_DEFAULT_Y_RECORDS)
         self.execute = tk.BooleanVar(value=RUN_NONLINEAR_TIME_HISTORY)
         self._build()
-        from OpenSees_Linear_Autofill_V124 import populate_available
-        ttk.Button(self.win,text='Refresh available project inputs',command=lambda:populate_available(self,role='nonlinear_model_script')).pack(anchor='w')
-        self.win.after_idle(lambda:populate_available(self,role='nonlinear_model_script'))
+        ttk.Button(self.win,text='Refresh available project inputs',command=self._refresh_available).pack(anchor='w')
+        self.win.after_idle(lambda:self._refresh_available() if not self.model.get() else None)
         # Initial selection comes from the export manifest. Coalesce model and
         # ULS/SLS changes into one deferred source-specific period refresh.
         # Modal elastic periods remain references, not NLTHA stiffness approval.
@@ -936,6 +932,14 @@ class NonlinearTimeHistoryGUI:
         self._readiness_selection_model = None
         self.model.trace_add('write',lambda *_:self._queue_period_refresh())
         self.ls.trace_add('write',lambda *_:self._queue_period_refresh())
+
+    def _refresh_available(self):
+        if self.model.get():
+            self._sync_readiness_for_selected_model()
+            self._refresh_known()
+        else:
+            from OpenSees_Linear_Autofill_V124 import populate_available
+            populate_available(self,role='nonlinear_model_script')
 
     def _queue_period_refresh(self):
         if self._period_refresh_queued:

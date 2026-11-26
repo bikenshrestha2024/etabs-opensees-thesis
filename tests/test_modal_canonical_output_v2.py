@@ -10,6 +10,26 @@ from components.inputs.output_contract import record_case_status
 
 
 class ModalLiveMigrationTests(unittest.TestCase):
+    def test_modal_zip_versions_and_uses_identical_organized_copy(self):
+        from zipfile import ZipFile
+        from components.modal.gui_and_reports import package_modal_evidence
+
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            model=root/'OpenSees_Complete_Linear_Model.py'
+            model.write_text('pass\n',encoding='utf-8')
+            run=prepare_canonical_modal_run(root,'ULS',model)
+            (run/'02_RESULTS'/'NBC105_Modal_V111.json').write_text('{"returned_modes":40,"limit_state":"ULS"}')
+            for section in ('02_RESULTS','03_EXCEL'):
+                (run/section/'modes.csv').write_text('mode,period\n1,2.4\n')
+            original=package_modal_evidence(run,'ULS')
+            revised=package_modal_evidence(run,'ULS')
+            self.assertNotEqual(original,revised)
+            self.assertTrue(original.is_file())
+            with ZipFile(revised) as archive:
+                self.assertIn('03_EXCEL/modes.csv',archive.namelist())
+                self.assertNotIn('02_RESULTS/modes.csv',archive.namelist())
+
     def test_new_modal_case_is_independent_and_discoverable(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td)

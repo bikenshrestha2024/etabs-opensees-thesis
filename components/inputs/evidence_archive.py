@@ -35,7 +35,7 @@ def _sha256(path: Path) -> str:
 
 def publish_case_evidence_zip(source_run, *, filename, files, category=None,
                               status='REVIEW_EVIDENCE_NOT_ENGINEERING_ACCEPTANCE',
-                              expected_sha256=None) -> Path:
+                              expected_sha256=None, overwrite=True) -> Path:
     """Create an atomic archive with an SHA256 manifest and no implicit file crawl.
 
     files is an iterable of (archive_relative_path, absolute_source_path).
@@ -44,6 +44,7 @@ def publish_case_evidence_zip(source_run, *, filename, files, category=None,
     paths and symlinks fail closed. Do not package sensitive source files unless
     the user has explicitly selected the local evidence package for review.
     expected_sha256 optionally binds every archive path to a previously reviewed digest.
+    With overwrite=False, publish only if the destination name is still free.
     """
     root = Path(source_run).expanduser()
     _refuse_linked_path(root)
@@ -119,7 +120,17 @@ def publish_case_evidence_zip(source_run, *, filename, files, category=None,
                         digest.update(chunk)
                 if digest.hexdigest() != entry['sha256']:
                     raise IOError(f"Source changed while packaging: {entry['archive_path']}")
-        temporary.replace(target)
+        if overwrite:
+            temporary.replace(target)
+        else:
+            reservation = target.with_name(target.name + '.reserve')
+            reservation.mkdir()
+            try:
+                if target.exists():
+                    raise FileExistsError(target)
+                temporary.rename(target)
+            finally:
+                reservation.rmdir()
     finally:
         temporary.unlink(missing_ok=True)
     return target

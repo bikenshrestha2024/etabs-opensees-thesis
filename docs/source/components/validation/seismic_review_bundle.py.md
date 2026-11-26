@@ -35,6 +35,10 @@ The selected native/legacy analysis-output folder remains a **read-only source**
 
 For the source export's `03_ESM/RUNS/ULS|SLS/<model>` selected response directory, automatic **ESM** evidence now publishes review snapshots to `<export>/03_ESM/REVIEW_SNAPSHOTS` and ZIPs to `<export>/03_ESM/07_EXPORT_ZIP`. An arbitrary selected subdirectory inside the same ETABS export cannot create a fresh `Seismic_Review_Packages` or `07_EXPORT_ZIP` under an ESM solver-run folder. This restores the same stage-level output owner used by ESM's combined exporter.
 
-**MRSM is intentionally unchanged**: a manifested MRSM solver run retains its case-local `07_EXPORT_ZIP` and review folder. An explicitly selected external output directory remains an override, and existing source or legacy ZIPs are not moved, deleted, repackaged or implicitly accepted.
+An explicitly selected external ESM output directory remains an override. Existing source and legacy ZIPs remain available.
 
-The folder correction is verified only by temporary-filesystem regression `tests/test_stage_owned_seismic_legacy_routing.py` and source code checks. Native ETABS/OpenSees numerical comparison and engineering acceptance remain open.
+Temporary-filesystem coverage for ESM routing is in `tests/test_stage_owned_seismic_legacy_routing.py`.
+
+# Canonical MRSM review folders
+
+An MRSM run's `02_RESULTS` remains the solver source. The expanded review lives under its sibling `06_REVIEW/Seismic_Review_Packages`, with its ZIP and archive pointer under `07_EXPORT_ZIP`. The review includes the selected run's input manifest, logs, results and reports. It excludes timing sidecars, prior packages and unrelated rebuilt model files. The packager checks the original model digest when the case manifest records it and verifies staged archive contents before publication.

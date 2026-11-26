@@ -2463,7 +2463,10 @@ class App:
         stage_tabs.add(stage_3,text="4. Linear")
         stage_3.columnconfigure(0,weight=1,uniform="stagecols")
         stage_3.columnconfigure(1,weight=1,uniform="stagecols")
-        ttk.Label(stage_3,text="Reference ESM, modal/RSA and linear time-history analyses on the reviewed model.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
+        linear_header = ttk.Frame(stage_3)
+        linear_header.grid(row=0,column=0,columnspan=2,sticky="ew",padx=10,pady=(4,8))
+        ttk.Label(linear_header,text="Equivalent static, modal, response spectrum and linear time history.").pack(anchor="w")
+        ttk.Label(linear_header,textvariable=self.out,wraplength=980).pack(anchor="w",pady=(2,0))
         group_3_0=make_group(stage_3,"Static and modal","Linear analysis",0)
         group_3_1=make_group(stage_3,"Dynamic linear","Linear analysis",1)
         stage_frames.append(stage_3)
@@ -2531,7 +2534,7 @@ class App:
         action(group_3_0,text="OpenSees equivalent static analysis — ULS/SLS",command=self._open_nbc105_esm)
         action(group_3_0,text="OpenSees modal analysis + NBC checks",command=self._open_modal_audit)
         action(group_3_1,text="Site / record spectra and matching diagnostics",command=self._open_spectrum_diagnostics)
-        action(group_3_1,text="Model response spectrum (CQC) - SLS / ULS",command=lambda:__import__('OpenSees_Model_Response_Spectrum_V132').launch(self.root,self.out.get()))
+        action(group_3_1,text="Model response spectrum (CQC) - SLS / ULS",command=lambda:self._open_gravity_nbc_review('OpenSees_Model_Response_Spectrum_V132'))
         action(group_6_1,text="Lateral deformation / drift outputs",command=lambda:__import__('OpenSees_Response_Checks_V132').launch_response_viewer(self.root,Path(self.out.get())))
         action(group_6_1,text="NBC 5.4 irregularity review",command=lambda:__import__('OpenSees_Response_Checks_V132').launch_irregularity(self.root,self.out.get()))
         action(group_3_1,text="OpenSees linear time history — paired NBC records",command=self._open_linear_time_history)
@@ -2589,8 +2592,11 @@ class App:
         ttk.Button(log_actions,text="Scroll to latest",command=lambda:self.logbox.yview_moveto(1)).pack(side="left",padx=3)
         self.log("Select the ETABS EDB and run ETABS → OpenSeesPy Import + Audit. ETABS is closed without saving. The generated connectivity/load audit is not a fully load-complete analysis model; review self-weight multipliers and all skipped load records before analysis.")
     def _open_spectrum_diagnostics(self):
+        folder = self._model_review_folder()
+        if folder is None:
+            return
         from NBC105_Spectrum_Scaling_V115 import launch_spectrum_gui
-        app=launch_spectrum_gui(self.root, self.out.get())
+        app=launch_spectrum_gui(self.root, folder)
         return app
 
     def _open_step13_basis(self):
@@ -2717,8 +2723,11 @@ class App:
 
     def _open_nonlinear_readiness(self):
         """Inspect actual project evidence; do not interpret static checklists as PASS."""
+        folder = self._model_review_folder()
+        if folder is None:
+            return
         from components.model.readiness_dashboard_gui import launch
-        return launch(self.root, self.out.get())
+        return launch(self.root, folder)
 
     def _open_material_values(self):
         from OpenSees_Results_UI_V127 import library_window
@@ -2726,13 +2735,14 @@ class App:
 
     def _open_nbc105_esm(self):
         """Launch the separate NBC ESM input/calculation GUI."""
-        gui_path=Path(__file__).resolve().with_name("OpenSees_Earthquake_Analysis_NBC105_V111.py")
-        if not gui_path.is_file():
-            messagebox.showerror("NBC ESM GUI missing",f"Keep {gui_path.name} beside the main program.")
+        folder = self._model_review_folder()
+        if folder is None:
             return
         try:
+            import OpenSees_Earthquake_Analysis_NBC105_V111 as esm_launcher
+            script = Path(esm_launcher.__file__).resolve()
             # Pass the converter output folder so the GUI opens the matching ETABS exports.
-            subprocess.Popen([sys.executable,str(gui_path),self.out.get().strip()],cwd=str(gui_path.parent), env={**dict(__import__('os').environ),'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
+            return subprocess.Popen([sys.executable,str(script),folder],cwd=str(script.parent), env={**os.environ,'PYTHONIOENCODING':'utf-8','PYTHONUTF8':'1'})
         except Exception as exc:
             messagebox.showerror("Could not open NBC ESM GUI",str(exc))
 
@@ -2759,46 +2769,65 @@ class App:
 
     def _open_modal_audit(self):
         """Open the NBC 105:2025 modal mass / eigenperiod audit GUI."""
-        gui_path=Path(__file__).resolve().with_name("OpenSees_Modal_GUI_NBC105_V111.py")
-        if not gui_path.is_file():
-            messagebox.showerror("Modal audit GUI missing",f"Keep {gui_path.name} beside this program.")
+        folder = self._model_review_folder()
+        if folder is None:
             return
         try:
-            spec=importlib.util.spec_from_file_location("opensees_modal_gui_nbc105",gui_path)
-            module=importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            from components.modal.gui_and_reports import ModalAuditGUI
+            from components.inputs.output_layout import export_root_for
             from OpenSees_Complete_Export_V118 import autoselect_inputs
-            gui=module.ModalAuditGUI(self.root)
-            autoselect_inputs(gui, self.out.get(), 'modal_model_script'); gui.run()
+            gui=ModalAuditGUI(self.root)
+            try:
+                if not autoselect_inputs(gui, folder, 'modal_model_script'):
+                    raise ValueError('The selected export has no saved modal model script: '+folder)
+            except Exception:
+                gui.root.destroy()
+                raise
+            gui.output.set(str(export_root_for(folder)/'04_MODAL'))
+            gui.run()
+            return gui
         except Exception as exc:
             messagebox.showerror("Could not open modal audit GUI",str(exc),parent=self.root)
 
     def _open_linear_time_history(self):
         """Open the separate NBC 105:2025 elastic time-history workflow."""
-        gui_path=Path(__file__).resolve().with_name("OpenSees_Linear_Time_History_NBC105_V115.py")
-        if not gui_path.is_file():
-            messagebox.showerror("Linear time-history GUI missing",f"Keep {gui_path.name} beside this program.",parent=self.root)
+        folder = self._model_review_folder()
+        if folder is None:
             return
         try:
-            spec=importlib.util.spec_from_file_location("opensees_linear_time_history_nbc105",gui_path)
-            module=importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            from OpenSees_Linear_Time_History_NBC105_V115 import LinearTimeHistoryGUI
+            from components.inputs.output_layout import export_root_for
             from OpenSees_Complete_Export_V118 import autoselect_inputs
-            gui=module.LinearTimeHistoryGUI(self.root)
-            autoselect_inputs(gui, self.out.get(), 'linear_model_script'); gui.run()
+            gui=LinearTimeHistoryGUI(self.root)
+            try:
+                if not autoselect_inputs(gui, folder, 'linear_model_script'):
+                    raise ValueError('The selected export has no saved linear model script: '+folder)
+            except Exception:
+                gui.win.destroy()
+                raise
+            gui.output.set(str(export_root_for(folder)/'06_LINEAR_TIME_HISTORY'))
+            gui.run()
+            return gui
         except Exception as exc:
             messagebox.showerror("Could not open linear time-history GUI",str(exc),parent=self.root)
 
     def _open_nonlinear_time_history(self):
         """Open V116 nonlinear paired-record runner, separate from the linear tool."""
-        gui_path=Path(__file__).resolve().with_name("OpenSees_Nonlinear_Time_History_NBC105_V116.py")
-        if not gui_path.is_file():
-            messagebox.showerror("Nonlinear time-history GUI missing",f"Keep {gui_path.name} beside this program.",parent=self.root); return
+        folder = self._model_review_folder()
+        if folder is None:
+            return
         try:
-            spec=importlib.util.spec_from_file_location("opensees_nonlinear_time_history_nbc105_v116",gui_path)
-            module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+            from OpenSees_Nonlinear_Time_History_NBC105_V116 import NonlinearTimeHistoryGUI
             from OpenSees_Complete_Export_V118 import autoselect_inputs
-            autoselect_inputs(module.launch_nonlinear_time_history_gui(self.root), self.out.get(), 'nonlinear_model_script')
+            gui=NonlinearTimeHistoryGUI(self.root)
+            try:
+                if not autoselect_inputs(gui, folder, 'nonlinear_model_script'):
+                    raise ValueError('The selected export has no saved nonlinear model script: '+folder)
+            except Exception:
+                gui.win.destroy()
+                raise
+            gui.run()
+            return gui
         except Exception as exc:
             messagebox.showerror("Could not open nonlinear time-history GUI",str(exc),parent=self.root)
 

@@ -195,10 +195,11 @@ def _run_analysis(config):
             os.environ['OPENSEES_LIMIT_STATE']=config['limit_state']
             try:
                 _model_scope=runpy.run_path(str(model), run_name="opensees_ltha_model")
-                from components.model.support_case_contract import require_runtime_support_case
-                verified_case=require_runtime_support_case(
-                    config.get('support_case','PHYSICAL_32'),_model_scope.get('MODEL_REPORT'))
-                print('[HISTORY SELECTED SUPPORT CASE VERIFIED]',verified_case,flush=True)
+                from components.model.support_case_contract import solver_reaction_support_tags
+                support_nodes=solver_reaction_support_tags(
+                    _model_scope.get('MODEL_REPORT'),os.environ['OPENSEES_SUPPORT_CASE'])
+                print('[HISTORY SELECTED SUPPORT CASE VERIFIED]',
+                      os.environ['OPENSEES_SUPPORT_CASE'],len(support_nodes),flush=True)
             except BaseException as exc:
                 profiler.add('model_and_gravity',phase_clock);profiler.finish('failed',str(exc));raise
             profiler.add('model_and_gravity',phase_clock)
@@ -208,19 +209,8 @@ def _run_analysis(config):
                 node_tags = set(int(x) for x in ops.getNodeTags())
                 missing = [s["node"] for s in stories if s["node"] not in node_tags]
                 if missing: raise RuntimeError(f"Story master nodes missing from model: {missing}")
-                export_data_path = model.parent / "OpenSees_Complete_Model_Data_V118.json"
-                if not export_data_path.is_file():
-                    raise FileNotFoundError(
-                        "Base-shear recording requires OpenSees_Complete_Model_Data_V118.json "
-                        "beside the selected model script."
-                    )
-                export_data = json.loads(export_data_path.read_text(encoding="utf-8-sig"))
-                support_nodes = [
-                    int(node) for node, flags in export_data["supports"].items()
-                    if any(bool(value) for value in flags[:3])
-                ]
-                if not support_nodes or not set(support_nodes).issubset(node_tags):
-                    raise ValueError("The export support-node mapping is empty or does not match the assembled model.")
+                if not set(support_nodes).issubset(node_tags):
+                    raise ValueError("Verified reaction support tags are missing from the assembled model.")
                 # NBC 105:2025 §8.1.1.2–3 / §9.3.1.2–3:
                 # Model builder MUST already have solved its §5.2 gravity
                 # preload. This freezes existing patterns; it does NOT apply
@@ -653,9 +643,8 @@ class LinearTimeHistoryGUI:
         self.execute = tk.BooleanVar(value=RUN_LINEAR_TIME_HISTORY)
         self._build()
         self.win.after(100, self._drain_log_queue)
-        from OpenSees_Linear_Autofill_V124 import populate_available
-        ttk.Button(self.win,text='Refresh available project inputs',command=lambda:populate_available(self,role='linear_model_script')).pack(anchor='w')
-        self.win.after_idle(lambda:populate_available(self,role='linear_model_script'))
+        ttk.Button(self.win,text='Refresh available project inputs',command=self._refresh_available).pack(anchor='w')
+        self.win.after_idle(lambda:self._refresh_available() if not self.model.get() else None)
         # The auto-selector already fills the initial model. Model/state changes
         # queue ONE refresh after Tk has finished updating the selection.
         # Avoid duplicate callbacks and state-change re-selection of the model.
@@ -666,6 +655,13 @@ class LinearTimeHistoryGUI:
         # Changing either policy invalidates previously auto-filled damping.
         self.support_case.trace_add('write',lambda *_:self._queue_period_refresh())
         self.seismic_mass_policy.trace_add('write',lambda *_:self._queue_period_refresh())
+
+    def _refresh_available(self):
+        if self.model.get():
+            self._refresh_known()
+        else:
+            from OpenSees_Linear_Autofill_V124 import populate_available
+            populate_available(self,role='linear_model_script')
 
     def _queue_period_refresh(self):
         if self._period_refresh_queued:

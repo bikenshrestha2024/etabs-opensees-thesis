@@ -32,14 +32,28 @@ def test_mrsm_seismic_bundle_zip_goes_to_run_owned_zip_folder(tmp_path):
     (project/"OpenSees_Complete_Model_Config_V118.json").write_text("{}",encoding="utf8")
     (run/"02_RESULTS"/"MRSM_Results_V132.json").write_text(
         '{"X_E0":{"force_scale":1.0}}',encoding="utf8")
+    (run/'02_RESULTS'/'ULS_X_E0_Support_Reactions_V132.csv').write_text('tag,rz\n1,2',encoding='utf8')
+    (run/'06_REVIEW'/'SAVED_CASE_COMPLETENESS.json').write_text('{"verified":6}',encoding='utf8')
+    (run/'01_LOGS').mkdir()
+    (run/'01_LOGS'/'MRSM_worker.log').write_text('saved solver log',encoding='utf8')
+    metadata=run/'02_RESULTS'/'00_PROCESSING_METADATA'
+    metadata.mkdir()
+    (metadata/'MRSM_Results.processing.json').write_text('{}',encoding='utf8')
+    foreign=project/'02_MODEL'/'REBUILDS'/'OTHER'
+    foreign.mkdir(parents=True)
+    (foreign/'OpenSees_Complete_Model_Config_V118.json').write_text('{"other": true}',encoding='utf8')
     result=bundle_seismic_review(project,run/"02_RESULTS",method="MRSM",
                                 include_comparison_template=False)
     path=Path(result["zip"])
     assert path.parent==run/"07_EXPORT_ZIP"
     assert path.is_file()
-    assert Path(result["folder"]).parent==run/"02_RESULTS"/"Seismic_Review_Packages"
+    assert Path(result["folder"]).parent==run/"06_REVIEW"/"Seismic_Review_Packages"
     with ZipFile(path) as z:
         assert "REVIEW_MANIFEST.json" in z.namelist()
+        assert any(name.endswith('/MRSM_worker.log') for name in z.namelist())
+        assert 'OpenSees_Direct/ULS_X_E0_Support_Reactions_V132.csv' in z.namelist()
+        assert '06_REVIEW/SAVED_CASE_COMPLETENESS.json' in z.namelist()
+        assert not any('processing.json' in name or '/OTHER/' in name for name in z.namelist())
 
 
 def test_mrsm_organized_zip_goes_to_seventh_run_folder(tmp_path):

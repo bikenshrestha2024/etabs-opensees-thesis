@@ -229,6 +229,8 @@ def package_modal_evidence(run_folder, limit_state, *, canonical=True):
     sections=(('00_INPUT_SOURCE','01_LOGS','02_RESULTS','03_EXCEL','04_FIGURES','06_REVIEW')
               if canonical else ('',))
     allowed={'.json','.csv','.xlsx','.txt','.log','.png','.pdf'}
+    organized={'.csv':'03_EXCEL','.xlsx':'03_EXCEL','.pdf':'04_FIGURES','.png':'04_FIGURES'}
+    from filecmp import cmp
     files=[]
     for section in sections:
         folder=root/section if section else root
@@ -236,11 +238,27 @@ def package_modal_evidence(run_folder, limit_state, *, canonical=True):
             continue
         for source in sorted(folder.iterdir()):
             if source.is_file() and source.suffix.lower() in allowed:
+                alternate=organized.get(source.suffix.lower())
+                if canonical and section=='02_RESULTS' and alternate:
+                    copy=root/alternate/source.name
+                    if copy.is_file() and not copy.is_symlink() and cmp(source,copy,shallow=False):
+                        continue
                 name=f'{section}/{source.name}' if section else source.name
                 files.append((name,source))
-    return publish_case_evidence_zip(
-        root,filename=f'NBC105_Modal_{state}_Evidence.zip',files=files,
-        status='COMPLETED_EIGEN_AUDIT_NATIVE_MODEL_EQUIVALENCE_NOT_VERIFIED')
+    from components.inputs.review_zip_paths import review_zip_directory
+    zip_dir=review_zip_directory(root)
+    stem=f'NBC105_Modal_{state}_Evidence'
+    revision=1
+    while True:
+        filename=f'{stem}_V{revision:02d}.zip' if revision>1 else stem+'.zip'
+        if not (zip_dir/filename).exists():
+            try:
+                return publish_case_evidence_zip(
+                    root,filename=filename,files=files,overwrite=False,
+                    status='COMPLETED_EIGEN_AUDIT_NATIVE_MODEL_EQUIVALENCE_NOT_VERIFIED')
+            except FileExistsError:
+                pass
+        revision+=1
 
 
 class ModalAuditGUI:
@@ -274,7 +292,7 @@ class ModalAuditGUI:
         self.confirm = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value="Select an OpenSees model script to run the modal audit.")
         self._build()
-        self.root.after_idle(lambda:__import__('OpenSees_Complete_Export_V118').autoselect_inputs(self,Path(self.model.get()).parent if self.model.get() else r'D:/Thesis Opensees/Etabs Nodes Export','modal_model_script'))
+        self.root.after_idle(self._select_initial_model)
         self.root.after_idle(lambda:self._fill_aw_from_sources(only_blank=True))
         self.model.trace_add('write',lambda *args:self._sync_project_system())
         from OpenSees_Research_UI_V123 import scrollable_form
@@ -414,9 +432,22 @@ class ModalAuditGUI:
         ttk.Entry(row, textvariable=var).pack(side="left", fill="x", expand=True, padx=6)
         ttk.Button(row, text="Browse…", command=command).pack(side="left")
 
+    def _select_initial_model(self):
+        if not self.model.get():
+            from OpenSees_Complete_Export_V118 import autoselect_inputs
+            autoselect_inputs(self,r'D:/Thesis Opensees/Etabs Nodes Export','modal_model_script')
+        self._route_automatic_output()
+
+    def _route_automatic_output(self):
+        if self._output_is_automatic and self.model.get():
+            from components.inputs.output_layout import export_root_for
+            self.output.set(str(export_root_for(Path(self.model.get()).parent)/'04_MODAL'))
+
     def _pick_model(self):
         p = filedialog.askopenfilename(parent=self.root, filetypes=[("Python scripts", "*.py"), ("All files", "*.*")])
-        if p: self.model.set(p)
+        if p:
+            self.model.set(p)
+            self._route_automatic_output()
 
     def _view_plot(self):
         from OpenSees_Results_UI_V127 import modal_results

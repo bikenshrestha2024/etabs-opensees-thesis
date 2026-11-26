@@ -39,7 +39,9 @@ def _file_rows(root, exclude):
             continue
         relative=file.relative_to(root)
         if len(relative.parts)>10:continue
-        if any(part.casefold() in {'07_export_zip','zip_exports','review_zips'} for part in relative.parts):continue
+        if any(part.casefold() in {'07_export_zip','zip_exports','review_zips',
+                                  '00_processing_metadata'} for part in relative.parts):continue
+        if file.name.endswith('.processing.json'):continue
         if any(part.startswith(("ESM_Validation_Evidence_",
                                 "Seismic_Review_","Gravity_Evidence_Upload"))
                for part in relative.parts):continue
@@ -149,14 +151,26 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
     # ESM uses a single module-level review folder, even when the selected
     # response was a long-named 03_ESM/RUNS/ULS or SLS case. This prevents
     # fresh review packages and ZIPs appearing at different locations.
-    # MRSM keeps its established case-local 07_EXPORT_ZIP contract.
+    # Canonical MRSM keeps the archive in its case-local ZIP folder.
     model_root=export_root_for(source)
     stage_scoped_esm=(method=="ESM" and
                       (output==model_root or model_root in output.parents))
     if stage_scoped_esm:
         review_owner=model_root/"03_ESM"
-    review_root=(review_owner/"REVIEW_SNAPSHOTS" if stage_scoped_esm or review_owner!=output
-                 else output/"Seismic_Review_Packages")
+    case_manifest = output.parent/'00_INPUT_SOURCE'/'CASE_MANIFEST.json'
+    canonical_mrsm = method == 'MRSM' and output.name == '02_RESULTS' and case_manifest.is_file()
+    if canonical_mrsm:
+        run_metadata=json.loads(case_manifest.read_text(encoding='utf-8-sig'))
+        if run_metadata.get('stage') not in ('MRSM','05_MRSM'):
+            raise ValueError('The selected saved case is not an MRSM run')
+        model_digest=run_metadata.get('model_sha256')
+        if model_digest and _sha(source/'OpenSees_Complete_Model_Data_V118.json')!=model_digest:
+            raise ValueError('Selected model export differs from the saved MRSM model fingerprint')
+        review_owner = output.parent
+        review_root = review_owner/'06_REVIEW'/'Seismic_Review_Packages'
+    else:
+        review_root=(review_owner/"REVIEW_SNAPSHOTS" if stage_scoped_esm or review_owner!=output
+                     else output/"Seismic_Review_Packages")
     review_root.mkdir(parents=True,exist_ok=True)
     stamp=datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     package=review_root/(method+"_Review_"+stamp)
@@ -191,7 +205,9 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
             "source":str(file)})
     # Selected method: do not take all other versions' results as if they
     # belong to the current run. Preserve existing actual output files.
-    for file,rel in _file_rows(source,[review_root]):
+    source_files = ((file, Path(file.name)) for file in sorted(source.iterdir())
+                    if file.is_file() and not file.is_symlink()) if canonical_mrsm else _file_rows(source,[review_root])
+    for file,rel in source_files:
         if (file.name.startswith(("OpenSees_Complete_Model_",
                                  "OpenSees_Source_Model_Metadata_",
                                  "OpenSees_Element_Connectivity",
@@ -209,7 +225,7 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
                          "comparison","input_sync","pdelta",
                          "response_recorder_index"))):
             continue
-        if (method=="MRSM" and
+        if (method=="MRSM" and not canonical_mrsm and
                 not any(s in name.casefold() for s in
                         ("mrsm","modal","spectrum","comparison","rayleigh","case_review"))):
             continue
@@ -217,6 +233,12 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
                "Comparisons" if "comparison" in name.casefold() else
                "OpenSees_Direct")
         collect(file,label+"/"+name)
+    if canonical_mrsm:
+        for section in ('00_INPUT_SOURCE','01_LOGS','03_EXCEL','04_FIGURES','05_COMPARISONS'):
+            for file,rel in _file_rows(review_owner/section,[review_root]):
+                collect(file,section+'/'+rel.as_posix())
+        for file,rel in _file_rows(review_owner/'06_REVIEW',[review_root]):
+            collect(file,'06_REVIEW/'+rel.as_posix())
     if native_etabs:
         p=Path(native_etabs).resolve()
         if p.is_file():
@@ -259,10 +281,24 @@ def bundle_seismic_review(source_export, analysis_output, *, method="ESM",
     from components.inputs.review_zip_paths import ensure_review_zip_directory
     zip_root=ensure_review_zip_directory(review_owner)
     zip_path=zip_root/(package.name+"_UPLOAD.zip")
-    with zipfile.ZipFile(zip_path,"w",compression=zipfile.ZIP_DEFLATED,
-                         compresslevel=9,allowZip64=True) as archive:
-        for f in sorted(package.rglob("*")):
-            if f.is_file():archive.write(f,arcname=f.relative_to(package).as_posix())
+    staged_zip=package/('.'+zip_path.name+'.tmp')
+    try:
+        with zipfile.ZipFile(staged_zip,"x",compression=zipfile.ZIP_DEFLATED,
+                             compresslevel=9,allowZip64=True) as archive:
+            for f in sorted(package.rglob("*")):
+                if f.is_file() and f!=staged_zip:
+                    archive.write(f,arcname=f.relative_to(package).as_posix())
+        with zipfile.ZipFile(staged_zip) as archive:
+            broken=archive.testzip()
+            if broken:
+                raise IOError('Review ZIP failed CRC verification: '+broken)
+            for item in manifest['collected']:
+                with archive.open(item['path']) as archived:
+                    if hashlib.file_digest(archived,'sha256').hexdigest()!=item['sha256']:
+                        raise IOError('Review ZIP member digest mismatch: '+item['path'])
+        staged_zip.replace(zip_path)
+    finally:
+        staged_zip.unlink(missing_ok=True)
     # Keep the longstanding review-root locator for existing GUI/readers.
     # Its ZIP path points to the canonical 07_EXPORT_ZIP; never duplicate ZIP bytes.
     (review_root/("LATEST_"+method+"_REVIEW.txt")).write_text(
