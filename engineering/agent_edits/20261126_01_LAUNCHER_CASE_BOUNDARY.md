@@ -1,0 +1,3 @@
+# 01.py launch and selected case boundary
+
+Base 28b866523507425776befd65e21dbef9f740e5e1. Editor ChatGPT GitHub connector. Read-first contract retained; 32 physical supports, 44 wall mesh points, 1D+1L full gravity and separate NBC Table 5-1 seismic mass. No physical inputs, EDB/workbook identities or native numerical routines changed. Main and CLI import reject stage/variant destinations before writing. Case-dependent specialist launchers share existing folder guard; aliases import safely and startup error fallback preserves log location. Synthetic tests added, native Windows execution and latest local case evidence unavailable. No historical data relocated or published.

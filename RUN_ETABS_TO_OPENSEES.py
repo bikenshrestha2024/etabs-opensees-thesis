@@ -15,9 +15,23 @@ def main():
         (logs/'LATEST.txt').write_text(str(log),encoding='utf8')
         code=child.wait()
         if code:
-            import tkinter as tk
-            from tkinter import messagebox
-            root=tk.Tk();root.withdraw();messagebox.showerror('OpenSees startup failed','Exit code: '+str(code)+'\nDetails saved in:\n'+str(log)+'\n\n'+log.read_text(encoding='utf8',errors='replace')[-3000:],parent=root);root.destroy()
+            # A broken Tk install/display may itself be the startup failure.
+            # Preserve the child's exit status and the log even without Tk.
+            detail='Exit code: '+str(code)+'\nDetails saved in:\n'+str(log)
+            print(detail,file=sys.stderr,flush=True)
+            root=None
+            try:
+                import tkinter as tk
+                from tkinter import messagebox
+                root=tk.Tk()
+                root.withdraw()
+                messagebox.showerror('OpenSees startup failed',detail+'\n\n'+log.read_text(encoding='utf8',errors='replace')[-3000:],parent=root)
+            except Exception:
+                traceback.print_exc()
+            finally:
+                if root is not None:
+                    try: root.destroy()
+                    except Exception: pass
         return code
     try:
         sys.path.insert(0,str(ROOT))

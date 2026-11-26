@@ -21,3 +21,6 @@ Creates `00_SOURCE_MANIFEST/PROJECT_CONTEXT.json` and numbered subdirectories *i
 ## V22 safe destination handling (2026-11-15)
 
 Project initialization checks existing `00_SOURCE_MANIFEST`, `PROJECT_CONTEXT.json` and canonical stage destinations for directory/file symlinks **before** writing project files. Invalid pre-existing project-context JSON is rejected with a descriptive error without updating it. The project context is written using a unique same-directory temporary file and atomic replacement rather than a shared fixed `.tmp` filename. `case_folder()` rejects linked stage/state/case intermediate components. This is a best-effort application-level path guard (not a guarantee against concurrent filesystem races or all NTFS junction/reparse-point types). It does not change source EDB bytes or original workbook content. Regression: `tests/test_project_output_layout_v171.py`.
+
+
+2026-11-26: `require_import_root` is a read-only preflight used before GUI log writes and by the worker/layout owner. It rejects stage/run descendants and marked clear-beam variants so that a selected analysis model cannot become a new import target. It does not hash or approve engineering results.

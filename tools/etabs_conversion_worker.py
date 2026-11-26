@@ -57,7 +57,8 @@ def validate_converter_report(report_file, *, old_signature=None):
 
 
 def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
-    from components.inputs.project_output_layout import create_project_layout
+    from components.inputs.project_output_layout import create_project_layout, require_import_root
+    output=require_import_root(output)
     from components.inputs.lfs_workbook_recovery import audit_optional_gui_workbooks
     from components.ui.application import convert_model
 
