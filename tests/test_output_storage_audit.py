@@ -140,6 +140,31 @@ class OutputStorageAuditTests(unittest.TestCase):
             self.assertEqual(before,{p.name:p.read_bytes() for p in root.iterdir()})
             write_report(result,Path(td)/"report")
 
+    def test_known_archive_manifests_verify_actual_members_and_aliases(self):
+        import hashlib
+        from zipfile import ZipFile
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            digest=hashlib.sha256(b"{}").hexdigest()
+            with ZipFile(root/"mesh.zip","w") as z:
+                z.writestr("MESH_04/result.json","{}")
+                z.writestr("MESH_04/ZIP_SHA256_MANIFEST.json",json.dumps({
+                    "files":{"result.json":digest,"missing.json":digest}}))
+            with ZipFile(root/"review.zip","w") as z:
+                z.writestr("result.json","{}")
+                z.writestr("REVIEW_MANIFEST.json",json.dumps({
+                    "collected":[{"path":"result.json","bytes":2,"sha256":digest}],
+                    "duplicates":[{"path":"alias.json","same_content_as":"result.json","bytes":2,"sha256":digest}]}))
+            for name,key in (("EVIDENCE_MANIFEST.json","archive_path"),
+                             ("ESM_Export_Manifest.json","snapshot_path")):
+                with ZipFile(root/(name+".zip"),"w") as z:
+                    z.writestr("result.json","{}")
+                    z.writestr(name,json.dumps({"files":[{key:"result.json","sha256":digest,"bytes":2}]}))
+            audit=scan_output(root,include_entries=True,validate_files=True)
+            self.assertEqual(audit["archive_manifest_inventory"],{
+                "manifests":4,"matched":4,"alias_matched":1,"failed":1})
+            self.assertEqual(audit["file_evidence_review_required_count"],1)
+
     def test_no_hash_does_not_infer_duplicate_from_equal_size(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
