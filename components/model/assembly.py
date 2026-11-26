@@ -356,14 +356,132 @@ def extract_source_metadata(sap, topology, frame_rows, output):
     return data
 
 
-def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=4):
+def _uniform_breaks(lo,hi,size):
+    """Interior points splitting [lo, hi] into equal parts no longer than size."""
+    gap=hi-lo
+    count=math.ceil(gap/size*(1-1e-6))
+    if count<=1: return []
+    return [lo+gap*k/count for k in range(1,count)]
+
+
+def _seed_wall_refinement_lines(records, panel_lines, original, plane_points,
+                                plane_resolution, size):
+    """Add conforming wall refinement points to the coplanar seed set.
+
+    Opt-in only (``wall_max_cell_size_m``); not called for the historical mesh.
+    The mesher derives every panel's grid lines from all coplanar seed points,
+    so a point added here becomes a mesh line in every panel whose plane
+    contains it. Vertical: one global set of wall elevations (union of all
+    wall horizontal lines, each gap split uniformly to <= size) is applied to
+    any wall that has a vertical cell gap above ``size``; points are put on
+    both vertical panel edges so walls meeting at a corner line share them.
+    Horizontal: each wall-line interval longer than ``size`` is split
+    uniformly; points are put on the bottom and top edges so the floor
+    planes receive the same lines. New floor-edge grid points created by
+    those lines are fed back so walls on other slab edges share them. The
+    loop stops when no new point appears. Units: metres.
+    [REF docs/source/components/model/assembly.py.md]
+    """
+    keys={tuple(round(x,8) for x in q) for q in original}
+    def add(point):
+        key=tuple(round(x,8) for x in point)
+        if key in keys: return False
+        keys.add(key); original.append(point)
+        for axis in range(3):
+            plane_points.setdefault((axis,int(round(point[axis]*plane_resolution))),[]).append(point)
+        return True
+    areas=[e for e in records if e.get('dimension')=='area_polygon']
+    walls=[e for e in areas if e.get('category')=='SHEAR WALL']
+    floors=[e for e in areas if e.get('category')=='FLOOR']
+    if not walls: return 0
+    def floor_edge_points():
+        found=set(); points=[]
+        for e in floors:
+            obj,p,a,b,area,normal,uu,vv=panel_lines(e)
+            for i,u in enumerate(uu):
+                for j,v in enumerate(vv):
+                    if i in (0,len(uu)-1) or j in (0,len(vv)-1):
+                        xyz=[p[0][k]+a[k]*u+b[k]*v for k in range(3)]
+                        key=tuple(round(x,8) for x in xyz)
+                        if key not in found:
+                            found.add(key); points.append((key,xyz))
+        return points
+    baseline_floor=({key for key,_ in floor_edge_points()} if floors else set())
+    levels=set()
+    for e in walls:
+        obj,p,a,b,area,normal,uu,vv=panel_lines(e)
+        levels.update(round(p[0][2]+b[2]*v,9) for v in vv)
+    levels=sorted(levels); refined=set(levels)
+    for lo,hi in zip(levels,levels[1:]):
+        refined.update(round(z,9) for z in _uniform_breaks(lo,hi,size))
+    refined=sorted(refined)
+    # Horizontal refinement lines must reach EVERY storey of a wall plane:
+    # once one panel adds a line, coplanar panels already see it and would
+    # not add their own floor-edge points. Keep the line seeds separately.
+    line_seeds={}; line_seed_list=[]
+    def seed(point):
+        line_seed_list.append(point)
+        for axis in range(3):
+            line_seeds.setdefault((axis,int(round(point[axis]*plane_resolution))),[]).append(point)
+    def seeds_in_plane(panel,normal):
+        axis=max(range(3),key=lambda index:abs(normal[index]))
+        if any(abs(normal[k])>1e-12 for k in range(3) if k!=axis):
+            return line_seed_list
+        centre=int(round(panel[0][axis]*plane_resolution))
+        found=[]
+        for offset in (-1,0,1):
+            found.extend(line_seeds.get((axis,centre+offset),()))
+        return found
+    added=0
+    for _iteration in range(100):
+        new=0
+        for e in walls:
+            obj,p,a,b,area,normal,uu,vv=panel_lines(e)
+            width=math.sqrt(_dot(a,a)); height=b[2]
+            ulines=set()
+            for u0,u1 in zip(uu,uu[1:]):
+                for u in _uniform_breaks(u0,u1,size/width):
+                    ulines.add(u); seed([p[0][k]+a[k]*u for k in range(3)])
+            for q in seeds_in_plane(p,normal):
+                d=_sub(q,p[0])
+                if abs(_dot(d,normal))>1e-7: continue
+                u=_dot(d,a)/(width*width)
+                if 1e-7<u<1-1e-7: ulines.add(u)
+            for u in sorted(ulines):
+                for v in (0.,1.):
+                    new+=add([p[0][k]+a[k]*u+b[k]*v for k in range(3)])
+            if any((v1-v0)*height>size*(1+1e-6) for v0,v1 in zip(vv,vv[1:])):
+                z0=p[0][2]; z1=z0+height
+                for z in refined:
+                    if z0+1e-7<z<z1-1e-7:
+                        v=(z-z0)/height
+                        for u in (0.,1.):
+                            new+=add([p[0][k]+a[k]*u+b[k]*v for k in range(3)])
+        if floors:
+            for key,xyz in floor_edge_points():
+                if key not in baseline_floor and add(xyz):
+                    new+=1; seed(xyz)
+        added+=new
+        if not new: return added
+    raise RuntimeError('wall_max_cell_size_m refinement did not converge in 100 passes')
+
+
+def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=4,
+                wall_max_cell_size_m=None):
     """Conforming rectangular grid over each source parallelogram.
 
     All coplanar source-node coordinate lines are used, even when a node is
     outside the individual panel. Adjacent panels therefore share subdivisions.
     No source opening is filled; each mesh cell belongs to an existing polygon.
+
+    ``wall_max_cell_size_m`` (default ``None`` = historical mesh) optionally
+    adds conforming wall refinement lines so no SHEAR WALL cell edge exceeds
+    the limit, matching ETABS 'Analysis - Wall Mesh Settings'.
+    [REF docs/source/components/model/assembly.py.md]
     """
     from components.model.source_node_identity import unique_coordinate_lookup
+    from components.model.shell_mesh_quality import validate_wall_max_cell_size
+    wall_max_cell_size_m=validate_wall_max_cell_size(wall_max_cell_size_m)
     nodes=dict(source_nodes)
     lookup=unique_coordinate_lookup(nodes)
     if not nodes:
@@ -416,15 +534,7 @@ def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=
             result.extend(plane_points.get((_axis, _center + _offset), ()))
         return result
 
-    _mesh_clock=time.perf_counter()
-    _mesh_panels=0
-    for e in records:
-        if e['dimension']!='area_polygon': continue
-        _mesh_panels+=1
-        if _mesh_panels%75==0:
-            print(f"[ASSEMBLY HEARTBEAT] mesh_panels={_mesh_panels}; "
-                  f"shell_cells={len(shells)}; "
-                  f"mesh_elapsed_s={time.perf_counter()-_mesh_clock:.2f}",flush=True)
+    def _panel_lines(e):
         obj=str(e['etabs_object']); ns=e['node_tags']
         if len(ns)!=4: raise ValueError(f'Area {obj}: only four-node polygons are supported')
         p=[nodes[int(n)] for n in ns]; a=_sub(p[1],p[0]); b=_sub(p[3],p[0]); cross=_cross(a,b)
@@ -443,7 +553,22 @@ def _mesh_areas(source_nodes, records, area_rows, materials, floor_subdivisions=
             u=(_dot(d,a)*bb-_dot(d,b)*ab)/det; v=(_dot(d,b)*aa-_dot(d,a)*ab)/det
             if 1e-7<u<1-1e-7: uvals.add(round(u,9))
             if 1e-7<v<1-1e-7: vvals.add(round(v,9))
-        uu,vv=sorted(uvals),sorted(vvals); grid={}
+        return obj,p,a,b,area,normal,sorted(uvals),sorted(vvals)
+
+    if wall_max_cell_size_m is not None:
+        _seed_wall_refinement_lines(records,_panel_lines,original,plane_points,
+                                    plane_resolution,wall_max_cell_size_m)
+
+    _mesh_clock=time.perf_counter()
+    _mesh_panels=0
+    for e in records:
+        if e['dimension']!='area_polygon': continue
+        _mesh_panels+=1
+        if _mesh_panels%75==0:
+            print(f"[ASSEMBLY HEARTBEAT] mesh_panels={_mesh_panels}; "
+                  f"shell_cells={len(shells)}; "
+                  f"mesh_elapsed_s={time.perf_counter()-_mesh_clock:.2f}",flush=True)
+        obj,p,a,b,area,normal,uu,vv=_panel_lines(e); grid={}
         prop=_area_property(area_rows[obj],materials)
         for i,u in enumerate(uu):
             for j,v in enumerate(vv):
@@ -543,10 +668,30 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
         if meta.get('errors'): report['warnings'].append(f"{len(meta['errors'])} source metadata queries failed; inspect OpenSees_Source_Model_Metadata_V118.json before claiming ETABS equivalence")
         _phase_clock=time.perf_counter()
         emit("[ASSEMBLY PHASE START] Conforming ShellMITC4 mesh")
-        nodes,shells,area_children=_mesh_areas(source_nodes,topology['elements'],area_rows,materials,cfg.get('floor_subdivisions',4))
+        # Optional ETABS 'Analysis - Wall Mesh Settings' analogue. Absent key
+        # keeps the historical wall mesh; the config file is not rewritten
+        # with a default so existing configs and their SHA stay unchanged.
+        from components.model.shell_mesh_quality import (
+            validate_wall_max_cell_size, audit_shell_mesh_quality)
+        wall_max_cell_size_m=validate_wall_max_cell_size(cfg.get('wall_max_cell_size_m'))
+        nodes,shells,area_children=_mesh_areas(source_nodes,topology['elements'],area_rows,materials,cfg.get('floor_subdivisions',4),
+                                               wall_max_cell_size_m=wall_max_cell_size_m)
         emit(f"[ASSEMBLY PHASE OK] Conforming ShellMITC4 mesh | "
               f"seconds={time.perf_counter()-_phase_clock:.3f} | "
               f"nodes={len(nodes)} | cells={len(shells)}")
+        # Diagnostic only: geometry statistics, no numerics change.
+        report['wall_max_cell_size_m']=wall_max_cell_size_m
+        report['shell_mesh_quality_audit']=audit_shell_mesh_quality(
+            nodes,shells,wall_max_cell_size_m=wall_max_cell_size_m,
+            floor_subdivisions=cfg.get('floor_subdivisions',4))
+        if wall_max_cell_size_m is not None:
+            report['warnings'].append(
+                f'Wall mesh refined to wall_max_cell_size_m={wall_max_cell_size_m:g} m '
+                '(ETABS Analysis - Wall Mesh Settings analogue). Mesh geometry only; '
+                'gravity reactions and modal response must be re-solved natively.')
+            if report['shell_mesh_quality_audit']['wall_max_cell_size_satisfied'] is False:
+                report['warnings'].append('Some wall cell edges still exceed wall_max_cell_size_m; '
+                                          'see shell_mesh_quality_audit.')
         _phase_clock=time.perf_counter()
         emit("[ASSEMBLY PHASE START] Frame-node spatial index")
         # Spatial lookup for beam intersection cuts. Old implementation
@@ -657,8 +802,20 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
             if (cfg.get('elastic_etabs_comparison') and
                     cfg.get('linear_shell_stiffness_policy','LEGACY_GROSS_SHELL')!='LEGACY_GROSS_SHELL'):
                 raise ValueError('Use one elastic shell comparison configuration at a time.')
-            elastic_comparison=compile_settings(cfg['elastic_etabs_comparison'],frame_elements,shells,meta)
+            elastic_settings=cfg['elastic_etabs_comparison']
+            if cfg.get('rigid_end_zones') is not None:
+                # Opt-in ETABS rigid end zones; absent or disabled = unchanged.
+                from components.model.rigid_end_zones import resolve_end_offsets, inject_end_offsets
+                rigid_offsets,rigid_audit=resolve_end_offsets(
+                    cfg['rigid_end_zones'],frame_elements,metadata=meta,
+                    default_workbook=cfg.get('etabs_native_assignment_workbook_path'),base_dir=folder)
+                if rigid_audit is not None:
+                    elastic_settings=inject_end_offsets(elastic_settings,rigid_offsets)
+                    report['rigid_end_zones']=rigid_audit
+            elastic_comparison=compile_settings(elastic_settings,frame_elements,shells,meta)
         else:
+            if (cfg.get('rigid_end_zones') or {}).get('enabled'):
+                raise ValueError('rigid_end_zones needs elastic_etabs_comparison (elastic comparison stiffness path)')
             elastic_comparison={}
         emit(f"[ASSEMBLY PHASE OK] Frame segment connectivity | "
               f"seconds={time.perf_counter()-_phase_clock:.3f} | "
@@ -1002,6 +1159,12 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
         payload['joint_volume_weight_audit']=report.get('joint_volume_weight_audit')
         payload['wall_base_restraint_policy']=cfg['wall_base_restraint_policy']
         payload['added_wall_mesh_support_tags']=extended_wall_supports
+        from components.modal.storey_mass_convention import (
+            validate_convention as _validate_mass_convention, DEFAULT as _DEFAULT_MASS_CONVENTION)
+        mass_convention=_validate_mass_convention(cfg.get('storey_mass_allocation_convention'))
+        if mass_convention!=_DEFAULT_MASS_CONVENTION:
+            # Opt-in storey-ledger convention; absent key keeps the payload unchanged.
+            payload['storey_mass_allocation_convention']=mass_convention
         if elastic_comparison:
             payload['elastic_etabs_comparison']=elastic_comparison
             report['elastic_etabs_comparison']={
@@ -1138,6 +1301,12 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
         story_rows=[]
         for g in groups:
             story_rows.append(dict(story_number=g['storey_number'],story_name=f"Storey_{g['storey_number']}",height_m=g['master_xyz'][2]-payload['base_z_m'],master_node_tag=g['master_tag'],dead_load_kN=0.,storage_live_load_kN=0.,other_live_load_kN=0.,roof_live_load_kN_ignored=0.,input_note='All active nodal source weights included; inter-floor weights assigned by NBC 105:2025 5.2 mid-height rule; fixed-base masses excluded. Compare with ETABS tributary conventions.'))
+        if mass_convention!=_DEFAULT_MASS_CONVENTION:
+            from components.modal.storey_mass_convention import storey_shares, BASE as _BASE_ROW
+            base_excluded=dict(dead_load_kN=0.,storage_live_load_kN=0.,other_live_load_kN=0.,roof_live_load_kN_ignored=0.)
+            for row in story_rows:
+                row['input_note']=('All active nodal source weights included; storey_mass_allocation_convention='
+                                   +mass_convention+' (opt-in, see storey_mass_convention.py); fixed-base masses excluded.')
         for pat,values in patterns.items():
             factor=float(cfg['mass_factors'][pat])
             if factor not in (0.,.3,.6,1.):raise ValueError(f'Unsupported story mass factor {factor} for {pat}')
@@ -1146,10 +1315,19 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
             for node,vec in values.items():
                 if all(payload['supports'].get(str(node),[0]*6)[:2]):continue
                 z=payload['nodes'][int(node)][2] if int(node) in payload['nodes'] else payload['nodes'][str(node)][2]
+                if mass_convention!=_DEFAULT_MASS_CONVENTION:
+                    for index,share in storey_shares(z,[g['master_xyz'][2] for g in groups],payload['base_z_m'],mass_convention):
+                        (base_excluded if index==_BASE_ROW else story_rows[index])[key]-=float(vec[2])*share
+                    continue
                 index=storey_index_for_elevation(z,[g['master_xyz'][2] for g in groups])
                 story_rows[index][key]-=float(vec[2])
         represented=sum(r['dead_load_kN']+.6*r['storage_live_load_kN']+.3*r['other_live_load_kN'] for r in story_rows)
         report['story_ledger_active_weight_kN']=represented
+        if mass_convention!=_DEFAULT_MASS_CONVENTION:
+            excluded=base_excluded['dead_load_kN']+.6*base_excluded['storage_live_load_kN']+.3*base_excluded['other_live_load_kN']
+            report['storey_mass_allocation_convention']=mass_convention
+            report['story_ledger_base_row_excluded_weight_kN']=excluded
+            represented+=excluded  # single mass ledger: floors + base row = active nodal weight
         report['story_ledger_mass_error_percent']=100*abs(represented-report['active_horizontal_seismic_weight_kN'])/max(1.,report['active_horizontal_seismic_weight_kN'])
         if report['story_ledger_mass_error_percent']>1e-7:raise ValueError('Story ledger does not reconcile with the assembled active nodal mass.')
         fields=['story_number','story_name','height_m','master_node_tag','dead_load_kN','storage_live_load_kN','other_live_load_kN','roof_live_load_kN_ignored','input_note']

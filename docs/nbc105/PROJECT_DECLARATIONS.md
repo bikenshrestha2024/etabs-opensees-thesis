@@ -29,14 +29,14 @@ USER_DECLARED 2026-11-21: `GRAVITY_M_S2 = 9.81` m/s^2, the value printed in the 
 
 SUPERSEDED (same day): the earlier USER_DECISION to use the higher-precision standard gravity 9.80665 m/s^2 is withdrawn. Its record, kept as history: it deviated from the printed value by (9.81 - 9.80665) / 9.81 = 0.0341 %; the Rayleigh period (Eq. 5.1(1), T proportional to 1/sqrt(g)) was longer by +0.0171 % than with 9.81.
 
-Numeric effect of restoring 9.81 relative to 9.80665 (computed):
+Numeric effect of restoring 9.81 relative to the superseded 9.80665 (history, computed; single source for these percentages):
 - Weight to mass, mass = W / g: mass is lower by 0.0341 % (ratio 9.80665 / 9.81 = 0.999659). Mass to weight is higher by 0.0342 %.
 - Rayleigh period, T proportional to 1/sqrt(g): shorter by 0.0171 %.
 - Acc(g) record conversion to m/s^2 (Path factor 9.81 instead of 9.80665): ground acceleration is higher by 0.0342 % (ratio 9.81 / 9.80665 = 1.000342). Earlier records of "0.0306 % or 0.03 %" in this repository are superseded by these figures.
 
 Consequence for saved evidence: a saved Rayleigh result (`NBC105_Rayleigh_Preliminary_*.json`) made with g = 9.80665 no longer passes `verify_saved_rayleigh_axis` (period rebuilt with 9.81 differs by 1.7e-4, tolerance rel 1e-8, deliberately not loosened; `RAYLEIGH_METHOD_VERSION` is not bumped). Results saved with 9.80665 are rejected on import and must be re-run: `import_project_inputs` drops such periods (`rayleigh_tx/ty` not filled) and its notes state the recorded g, the g of this release and the superseded value, and that the Rayleigh analysis must be re-run. Until then the ESM adopted period falls back to 1.25 x empirical. Saved model exports and NLTHA/RS result folders made with 9.80665 (mass from `assembly.py`, Path factor 9.80665 in the Input Record Audit) are history and are not rewritten; re-assemble and re-run to obtain 9.81 results. Pinned by `tests/test_rayleigh_saved_g_note.py`.
 
-`SUPERSEDED_GRAVITY_M_S2 = 9.80665` is kept in `components/nbc105/constants.py` only so that old results can be recognised and rejected; no calculation uses it. A scan test (`tests/test_nbc105_constants.py`) fails if a 9.80665 or 9806.65 literal appears in any `.py` file under `components/` or `tools/` other than `constants.py`.
+`SUPERSEDED_GRAVITY_M_S2 = 9.80665` is kept in `components/nbc105/constants.py` only so that old results can be recognised and rejected; no calculation uses it. A scan test (`tests/test_nbc105_constants.py`) fails if a literal of the superseded value (9.80665 or 9806.65) appears in any `.py` file under `components/` or `tools/` other than `constants.py`.
 
 | File group | Use of g |
 |---|---|
