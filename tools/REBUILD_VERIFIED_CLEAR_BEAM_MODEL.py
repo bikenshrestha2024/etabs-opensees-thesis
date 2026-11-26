@@ -227,9 +227,8 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
             raise ValueError("Source EDB changed since export. Re-export the selected EDB before rebuilding.")
     elastic_settings=None
     if elastic_settings_path is not None:
-        elastic_settings=json.loads(Path(elastic_settings_path).read_text(encoding="utf-8-sig"))
-        if not isinstance(elastic_settings,dict) or not elastic_settings:
-            raise ValueError("Elastic comparison settings must contain at least one stiffness state")
+        from components.model.elastic_conversion_settings import read_comparison_settings
+        elastic_settings=read_comparison_settings(elastic_settings_path)
     print("[RUNNING] Preflight source JSON and native ETABS Excel tables verified.",
           flush=True)
     # The canonical nested path is the only explicitly approved descendant.

@@ -1,6 +1,8 @@
 """Resolve elastic ETABS comparison inputs in kN–m before generating the model."""
 from collections import defaultdict
+import json
 import math
+from pathlib import Path
 
 from components.model.linear_shell_stiffness import FIELDS, positive, shell_section_parameters
 from components.model.physical_weight_modifiers import FRAME_LABELS
@@ -34,6 +36,22 @@ def _check_keys(mapping, allowed, label):
     extra = set(mapping) - set(allowed)
     if extra:
         raise ValueError(f"{label} has unknown keys: {', '.join(sorted(extra))}")
+
+
+def read_comparison_settings(filename):
+    """[REF docs/source/components/model/elastic_conversion_settings.py.md] Read explicit ULS/SLS settings."""
+    file = Path(filename).expanduser()
+    if file.suffix.casefold() != '.json' or file.name.casefold().endswith('.processing.json'):
+        raise ValueError('Select the ULS/SLS elastic settings JSON. Processing sidecars only record timing.')
+    settings = json.loads(file.read_text(encoding='utf-8-sig'))
+    _check_keys(settings, ('ULS','SLS'), 'Elastic comparison settings')
+    if not settings:
+        raise ValueError('Elastic comparison settings must specify ULS or SLS.')
+    for state, options in settings.items():
+        _check_keys(options, OPTION_KEYS, state)
+        if not options:
+            raise ValueError(f'{state} elastic comparison settings are empty.')
+    return settings
 
 
 def _native_factors(records, kind, object_id, section, fields):

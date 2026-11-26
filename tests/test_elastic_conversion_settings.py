@@ -55,3 +55,17 @@ def test_shell_objects_have_independent_effective_stiffness_and_source_thickness
     assert plan["2"]["E_membrane_kN_m2"]==20e6
     assert plan["1"]["physical_thickness_m"]==plan["2"]["physical_thickness_m"]==.6
     assert p["E"]==25e6
+def test_read_comparison_settings_rejects_timing_and_empty_states(tmp_path):
+    from components.model.elastic_conversion_settings import read_comparison_settings
+    import pytest
+
+    sidecar = tmp_path/'elastic_conversion_settings.py.processing.json'
+    sidecar.write_text('{"stage":"conversion"}',encoding='utf-8')
+    with pytest.raises(ValueError,match='sidecars'):
+        read_comparison_settings(sidecar)
+    settings=tmp_path/'elastic.json'
+    settings.write_text('{"ULS":{}}',encoding='utf-8')
+    with pytest.raises(ValueError,match='empty'):
+        read_comparison_settings(settings)
+    settings.write_text('{"ULS":{"use_native_frame_modifiers":true}}',encoding='utf-8')
+    assert read_comparison_settings(settings) == {'ULS':{'use_native_frame_modifiers':True}}

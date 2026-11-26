@@ -27,6 +27,8 @@ The 8,024.059 kN difference between native wall-corner support reactions and the
 
 Use **Rebuild with ETABS elastic settings** in the updated gravity GUI. Select the reviewed assignment workbook, the [project ULS settings JSON](20261121_native_gravity_uls.json), and a new output location. The CLI tool `tools/REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py` accepts the same JSON via `--elastic-comparison-settings` together with `--source-dir`, `--assignment-workbook` and `--dest-dir`. If the source export has a project context, the rebuild checks its EDB fingerprint and creates a source-bound context for the new export.
 
+The GUI selects a new rebuild location automatically. It starts the picker at `02_MODEL/SETTINGS/ETABS_ELASTIC_COMPARISON/ETABS_Elastic_Comparison_ULS_Diagnostic.json` when that copy is available and otherwise suggests the repository JSON. Select the JSON before selecting the original assignment workbook if prompted. The settings cover ULS with approximate shell shear and without native rigid frame end offsets. After the rebuild, run the full `1.0D + 1.0L` comparison on the newly selected gravity model.
+
 ```json
 {
   "ULS": {

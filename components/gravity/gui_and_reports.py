@@ -652,11 +652,22 @@ class GravityAnalysisGUI:
         settings=None
         if elastic_comparison:
             reference = _runtime_repo_root() / 'docs' / 'validation'
+            staged = source/'02_MODEL'/'SETTINGS'/'ETABS_ELASTIC_COMPARISON'
+            suggested = staged/'ETABS_Elastic_Comparison_ULS_Diagnostic.json'
+            if not suggested.is_file():
+                suggested = reference/'20261121_native_gravity_uls.json'
             settings=filedialog.askopenfilename(
                 parent=self.win,title="Select ETABS elastic comparison settings",
-                initialdir=str(reference if reference.is_dir() else source),
+                initialdir=str(suggested.parent if suggested.is_file() else source),
+                initialfile=suggested.name if suggested.is_file() else '',
                 filetypes=[("Elastic stiffness settings","*.json"), ("All files","*.*")])
             if not settings:
+                return
+            try:
+                from components.model.elastic_conversion_settings import read_comparison_settings
+                read_comparison_settings(settings)
+            except (OSError, ValueError) as exc:
+                messagebox.showerror('Choose elastic comparison settings',str(exc),parent=self.win)
                 return
         native=self.etabs_native_assignment_var.get().strip()
         if not native:

@@ -22,7 +22,9 @@ def launch(parent, folder):
     from tkinter import ttk, filedialog, messagebox
     from tkinter.scrolledtext import ScrolledText
 
-    project = Path(folder).expanduser().resolve()
+    from components.inputs.output_layout import export_root_for
+    model_folder = Path(folder).expanduser().resolve()
+    project = export_root_for(model_folder)
     win = tk.Toplevel(parent)
     win.title("NLTHA Readiness | Evidence and Calibration Dashboard")
     win.geometry("1230x825")
@@ -53,7 +55,7 @@ def launch(parent, folder):
     model_row = ttk.Frame(outer)
     model_row.pack(fill="x", pady=3)
     ttk.Label(model_row, text="Model builder:").pack(side="left")
-    discovered_model, discovered_status = discover_project_model(project)
+    discovered_model, discovered_status = discover_project_model(model_folder)
     model_var = tk.StringVar(value=str(discovered_model) if discovered_model else "")
     model_selection_status = tk.StringVar(
         value=("Auto-detected standard nonlinear builder for inspection only; "
@@ -94,7 +96,7 @@ def launch(parent, folder):
     vert.pack(side="left", fill="y")
     table.tag_configure("MISSING_EVIDENCE", foreground="#9c3030")
     table.tag_configure("EVIDENCE_FOUND_REVIEW_REQUIRED", foreground="#98601b")
-    table.tag_configure("REVIEWED_SIGNOFF_CLAIM", foreground="#17664b")
+    table.tag_configure("REVIEWED_SIGNOFF_CLAIM", foreground="#98601b")
 
     detail = ScrolledText(right, wrap="word", width=55)
     detail.pack(fill="both", expand=True)
@@ -205,7 +207,8 @@ def launch(parent, folder):
                         "READINESS: " + result["readiness_level"] +
                         " | Reviewed claims: " + str(counts["REVIEWED_SIGNOFF_CLAIM"]) +
                         " | Available for review: " + str(counts["EVIDENCE_FOUND_REVIEW_REQUIRED"]) +
-                        " | Missing: " + str(counts["MISSING_EVIDENCE"]) +
+                        " | No discovered files: " + str(sum(not group["evidence"]
+                                                            for group in result["groups"])) +
                         " | Draft: " + result["draft_state"])
                     detail.configure(state="normal")
                     detail.delete("1.0", "end")
@@ -342,11 +345,28 @@ def launch(parent, folder):
 
     def generate_wall_probes():
         try:
+            project_root = export_root_for(project_var.get())
+            stage = project_root / "07_NONLINEAR_TIME_HISTORY"
+            configs = sorted(stage.glob("RUNS/*/*/*/02_RESULTS/RunConfig.json"),
+                             key=lambda path: path.stat().st_mtime, reverse=True)
+            suggested = configs[0] if configs else None
             source = filedialog.askopenfilename(
                 parent=win, title="Choose actual exploratory RunConfig JSON",
-                filetypes=[("JSON", "*.json")])
+                initialdir=str(suggested.parent if suggested else
+                               (stage if stage.is_dir() else project_root)),
+                initialfile=suggested.name if suggested else "",
+                filetypes=[("Exploratory RunConfig", "*RunConfig*.json"), ("JSON", "*.json")])
             if not source:
                 return
+            source_path = Path(source).resolve()
+            config = json.loads(source_path.read_text(encoding="utf-8-sig"))
+            if (source_path.name.endswith(".processing.json") or not isinstance(config, dict)
+                    or any(not isinstance(config.get(key), str) or not config[key].strip()
+                           for key in ("model_folder", "x_path", "y_path"))):
+                raise ValueError("Choose an actual exploratory RunConfig with model and paired motion paths.")
+            config_model = source_path.parent / Path(config["model_folder"]).expanduser()
+            if export_root_for(config_model) != project_root:
+                raise ValueError("The RunConfig belongs to a different ETABS export.")
             from components.inputs.output_layout import owned_run_destination
             destination = owned_run_destination(
                 project_var.get(), "SOFTWARE_DIAGNOSTICS", "WALL_PROBES")
