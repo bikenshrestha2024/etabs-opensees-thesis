@@ -52,6 +52,19 @@ def response_aggregation_rule(number_of_pairs):
     if number_of_pairs<3:raise ValueError("NBC 9.3.2.1: at least 3 orthogonal pairs")
     return record_response_rule(number_of_pairs)
 
+def project_response_aggregation(accepted_responses,*,declared_count=None):
+    """§8.1.3 / §9.3.3 over the ACCEPTED records of the declared 8-record set.
+
+    [REF NBC105-2025 §9.3.3 p.47] Delegates to Clause 8
+    ``project_record_set_evaluation``; failed or non-converged records must not
+    be passed in. Fewer than 7 accepted -> maximum; more than 7 -> average;
+    exactly 7 -> BLOCKED (printed text does not define it).
+    """
+    from components.nbc105.clause_08_elastic_time_history import (
+        project_record_set_evaluation, PROJECT_DECLARED_GROUND_MOTION_COUNT)
+    n=PROJECT_DECLARED_GROUND_MOTION_COUNT if declared_count is None else declared_count
+    return project_record_set_evaluation(accepted_responses,declared_count=n)
+
 
 def validate_nbc105_design_metadata(evidence,*,record_dt_s,integration_dt_s,
                                     selected_scale,orientations):
