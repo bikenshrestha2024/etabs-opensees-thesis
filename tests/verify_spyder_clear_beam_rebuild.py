@@ -167,6 +167,52 @@ class RebuildEntryTests(unittest.TestCase):
             build._verify_before_creating_output(self.source,self.book,link/"new")
         self.assertEqual(list(outside.iterdir()),[])
 
+    def test_gui_auto_settings_and_assignment_resolution(self):
+        """Exercise actual GUI methods without a display or solver."""
+        import ast
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from openpyxl import Workbook
+        from components.inputs.etabs_table_bundle import _REQUIRED_ASSIGNMENT_SHEETS
+        source=self.source
+        repo=self.root/"repo"
+        review=repo/"docs"/"validation"
+        review.mkdir(parents=True)
+        settings=review/"20261121_native_gravity_uls.json"
+        settings.write_text('{"ULS":{"use_native_frame_modifiers":true}}')
+        picker=Mock(side_effect=AssertionError("unexpected file dialog"))
+        ns={"Path":Path,"_runtime_repo_root":lambda:repo,
+            "filedialog":SimpleNamespace(askopenfilename=picker)}
+        tree=ast.parse((build.ROOT/"components/gravity/gui_and_reports.py").read_text(encoding="utf-8"))
+        cls=next(n for n in tree.body if isinstance(n,ast.ClassDef) and n.name=="GravityAnalysisGUI")
+        for name in ("_rebuild_elastic_settings","_rebuild_assignment_workbook"):
+            method=next(n for n in cls.body if isinstance(n,ast.FunctionDef) and n.name==name)
+            exec(compile(ast.Module(body=[method],type_ignores=[]),"<gui method>","exec"),ns)
+        def var(value=""):
+            return SimpleNamespace(get=lambda:value,set=Mock())
+        ui=SimpleNamespace(win=None,_gravity_action_log=Mock(),
+            etabs_native_assignment_var=var(),etabs_full_table_var=var(),
+            etabs_edb_path=var())
+        with patch("components.inputs.project_workbooks.source_limit_state",return_value=("ULS","source")):
+            self.assertEqual(ns["_rebuild_elastic_settings"](ui,source),str(settings))
+        with patch("components.inputs.project_workbooks.source_limit_state",return_value=("SLS","source")):
+            picker.side_effect=None
+            picker.return_value=str(settings)
+            with self.assertRaisesRegex(ValueError,"source state SLS"):
+                ns["_rebuild_elastic_settings"](ui,source)
+        picker.side_effect=AssertionError("unexpected assignment picker")
+        full=self.root/"registered.xlsx"
+        book=Workbook()
+        book.remove(book.active)
+        for name in _REQUIRED_ASSIGNMENT_SHEETS:
+            book.create_sheet(name)
+        book.save(full)
+        with patch("components.inputs.gravity_evidence_stage.staged_gravity_workbooks",return_value={}):
+            with patch("components.inputs.project_workbooks.registered_project_source",
+                       side_effect=lambda source,role,**kw: str(full) if role=="etabs_assignment" else None):
+                self.assertEqual(ns["_rebuild_assignment_workbook"](ui,source),str(full))
+        ui.etabs_native_assignment_var.set.assert_called_with(str(full))
+
     def test_no_nested_or_existing_output(self):
         for bad in (self.source/"nested",self.source):
             with self.assertRaises((ValueError,FileExistsError)):
