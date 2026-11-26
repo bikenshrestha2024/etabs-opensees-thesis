@@ -979,6 +979,9 @@ class NonlinearTimeHistoryGUI:
         """[REF components/inputs/analysis_autofill.py] Recompute source-bound periods."""
         path = Path(self.model.get()) if self.model.get() else None
         if path is None or not path.is_file():
+            from components.inputs.analysis_autofill import clear_history_reference
+            clear_history_reference(self,'Selected nonlinear model builder is missing.')
+            if self._output_is_automatic:self.output.set('')
             return
         try:
             from OpenSees_Linear_Autofill_V124 import populate_linear

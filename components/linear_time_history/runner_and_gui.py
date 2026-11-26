@@ -674,7 +674,11 @@ class LinearTimeHistoryGUI:
         self._refresh_known()
 
     def _refresh_known(self):
-        if not Path(self.model.get()).is_file():return
+        if not Path(self.model.get()).is_file():
+            from components.inputs.analysis_autofill import clear_history_reference
+            clear_history_reference(self,'Selected linear model builder is missing.')
+            if self._output_is_automatic:self.output.set('')
+            return
         try:
             from OpenSees_Linear_Autofill_V124 import populate_linear
             if self._output_is_automatic:
