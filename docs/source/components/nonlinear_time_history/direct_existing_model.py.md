@@ -13,6 +13,8 @@
 
 **Unit tests:** `tests/test_direct_existing_nltha_20261122.py` for nonlinear-wall XY/YX defaults, full/truncated intent, source hashes, missing motion and unknown section failures. Native Windows test requires actual model+waveform source files and OpenSeesPy/XARA available; CI's syntax/import tests cannot substitute for that.
 
+The direct runner resolves the requested output through the shared stage owner after source preflight. In-export legacy or wrong-stage selections use a fresh `07_NONLINEAR_TIME_HISTORY/RUNS` folder with a case ID tied to the model SHA, variant, state and earthquake. The status records the actual destination. Explicit NLTHA and external destinations still require a fresh or empty run folder.
+
 ## 2026-11-22 — strict first-completed-case acceptance screen
 
 The direct native executor now calls `verify_full_duration_pair_outputs(output_dir,config,cases)` **only when its underlying OpenSees runner reports two exploratory full records**. It requires two real on-disk `XY/` and `YX/` histories (`Building_Nonlinear_history.csv`), saved `Case_Summary.json`, and `Accepted_History_Completion_Gate.json`. Every history numeric channel and accepted time is streamed and checked for finiteness, strictly increasing times, exact recorded step count and final physical time. The two case summaries must identify the same 64-hex model and paired-input SHA, original event/variant/state and bidirectional excitation; their on-disk evidence must agree with the returned solver case. It then additionally compares the case model SHA to the source model byte hash collected at preflight.

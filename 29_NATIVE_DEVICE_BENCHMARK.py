@@ -144,7 +144,10 @@ def main(argv=None):
                 report["cases"].append(_case(ops,kind,out/kind))
             finally:
                 ops.wipe()
-        report["status"]="NATIVE_EXECUTED_REVIEW_REQUIRED"
+        if any(case["status"] == "FAILED_NATIVE_STEP" for case in report["cases"]):
+            report["status"]="FAILED_NATIVE_STEP"
+        else:
+            report["status"]="NATIVE_EXECUTED_REVIEW_REQUIRED"
     except Exception as exc:
         report["status"]="FAILED_OR_NATIVE_UNAVAILABLE"
         report["error_type"]=type(exc).__name__

@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 from components.nonlinear_time_history.soil_c_nltha_suite import (
     EVENT_ORDER, FIELD_TYPE, register_rows, audit_suite, verify_runner_pair,
-    reconcile_loma_runtime_pair
+    reconcile_loma_runtime_pair, write_suite_report
 )
 
 class SoilCPreflightTests(unittest.TestCase):
@@ -66,6 +66,16 @@ class SoilCPreflightTests(unittest.TestCase):
             (Path(d)/rows[0]["source_filename"]).write_text("SOURCE MODIFIED")
             report=audit_suite(d,register=reg)
             self.assertTrue(report["component_source_failures"])
+
+    def test_preflight_report_cannot_replace_input_waveform_or_register(self):
+        with tempfile.TemporaryDirectory() as d:
+            register,rows=self._register(d)
+            for source in (Path(d)/rows[0]["source_filename"],register):
+                with self.subTest(source=source):
+                    original=source.read_bytes()
+                    with self.assertRaisesRegex(ValueError,"overwrite input"):
+                        write_suite_report(source,d,register=register)
+                    self.assertEqual(source.read_bytes(),original)
 
     def test_unknown_modal_periods_not_assumed(self):
         with tempfile.TemporaryDirectory() as d:

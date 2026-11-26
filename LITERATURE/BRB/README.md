@@ -4,8 +4,8 @@
 
 | ID | Use in the thesis | Master metadata |
 |---|---|---|
-| L012 | BRB fatigue | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
-| L013 | BRB out-of-plane eccentricity | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
+| L012 / R07 | BRB fatigue tests and Eq. (5) normalized hysteretic work | [Publisher article](https://doi.org/10.1016/j.soildyn.2025.109700) |
+| L013 / R08 | BRB out-of-plane connection eccentricity | [Publisher article](https://link.springer.com/article/10.1007/s11803-024-2282-4) |
 | L018 | 2026 BRB-outrigger method | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 | L021 | Damped substructure outrigger concept | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 

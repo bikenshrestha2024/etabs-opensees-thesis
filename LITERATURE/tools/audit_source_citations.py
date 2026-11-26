@@ -73,7 +73,7 @@ def canonical(raw):
 
 def csv_text(head, rows):
     b = io.StringIO(newline="")
-    writer = csv.writer(b)
+    writer = csv.writer(b, lineterminator="\n")
     writer.writerow(head)
     writer.writerows(rows)
     return b.getvalue()
@@ -112,7 +112,7 @@ def generate():
                 if not tags:
                     tags = ["OpenSees_Methods"]
                 for tag in tags:
-                    entry = [tag, p, no, kind, ref, id_, title, line.strip()[:180]]
+                    entry = [tag, p, no, kind, ref, id_, title, line.strip()[:180].rstrip()]
                     rows.append(entry)
                     by_category[tag].append(entry)
                 if kind == "DOI" and not id_:

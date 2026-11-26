@@ -871,7 +871,7 @@ def raise_if_points_dropped(label,names,log=None):
     raise err
 
 
-def make_edb_working_copy(edb,root=None):
+def make_edb_working_copy(edb,root=None,*,expected_edb_sha256=None):
     """Copy the user's EDB into a private temp folder and return the copy path.
 
     [REF docs/NLTHA_READINESS_WORKFLOW.md section 6 (ETABS ingestion guards); engineering/rules/CORE_RULES.md rule 4]
@@ -888,6 +888,10 @@ def make_edb_working_copy(edb,root=None):
         os.chmod(dest,0o600|(dest.stat().st_mode&0o777))
         if dest.stat().st_size!=src.stat().st_size:
             raise IOError("EDB working copy size mismatch")
+        if expected_edb_sha256 is not None:
+            from components.inputs.project_output_layout import sha256_file
+            if sha256_file(dest) != expected_edb_sha256:
+                raise IOError("EDB working copy SHA256 mismatch with the bound export source")
     except BaseException:
         shutil.rmtree(folder,ignore_errors=True); raise
     return dest

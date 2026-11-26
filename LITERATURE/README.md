@@ -29,7 +29,7 @@
 
 Add new works by unique DOI; preserve existing stable IDs. On each citation refresh store *source, UTC retrieval date, count, and methodology*. Keep the catalog useful offline: URLs are references; private PDFs must not be silently pushed. See [existing curated source registry](../docs/00_RESEARCH_REFERENCES.md) for R01–R13 linkage.
 
-The curated master catalog includes **48 works** after the supplemental 2026-11-14 Dvorkin/Bathe 1984 intake; **12 unique works** were appended from the 20-file literature intake and 3 already-listed works (L006, L007, L034) were not duplicated. The automated source audit also detects additional DOIs and reports uncatalogued sources separately; a matched DOI alone does not mean full metadata has been verified. Incomplete bibliographic fields represent **outstanding verification**, not implied completeness.
+The curated master catalog includes **49 works**. The circular-tube brace surrogate (L049/R09) follows the 2026-11-14 literature intake. The automated source audit reports DOIs outside the curated catalog separately. Incomplete bibliographic fields remain open for verification.
 
 ## Classification folders
 

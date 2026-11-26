@@ -4,7 +4,7 @@
 **Previous launcher:** [`08_BUILDING_NONLINEAR_TRIAL.py`](../../08_BUILDING_NONLINEAR_TRIAL.py) (compatibility alias)
 
 ## Goal
-Short nonlinear diagnostic trial. Run from the complete repository with a compatible Windows Python/OpenSeesPy environment. This entry point retains the original launcher's numerical implementation unchanged.
+Open the exploratory nonlinear history GUI for an assembled export. Set a positive trial duration before starting a short run. The GUI starts with a duration of zero, which requests the full record. The [triage program](21_NLTHA_TRIAGE.md) can prepare controlled ZERO/X/Y/XY short probes.
 
 ## Input checklist
 Confirm the current export folder, validated geometry and section mapping, gravity and mass data, analysis units, selected material cards, and output destination as applicable to this subprogram. Do not mix old saved V156 exports with source modules from the new checkout.

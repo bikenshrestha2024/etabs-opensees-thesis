@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from components.inputs.output_contract import refuse_source_overwrite
 from components.nonlinear_time_history.nbc105_2025_audit import paired_ground_motion_scale,scaling_period_range
 
 def pair_spectrum_audit(x_path,y_path,*,soil_type,Z,I,omega_u,R_mu,
@@ -68,8 +69,10 @@ def pair_spectrum_audit(x_path,y_path,*,soil_type,Z,I,omega_u,R_mu,
         ]
     }
 
-def write_pair_audit(destination,*args,**kwargs):
-    report=pair_spectrum_audit(*args,**kwargs)
-    path=Path(destination);path.parent.mkdir(parents=True,exist_ok=True)
+def write_pair_audit(destination,x_path,y_path,**kwargs):
+    path=Path(destination).expanduser()
+    refuse_source_overwrite(path,(x_path,y_path))
+    report=pair_spectrum_audit(x_path,y_path,**kwargs)
+    path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(json.dumps(report,indent=2,allow_nan=False),encoding="utf-8")
     return report

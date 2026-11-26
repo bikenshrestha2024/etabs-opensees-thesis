@@ -14,7 +14,7 @@ from components.nonlinear_time_history.source_model_handoff import (
     stage_existing_model_sources, solver_reaction_support_tags, literature_section_inventory
 )
 from components.nonlinear_time_history.direct_existing_model import (
-    main, make_research_nltha_config, preflight_existing_model
+    main, make_research_nltha_config, preflight_existing_model, run_existing_model_nltha,
 )
 from components.gravity.etabs_reaction_support_filter import PROJECT_PRIMARY_32
 
@@ -130,6 +130,43 @@ class ExistingModelNLTHATests(unittest.TestCase):
                 output_dir=p/"results",event="Kobe",variant_id="UNVERIFIED")
             with self.assertRaisesRegex(FileNotFoundError,"missingA"):
                 preflight_existing_model(cfg)
+
+    def test_check_only_output_uses_the_selected_case_stage_owner(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder).resolve()
+            source=root/"export"
+            source.mkdir()
+            canonical_stage=source/"07_NONLINEAR_TIME_HISTORY"
+            wrong_stage=source/"04_MODAL"/"wrong"
+            has_valid_owner=(canonical_stage/"RUNS"/"explicit", root/"custom")
+            cases=((wrong_stage, None), *((path,path) for path in has_valid_owner))
+            preflight={"model_files_sha256":{
+                "OpenSees_Complete_Model_Data_V118.json":"a"*64,
+            }}
+            for requested,expected in cases:
+                with self.subTest(requested=requested), patch(
+                    "components.nonlinear_time_history.direct_existing_model.preflight_existing_model",
+                    return_value=preflight,
+                ):
+                    config=make_research_nltha_config(
+                        model_folder=source,x_path=root/"A.txt",y_path=root/"B.txt",
+                        output_dir=requested,event="Loma Prieta",variant_id="M0",
+                    )
+                    status=run_existing_model_nltha(config,check_only=True)
+                    self.assertEqual(status["status"],"PREFLIGHT_ONLY_NO_SOLVER_RUN")
+                    if expected is None:
+                        self.assertFalse(requested.exists())
+                        self.assertEqual(len(list((canonical_stage/"RUNS").rglob(
+                            "DIRECT_EXISTING_NLTHA_STATUS.json"))),1)
+                        results=Path(status["output_dir"])
+                        self.assertEqual(results.name,"02_RESULTS")
+                        self.assertEqual(results.parents[2],canonical_stage/"RUNS"/"ULS")
+                        manifest=json.loads((results.parent/"00_INPUT_SOURCE"/
+                                             "CASE_MANIFEST.json").read_text(encoding="utf-8"))
+                        self.assertEqual(manifest["solver_status"],"CREATED")
+                        self.assertEqual(manifest["model_sha256"],"a"*64)
+                    else:
+                        self.assertTrue((expected/"DIRECT_EXISTING_NLTHA_STATUS.json").is_file())
 
 
 if __name__=="__main__":

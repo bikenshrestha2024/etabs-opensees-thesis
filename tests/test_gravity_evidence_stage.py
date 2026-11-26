@@ -1,5 +1,6 @@
 """Tests for real ETABS workbook staging; no ETABS installation required."""
 import json
+import os
 from pathlib import Path
 from zipfile import ZipFile
 import pytest
@@ -50,6 +51,39 @@ def test_tampered_staged_workbook_is_rejected(tmp_path):
     Path(staged["etabs_assignment"]).write_bytes(b"tampered")
     with pytest.raises(ValueError):
         staged_gravity_workbooks(export)
+
+
+def test_failed_restage_preserves_the_published_workbook_pair(tmp_path, monkeypatch):
+    export = tmp_path / "export"
+    export.mkdir()
+    a = workbook(tmp_path / "a.xlsx")
+    b = workbook(tmp_path / "b.xlsx")
+    manifest = stage_gravity_workbooks(export, assignment=a, full_table=b)
+    original_manifest = manifest.read_bytes()
+    original_pair = staged_gravity_workbooks(export)
+    for source in (a, b):
+        with ZipFile(source, "a") as archive:
+            archive.writestr("changed.txt", source.name)
+
+    replace = os.replace
+
+    def interrupt_second_copy(partial, target):
+        if Path(target).stem == "etabs_full_table":
+            raise PermissionError("simulated locked workbook")
+        replace(partial, target)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "replace", interrupt_second_copy)
+        with pytest.raises(PermissionError, match="locked workbook"):
+            stage_gravity_workbooks(export, assignment=a, full_table=b)
+    assert manifest.read_bytes() == original_manifest
+    assert staged_gravity_workbooks(export) == original_pair
+
+    stage_gravity_workbooks(export, assignment=a, full_table=b)
+    updated_pair = staged_gravity_workbooks(export)
+    assert updated_pair != original_pair
+    assert file_sha256(updated_pair["etabs_assignment"]) == file_sha256(a)
+    assert all(Path(value).is_file() for value in original_pair.values())
 
 
 def test_unchanged_edb_is_hash_bound(tmp_path):

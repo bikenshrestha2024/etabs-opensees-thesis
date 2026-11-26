@@ -37,10 +37,19 @@ def find_candidates(folder: Path):
     return sorted({p.parent for p in folder.rglob(DATA_FILE)})
 
 
+def add_element_metadata(match, element, data):
+    nodes = element.get("nodes", [])
+    coordinates = {str(node): data.get("nodes", {}).get(str(node)) for node in nodes}
+    match.update(category=element.get("category"), node_tags=nodes,
+                 node_coordinates=coordinates, properties=element.get("properties"),
+                 source_element=element)
+
+
 def trace(folder: Path, tag: int):
     mapping_file = folder / MAP_FILE
     data_file = folder / DATA_FILE
-    mapping = read_json(mapping_file) if mapping_file.is_file() else {}
+    map_exists = mapping_file.is_file()
+    mapping = read_json(mapping_file) if map_exists else {}
     data = read_json(data_file) if data_file.is_file() else None
     matches = []
     for source_key, solver_tags in mapping.items():
@@ -48,21 +57,23 @@ def trace(folder: Path, tag: int):
             source_type, _, object_name = source_key.partition(":")
             match = {"source_key": source_key, "source_type": source_type,
                      "object_name": object_name, "solver_tag": tag}
-            if isinstance(data, dict):
-                source_collection = "frames" if source_type == "FRAME" else "shells" if source_type == "AREA" else None
-                for element in data.get(source_collection, []) if source_collection else []:
-                    if str(element.get("object")) != object_name:
-                        continue
-                    nodes = element.get("nodes", [])
-                    coordinates = {str(node): data.get("nodes", {}).get(str(node)) for node in nodes}
-                    match.update(category=element.get("category"),
-                                 node_tags=nodes, node_coordinates=coordinates,
-                                 properties=element.get("properties"),
-                                 source_element=element)
-                    break
+            source_collection = {"FRAME": "frames", "AREA": "shells"}.get(source_type)
+            if isinstance(data, dict) and source_collection:
+                # Assembly appends solver tags in the same order as the
+                # serialized cells or frame segments of each source object.
+                elements = [
+                    element for element in data.get(source_collection, [])
+                    if str(element.get("object")) == object_name
+                ]
+                if (len(elements) == len(solver_tags)
+                        and all(type(value) is int for value in solver_tags)
+                        and solver_tags == sorted(set(solver_tags))):
+                    add_element_metadata(match, elements[solver_tags.index(tag)], data)
+                else:
+                    match["metadata_status"] = "MAP_AND_MODEL_SEGMENTS_DISAGREE"
             matches.append(match)
-    mapping_method = "element_map" if mapping_file.is_file() else "unavailable"
-    if not matches and isinstance(data, dict):
+    mapping_method = "element_map" if map_exists else "unavailable"
+    if not map_exists and isinstance(data, dict):
         frame_first_tag = 100001
         frame_count = len(data.get("frames", []))
         shell_first_tag = frame_first_tag + frame_count
@@ -77,22 +88,17 @@ def trace(folder: Path, tag: int):
             source_type = None
         if element is not None:
             object_name = str(element.get("object"))
-            nodes = element.get("nodes", [])
-            coordinates = {str(node): data.get("nodes", {}).get(str(node)) for node in nodes}
-            matches.append({
+            match = {
                 "source_key": f"{source_type}:{object_name}",
                 "source_type": source_type,
                 "object_name": object_name,
                 "solver_tag": tag,
-                "category": element.get("category"),
-                "node_tags": nodes,
-                "node_coordinates": coordinates,
-                "properties": element.get("properties"),
-                "source_element": element,
-            })
+            }
+            add_element_metadata(match, element, data)
+            matches.append(match)
             mapping_method = "deterministic_tag_range_fallback"
     return {"isolated_model": str(folder.resolve()), "tag": tag,
-            "element_map_found": mapping_file.is_file(), "mapping_method": mapping_method,
+            "element_map_found": map_exists, "mapping_method": mapping_method,
             "model_data_found": data is not None,
             "matches": matches,
             "warning": "First non-finite response after solver failure may be a downstream symptom, not the initiating element."}

@@ -8,4 +8,6 @@
 
 **Tests:** [verify_nbc105_pair_spectrum_audit.py](../../../../tests/verify_nbc105_pair_spectrum_audit.py); injected candidate factors are logic tests, not a native spectral computation.
 
+`write_pair_audit` refuses any output path that refers to either accelerogram, including an alias to the same file.
+
 [Complete stage guide](../../../programs/32_NBC105_PAIR_SPECTRUM_AUDIT.md)

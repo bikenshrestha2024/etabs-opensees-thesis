@@ -11,6 +11,8 @@ Create a repeatable, non-destructive inventory of source export files and the re
 - `audit_export_structure(export_dir, verify_copies=True)`: accepts a local export root Path or an existing path inside a recognized canonical/legacy stage. Reads **directory listings**, file names and sizes; hashes only the source and categorized **mirror copies** when both are present and SHA checking is selected. Returns JSON-compatible dictionary. It doesn't create files or modify any model data.
 - `write_folder_audit(export_dir, verify_copies=True)`: uses the read-only audit above and **creates** timestamped `Folder_Audit_*.json` and `.md` under `01_ETABS_EXPORT/00_MANIFEST/FOLDER_AUDITS/`. Never overwrites an older report. Reports include local absolute paths and must not be committed to public GitHub.
 - `22_AUDIT_EXPORT_FOLDERS.py <export_root> [--mirror] [--skip-hash]`: optional `--mirror` creates classified copies with SHA verification using `export_mirror()`; originals and legacy result files remain unmoved. `--skip-hash` only inventories names and presence, so cannot certify mirror identity.
+
+The launcher resolves a path inside a known analysis stage to its owning export root before mirroring or writing the audit.
 - `09_ORGANIZE_ETABS_EXPORT.py` now additionally writes this audit after its existing mirror and stage-index procedures, preserving its existing return value and console status.
 
 ## Classification and observed limitations

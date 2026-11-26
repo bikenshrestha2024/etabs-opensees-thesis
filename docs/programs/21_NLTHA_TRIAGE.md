@@ -12,7 +12,7 @@ Use the same complete current source environment and a known existing explorator
 python 21_NLTHA_TRIAGE.py --config "D:\\Existing_Run\\RunConfig.json" --output "D:\\NLTHA_Probes"
 ```
 
-The four files `Probe_ZERO.json`, `Probe_X.json`, `Probe_Y.json` and `Probe_XY.json` are written, **but they are not executed**. Use the V168 exploratory nonlinear runner on each config in a fresh process / independently rebuilt model. All probes use ULS, XY orientation, first 0.005 s, zero Rayleigh damping and separate output directories. Do not change multiple mechanical assumptions between probes. Do not overwrite earlier evidence.
+The command writes four configurations, `Probe_ZERO.json`, `Probe_X.json`, `Probe_Y.json` and `Probe_XY.json`. Run each config in a fresh process with an independently rebuilt model. The probes preserve the source ULS/SLS state, use XY orientation and zero Rayleigh damping, and default to one time step. Each has a separate output directory.
 
 
 Execute each generated configuration from the repository root with the exploratory runner, for example:
@@ -32,7 +32,7 @@ After running, review:
 python 21_NLTHA_TRIAGE.py --review "D:\\NLTHA_Probes"
 ```
 
-The review classifies missing, failed and passing probes and prints an evidence-based interpretation. It never labels short probes as completed full-record simulations.
+The review classifies missing, failed and passing probes and prints an evidence-based interpretation. Keep each manifested probe's `NLTHA_Input_Quality.json` with its results. The review checks the ordered record digests against the manifest and checks the case summary for XY orientation, matching model and limit state, requested duration and matching diagnostic damping flags. A passing probe covers only its requested short trial.
 
 ## Built-in additions to the exploratory runner
 - Input acceleration vectors are required to be nonempty, finite, with valid sample timestep and declared acceleration units.

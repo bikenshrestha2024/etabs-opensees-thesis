@@ -1,7 +1,7 @@
 """Nonlinear frame section tag registry and ETABS section-name validation.
 
 [REF OpenSees 'section Fiber' / 'beamIntegration' manual (integer tag namespaces)]
-[REF R10 NBC105-2025 §9.3.1 (3D nonlinear model must represent the as-modelled members)]
+[REF R10 NBC 105:2025 §9.3.1.1 (3D modeling and significant post-elastic behavior)]
 
 Replaces the literal ``{'SHS_350x350x16_STEEL_FIBER':701, ...}`` that was
 repeated in components/model/assembly.py and components/ui/application.py.
@@ -73,8 +73,9 @@ def resolve_nonlinear_section_tags(cfg, *, research=False):
 def validate_frame_mapping(data, cfg, section_tags, *, overrides=None, research=False):
     """Check ETABS frame section names against mapping and registered tags.
 
-    [REF R10 NBC105-2025 §9.3.1] every modelled member needs a defined
-    nonlinear representation; fail before building any element.
+    [REF R10 NBC 105:2025 §9.3.1.1] sets the nonlinear modeling requirements.
+    This repository checks that each frame using a fiber section has a valid
+    ETABS-to-OpenSees mapping before building any element.
     Mirrors build_complete_model: device-target frames and research hinged
     braces (corotTruss) do not use a fibre section.
     Output: dict(used_targets=..., unused_mapping_keys=...). Raises ValueError

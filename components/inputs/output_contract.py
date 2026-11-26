@@ -93,6 +93,19 @@ def _refuse_linked_output_target(target):
             raise ValueError("Refusing linked derived-output destination: "+str(component))
 
 
+def refuse_source_overwrite(destination, sources):
+    """Refuse a derived output that names an input, including file aliases.
+
+    [REF docs/source/components/inputs/output_contract.py.md]
+    """
+    target = Path(destination).expanduser().resolve()
+    target_exists = target.exists()
+    for source in sources:
+        source = Path(source).expanduser().resolve()
+        if target == source or (target_exists and source.exists() and target.samefile(source)):
+            raise ValueError("Refusing to overwrite input with derived output: " + str(source))
+
+
 def atomic_json(path, data):
     """[REF docs/source/components/inputs/output_contract.py.md]
     Stable two-space UTF-8 JSON, replacing only the specified derived output.

@@ -10,11 +10,75 @@ import unittest
 from unittest import mock
 
 from tools.etabs_conversion_worker import _report_signature, run, validate_converter_report
+from components.validation.gravity_etabs_direct import make_edb_working_copy
 
 
 class TestWorkerReport(unittest.TestCase):
+    def test_edb_replacement_after_source_binding_is_rejected_at_copy(self):
+        application = ModuleType("components.ui.application")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            edb = root / "source.EDB"
+            edb.write_bytes(b"old")
+
+            def replace_source(*args, **kwargs):
+                edb.write_bytes(b"new")
+                return {}
+
+            def conversion(source, folder, log, include_live, **kwargs):
+                make_edb_working_copy(source, root=root, **kwargs)
+                self.fail("Changed EDB bytes passed the copy gate")
+
+            application.convert_model = conversion
+            with (
+                mock.patch.dict(sys.modules, {application.__name__: application}),
+                mock.patch("components.inputs.lfs_workbook_recovery.audit_optional_gui_workbooks",
+                           side_effect=replace_source),
+                self.assertRaisesRegex(OSError, "EDB working copy SHA256 mismatch"),
+            ):
+                run(edb, root / "export", False, False)
+
+    def test_failed_in_place_import_leaves_marker_until_successful_retry(self):
+        application = ModuleType("components.ui.application")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            edb = root / "source.EDB"
+            edb.write_bytes(b"synthetic source")
+            output = root / "export"
+            output.mkdir()
+            report = output / "OpenSees_Complete_Export_Report_V118.json"
+            report.write_text('{"assembly_errors": [], "revision": "previous"}')
+            topology = output / "OpenSees_Element_Connectivity.json"
+            topology.write_text('{"revision": "previous"}')
+            marker = output / "00_SOURCE_MANIFEST" / "IMPORT_INCOMPLETE.json"
+
+            def failing_conversion(_edb, folder, _log, _live, **kwargs):
+                topology.write_text('{"revision": "partial"}')
+                raise RuntimeError("interrupted before assembly finished")
+
+            def successful_conversion(_edb, folder, _log, _live, **kwargs):
+                topology.write_text('{"revision": "retry complete"}')
+                report.write_text('{"assembly_errors": [], "revision": "retry complete"}')
+
+            with (
+                mock.patch.dict(sys.modules, {application.__name__: application}),
+                mock.patch("components.inputs.lfs_workbook_recovery.audit_optional_gui_workbooks",
+                           return_value={}),
+            ):
+                application.convert_model = failing_conversion
+                with self.assertRaisesRegex(RuntimeError, "interrupted before assembly"):
+                    run(edb, output, False, False)
+                self.assertEqual(json.loads(topology.read_text())["revision"], "partial")
+                self.assertEqual(json.loads(report.read_text())["revision"], "previous")
+                self.assertTrue(marker.is_file())
+
+                application.convert_model = successful_conversion
+                result = run(edb, output, False, False)
+                self.assertEqual(result["status"], "EXPORT_COMPLETED_REVIEW_REQUIRED")
+                self.assertFalse(marker.exists())
+
     def test_categorizing_keeps_the_active_log_and_reports_mirror_conflicts(self):
-        def fake_conversion(_edb, output, _log, _live):
+        def fake_conversion(_edb, output, _log, _live, **kwargs):
             folder = Path(output)
             (folder / "OpenSees_Complete_Export_Report_V118.json").write_text(
                 '{"assembly_errors": []}', encoding="utf-8")

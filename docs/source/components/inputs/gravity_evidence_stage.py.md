@@ -6,7 +6,7 @@
 
 ## Procedure
 1. Choose the current OpenSees_Complete_Gravity_Model.py in Gravity Analysis. Browse for BOTH the original assignment and compressed full ETABS table XLSX files.
-2. Click **Stage BOTH selected ETABS XLSX files locally (SHA256, no LFS)**. Copies are written to 01_ETABS_EXPORT/10_PRIVATE_ETABS_WORKBOOKS and an atomic gravity_evidence_manifest.json records absolute paths, bytes, source file names and SHA256.
+2. Click **Stage BOTH selected ETABS XLSX files locally (SHA256, no LFS)**. New copies are stored under `01_ETABS_EXPORT/10_PRIVATE_ETABS_WORKBOOKS/SHA256/<digest>/`. After both copies verify, `gravity_evidence_manifest.json` switches to the new pair. It records absolute paths, bytes, source file names and SHA256. Existing manifests with the original file layout remain readable.
 3. When source EDB is specified and locally present, its SHA256 is recorded. Manifest reloading rejects changed EDB or changed staged Excel files.
 4. A missing optional registered Git-LFS workbook no longer triggers a mandatory modal picker during ordinary OpenSees gravity GUI auto-selection. It must still be supplied for any explicit ETABS comparison requiring it.
 5. Material/section source Excel is accessible from current components/ui/results.py (Export / open complete Excel library). If Windows is loading an older V116 runtime, use: python 08_EXPORT_MATERIAL_SECTION_LIBRARY.py "D:/Thesis Opensees/ETABS 11-14-2026/1". It exports under 02_MODEL/MATERIAL_SECTION_LIBRARY.

@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 import re
 import shutil
+from uuid import uuid4
 from zipfile import ZipFile, ZIP_DEFLATED
 
 _CASE = re.compile(r"(ULS|SLS)_[XY][+-]_E[+-0]", re.IGNORECASE)
@@ -406,7 +407,14 @@ def build_combined_esm_export(output_root, *, allow_incomplete=False):
     selected.extend(_stage_comparison_sources(root, calc_roots))
     if not selected:
         raise ValueError("No ESM source output files found. Calculate and export a case first.")
-    datetime_token = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    cases, stories = _data_rows(root, calc_roots)
+    if not cases and not allow_incomplete:
+        raise ValueError("ESM artifacts were found, but no calculation JSON is available; "
+                         "an engineering combined result cannot be generated.")
+    batch = _latest_batch_status(root, calc_roots)
+    calculation_status = "CALCULATION_JSON_AVAILABLE" if cases else "NO_CALCULATION_JSON"
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+    datetime_token = f"{timestamp}_{uuid4().hex[:8]}"
     # Keep the original per-case scripts/results readable; publish immutable review
     # evidence under the selected ETABS export\u2019s 03_ESM subtree.
     from components.inputs.output_layout import review_snapshots_for
@@ -427,12 +435,6 @@ def build_combined_esm_export(output_root, *, allow_incomplete=False):
             "sha256": _sha256(source), "bytes": source.stat().st_size,
             "module": _MODULES[module], "state": state, "case": case,
         })
-    cases, stories = _data_rows(root, calc_roots)
-    batch = _latest_batch_status(root, calc_roots)
-    calculation_status = "CALCULATION_JSON_AVAILABLE" if cases else "NO_CALCULATION_JSON"
-    if not cases and not allow_incomplete:
-        raise ValueError("ESM artifacts were found, but no calculation JSON is available; "
-                         "an engineering combined result cannot be generated.")
     workbook = snapshot / "ESM_Combined_Inspection.xlsx"
     _combined_workbook(workbook, cases, stories, manifest)
     # Report state must be visible directly inside the workbook, not only JSON.

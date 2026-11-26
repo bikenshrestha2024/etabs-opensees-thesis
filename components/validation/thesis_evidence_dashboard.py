@@ -8,6 +8,7 @@ import csv
 import hashlib
 import json
 from pathlib import Path
+from components.inputs.output_contract import refuse_source_overwrite
 
 STAGES = (
     ("00_PROVENANCE", "EDB/Excel/records/software source hashes"),
@@ -34,7 +35,7 @@ def sha256_file(path):
 def _valid_hash(x):
     return isinstance(x, str) and len(x) == 64 and all(c in "0123456789abcdefABCDEF" for c in x)
 
-def audit(manifest, *, manifest_dir, base_dir=None):
+def audit(manifest, *, manifest_dir, base_dir=None, evidence_paths=None):
     """Validate reviewer-declared evidence identity and ordered dependencies.
 
     A VERIFIED claim is screened only for referenced local file identities.
@@ -70,6 +71,8 @@ def audit(manifest, *, manifest_dir, base_dir=None):
             if not path.is_absolute():
                 path = base / path
             path = path.resolve()
+            if evidence_paths is not None:
+                evidence_paths.add(path)
             if path in seen:
                 issues.append("Duplicate evidence path")
             seen.add(path)
@@ -95,12 +98,17 @@ def audit(manifest, *, manifest_dir, base_dir=None):
                 all_stage_identities_verified=all(r["identity_verified"] for r in rows),
                 engineering_accepted=False)
 
-def save_reports(result, output_dir, *, png=False):
+def save_reports(result, output_dir, *, png=False, protected_inputs=()):
     out = Path(output_dir)
+    json_path = out / "Thesis_Evidence_Dashboard.json"
+    csv_path = out / "Thesis_Evidence_Dashboard.csv"
+    png_path = out / "Thesis_Evidence_Dashboard.png"
+    for path in (json_path, csv_path, png_path) if png else (json_path, csv_path):
+        refuse_source_overwrite(path, protected_inputs)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "Thesis_Evidence_Dashboard.json").write_text(
+    json_path.write_text(
         json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")
-    with (out / "Thesis_Evidence_Dashboard.csv").open("w", newline="", encoding="utf-8-sig") as f:
+    with csv_path.open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=list(result["stages"][0]))
         writer.writeheader()
         writer.writerows(result["stages"])
@@ -121,7 +129,7 @@ def save_reports(result, output_dir, *, png=False):
         for i, r in enumerate(rows):
             ax.text(values[i] + 0.02, i, r["evaluated_status"], va="center", fontsize=8)
         fig.tight_layout()
-        fig.savefig(out / "Thesis_Evidence_Dashboard.png", dpi=170)
+        fig.savefig(png_path, dpi=170)
         plt.close(fig)
     return out
 
@@ -133,9 +141,11 @@ def main(argv=None):
     p.add_argument("--png", action="store_true")
     a = p.parse_args(argv)
     path = Path(a.manifest).resolve()
+    protected_inputs = {path}
     result = audit(json.loads(path.read_text(encoding="utf-8-sig")),
-                   manifest_dir=path.parent, base_dir=a.base_dir)
-    save_reports(result, a.output_dir, png=a.png)
+                   manifest_dir=path.parent, base_dir=a.base_dir,
+                   evidence_paths=protected_inputs)
+    save_reports(result, a.output_dir, png=a.png, protected_inputs=protected_inputs)
     print(json.dumps({"status": result["status"],
                       "identity_verified": result["all_stage_identities_verified"],
                       "output_dir": str(Path(a.output_dir).resolve())}, indent=2))

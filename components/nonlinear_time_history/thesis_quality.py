@@ -143,11 +143,6 @@ def generate_isolation_configs(config, output_dir):
         raise FileNotFoundError("Source model_folder does not exist: "+str(source))
     if source==destination:
         raise ValueError("Diagnostic outputs must not overwrite the model source")
-    if destination.is_relative_to(source) and destination.name not in (
-        "NLTHA_Probes","OpenSees_Analysis_Results"):
-        # Ordinary nested output is permitted only outside input file names;
-        # production source files are never modified by this generator.
-        pass
     dt=float(base.get("dt_s",0))
     if not math.isfinite(dt) or dt<=0:
         raise ValueError("Original configuration must specify finite positive dt_s")
@@ -179,6 +174,7 @@ def generate_isolation_configs(config, output_dir):
             orientations=["XY"],duration_s=period,
             diagnostic_zero_damping=True,diagnostic_mass_damping=False,
             analysis_intent="RESEARCH_DIAGNOSTIC",
+            expected_model_sha256=inputs["model_sha256"],
             output_dir=str(destination/label),
             diagnostic_suspect_tags=[110280,112778])
         # NEVER mutate source config or select different earthquake files.
@@ -215,21 +211,33 @@ def review_isolation_runs(folder):
         elif summary.exists():
             data = json.loads(summary.read_text(encoding="utf-8-sig"))
             q = classify_case_result(data)
-            # Short trials are successful probes when they reached their requested time.
-            valid = data.get("status") in (
+            valid = manifest is not None and data.get("status") in (
                 "COMPLETED_TRUNCATED_TRIAL", "COMPLETED_EXPLORATORY_RECORD"
             )
-            try:
-                expected=float(manifest["probe_duration_s"]) if manifest else 0.005
-                valid = valid and float(data["physical_time_s"]) >= expected-1e-8
-                if manifest:
-                    valid=valid and data.get("limit_state")==manifest["limit_state"]
-                    valid=valid and data.get("diagnostic_excitation")==label
-                    valid=valid and data.get("model_sha256")==manifest["input_fingerprints"]["model_sha256"]
-            except (ValueError, TypeError, KeyError):
-                valid = False
+            if valid:
+                try:
+                    inputs = manifest["input_fingerprints"]
+                    quality = json.loads((directory / "NLTHA_Input_Quality.json")
+                                         .read_text(encoding="utf-8-sig"))
+                    digests = [row["sha256"] for row in quality["records"]]
+                    valid = (
+                        digests == [inputs["record_A_sha256"], inputs["record_B_sha256"]]
+                        and data.get("model_sha256") == inputs["model_sha256"]
+                        and data.get("limit_state") == manifest["limit_state"]
+                        and data.get("orientation") == "XY"
+                        and data.get("diagnostic_excitation") == label
+                        and data.get("diagnostic_zero_damping") is True
+                        and data.get("diagnostic_mass_damping") is False
+                        and math.isclose(float(data["physical_time_s"]),
+                                         float(manifest["probe_duration_s"]),
+                                         rel_tol=0, abs_tol=1e-8)
+                        and math.isfinite(float(data["physical_time_s"]))
+                    )
+                except (OSError, ValueError, TypeError, KeyError):
+                    valid = False
             rows.append({"probe": label, "status": "PROBE_PASSED" if valid else "INCOMPLETE",
                          "evidence": str(summary),
+                         "reason": "" if valid else "Saved time, model, motions or probe settings do not match the manifest",
                          "full_record_completed": q["full_record_completed"]})
         else:
             rows.append({"probe": label, "status": "NOT_RUN", "evidence": None})

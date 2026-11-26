@@ -88,6 +88,33 @@ class TriageEvidence(unittest.TestCase):
             r=review_isolation_runs(root/"diagnostics")
             self.assertEqual(r["probe_results"][0]["status"],"INCOMPLETE")
 
+    def test_review_binds_accepted_probe_to_both_waveforms_and_zero_damping(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);c=source(root)
+            output=root/"diagnostics"
+            generate_isolation_configs(c,output)
+            hashes=json.loads((output/"00_Probe_Evidence_Manifest.json").read_text())["input_fingerprints"]
+            folder=output/"ZERO"
+            summary=folder/"XY"/"Case_Summary.json"
+            summary.parent.mkdir(parents=True)
+            raw={"records":[{"sha256":hashes["record_A_sha256"]},{"sha256":hashes["record_B_sha256"]}]}
+            quality=folder/"NLTHA_Input_Quality.json"
+            quality.write_text(json.dumps(raw))
+            result=dict(status="COMPLETED_TRUNCATED_TRIAL",physical_time_s=.005,
+                 full_record_duration_s=45.,orientation="XY",limit_state="ULS",
+                 diagnostic_excitation="ZERO",model_sha256=hashes["model_sha256"],
+                 diagnostic_zero_damping=True,diagnostic_mass_damping=False)
+            summary.write_text(json.dumps(result))
+            self.assertEqual(review_isolation_runs(output)["probe_results"][0]["status"],"PROBE_PASSED")
+            raw["records"].reverse()
+            quality.write_text(json.dumps(raw))
+            self.assertEqual(review_isolation_runs(output)["probe_results"][0]["status"],"INCOMPLETE")
+            raw["records"].reverse()
+            quality.write_text(json.dumps(raw))
+            result["diagnostic_zero_damping"]=False
+            summary.write_text(json.dumps(result))
+            self.assertEqual(review_isolation_runs(output)["probe_results"][0]["status"],"INCOMPLETE")
+
     def test_focused_last_accepted_snapshot(self):
         with tempfile.TemporaryDirectory() as temp:
             file=Path(temp)/"committed.json"

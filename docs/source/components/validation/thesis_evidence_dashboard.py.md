@@ -6,4 +6,6 @@ This is a **read-only provenance and stage-dependency screen**, NOT a substitute
 
 The stages follow [canonical run order](../../../review/00_CANONICAL_RUN_ORDER_AND_NAMING.md) and the [P0 issue ledger](../../../review/00_ACTIVE_CODE_ENGINEERING_REVIEW.md). A claimed VERIFIED stage is blocked if files are missing, SHA256 differs or a preceding stage is unverified. Source identity can never prove physical correctness; `engineering_accepted` is always false.
 
+The command checks the destination of every requested report against the manifest and every evidence path before writing any report. It refuses paths that refer to any of those input files.
+
 Run tests: [verify_thesis_evidence_dashboard.py](../../../../tests/verify_thesis_evidence_dashboard.py).

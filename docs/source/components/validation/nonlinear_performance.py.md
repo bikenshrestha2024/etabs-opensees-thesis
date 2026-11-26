@@ -8,7 +8,7 @@
 Defines NBC-based edge drift templates, demands keyed by ground-motion pair/orientation and expected model SHA, reviewer-controlled member/device acceptance limits and suite aggregation.
 
 ## Explicit assumptions and known deficiencies
-Requires status COMPLETED_FULL_RECORD; exploratory runner produces COMPLETED_EXPLORATORY_RECORD. This is a deliberate evidence-tier mismatch requiring a reviewed evidence-promotion workflow, not a string replacement. The supplied NBC105:2025 code places drift values in clause 5.5.3 while 9.3.3.1 references 5.6.
+A demand row names a native nonlinear suite summary or its history CSV. The assessment matches the limit state, pair, orientation, model digest and completion, then checks the saved history through the full duration. If a demand CSV contains relative evidence paths, the GUI resolves them from that CSV's directory. Exploratory and truncated histories remain outside this assessment. The supplied NBC 105:2025 code places drift values in clause 5.5.3 while 9.3.3.1 references 5.6.
 
 ## Required thesis engineering changes
 Keep thresholds, hazard level, positive limiting strength/deformation, acceptance class and citation transparent. Test exact-7-record behavior separately before deciding code interpretation. Reject incomplete histories, missing pair orientations and sources with mismatching SHA/units.

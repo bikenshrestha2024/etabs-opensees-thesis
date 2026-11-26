@@ -55,7 +55,9 @@ class TestConversionGuiIsolation(unittest.TestCase):
         self.assertIn("def _poll_conversion_worker(self)", self.app_source)
         self.assertIn("def _cancel_conversion(self)", self.app_source)
         self.assertIn("def main() -> int:", self.worker_source)
-        self.assertIn("convert_model(str(edb), str(output), log, include_live)",
+        self.assertIn("convert_model(str(edb), str(output), log, include_live,",
+                      self.worker_source)
+        self.assertIn('expected_edb_sha256=context["source_edb_sha256"]',
                       self.worker_source)
         self.assertIn("model_equivalence", self.worker_source)
         self.assertIn("NOT_VERIFIED", self.worker_source)
@@ -93,6 +95,26 @@ class TestConversionGuiIsolation(unittest.TestCase):
     def test_source_has_single_export_button_binding(self):
         self.assertEqual(self.app_source.count("command=self._run)"), 1)
         self.assertIn("command=self._cancel_conversion", self.app_source)
+
+    def test_model_review_blocks_only_selected_export_with_incomplete_import(self):
+        from components.ui import application
+
+        with TemporaryDirectory() as directory:
+            partial = Path(directory) / 'partial'
+            marker = partial / '00_SOURCE_MANIFEST' / 'IMPORT_INCOMPLETE.json'
+            marker.parent.mkdir(parents=True)
+            marker.write_text('{}', encoding='utf-8')
+            isolated = partial / '02_MODEL' / 'REBUILDS' / 'verified'
+            isolated.mkdir(parents=True)
+            gui = Mock()
+            gui._conversion_process = None
+
+            with patch.object(application.messagebox, 'showwarning') as warning:
+                gui.out.get.return_value = str(partial)
+                self.assertIsNone(application.App._model_review_folder(gui))
+                warning.assert_called_once()
+                gui.out.get.return_value = str(isolated)
+                self.assertEqual(application.App._model_review_folder(gui), str(isolated.resolve()))
 
     def test_completed_export_view_remains_bound_to_the_worker_folder(self):
         from components.ui import application

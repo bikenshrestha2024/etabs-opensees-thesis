@@ -1,6 +1,6 @@
 # ESM combined inspection and non-destructive folder organizer
 
-**What:** Copy-only exporter builds categorized ESM review trees in <ETABS export>/03_ESM/REVIEW_SNAPSHOTS/<UTC timestamp>. Separately names ETABS_Linked_Equivalent_Static and OpenSees_Direct_Equivalent_Static; each then has limit state, case and extension categories JSON, Excel, CSV, Plots, Scripts, Logs and PDF. Creates ESM_Combined_Inspection.xlsx, ESM_Export_Manifest.json, ZIP and LATEST_ESM_COMBINED_EXPORT.txt.
+**What:** The copy-only exporter writes categorized ESM review trees under `03_ESM/REVIEW_SNAPSHOTS/<UTC timestamp>_<unique suffix>`. The snapshot and ZIP share that identifier. After checking for calculation evidence or an explicit manifest-only request, it copies ETABS-linked and OpenSees-direct artifacts by limit state, case and format. It writes `ESM_Combined_Inspection.xlsx`, `ESM_Export_Manifest.json`, a ZIP, and `LATEST_ESM_COMBINED_EXPORT.txt`.
 
 **Why:** The original six X/Y ESM scripts and per-case JSON, CSV, XLSX and PNG are scattered among unrelated gravity and seismic results. Earlier export controls were difficult to find and lacked one combined inspection workbook.
 

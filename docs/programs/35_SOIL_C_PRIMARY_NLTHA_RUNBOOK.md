@@ -104,6 +104,8 @@ python 35_SOIL_C_NLTHA_PREFLIGHT.py --matched-dir "D:/Thesis/Target Spectra/Soil
 
 Exit status `0` means registered source hash and pair timing checks have no failures; **not** a design pass. Exit `3` indicates Loma timing review, and `2` indicates source-file mismatches or missing files. Review the actual JSON for all listed cases. The preflight **never** edits or copies the waveform samples.
 
+Use a separate report file. The preflight rejects an output path that identifies the source register or any registered waveform.
+
 ## 06. Building runner config: research vs accepted thesis intent
 
 The existing `components/nonlinear_time_history/building_exploratory.py` remains an **EXPLORATORY** analysis entry point; no automated code commit can make unvalidated materials experimentally credible.

@@ -1,9 +1,129 @@
 """Run-order and static-source audits; solver-free, no model data."""
+import importlib
+import json
+import runpy
+import subprocess
+import sys
 import tempfile
 import unittest
 import re
 from pathlib import Path
+from unittest.mock import patch
 from tools.audit_active_repository import inventory, inspect_one_python, CANONICAL
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class NumberedLauncherTests(unittest.TestCase):
+    def test_gui_launchers_and_legacy_aliases_do_not_open_windows_on_import(self):
+        names = (
+            "02_INPUT_READINESS", "02_MODEL_INPUTS_AND_READINESS",
+            "03_GRAVITY", "04_MODAL_ULS_SLS", "05_EQUIVALENT_STATIC",
+            "06_RESPONSE_SPECTRUM", "07_LINEAR_TIME_HISTORY", "07_WALL_VALIDATION",
+            "08_BUILDING_NONLINEAR_TRIAL", "09_NONLINEAR_REVIEWED_MODEL",
+            "10_GRAVITY", "10_WALL_VALIDATION", "11_MODAL_ULS_SLS",
+            "12_EQUIVALENT_STATIC", "13_RESPONSE_SPECTRUM", "14_LINEAR_TIME_HISTORY",
+            "15_BUILDING_NONLINEAR_TRIAL", "16_NONLINEAR_REVIEWED_MODEL",
+            "17_BUILDING_FULL_NONLINEAR", "18_BUILDING_FULL_NONLINEAR",
+        )
+        load = runpy.run_path
+        facade_calls = []
+
+        def record_facade(path, *, run_name):
+            if Path(path).name.startswith("OpenSees_"):
+                facade_calls.append((Path(path).name, run_name))
+                return {}
+            return load(path, run_name=run_name)
+
+        for name in names:
+            with self.subTest(name=name), \
+                 patch.object(sys, "path", sys.path.copy()), \
+                 patch("runpy.run_path", side_effect=record_facade), \
+                 patch("OpenSees_Workflow_V144.launch") as readiness, \
+                 patch("tkinter.Tk") as window, \
+                 patch("tkinter.filedialog.askdirectory", return_value=""):
+                facade_calls.clear()
+                load(str(ROOT / (name + ".py")), run_name="review_import")
+                self.assertEqual(facade_calls, [])
+                readiness.assert_not_called()
+                window.assert_not_called()
+
+    def test_connectivity_audit_usage_names_the_invoked_launcher(self):
+        for name in ("19_AUDIT_LOAD_CONNECTIONS.py", "20_AUDIT_LOAD_CONNECTIONS.py"):
+            with self.subTest(name=name):
+                result = subprocess.run(
+                    [sys.executable, "-B", str(ROOT / name)],
+                    capture_output=True, text=True, check=False,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"python {name} <export folder>", result.stderr)
+
+    def test_explicit_execution_preserves_compatibility_facade_routes(self):
+        facade_launchers = {
+            "07_WALL_VALIDATION": "OpenSees_Wall_Validation_V147.py",
+            "03_GRAVITY": "OpenSees_Gravity_GUI_V110.py",
+            "11_MODAL_ULS_SLS": "OpenSees_Modal_GUI_NBC105_V111.py",
+            "12_EQUIVALENT_STATIC": "OpenSees_Earthquake_Analysis_NBC105_V111.py",
+            "14_LINEAR_TIME_HISTORY": "OpenSees_Linear_Time_History_NBC105_V115.py",
+            "16_NONLINEAR_REVIEWED_MODEL": "OpenSees_Nonlinear_Time_History_NBC105_V116.py",
+        }
+        load = runpy.run_path
+        facade_calls = []
+
+        def record_facade(path, *, run_name):
+            name = Path(path).name
+            if name in facade_launchers.values():
+                facade_calls.append((name, run_name))
+                return {}
+            return load(path, run_name=run_name)
+
+        for name, facade in facade_launchers.items():
+            with self.subTest(name=name), \
+                 patch.object(sys, "path", sys.path.copy()), \
+                 patch("runpy.run_path", side_effect=record_facade):
+                facade_calls.clear()
+                load(str(ROOT / (name + ".py")), run_name="__main__")
+                self.assertEqual(facade_calls, [(facade, "__main__")])
+
+    def test_element_trace_selects_the_mapped_cell_of_a_meshed_area(self):
+        trace_module = importlib.import_module("20_TRACE_FAILED_ELEMENT")
+        with tempfile.TemporaryDirectory() as folder:
+            model = Path(folder)
+            (model / trace_module.MAP_FILE).write_text(
+                json.dumps({"AREA:wall-7": [100001, 100002]}), encoding="utf-8"
+            )
+            (model / trace_module.DATA_FILE).write_text(json.dumps({
+                "frames": [],
+                "nodes": {str(i): [i, 0, 0] for i in range(1, 9)},
+                "shells": [
+                    {"object": "wall-7", "category": "SHEAR WALL", "nodes": [1, 2, 3, 4]},
+                    {"object": "wall-7", "category": "SHEAR WALL", "nodes": [5, 6, 7, 8]},
+                ],
+            }), encoding="utf-8")
+            result = trace_module.trace(model, 100002)
+            self.assertEqual(result["matches"][0]["node_tags"], [5, 6, 7, 8])
+            self.assertEqual(result["matches"][0]["node_coordinates"]["5"], [5, 0, 0])
+
+            (model / trace_module.MAP_FILE).write_text(
+                json.dumps({"AREA:wall-7": [100002]}), encoding="utf-8"
+            )
+            result = trace_module.trace(model, 100002)
+            match = result["matches"][0]
+            self.assertEqual(match["source_key"], "AREA:wall-7")
+            self.assertEqual(match["metadata_status"], "MAP_AND_MODEL_SEGMENTS_DISAGREE")
+            self.assertNotIn("node_tags", match)
+
+    def test_element_trace_does_not_infer_tag_omitted_from_existing_map(self):
+        trace_module = importlib.import_module("20_TRACE_FAILED_ELEMENT")
+        with tempfile.TemporaryDirectory() as folder:
+            model = Path(folder)
+            (model / trace_module.MAP_FILE).write_text("{}", encoding="utf-8")
+            (model / trace_module.DATA_FILE).write_text(json.dumps({
+                "frames": [{"object": "beam-1", "category": "BEAM", "nodes": [1, 2]}],
+            }), encoding="utf-8")
+            result = trace_module.trace(model, 100001)
+            self.assertEqual(result["mapping_method"], "element_map")
+            self.assertEqual(result["matches"], [])
 
 class AuditTests(unittest.TestCase):
     def test_project_launchers_present(self):

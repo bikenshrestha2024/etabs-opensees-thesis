@@ -12,10 +12,8 @@ def main(argv=None):
     parser.add_argument("manifest",type=Path)
     parser.add_argument("--output",type=Path)
     opts=parser.parse_args(argv)
-    result=load_case_manifest(opts.manifest)
     target=opts.output or opts.manifest.parent/"M0_M6_Research_Comparison.json"
-    if target.resolve()==opts.manifest.resolve():
-        raise ValueError("Output cannot overwrite the input manifest")
+    result=load_case_manifest(opts.manifest,output=target)
     target.parent.mkdir(parents=True,exist_ok=True)
     target.write_text(json.dumps(result,indent=2,allow_nan=False),encoding="utf-8")
     print(json.dumps({"status":result["status"],"cases":result["paired_case_keys"],

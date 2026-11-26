@@ -13,6 +13,8 @@ Confirm the current export folder, validated geometry and section mapping, gravi
 In Spyder open `18_NONLINEAR_PERFORMANCE.py` and run. Alternatively from the repository root invoke `python 18_NONLINEAR_PERFORMANCE.py`. If the script requires arguments (particularly the two diagnostic scripts), inspect the Python source usage and supply an appropriate export or failed-run folder.
 
 ## Validation and results
+The demand CSV supplies the pair, orientation, completion status, model hash, and result path. The current assessor checks that the path exists and reads the other values from the CSV. Before relying on a criterion result, reconcile each demand with its result file, including the limit state and full-record evidence. The GUI does not directly import the exploratory case summaries.
+
 Review the program's actual run logs, input assumptions, generated files and solver status before interpreting engineering output. Material examples and smoke tests are not experimental calibration, and an incomplete nonlinear earthquake history must not be ranked. The building transient first-step failure remains unresolved.
 
 [Complete run order](00_PROGRAM_INDEX.md) · [Modeling basis](../../Research_Components/02_MODELLING_BASIS.md)

@@ -1,5 +1,6 @@
 """Local filesystem tests: do not access any ETABS installation or external network."""
 import json
+import runpy
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -9,6 +10,21 @@ from components.inputs.export_mirror import export_mirror
 
 
 class FolderAuditTests(unittest.TestCase):
+    def test_numbered_mirror_uses_the_same_export_owner_as_the_audit(self):
+        launcher = Path(__file__).resolve().parents[1] / "22_AUDIT_EXPORT_FOLDERS.py"
+        main = runpy.run_path(str(launcher))["main"]
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            nested = root / "04_MODAL" / "RUNS" / "ULS"
+            nested.mkdir(parents=True)
+            name = "OpenSees_Element_Connectivity.json"
+            (root / name).write_text('{"nodes": [1]}', encoding="utf-8")
+
+            report, _ = main([str(nested), "--mirror"])
+            self.assertFalse((nested / "01_ETABS_EXPORT").exists())
+            self.assertTrue((root / "01_ETABS_EXPORT" / "02_MAPPING" / name).is_file())
+            self.assertTrue(report.is_file())
+
     def test_audit_missing_mirror_and_legacy_without_mutation(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp) / "ETABS" / "Case_3"

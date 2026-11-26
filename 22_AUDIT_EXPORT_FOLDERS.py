@@ -14,6 +14,7 @@ import argparse
 from pathlib import Path
 from components.inputs.folder_audit import write_folder_audit
 from components.inputs.export_mirror import export_mirror
+from components.inputs.output_layout import export_root_for
 
 
 def main(argv=None):
@@ -24,10 +25,14 @@ def main(argv=None):
     parser.add_argument("--skip-hash", action="store_true",
                         help="Skip potentially expensive original-vs-mirror hash comparison.")
     args = parser.parse_args(argv)
+    selected = args.export_dir.expanduser()
+    root = export_root_for(selected)
     if args.mirror:
-        copied = export_mirror(args.export_dir)
+        if selected.is_symlink():
+            raise ValueError("Refusing symlinked selected export root")
+        copied = export_mirror(root)
         print("SOURCE_MIRROR_MANIFEST=" + str(copied))
-    json_file, md_file = write_folder_audit(args.export_dir,
+    json_file, md_file = write_folder_audit(root,
                                             verify_copies=not args.skip_hash)
     print("FOLDER_AUDIT_JSON=" + str(json_file))
     print("FOLDER_AUDIT_MARKDOWN=" + str(md_file))

@@ -41,6 +41,12 @@ def audit(folder):
     result['summary']={'slab_objects':len(result['slabs']),'slabs_without_direct_beam_or_wall_node':sum(not (x['shared_beam_nodes'] or x['shared_wall_nodes']) for x in result['slabs']),'wall_objects':len(result['walls']),'wall_objects_without_direct_shared_wall_nodes':sum(not x['shared_other_wall_object_nodes'] for x in result['walls']),'missing_node_reference_count':sum(len(x['nodes']) for x in missing_node_references),'gravity_total_kN':data.get('total_downward_load_kN'),'gravity_by_pattern_kN':data.get('gravity_by_pattern_kN')}
     return result
 
-if __name__=='__main__':
-    if len(sys.argv)!=2: raise SystemExit('Usage: python 20_AUDIT_LOAD_CONNECTIONS.py <export folder>')
-    print(json.dumps(audit(sys.argv[1]),indent=2))
+def main():
+    if len(sys.argv) != 2:
+        launcher = Path(sys.argv[0]).name
+        raise SystemExit(f'Usage: python {launcher} <export folder>')
+    print(json.dumps(audit(sys.argv[1]), indent=2))
+
+
+if __name__ == '__main__':
+    main()

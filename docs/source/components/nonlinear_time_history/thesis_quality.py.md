@@ -16,6 +16,8 @@ Document original ETABS export path/SHA, declared kN-m-s model units, stress con
 `validate_convergence_settings` supplies the OpenSees `NormDispIncr` policy to the reviewed and exploratory NLTHA runners. The default is `1e-6` with 40 iterations per attempt. Select `1e-7` for a strict run. Reviewed execution rejects a separate final fallback. A legacy exploratory fallback already covered by the selected tolerance is omitted. The tolerance controls the solution-increment norm. See the [OpenSees convergence-test reference](https://opensees.github.io/OpenSeesDocumentation/user/manual/analysis/test/NormDispIncr.html).
 Capture source commit SHA, model/ground-motion fingerprint, ULS/SLS, record orientation, completed physical duration, solver diagnostics, exception traceback and linked reports. Mark failed or truncated runs and do not include them in thesis rankings.
 
+A completed isolation probe needs the generated manifest, its own accepted case summary and the runner's ordered waveform SHA-256 values in `NLTHA_Input_Quality.json`. Review checks the model digest, XY orientation, state, excitation, damping flags and requested end time before counting the result as a comparable short probe.
+
 ## Research and standards
 Relevant register IDs: R01 R02 R03 R04 R05 R06. Consult [research reference register](../../../00_RESEARCH_REFERENCES.md). These identify potentially applicable publications, not proof of parameter calibration or test reproduction.
 

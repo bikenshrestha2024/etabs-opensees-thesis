@@ -18,6 +18,8 @@ All new stage tools should call `canonical_stage_folder(stage)` / `create_case_r
 
 Auxiliary destinations remain distinct: `02_MODEL` (MESH_04/08/16 model assembly), `08_ETABS_COMPARISONS`, `09_SOFTWARE_DIAGNOSTICS`, `90_UPLOAD_PACKAGES`. The old `06_LINEAR_TH` and `07_NONLINEAR_TH` directories are **readable aliases**, never new production stage directories. `OpenSees_Analysis_Results` is retained for historical runs. No existing file has been moved.
 
+`refuse_source_overwrite(destination, sources)` rejects a derived-output filename that resolves to an input or refers to the same existing file through a hard link. Call it for every intended output before creating files.
+
 ## One consistent new case run
 
 ```text

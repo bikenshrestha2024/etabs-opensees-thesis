@@ -9,7 +9,7 @@ Single source for nonlinear fibre-section tags. Defaults come from `components/s
 
 ## References
 
-NBC 105:2025 §9.3.1 (R10); OpenSees section/beamIntegration tag namespaces. Tag convention: [REF_TAG_CONVENTION.md](../../../../docs/REF_TAG_CONVENTION.md).
+NBC 105:2025 §9.3.1.1 (R10) requires a 3D model with significant post-elastic behavior represented. This repository enforces a section-tag mapping for frames built with fiber sections. [NBC 105:2025](https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf), [Repository citation convention](../../../../docs/REF_TAG_CONVENTION.md)
 
 ## Verification
 

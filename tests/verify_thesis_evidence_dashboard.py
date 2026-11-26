@@ -1,9 +1,10 @@
 """Fail-closed thesis evidence dashboard regression tests (standard library)."""
 import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
-from components.validation.thesis_evidence_dashboard import STAGES, audit, save_reports
+from components.validation.thesis_evidence_dashboard import STAGES, audit, main, save_reports
 
 class EvidenceDashboardChecks(unittest.TestCase):
     def setUp(self):
@@ -59,6 +60,29 @@ class EvidenceDashboardChecks(unittest.TestCase):
         p["stages"][STAGES[0][0]]["status"]="CERTIFIED"
         with self.assertRaises(ValueError):
             self.check(p)
+
+    def test_dashboard_cannot_replace_manifest(self):
+        manifest=self.root/"Thesis_Evidence_Dashboard.json"
+        original=json.dumps(self.payload()).encode()
+        manifest.write_bytes(original)
+        with self.assertRaisesRegex(ValueError,"overwrite input"):
+            main(["--manifest",str(manifest),"--output-dir",str(self.root)])
+        self.assertEqual(manifest.read_bytes(),original)
+        self.assertFalse((self.root/"Thesis_Evidence_Dashboard.csv").exists())
+
+    def test_dashboard_cannot_replace_an_evidence_file(self):
+        evidence=self.root/"Thesis_Evidence_Dashboard.csv"
+        evidence.write_bytes(b"previous CSV evidence")
+        payload=self.payload(1)
+        payload["stages"][STAGES[0][0]]["evidence"]=[{
+            "path":evidence.name,"sha256":hashlib.sha256(evidence.read_bytes()).hexdigest(),
+        }]
+        manifest=self.root/"manifest.json"
+        manifest.write_text(json.dumps(payload),encoding="utf-8")
+        with self.assertRaisesRegex(ValueError,"overwrite input"):
+            main(["--manifest",str(manifest),"--output-dir",str(self.root)])
+        self.assertEqual(evidence.read_bytes(),b"previous CSV evidence")
+        self.assertFalse((self.root/"Thesis_Evidence_Dashboard.json").exists())
 
 if __name__=="__main__":
     unittest.main()

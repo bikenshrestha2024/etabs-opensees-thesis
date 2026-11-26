@@ -14,6 +14,8 @@ import os
 import shutil
 import tempfile
 
+from components.inputs.output_contract import atomic_json
+
 ROLES = ("etabs_assignment", "etabs_full_table")
 VALID_EXTENSIONS = {".xlsx", ".xlsm"}
 LFS_PREFIX = b"version https://git-lfs.github.com/spec/v1"
@@ -73,20 +75,24 @@ def stage_gravity_workbooks(export_dir, *, assignment, full_table, source_edb=No
     destination.mkdir(parents=True, exist_ok=True)
     prepared = {}
     for role, source in selected.items():
-        target = destination / (role + source.suffix.lower())
-        if source != target.resolve():
+        digest = file_sha256(source)
+        # A published manifest keeps referring to the same bytes while another
+        # pair is staged. Only the manifest switches after both copies verify.
+        target = destination / "SHA256" / digest / (role + source.suffix.lower())
+        if not target.is_file() or file_sha256(target) != digest:
+            target.parent.mkdir(parents=True, exist_ok=True)
             # Copy into temporary filename first to avoid partial accepted files.
-            with tempfile.NamedTemporaryFile(dir=destination, prefix=role+"_",
+            with tempfile.NamedTemporaryFile(dir=target.parent, prefix=role+"_",
                                              suffix=".partial", delete=False) as tmp:
                 partial = Path(tmp.name)
             try:
                 shutil.copyfile(source, partial)
-                if file_sha256(partial) != file_sha256(source):
+                if file_sha256(partial) != digest:
                     raise IOError("Source/staged workbook hash mismatch: "+role)
                 os.replace(partial, target)
             finally:
                 partial.unlink(missing_ok=True)
-        prepared[role] = {"path": str(target), "sha256": file_sha256(target),
+        prepared[role] = {"path": str(target), "sha256": digest,
                           "source_name": source.name, "bytes": target.stat().st_size}
     edb = Path(source_edb).resolve() if source_edb else None
     doc = {"schema": 1,
@@ -99,13 +105,7 @@ def stage_gravity_workbooks(export_dir, *, assignment, full_table, source_edb=No
            "validation_needed": ["ETABS model identity", "native assignment sheet presence",
                                  "matching ULS load case and joint reactions",
                                  "source versus OpenSees gravity parity"]}
-    path = manifest_path(folder)
-    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=destination,
-                                     suffix=".partial", delete=False) as tmp:
-        json.dump(doc, tmp, indent=2)
-        temp = Path(tmp.name)
-    os.replace(temp, path)
-    return path
+    return atomic_json(manifest_path(folder), doc)
 
 
 def staged_gravity_workbooks(export_dir):

@@ -13,6 +13,8 @@ import math
 import sys
 import traceback
 from pathlib import Path
+from components.inputs.output_contract import compact_case_id, create_case_run, record_case_status
+from components.inputs.output_layout import owned_run_destination
 from components.nonlinear_time_history.source_model_handoff import (
     required_source_files, source_sha256, literature_section_inventory
 )
@@ -366,8 +368,16 @@ def run_existing_model_nltha(config, *, check_only=False, executor=None):
     current_sha=preflight["model_files_sha256"]["OpenSees_Complete_Model_Data_V118.json"]
     if config.get("expected_model_sha256") not in (None,current_sha):
         raise ValueError("Selected model differs from the previously bound model SHA256")
-    config=dict(config,expected_model_sha256=current_sha)
-    output=Path(config["output_dir"]).expanduser().resolve()
+    selected=Path(config["output_dir"]).expanduser()
+    scope=f"{config['variant_id']}_{config['limit_state']}_{config['pair_id']}"
+    case_id=compact_case_id("NLTHA",scope,current_sha)
+    output=owned_run_destination(config["model_folder"],"NLTHA",case_id,selected=selected)
+    managed_run=None
+    if output != selected.resolve():
+        managed_run=create_case_run(config["model_folder"],"NLTHA",case_id,
+                                    state=config["limit_state"],model_sha256=current_sha)
+        output=managed_run/"02_RESULTS"
+    config=dict(config,expected_model_sha256=current_sha,output_dir=str(output))
     # An existing case may contain a successful XY/YX run or first-failure
     # snapshots. Never mix a rerun into those immutable scientific records.
     if output.exists():
@@ -379,17 +389,21 @@ def run_existing_model_nltha(config, *, check_only=False, executor=None):
     output.mkdir(parents=True,exist_ok=True)
     target=output/"DIRECT_EXISTING_NLTHA_STATUS.json"
     plan=output/"DIRECT_EXISTING_NLTHA_SOURCE_AND_SECTION_BASIS.json"
-    plan.write_text(json.dumps(preflight,indent=2,allow_nan=False),encoding="utf-8")
+    with plan.open("x",encoding="utf-8") as stream:
+        json.dump(preflight,stream,indent=2,allow_nan=False)
     def status(phase,**values):
         record=dict(status=phase,analysis_intent=config["analysis_intent"],
                     original_source_untouched=True,
+                    output_dir=str(output),
                     recorded_at=datetime.datetime.now().astimezone().isoformat(),
                     model_sha256=preflight["model_files_sha256"]["OpenSees_Complete_Model_Data_V118.json"],
                     **values)
         target.write_text(json.dumps(record,indent=2,allow_nan=False),encoding="utf-8")
         return record
     if check_only:
-        return status("PREFLIGHT_ONLY_NO_SOLVER_RUN",note="Run without --check-only to start OpenSees nonlinear transient")
+        return status("PREFLIGHT_ONLY_NO_SOLVER_RUN",note="Use a fresh run folder without --check-only to start OpenSees nonlinear transient")
+    if managed_run is not None:
+        record_case_status(managed_run,"RUNNING")
     status("NATIVE_NLTHA_STARTED",note="Not evidence that analysis completed")
     try:
         if executor is None:
@@ -417,6 +431,8 @@ def run_existing_model_nltha(config, *, check_only=False, executor=None):
                 c["source_model_sha256"] != preflight["model_files_sha256"]["OpenSees_Complete_Model_Data_V118.json"]
                 for c in verified_pair.values()):
             raise ValueError("Saved full-duration case model differs from preflight source SHA256")
+        if managed_run is not None:
+            record_case_status(managed_run,"COMPLETED_SOLVER_ONLY" if is_full else "INCOMPLETE")
         return status("EXPLORATORY_FULL_DURATION_NUMERICAL_SCREEN"
                       if is_full else "EXPLORATORY_TRUNCATED_TRIAL_ONLY",
                       case_ids=[c.get("orientation") for c in cases],
@@ -431,6 +447,9 @@ def run_existing_model_nltha(config, *, check_only=False, executor=None):
                failed_reason=str(exc),error_type=type(exc).__name__,
                native_solver_passed=False,
                traceback=traceback.format_exc(limit=15))
+        if managed_run is not None:
+            record_case_status(managed_run,"INTERRUPTED" if isinstance(exc,KeyboardInterrupt)
+                               else "FAILED",message=str(exc))
         raise
 
 

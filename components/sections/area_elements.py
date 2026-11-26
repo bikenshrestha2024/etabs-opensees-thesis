@@ -1,8 +1,8 @@
 # WALL FORMULATION NOTE: this source handles physical shell/wall element interfaces.
 # E-SFI-MVLEM-3D per-panel construction alone does not prove core-opening compatibility,
 # junction bending, re-entrant torsion, experimental calibration or mesh convergence.
-# Kolozvari, Lopez and Massone (2023): DOI:10.1016/j.engstruct.2023.116700.
-# Alternative comparison only: Tura et al. (2026), DOI:10.1007/s10518-025-02165-2.
+# [REF R02 Kolozvari, Lopez and Massone (2023), DOI 10.1016/j.engstruct.2023.116700]
+# [REF R13 Tura et al. (2026), DOI 10.1007/s10518-025-02165-2] Alternative wall formulation.
 # -*- coding: utf-8 -*-
 """ETABS area-object integration for OpenSeesPy (V116).
 
@@ -20,8 +20,8 @@ References:
   E-SFI-MVLEM-3D; https://doi.org/10.1016/j.engstruct.2023.116700
 * E-SFI-MVLEM-3D command and benchmark documentation:
   https://github.com/kkolozvari/E-SFI-MVLEM-3D
-* NBC 105:2025 §7.3.12 requires the response of wall segments and coupling
-  beams to be represented for walls with openings.
+* [REF R10 NBC 105:2025 §9.3.1.1 and Annex A §§5.5–5.6] Main text covers 3D
+  nonlinear modeling. Annex A covers coupling-beam detailing and wall openings.
 * IS 16700:2023 §7.3.12 asks for wall models to represent solid/coupled/
   perforated/punched wall segment and coupling-beam behavior (supplementary).
 * OpenSees ShellMITC4 is an elastic shell formulation when paired with an
@@ -875,6 +875,6 @@ def launch_area_integration_gui(parent=None, export_dir=None):
         except Exception as exc:
             messagebox.showerror("Open output folder",str(exc),parent=win)
     ttk.Button(root,text="Open output folder",command=open_output_folder).pack(anchor="w",pady=4)
-    ttk.Label(root, text="References: Kolozvari, Lopez & Massone (2023), Engineering Structures 294, 116700, doi:10.1016/j.engstruct.2023.116700; E-SFI-MVLEM-3D user docs at github.com/kkolozvari/E-SFI-MVLEM-3D. NBC 105:2025 §7.3.12 governs wall segment/coupling beam representation. ShellMITC4 + elastic plate section is a linear floor panel, not nonlinear slab RC.", wraplength=1000).pack(anchor="w", pady=(8, 0))
+    ttk.Label(root, text="E-SFI-MVLEM-3D formulation: Kolozvari, Lopez & Massone (2023), doi:10.1016/j.engstruct.2023.116700. NBC 105:2025 §9.3.1.1 covers nonlinear modeling. Annex A §§5.5–5.6 cover coupling beams and wall openings. ShellMITC4 with an elastic plate section models a linear floor panel.", wraplength=1000).pack(anchor="w", pady=(8, 0))
     return win
 

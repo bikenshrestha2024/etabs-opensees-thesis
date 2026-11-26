@@ -5,7 +5,9 @@ No solver, native ETABS or private model required. [REF docs/superpowers/plans/2
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from components.equivalent_static.organized_exports import build_combined_esm_export
 from components.model.support_case_contract import (select_support_case, normalize_support_case, require_runtime_support_case)
@@ -83,7 +85,13 @@ class ESMExportCaseDiscovery(unittest.TestCase):
                 "story_number,force\n1,5\n",encoding="utf8")
             with self.assertRaisesRegex(ValueError,"no calculation JSON"):
                 build_combined_esm_export(root)
-            out=build_combined_esm_export(root,allow_incomplete=True)
+            snapshots = root / "03_ESM" / "REVIEW_SNAPSHOTS"
+            self.assertFalse(snapshots.exists())
+            with patch("components.equivalent_static.organized_exports.datetime") as clock:
+                clock.now.return_value = datetime(2026, 11, 26, tzinfo=timezone.utc)
+                out=build_combined_esm_export(root,allow_incomplete=True)
+                second=build_combined_esm_export(root,allow_incomplete=True)
+            self.assertNotEqual(out["zip"],second["zip"])
             self.assertEqual(out["cases"],0)
             self.assertEqual(out["calculation_status"],"NO_CALCULATION_JSON")
             self.assertTrue(Path(out["zip"]).is_file())

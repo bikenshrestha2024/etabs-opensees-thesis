@@ -4,7 +4,7 @@ from components.nonlinear_time_history.variant_comparison import (
     VARIANTS,INVARIANTS,METRICS,validate_variant_manifest,compare_completed_cases)
 def manifest():
     return {"variants":[dict(variant=m,model_export_path=m,
-            model_file_sha256="a"*64,outrigger_floors=[] if m=="M0" else [7],
+            model_file_sha256=f"{int(m[1:])+10:064x}",outrigger_floors=[] if m=="M0" else [7],
             **{k:"b"*64 for k in INVARIANTS}) for m in VARIANTS]}
 def suite():
     data={}
@@ -13,7 +13,7 @@ def suite():
         for limit in ("ULS","SLS"):
             for pair in ("P1","P2","P3"):
                 for axis in ("XY","YX"):
-                    cases.append(dict(variant_id=model,model_sha256="a"*64,
+                    cases.append(dict(variant_id=model,model_sha256=f"{int(model[1:])+10:064x}",
                         limit_state=limit,pair_id=pair,
                         orientation=axis,record_sha256=("%064x" % int(pair[1:])),
                         completion_gate=dict(status="FULL_DURATION_NUMERIC_SCREEN",
@@ -105,11 +105,18 @@ class CompareTests(unittest.TestCase):
         p["variants"][2]["model_export_path"]=p["variants"][1]["model_export_path"]
         with self.assertRaisesRegex(ValueError,"distinct model export paths"):
             validate_variant_manifest(p)
+
         # A differently written path referring to the same directory
         # must not evade model-version identity checks.
         p=manifest()
         p["variants"][2]["model_export_path"]="M1/../M1"
         with self.assertRaisesRegex(ValueError,"distinct model export paths"):
+            validate_variant_manifest(p)
+
+    def test_copied_variant_export_under_a_different_path_is_rejected(self):
+        p=manifest()
+        p["variants"][2]["model_file_sha256"]=p["variants"][1]["model_file_sha256"].upper()
+        with self.assertRaisesRegex(ValueError,"distinct model export SHA256"):
             validate_variant_manifest(p)
 
     def test_missing_or_malformed_variant_manifest_fails_clearly(self):

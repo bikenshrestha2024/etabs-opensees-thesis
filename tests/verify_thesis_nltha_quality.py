@@ -75,12 +75,20 @@ class ThesisNLTHAQualityTests(unittest.TestCase):
     def test_x_failure_is_classified_not_solved(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
+            hashes = {"model_sha256":"a"*64, "record_A_sha256":"b"*64, "record_B_sha256":"c"*64}
+            (root/"00_Probe_Evidence_Manifest.json").write_text(json.dumps({
+                "probe_duration_s":.005, "limit_state":"ULS", "input_fingerprints":hashes}))
             for label in ("ZERO", "Y", "XY"):
                 p = root/label/"XY"/"Case_Summary.json"
                 p.parent.mkdir(parents=True)
                 p.write_text(json.dumps({
                     "status": "COMPLETED_TRUNCATED_TRIAL", "physical_time_s": .005,
-                    "full_record_duration_s": 20.0}))
+                    "full_record_duration_s": 20.0, "orientation":"XY", "limit_state":"ULS",
+                    "diagnostic_excitation":label, "model_sha256":hashes["model_sha256"],
+                    "diagnostic_zero_damping":True, "diagnostic_mass_damping":False}))
+                (root/label/"NLTHA_Input_Quality.json").write_text(json.dumps({
+                    "records":[{"sha256":hashes["record_A_sha256"]},
+                               {"sha256":hashes["record_B_sha256"]}]}))
             p = root/"X"/"XY"/"FAILED.json"
             p.parent.mkdir(parents=True)
             p.write_text(json.dumps({"error": "tangent failure", "stage": "transient_analysis"}))
