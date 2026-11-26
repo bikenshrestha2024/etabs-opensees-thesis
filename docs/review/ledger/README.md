@@ -2,6 +2,20 @@
 
 The [2026-11-26 numbered workflow review](20261126_NUMBERED_WORKFLOW_REVIEW.md) records the ordered launcher inspection, component fixes, and outstanding implementation review.
 
+## 2026-11-26 numbered workflow release verification
+
+| Merged change | Commit | Scope |
+| --- | --- | --- |
+| [Numbered workflow integrity](https://github.com/bikenshrestha2024/etabs-opensees-thesis/pull/210) | `c7a83c8f` | Startup, ETABS working-copy provenance, Gravity workbook staging, ESM and Stage 22 output ownership, nonlinear evidence checks, and literature citations |
+| [Disk audit and Gravity saved-result selection](https://github.com/bikenshrestha2024/etabs-opensees-thesis/pull/211) | `28ceefbf` | Restore the direct audit command and prefer the canonical Gravity case when saved-result timestamps tie |
+
+- **Software checks.** Windows started the workbench through `01.py`. The final Windows suite reported 1,953 passed, 45 skipped, and 865 subtests passed. GitHub Actions passed all 14 workflows on the first pull request and all eight on the final head of the follow-up. Both literature inventories reproduced.
+- **Project folder checks.** The local audit inventoried 11,437 files and passed CRC checks on 292 ZIP and workbook containers. A separate check of the five nested archives passed CRC. The Slab Load Path workbook requests recalculation on open and contains 357,777 formulas without cached results. A repacked MRSM archive retains a legacy manifest with six unresolved processing-file references. These findings concern saved evidence and archive references. [Disk audit guide](../../source/tools/audit_output_storage.py.md)
+- **Elastic comparison.** In **3. Gravity / NBC**, open **Rebuild with ETABS elastic settings** to select the ULS configuration. The staged project file matched the repository reference byte for byte and passed the settings reader. [ULS settings reference](../../validation/20261121_native_gravity_uls.json)
+- **Remaining review.** The 57 numbered entry files received line-by-line inspection. The remaining implementation modules require further source review. Native ETABS equivalence and production NLTHA qualification remain open. The exploratory Kobe case recorded 2.270 s of the 40.940 s record in XY before the process stopped. [Review coverage](20261126_NUMBERED_WORKFLOW_REVIEW.md)
+
+## Exact-source attestations
+
 [semantic_review_attestations.csv](semantic_review_attestations.csv) is the exact-source Git blob review ledger for newly source-inspected, regression-backed symbols. **Only an exact blob SHA match** on a tracked source path, identified qualified function, tracked review evidence and tracked test(s) allows the integrated audit to label a function SOURCE_INSPECTED_TESTED_NOT_NATIVE_VERIFIED. A changed file, duplicate entry, unsafe/untracked evidence or missing reviewer makes the static audit BLOCKED.
 
 The status is explicitly AI-assisted source inspection, not independent semantic completion or native engineering validation. The authoritative function queue stays under generated audit/integrated/08_SEMANTIC_REVIEW/; its semantic_review_completed_count remains zero. The original November 2026 frozen research baselines below are preserved unchanged.
