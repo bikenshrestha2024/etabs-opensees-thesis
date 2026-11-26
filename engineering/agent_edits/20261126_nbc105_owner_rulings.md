@@ -25,3 +25,6 @@ Editor Claude Code (model label UNKNOWN). Branch `feat/nbc105-normative-sentence
 
 ## Ruling 11: scope update, DEFERRED_DESIGN_PHASE
 `components/nbc105/normative_register.py` and `tools/nbc105_normative_extract.py` (new disposition in vocabulary, notes required, counted as open external), `DISPOSITION_RULES.csv` (27 Annex B rules rewritten: 156 rows PROJECT_NOT_APPLICABLE -> DEFERRED_DESIGN_PHASE; 9.2 pushover notes record the user declaration; the file round-trips byte-identically through csv), `PROJECT_DECLARATIONS.md` section 6, guide, `tests/test_nbc105_normative_register.py::DeferredDesignPhase`. Gate stays fail-closed and never certified.
+
+## Ruling 10: Annex C project rows
+New `components/nbc105/annex_c_zoning.py` (+ guide, registry row), `docs/nbc105/annex_c/TABLE_C1_PROJECT_ROWS.csv` (generated from the pdftotext layer of printed p.106 and checked against the page image; header, serial 346, Kathmandu block 340-350, rows 326 and 335, Figure 4-3 usage record, scope record, SHA-256 per row), `tests/test_nbc105_followup_annex_c.py`, rows NC-0001, N4-0078/0079/0080. Remaining rows stay EXTERNAL_DATA_REQUIRED.

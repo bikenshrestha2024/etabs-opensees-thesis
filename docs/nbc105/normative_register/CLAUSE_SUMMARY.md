@@ -34,7 +34,6 @@ SHALL: 332, SHOULD: 36, MAY: 31, LIMIT: 21, STATEMENT: 302, CLAUSE: 229, TABLE: 
 - Printed 4.1.2 cites 'Figure 4-1(a)/(b)' and 'Table 4.1' while the figures are numbered 4-1 and 4-2 and the table 4-1; cross-reference wording anomaly, no numeric effect. (rows: N4-0010, N4-0011, N4-0015, N4-0016; 4 row(s))
 - Declared project deviation from the printed 4.1.3.1 requirement (Vs,30 mandatory above 40 m); recorded, not accepted. (rows: N4-0033; 1 row(s))
 - Printed Table 4-3 lists Kathmandu Metropolitan City wards '...,30,32,32' (32 printed twice); code keeps ward 32 once, possible misprint (for 31 or 33) to confirm with DUDBC. (rows: N4-0052, N4-0053, N4-0054, N4-0055, N4-0056, N4-0057 ...; 22 row(s))
-- Printed 4.1.4 says 'interpolated from Figure 4-4' (the map is Figure 4-3) and repeats 'shall be'; wording anomaly. Table C-1 is only checked here as an existence/range fact: 753 rows with values 0.25, 0.30, 0.35, 0.40. (rows: N4-0078, N4-0079; 2 row(s))
 - Possible class-II classification (more than 500 persons) for a 95 m building; the code takes I as a user input and does not enforce Table 4-4. (rows: N4-0085, N4-0086, N4-0087, N4-0088, N4-0089; 5 row(s))
 - Resolved: the earlier clamp interpretation is withdrawn in clause 5. The workbook per-segment contribution still uses the 0.9-limited ratio numerically (unchanged number) but the exceedance is flagged, not silent. (rows: N5-0030; 1 row(s))
 - Printed 5.4 refers to 'clauses 5.5.1 to 5.5.2' for irregularity, but the irregularity clauses are numbered 5.4.1 and 5.4.2 (cross-reference anomaly in the standard; the same wrong number appears in 3.2.1 iii). (rows: N5-0094; 1 row(s))
@@ -56,7 +55,7 @@ SHALL: 332, SHOULD: 36, MAY: 31, LIMIT: 21, STATEMENT: 302, CLAUSE: 229, TABLE: 
 - Printed 4.4.1.1 cites 'Fig. 4-9' for the effective joint width; the figure is Figure 4-10, and hc is listed but not used in bj = min(bb; bc). The text layer garbles the confinement wording of the three Vjc cases (the 1.5, 1.2, 1.0 coefficients are read from the page layout). (rows: NA-0224, NA-0225, NA-0226, NA-0230, NA-0231, NA-0235; 6 row(s))
 - Printed 'special shear walls' is not defined; the helper applies the limits to every wall passed to it and takes the coupled flag as a building-level declaration. (rows: NA-0301; 1 row(s))
 - Printed B.7.1.1 uses 'Pd/Pc > 0.15' for the reduced resistances (Eq. 7.1.5/7.1.6) but 'Pd/Pc >= 0.15' for the length cap (Eq. 7.1.7/7.1.8); the thresholds are inconsistent at equality. Equation text is garbled in the text layer and was read from the page layout. (rows: NB-0225, NB-0226, NB-0231, NB-0232, NB-0234, NB-0235 ...; 12 row(s))
-- The Table C-1 value column is headed 'PGA' while Clause 4.1.4 calls the same quantity the seismic zoning factor Z; no conversion is printed. The project Z = 0.35 equals the printed Kirtipur row. (rows: NC-0001; 1 row(s))
+- The Table C-1 value column is headed PGA while clause 4.1.4 calls it Z; no conversion is printed. The project Z = 0.35 equals the printed Kirtipur row (reproduced by project_zoning_factor). (rows: NC-0001; 1 row(s))
 
 ## Open gaps (UNVERIFIED_GAP rows)
 

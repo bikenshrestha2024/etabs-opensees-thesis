@@ -61,3 +61,7 @@ Findings
 - Clause 4.1.3.3 makes the listed Kathmandu-Valley municipalities and wards Soil Type D by default. Soil C for a site listed in Table 4-3 requires demonstrated test results to a depth of 30 m; the default-D rule is not applied automatically anywhere in production code (row 10, REFERENCE_ONLY).
 - Vs,30 testing is required by §4.1.3.1 for buildings higher than 40 m. It is optional for this thesis (USER_DECLARED 2026-11-21, [project declarations](PROJECT_DECLARATIONS.md) section 4): `select_soil_type` reports the requirement as issue `VS30_REQUIRED_ABOVE_40M_NOT_SUPPLIED` instead of raising, and a soil class for such a building that rests on N_SPT remains a documented deviation from the printed clause.
 - This matrix does not decide the project site, its municipality or ward, or its soil type. Those remain `USER_RESPONSIBILITY`; the project's Soil C choice must be supported by site data supplied by the user.
+
+## Owner ruling 10: Annex C Table C-1 project rows (2026-11-26)
+
+Z for the project is the Table C-1 value, serial 346 (Kathmandu, Kirtipur Nagarpalika), printed p. 106, 0.35 (`components/nbc105/annex_c_zoning.py::project_zoning_factor`; data in `docs/nbc105/annex_c/TABLE_C1_PROJECT_ROWS.csv` with printed-page locators and SHA-256 per row; tests `tests/test_nbc105_followup_annex_c.py`). Figure 4-3 is not used by the project (4.1.4: the Table value governs for listed municipalities). All other Table C-1 rows are EXTERNAL_DATA_REQUIRED.
