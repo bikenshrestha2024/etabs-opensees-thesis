@@ -11,18 +11,22 @@ from __future__ import annotations
 import math
 
 from components.nbc105.constants import GRAVITY_M_S2
-from components.nbc105.clause_05_dynamic_characteristics import storey_index_for_elevation
+from components.modal.storey_mass_convention import BASE, CONFIG_KEY, storey_shares, validate_convention
 
 
 def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=GRAVITY_M_S2,
-                                   tolerance_kN=0.01, z_tolerance_m=1e-7):
+                                   tolerance_kN=0.01, z_tolerance_m=1e-7, convention=None):
     """Reconcile source nodal seismic weight and quantify floor lumping.
 
     [REF docs/validation/20261118_RAYLEIGH_RETAINED_DOF_CORRECTION.md]
+    [REF components/modal/storey_mass_convention.py]
 
     The converter assigns horizontal-active nodes by consecutive floor
-    midpoints. This preserves total weight but
+    midpoints (default convention). This preserves total weight but
     does not preserve mass moments or eigenvector-weighted kinetic energy.
+    ``convention`` defaults to the model's ``storey_mass_allocation_convention``
+    (absent = historical default). Base-row weight of the ETABS conventions is
+    reported separately and the floors plus base row reconcile with the nodal mass.
     """
     if not isinstance(model, dict) or not story_rows:
         raise ValueError("Assembled model and Rayleigh story ledger required")
@@ -42,6 +46,8 @@ def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=GRAVITY_M_S2,
     base = float(model["base_z_m"])
     if not math.isfinite(base) or heights[0] <= base:
         raise ValueError("Invalid seismic base for mass audit")
+    convention = validate_convention(convention if convention is not None else model.get(CONFIG_KEY))
+    base_row_weight = 0.0
     nodal_mass = model["nodal_mass"]
     points = model["nodes"]
     supports = model["supports"]
@@ -82,17 +88,22 @@ def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=GRAVITY_M_S2,
             raise ValueError("Seismic mass below assembled seismic base")
         if z > heights[-1]+z_tolerance_m:
             raise ValueError("Mass node located above uppermost diaphragm")
-        floor_index = storey_index_for_elevation(z, heights)
-        lift = heights[floor_index]-z
         w = mass*g_mass
-        mass_by_floor[floor_index] += w
         active_nodes += 1
-        if abs(lift) > z_tolerance_m:
-            intermediate_nodes += 1
-            moved_weight += w
-            first_moment_shift += w*lift
-            max_lift = max(max_lift, lift)
-            max_drop = max(max_drop, -lift)
+        moved = False
+        for floor_index, share in storey_shares(z, heights, base, convention):
+            if floor_index == BASE:
+                base_row_weight += w*share
+                continue
+            lift = heights[floor_index]-z
+            mass_by_floor[floor_index] += w*share
+            if abs(lift) > z_tolerance_m:
+                moved = True
+                moved_weight += w*share
+                first_moment_shift += w*share*lift
+                max_lift = max(max_lift, lift)
+                max_drop = max(max_drop, -lift)
+        intermediate_nodes += moved
     expected_by_floor = []
     for row, group in zip(story_rows, groups):
         if int(row["master_node_tag"]) != int(group["master_tag"]):
@@ -109,6 +120,8 @@ def audit_rayleigh_mass_elevations(model, story_rows, *, g_mass=GRAVITY_M_S2,
     return {
         "status": "SOURCE_MASS_TOTAL_RECONCILED_VERTICAL_LUMPING_NOT_EIGEN_EQUIVALENCE",
         "source_active_horizontal_weight_kN": total,
+        "storey_mass_allocation_convention": convention,
+        "base_row_excluded_weight_kN": base_row_weight,
         "floor_count": len(groups),
         "active_mass_node_count": active_nodes,
         "intermediate_mass_node_count": intermediate_nodes,

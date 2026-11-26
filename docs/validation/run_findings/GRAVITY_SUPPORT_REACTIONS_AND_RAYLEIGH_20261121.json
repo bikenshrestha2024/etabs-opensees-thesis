@@ -1087,5 +1087,54 @@
   },
   "gap_closed": false,
   "production_defaults_changed": false
+ },
+ "rayleigh_eigen_switches_20261121": {
+  "status": "SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE",
+  "report_section": "§9",
+  "numbers": "RAYLEIGH_EIGEN_SWITCHES_MESH04_20261121.json",
+  "rayleigh_T_s": {
+   "R0_V127": [
+    1.661966,
+    2.383341
+   ],
+   "R1_clear_beam": [
+    1.636009,
+    2.345812
+   ],
+   "R2_preset": [
+    1.795198,
+    2.432197
+   ],
+   "R3_preset_base_row": [
+    1.795198,
+    2.432197
+   ],
+   "R4_preset_linear_split": [
+    1.79323,
+    2.429463
+   ],
+   "R5_clear_beam_linear_split": [
+    1.634077,
+    2.343038
+   ]
+  },
+  "eigen_T_s": {
+   "R0_V127": [
+    1.66365,
+    2.383507
+   ],
+   "R1_clear_beam": [
+    1.637642,
+    2.345896
+   ],
+   "R2_preset": [
+    1.797309,
+    2.432931
+   ]
+  },
+  "adopted_Y_s": 1.92198,
+  "etabs_modal_periods": "NOT_IN_EVIDENCE",
+  "production_defaults_changed": false,
+  "g_m_s2": 9.81
  }
 }

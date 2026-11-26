@@ -109,3 +109,14 @@ The remaining high ratios come from historical narrow widths (0.1/0.05/0.025 m),
 ## 2026-11-21: opt-in `rigid_end_zones` hook
 
 `prepare_complete_export` reads the config block `rigid_end_zones` just before `compile_settings`. When it is absent or `enabled: false`, nothing changes. When it is enabled, [rigid_end_zones.py](rigid_end_zones.py.md) resolves the ETABS end length offsets (assignment workbook or EDB metadata) and writes them as `end_offsets_m` into every `elastic_etabs_comparison` state. The export report gets a `rigid_end_zones` audit. The block without a non-empty `elastic_etabs_comparison` raises. Loads, masses and self-weight are unchanged (solved: 311,367.3139 kN in every step of the [run finding §8](../../../validation/run_findings/GRAVITY_SUPPORT_REACTIONS_AND_RAYLEIGH_20261121.md)). Named preset: [etabs_comparison_preset.py](etabs_comparison_preset.py.md).
+
+## 2026-11-21: opt-in `storey_mass_allocation_convention`
+
+The storey ledger keeps the §5.2 mid-height rule by default. When the key is absent, the payload, ledger CSV and report are byte-identical (checked on the MESH_04 clear-beam export: model data, ledger and config SHA-256 equal before and after). With `ETABS_BASE_ROW` or `ETABS_BASE_ROW_LINEAR_SPLIT` ([storey_mass_convention.py](../modal/storey_mass_convention.py.md)):
+
+- the ledger rows use `storey_shares`, and their `input_note` names the convention;
+- the base-row weight goes to `story_ledger_base_row_excluded_weight_kN` in the report;
+- the single-ledger check is floors + base row = active nodal weight;
+- the model data records `storey_mass_allocation_convention`, so the Rayleigh mass audit uses the same rule.
+
+Nodal masses, gravity loads and the eigen mass matrix do not change.

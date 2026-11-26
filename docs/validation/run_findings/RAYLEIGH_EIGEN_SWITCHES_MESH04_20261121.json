@@ -1,0 +1,157 @@
+{
+ "status": "SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE",
+ "schema": "RAYLEIGH_EIGEN_SWITCHES_V1",
+ "date": "2026-11-21",
+ "solver": "OpenSeesPy 3.8.0, Linux; components.modal.rayleigh.run (V127 method, empirical ESM seed, soil B settings as stored V127) and the modal GUI runner (linear model, seismic gravity preload, 76 source supports, PythonSparse, 12 modes); no ETABS run",
+ "g_m_s2": 9.81,
+ "Aw_m2": {
+  "X": 2.07317451524,
+  "Y": 2.20308033241
+ },
+ "H_m": 95.0,
+ "stored_V127": {
+  "T_X_s": 1.661966,
+  "T_Y_s": 2.383341
+ },
+ "empirical_NBC105": {
+  "T_X_s": 1.585025,
+  "T_Y_s": 1.537584,
+  "amplified_1_25_X_s": 1.981281,
+  "amplified_1_25_Y_s": 1.92198
+ },
+ "etabs_modal_periods": "NOT_IN_EVIDENCE: no Modal Periods/Participating Mass table in Assignment_Export, ESM_Review, Comparisons_Review or Gravity_Review uploads; NBC105_2025_95m_12m_MODEL_ALIGNED_V10_7.xlsx has the ETABS/Rayleigh T1 input fields blank",
+ "etabs_WeightUsed_kN": 275628.41,
+ "nodal_mass_sha256_16_R2_R3_R4": "40f9bca4aec9e8cd (identical)",
+ "cases": [
+  {
+   "case": "R0_V127_GROSS_BEAM_LEGACY",
+   "model_sha256_16": "8cb0cafa659c51fe",
+   "rayleigh_T_X_s": 1.661966,
+   "rayleigh_T_Y_s": 2.383341,
+   "adopted_T_X_s": 1.661966,
+   "adopted_T_Y_s": 1.92198,
+   "reference_k_X": 1.74064,
+   "reference_k_Y": 1.71099,
+   "seismic_weight_W_kN": 284691.556,
+   "W1_kN": 11600.802,
+   "W_roof_kN": 9802.305,
+   "storey_mass_allocation_convention": "NBC_MID_HEIGHT_BASE_TO_FLOOR1",
+   "base_row_excluded_kN": 0.0,
+   "eigen_first_translational": {
+    "X": {
+     "mode": 2,
+     "period_s": 1.66365,
+     "participation_percent": 67.4
+    },
+    "Y": {
+     "mode": 1,
+     "period_s": 2.383507,
+     "participation_percent": 66.96
+    }
+   }
+  },
+  {
+   "case": "R1_CLEAR_BEAM_LEGACY",
+   "model_sha256_16": "b93bc53525553077",
+   "rayleigh_T_X_s": 1.636009,
+   "rayleigh_T_Y_s": 2.345812,
+   "adopted_T_X_s": 1.636009,
+   "adopted_T_Y_s": 1.92198,
+   "reference_k_X": 1.74064,
+   "reference_k_Y": 1.71099,
+   "seismic_weight_W_kN": 276039.112,
+   "W1_kN": 11254.705,
+   "W_roof_kN": 9456.207,
+   "storey_mass_allocation_convention": "NBC_MID_HEIGHT_BASE_TO_FLOOR1",
+   "base_row_excluded_kN": 0.0,
+   "eigen_first_translational": {
+    "X": {
+     "mode": 2,
+     "period_s": 1.637642,
+     "participation_percent": 67.39
+    },
+    "Y": {
+     "mode": 1,
+     "period_s": 2.345896,
+     "participation_percent": 66.96
+    }
+   }
+  },
+  {
+   "case": "R2_CLEAR_BEAM_PRESET",
+   "model_sha256_16": "6425d48fe34299df",
+   "rayleigh_T_X_s": 1.795198,
+   "rayleigh_T_Y_s": 2.432197,
+   "adopted_T_X_s": 1.795198,
+   "adopted_T_Y_s": 1.92198,
+   "reference_k_X": 1.74064,
+   "reference_k_Y": 1.71099,
+   "seismic_weight_W_kN": 276039.112,
+   "W1_kN": 11254.705,
+   "W_roof_kN": 9456.207,
+   "storey_mass_allocation_convention": "NBC_MID_HEIGHT_BASE_TO_FLOOR1",
+   "base_row_excluded_kN": 0.0,
+   "eigen_first_translational": {
+    "X": {
+     "mode": 2,
+     "period_s": 1.797309,
+     "participation_percent": 69.27
+    },
+    "Y": {
+     "mode": 1,
+     "period_s": 2.432931,
+     "participation_percent": 68.32
+    }
+   }
+  },
+  {
+   "case": "R3_PRESET_ETABS_BASE_ROW",
+   "model_sha256_16": "336cb9fa7bbd3c3d",
+   "rayleigh_T_X_s": 1.795198,
+   "rayleigh_T_Y_s": 2.432197,
+   "adopted_T_X_s": 1.795198,
+   "adopted_T_Y_s": 1.92198,
+   "reference_k_X": 1.74064,
+   "reference_k_Y": 1.71099,
+   "seismic_weight_W_kN": 275843.87,
+   "W1_kN": 11059.462,
+   "W_roof_kN": 9456.207,
+   "storey_mass_allocation_convention": "ETABS_BASE_ROW",
+   "base_row_excluded_kN": 195.242,
+   "eigen_first_translational": "NOT_RUN_NODAL_MASS_AND_STIFFNESS_IDENTICAL_TO_R2"
+  },
+  {
+   "case": "R4_PRESET_ETABS_BASE_ROW_LINEAR_SPLIT",
+   "model_sha256_16": "00da75ea3c25fdc9",
+   "rayleigh_T_X_s": 1.79323,
+   "rayleigh_T_Y_s": 2.429463,
+   "adopted_T_X_s": 1.79323,
+   "adopted_T_Y_s": 1.92198,
+   "reference_k_X": 1.74064,
+   "reference_k_Y": 1.71099,
+   "seismic_weight_W_kN": 275628.407,
+   "W1_kN": 11059.462,
+   "W_roof_kN": 9240.745,
+   "storey_mass_allocation_convention": "ETABS_BASE_ROW_LINEAR_SPLIT",
+   "base_row_excluded_kN": 410.705,
+   "eigen_first_translational": "NOT_RUN_NODAL_MASS_AND_STIFFNESS_IDENTICAL_TO_R2"
+  },
+  {
+   "case": "R5_CLEAR_BEAM_LEGACY_ETABS_BASE_ROW_LINEAR_SPLIT",
+   "model_sha256_16": "50e8196d82739d19",
+   "rayleigh_T_X_s": 1.634077,
+   "rayleigh_T_Y_s": 2.343038,
+   "adopted_T_X_s": 1.634077,
+   "adopted_T_Y_s": 1.92198,
+   "reference_k_X": 1.74064,
+   "reference_k_Y": 1.71099,
+   "seismic_weight_W_kN": 275628.407,
+   "W1_kN": 11059.462,
+   "W_roof_kN": 9240.745,
+   "storey_mass_allocation_convention": "ETABS_BASE_ROW_LINEAR_SPLIT",
+   "base_row_excluded_kN": 410.705,
+   "eigen_first_translational": "NOT_RUN_NODAL_MASS_AND_STIFFNESS_IDENTICAL_TO_R1"
+  }
+ ],
+ "run_folder": "/home/claude/out/MESH_04_ETABS_ELASTIC_COMPARISON_20261121/04_MODAL/RUNS/ETABS_ELASTIC_GRAVITY_COMPARISON/RAYLEIGH_EIGEN_SWITCHES/20261121T152120_341989Z_f025c6cc (not committed)"
+}

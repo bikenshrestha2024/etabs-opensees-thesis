@@ -1157,6 +1157,12 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
         payload['joint_volume_weight_audit']=report.get('joint_volume_weight_audit')
         payload['wall_base_restraint_policy']=cfg['wall_base_restraint_policy']
         payload['added_wall_mesh_support_tags']=extended_wall_supports
+        from components.modal.storey_mass_convention import (
+            validate_convention as _validate_mass_convention, DEFAULT as _DEFAULT_MASS_CONVENTION)
+        mass_convention=_validate_mass_convention(cfg.get('storey_mass_allocation_convention'))
+        if mass_convention!=_DEFAULT_MASS_CONVENTION:
+            # Opt-in storey-ledger convention; absent key keeps the payload unchanged.
+            payload['storey_mass_allocation_convention']=mass_convention
         if elastic_comparison:
             payload['elastic_etabs_comparison']=elastic_comparison
             report['elastic_etabs_comparison']={
@@ -1281,6 +1287,12 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
         story_rows=[]
         for g in groups:
             story_rows.append(dict(story_number=g['storey_number'],story_name=f"Storey_{g['storey_number']}",height_m=g['master_xyz'][2]-payload['base_z_m'],master_node_tag=g['master_tag'],dead_load_kN=0.,storage_live_load_kN=0.,other_live_load_kN=0.,roof_live_load_kN_ignored=0.,input_note='All active nodal source weights included; inter-floor weights assigned by NBC 105:2025 5.2 mid-height rule; fixed-base masses excluded. Compare with ETABS tributary conventions.'))
+        if mass_convention!=_DEFAULT_MASS_CONVENTION:
+            from components.modal.storey_mass_convention import storey_shares, BASE as _BASE_ROW
+            base_excluded=dict(dead_load_kN=0.,storage_live_load_kN=0.,other_live_load_kN=0.,roof_live_load_kN_ignored=0.)
+            for row in story_rows:
+                row['input_note']=('All active nodal source weights included; storey_mass_allocation_convention='
+                                   +mass_convention+' (opt-in, see storey_mass_convention.py); fixed-base masses excluded.')
         for pat,values in patterns.items():
             factor=float(cfg['mass_factors'][pat])
             if factor not in (0.,.3,.6,1.):raise ValueError(f'Unsupported story mass factor {factor} for {pat}')
@@ -1289,10 +1301,19 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
             for node,vec in values.items():
                 if all(payload['supports'].get(str(node),[0]*6)[:2]):continue
                 z=payload['nodes'][int(node)][2] if int(node) in payload['nodes'] else payload['nodes'][str(node)][2]
+                if mass_convention!=_DEFAULT_MASS_CONVENTION:
+                    for index,share in storey_shares(z,[g['master_xyz'][2] for g in groups],payload['base_z_m'],mass_convention):
+                        (base_excluded if index==_BASE_ROW else story_rows[index])[key]-=float(vec[2])*share
+                    continue
                 index=storey_index_for_elevation(z,[g['master_xyz'][2] for g in groups])
                 story_rows[index][key]-=float(vec[2])
         represented=sum(r['dead_load_kN']+.6*r['storage_live_load_kN']+.3*r['other_live_load_kN'] for r in story_rows)
         report['story_ledger_active_weight_kN']=represented
+        if mass_convention!=_DEFAULT_MASS_CONVENTION:
+            excluded=base_excluded['dead_load_kN']+.6*base_excluded['storage_live_load_kN']+.3*base_excluded['other_live_load_kN']
+            report['storey_mass_allocation_convention']=mass_convention
+            report['story_ledger_base_row_excluded_weight_kN']=excluded
+            represented+=excluded  # single mass ledger: floors + base row = active nodal weight
         report['story_ledger_mass_error_percent']=100*abs(represented-report['active_horizontal_seismic_weight_kN'])/max(1.,report['active_horizontal_seismic_weight_kN'])
         if report['story_ledger_mass_error_percent']>1e-7:raise ValueError('Story ledger does not reconcile with the assembled active nodal mass.')
         fields=['story_number','story_name','height_m','master_node_tag','dead_load_kN','storage_live_load_kN','other_live_load_kN','roof_live_load_kN_ignored','input_note']

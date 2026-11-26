@@ -393,3 +393,47 @@ All are on the X3 configuration (or S4 where stated), and are sensitivities only
 1. `python tools\REBUILD_VERIFIED_CLEAR_BEAM_MODEL.py --source-dir <export> --assignment-workbook <Assignment_Export xlsx> --dest-dir <new> --comparison-preset ETABS_ELASTIC_GRAVITY_COMPARISON`
 2. `python tools\etabs_comparison_ablation.py --base-export <verified clear-beam export> --etabs-support-csv <Gravity_All_Support_Nodes.csv> --etabs-reaction-table <Joint Reactions xlsx/csv> --out-dir <run>\02_RESULTS\ablation`. The default steps are S0, S1, X2, X3 and X8. Confirm that the Linux numbers above are reproduced.
 3. ETABS exports that would split the remaining 3.7 MN: brace axial forces and wall pier P at storey 1 and at the outrigger storeys for `1. DL + LL`; ideally an ETABS run with walls set to Auto Rectangular Mesh at 1 m, to measure the ETABS-side mesh effect directly.
+
+## 9. Solved Rayleigh and eigen periods per switch (2026-11-21)
+
+Status: `SOLVER_OR_LOG_EVIDENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE`. Native OpenSeesPy 3.8.0 on Linux, no ETABS run. Numbers: [RAYLEIGH_EIGEN_SWITCHES_MESH04_20261121.json](RAYLEIGH_EIGEN_SWITCHES_MESH04_20261121.json).
+
+**Method.**
+
+- Rayleigh: `components.modal.rayleigh.run` with the stored V127 settings (empirical ESM seed, Aw X 2.07317 / Y 2.20308 m², soil B as recorded in V127).
+- Eigen: the modal GUI runner (linear model with seismic gravity preload, 76 source supports, 12 modes). The first translational mode is the lowest mode whose UX (or UY) participation is at least 10 % and larger than the other two directions.
+- g = 9.81 m/s² throughout. The new test `tests/test_storey_mass_convention.py` and the existing `SupersededLiteralScan` check that 9.80665 does not appear in production code.
+
+**Pipeline check.** R0 reproduces the stored V127 values exactly: T_X 1.661966 s and T_Y 2.383341 s.
+
+| Case | Switches | Rayleigh T_X (s) | Rayleigh T_Y (s) | Eigen T_X (s), mode | Eigen T_Y (s), mode | W (kN) | Adopted X / Y (s) |
+|---|---|---|---|---|---|---|---|
+| R0 | V127 export: gross beam weight, legacy stiffness, default ledger | 1.661966 | 2.383341 | 1.663650, 2 | 2.383507, 1 | 284,691.556 | 1.661966 / 1.921980 |
+| R1 | + clear-beam weight | 1.636009 | 2.345812 | 1.637642, 2 | 2.345896, 1 | 276,039.112 | 1.636009 / 1.921980 |
+| R2 | + `ETABS_ELASTIC_GRAVITY_COMPARISON` stiffness | 1.795198 | 2.432197 | 1.797309, 2 | 2.432931, 1 | 276,039.112 | 1.795198 / 1.921980 |
+| R3 | R2 + `ETABS_BASE_ROW` | 1.795198 | 2.432197 | = R2 (same nodal mass) | = R2 | 275,843.870 | 1.795198 / 1.921980 |
+| R4 | R2 + `ETABS_BASE_ROW_LINEAR_SPLIT` | 1.793230 | 2.429463 | = R2 | = R2 | 275,628.407 | 1.793230 / 1.921980 |
+| R5 | R1 + `ETABS_BASE_ROW_LINEAR_SPLIT` | 1.634077 | 2.343038 | = R1 | = R1 | 275,628.407 | 1.634077 / 1.921980 |
+
+NBC 105:2025 empirical values: X 1.585025 s and Y 1.537584 s; 1.25 times these, X 1.981281 s and Y 1.921980 s. ETABS modal periods are not in any uploaded evidence. The assignment export has no modal results table. The ESM, Comparisons and Gravity review zips contain none. The user's `NBC105_2025_95m_12m_MODEL_ALIGNED_V10_7.xlsx` (the ETABS-side scaling workbook) leaves its ETABS/Rayleigh T1 input fields blank and repeats only the empirical values above. The ETABS scaling program `ETABS_NBC105_SINGLE_FILE_V10_7_MODEL_RECONCILED.py` has no OpenSees, Rayleigh or gravity-constant content. Neither file is linked to the OpenSees side beyond these empirical inputs.
+
+**Effect of each switch.**
+
+- **Clear-beam weight** (−8,652 kN of beam weight in W): T −1.56 % (X) and −1.57 % (Y). This agrees with the §3 estimate (−1.55 %).
+- **Preset stiffness** (wall 0.5/0.1, beam J 0.01, rigid zones): T_X +9.73 % and T_Y +3.68 %. The wall in-plane modifier dominates, as the core is the main lateral system.
+- **`ETABS_BASE_ROW`** (−195.243 kN from W1): ΔT −2e-7 s. The base-storey displacement is close to zero.
+- **`ETABS_BASE_ROW_LINEAR_SPLIT`** (base −410.705 kN, roof −215.463 kN): T −0.11 %. This agrees with the §7.2 estimate (−0.116 %). Its W of 275,628.407 kN equals the ETABS `WeightUsed` of 275,628.41 kN.
+- **Rayleigh against eigen:** agreement within 0.13 % in every solved case.
+- **Adopted periods:** X is Rayleigh in every case. Y stays 1.921980 s (1.25 T_emp), because the Rayleigh T_Y exceeds it in every case.
+
+**Mid-height ledger.** The default ledger is unchanged (byte-identical export when the key is absent). For the ETABS conventions:
+
+- the assembler checks floors + base row = active nodal weight (error ≤ 2e-13 %);
+- the Rayleigh mass audit reproduces the floor weights to 3e-11 kN;
+- eigen nodal masses are identical across R2, R3 and R4 (SHA-256 prefix 40f9bca4…).
+
+`ETABS_BASE_ROW` equals a strict §5.2 reading for this building, because the only mass below the storey-1 mid-height is at z = 0. The linear split is not the §5.2 rule. It reproduces the ETABS storey masses.
+
+**Defaults.** None changed. The production ledger stays `NBC_MID_HEIGHT_BASE_TO_FLOOR1`. Adopting an ETABS convention is an engineering decision for the user.
+
+**Windows re-run.** The same R0 to R4 cases, with `storey_mass_allocation_convention` set in a copied config, then Rayleigh and Modal from the GUI. Also an ETABS `Modal Periods and Frequencies` and `Modal Participating Mass Ratios` export of the same model, to give an ETABS modal comparison that is missing here.
