@@ -61,12 +61,12 @@ def read_tables(workbook, names=TABLES):
 
 def scan_beam_forces(paths, cases, *, atol=1e-6, rtol=1e-9):
     """Stream beam-force workbooks; keep rows of `cases`; check overlaps and coverage."""
-    from components.validation.etabs_split_beam_forces import _stream_rows
+    from components.validation.etabs_split_beam_forces import _stream_tables
     wanted = set(cases)
     records, coverage = {}, []
     for path in paths:
         count, last, beams = 0, None, defaultdict(set)
-        for row in _stream_rows(path):
+        for _sheet, row in _stream_tables(path):
             if row["Output Case"] in (None, "") and row["Story"] in (None, ""):
                 continue  # ETABS units row below the column names
             count += 1
