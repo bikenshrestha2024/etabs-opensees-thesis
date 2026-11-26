@@ -33,6 +33,8 @@ reports, figures, direct ETABS node results, current dual case workbooks,
 source model configuration, structure mapping and weight audits are
 gathered by the same routine.
 
+Automatic single-run selection considers both saved layouts. It selects the newest eligible result by filesystem modification time. When timestamps match, a canonical `02_RESULTS/<support strategy>/<gravity profile>/<run-id>` result takes precedence over a legacy flat result.
+
 The ZIP contains:
 \`EVIDENCE_MANIFEST.json\` listing exact source path, SHA256, byte count,
 missing files and oversized omitted files; and

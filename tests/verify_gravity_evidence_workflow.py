@@ -1,6 +1,7 @@
 """Centralized gravity evidence packaging and exact path regression tests."""
 from __future__ import annotations
 import json
+import os
 import tempfile
 import unittest
 import zipfile
@@ -161,6 +162,8 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
 
     def test_canonical_support_cases_and_upload_owner(self):
         from components.gravity.output_ownership import case_directory,dual_runs_parent
+        timestamp = 1_700_000_000
+        os.utime(self.gravity/"Gravity_Result_V110.json", (timestamp,timestamp))
         for scenario in ("ETABS_NONZERO_REACTION_DIAGNOSTIC",
                          "ETABS_SOURCE_SUPPORTS",
                          "CONTINUOUS_WALL_BASE_FIXED"):
@@ -172,6 +175,7 @@ class GravityEvidenceWorkflowTests(unittest.TestCase):
                             "gravity_profile":"GRAVITY_1.0D_1.0L",
                             "model_script":str(self.script),
                             "ok":True}),encoding="utf-8")
+            os.utime(case/"Gravity_Result_V110.json", (timestamp,timestamp))
             (case/"Gravity_Run_V110.log").write_text("ok",encoding="utf-8")
         latest=__import__(
             "components.gravity.evidence_workflow",
