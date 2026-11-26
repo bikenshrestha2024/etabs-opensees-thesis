@@ -1589,6 +1589,10 @@ class GravityAnalysisGUI:
         ttk.Button(elastic_actions,text="Rebuild with ETABS elastic settings (auto)",
                    command=lambda:self._rebuild_verified_clear_beam(elastic_comparison=True)
                    ).pack(side="left")
+        ttk.Button(elastic_actions,text="Rebuild + run selected gravity case",
+                   command=lambda:self._rebuild_verified_clear_beam(
+                       elastic_comparison=True,auto=True)
+                   ).pack(side="left",padx=5)
         ttk.Button(elastic_actions,text="Custom elastic JSON...",
                    command=lambda:self._rebuild_verified_clear_beam(
                        elastic_comparison=True,custom_elastic_settings=True)
@@ -2302,16 +2306,13 @@ class GravityAnalysisGUI:
             self._gravity_action_log("EVIDENCE_EXPORT_ERROR",
                 "Gravity solver passed; upload ZIP failed: "+str(pack_exc))
         # Solver convergence is distinct from original ETABS engineering equivalence.
-        global_gap=None
-        if primary32_summary:
-            global_gap=abs(float(primary32_summary["global_difference_kN"]))
         if not source_audit_ok:
             final_state="BLOCKED"
             status_name="SOLVER COMPLETED; source ledger audit BLOCKED"
-        elif global_gap is not None and global_gap>max(
-                1.0,abs(float(primary32_summary["etabs_total_FZ_kN"]))*0.005):
+        elif primary32_summary and primary32_summary["numerical_agreement"]=="MISMATCH":
             final_state="MISMATCH"
-            status_name="SOLVER FINISHED; original ETABS 32-support comparison MISMATCH"
+            status_name=("SOLVER FINISHED; ETABS 32-support comparison MISMATCH | "
+                         f"max pointwise residual={primary32_summary['worst_abs_node_difference_kN']:.3f} kN")
         else:
             final_state="FINISHED"
             status_name="SOLVER FINISHED; structural ETABS equivalence NOT CERTIFIED"
@@ -2323,12 +2324,14 @@ class GravityAnalysisGUI:
             f"{payload.get('wall_support_strategy')} | {payload.get('gravity_profile')} | solver converged | "
             f"source audit={'RECONCILED' if source_audit_ok else 'BLOCKED'} | ETABS validation not established | result={out} | "
             f"common index={__import__('components.gravity.output_ownership',fromlist=['index_path']).index_path(self.output_var.get(),'Gravity_Output_Index.txt')}")
-        messagebox.showinfo("Gravity analysis complete",
-            "Gravity solver converged; equilibrium check passed; gravity frozen at time zero.\n\n"
+        message=( "Gravity solver converged; equilibrium check passed; gravity frozen at time zero.\n\n"
             +("Source gravity ledger reconciled to solver input. ETABS equivalence NOT VALIDATED."
               if source_audit_ok else
               "WARNING: full exported source load audit blocked. Review GRAVITY_SOURCE_AUDIT_BLOCKED log.")
-            +"\n\nWorkbooks, plots and source audit saved under:\n"+str(out),parent=self.win)
+            +"\n\n"+status_name
+            +"\n\nWorkbooks, plots and source audit saved under:\n"+str(out))
+        notify=messagebox.showwarning if final_state in ("BLOCKED","MISMATCH") else messagebox.showinfo
+        notify("Gravity analysis result",message,parent=self.win)
 
     @timed_outputs('Gravity figure and workbook export','out')
     def _make_outputs(self, payload, out):

@@ -226,6 +226,13 @@ def export_primary_32_comparison(gravity_result, audit_json, output_dir):
     if abs(open_total-solver_total)>max(0.01,abs(solver_total)*1e-7):
         raise ValueError("Saved 32-node reactions do not sum to solver support total")
     global_diff=open_total-etabs_total
+    # Same pointwise numerical screen as the native direct comparison.
+    # This is diagnostic, never a structural acceptance tolerance.
+    max_abs=rows[0]["abs_delta_kN"]
+    sum_abs=sum(row["abs_delta_kN"] for row in rows)
+    rms=math.sqrt(sum(row["delta_kN"]**2 for row in rows)/len(rows))
+    global_ok=abs(global_diff)<=max(1.0,abs(etabs_total)*0.005)
+    pointwise_ok=max_abs<=1.0
     # Report diagnostics without converting a numerical match to structural acceptance.
     summary=dict(
         mode=MODE,classification="PRIMARY_PROJECT_GRAVITY_CASE",
@@ -237,7 +244,13 @@ def export_primary_32_comparison(gravity_result, audit_json, output_dir):
         worst_abs_node_difference_kN=rows[0]["abs_delta_kN"],
         worst_node=rows[0]["opensees_node"],
         original_etabs_table_sha256=audit["source_sha256"],
-        numerical_agreement="SCREENING_ONLY" if abs(global_diff)<=max(1.0,abs(etabs_total)*0.005) else "MISMATCH",
+        global_screening_status="WITHIN_SCREEN_ONLY" if global_ok else "MISMATCH",
+        pointwise_screening_status=("POINTWISE_NUMERICAL_SCREEN_ONLY_NOT_ENGINEERING_ACCEPTANCE"
+                                    if pointwise_ok else "POINTWISE_RESIDUAL_EXCEEDS_NUMERICAL_SCREEN"),
+        pointwise_numerical_screen_threshold_kN=1.0,
+        sum_absolute_nodal_difference_kN=sum_abs,
+        rms_nodal_difference_kN=rms,
+        numerical_agreement="SCREENING_ONLY" if global_ok and pointwise_ok else "MISMATCH",
         structural_validation="NOT_ESTABLISHED",
         warning="Converged reaction agreement does not verify ETABS internal mesh restraint mapping, "
                 "wall stiffness, beam end-zone weight or equivalent load path.",

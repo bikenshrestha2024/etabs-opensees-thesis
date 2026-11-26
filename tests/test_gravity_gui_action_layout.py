@@ -60,6 +60,12 @@ class GravityLayoutTests(unittest.TestCase):
         self.assertIn("ETABS equivalence not inferred",source)
         self.assertIn("_set_gravity_operation",self.funcs)
 
+    def test_primary_rebuild_can_continue_and_pointwise_failure_is_visible(self):
+        self.assertIn('text="Rebuild + run selected gravity case"',self.source)
+        self.assertIn('elastic_comparison=True,auto=True',self.source)
+        self.assertIn('primary32_summary["numerical_agreement"]=="MISMATCH"',self.source)
+        self.assertIn("max pointwise residual=",self.source)
+
     def test_physics_callbacks_and_analysis_routines_remain_named(self):
         for callback in ("run", "run_both_wall_supports", "_inputs",
                          "_set_gravity_operation", "_export_all_pages"):

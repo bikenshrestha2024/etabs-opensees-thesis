@@ -44,7 +44,18 @@ def export_storey_gravity(folder,data,config,pattern_types=None,*,generate_workb
     if not math.isclose(actual,expected,rel_tol=1e-10,abs_tol=1e-6):raise ValueError(f'Storey gravity ledger mismatch: {actual} vs {expected}')
     detail=[dict(storey=k[0],source=k[1],component=k[2],pattern=k[3],classification=k[4],load_class=k[5],gravity_factor=k[6],unfactored_kN=v,applied_kN=v*k[6]) for k,v in sorted(details.items())]
     note='Equivalent source nodal weights assigned to next diaphragm level above each node; base-node shares retained in BASE. Member weights spanning floors are apportioned by their consistent nodal forces. This is applied load by level, not storey axial force or cumulative storey reaction. Signed downward positive; upward negative. Unknown patterns remain unclassified.'
-    report=dict(rows=table,details=detail,total_applied_kN=actual,assembled_total_kN=expected,reconciliation_error_kN=actual-expected,convention=note)
+    # The configured model load and the full independent gravity benchmark
+    # are distinct purposes. Do not change the actual model factors here.
+    full_total=sum(r['unfactored_total_kN'] for r in table)
+    report=dict(rows=table,details=detail,total_applied_kN=actual,assembled_total_kN=expected,
+                reconciliation_error_kN=actual-expected,convention=note,
+                load_purpose='CONFIGURED_MODEL_LOAD_LEDGER_NOT_SOLVER_RESULT',
+                configured_gravity_factors=dict(config['gravity_factors']),
+                full_unfactored_gravity_total_kN=full_total,
+                configured_minus_full_gravity_kN=actual-full_total,
+                beam_weight_policy=config.get('etabs_beam_weight_policy','UNKNOWN'),
+                source_model_config_sha256=data.get('config_sha256'),
+                solver_status='NOT_ASSESSED_BY_LOAD_LEDGER')
     (folder/'Gravity_Storey_Load_Breakdown_V131.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     for name,values in [('Gravity_Storey_Load_Breakdown_V131.csv',table),('Gravity_Source_Load_Detail_V131.csv',detail)]:
         if values:
@@ -92,7 +103,13 @@ def export_storey_gravity(folder,data,config,pattern_types=None,*,generate_workb
             # large source detail sheet and added minutes to large exports.
             for header in ws[1]:
                 ws.column_dimensions[header.column_letter].width=min(42,max(16,len(str(header.value))+2))
-    wb.create_sheet('Read me').append([note])
+    readme=wb.create_sheet('Read me')
+    readme.append([note])
+    for key in ('load_purpose','configured_gravity_factors','full_unfactored_gravity_total_kN',
+                'total_applied_kN','configured_minus_full_gravity_kN','beam_weight_policy',
+                'source_model_config_sha256','solver_status'):
+        value=report[key]
+        readme.append([key,json.dumps(value) if isinstance(value,dict) else value])
     # A formula workbook may be hundreds of MB. Never save directly over a
     # previously valid artifact or hash the entire XLSX in RAM. The status
     # distinguishes a currently regenerating workbook from a verified one.
