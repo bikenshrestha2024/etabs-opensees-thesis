@@ -31,6 +31,7 @@ def saved_cases(folder):
                  key=lambda p:(p.stat().st_mtime_ns,str(p)),reverse=True)
     unique={}
     conflicts=[]
+    state_identities={}
     for path in paths:
         try:
             document=json.loads(path.read_text(encoding='utf-8-sig'))
@@ -39,6 +40,8 @@ def saved_cases(folder):
         if not isinstance(document,dict):
             raise ValueError('MRSM saved result is not a case dictionary: '+str(path))
         for key,case in document.items():
+            if not isinstance(case,dict):
+                raise ValueError('MRSM saved case is not an object: '+str(path)+' '+key)
             state=case.get('limit_state')
             digest=case.get('model_sha256')
             if state not in ('ULS','SLS') or not isinstance(digest,str) or not digest.strip():
@@ -46,6 +49,15 @@ def saved_cases(folder):
             # Old saved MRSM reference files sometimes contain a non-SHA
             # source label. Keep them READABLE, but do not promote that label
             # to the production six-case/source-hash acceptance gate.
+            # Different case keys do not authorize combining two different
+            # model or support/mass bases for the same limit state.
+            basis=(digest,case.get('support_case'),case.get('seismic_mass_policy'),
+                   case.get('gravity_profile'),case.get('modal_numeric_sha256') or
+                   case.get('implementation_sha256'))
+            if state in state_identities and state_identities[state][0]!=basis:
+                conflicts.append((state,key,str(state_identities[state][1]),str(path)))
+            else:
+                state_identities.setdefault(state,(basis,path))
             identity=(state,key)
             if identity in unique:
                 previous=unique[identity]
@@ -54,7 +66,7 @@ def saved_cases(folder):
                 continue
             unique[identity]=(path,key,case)
     if conflicts:
-        raise ValueError('Multiple incompatible MRSM models for the same limit-state/case; '
+        raise ValueError('Multiple incompatible MRSM model/policy sources within one limit state; '
                          'select a specific RUNS/.../02_RESULTS folder: '+repr(conflicts[:5]))
     return list(unique.values())
 
@@ -87,8 +99,14 @@ def figures(cases):
                 heights=sorted(levels);grid[2,col].plot([levels[z] for z in heights],heights,label=label)
         for row,title,unit in [(0,'Storey shear','kN'),(1,'Design edge drift','ratio'),(2,'Nodal deflection envelope','mm')]:
             grid[row,col].set(title=state+' '+title,xlabel=unit,ylabel='Elevation / height (m)');grid[row,col].grid(alpha=.25)
-            if grid[row,col].lines:grid[row,col].legend(fontsize=7)
-        grid[1,col].axvline(.025 if state=='ULS' else .006,color='black',ls='--')
+            if grid[row,col].lines:
+                grid[row,col].legend(fontsize=7)
+            else:
+                grid[row,col].text(.5,.5,'No saved '+state+' '+title.lower()+' evidence',
+                                   transform=grid[row,col].transAxes,ha='center',va='center',
+                                   wrap=True,fontsize=10,color='#666666')
+        if rows:
+            grid[1,col].axvline(.025 if state=='ULS' else .006,color='black',ls='--')
     comparison.suptitle('ULS left / SLS right | Deflection: saved non-concurrent CQC envelopes; force-only scale excluded')
     items.append(('ULS-SLS comparison: shear drift deflection',comparison))
     return items
@@ -102,7 +120,7 @@ def export_reports(folder):
     from openpyxl import Workbook
     from openpyxl.styles import Font,PatternFill,Alignment
     from openpyxl.chart import ScatterChart,Series,Reference
-    wb=Workbook();summary=wb.active;summary.title='Case summary';summary.append(['MRSM saved analysis results — NBC 105:2025']);summary.append(['E0 = centered; Eplus/Eminus = signed 5% perpendicular breadth eccentric inertia. CQC envelopes are not concurrent physical states.']);summary.append(['Displacement/drift are not multiplied by the force-only section 7.5 base-shear scale.']);summary.append([])
+    wb=Workbook();summary=wb.active;summary.title='Case summary';summary.append(['MRSM saved analysis results — NBC 105:2025']);summary.append(['E0 = centered; Eplus/Eminus = signed 5% perpendicular breadth eccentric inertia. CQC envelopes are not concurrent physical states.']);summary.append(['Displacement/drift are not multiplied by the force-only section 7.5 base-shear scale.']);summary.append(['Saved cases: '+', '.join(f"{state}: {sum(r['limit_state']==state for _,_,r in cases)}" for state in ('ULS','SLS'))+' | Absent states are NOT ANALYZED in this report; legacy results are review evidence only.'])
     headers=['State','Axis','Case','Eccentricity sign','Raw V (kN)','ESM reference V (kN)','Force scale','Scaled V (kN)','Max design drift','Drift limit','Modal mass (%)','Analysis status','Source JSON']
     summary.append(headers);storey=wb.create_sheet('Storey response');storey.append(['State','Case','Storey','Height (m)','Scaled shear (kN)','Elastic master drift','Design edge drift','Design master drift','Drift limit','Drift status'])
     modal=wb.create_sheet('Modal response');modal.append(['State','Case','Mode','Period (s)','Frequency (Hz)','Signed modal base shear (kN)','UX mode (%)','UY mode (%)','RZ mode (%)','UX cumulative (%)','UY cumulative (%)'])
@@ -165,10 +183,20 @@ def launch(parent,folder):
         except Exception as e:messagebox.showerror('MRSM reports',str(e),parent=win)
     actions=ttk.Frame(win);actions.pack(fill='x');ttk.Button(actions,text='Export saved data to Excel / PNG / PDF',command=export).pack(side='left')
     def open_book(state):
-        books=[p for p in Path(folder).rglob('MRSM_Results_V134.xlsx') if p.parent.name=='MRSM_'+state]
-        if not books and (Path(folder)/'MRSM_Results_V134.xlsx').is_file():books=[Path(folder)/'MRSM_Results_V134.xlsx']
-        if books:__import__('os').startfile(str(books[0]))
-        else:messagebox.showinfo('MRSM Excel','Export '+state+' saved results first.',parent=win)
+        try:
+            current=saved_cases(folder)
+            sources={p.parent for p,_,case in current if case['limit_state']==state}
+            if not sources:
+                messagebox.showinfo('MRSM Excel','No saved '+state+' result in selected scope. Run that state first.',parent=win)
+                return
+            books=sorted(p/'MRSM_Results_V134.xlsx' for p in sources
+                         if (p/'MRSM_Results_V134.xlsx').is_file())
+            if len(books)==1:
+                __import__('os').startfile(str(books[0]))
+            else:
+                messagebox.showinfo('MRSM Excel','Export the selected saved data or open its exact run folder. Multiple or missing source workbooks are not auto-selected.',parent=win)
+        except (OSError,ValueError) as exc:
+            messagebox.showerror('MRSM Excel',str(exc),parent=win)
     for state in ('ULS','SLS'):ttk.Button(actions,text='Open '+state+' Excel',command=lambda state=state:open_book(state)).pack(side='left')
     body=ttk.Frame(win);body.pack(fill='both',expand=True)
     if cases:embed_figures(body,figures(cases))

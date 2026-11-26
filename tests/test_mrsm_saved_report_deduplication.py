@@ -28,6 +28,32 @@ class TestMRSMReports(unittest.TestCase):
             self.assertEqual(cases[0][0],authoritative/'MRSM_Results_V132.json')
             self.assertEqual(cases[0][2]['marker'],'NATIVE_WORKING_COPY')
 
+    def test_same_state_disjoint_cases_cannot_mix_different_models_or_policies(self):
+        for different in ('model_sha256','support_case','seismic_mass_policy'):
+            with self.subTest(field=different), tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp)
+                path=root/'MRSM_ULS'
+                path.mkdir()
+                source={'limit_state':'ULS','model_sha256':'modelA',
+                        'support_case':'PHYSICAL_32','seismic_mass_policy':'SOURCE_DISTRIBUTED'}
+                second=dict(source)
+                second[different]='different'
+                (path/'MRSM_Results_V132.json').write_text(json.dumps({
+                    'X_E0':source,'Y_E0':second}))
+                with self.assertRaisesRegex(ValueError,'incompatible MRSM'):
+                    saved_cases(root)
+
+    def test_missing_sls_panels_are_explicitly_labeled(self):
+        from components.response_spectrum.reports import figures
+        case={'limit_state':'ULS','axis':'X','stories':[{
+            'height_m':3.0,'scaled_story_shear_kN':10.0,'design_drift_ratio':.001}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            result=figures([(Path(tmp)/'MRSM_Results_V132.json','X_E0',case)])
+            combined=result[-1][1]
+            for ax in (combined.axes[1],combined.axes[3],combined.axes[5]):
+                self.assertTrue(any('No saved SLS' in label.get_text() for label in ax.texts))
+                self.assertEqual(len(ax.lines),0)
+
     def test_source_different_state_is_not_silently_merged(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)
