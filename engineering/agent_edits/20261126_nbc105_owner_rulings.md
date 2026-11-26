@@ -40,3 +40,7 @@ New `components/nbc105/clause_07_missing_mass.py` (+ guide, registry row), gate 
 
 ## Ruling 9d: Table 4-4 occupancy classification
 `clause_04_seismic_hazard.py` (OCCUPANCY_CLASS, OCCUPANT_LIMIT_PERSONS, classify_importance), `components/equivalent_static/code_basis.py::calculate_esm` (optional `occupancy_basis`, reports only), `tests/test_nbc105_followup_importance_class.py`, rows N4-0085..0089, clause_04 guide. Exactly 500 occupants is not printed; treated as class II and flagged.
+
+## Ruling 8: cross-reference audit
+New `tools/nbc105_crossref_audit.py` (+ guide `docs/source/tools/nbc105_crossref_audit.py.md`, registry row), `docs/nbc105/CROSS_REFERENCE_REGISTER.csv` and `.md` (59 references: 5 misdirected, 1 ambiguous), `tests/test_nbc105_followup_crossref_audit.py`. Corrected citations added to the clause_04 `spectral_shape_factor` docstring and the clause_02 matrix; drift (5.5.3) and zoning-map (Figure 4-3) citations already in code.
+

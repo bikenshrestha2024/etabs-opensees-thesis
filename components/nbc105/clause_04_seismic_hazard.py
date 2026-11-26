@@ -102,7 +102,9 @@ def _finite(value, name):
 
 
 def spectral_shape_factor(period_s, soil, *, method):
-    """Return Ch(T) of Eq. 4.1(2) with the Table 4-1 parameters.
+    """
+    Cross-reference note: printed 4.1.2 calls the MRSM curves "Figure 4-1(b)"; the MRSM figure is
+    Figure 4-2 (Figure 4-1 is the ESM figure). See docs/nbc105/CROSS_REFERENCE_REGISTER.md.Return Ch(T) of Eq. 4.1(2) with the Table 4-1 parameters.
 
     [REF NBC105-2025 §4.1.2, printed pp. 22-24]
     ``method="equivalent_static"`` uses Ta = 0 (Table 4-1 footnote, Figure
