@@ -26,7 +26,7 @@ from components.nbc105.constants import GRAVITY_M_S2
 __all__ = [
     "AMPLIFICATION_FACTOR", "LWI_OVER_H_MAX", "KT_BY_SYSTEM",
     "SHEAR_WALL_KT_NUMERATOR", "LIVE_LOAD_FACTORS", "building_height_m",
-    "effective_wall_area_m2", "empirical_period_s", "amplified_period_s",
+    "effective_wall_area_m2", "effective_wall_area_result", "empirical_period_s", "amplified_period_s",
     "adopted_period_s", "rayleigh_period_s", "storey_index_for_elevation",
     "seismic_weight_kN", "period_factor_deviation",
 ]
@@ -84,25 +84,60 @@ def building_height_m(top_z_m, base_z_m, *, basement_height_m=0.0,
     return h
 
 
+class LwiOverHExceeded(ValueError):
+    """Lwi/H exceeds the printed 0.9 restriction; never clamped silently.
+
+    [REF NBC105-2025 §5.1.2, printed p. 30]
+    """
+
+
+def effective_wall_area_result(walls: Iterable[tuple[float, float]], height_m):
+    """Evaluate Aw = sum(Awi*(0.2+(Lwi/H)**2)) and flag Lwi/H > 0.9.
+
+    [REF NBC105-2025 §5.1.2, printed pp. 29-30]
+    Printed p. 30: Lwi is the first-storey wall length "with the restriction
+    that Lwi/H should not exceed 0.9". The formula on p. 29 contains plain
+    (Lwi/H)^2; 0.9 is a restriction on the input, not a cap inside the formula,
+    so Lwi/H > 0.9 (strict) is a limit exceedance, never a silent clamp.
+    Returns ``aw_m2`` (None when any wall exceeds, fail-closed), the literal
+    formula value ``aw_m2_formula_uncapped``, the informational
+    ``aw_m2_if_ratio_limited_to_0_9`` and the per-wall ``flags``.
+    """
+    h = _positive(height_m, "height_m")
+    flags, formula, limited = [], 0.0, 0.0
+    for index, (awi, lwi) in enumerate(walls):
+        awi = _positive(awi, "Awi")
+        lwi = _positive(lwi, "Lwi")
+        ratio = lwi / h
+        formula += awi * (0.2 + ratio ** 2)
+        limited += awi * (0.2 + min(ratio, LWI_OVER_H_MAX) ** 2)
+        flags.append({"wall_index": index, "lwi_over_h": ratio,
+                      "limit": LWI_OVER_H_MAX, "exceeds_limit": _strictly_above(ratio, LWI_OVER_H_MAX)})
+    if not flags:
+        raise ValueError("at least one wall is required")
+    exceeding = [f["wall_index"] for f in flags if f["exceeds_limit"]]
+    return {"aw_m2": None if exceeding else formula,
+            "aw_m2_formula_uncapped": formula, "aw_m2_if_ratio_limited_to_0_9": limited,
+            "exceeding_walls": exceeding, "flags": flags,
+            "status": "LIMIT_EXCEEDED_LWI_OVER_H_GT_0_9" if exceeding else "WITHIN_LIMIT"}
+
+
 def effective_wall_area_m2(walls: Iterable[tuple[float, float]], height_m):
-    """Return Aw = sum(Awi*(0.2+min(Lwi/H, 0.9)**2)) for (Awi, Lwi) walls.
+    """Return Aw = sum(Awi*(0.2+(Lwi/H)**2)); raise LwiOverHExceeded if Lwi/H > 0.9.
 
     [REF NBC105-2025 §5.1.2, printed pp. 29-30]
     Aw summation p. 29; Awi (first-storey effective wall area), Lwi
-    (first-storey wall length in the considered direction, Lwi/H <= 0.9) and
-    Nw (walls in the considered direction) are defined on p. 30.
+    (first-storey wall length in the considered direction, Lwi/H should not
+    exceed 0.9) and Nw (walls in the considered direction) are defined on
+    p. 30. Use ``effective_wall_area_result`` to obtain flags instead of an
+    exception. Changed 2026-11-26 (owner ruling 4): the former silent clamp of
+    Lwi/H at 0.9 is removed.
     """
-    h = _positive(height_m, "height_m")
-    total = 0.0
-    count = 0
-    for awi, lwi in walls:
-        awi = _positive(awi, "Awi")
-        lwi = _positive(lwi, "Lwi")
-        total += awi * (0.2 + min(lwi / h, LWI_OVER_H_MAX) ** 2)
-        count += 1
-    if count == 0:
-        raise ValueError("at least one wall is required")
-    return total
+    result = effective_wall_area_result(walls, height_m)
+    if result["aw_m2"] is None:
+        raise LwiOverHExceeded("Lwi/H > 0.9 for wall index(es) %s (NBC 105:2025 5.1.2 restriction); "
+                               "revise the wall input" % result["exceeding_walls"])
+    return result["aw_m2"]
 
 
 def empirical_period_s(height_m, system_type, aw_m2=None):

@@ -13,3 +13,6 @@ Editor Claude Code (model label UNKNOWN). Branch `feat/nbc105-normative-sentence
 
 ## Ruling 3: two separate drift outputs
 `clause_05_dynamic_characteristics.py` (`etabs_comparison_drift`, `opensees_actual_drift`, `separate_drift_outputs`, `require_same_drift_basis`, `drift_basis`), `response_checks.py::drift_check(drift_basis=...)` with explicit labels at all production callers (static/MRSM = ETABS_COMPARISON, history = OPENSEES_ACTUAL), MRSM result JSON and `reports.py` columns, ESM generated response rows, LTH/NLTHA summaries; `tests/test_nbc105_followup_drift_bases.py`; rows N5-0127/0129/0137. The Rmu-scaled basis is stated in 5.5.1.1 (not 5.5.3).
+
+## Ruling 4: Lwi/H > 0.9
+`clause_05_dynamic_characteristics.py` (`effective_wall_area_result`, `LwiOverHExceeded`; `effective_wall_area_m2` no longer clamps), `components/inputs/project_workbooks.py::_wall_aw_from_lines` (CRLF preserved; per-segment flag, numeric value unchanged), `components/modal/analysis.py` docstring, `tests/test_nbc105_followup_lwi_over_h.py`, `tests/test_nbc105_clause5.py` (clamp test replaced), row N5-0030. Printed p.30 words it as a restriction on Lwi; the formula on p.29 has no cap, so no clamp.

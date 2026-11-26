@@ -33,7 +33,7 @@ def nbc105_period_estimate(*, height_m, system_type, wall_aw_x_m2=None,
 
     For concrete shear-wall buildings, ``wall_aw_*`` is the direction-specific
     effective wall area parameter from §5.1.2:
-    Aw = sum(Awi * (0.2 + (min(Lwi/H, 0.9))**2)).
+    Aw = sum(Awi * (0.2 + (Lwi/H)**2)), with Lwi/H <= 0.9 required (not clamped).
     Supply it separately for X and Y using first-storey walls effective in that
     direction. The routine does not infer net wall areas around openings.
 

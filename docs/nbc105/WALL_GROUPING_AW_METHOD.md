@@ -14,7 +14,7 @@ The clause does not define how walls are grouped around openings, that is, which
 
 ## 2. What the code does
 
-Shared factor: `effective_wall_area_m2` in `components/nbc105/clause_05_dynamic_characteristics.py` computes the sum of Awi (0.2 + (Lwi/H)^2) with Lwi/H clamped at 0.9 (tested by `test_aw_clamps_lwi_over_h_at_0_9`).
+Shared factor: `effective_wall_area_m2` in `components/nbc105/clause_05_dynamic_characteristics.py` computes the sum of Awi (0.2 + (Lwi/H)^2) with Lwi/H > 0.9 rejected as a limit exceedance, not clamped (owner ruling 2026-11-26; tested by `test_aw_lwi_over_h_above_0_9_is_a_limit_exceedance_not_a_clamp`).
 
 `components/inputs/grouped_wall_aw.py` ([guide](../source/components/inputs/grouped_wall_aw.py.md)):
 - `grouped_wall_aw(profile, height_m, groups)`: each group is an explicitly mapped whole structural wall `{id, axis, plane_m, thickness_m, start_m, end_m}`. For every first-storey horizontal slice of the exported shell geometry it merges the solid shell intervals that lie on the group's axis, plane and thickness, clipped to the group's span, and multiplies the solid width by the thickness to get a net area. It takes the minimum net area over the first-storey slices as the group's Awi, and uses the gross group span (end - start, openings included) as Lwi: contribution = (minimum net area) x (0.2 + min(gross length / H, 0.9)^2). Contributions are summed per axis. It rejects duplicate or blank ids, axes other than X/Y, non-positive spans, overlapping groups, wall material in any slice that is not assigned to exactly one group, and groups with no concrete in a slice. It never infers groups.

@@ -32,10 +32,13 @@ class Clause5Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             c5.empirical_period_s(16, "timber")
 
-    def test_aw_clamps_lwi_over_h_at_0_9(self):
-        # H=10. Wall A: Awi=2, Lwi=5 -> 2*(0.2+0.25)=0.9. Wall B: Awi=3, Lwi=20 (ratio 2 -> 0.9) -> 3*(0.2+0.81)=3.03
-        self.assertAlmostEqual(c5.effective_wall_area_m2([(2.0, 5.0), (3.0, 20.0)], 10.0), 0.9 + 3.03, places=12)
-        self.assertAlmostEqual(c5.effective_wall_area_m2([(1.0, 9.0)], 10.0), 1.0 * (0.2 + 0.81), places=12)
+    def test_aw_lwi_over_h_above_0_9_is_a_limit_exceedance_not_a_clamp(self):
+        # Owner ruling 4 (2026-11-26): printed 5.1.2 p.30 "Lwi/H should not exceed 0.9" is a restriction, not a cap in the formula.
+        # H=10. Wall A: Awi=2, Lwi=5 -> 2*(0.2+0.25)=0.9. Wall B (ratio 2) now exceeds and is rejected.
+        self.assertAlmostEqual(c5.effective_wall_area_m2([(2.0, 5.0)], 10.0), 0.9, places=12)
+        self.assertAlmostEqual(c5.effective_wall_area_m2([(1.0, 9.0)], 10.0), 1.0 * (0.2 + 0.81), places=12)  # equality is allowed
+        with self.assertRaises(c5.LwiOverHExceeded):
+            c5.effective_wall_area_m2([(2.0, 5.0), (3.0, 20.0)], 10.0)
 
     def test_aw_rejects_nonpositive(self):
         for walls, h in (([(0.0, 3.0)], 10.0), ([(1.0, -3.0)], 10.0), ([(1.0, 3.0)], 0.0), ([(1.0, 3.0)], -5.0), ([], 10.0)):
