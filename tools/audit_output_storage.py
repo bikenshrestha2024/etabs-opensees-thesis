@@ -15,6 +15,7 @@ import os
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from zipfile import ZipFile, BadZipFile
 
 
 def _refuse_linked_chain(path):
@@ -33,7 +34,40 @@ def _sha256(path):
     return h.hexdigest()
 
 
-def scan_output(root, *, max_large=50, hash_duplicates=True):
+def _validate_container(path):
+    """Read-only format checks; never execute archive members or formulas."""
+    ext=path.suffix.lower()
+    if ext == ".json":
+        with path.open("r",encoding="utf-8-sig") as stream:
+            json.load(stream)
+        return "JSON_PARSED"
+    if ext in {".zip",".xlsx",".xlsm",".docx",".pptx"}:
+        with ZipFile(path) as archive:
+            names=archive.namelist()
+            if len(names)!=len(set(names)):
+                raise ValueError("Duplicate archive member names")
+            bad=archive.testzip()
+            if bad is not None:
+                raise ValueError("CRC failure: "+bad)
+            if ext in {".xlsx",".xlsm"} and "xl/workbook.xml" not in names:
+                raise ValueError("Missing Excel workbook XML")
+        return "ZIP_CRC_CHECKED"
+    if ext == ".png":
+        with path.open("rb") as stream:
+            if stream.read(8)!=b"\x89PNG\r\n\x1a\n":
+                raise ValueError("Invalid PNG signature")
+        return "PNG_SIGNATURE_CHECKED"
+    if ext in {".log",".txt",".csv",".jsonl"}:
+        with path.open("r",encoding="utf-8-sig",errors="strict") as stream:
+            for line in stream:
+                if ext == ".jsonl" and line.strip():
+                    json.loads(line)
+        return "TEXT_READ" if ext!=".jsonl" else "JSONL_PARSED"
+    return "NOT_FORMAT_CHECKED"
+
+
+def scan_output(root, *, max_large=50, hash_duplicates=True,
+                include_entries=False, validate_files=False):
     """Inventory actual bytes and content-identical files without mutation.
 
     A file's location and basename have no effect on the SHA identity.
@@ -46,7 +80,9 @@ def scan_output(root, *, max_large=50, hash_duplicates=True):
         raise NotADirectoryError(str(root))
     entries = []
     errors = []
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+    def walk_error(exc):
+        errors.append({"path":str(exc.filename or root),"error":str(exc)})
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=False, onerror=walk_error):
         dirnames[:] = [d for d in dirnames if not (Path(dirpath) / d).is_symlink()]
         for filename in filenames:
             path = Path(dirpath) / filename
@@ -95,6 +131,16 @@ def scan_output(root, *, max_large=50, hash_duplicates=True):
                         "paths": [x["relative_path"] for x in group],
                         "review_only": True,
                     })
+    validation_counts=defaultdict(int)
+    if validate_files:
+        for item in entries:
+            try:
+                status=_validate_container(root/item["relative_path"])
+            except (OSError, ValueError, BadZipFile, RuntimeError, NotImplementedError) as exc:
+                status="FORMAT_CHECK_FAILED"
+                errors.append({"path":item["relative_path"],"error":str(exc)})
+            item["format_check"]=status
+            validation_counts[status]+=1
     result = {
         "schema": "etabs-opensees-output-size-audit-v1",
         "status": "DISK_FOOTPRINT_ONLY_NOT_ENGINEERING_EQUIVALENCE",
@@ -113,8 +159,12 @@ def scan_output(root, *, max_large=50, hash_duplicates=True):
             g["redundant_bytes"] for g in duplicates),
         "scan_errors": errors,
         "hash_duplicates": bool(hash_duplicates),
+        "format_checks_requested": bool(validate_files),
+        "format_check_counts": dict(validation_counts),
         "action": "REPORT_ONLY_NO_DELETION",
     }
+    if include_entries:
+        result["files"]=sorted(entries,key=lambda item:item["relative_path"])
     return result
 
 

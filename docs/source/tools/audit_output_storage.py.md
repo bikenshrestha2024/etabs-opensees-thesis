@@ -43,3 +43,6 @@ With `--root <case>` and no explicit `--out`, a new report now belongs to the se
 ## 2026-11-15 linked-path audit boundary
 
 The static local disk audit refuses a symlinked selected root and any symlink in the report destination's existing ancestor chain **before** resolution, preventing its read-only scanning/writing from silently operating on an unrelated external project directory. Symlinked children are still skipped during the walk. Test fixtures under `tests/test_output_storage_audit.py` verify the source alias and linked report-parent cases leave the external folder untouched. This is a normal Python filesystem guard, not an OS-level race-proof sandbox; disk footprint duplication is not evidence of ETABS/OpenSees correctness.
+
+
+2026-11-26: `scan_output(..., include_entries=True, validate_files=True)` optionally includes all relative file paths and lightweight format outcomes. The all-module migration audit uses complete enumeration by default and exposes explicit hash and format flags. Format failures and walk errors remain in `scan_errors`; no numerical validation or deletion is implied.

@@ -2474,7 +2474,10 @@ class App:
         stage_tabs.add(stage_4,text="5. Nonlinear")
         stage_4.columnconfigure(0,weight=1,uniform="stagecols")
         stage_4.columnconfigure(1,weight=1,uniform="stagecols")
-        ttk.Label(stage_4,text="Review readiness, then run controlled nonlinear models and paired records.",wraplength=1050).grid(row=0,column=0,columnspan=2,sticky="w",padx=10,pady=(4,8))
+        nonlinear_header=ttk.Frame(stage_4)
+        nonlinear_header.grid(row=0,column=0,columnspan=2,sticky="ew",padx=10,pady=(4,8))
+        ttk.Label(nonlinear_header,text="Review readiness, then run controlled nonlinear models and paired records.",wraplength=1050).pack(anchor="w")
+        ttk.Label(nonlinear_header,textvariable=self.out,wraplength=980).pack(anchor="w",pady=(2,0))
         group_4_0=make_group(stage_4,"Readiness and modelling","Nonlinear analysis",0)
         group_4_1=make_group(stage_4,"Research and progression","Nonlinear analysis",1)
         stage_frames.append(stage_4)
@@ -2526,6 +2529,7 @@ class App:
         action(group_1_0,text="OpenSees material + section library — RC, walls, slab, SHS, FVD, BRB",command=self._open_material_values)
         action(group_1_1,text="FVD / BRB ETABS brace replacement guide",command=self._open_fvd_brb_guide)
         action(group_2_0,text="OpenSees gravity analysis — run, plot + report",command=self._open_gravity_analysis)
+        action(group_2_0,text="Elastic comparison settings — select JSON + rebuild",command=self._open_elastic_comparison_settings)
         action(group_2_0,text="Generate detailed storey-gravity Excel from saved model (no ETABS)",command=self._generate_storey_gravity_excel)
         action(group_2_1,text="NBC 105: load combinations, stiffness + mass source",command=self._open_nbc105_settings)
         action(group_2_1,text="ULS / SLS design checks - combinations, drift, sections",command=lambda:self._open_gravity_nbc_review('OpenSees_Design_Checks_V135'))
@@ -2545,6 +2549,7 @@ class App:
         action(group_1_1,text="ETABS area mesh → OpenSees floors/wall panels",command=self._open_area_integration)
         action(group_4_1,text="OpenSees stability + outrigger case progression",command=self._open_project_progression)
         action(group_6_1,text="OpenSees result interpretation + mode shapes",command=self._open_result_interpretation)
+        action(group_6_0,text="All modules — audit folder structure, duplicates and file formats",command=self._open_all_module_file_audit)
         action(group_4_0,text='Nonlinear dependencies - available / missing inputs',command=lambda:__import__('components.model.nonlinear_preflight',fromlist=['launch']).launch(self.root,self.out.get()))
         action(group_4_0,text="OpenSees nonlinear readiness / calibration status",command=self._open_nonlinear_readiness)
         # Important source-evidence warnings stay close to the appropriate workflow.
@@ -2746,7 +2751,48 @@ class App:
         except Exception as exc:
             messagebox.showerror("Could not open NBC ESM GUI",str(exc))
 
-    def _open_gravity_analysis(self):
+    def _open_all_module_file_audit(self):
+        """Run the existing all-module audit locally; no model or file relocation."""
+        folder=self._model_review_folder()
+        if folder is None:
+            return
+        if getattr(self,"_all_module_audit_process",None) is not None:
+            messagebox.showinfo("Audit running","An all-module file audit is already running.",parent=self.root)
+            return
+        from components.shared.repository_paths import runtime_repo_root
+        from components.inputs.output_layout import export_root_for
+        repo=runtime_repo_root(__file__,globals().get("_component_source"))
+        script=repo/"tools"/"RUN_FULL_OUTPUT_MIGRATION_AUDIT.py"
+        if not script.is_file():
+            messagebox.showerror("Repository tools missing","Run 01_MAIN_GUI.py from the updated repository, not an exported runtime snapshot.",parent=self.root)
+            return
+        root=export_root_for(folder)
+        if not messagebox.askyesno("Audit all saved outputs","Read all selected project files, check archive integrity and SHA duplicates? This can take time. No files will be deleted or uploaded.",parent=self.root):
+            return
+        try:
+            proc=subprocess.Popen([sys.executable,str(script),"--export-root",str(root),"--hash-duplicates","--validate-files"],cwd=str(repo),stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding="utf-8",errors="replace",env={**os.environ,"PYTHONUTF8":"1"})
+            self._all_module_audit_process=proc
+            self.log("[ALL MODULE AUDIT] "+str(root))
+            # Drain pipe in a worker; Tk updates are scheduled on the UI thread.
+            import threading
+            def collect():
+                output,_=proc.communicate()
+                def complete():
+                    self._all_module_audit_process=None
+                    self.log(output)
+                    messagebox.showinfo("All-module audit","Exit code: "+str(proc.returncode)+" (2 means review required). See the main log and 09_SOFTWARE_DIAGNOSTICS for reports. Not engineering acceptance.",parent=self.root)
+                self.root.after(0,complete)
+            threading.Thread(target=collect,daemon=True).start()
+        except Exception as exc:
+            self._all_module_audit_process=None
+            messagebox.showerror("All-module audit",str(exc),parent=self.root)
+
+    def _open_elastic_comparison_settings(self):
+        gui=self._open_gravity_analysis(require_manifest=True)
+        if gui is not None:
+            gui._rebuild_verified_clear_beam(elastic_comparison=True)
+
+    def _open_gravity_analysis(self, *, require_manifest=False):
         """Open the gravity-analysis runner and reporting GUI."""
         folder = self._model_review_folder()
         if folder is None:
@@ -2762,7 +2808,13 @@ class App:
             from OpenSees_Complete_Export_V118 import autoselect_inputs
             gui=launch(self.root)
             gui.etabs_edb_path.set(selected or exported)
-            autoselect_inputs(gui,folder,'gravity_model_script')
+            try:
+                bound=autoselect_inputs(gui,folder,'gravity_model_script')
+                if require_manifest and not bound:
+                    raise ValueError('Select a completed export with a gravity model manifest first.')
+            except Exception:
+                gui.win.destroy()
+                raise
             return gui
         except Exception as exc:
             messagebox.showerror("Could not open gravity GUI",str(exc),parent=self.root)
