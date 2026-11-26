@@ -111,6 +111,26 @@ class Primary32Tests(unittest.TestCase):
         selected,_=classify_supports(self.path,self.topology,self.original)
         self.assertEqual(len(selected),32)
 
+    def test_global_equilibrium_does_not_hide_pointwise_mismatch(self):
+        _,audit=classify_supports(self.path,self.topology,self.original)
+        tags=list(PROJECT_PRIMARY_32)
+        values={tag:1000. for tag in tags}
+        values[tags[0]]+=768.045
+        values[tags[1]]-=768.045
+        result=dict(ok=True,wall_support_strategy=MODE,
+                    support_node_tags=tags,
+                    reactions=[dict(node_tag=tag,rz_kN=values[tag]) for tag in tags],
+                    report=dict(support_vertical_reaction_kN=32000.))
+        summary=export_primary_32_comparison(result,audit,self.tmp.name)
+        self.assertAlmostEqual(summary["global_difference_kN"],0.,places=8)
+        self.assertEqual(summary["global_screening_status"],"WITHIN_SCREEN_ONLY")
+        self.assertEqual(summary["numerical_agreement"],"MISMATCH")
+        self.assertEqual(summary["pointwise_screening_status"],"POINTWISE_RESIDUAL_EXCEEDS_NUMERICAL_SCREEN")
+        self.assertAlmostEqual(summary["worst_abs_node_difference_kN"],768.045)
+        self.assertAlmostEqual(summary["sum_absolute_nodal_difference_kN"],1536.09)
+        self.assertAlmostEqual(summary["rms_nodal_difference_kN"],192.01125)
+        self.assertEqual(summary["structural_validation"],"NOT_ESTABLISHED")
+
     def test_export_exact_32_numeric_comparison(self):
         selected,audit=classify_supports(self.path,self.topology,self.original)
         reactions=[dict(node_tag=i,rz_kN=1000.0)

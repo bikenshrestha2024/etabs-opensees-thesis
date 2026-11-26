@@ -40,4 +40,4 @@ jobs:
           python -m unittest -v tests.test_gravity_organized_case_index_v172 tests.verify_gravity_case_reaction_registry
       - name: Verify case evidence paths and immutable ZIP-only archives
         run: |
-          python -m unittest -v tests.verify_gravity_evidence_workflow tests.test_gravity_archive_only_snapshot tests.test_gravity_workspace_duplicate_audit
+          python -m unittest -v tests.verify_gravity_evidence_workflow tests.test_gravity_archive_only_snapshot tests.test_gravity_workspace_duplicate_audit tests.verify_primary_32_support_reactions tests.test_gravity_gui_action_layout
