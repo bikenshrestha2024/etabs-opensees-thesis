@@ -122,29 +122,34 @@ def write_target_spectra(folder, *, zoning_Z, importance_I,
     start = float(start_s)
     end = float(end_s)
     step = _positive(step_s, "step_s")
+    Z = _positive(zoning_Z, "zoning_Z")
+    I = _positive(importance_I, "importance_I")
     if not 0 <= start < end <= 6:
         raise ValueError("NBC Fig 4-2 target domain must be within 0..6 s")
     count = int(round((end-start)/step))
     if count < 2 or not math.isclose(start+count*step,end,abs_tol=1e-9):
         raise ValueError("Select a step that evenly divides the period range")
     root = Path(folder)
+    targets = {soil: root / f"NBC105_2025_RC_DUAL_Soil_{soil}_ULS_Target_g.csv"
+               for soil in ("C", "D")}
+    metadata_path = root / "NBC105_2025_RC_DUAL_C_D_Target_Metadata.json"
+    for path in (*targets.values(), metadata_path):
+        if path.exists() or path.is_symlink():
+            raise FileExistsError("Refusing to overwrite existing target evidence: " + str(path))
     root.mkdir(parents=True, exist_ok=True)
-    files = {}
-    for soil in ("C","D"):
-        target = root / ("NBC105_2025_RC_DUAL_Soil_" + soil + "_ULS_Target_g.csv")
-        with target.open("w",newline="",encoding="utf-8") as fh:
+    for soil, target in targets.items():
+        with target.open("x",newline="",encoding="utf-8") as fh:
             writer=csv.writer(fh)
             writer.writerow(["T_s","Sa_g"])
             for i in range(count+1):
                 T = start + step*i
-                writer.writerow([f"{T:.9f}",f"{target_nltha_g(T,soil,zoning_Z=zoning_Z,importance_I=importance_I):.12g}"])
-        files[soil] = str(target)
+                writer.writerow([f"{T:.9f}",f"{target_nltha_g(T,soil,zoning_Z=Z,importance_I=I):.12g}"])
     metadata = dict(schema="NBC105_2025_RC_DUAL_C_D_TARGETS_V1",
         code_source=SOURCE, system=RC_DUAL_SHEAR_WALL,
-        Z=float(zoning_Z), I=float(importance_I),
+        Z=Z, I=I,
         target_kind="C_h(T) * Z * I / Omega_u_ULS",
         soil=SOIL,period_min_s=start,period_max_s=end,period_step_s=step,
-        target_files=files,
+        target_files={soil: str(path) for soil, path in targets.items()},
         soil_type_selected_for_each_record=False,
         record_to_soil_mapping_provided=False,
         spectrum_match_approved=False,
@@ -155,6 +160,6 @@ def write_target_spectra(folder, *, zoning_Z, importance_I,
           "No unreviewed extrapolation beyond 6 seconds.",
           "Already matched Acc(g) source Path factor remains 9.81 for kN-m-s."
         ])
-    filename=root/"NBC105_2025_RC_DUAL_C_D_Target_Metadata.json"
-    filename.write_text(json.dumps(metadata,indent=2,allow_nan=False),encoding="utf-8")
+    with metadata_path.open("x",encoding="utf-8") as stream:
+        json.dump(metadata,stream,indent=2,allow_nan=False)
     return metadata

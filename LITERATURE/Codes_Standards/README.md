@@ -4,6 +4,7 @@
 
 | ID | Use in the thesis | Master metadata |
 |---|---|---|
+| R10 | Governing seismic code, NBC 105:2025 (Second Revision) | [Official DUDBC PDF](https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf) |
 | L002 | Low/medium-rise seismic design context | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 | L028 | Computational engineering framework | [DOI, authors, journal, PDF state, citations](../MASTER_LITERATURE_INDEX.csv) |
 

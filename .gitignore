@@ -60,3 +60,7 @@ REVIEW_MAIN/00_MODEL/20261116_MESH04_AND_ETABS23_VERIFICATION/MESH_04_Floor_and_
 # a separate reviewed history remediation, not a force push.
 /Viewer_Preview_V*/
 /New_Export_Viewer_Diagnostic/
+
+# The workbench's current startup log and local pointer are machine-specific.
+/Startup_Logs/*.log
+/Startup_Logs/LATEST.txt

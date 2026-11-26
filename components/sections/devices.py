@@ -22,6 +22,7 @@ def define_fvd_material(ops, *, material_tag, K, Cd, alpha,
                         gap_length=0.0, unit_note="user-verified consistent units"):
     """Define Maxwell ViscousDamper material: spring K + dashpot Cd*v**alpha.
 
+    [REF R05 Korkmaz & Kircil (2026), §3, DOI 10.3390/buildings16040711]
     K is force/length; Cd is force*(time/length)**alpha. OpenSees' ViscousDamper
     models these in series. K is not simply the damper coefficient divided by
     an arbitrary time; derive it from brace/device axial stiffness.
@@ -130,8 +131,8 @@ add_brb_corot_truss(ops, element_tag=8802, i_node=903, j_node=904,
 
 # -----------------------------------------------------------------------------
 # THESIS DEVICE RESPONSE METRICS (independent of OpenSees executable)
-# R05: Korkmaz & Kircil (2026), DOI 10.3390/buildings16040711 (FVD).
-# R07: Guerrero Bobadilla et al. (2025), SDEE 199, 109700 (BRB fatigue).
+# R05: Korkmaz & Kircil (2026), DOI 10.3390/buildings16040711 (FVD model).
+# R07: Guerrero Bobadilla et al. (2025), DOI 10.1016/j.soildyn.2025.109700 (BRB fatigue benchmark).
 # These expressions are bookkeeping diagnostics; they do NOT reproduce specimen
 # failure, manufacturer stroke capacity or validate a nonlinear device model.
 # -----------------------------------------------------------------------------
@@ -142,7 +143,8 @@ def convert_fvd_cd_mm_to_m(Cd_kN_per_mm_per_s_alpha, alpha):
     For F=Cd*sign(v)*abs(v)**alpha, v_mm=1000*v_m and
     Cd_(kN,m,s)=Cd_(kN,mm,s)*1000**alpha.
     Convert exactly once, not repeatedly after loading a converted register.
-    See Korkmaz & Kircil (2026), DOI 10.3390/buildings16040711.
+    [REF R05 Korkmaz & Kircil (2026), Eq. (5) and Table 4, DOI 10.3390/buildings16040711]
+    The conversion follows from the units in the signed force–velocity law.
     """
     Cd=float(Cd_kN_per_mm_per_s_alpha)
     alpha=float(alpha)
@@ -189,7 +191,9 @@ def brb_cumulative_plastic_ductility(plastic_deformation_m, yield_displacement_m
     Input must be actual isolated plastic deformation of the BRB core.
     Total element extension is NOT a substitute without an elastic/plastic
     decomposition. The value is a demand measure, not a fatigue-life verdict.
-    Context: Guerrero Bobadilla et al. (2025), SDEE 199, 109700.
+    [REF R07 Guerrero Bobadilla et al. (2025), Eq. (5), DOI 10.1016/j.soildyn.2025.109700]
+    The paper's benchmark measures hysteretic work normalized by yield force
+    times yield displacement. This diagnostic measures normalized plastic travel.
     """
     uy=float(yield_displacement_m)
     values=[float(x) for x in plastic_deformation_m]

@@ -32,6 +32,8 @@ python 33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py "D:/Thesis/NBC105_Vertical_Fea
 
 Absent keys or `null` mean UNKNOWN, not false.
 
+The feature JSON and the report must be separate files. The launcher checks their file identities before writing the report.
+
 ## 3. Exact adopted scale and unit-conversion chain: §9.3.2.2, p46–47
 
 For an original unscaled horizontal acceleration record pair A and B:

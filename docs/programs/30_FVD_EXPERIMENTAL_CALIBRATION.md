@@ -8,6 +8,8 @@ Run from Spyder-compatible repository root:
 
     python 30_CALIBRATE_FVD_FROM_TEST.py "D:/Thesis/FVD_Test/measured.csv" --output "D:/Thesis/FVD_Test/Calibrated"
 
+The launcher checks both output paths before fitting. It rejects `FVD_Measured_vs_Maxwell.csv` or `FVD_Calibration_Report.json` if either path identifies the measured input file.
+
 The script solves the Maxwell equation dF/dt=K*(v-sign(F)*(|F|/Cd)^(1/alpha)) with scipy.integrate.solve_ivp Radau and fits K, Cd, alpha with scipy.optimize.least_squares. It evaluates both possible load-cell force sign conventions and chooses the smaller held-out RMSE, recording the choice.
 
 **Limitations:** The split is time-based within ONE test, not independent experimental validation. K/Cd/alpha are often non-identifiable from one frequency/amplitude; compare independent load cycles and mechanical capacities. The model fitted to actual displacement and total force may not represent connection flexibility, temperature, relief valves, air entrainment or actual high-rate device response. A fit is not authorization to use it in building NLTHA. No actual experimental CSV is supplied in the repository, so no experimental calibration is asserted or computed in this commit.

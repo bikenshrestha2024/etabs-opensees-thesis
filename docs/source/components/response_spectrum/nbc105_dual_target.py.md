@@ -6,6 +6,8 @@
 
 **Outputs:** two independent CSVs and manifest JSON, neither of which is a matched-accelerogram validation.
 
+Choose a fresh output folder for each target set. The writer validates the factors and checks for existing target CSVs or metadata before creating files.
+
 **Tests:** `tests/verify_nbc105_dual_target.py` verifies the official piecewise formulas for both types and checks that a D curve fails a C-target comparison.
 
 [Full instructions](../../../programs/34_NBC105_RC_DUAL_SOIL_C_D_TARGETS.md).

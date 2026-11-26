@@ -17,6 +17,7 @@ import json
 import math
 from pathlib import Path
 
+from components.inputs.output_contract import refuse_source_overwrite
 from components.nonlinear_time_history.nbc105_2025_audit import (
     nbc105_time_step_limit, response_aggregation_rule, scaling_period_range,
 )
@@ -202,9 +203,14 @@ def audit_suite(matched_root, *, t1_x_s=None, t1_y_s=None, tn90_x_s=None,
     }
 
 
-def write_suite_report(destination, matched_root, **kwargs):
-    data=audit_suite(matched_root,**kwargs)
+def write_suite_report(destination, matched_root, *, register=REGISTER, **kwargs):
+    """Write preflight JSON to a path distinct from the register and waveforms."""
+    source = Path(matched_root).expanduser().resolve()
+    data = audit_suite(source, register=register, **kwargs)
+    waveforms = [source / component["source_filename"]
+                 for pair in data["records"] for component in pair["components"]]
     p=Path(destination)
+    refuse_source_overwrite(p, [register, *waveforms])
     p.parent.mkdir(parents=True,exist_ok=True)
     p.write_text(json.dumps(data,indent=2,allow_nan=False),encoding="utf-8")
     return data

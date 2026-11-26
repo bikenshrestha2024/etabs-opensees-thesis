@@ -1,5 +1,9 @@
 """Horizontal three-dimensional OpenSees input mapping / NBC vertical scope."""
+import runpy
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 from components.nonlinear_time_history.nbc105_horizontal_input import (
  vertical_acceleration_review,component_direction_mapping,unit_and_scale,
  applied_motion_manifest)
@@ -40,4 +44,15 @@ class EarthquakeInputTests(unittest.TestCase):
     self.assertEqual([r["source_component"] for r in x["commands"]],["A","B"])
     self.assertEqual([r["source_component"] for r in y["commands"]],["B","A"])
     self.assertAlmostEqual(y["commands"][0]["path_factor_m_s2"],1.45)
+ def test_vertical_report_cannot_overwrite_features(self):
+    launcher=Path(__file__).resolve().parents[1]/"33_NBC105_VERTICAL_APPLICABILITY_REVIEW.py"
+    with TemporaryDirectory() as folder:
+        features=Path(folder)/"features.json"
+        features.write_bytes(b"{}")
+        main=runpy.run_path(str(launcher))["main"]
+        argv=[str(launcher),str(features),"--output",str(features)]
+        with patch("sys.argv",argv),self.assertRaisesRegex(ValueError,"overwrite input"):
+            main()
+        self.assertEqual(features.read_bytes(),b"{}")
+
 if __name__=="__main__":unittest.main()

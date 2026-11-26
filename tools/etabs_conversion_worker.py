@@ -57,10 +57,14 @@ def validate_converter_report(report_file, *, old_signature=None):
 
 
 def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
-    from components.inputs.project_output_layout import create_project_layout, require_import_root
-    output=require_import_root(output)
+    from components.inputs.project_output_layout import (
+        IMPORT_INCOMPLETE, create_project_layout, require_import_root,
+    )
+    from components.inputs.output_contract import atomic_json
     from components.inputs.lfs_workbook_recovery import audit_optional_gui_workbooks
     from components.ui.application import convert_model
+
+    output = require_import_root(output)
 
     def log(line):
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {line}", flush=True)
@@ -82,13 +86,22 @@ def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
         str(optional.get("evidence_status")))
     report_file = output / "OpenSees_Complete_Export_Report_V118.json"
     previous_signature = _report_signature(report_file)
+    incomplete_marker = output / IMPORT_INCOMPLETE
+    # The converter writes in place. Leave a durable warning if it exits or is
+    # terminated before publishing a fresh, error-free assembly report.
+    atomic_json(incomplete_marker, {
+        "status": "IMPORT_INCOMPLETE",
+        "source_edb_sha256": context["source_edb_sha256"],
+    })
     stage_clock = time.perf_counter()
     log("[WORKER STAGE START] ETABS import, source viewer export, model assembly")
-    convert_model(str(edb), str(output), log, include_live)
+    convert_model(str(edb), str(output), log, include_live,
+                  expected_edb_sha256=context["source_edb_sha256"])
     log(f"[WORKER STAGE OK] ETABS import and assembly: {time.perf_counter()-stage_clock:.2f}s")
     report = validate_converter_report(
         report_file, old_signature=previous_signature
     )
+    incomplete_marker.unlink()
     mirror = {"status": "not_requested"}
     if categorize:
         log("[WORKER STAGE START] Optional SHA-verified categorized export mirror")

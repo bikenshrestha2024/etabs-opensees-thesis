@@ -6,7 +6,7 @@
 
 ## Procedure
 1. Choose the current OpenSees_Complete_Gravity_Model.py in Gravity Analysis. Browse for BOTH the original assignment and compressed full ETABS table XLSX files.
-2. Click **Stage BOTH selected ETABS XLSX files locally (SHA256, no LFS)**. Copies are written to 01_ETABS_EXPORT/10_PRIVATE_ETABS_WORKBOOKS and an atomic gravity_evidence_manifest.json records absolute paths, bytes, source file names and SHA256.
+2. Click **Stage BOTH selected ETABS XLSX files locally (SHA256, no LFS)**. New copies are stored at `01_ETABS_EXPORT/10_PRIVATE_ETABS_WORKBOOKS/OBJECTS/<SHA256>/workbook.xlsx` or `workbook.xlsm`. After both copies verify, `gravity_evidence_manifest.json` switches to the new pair. It records absolute paths, bytes, source file names and SHA256. Existing manifests with verified copies in the original file layout remain readable.
 3. When source EDB is specified and locally present, its SHA256 is recorded. Manifest reloading rejects changed EDB or changed staged Excel files.
 4. A missing optional registered Git-LFS workbook no longer triggers a mandatory modal picker during ordinary OpenSees gravity GUI auto-selection. It must still be supplied for any explicit ETABS comparison requiring it.
 5. Material/section source Excel is accessible from current components/ui/results.py (Export / open complete Excel library). If Windows is loading an older V116 runtime, use: python 08_EXPORT_MATERIAL_SECTION_LIBRARY.py "D:/Thesis Opensees/ETABS 11-14-2026/1". It exports under 02_MODEL/MATERIAL_SECTION_LIBRARY.
@@ -22,5 +22,3 @@
 Run python -m pytest tests/test_gravity_evidence_stage.py -q. Native tests are not claimed as executed.
 OpenSees ShellMITC4: https://openseespydoc.readthedocs.io/en/latest/src/ShellMITC4.html
 ETABS frame release documentation: https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Frame/Frame_Releases_and_Partial_Fixity.htm
-
-2026-11-26: private staging now retains exact workbook objects at `01_ETABS_EXPORT/10_PRIVATE_ETABS_WORKBOOKS/OBJECTS/<SHA256>/workbook.xlsx` (or `.xlsm`). The active pair manifest is atomically updated only after both files are validated. Restaging changed bytes does not overwrite files already referenced by previous gravity runs; identical unchanged bytes reuse their object. Historical fixed-name files remain readable when their manifest and digest match. Linked paths and manifest references outside private export storage are refused. This remains staging, not native ETABS identity or reaction validation.

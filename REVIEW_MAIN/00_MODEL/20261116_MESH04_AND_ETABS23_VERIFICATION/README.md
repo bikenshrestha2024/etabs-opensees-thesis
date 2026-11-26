@@ -3,7 +3,7 @@
 **Status: SOURCE CONNECTIVITY AUDITED; ETABS–OpenSees NATIVE EQUIVALENCE NOT VERIFIED.**
 
 - [ETABS 23 benchmark review](ETABS23_Analysis_Verification.md)
-- [Privacy and engineering acceptance review](../../20261116_PUBLIC_MODEL_EVIDENCE_EXPOSURE_AND_ACCEPTANCE.md)
+- [Privacy and engineering acceptance review](../../08_SOFTWARE_SECURITY/20261116_PUBLIC_MODEL_EVIDENCE_EXPOSURE_AND_ACCEPTANCE.md)
 
 The converter-generated MESH_04 audit identified two internal frame–slab interface locations (solver node tags 3751 and 3754) where adjacent beam segments and floor cells share the same assembled node tag. This supports direct connectivity *in that particular assembled OpenSees export*, but does not establish identical ETABS native analysis mesh or 32-support reactions.
 

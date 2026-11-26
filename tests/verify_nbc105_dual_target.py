@@ -24,6 +24,21 @@ class Targets(unittest.TestCase):
  def test_no_unreviewed_extrapolation(self):
     with self.assertRaises(ValueError):ch_modal_nltha(6.5,"D")
     with self.assertRaises(ValueError):ch_modal_nltha(1.,"B")
+ def test_invalid_input_has_no_output_side_effect(self):
+    with tempfile.TemporaryDirectory() as folder:
+        root=Path(folder)/"unused"
+        with self.assertRaisesRegex(ValueError,"zoning_Z"):
+            write_target_spectra(root,zoning_Z=-1,importance_I=1)
+        self.assertFalse(root.exists())
+ def test_prior_output_detected_before_creating_any_target(self):
+    with tempfile.TemporaryDirectory() as folder:
+        root=Path(folder)
+        previous=root/"NBC105_2025_RC_DUAL_Soil_D_ULS_Target_g.csv"
+        previous.write_bytes(b"prior target spectrum")
+        with self.assertRaises(FileExistsError):
+            write_target_spectra(root,zoning_Z=.35,importance_I=1)
+        self.assertEqual(previous.read_bytes(),b"prior target spectrum")
+        self.assertEqual(list(root.iterdir()),[previous])
  def test_separate_csv_roundtrip(self):
     with tempfile.TemporaryDirectory() as root:
         data=write_target_spectra(root,zoning_Z=.35,importance_I=1,step_s=.05)

@@ -66,6 +66,8 @@ For an intentionally **truncated diagnostic** transient, append `--trial-duratio
 
 Stage 38 uses `NormDispIncr=1e-6` by default. Append `--strict-tolerance` for `1e-7` at every attempt. Run strict and relaxed comparisons in separate output folders and verify the applied value in `RunConfig.json`. `NormDispIncr` measures the displacement-increment norm. Reserve reviewed production execution for a source-approved model.
 
+If the chosen location is in the same ETABS export's legacy results folder or a different stage, Stage 38 writes to `07_NONLINEAR_TIME_HISTORY/RUNS/<state>/<case>/<run-id>/02_RESULTS` and records the source model digest in the case manifest. A destination already inside the NLTHA stage or a custom directory outside the export remains available. Check `output_dir` in the printed status for the actual location. Use a fresh explicit destination when starting a solver run after `--check-only`.
+
 Current default `dt_s=0.005 s` is only a preliminary selection and is rejected if greater than the actual matched record's digitization interval. A modal `T1/100` or `Tn` smaller than this also governs; confirm NBC §9.3.2.4 with actual nonlinear modal values. No auto doubling/re-matching or secondary scaling: already spectrum-matched inputs have nominal additional scale `1.0` and require independent original SeismoMatch factor evidence. Actual source waveforms must be available and distinguishable by SHA before an executable case begins.
 
 ## 5. Full analysis sequence and outputs

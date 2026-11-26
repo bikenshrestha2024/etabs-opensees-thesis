@@ -2,7 +2,7 @@
 # Clause 9.3.3.1 references 5.6, which describes accidental eccentricity; retain a
 # transparent cross-reference warning rather than silently inventing a correction.
 # Performance checks require actual element-specific criteria and complete-record evidence.
-# Source: DUDBC NBC105:2025, https://dudbc.gov.np/pages/24231978/.
+# [REF R10 DUDBC NBC 105:2025 §§5.5.3 and 9.3.3.1] The NBC constant below links to the official PDF.
 """Explicit nonlinear performance criteria and complete-suite assessment (V151)."""
 from pathlib import Path
 import csv,json,math,datetime,webbrowser
@@ -24,8 +24,60 @@ def finite(v):
  if not math.isfinite(n):raise ValueError('Non-finite demand or limit')
  return n
 
+
+def _verify_full_record(row, limit_state, model_sha256):
+    from components.nonlinear_time_history.full_record_gate import verify_numeric_accepted_row
+
+    selected = Path(row["result_file"]).expanduser().resolve()
+    summary_path = (selected.with_name("NBC105_Nonlinear_Time_History_Summary_V116.json")
+                    if selected.suffix.lower() == ".csv" else selected)
+    if not summary_path.is_file():
+        raise ValueError("Missing native nonlinear suite summary")
+    summary = json.loads(summary_path.read_text(encoding="utf-8-sig"))
+    if not isinstance(summary, dict) or not isinstance(summary.get("records"), list):
+        raise ValueError("Invalid native nonlinear suite summary")
+    if summary["limit_state_context"] != limit_state:
+        raise ValueError("Result limit state differs from the assessment")
+    matching = [record for record in summary["records"]
+                if isinstance(record, dict) and (record.get("pair_id"), record.get("orientation"))
+                == (row["pair_id"], row["orientation"])]
+    if len(matching) != 1 or matching[0]["status"] != "COMPLETED_FULL_RECORD":
+        raise ValueError("Result does not identify one completed full-record case")
+    record = matching[0]
+    duration = finite(record["full_record_duration_s"])
+    history = (summary_path.parent / record["history_csv"]).resolve()
+    if (history.parent != summary_path.parent
+            or (selected.suffix.lower() == ".csv" and selected != history)):
+        raise ValueError("Selected history differs from the saved case")
+    metadata = json.loads(history.with_name(history.name + ".metadata.json")
+                          .read_text(encoding="utf-8-sig"))
+    if (metadata["status"] != "completed" or metadata["limit_state"] != limit_state
+            or metadata["model_data_sha256"] != model_sha256):
+        raise ValueError("History metadata differs from the assessment model, state or completion")
+    if duration <= 0 or not math.isclose(finite(record["duration_s"]), duration,
+                                         rel_tol=0, abs_tol=1e-7):
+        raise ValueError("Saved case duration differs from the earthquake record")
+    previous = -1.0
+    count = 0
+    with history.open(encoding="utf-8-sig", newline="") as stream:
+        reader = csv.DictReader(stream)
+        columns = reader.fieldnames or []
+        if "time_s" not in columns or len(columns) < 2 or len(set(columns)) != len(columns):
+            raise ValueError("Accepted history requires time and unique response channels")
+        for state in reader:
+            verify_numeric_accepted_row(state, row_index=count)
+            current = finite(state["time_s"])
+            if current < 0 or current <= previous:
+                raise ValueError("Accepted history time must increase")
+            previous = current
+            count += 1
+    if count < 2 or not math.isclose(previous, duration, rel_tol=0, abs_tol=1e-7):
+        raise ValueError("Accepted history does not reach full record duration")
+
+
 def assess(config,rows):
  expected=config.get('expected_pair_ids',[]);orientations=config.get('orientations',[]);digest=config.get('model_sha256','');out=[]
+ verified_results=set()
  if len(expected)!=len(set(expected)):raise ValueError('Duplicate expected pair IDs')
  if orientations!=['XY','YX']:raise ValueError('Paired 3D assessment requires XY and YX')
  for criterion in config['criteria']:
@@ -48,9 +100,12 @@ def assess(config,rows):
     if r['model_sha256']!=digest:raise ValueError('Demand model fingerprint differs')
     if r['unit']!=criterion['unit']:raise ValueError('Demand/limit units differ')
     if r['status']!='COMPLETED_FULL_RECORD':raise ValueError('Failed/truncated case is not full-record evidence')
-    if not Path(r['result_file']).is_file():raise ValueError('Missing result evidence')
     key=(r['pair_id'],r['orientation'])
     if key in values:raise ValueError('Duplicate metric/pair/orientation; distinguish member metrics')
+    evidence_key=(r['result_file'],*key)
+    if evidence_key not in verified_results:
+     _verify_full_record(r,config['limit_state'],digest)
+     verified_results.add(evidence_key)
     values[key]=abs(finite(r['demand']))
    keys={(pair,o) for pair in expected for o in orientations}
    if set(values)!=keys:raise ValueError('Missing or unexpected pair/orientation demands')
@@ -60,9 +115,9 @@ def assess(config,rows):
    if rule not in ('NBC_SUITE','MAXIMUM'):raise ValueError('Aggregation must be NBC_SUITE or MAXIMUM')
    demand=max(pair_peaks) if len(expected)<7 or rule=='MAXIMUM' else sum(pair_peaks)/len(pair_peaks)
    q.update(demand=demand,utilization=demand/limit,status='PASS' if demand<=limit else 'FAIL',statistic='maximum' if len(expected)<7 or rule=='MAXIMUM' else 'mean',pair_count=len(expected))
-  except (ValueError,TypeError,KeyError) as exc:q['reason']=str(exc)
+  except (OSError,ValueError,TypeError,KeyError) as exc:q['reason']=str(exc)
   out.append(q)
- return dict(overall='FAIL' if any(r['status']=='FAIL' for r in out) else 'INCOMPLETE' if any(r['status']=='NOT EVALUATED' for r in out) else 'SUPPLIED CRITERIA PASS',checks=out,scope='Only supplied metrics assessed. Convergence, drift or coupon PASS is not building acceptance.',finished=datetime.datetime.now().astimezone().isoformat())
+ return dict(overall='FAIL' if any(r['status']=='FAIL' for r in out) else 'INCOMPLETE' if not out or any(r['status']=='NOT EVALUATED' for r in out) else 'SUPPLIED CRITERIA PASS',checks=out,scope='Only supplied metrics assessed. Convergence, drift or coupon PASS is not building acceptance.',finished=datetime.datetime.now().astimezone().isoformat())
 
 def launch(parent,folder):
  import tkinter as tk
@@ -92,7 +147,9 @@ def launch(parent,folder):
  def demands():
   path=filedialog.askopenfilename(parent=win,filetypes=[('Metric demands CSV','*.csv')])
   if path:
-   with Path(path).open(encoding='utf-8-sig',newline='') as stream:current['rows']=list(csv.DictReader(stream))
+   base=Path(path).resolve().parent
+   with Path(path).open(encoding='utf-8-sig',newline='') as stream:
+    current['rows']=[{**row,'result_file':str(base/row['result_file'])} for row in csv.DictReader(stream)]
  def csv_template():
   path=filedialog.asksaveasfilename(parent=win,defaultextension='.csv',initialfile='Nonlinear_Metric_Demands_V151.csv')
   if path:

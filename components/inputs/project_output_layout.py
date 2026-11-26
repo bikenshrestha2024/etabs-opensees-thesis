@@ -15,6 +15,7 @@ from components.inputs.output_layout import ALL_STAGE_FOLDERS, LEGACY_STAGE_ALIA
 # Single registry. Historical 06_LINEAR_TH / 07_NONLINEAR_TH are readable
 # aliases but must not be created as competing new stage directories.
 MODULES = tuple(ALL_STAGE_FOLDERS.values())
+IMPORT_INCOMPLETE = Path("00_SOURCE_MANIFEST") / "IMPORT_INCOMPLETE.json"
 
 
 def sha256_file(path):

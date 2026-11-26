@@ -5,6 +5,7 @@ This is a report launcher only; does not run the actual earthquake model.
 import argparse
 import json
 from pathlib import Path
+from components.inputs.output_contract import refuse_source_overwrite
 from components.nonlinear_time_history.nbc105_horizontal_input import vertical_acceleration_review
 
 def main():
@@ -12,6 +13,7 @@ def main():
     p.add_argument("features_json",type=Path)
     p.add_argument("--output",type=Path,required=True)
     a=p.parse_args()
+    refuse_source_overwrite(a.output,(a.features_json,))
     data=json.loads(a.features_json.read_text(encoding="utf-8-sig"))
     report=vertical_acceleration_review(data)
     a.output.parent.mkdir(parents=True,exist_ok=True)

@@ -1,6 +1,6 @@
 # 00 — RTFC implementation instructions for repository contributors
 
-Read [the RTFC prompt](../../.github/prompts/soil-c-nltha-rtfc.prompt.md).
+Read [the RTFC prompt](../.github/prompts/soil-c-nltha-rtfc.prompt.md).
 The training slide's ordering is **R = Role, T = Task, F = Format,
 C = Context**, not a new seismic code or numerical algorithm.
 

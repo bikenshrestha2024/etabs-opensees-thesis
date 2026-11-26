@@ -1,14 +1,13 @@
 # 01 — Main GUI
 
-**Launch:** `01_MAIN_GUI.py` from Spyder, or run `python 01_MAIN_GUI.py` from the repository root.
+Open `01_WORKFLOW_START.py` in Spyder or run `python 01.py` from the repository. `01_MAIN_GUI.py` remains available for existing shortcuts.
 
-This is the short, descriptive **user entry point** for the full ETABS → OpenSeesPy research launcher. It delegates to `01.py` → `RUN_ETABS_TO_OPENSEES.py` → the original V116 compatibility module → `components/ui/application.py`. The existing fresh-child process, Python interpreter, startup log, error dialog and import behavior remain unchanged.
+The numbered entries delegate to `01.py`, then `RUN_ETABS_TO_OPENSEES.py`, the V116 facade, and `components/ui/application.py`. The launcher uses the same Python interpreter in a fresh process. Importing a numbered entry leaves the workbench closed.
 
-**Naming policy:** The stage number `01` means main GUI entry; it does not rename the 01–21 canonical engineering steps, and users should not infer that running the GUI completes model input validation. Retain `01.py`, `01_WORKFLOW_START.py` and `ETABS_to_OpenSeesPy_Section_Review_V116_NBC105_Area_NLTHA.py` for old launchers/imports and reproducible historical outputs. The shorter alias is the recommended filename in user-facing instructions.
+The latest startup log is recorded in the local `Startup_Logs/LATEST.txt` pointer. A process-start failure or a Tk callback exception records its original traceback in the log. Opening the workbench is separate from running ETABS import or verifying a structural model.
 
 **Inputs:** Existing ETABS EDB, source workbook registration and output folder; no inputs are baked into this launcher. Do not mix old exported runtime modules with current repository code.
 
-**Verification:** `python -m unittest discover -s tests -p 'test_main_launcher_short_alias.py' -v`. This is static chain verification; actual Spyder/Windows ETABS startup and analysis execution still require a native check. No engineering acceptance is implied.
+Import targets the original export root. Project-dependent tools use the selected export, including when the workbench also contains a previously opened case.
 
-
-2026-11-26: the compatibility aliases are import-safe; actual execution still uses the same fresh child and startup log. If the Tk error dialog cannot initialize, the parent prints the log location and retains the child exit status. Import must target an original export root rather than a stage or rebuilt variant; project-dependent specialist actions use the common selected-folder guard. These are software checks only.
+Run `python -m pytest -q tests/test_main_launcher_short_alias.py` to check aliases and startup failure handling. On Windows, set `OPENSEES_STARTUP_SMOKE=1` before running `01.py` to open the Tk window briefly and verify the startup chain.

@@ -1,8 +1,9 @@
 """Pair spectrum audit inputs and scaling; native record spectrum is separate."""
+import os
 import tempfile
 import unittest
 from pathlib import Path
-from components.response_spectrum.nbc_pair_spectrum_audit import pair_spectrum_audit
+from components.response_spectrum.nbc_pair_spectrum_audit import pair_spectrum_audit, write_pair_audit
 
 class PairScalingTests(unittest.TestCase):
  def factory(self,fx,fy):
@@ -37,5 +38,30 @@ class PairScalingTests(unittest.TestCase):
         x,y=self.paths(d)
         with self.assertRaisesRegex(ValueError,"different"):
             self.evaluate_pair(x,x,self.factory(1.3,1.1))
+
+ def test_report_cannot_replace_either_source(self):
+    with tempfile.TemporaryDirectory() as d:
+        x,y=self.paths(d)
+        for destination in (x,y):
+            with self.subTest(destination=destination), self.assertRaisesRegex(ValueError,"overwrite input"):
+                write_pair_audit(destination,x,y,soil_type="C",Z=.45,I=1.,
+                    omega_u=1.5,R_mu=4.,t1_x_s=3.6,t1_y_s=3.2,
+                    tn90_x_s=.15,tn90_y_s=.12,evaluator=self.factory(1.3,1.1))
+        self.assertEqual(x.read_text(),"x original")
+        self.assertEqual(y.read_text(),"y original")
+
+ def test_report_cannot_replace_a_hard_link_to_a_source(self):
+    with tempfile.TemporaryDirectory() as d:
+        x,y=self.paths(d)
+        alias=Path(d)/"alias.at2"
+        try:
+            os.link(y,alias)
+        except OSError as exc:
+            self.skipTest(f"Filesystem disallows hard links: {exc}")
+        with self.assertRaisesRegex(ValueError,"overwrite input"):
+            write_pair_audit(alias,x,y,soil_type="C",Z=.45,I=1.,
+                omega_u=1.5,R_mu=4.,t1_x_s=3.6,t1_y_s=3.2,
+                tn90_x_s=.15,tn90_y_s=.12,evaluator=self.factory(1.3,1.1))
+        self.assertEqual(y.read_text(),"y original")
 
 if __name__=="__main__":unittest.main()

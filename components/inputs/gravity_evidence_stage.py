@@ -14,6 +14,8 @@ import os
 import shutil
 import tempfile
 
+from components.inputs.output_contract import atomic_json
+
 ROLES = ("etabs_assignment", "etabs_full_table")
 VALID_EXTENSIONS = {".xlsx", ".xlsm"}
 LFS_PREFIX = b"version https://git-lfs.github.com/spec/v1"
@@ -115,13 +117,7 @@ def stage_gravity_workbooks(export_dir, *, assignment, full_table, source_edb=No
            "validation_needed": ["ETABS model identity", "native assignment sheet presence",
                                  "matching ULS load case and joint reactions",
                                  "source versus OpenSees gravity parity"]}
-    path = manifest_path(folder)
-    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=destination,
-                                     suffix=".partial", delete=False) as tmp:
-        json.dump(doc, tmp, indent=2)
-        temp = Path(tmp.name)
-    os.replace(temp, path)
-    return path
+    return atomic_json(manifest_path(folder), doc)
 
 
 def staged_gravity_workbooks(export_dir):

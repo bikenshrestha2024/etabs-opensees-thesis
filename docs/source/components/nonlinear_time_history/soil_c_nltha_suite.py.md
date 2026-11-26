@@ -13,7 +13,7 @@
 - `audit_suite`: source hashes and metadata; 8 pair identities, expected timing; optional actual modal-based dt/period screen. Missing inputs are **UNKNOWN**, not PASS.
 - `verify_runner_pair`: SHA mapping to real input without reliance on download suffix and explicit review gate.
 - `reconcile_loma_runtime_pair`: strictly one zero sample **only in the shorter runtime array** when opted-in with reviewer; does not alter original waveform file.
-- `write_suite_report`: JSON evidence export.
+- `write_suite_report` exports the JSON evidence and rejects destinations that identify the source register or a registered waveform.
 
 **Output/exit:** `35_SOIL_C_NLTHA_PREFLIGHT.py` writes JSON for all eight pairs; exit code `2` if files do not match and `3` if source timing remains unresolved. The existing exploratory runner writes `Soil_C_Matched_Source_Gate.json` for one case.
 

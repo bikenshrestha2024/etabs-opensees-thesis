@@ -6,10 +6,11 @@
 The PUBLISHED_REFERENCE basis mixes sources: PEER 2015/12 wall concrete and
 steel, the OpenSees primer Concrete01 for frame concrete, nominal Fe500 for
 frame rebar, the OpenSees-documented SteelMPF transition, and a user brace
-Fy. ``PEER_2015_12_SINGLE_SOURCE`` takes concrete, reinforcing steel
-(transition values as printed) and frame concrete/rebar strengths from the
-same PEER card. Anything that paper does not give is NOT filled from another
-paper. It is labelled MODEL_ASSUMPTION_NOT_IN_SOURCE, NOT_IN_SOURCE or
+Fy. ``PEER_2015_12_SINGLE_SOURCE`` takes wall concrete and reinforcing steel
+from the same PEER card, converts the printed curvature coefficient to the
+OpenSees input convention, and transfers selected wall specimen values to
+the exploratory frame Concrete01 and Steel02 models. Gaps are labelled
+MODEL_ASSUMPTION_NOT_IN_SOURCE, NOT_IN_SOURCE or
 PROVENANCE_NOT_RECORDED. FVD and BRB have no data in PEER 2015/12; a device
 scenario still needs its own citation (sections/mapping_audit.validate_device).
 Values are research transfers of a specimen card, not project calibration.
@@ -49,9 +50,11 @@ def peer_fsam_panel_values():
 
 
 def peer_single_source():
-    """Concrete, steel, frame and FSAM inputs all from PEER 2015/12 Appendix B.3.
+    """Prepare Appendix B.3 wall data and the exploratory frame transfer.
 
-    [REF R01 PEER 2015/12 Appendix B.3, printed pp. 90-91]
+    [REF R01 PEER 2015/12 Appendix B.3, printed pp. 90–91]
+    R01 supplies wall specimen inputs. Frame Concrete01 and Steel02 reuse
+    selected wall material values with separately identified assumptions.
     Output: dict(wall_concrete, wall_steel, frame_section, fsam, rows) where
     rows is the provenance table (family, parameter, value, unit, status, locator).
     """
@@ -60,7 +63,8 @@ def peer_single_source():
     patch = _card('PEER_Web_ESFI_Patch.json')
     c = dict(concrete['parameters'])
     s = dict(steel['parameters'])
-    # [REF Menegotto & Pinto 1973; Filippou et al. 1983; OpenSees SteelMPF/Steel02]
+    # [REF R01 Figure 2.22 and Appendix B.3; OpenSees SteelMPF constructor]
+    # https://github.com/OpenSees/OpenSees/blob/master/SRC/material/uniaxial/SteelMPF.cpp
     # PEER B.3 prints the absolute Menegotto-Pinto term a1=18.5 in
     # R = R0 - a1*xi/(a2+xi). OpenSees uses R = R0*(1 - cR1*xi/(cR2+xi)), so the
     # same-source value is cR1 = a1/R0 = 18.5/20 = 0.925. Passing 18.5 directly

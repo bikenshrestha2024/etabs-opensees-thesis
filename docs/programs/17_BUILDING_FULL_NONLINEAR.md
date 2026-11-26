@@ -4,7 +4,7 @@
 **Previous launcher:** [`18_BUILDING_FULL_NONLINEAR.py`](../../18_BUILDING_FULL_NONLINEAR.py) (compatibility alias)
 
 ## Goal
-Full nonlinear history (unresolved first-step failure). Run from the complete repository with a compatible Windows Python/OpenSeesPy environment. This entry point retains the original launcher's numerical implementation unchanged.
+Open the same exploratory nonlinear history GUI as [stage 15](15_BUILDING_NONLINEAR_TRIAL.md). It defaults to full record and allows short trials. This entry point initially selects the repository's historical `Saved_Project_V156` folder. Use the folder selector to choose the verified current export before starting a current-project run.
 
 ## Input checklist
 Confirm the current export folder, validated geometry and section mapping, gravity and mass data, analysis units, selected material cards, and output destination as applicable to this subprogram. Do not mix old saved V156 exports with source modules from the new checkout.

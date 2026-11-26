@@ -136,7 +136,7 @@ def _api_names(obj, method="GetNameList"):
     except Exception: return []
 
 
-def _connect_etabs(edb, log, copy_holder=None):
+def _connect_etabs(edb, log, copy_holder=None, *, expected_edb_sha256=None):
     """Open a temporary working copy of the EDB (never the original).
 
     The copy path is appended to copy_holder so the caller can call
@@ -163,7 +163,7 @@ def _connect_etabs(edb, log, copy_holder=None):
             sap = etabs.SapModel
             _api_clock=time.perf_counter()
             log("[ETABS COM START] OpenFile for temporary working copy of the selected EDB (may be long)")
-            work_edb = make_edb_working_copy(edb)
+            work_edb = make_edb_working_copy(edb, expected_edb_sha256=expected_edb_sha256)
             if copy_holder is not None: copy_holder.append(work_edb)
             log(f"[ETABS WORKING COPY] {work_edb} (original EDB is not opened or modified)")
             ret = sap.File.OpenFile(os.path.abspath(work_edb))
@@ -911,15 +911,6 @@ def num(v):
     try:
         x=float(v); return x if math.isfinite(x) else None
     except Exception: return None
-def _report_gui_error(root,typ,value,tb):
-    import traceback,datetime
-    folder=Path(__file__).resolve().parent/'Startup_Logs';folder.mkdir(exist_ok=True)
-    path=folder/'callback_errors.log'
-    with path.open('a',encoding='utf8') as stream:
-        stream.write(datetime.datetime.now().astimezone().isoformat()+'\n')
-        traceback.print_exception(typ,value,tb,file=stream)
-    messagebox.showerror('Interface error',str(value)+'\nLog: '+str(path),parent=root)
-
 def main():
     payload=json.loads(AUDIT_PATH.read_text(encoding="utf-8")); rows=[]
     for src in payload.get("frame_assignments",[]):
@@ -1303,7 +1294,7 @@ if __name__=="__main__": main()
 # It is deliberately an audit/connectivity stage, not a completed analysis model.
 # ============================================================================
 @timed_outputs('ETABS complete conversion','outdir')
-def convert_model(edb, outdir, log, include_live=True):
+def convert_model(edb, outdir, log, include_live=True, *, expected_edb_sha256=None):
     if ops is None: raise RuntimeError("OpenSeesPy not installed in this environment.")
     os.makedirs(outdir,exist_ok=True)
     etabs=sap=None; _edb_copies=[]
@@ -1326,7 +1317,8 @@ def convert_model(edb, outdir, log, include_live=True):
         # records this request; always verify the active units in the log.
         # --------------------------------------------------------------------
         _begin_step("ETABS connection and source model extraction")
-        etabs,sap=_connect_etabs(edb,log,copy_holder=_edb_copies)
+        etabs,sap=_connect_etabs(edb,log,copy_holder=_edb_copies,
+                                 expected_edb_sha256=expected_edb_sha256)
         log("[ETABS API] Model connected; starting point/frame/area inventories")
         point_names=_api_names(sap.PointObj)
         frame_names=_api_names(sap.FrameObj)
@@ -3238,7 +3230,17 @@ class App:
             messagebox.showwarning('Select a saved export',
                 'Choose the folder that contains the ETABS export.', parent=self.root)
             return None
-        return str(Path(selected).expanduser().resolve())
+        from components.inputs.project_output_layout import IMPORT_INCOMPLETE
+        folder = Path(selected).expanduser().resolve()
+        if (folder / IMPORT_INCOMPLETE).exists():
+            messagebox.showwarning(
+                'Incomplete ETABS import',
+                'This export may contain files from a failed or interrupted import. '
+                'Inspect the worker log and complete the Import again for this folder.',
+                parent=self.root,
+            )
+            return None
+        return str(folder)
 
     def _open_section_mapping(self):
         folder = self._model_review_folder()
@@ -3810,6 +3812,29 @@ class App:
                 messagebox.showinfo('Assembled model export rebuilt','Gravity/model/story files will be selected automatically in their analysis windows.\n\n'+str(Path(self.out.get())/manifest['report']),parent=self.root)
         except Exception as exc:
             messagebox.showerror('Could not rebuild export',str(exc),parent=self.root)
+
+
+def _report_gui_error(root, error_type, error, traceback_frames):
+    """Keep the original Tk callback exception in the current startup log."""
+    from components.shared.repository_paths import runtime_repo_root
+
+    log = os.environ.get("OPENSEES_STARTUP_LOG")
+    if log:
+        # The fresh-process launcher redirects this stream to its open log.
+        traceback.print_exception(error_type, error, traceback_frames, file=sys.stderr)
+        messagebox.showerror("Interface error", f"{error}\nLog {log}", parent=root)
+        return
+    runtime = runtime_repo_root(__file__, globals().get("_component_source"))
+    path = runtime / "Startup_Logs" / "callback_errors.log"
+    details = str(error)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as stream:
+            traceback.print_exception(error_type, error, traceback_frames, file=stream)
+        details += f"\nLog {path}"
+    except OSError:
+        traceback.print_exception(error_type, error, traceback_frames, file=sys.stderr)
+    messagebox.showerror("Interface error", details, parent=root)
 
 
 def main():

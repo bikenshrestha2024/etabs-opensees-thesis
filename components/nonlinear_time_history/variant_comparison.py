@@ -41,6 +41,7 @@ def validate_variant_manifest(payload):
         if len(val)!=64 or any(ch not in "0123456789abcdefABCDEF" for ch in val):
             raise ValueError(f"Invalid fingerprint for {key}")
     seen_export_paths={}
+    seen_export_hashes={}
     for r in rows:
         raw_path=r.get("model_export_path")
         if not isinstance(raw_path,str) or not raw_path.strip() or not r.get("model_file_sha256"):
@@ -55,6 +56,11 @@ def validate_variant_manifest(payload):
         if (not isinstance(digest,str) or len(digest)!=64 or
                 any(ch not in "0123456789abcdefABCDEF" for ch in digest)):
             raise ValueError(f"{r['variant']}: invalid model export SHA256")
+        digest=digest.lower()
+        if digest in seen_export_hashes:
+            raise ValueError("M0–M6 require distinct model export SHA256 values: "
+                             + seen_export_hashes[digest] + " and " + r["variant"])
+        seen_export_hashes[digest]=r["variant"]
         if not isinstance(r.get("outrigger_floors"),list):
             raise ValueError(f"{r['variant']}: outrigger floors must be listed")
         if r["variant"]=="M0" and r["outrigger_floors"]:
@@ -245,10 +251,11 @@ def compare_completed_cases(payload, summaries, *, require_pairs=3):
                 warning="Numerical comparative screens only; all model/component acceptance gates still required.")
 
 
-def load_case_manifest(path):
+def load_case_manifest(path, *, output=None):
     manifest=Path(path)
     payload=json.loads(manifest.read_text(encoding="utf-8-sig"))
     variants=validate_variant_manifest(payload)
+    protected=[manifest]
     collected={}
     for record in variants:
         files=record.get("case_summary_files",[])
@@ -258,6 +265,10 @@ def load_case_manifest(path):
             p=Path(name)
             if not p.is_absolute():p=manifest.parent/p
             data=json.loads(p.read_text(encoding="utf-8-sig"))
+            protected.append(p)
             items.append(data)
         collected[record["variant"]]=items
+    if output is not None:
+        from components.inputs.output_contract import refuse_source_overwrite
+        refuse_source_overwrite(output,protected)
     return compare_completed_cases(payload,collected)

@@ -183,7 +183,7 @@ def _steelmpf_transition(profile):
         return dict(R0=20.,cR1=.925,cR2=.0015,
                     basis='OpenSees SteelMPF author-documented transition default; PEER appendix cR1 entry retained as an explicit alternate')
     if profile=='PEER_APPENDIX_EXACT':
-        # [REF PEER 2015/12 App. B.3; Menegotto & Pinto 1973; OpenSees SteelMPF]
+        # [REF R01 PEER 2015/12 Figure 2.22 and Appendix B.3; OpenSees SteelMPF]
         # Printed a1=18.5 is the absolute form R=R0-a1*xi/(a2+xi); OpenSees uses
         # R=R0*(1-cR1*xi/(cR2+xi)) so cR1=a1/R0=0.925. cR1=18.5 gave NaN on the
         # first reversal (verified natively, 2026-11-07).
@@ -256,8 +256,8 @@ def define_building_materials(ops,data,folder,material_overrides=None):
                      E0_mpa=200000.,steel_b=.01,steel_R0=20.,
                      steel_cR1=.925,steel_cR2=.15)
             if single:
-                # [REF R01 Appendix B.3] frame concrete strength/peak strain and
-                # rebar from the SAME paper card; post-peak terms flagged.
+                # [REF R01 Appendix B.3] exploratory frame inputs transfer the
+                # wall specimen values. Frame post-peak terms are assumptions.
                 q.update(single['frame_section'])
             for key, value in material_overrides.items():
                 if key in FRAME_OVERRIDE_TARGETS:
@@ -284,9 +284,9 @@ def define_building_materials(ops,data,folder,material_overrides=None):
             elif ckey in ('rc','xcrn','ft_mpa','et','rt','xcrp'):
                 target={'rc':'rc','xcrn':'xcrn','ft_mpa':'ft','et':'et','rt':'rt','xcrp':'xcrp'}[ckey]
                 c[target]=value
-    # Keep the PEER appendix value selectable because its cR1 differs from
-    # the SteelMPF author-documented transition default.
-    if not single:  # single-source keeps the paper's printed transition values
+    # Both transition profiles currently give the same OpenSees input values.
+    # The PEER route documents the conversion of the report's printed a1.
+    if not single:
         s.update(R0=transition['R0'],cR1=transition['cR1'],cR2=transition['cR2'])
     steel_targets={
         'fyp_mpa':'fyp','fyn_mpa':'fyn','E0_mpa':'E0','bp':'bp','bn':'bn',

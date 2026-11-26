@@ -43,7 +43,7 @@ This report supersedes the earlier [six-X-file preliminary audit](../../00_SEISM
 
 ## Code traceability and usage
 
-- See [`tools/verify_matched_waveforms.py`](../../tools/verify_matched_waveforms.py) to verify all 16 matched source hashes, PGA, dt, duration and pair consistency locally. It runs with only Python standard library, does not change inputs, and can emit a JSON result.
+- See [`tools/verify_matched_waveforms.py`](../../../tools/verify_matched_waveforms.py) to verify all 16 matched source hashes, PGA, dt, duration and pair consistency locally. It runs with only Python standard library, does not change inputs, and can emit a JSON result.
 - Source register: [`matched_component_register.csv`](matched_component_register.csv); no accelerogram samples are included in this public repository.
 - Existing `components/nonlinear_time_history/seismomatch_audit.py` screens matched imports and period-window coverage; `nbc105_horizontal_input.py` documents the two Path patterns and scale one. Waveforms and SeismoMatch session files should remain local/private.
 - NBC source: https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf, clauses 4.1 and 9.3.2.

@@ -146,7 +146,8 @@ class CompletedExistingNLTHAEvidence(unittest.TestCase):
     def test_nonempty_existing_output_folder_must_not_be_reused_for_native_run(self):
         old=self.root/"Old_Native_Result.json"
         old.write_text('{"status":"PREVIOUS_SOLVED_RUN"}',encoding="utf8")
-        config=dict(self.config, output_dir=str(self.root),analysis_intent="RESEARCH_DIAGNOSTIC")
+        config=dict(self.config, model_folder=str(self.root/"export"),
+                    output_dir=str(self.root),analysis_intent="RESEARCH_DIAGNOSTIC")
         with patch.object(native, "preflight_existing_model", return_value={
             "model_files_sha256":{"OpenSees_Complete_Model_Data_V118.json":DIGEST_MODEL}
         }):

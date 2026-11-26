@@ -18,6 +18,8 @@ import sys
 import traceback
 from pathlib import Path
 
+from components.inputs.output_contract import refuse_source_overwrite
+
 COLUMNS=("time_s","displacement_m","force_kN")
 
 def read_experiment(path):
@@ -142,6 +144,10 @@ def main(argv=None):
     ap.add_argument("--output",required=True,type=Path)
     args=ap.parse_args(argv)
     out=args.output.resolve()
+    curve=out/"FVD_Measured_vs_Maxwell.csv"
+    report_path=out/"FVD_Calibration_Report.json"
+    for destination in (curve, report_path):
+        refuse_source_overwrite(destination, (args.measured_csv,))
     out.mkdir(parents=True,exist_ok=True)
     report=dict(status="NOT_RUN",source=str(args.measured_csv.resolve()),
                 model="Maxwell_ViscousDamper",valid_for_building=False)
@@ -149,7 +155,6 @@ def main(argv=None):
         data=read_experiment(args.measured_csv)
         report.update(fit_measured_fvd(data))
         report["source_sha256"]=hashlib.sha256(args.measured_csv.read_bytes()).hexdigest()
-        curve=out/"FVD_Measured_vs_Maxwell.csv"
         with curve.open("w",newline="",encoding="utf-8") as f:
             w=csv.writer(f)
             w.writerow(["time_s","measured_force_kN","simulated_internal_force_kN",
@@ -163,9 +168,9 @@ def main(argv=None):
         report.update(status="FAILED",error=str(exc),
                       error_type=type(exc).__name__,
                       traceback=traceback.format_exc())
-    (out/"FVD_Calibration_Report.json").write_text(
+    report_path.write_text(
         json.dumps(report,indent=2,allow_nan=False),encoding="utf-8")
-    print(json.dumps(dict(status=report["status"],report=str(out/"FVD_Calibration_Report.json")),indent=2))
+    print(json.dumps(dict(status=report["status"],report=str(report_path)),indent=2))
     return 0 if report["status"]=="MEASURED_DATA_FITTED_NOT_INDEPENDENTLY_VALIDATED" else 2
 
 if __name__=="__main__":

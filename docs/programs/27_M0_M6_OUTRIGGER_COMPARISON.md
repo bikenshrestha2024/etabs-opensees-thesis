@@ -9,3 +9,5 @@ Every case summary must identify pair_id, ULS/SLS, XY/YX, record SHA, finite ful
 Reference: NBC 105:2025 Section 9.3.2.1; Korkmaz & Kircil (2026), DOI 10.3390/buildings16040711. Do not transfer published FVD reduction percentages.
 
 Additional integrity gate: every case summary must contain a matching variant_id and the exact source model SHA-256 specified for that variant in the manifest. Cross-assignment of M2 results to M4 is blocked even when motions match.
+
+Each variant must have different model export bytes. Renaming or copying an export cannot establish a separate variant. The comparison report also refuses destinations that alias the input manifest or any referenced case summary.

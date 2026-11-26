@@ -1,7 +1,7 @@
 # area_elements.py — Area-element integration for floor shells and nonlinear walls
 
 **Python source:** [components/sections/area_elements.py](../../../../components/sections/area_elements.py)
-**Current Git blob SHA:** b7c79053ac2b8a2a6c33516f07a0ec5894fc6c74
+**Current Git blob SHA:** 42dad75f133aa2768eced2f40b03e4b1323d32fc
 **Review status:** Source content was inspected for these specific behaviors. Physical/numerical validation not executed.
 
 ## What this file currently implements
@@ -14,8 +14,7 @@ The area adapter's wall macro-fiber discretization path is not necessarily equiv
 Compare geometry, wall fiber widths/thicknesses, actual surface reinforcement, normal directions, areas, opening borders, floor-to-wall joints and density/mass handling. Add small-mesh convergence and isolated panel benchmarks using the same material card in both code paths.
 
 ## Cited scientific context
-R01, R02 and R13 (R13 is an alternative element family, not identical to E-SFI).
-References are indexed in [the research source register](../../../00_RESEARCH_REFERENCES.md). Paper citations establish appropriate model context, not code validation.
+R01 provides specimen material context, R02 details E-SFI-MVLEM-3D, and R13 evaluates the alternative LFSAFE layered-shell formulation. NBC 105:2025 §9.3.1.1 gives the general 3D nonlinear modeling requirements. Annex A §§5.5–5.6 address coupling-beam detailing and wall openings. [Research source register](../../../00_RESEARCH_REFERENCES.md), [NBC 105:2025](https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf)
 
 ## Required regression output
 Unit/metadata tests, isolated material or wall benchmarks, complete solver log, model+record hashes, type-safe status, full-record duration and independent ETABS/experiment comparison. Avoid marking a case verified if any gate remains unresolved.

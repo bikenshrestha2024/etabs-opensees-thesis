@@ -5,10 +5,10 @@
 
 ## What it does
 
-- **`PEER_2015_12_SINGLE_SOURCE`** basis: wall concrete (ConcreteCM), reinforcing steel (SteelMPF; the printed Menegotto–Pinto a1 = 18.5 is converted to OpenSees cR1 = a1/R0 = 0.925, because OpenSees uses R = R0(1 − cR1ξ/(cR2+ξ)) and an unconverted 18.5 gives NaN on the first reversal; cR2 = 0.0015 as printed), frame Concrete01 strength and peak strain, and frame Steel02 rebar are all taken from **one** card: Kolozvari, Orakcal & Wallace (2015), PEER 2015/12, Appendix B.3 (RW-A15-P10-S78 web). Nothing missing is filled from another paper:
-  - Concrete01 post-peak terms: `MODEL_ASSUMPTION_NOT_IN_SOURCE`.
-  - FSAM ν/α: `PROVENANCE_NOT_RECORDED` (the catalogue file has no locator).
-  - SHS brace, FVD and BRB: `NOT_IN_SOURCE`. A device scenario still needs its own citation.
+- **`PEER_2015_12_SINGLE_SOURCE`** uses the RW-A15-P10-S78 web ConcreteCM and SteelMPF entries in R01 Appendix B.3, printed pp. 90–91. The printed Menegotto–Pinto `a1=18.5` is converted to OpenSees `cR1=a1/R0=0.925`, with `cR2=0.0015` carried over. [PEER Report 2015/12](https://peer.berkeley.edu/publications/2015-12), [OpenSees SteelMPF source](https://github.com/OpenSees/OpenSees/blob/master/SRC/material/uniaxial/SteelMPF.cpp)
+  - The exploratory frame transfers strength and peak strain to Concrete01 and rebar inputs to Steel02. Frame Concrete01 post-peak terms are `MODEL_ASSUMPTION_NOT_IN_SOURCE`.
+  - Appendix B.3 lists `nu=0.8` and `alfadow=0.01` for both FSAM panel regions and different reinforcement ratios for the web and boundary.
+  - SHS brace, FVD and BRB inputs are `NOT_IN_SOURCE`. A device scenario still needs its own citation.
 - **`source_table(basis)`** returns provenance rows. The GUI's "Material source table" button shows them and saves them as CSV (opens in Excel). `PUBLISHED_REFERENCE` is shown as `MIXED_SOURCES`.
 - **`default_candidates(key, basis)`** gives sensitivity candidates of 0.9×, 1.0× and 1.1× the basis baseline (the analyst-bracket rule already used for brace Fy), or a stated reason when the baseline is 0 or depends on the model.
 
