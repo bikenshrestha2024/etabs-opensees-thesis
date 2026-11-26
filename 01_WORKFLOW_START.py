@@ -1,5 +1,6 @@
+"""Compatibility entry for the canonical 01.py launcher."""
 from pathlib import Path
-import sys,runpy,os
-ROOT=Path(__file__).resolve().parent
-sys.path.insert(0,str(ROOT))
-runpy.run_path(str(ROOT/'01.py'),run_name='__main__')
+import runpy
+
+if __name__ == "__main__":
+    runpy.run_path(str(Path(__file__).resolve().with_name("01.py")),run_name="__main__")

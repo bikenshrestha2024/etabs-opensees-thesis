@@ -103,3 +103,6 @@ Use **Review selected export in Model** to continue from Import. Model shows the
 
 
 2026-11-26: Gravity/NBC exposes the existing elastic comparison rebuild through a manifest-bound shortcut. Results exposes the existing full migration audit using the selected export root, explicit confirmation, SHA duplicate and format checks, and a child process; logs and reports remain local. Nonlinear displays the selected folder, without altering the newer native launchers or engineering gates.
+
+
+2026-11-26: the main import callback validates the original export-root boundary before writing conversion logs. Case-dependent specialist actions in Import, Linear/Results and Nonlinear use `_launch_selected_tool` and the existing `_model_review_folder` guard, rather than reading an unvalidated entry. Saved source-view actions prefer the selected export, not a previously completed worker from another case. Native solver behavior and model acceptance are unchanged.

@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from components.inputs.output_layout import ALL_STAGE_FOLDERS, LEGACY_STAGE_ALIASES, canonical_stage_folder
+from components.inputs.output_layout import ALL_STAGE_FOLDERS, LEGACY_STAGE_ALIASES, canonical_stage_folder, export_root_for
 
 # Single registry. Historical 06_LINEAR_TH / 07_NONLINEAR_TH are readable
 # aliases but must not be created as competing new stage directories.
@@ -24,6 +24,19 @@ def sha256_file(path):
         for block in iter(lambda: reader.read(1048576), b""):
             h.update(block)
     return h.hexdigest()
+
+
+def require_import_root(selected_output_root):
+    """Validate import destination without creating files or modifying rebuilds."""
+    if not str(selected_output_root).strip():
+        raise ValueError("Select an explicit ETABS export root.")
+    candidate=Path(selected_output_root).expanduser()
+    if any(part.is_symlink() for part in (candidate,*candidate.parents)):
+        raise ValueError("Refusing linked ETABS export root.")
+    root=candidate.resolve()
+    if export_root_for(root)!=root or (root/"CLEAR_BEAM_REBUILD_STATUS.json").exists():
+        raise ValueError("Import requires the original project export root, not a stage/run/rebuilt model folder. Select a new export root for a new import.")
+    return root
 
 
 def create_project_layout(source_edb, selected_output_root, *,
@@ -40,7 +53,7 @@ def create_project_layout(source_edb, selected_output_root, *,
         raise ValueError("The authoritative physical source must be a .EDB file.")
     if not source.is_file():
         raise FileNotFoundError(str(source))
-    root = Path(selected_output_root).expanduser().resolve()
+    root = require_import_root(selected_output_root)
     if root == source or root in source.parents:
         raise ValueError("Output root must not be an ancestor of the source EDB.")
     sha = sha256_file(source)

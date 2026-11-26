@@ -9,3 +9,6 @@ This is the short, descriptive **user entry point** for the full ETABS → OpenS
 **Inputs:** Existing ETABS EDB, source workbook registration and output folder; no inputs are baked into this launcher. Do not mix old exported runtime modules with current repository code.
 
 **Verification:** `python -m unittest discover -s tests -p 'test_main_launcher_short_alias.py' -v`. This is static chain verification; actual Spyder/Windows ETABS startup and analysis execution still require a native check. No engineering acceptance is implied.
+
+
+2026-11-26: the compatibility aliases are import-safe; actual execution still uses the same fresh child and startup log. If the Tk error dialog cannot initialize, the parent prints the log location and retains the child exit status. Import must target an original export root rather than a stage or rebuilt variant; project-dependent specialist actions use the common selected-folder guard. These are software checks only.

@@ -13,6 +13,14 @@ class ShortLauncherTests(unittest.TestCase):
         self.assertIn('with_name("01.py")',src)
         self.assertIn('run_name="__main__"',src)
 
+    def test_importing_legacy_aliases_has_no_side_effect(self):
+        import runpy
+        from unittest.mock import patch
+        original=runpy.run_path
+        for name in ("01_WORKFLOW_START.py","01_START_ETABS_TO_OPENSEES.py"):
+            with patch("runpy.run_path",side_effect=AssertionError("import must not start GUI")):
+                original(str(ROOT/name),run_name="import_check")
+
     def test_original_startup_chain_unchanged(self):
         self.assertIn("RUN_ETABS_TO_OPENSEES.py",(ROOT/"01.py").read_text(encoding="utf-8"))
         startup=(ROOT/"RUN_ETABS_TO_OPENSEES.py").read_text(encoding="utf-8")
