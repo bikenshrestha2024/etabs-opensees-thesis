@@ -13,7 +13,7 @@
 
 ## Sentence-level register (added 2026-11-21)
 
-The [normative register](NORMATIVE_REGISTER_GUIDE.md) now enumerates 1417 normative units (Clauses 1-10, Annexes A-C) with one disposition each: 353 IMPLEMENTED_AND_TESTED, 7 IMPLEMENTED_UNTESTED, 307 MANUAL_PROJECT_CHECK, 180 PROJECT_NOT_APPLICABLE, 559 DEFINITION_ONLY, 11 EXTERNAL_DATA_REQUIRED, 0 UNVERIFIED_GAP, 0 unreviewed. Its gate (`python -m components.nbc105 --audit`) reports REGISTER_REVIEWED_EXTERNAL_GATES_OPEN and never certifies. The standard is **not certified**. External gates that remain open: independent human sign-off, native ETABS/OpenSees evidence, project wall and connection designs (Annex A RC detailing, Annex C Table C-1 transcription).
+The [normative register](NORMATIVE_REGISTER_GUIDE.md) now enumerates 1417 normative units (Clauses 1-10, Annexes A-C) with one disposition each: 369 IMPLEMENTED_AND_TESTED, 5 IMPLEMENTED_UNTESTED, 293 MANUAL_PROJECT_CHECK, 24 PROJECT_NOT_APPLICABLE, 156 DEFERRED_DESIGN_PHASE, 559 DEFINITION_ONLY, 11 EXTERNAL_DATA_REQUIRED, 0 UNVERIFIED_GAP, 0 unreviewed. Its gate (`python -m components.nbc105 --audit`) reports REGISTER_REVIEWED_EXTERNAL_GATES_OPEN and never certifies. The standard is **not certified**. External gates that remain open: independent human sign-off, native ETABS/OpenSees evidence, project wall and connection designs (Annex A RC detailing, Annex C Table C-1 transcription).
 
 ## Mandatory gap groups
 
