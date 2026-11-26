@@ -433,3 +433,100 @@ def mass_irregularity(masses, *, exempt=None, reference="LIGHTER_STOREY"):
     return out
 
 __all__ += ["mass_irregularity", "MASS_IRREGULARITY_FRACTION"]
+
+
+# Two explicitly separate drift outputs (owner ruling 3, 2026-11-26). Never mix.
+DRIFT_BASES = ("ETABS_COMPARISON", "OPENSEES_ACTUAL")
+
+
+def drift_basis(label):
+    """Validate and return a drift-basis label (ETABS_COMPARISON or OPENSEES_ACTUAL).
+
+    [REF NBC105-2025 §5.5.1 printed p. 36; §5.5.3 printed p. 37]
+    """
+    if label not in DRIFT_BASES:
+        raise ValueError("drift basis must be one of " + ", ".join(DRIFT_BASES))
+    return label
+
+
+def etabs_comparison_drift(elastic_relative_deflection_m, storey_height_m, limit_state, ductility_factor=None):
+    """ETABS_COMPARISON drift: design-scaled the way the ETABS drift output is.
+
+    [REF NBC105-2025 §5.5.1.1 and §5.5.1.2 printed p. 36; §5.5.3 printed p. 37]
+    ULS: design deflection = elastic ESM/MRSM deflection x Rmu (5.5.1.1; the
+    printed text is explicit that the design deflection is the elastic value
+    multiplied by the ductility factor). SLS: design deflection = elastic
+    deflection (5.5.1.2). The ratio is then compared with the 5.5.3 limit via
+    ``interstory_drift_check``. Compare ONLY with ETABS drift output; this is
+    not the OpenSees response (see ``opensees_actual_drift``).
+    """
+    state = str(limit_state).upper()
+    if state not in DRIFT_LIMITS:
+        raise ValueError("limit_state must be ULS/SLS")
+    elastic = float(elastic_relative_deflection_m)
+    if not math.isfinite(elastic):
+        raise ValueError("nonfinite elastic inter-storey deflection")
+    if state == "ULS":
+        if ductility_factor is None:
+            raise ValueError("ULS design deflection needs the Rmu ductility factor (5.5.1.1)")
+        design = uls_design_deflection(elastic, ductility_factor)
+        clause = "5.5.1.1 + 5.5.3"
+    else:
+        design = elastic
+        clause = "5.5.1.2 + 5.5.3"
+    out = dict(interstory_drift_check(design, storey_height_m, state))
+    out.update(drift_basis="ETABS_COMPARISON", clause=clause, limit_state=state,
+               elastic_relative_deflection_m=elastic, design_relative_deflection_m=design,
+               elastic_ratio=abs(elastic) / _positive(storey_height_m, "storey height"),
+               scaled_by_Rmu=(state == "ULS"),
+               note="Design-scaled like ETABS drift output; compare with ETABS only, never with OPENSEES_ACTUAL.")
+    return out
+
+
+def opensees_actual_drift(actual_relative_deflection_m, storey_height_m, limit_state):
+    """OPENSEES_ACTUAL drift: actual (unscaled) OpenSees inter-storey response.
+
+    [REF NBC105-2025 §5.5.3 printed p. 37; checked by §8.1.3.1 p. 43 and §9.3.3.1 p. 48]
+    The actual elastic or inelastic OpenSees relative deflection is divided by
+    the storey height and compared with the 5.5.3 limit. No ductility factor,
+    force scale or ESM kd is applied (the function has no such argument).
+    """
+    state = str(limit_state).upper()
+    out = dict(interstory_drift_check(actual_relative_deflection_m, storey_height_m, state))
+    out.update(drift_basis="OPENSEES_ACTUAL", clause="5.5.3 (via 8.1.3.1 / 9.3.3.1)",
+               limit_state=state, actual_relative_deflection_m=float(actual_relative_deflection_m),
+               scaled_by_Rmu=False,
+               note="Actual unscaled OpenSees response; compare with ETABS_COMPARISON only through an explicit, labelled reconciliation.")
+    return out
+
+
+def separate_drift_outputs(*, limit_state, storey_height_m, elastic_relative_deflection_m=None,
+                           ductility_factor=None, opensees_relative_deflection_m=None):
+    """Return the two drift outputs side by side under separate keys, never merged.
+
+    [REF NBC105-2025 §5.5.1 p. 36; §5.5.3 p. 37]
+    A missing input leaves its key None; there is no combined pass flag.
+    """
+    return {
+        "ETABS_COMPARISON": None if elastic_relative_deflection_m is None else etabs_comparison_drift(
+            elastic_relative_deflection_m, storey_height_m, limit_state, ductility_factor),
+        "OPENSEES_ACTUAL": None if opensees_relative_deflection_m is None else opensees_actual_drift(
+            opensees_relative_deflection_m, storey_height_m, limit_state),
+        "combined_pass": None,
+        "mixing_allowed": False,
+    }
+
+
+def require_same_drift_basis(*outputs):
+    """Raise if drift outputs carry different bases (comparison would mix bases).
+
+    [REF NBC105-2025 §5.5.1 p. 36; §5.5.3 p. 37]
+    """
+    bases = {drift_basis(o["drift_basis"]) for o in outputs}
+    if len(bases) > 1:
+        raise ValueError("refusing to mix drift bases: " + ", ".join(sorted(bases)))
+    return bases.pop() if bases else None
+
+__all__ += ["DRIFT_BASES", "drift_basis", "etabs_comparison_drift", "opensees_actual_drift",
+            "separate_drift_outputs", "require_same_drift_basis"]
+

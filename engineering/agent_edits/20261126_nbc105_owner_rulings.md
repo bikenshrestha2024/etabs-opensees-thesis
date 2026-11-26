@@ -10,3 +10,6 @@ Editor Claude Code (model label UNKNOWN). Branch `feat/nbc105-normative-sentence
 
 ## Ruling 7: single source of drift limits
 `clause_05_dynamic_characteristics.py` (`DRIFT_LIMITS`, `drift_limit_ratio`, `drift_ratio_status`), literals replaced in the LTH/NLTHA runners, ESM `code_basis.py` and `legacy_code_basis.py`, MRSM `reports.py`/`model_analysis.py`, `validation/design_checks.py`, `nonlinear_performance.py`, `case_review.py`, `response_checks.py` and `tools/plot_results.py`; dead `DRIFT_LIMITS` of `nbc105_2025_audit.py` removed; `history_drift_check` added; `tests/test_nbc105_followup_drift_single_source.py`; rows N8-0023, N9-0069. Numeric values unchanged (0.025 / 0.006).
+
+## Ruling 3: two separate drift outputs
+`clause_05_dynamic_characteristics.py` (`etabs_comparison_drift`, `opensees_actual_drift`, `separate_drift_outputs`, `require_same_drift_basis`, `drift_basis`), `response_checks.py::drift_check(drift_basis=...)` with explicit labels at all production callers (static/MRSM = ETABS_COMPARISON, history = OPENSEES_ACTUAL), MRSM result JSON and `reports.py` columns, ESM generated response rows, LTH/NLTHA summaries; `tests/test_nbc105_followup_drift_bases.py`; rows N5-0127/0129/0137. The Rmu-scaled basis is stated in 5.5.1.1 (not 5.5.3).

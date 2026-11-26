@@ -357,7 +357,7 @@ def _run_analysis(config):
                     "maximum_story_drift_X": max(r[f"{s['story_name']}_drift_X"] for r in lines for s in stories),
                     "minimum_story_drift_Y": min(r[f"{s['story_name']}_drift_Y"] for r in lines for s in stories),
                     "maximum_story_drift_Y": max(r[f"{s['story_name']}_drift_Y"] for r in lines for s in stories),
-                    "drift_limit_ratio": drift_limit,
+                    "drift_limit_ratio": drift_limit, "drift_basis": "OPENSEES_ACTUAL",
                     "drift_screen_X": "PASS" if max(abs(r[f"{s['story_name']}_drift_X"]) for r in lines for s in stories) <= drift_limit else "REVIEW",
                     "drift_screen_Y": "PASS" if max(abs(r[f"{s['story_name']}_drift_Y"]) for r in lines for s in stories) <= drift_limit else "REVIEW",
                     "rayleigh_alphaM_s-1": alpha_m, "rayleigh_betaKcommitted_s": beta_kc,

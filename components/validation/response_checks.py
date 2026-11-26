@@ -10,15 +10,21 @@ def write_csv(path,rows):
         with Path(path).open('w',newline='',encoding='utf-8-sig') as stream:
             w=csv.DictWriter(stream,fieldnames=list(dict.fromkeys(k for row in rows for k in row)));w.writeheader();w.writerows(rows)
 
-def drift_check(rows,limit_state):
-    """Report §5.5.3 using one canonical Clause 5 limit, with unchanged schema."""
-    from components.nbc105.clause_05_dynamic_characteristics import interstory_drift_check
+def drift_check(rows,limit_state,drift_basis=None):
+    """Report §5.5.3 using one canonical Clause 5 limit.
+
+    ``drift_basis`` is ETABS_COMPARISON (design-scaled, ESM/MRSM, like ETABS) or
+    OPENSEES_ACTUAL (unscaled history response); it is written to every row.
+    None keeps the legacy schema and labels the row UNLABELLED_LEGACY.
+    """
+    from components.nbc105.clause_05_dynamic_characteristics import interstory_drift_check, drift_basis as _basis
+    label='UNLABELLED_LEGACY' if drift_basis is None else _basis(drift_basis)
     result=[]
     for row in rows:
         # Input is already a design drift RATIO; pass unit storey height.
         decision=interstory_drift_check(row["design_drift_ratio"],1.0,limit_state)
         result.append(dict(**row,limit_state=limit_state,limit_ratio=decision["limit"],
-                           clause='NBC 105:2025 5.5.3',
+                           clause='NBC 105:2025 5.5.3',drift_basis=label,
                            status='PASS' if decision["pass"] else 'EXCEEDS'))
     return result
 
@@ -70,7 +76,7 @@ def export_static_response(ops,model_script,output,story_rows,limit_state,baseli
     data=json.loads(source.read_text(encoding='utf-8-sig'));tag=str(story_rows[0].get('limit_state',limit_state))+'_'+str(story_rows[0].get('direction','case'))
     # Unique generated runner output prefix is supplied in the row metadata.
     tag=story_rows[0].get('response_case',tag)
-    checks=drift_check(story_rows,limit_state);write_csv(output/('Drift_Check_'+tag+'_V132.csv'),checks)
+    checks=drift_check(story_rows,limit_state,'ETABS_COMPARISON');write_csv(output/('Drift_Check_'+tag+'_V132.csv'),checks)
     if baseline:
         groups=sorted(data['diaphragms'],key=lambda g:g['master_xyz'][2]);edge_rows=[]
         case_axis='Y' if '_Y' in tag else 'X';dof=1 if case_axis=='Y' else 0;perp=0 if case_axis=='Y' else 1;sign=1 if case_axis=='Y' else -1
@@ -82,7 +88,7 @@ def export_static_response(ops,model_script,output,story_rows,limit_state,baseli
             for end,position in enumerate((min(p[perp] for p in pts),max(p[perp] for p in pts))):
                 drift=abs(floor_u(g,position)-floor_u(below,position))/h
                 edge_rows.append(dict(story_number=g['storey_number'],axis=case_axis,edge=end+1,floor_displacement_m=floor_u(g,position),height_m=g['master_xyz'][2]-data['base_z_m'],elastic_drift_ratio=drift,design_drift_ratio=drift*design_factor))
-        write_csv(output/('Floor_Edge_Drift_'+tag+'_V132.csv'),drift_check(edge_rows,limit_state))
+        write_csv(output/('Floor_Edge_Drift_'+tag+'_V132.csv'),drift_check(edge_rows,limit_state,'ETABS_COMPARISON'))
     disp={str(n):list(ops.nodeDisp(int(n))) for n in data['nodes']}
     (output/('Deformation_'+tag+'_V132.json')).write_text(json.dumps(dict(nodes=data['nodes'],elements=[e['nodes'] for e in data['frames']+data['shells']],displacements=disp,note='Total converged displacement including gravity; use design drift CSV for seismic drift acceptance.')),encoding='utf-8')
     review=irregularity(data,story_rows)
@@ -105,7 +111,7 @@ def export_history_checks(lines,stories,output,case,limit_state,model_script=Non
             key=s['story_name']+'_drift_'+axis
             critical=max(lines,key=lambda r:abs(r[key]))
             rows.append(dict(story=s['story_name'],axis=axis,critical_time_s=critical['time_s'],design_drift_ratio=abs(critical[key]),height_m=s['height']))
-    write_csv(Path(output)/('Drift_Check_'+case+'_V132.csv'),drift_check(rows,limit_state))
+    write_csv(Path(output)/('Drift_Check_'+case+'_V132.csv'),drift_check(rows,limit_state,'OPENSEES_ACTUAL'))
     edge_peaks={};edge_rows=[]
     if model_script:
         path=Path(model_script).parent/'OpenSees_Complete_Model_Data_V118.json'
@@ -123,7 +129,7 @@ def export_history_checks(lines,stories,output,case,limit_state,model_script=Non
                             return abs(upper-lower)/h
                         critical_edge=max(lines,key=ratio);value=ratio(critical_edge);edge_peaks[axis]=max(value,edge_peaks.get(axis,0.))
                         edge_rows.append(dict(story_number=g['storey_number'],axis=axis,edge=end+1,critical_time_s=critical_edge['time_s'],design_drift_ratio=value))
-            write_csv(Path(output)/('Floor_Edge_Drift_'+case+'_V132.csv'),drift_check(edge_rows,limit_state))
+            write_csv(Path(output)/('Floor_Edge_Drift_'+case+'_V132.csv'),drift_check(edge_rows,limit_state,'OPENSEES_ACTUAL'))
             critical=max(lines,key=lambda r:max(abs(r[s['story_name']+'_drift_'+a]) for s in stories for a in ('X','Y')))
             from OpenSees_History_Inspection_V133 import floor_snapshot
             displacement=floor_snapshot(data,stories,critical)
