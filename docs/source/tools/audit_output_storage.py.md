@@ -49,3 +49,5 @@ The static local disk audit refuses a symlinked selected root and any symlink in
 
 
 2026-11-26: `--validate-files` now inspects embedded supported members of evidence ZIPs (no extraction), streams worksheet XML in standalone and embedded XLSX/XLSM, counts formula cells without cached results and cached formula errors, and records explicit review-required cases for nested ZIPs and embedded workbooks above 512 MiB. A cached zero is distinct from no cache; no formulas are evaluated and no workbooks are rewritten. Counts include repeated workbook instances, not unique logical models. The all-module audit summarizes these findings and returns review-required exit status 2 when applicable. Tests use synthetic XML and preserve original bytes.
+
+2026-11-26: the four existing mesh, evidence, MRSM review and ESM snapshot manifest formats are independently checked against stored ZIP member SHA256 and declared byte counts. Deduplicated aliases must point to registered members. Invalid/missing references remain review items; a manifest match is byte integrity only. Unknown manifest formats are not represented as verified.

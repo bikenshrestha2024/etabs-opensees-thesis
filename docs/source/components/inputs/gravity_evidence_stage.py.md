@@ -22,3 +22,5 @@
 Run python -m pytest tests/test_gravity_evidence_stage.py -q. Native tests are not claimed as executed.
 OpenSees ShellMITC4: https://openseespydoc.readthedocs.io/en/latest/src/ShellMITC4.html
 ETABS frame release documentation: https://docs.csiamerica.com/help-files/etabs/Menus/Assign/Frame/Frame_Releases_and_Partial_Fixity.htm
+
+2026-11-26: private staging now retains exact workbook objects at `01_ETABS_EXPORT/10_PRIVATE_ETABS_WORKBOOKS/OBJECTS/<SHA256>/workbook.xlsx` (or `.xlsm`). The active pair manifest is atomically updated only after both files are validated. Restaging changed bytes does not overwrite files already referenced by previous gravity runs; identical unchanged bytes reuse their object. Historical fixed-name files remain readable when their manifest and digest match. Linked paths and manifest references outside private export storage are refused. This remains staging, not native ETABS identity or reaction validation.

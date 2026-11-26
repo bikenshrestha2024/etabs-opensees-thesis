@@ -70,6 +70,7 @@ def run_full_audit(export_root, *, repository=_REPO, hash_duplicates=False, vali
             "format_check_counts":disk["format_check_counts"],
             "embedded_format_check_counts":disk["embedded_format_check_counts"],
             "excel_formula_cache_inventory":disk["excel_formula_cache_inventory"],
+            "archive_manifest_inventory":disk["archive_manifest_inventory"],
             "file_evidence_review_required_count":disk["file_evidence_review_required_count"],
             "disk_scan_error_count":len(disk["scan_errors"]),
             "producer_consumer_review_required":
