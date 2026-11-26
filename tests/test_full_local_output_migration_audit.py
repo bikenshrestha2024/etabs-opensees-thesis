@@ -41,6 +41,8 @@ class FullLocalOutputAuditTests(unittest.TestCase):
             self.assertEqual(status["duplicate_hash_check"],"REQUESTED")
             self.assertEqual(status["format_check_counts"],{"JSON_PARSED":1})
             self.assertEqual(status["disk_scan_error_count"],0)
+            self.assertEqual(status["file_evidence_review_required_count"],0)
+            self.assertEqual(status["excel_formula_cache_inventory"]["workbook_instances"],0)
             import json
             disk=json.loads((run/"02_RESULTS"/"05_ALL_OUTPUT_FILE_INVENTORY.json").read_text())
             self.assertEqual(len(disk["files"]),1)

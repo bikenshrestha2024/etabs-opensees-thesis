@@ -108,6 +108,38 @@ class OutputStorageAuditTests(unittest.TestCase):
             self.assertEqual(len(result["exact_duplicate_groups"]),1)
             self.assertEqual(before,{p.name:p.read_bytes() for p in root.iterdir()})
 
+    def test_archive_and_workbook_caches_are_inspected_without_recalculation(self):
+        from io import BytesIO
+        from zipfile import ZipFile
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"source"
+            root.mkdir()
+            book=BytesIO()
+            ns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+            with ZipFile(book,"w") as z:
+                z.writestr("xl/workbook.xml",f'<workbook xmlns="{ns}"/>')
+                z.writestr("xl/worksheets/sheet1.xml",
+                           f'<worksheet xmlns="{ns}"><sheetData><row>'
+                           '<c r="A1"><f>1+1</f><v/></c>'
+                           '<c r="B1"><f>0</f><v>0</v></c>'
+                           '<c r="C1" t="e"><f>1/0</f><v>#DIV/0!</v></c>'
+                           '</row></sheetData></worksheet>')
+            (root/"source.xlsx").write_bytes(book.getvalue())
+            with ZipFile(root/"evidence.zip","w") as z:
+                z.writestr("report.xlsx",book.getvalue())
+                z.writestr("bad.json","{")
+                z.writestr("nested.zip",b"not inspected")
+            before={p.name:p.read_bytes() for p in root.iterdir()}
+            result=scan_output(root,include_entries=True,validate_files=True)
+            self.assertEqual(result["excel_formula_cache_inventory"],{
+                "workbook_instances":2,"formula_cells":6,
+                "missing_cached_formula_values":2,"cached_formula_errors":2})
+            self.assertEqual(result["file_evidence_review_required_count"],3)
+            self.assertEqual(result["embedded_format_check_counts"]["FORMAT_CHECK_FAILED"],1)
+            self.assertEqual(len(result["scan_errors"]),1)
+            self.assertEqual(before,{p.name:p.read_bytes() for p in root.iterdir()})
+            write_report(result,Path(td)/"report")
+
     def test_no_hash_does_not_infer_duplicate_from_equal_size(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

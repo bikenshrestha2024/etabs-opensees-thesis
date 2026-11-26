@@ -12,6 +12,11 @@ import csv
 import hashlib
 import json
 import os
+import io
+import re
+import shutil
+import tempfile
+from xml.etree import ElementTree as ET
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,7 +39,106 @@ def _sha256(path):
     return h.hexdigest()
 
 
-def _validate_container(path):
+_SHEET_XML = re.compile(r"^xl/worksheets/[^/]+\.xml$")
+_XL_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+_MAX_EMBEDDED_WORKBOOK_BYTES = 512 * 1024 * 1024
+
+
+def _check_archive(archive):
+    names=archive.namelist()
+    if len(names)!=len(set(names)):
+        raise ValueError("Duplicate archive member names")
+    bad=archive.testzip()
+    if bad is not None:
+        raise ValueError("CRC failure: "+bad)
+    return names
+
+
+def _workbook_formula_inventory(archive, names):
+    """Stream worksheet XML. A cache is evidence of a saved value, not correctness."""
+    if "xl/workbook.xml" not in names:
+        raise ValueError("Missing Excel workbook XML")
+    with archive.open("xl/workbook.xml") as stream:
+        ET.parse(stream)
+    sheets=[]
+    for name in sorted(n for n in names if _SHEET_XML.fullmatch(n)):
+        formulas=missing=errors=0
+        with archive.open(name) as stream:
+            # Retain child formula/value nodes until their containing cell closes.
+            stack=[]
+            for event,elem in ET.iterparse(stream,events=("start","end")):
+                if event=="start":
+                    stack.append(elem)
+                    continue
+                if elem.tag==_XL_NS+"c":
+                    if elem.find(_XL_NS+"f") is not None:
+                        formulas+=1
+                        value=elem.find(_XL_NS+"v")
+                        if value is None or value.text is None or not value.text.strip():
+                            missing+=1
+                        elif elem.get("t")=="e":
+                            errors+=1
+                    elem.clear()
+                elif elem.tag==_XL_NS+"row":
+                    if len(stack)>1:
+                        stack[-2].remove(elem)
+                    elem.clear()
+                stack.pop()
+        sheets.append(dict(worksheet_xml=name,formula_cells=formulas,
+                           missing_cached_formula_values=missing,cached_formula_errors=errors))
+    return dict(formula_cells=sum(s["formula_cells"] for s in sheets),
+                missing_cached_formula_values=sum(s["missing_cached_formula_values"] for s in sheets),
+                cached_formula_errors=sum(s["cached_formula_errors"] for s in sheets),
+                worksheets=sheets)
+
+
+def _embedded_evidence(archive, names):
+    """Inspect supported members directly, without extracting or executing them."""
+    records=[]
+    for name in names:
+        if name.endswith("/"):
+            continue
+        ext=Path(name).suffix.lower()
+        if ext not in {".xlsx",".xlsm",".json",".jsonl",".png",".log",".txt",".csv",".zip"}:
+            continue
+        item={"member":name}
+        try:
+            if ext in {".xlsx",".xlsm"}:
+                if archive.getinfo(name).file_size>_MAX_EMBEDDED_WORKBOOK_BYTES:
+                    item["status"]="REVIEW_REQUIRED_EMBEDDED_WORKBOOK_SIZE_LIMIT"
+                else:
+                    with tempfile.SpooledTemporaryFile(max_size=8*1024*1024) as buffer:
+                        with archive.open(name) as source:
+                            shutil.copyfileobj(source,buffer)
+                        buffer.seek(0)
+                        with ZipFile(buffer) as workbook:
+                            item["excel_formula_inventory"]=_workbook_formula_inventory(workbook,_check_archive(workbook))
+                    item["status"]="EXCEL_XML_CHECKED"
+            elif ext==".zip":
+                item["status"]="REVIEW_REQUIRED_NESTED_ZIP_NOT_INSPECTED"
+            else:
+                with archive.open(name) as raw:
+                    if ext==".png":
+                        if raw.read(8)!=b"\x89PNG\r\n\x1a\n":
+                            raise ValueError("Invalid PNG signature")
+                        item["status"]="PNG_SIGNATURE_CHECKED"
+                    else:
+                        with io.TextIOWrapper(raw,encoding="utf-8-sig",errors="strict") as stream:
+                            if ext==".json":
+                                json.load(stream)
+                                item["status"]="JSON_PARSED"
+                            else:
+                                for line in stream:
+                                    if ext==".jsonl" and line.strip():
+                                        json.loads(line)
+                                item["status"]="JSONL_PARSED" if ext==".jsonl" else "TEXT_READ"
+        except (OSError,ValueError,BadZipFile,RuntimeError,NotImplementedError,ET.ParseError) as exc:
+            item.update(status="FORMAT_CHECK_FAILED",error=str(exc))
+        records.append(item)
+    return records
+
+
+def _validate_container(path, details):
     """Read-only format checks; never execute archive members or formulas."""
     ext=path.suffix.lower()
     if ext == ".json":
@@ -43,14 +147,11 @@ def _validate_container(path):
         return "JSON_PARSED"
     if ext in {".zip",".xlsx",".xlsm",".docx",".pptx"}:
         with ZipFile(path) as archive:
-            names=archive.namelist()
-            if len(names)!=len(set(names)):
-                raise ValueError("Duplicate archive member names")
-            bad=archive.testzip()
-            if bad is not None:
-                raise ValueError("CRC failure: "+bad)
-            if ext in {".xlsx",".xlsm"} and "xl/workbook.xml" not in names:
-                raise ValueError("Missing Excel workbook XML")
+            names=_check_archive(archive)
+            if ext in {".xlsx",".xlsm"}:
+                details["excel_formula_inventory"]=_workbook_formula_inventory(archive,names)
+            elif ext==".zip":
+                details["embedded_evidence"]=_embedded_evidence(archive,names)
         return "ZIP_CRC_CHECKED"
     if ext == ".png":
         with path.open("rb") as stream:
@@ -132,15 +233,33 @@ def scan_output(root, *, max_large=50, hash_duplicates=True,
                         "review_only": True,
                     })
     validation_counts=defaultdict(int)
+    embedded_counts=defaultdict(int)
+    formula_totals={"workbook_instances":0,"formula_cells":0,
+                    "missing_cached_formula_values":0,"cached_formula_errors":0}
+    review_required=0
     if validate_files:
         for item in entries:
             try:
-                status=_validate_container(root/item["relative_path"])
-            except (OSError, ValueError, BadZipFile, RuntimeError, NotImplementedError) as exc:
+                status=_validate_container(root/item["relative_path"],item)
+            except (OSError, ValueError, BadZipFile, RuntimeError, NotImplementedError, ET.ParseError) as exc:
                 status="FORMAT_CHECK_FAILED"
                 errors.append({"path":item["relative_path"],"error":str(exc)})
             item["format_check"]=status
             validation_counts[status]+=1
+            for member in item.get("embedded_evidence",[]):
+                embedded_counts[member["status"]]+=1
+                if member["status"]=="FORMAT_CHECK_FAILED":
+                    errors.append({"path":item["relative_path"]+"!/"+member["member"],"error":member["error"]})
+                elif member["status"].startswith("REVIEW_REQUIRED"):
+                    review_required+=1
+            for record in [item,*item.get("embedded_evidence",[])]:
+                book=record.get("excel_formula_inventory")
+                if book is not None:
+                    formula_totals["workbook_instances"]+=1
+                    for key in ("formula_cells","missing_cached_formula_values","cached_formula_errors"):
+                        formula_totals[key]+=book[key]
+                    if book["missing_cached_formula_values"] or book["cached_formula_errors"]:
+                        review_required+=1
     result = {
         "schema": "etabs-opensees-output-size-audit-v1",
         "status": "DISK_FOOTPRINT_ONLY_NOT_ENGINEERING_EQUIVALENCE",
@@ -161,6 +280,9 @@ def scan_output(root, *, max_large=50, hash_duplicates=True,
         "hash_duplicates": bool(hash_duplicates),
         "format_checks_requested": bool(validate_files),
         "format_check_counts": dict(validation_counts),
+        "embedded_format_check_counts":dict(embedded_counts),
+        "excel_formula_cache_inventory":formula_totals,
+        "file_evidence_review_required_count":review_required,
         "action": "REPORT_ONLY_NO_DELETION",
     }
     if include_entries:
@@ -180,7 +302,7 @@ def write_report(report, destination):
         json.dumps(report, indent=2), encoding="utf-8")
     with (out / "CSV" / "LARGEST_FILES.csv").open("w", newline="", encoding="utf-8-sig") as fp:
         writer = csv.DictWriter(fp, fieldnames=(
-            "relative_path", "bytes", "extension", "module_folder"))
+            "relative_path", "bytes", "extension", "module_folder"),extrasaction="ignore")
         writer.writeheader()
         writer.writerows(report["largest_files"])
     with (out / "CSV" / "EXACT_DUPLICATES.csv").open("w", newline="", encoding="utf-8-sig") as fp:
@@ -242,6 +364,8 @@ def main(argv=None):
     parser.add_argument("--out", help="New report folder (outside the audited root preferred)")
     parser.add_argument("--no-hash", action="store_true",
                         help="Fast size-only inventory; no duplicate SHA checks")
+    parser.add_argument("--validate-files",action="store_true",
+                        help="Check supported file formats and embedded Excel formula caches")
     args = parser.parse_args(argv)
     root = args.root
     if not root:
@@ -254,7 +378,8 @@ def main(argv=None):
             top.destroy()
     if not root:
         raise SystemExit("No output directory selected; nothing modified.")
-    report = scan_output(root, hash_duplicates=not args.no_hash)
+    report = scan_output(root, hash_duplicates=not args.no_hash,
+                         include_entries=args.validate_files,validate_files=args.validate_files)
     # Save local diagnostics in the selected case's canonical output stage.
     # The report describes the source snapshot BEFORE these new files are made;
     # previous saved audits are counted on subsequent disk inventories.
@@ -267,7 +392,7 @@ def main(argv=None):
     print("DISK AUDIT (NO FILES REMOVED):", result)
     print("Total bytes:", report["total_bytes"],
           "| identical-file candidates:", report["exact_duplicate_redundant_bytes"])
-    return 0
+    return 2 if report["scan_errors"] or report["file_evidence_review_required_count"] else 0
 
 
 if __name__ == "__main__":
