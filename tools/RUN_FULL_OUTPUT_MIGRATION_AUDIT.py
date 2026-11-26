@@ -27,7 +27,7 @@ from tools.audit_output_stage_ownership import audit as audit_active_owners
 from tools.audit_output_storage import scan_output
 
 
-def run_full_audit(export_root, *, repository=_REPO):
+def run_full_audit(export_root, *, repository=_REPO, hash_duplicates=False, validate_files=False):
     root=Path(export_root).expanduser()
     if any(x.is_symlink() for x in (root,*root.parents)):
         raise ValueError("Refusing linked project export")
@@ -40,7 +40,8 @@ def run_full_audit(export_root, *, repository=_REPO):
     layout=audit_export_layout(root)
     stage=audit_stage_migration(root)
     owners=audit_active_owners(repo)
-    disk=scan_output(root,hash_duplicates=False)
+    disk=scan_output(root,hash_duplicates=hash_duplicates,include_entries=True,
+                     validate_files=validate_files)
     if source["parse_errors"] or owners["parse_errors"]:
         raise ValueError("Active source cannot be fully parsed; no audit published")
     run=create_case_run(root,"SOFTWARE_DIAGNOSTICS",
@@ -63,7 +64,11 @@ def run_full_audit(export_root, *, repository=_REPO):
             "owners":source["owner_counts"],
             "project_output_files_inspected":disk["total_files"],
             "project_output_bytes_accounted":disk["total_bytes"],
-            "duplicate_hash_check":"NOT_RUN_UNLESS_EXPLICITLY_REQUESTED",
+            "duplicate_hash_check":"REQUESTED" if hash_duplicates else "NOT_REQUESTED",
+            "exact_duplicate_groups":len(disk["exact_duplicate_groups"]),
+            "format_checks_requested":validate_files,
+            "format_check_counts":disk["format_check_counts"],
+            "disk_scan_error_count":len(disk["scan_errors"]),
             "producer_consumer_review_required":
                 source["producer_consumer_review_required"],
             "stage_case_count":layout["case_counts"],
@@ -94,11 +99,15 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--export-root",type=Path,required=True)
     parser.add_argument("--repo",type=Path,default=_REPO)
+    parser.add_argument("--hash-duplicates",action="store_true",help="SHA-check same-size duplicate candidates; never delete")
+    parser.add_argument("--validate-files",action="store_true",help="Read JSON/text and check archive CRC/PNG signatures; not numerical validation")
     args=parser.parse_args(argv)
-    run,summary=run_full_audit(args.export_root,repository=args.repo)
+    run,summary=run_full_audit(args.export_root,repository=args.repo,
+                              hash_duplicates=args.hash_duplicates,validate_files=args.validate_files)
     print(json.dumps({"audit_run":str(run),**summary},indent=2))
     return 2 if summary["producer_consumer_review_required"] or (
-        summary["layout_issue_count"] or summary["owner_guard_violation_count"]) else 0
+        summary["layout_issue_count"] or summary["owner_guard_violation_count"] or
+        summary["disk_scan_error_count"]) else 0
 
 
 if __name__=="__main__":

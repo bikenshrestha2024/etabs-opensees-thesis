@@ -53,6 +53,16 @@ class LauncherWorkflowLayoutTests(unittest.TestCase):
                           '4. Linear','5. Nonlinear','6. Materials','7. Results'):
             self.assertIn(short_tab,self.code)
 
+    def test_all_module_audit_and_elastic_shortcuts_reuse_owners(self):
+        self.assertIn("command=self._open_all_module_file_audit",self.code)
+        self.assertIn("command=self._open_elastic_comparison_settings",self.code)
+        self.assertIn('"_all_module_audit_process"',self.code)
+        self.assertIn('"--hash-duplicates","--validate-files"',self.code)
+        self.assertIn('export_root_for(folder)',self.code)
+        self.assertIn('_open_gravity_analysis(require_manifest=True)',self.code)
+        self.assertIn('_rebuild_verified_clear_beam(elastic_comparison=True)',self.code)
+        self.assertIn('textvariable=self.out,wraplength=980',self.code)
+
     def test_log_keeps_copy_and_two_axes_of_scrolling(self):
         for item in ('orient="vertical",command=self.logbox.yview',
                      'orient="horizontal",command=self.logbox.xview',

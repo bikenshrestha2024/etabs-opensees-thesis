@@ -88,6 +88,26 @@ class OutputStorageAuditTests(unittest.TestCase):
                 write_report({},alias/"08_AUDIT")
             self.assertEqual(list(outside.iterdir()),[])
 
+    def test_full_inventory_and_format_checks_are_read_only(self):
+        from zipfile import ZipFile
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            for i in range(55):
+                (root/f"{i}.json").write_text('{"ok":true}',encoding="utf-8")
+            (root/"broken.json").write_text("{",encoding="utf-8")
+            (root/"bad.png").write_bytes(b"not a png")
+            with ZipFile(root/"valid.zip","w") as archive:
+                archive.writestr("report.txt","test")
+            before={p.name:p.read_bytes() for p in root.iterdir()}
+            result=scan_output(root,include_entries=True,validate_files=True)
+            self.assertEqual(len(result["files"]),58)
+            self.assertEqual(len(result["largest_files"]),50)
+            self.assertEqual(result["format_check_counts"]["JSON_PARSED"],55)
+            self.assertEqual(result["format_check_counts"]["FORMAT_CHECK_FAILED"],2)
+            self.assertEqual(result["format_check_counts"]["ZIP_CRC_CHECKED"],1)
+            self.assertEqual(len(result["exact_duplicate_groups"]),1)
+            self.assertEqual(before,{p.name:p.read_bytes() for p in root.iterdir()})
+
     def test_no_hash_does_not_infer_duplicate_from_equal_size(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
