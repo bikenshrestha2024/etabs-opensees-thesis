@@ -565,3 +565,120 @@ def require_same_drift_basis(*outputs):
 __all__ += ["DRIFT_BASES", "drift_basis", "etabs_comparison_drift", "opensees_actual_drift",
             "separate_drift_outputs", "require_same_drift_basis"]
 
+
+# --- Input-driven irregularity checks 5.4.1.4, 5.4.2.3, 5.4.2.4, 5.4.2.5 (owner ruling 9c) ---
+REENTRANT_FRACTION = 0.15
+DIAPHRAGM_CUTOUT_FRACTION = 0.50
+DIAPHRAGM_STIFFNESS_CHANGE_FRACTION = 0.50
+
+
+def in_plane_discontinuity_irregularity(offsets):
+    """5.4.1.4 in-plane discontinuity in a vertical lateral force resisting element.
+
+    [REF NBC105-2025 §5.4.1.4, printed p. 33 (Figure 5-2)]
+    Printed: the irregularity "shall be considered to exist where there is an
+    in-plane offset of a vertical seismic force-resisting element resulting in
+    overturning demands on supporting structural elements". No numeric threshold
+    is printed. ``offsets`` is an iterable of (offset_m, causes_overturning_on_support)
+    for each vertical element; an element is irregular when its offset is greater
+    than zero AND the caller states it overloads the supporting element in overturning
+    (a geometry offset alone does not trigger it).
+    """
+    flags = []
+    for i, (offset, overturning) in enumerate(offsets):
+        off = _nonnegative(offset, "in-plane offset")
+        if type(overturning) is not bool:
+            raise ValueError("causes_overturning_on_support must be bool")
+        flags.append({"element_index": i, "offset_m": off, "causes_overturning": overturning,
+                      "irregular": off > 0 and overturning})
+    if not flags:
+        raise ValueError("at least one vertical element is required")
+    bad = [f["element_index"] for f in flags if f["irregular"]]
+    return {"irregular": bool(bad), "irregular_elements": bad, "flags": flags,
+            "status": "IRREGULAR" if bad else "PASS", "threshold": "NONE_PRINTED_OFFSET_PLUS_OVERTURNING_DEMAND"}
+
+
+def reentrant_corner_check(projection_x_m=None, overall_x_m=None, projection_y_m=None, overall_y_m=None):
+    """5.4.2.3 re-entrant corners, per direction (projection strictly > 15 percent of the overall dimension).
+
+    [REF NBC105-2025 §5.4.2.3, printed p. 34 (Figure 5-4)]
+    A direction is evaluated only when both its projection and overall dimension are given;
+    otherwise it is NOT_EVALUATED. Uses ``reentrant_corner_irregularity`` (strict >).
+    """
+    out = {}
+    for axis, proj, dim in (("X", projection_x_m, overall_x_m), ("Y", projection_y_m, overall_y_m)):
+        if proj is None or dim is None:
+            out[axis] = {"status": "NOT_EVALUATED", "missing": ["PROJECTION_" + axis, "OVERALL_DIMENSION_" + axis]}
+            continue
+        p = _nonnegative(proj, "projection")
+        d = _positive(dim, "overall dimension")
+        irr = reentrant_corner_irregularity(p, d) if p > 0 else False
+        out[axis] = {"status": "IRREGULAR" if irr else "PASS", "ratio": p / d,
+                     "threshold": REENTRANT_FRACTION, "irregular": irr}
+    done = [v for v in out.values() if v["status"] != "NOT_EVALUATED"]
+    out["overall"] = ("NOT_EVALUATED" if not done else
+                      "IRREGULAR" if any(v["irregular"] for v in done) else
+                      "PASS" if len(done) == 2 else "PASS_EVALUATED_DIRECTIONS_ONLY")
+    return out
+
+
+def diaphragm_discontinuity_irregularity(cutout_area_m2=None, gross_enclosed_area_m2=None,
+                                         stiffness_this_storey=None, stiffness_adjacent_storey=None):
+    """5.4.2.4 diaphragm discontinuity: cutout/open area > 50 percent of the gross area, or stiffness change > 50 percent.
+
+    [REF NBC105-2025 §5.4.2.4, printed p. 35 (Figure 5-5)]
+    Two independent triggers (either flags): cutout or open area strictly greater than 50 percent of the
+    gross enclosed diaphragm area; effective diaphragm stiffness changing by strictly more than 50 percent
+    from one storey to the next. The print does not name the base of the stiffness change, so both
+    readings are returned: change / lower stiffness (default, conservative) and change / higher stiffness.
+    A trigger whose inputs are missing is NOT_EVALUATED (never PASS).
+    """
+    result = {}
+    if cutout_area_m2 is None or gross_enclosed_area_m2 is None:
+        result["cutout"] = {"status": "NOT_EVALUATED", "missing": ["CUTOUT_AREA", "GROSS_ENCLOSED_AREA"]}
+    else:
+        c = _nonnegative(cutout_area_m2, "cutout area")
+        g = _positive(gross_enclosed_area_m2, "gross area")
+        if c > g:
+            raise ValueError("cutout area cannot exceed the gross enclosed area")
+        irr = _strictly_above(c, DIAPHRAGM_CUTOUT_FRACTION * g)
+        result["cutout"] = {"status": "IRREGULAR" if irr else "PASS", "ratio": c / g, "irregular": irr,
+                            "threshold": DIAPHRAGM_CUTOUT_FRACTION}
+    if stiffness_this_storey is None or stiffness_adjacent_storey is None:
+        result["stiffness"] = {"status": "NOT_EVALUATED", "missing": ["DIAPHRAGM_STIFFNESS_THIS_STOREY", "DIAPHRAGM_STIFFNESS_ADJACENT_STOREY"]}
+    else:
+        a = _positive(stiffness_this_storey, "diaphragm stiffness")
+        b = _positive(stiffness_adjacent_storey, "adjacent diaphragm stiffness")
+        lo, hi = min(a, b), max(a, b)
+        vs_lo = _strictly_above(hi - lo, DIAPHRAGM_STIFFNESS_CHANGE_FRACTION * lo)
+        vs_hi = _strictly_above(hi - lo, DIAPHRAGM_STIFFNESS_CHANGE_FRACTION * hi)
+        result["stiffness"] = {"status": "IRREGULAR" if vs_lo else "PASS", "irregular": vs_lo,
+                               "irregular_vs_higher": vs_hi, "change_over_lower": (hi - lo) / lo,
+                               "change_over_higher": (hi - lo) / hi, "threshold": DIAPHRAGM_STIFFNESS_CHANGE_FRACTION}
+    done = [v for v in result.values() if v["status"] != "NOT_EVALUATED"]
+    result["overall"] = ("NOT_EVALUATED" if not done else "IRREGULAR" if any(v["irregular"] for v in done)
+                         else "PASS" if len(done) == 2 else "PASS_EVALUATED_TRIGGERS_ONLY")
+    return result
+
+
+def out_of_plane_offset_irregularity(offsets_m, tolerance_m=0.0):
+    """5.4.2.5 out-of-plane offset: a discontinuity in the lateral force resisting path.
+
+    [REF NBC105-2025 §5.4.2.5, printed p. 35 (Figure 5-6)]
+    Printed: it "is said to exist where there is a discontinuity in a lateral force resisting path, such as an
+    out-of-plane [offset] of at least one vertical element". No threshold is printed; an element is flagged when
+    its out-of-plane offset is greater than ``tolerance_m`` (default 0: any offset). The tolerance is the
+    caller's declared modelling tolerance, not a printed value.
+    """
+    tol = _nonnegative(tolerance_m, "tolerance")
+    offs = [_nonnegative(v, "out-of-plane offset") for v in offsets_m]
+    if not offs:
+        raise ValueError("at least one vertical element is required")
+    bad = [i for i, v in enumerate(offs) if v > tol]
+    return {"irregular": bool(bad), "irregular_elements": bad, "status": "IRREGULAR" if bad else "PASS",
+            "tolerance_m": tol, "threshold": "NONE_PRINTED_ANY_OFFSET_ABOVE_DECLARED_TOLERANCE"}
+
+__all__ += ["REENTRANT_FRACTION", "DIAPHRAGM_CUTOUT_FRACTION", "DIAPHRAGM_STIFFNESS_CHANGE_FRACTION",
+            "in_plane_discontinuity_irregularity", "reentrant_corner_check",
+            "diaphragm_discontinuity_irregularity", "out_of_plane_offset_irregularity"]
+

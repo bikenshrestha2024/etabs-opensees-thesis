@@ -28,7 +28,7 @@ def drift_check(rows,limit_state,drift_basis=None):
                            status='PASS' if decision["pass"] else 'EXCEEDS'))
     return result
 
-def irregularity(data,story_rows=None,capacity_rows=None,mass_exempt_storeys=()):
+def irregularity(data,story_rows=None,capacity_rows=None,mass_exempt_storeys=(),plan_inputs=None):
     mass_exempt=set(mass_exempt_storeys)
     groups=sorted(data.get('diaphragms',[]),key=lambda g:g['master_xyz'][2]);nodes=data['nodes'];checks=[]
     def add(clause,kind,level,value,threshold,status,note=''):
@@ -66,7 +66,24 @@ def irregularity(data,story_rows=None,capacity_rows=None,mass_exempt_storeys=())
         for a,b in zip(sorted(capacity_rows,key=lambda r:float(r['storey_number'])),sorted(capacity_rows,key=lambda r:float(r['storey_number']))[1:]):
             ratio=float(a['lateral_strength_kN'])/float(b['lateral_strength_kN']);add('5.4.1.1','Weak story',a['storey_number'],ratio,.8,'IRREGULAR' if ratio<.8 else 'PASS')
     else:add('5.4.1.1','Weak story','ALL',None,.8,'NOT EVALUATED','Requires reviewed lateral-strength capacities; elastic stiffness is not strength.')
-    for clause,kind in [('5.4.1.4','In-plane discontinuity'),('5.4.2.1','Torsion'),('5.4.2.2','Extreme torsion'),('5.4.2.3','Re-entrant corners'),('5.4.2.4','Diaphragm discontinuity'),('5.4.2.5','Out of plane offset')]:add(clause,kind,'ALL',None,None,'NOT EVALUATED','Requires floor-edge center-of-mass response or reviewed plan/vertical load-path geometry; not inferred from bounding box.')
+    plan=plan_inputs or {}
+    from components.nbc105 import clause_05_dynamic_characteristics as c5
+    def _result(status):return 'IRREGULAR' if status=='IRREGULAR' else 'NOT EVALUATED' if str(status).startswith('NOT_EVALUATED') else 'PASS'
+    def _missing(note):return 'Requires floor-edge center-of-mass response or reviewed plan/vertical load-path geometry; not inferred from bounding box. Missing input: '+note
+    for clause,kind in [('5.4.1.4','In-plane discontinuity'),('5.4.2.1','Torsion'),('5.4.2.2','Extreme torsion'),('5.4.2.3','Re-entrant corners'),('5.4.2.4','Diaphragm discontinuity'),('5.4.2.5','Out of plane offset')]:
+        if clause=='5.4.1.4' and 'in_plane_offsets' in plan:
+            r=c5.in_plane_discontinuity_irregularity(plan['in_plane_offsets']);add(clause,kind,'ALL',len(r['irregular_elements']),'offset>0 and overturning',r['status'],'Input-driven (clause_05.in_plane_discontinuity_irregularity); no printed numeric threshold.')
+        elif clause=='5.4.2.3' and any(k in plan for k in ('reentrant_projection_x_m','reentrant_projection_y_m')):
+            r=c5.reentrant_corner_check(plan.get('reentrant_projection_x_m'),plan.get('overall_x_m'),plan.get('reentrant_projection_y_m'),plan.get('overall_y_m'))
+            add(clause,kind,'ALL',max([v['ratio'] for v in (r['X'],r['Y']) if 'ratio' in v] or [None]) if any('ratio' in v for v in (r['X'],r['Y'])) else None,.15,_result(r['overall'].replace('PASS_EVALUATED_DIRECTIONS_ONLY','NOT_EVALUATED') if r['overall']=='PASS_EVALUATED_DIRECTIONS_ONLY' else r['overall']),'Input-driven (clause_05.reentrant_corner_check); a direction without projection and overall dimension is NOT EVALUATED.')
+        elif clause=='5.4.2.4' and any(k in plan for k in ('diaphragm_cutout_area_m2','diaphragm_stiffness_this_storey')):
+            r=c5.diaphragm_discontinuity_irregularity(plan.get('diaphragm_cutout_area_m2'),plan.get('diaphragm_gross_area_m2'),plan.get('diaphragm_stiffness_this_storey'),plan.get('diaphragm_stiffness_adjacent_storey'))
+            add(clause,kind,'ALL',None,.5,_result(r['overall'].replace('PASS_EVALUATED_TRIGGERS_ONLY','NOT_EVALUATED') if r['overall']=='PASS_EVALUATED_TRIGGERS_ONLY' else r['overall']),'Input-driven (clause_05.diaphragm_discontinuity_irregularity): cutout > 50 percent of gross area or stiffness change > 50 percent; a trigger without inputs is NOT EVALUATED.')
+        elif clause=='5.4.2.5' and 'out_of_plane_offsets_m' in plan:
+            r=c5.out_of_plane_offset_irregularity(plan['out_of_plane_offsets_m'],plan.get('out_of_plane_tolerance_m',0.0));add(clause,kind,'ALL',len(r['irregular_elements']),'offset > declared tolerance',r['status'],'Input-driven (clause_05.out_of_plane_offset_irregularity); no printed threshold.')
+        else:
+            need={'5.4.1.4':'plan_inputs[in_plane_offsets] = [(offset_m, causes_overturning_on_support)]','5.4.2.3':'plan_inputs[reentrant_projection_x_m, overall_x_m, reentrant_projection_y_m, overall_y_m]','5.4.2.4':'plan_inputs[diaphragm_cutout_area_m2, diaphragm_gross_area_m2, diaphragm_stiffness_this_storey, diaphragm_stiffness_adjacent_storey]','5.4.2.5':'plan_inputs[out_of_plane_offsets_m]'}.get(clause,'storey end displacements (floor-edge center-of-mass response)')
+            add(clause,kind,'ALL',None,None,'NOT EVALUATED',_missing(need))
     return dict(checks=checks,overall='IRREGULAR' if any(r['status']=='IRREGULAR' for r in checks) else 'INCOMPLETE' if any(r['status']=='NOT EVALUATED' for r in checks) else 'NO TRIGGER FOUND',note='A partial screen cannot certify regularity; missing checks remain explicit.')
 
 @timed_outputs('Static drift, deformation and irregularity export','output')

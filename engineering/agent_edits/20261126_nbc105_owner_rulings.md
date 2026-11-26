@@ -34,3 +34,6 @@ New `components/nbc105/clause_07_missing_mass.py` (+ guide, registry row), gate 
 
 ## Ruling 9b: rigid diaphragm 10 percent
 `clause_02_general_principles.py::rigid_diaphragm_check`, `tests/test_nbc105_followup_rigid_diaphragm.py`, row N2-0057. No production caller (needs two model runs).
+
+## Ruling 9c: plan and vertical irregularities
+`clause_05_dynamic_characteristics.py` (in_plane_discontinuity_irregularity, reentrant_corner_check, diaphragm_discontinuity_irregularity, out_of_plane_offset_irregularity), `components/validation/response_checks.py::irregularity` (optional `plan_inputs`; NOT EVALUATED with the missing-input list when absent), `tests/test_nbc105_followup_plan_irregularities.py`, rows N5-0103/0116/0119/0122, clause_05 guide. No model-data extraction of the inputs yet.
