@@ -19,7 +19,7 @@ import tempfile
 from xml.etree import ElementTree as ET
 from collections import defaultdict
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from zipfile import ZipFile, BadZipFile
 
 
@@ -138,6 +138,78 @@ def _embedded_evidence(archive, names):
     return records
 
 
+def _archive_manifest_checks(archive, names):
+    """Verify known package manifest references against exact archive bytes."""
+    registered=set(names)
+    verified={}
+    reports=[]
+    for name in sorted(names):
+        base=PurePosixPath(name).name
+        if base not in {"ZIP_SHA256_MANIFEST.json","EVIDENCE_MANIFEST.json",
+                        "REVIEW_MANIFEST.json","ESM_Export_Manifest.json"}:
+            continue
+        report={"manifest":name,"matched":0,"failed":0,"alias_matched":0,"issues":[]}
+        try:
+            with archive.open(name) as raw:
+                data=json.load(io.TextIOWrapper(raw,encoding="utf-8-sig"))
+            if not isinstance(data,dict):
+                raise ValueError("Expected manifest object")
+            parent=PurePosixPath(name).parent
+            if base=="ZIP_SHA256_MANIFEST.json":
+                rows=[{"path":p,"sha256":h} for p,h in data["files"].items()]
+            elif base=="REVIEW_MANIFEST.json":
+                rows=data["collected"]
+            elif base=="EVIDENCE_MANIFEST.json":
+                rows=[dict(row,path=row["archive_path"]) for row in data["files"]]
+            else:
+                rows=[dict(row,path=row["snapshot_path"]) for row in data["files"]]
+            if not isinstance(rows,list) or not rows:
+                raise ValueError("Missing or empty registered file inventory")
+            seen=set()
+
+            def check(row, alias=False):
+                try:
+                    rel=row["same_content_as" if alias else "path"]
+                    if not isinstance(rel,str) or not rel or any(p in ("",".","..") for p in rel.split("/")) or "\\" in rel or ":" in rel:
+                        raise ValueError("Unsafe relative manifest member")
+                    member=str(parent/PurePosixPath(rel))
+                    if member not in registered or member.endswith("/"):
+                        raise ValueError("Registered member missing: "+member)
+                    if not alias:
+                        if member in seen:
+                            raise ValueError("Repeated registered member")
+                        seen.add(member)
+                    elif member not in seen:
+                        raise ValueError("Alias target is not a registered member")
+                    expected=row["sha256"]
+                    if not isinstance(expected,str) or not re.fullmatch(r"[0-9a-fA-F]{64}",expected):
+                        raise ValueError("Invalid SHA256 reference")
+                    if member not in verified:
+                        with archive.open(member) as source:
+                            verified[member]=hashlib.file_digest(source,"sha256").hexdigest()
+                    if verified[member]!=expected.lower():
+                        raise ValueError("SHA256 mismatch")
+                    if "bytes" in row and row["bytes"]!=archive.getinfo(member).file_size:
+                        raise ValueError("Byte count mismatch")
+                    report["alias_matched" if alias else "matched"]+=1
+                except (KeyError,TypeError,ValueError,OSError,RuntimeError) as exc:
+                    report["failed"]+=1
+                    report["issues"].append({"reference":str(row.get("path","")) if isinstance(row,dict) else repr(row),"reason":str(exc)})
+            for row in rows:
+                check(row)
+            if base=="REVIEW_MANIFEST.json":
+                for row in data.get("duplicates",[]):
+                    check(row,alias=True)
+            declared=data.get("file_count",data.get("unique_file_count"))
+            if declared is not None and declared!=len(rows):
+                raise ValueError("Declared manifest count differs from registered rows")
+        except (KeyError,AttributeError,TypeError,ValueError,OSError,RuntimeError) as exc:
+            report["failed"]+=1
+            report["issues"].append({"reason":str(exc)})
+        reports.append(report)
+    return reports
+
+
 def _validate_container(path, details):
     """Read-only format checks; never execute archive members or formulas."""
     ext=path.suffix.lower()
@@ -152,6 +224,7 @@ def _validate_container(path, details):
                 details["excel_formula_inventory"]=_workbook_formula_inventory(archive,names)
             elif ext==".zip":
                 details["embedded_evidence"]=_embedded_evidence(archive,names)
+                details["archive_manifest_checks"]=_archive_manifest_checks(archive,names)
         return "ZIP_CRC_CHECKED"
     if ext == ".png":
         with path.open("rb") as stream:
@@ -237,6 +310,7 @@ def scan_output(root, *, max_large=50, hash_duplicates=True,
     formula_totals={"workbook_instances":0,"formula_cells":0,
                     "missing_cached_formula_values":0,"cached_formula_errors":0}
     review_required=0
+    manifest_totals={"manifests":0,"matched":0,"alias_matched":0,"failed":0}
     if validate_files:
         for item in entries:
             try:
@@ -246,6 +320,12 @@ def scan_output(root, *, max_large=50, hash_duplicates=True,
                 errors.append({"path":item["relative_path"],"error":str(exc)})
             item["format_check"]=status
             validation_counts[status]+=1
+            for manifest in item.get("archive_manifest_checks",[]):
+                manifest_totals["manifests"]+=1
+                for key in ("matched","alias_matched","failed"):
+                    manifest_totals[key]+=manifest[key]
+                if manifest["failed"]:
+                    review_required+=1
             for member in item.get("embedded_evidence",[]):
                 embedded_counts[member["status"]]+=1
                 if member["status"]=="FORMAT_CHECK_FAILED":
@@ -282,6 +362,7 @@ def scan_output(root, *, max_large=50, hash_duplicates=True,
         "format_check_counts": dict(validation_counts),
         "embedded_format_check_counts":dict(embedded_counts),
         "excel_formula_cache_inventory":formula_totals,
+        "archive_manifest_inventory":manifest_totals,
         "file_evidence_review_required_count":review_required,
         "action": "REPORT_ONLY_NO_DELETION",
     }
