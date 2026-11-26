@@ -313,6 +313,34 @@ def reentrant_corner_irregularity(projection_m,overall_dimension_m):
     return _strictly_above(_positive(projection_m,"projection"),
                            .15*_positive(overall_dimension_m,"dimension"))
 
+# SINGLE SOURCE of the printed 5.5.3 (p.37) drift limits. 8.1.3.1 (p.43) and
+# 9.3.3.1 (p.48) cite "clause 5.6" for these limits, but printed 5.6 is
+# Accidental Eccentricity; the limits are in 5.5.3 (see CROSS_REFERENCE_REGISTER).
+DRIFT_LIMITS = {"ULS": 0.025, "SLS": 0.006}
+
+
+def drift_limit_ratio(limit_state):
+    """Return the printed 5.5.3 inter-story drift ratio limit for ULS or SLS.
+
+    [REF NBC105-2025 §5.5.3, printed p. 37] 0.025 at ultimate, 0.006 at
+    serviceability limit state; the only definition of these numbers in code.
+    """
+    state = str(limit_state).upper()
+    if state not in DRIFT_LIMITS:
+        raise ValueError("limit_state must be ULS/SLS")
+    return DRIFT_LIMITS[state]
+
+
+def drift_ratio_status(drift_ratio, limit_state):
+    """Return PASS or REVIEW for a drift RATIO, via interstory_drift_check.
+
+    [REF NBC105-2025 §5.5.3, printed p. 37; cited by 8.1.3.1 and 9.3.3.1]
+    Used by the linear and nonlinear time-history summaries so every drift
+    screen shares clause 5's limits and strict comparison (ratio <= limit).
+    """
+    return "PASS" if interstory_drift_check(drift_ratio, 1.0, limit_state)["pass"] else "REVIEW"
+
+
 def interstory_drift_check(relative_deflection_m,storey_height_m,limit_state):
     """§5.5.3 p.37: <=0.025 ULS, <=0.006 SLS (design-level drift).
 [REF NBC105-2025 §5, printed pp. 28–37]"""
@@ -322,7 +350,7 @@ def interstory_drift_check(relative_deflection_m,storey_height_m,limit_state):
     state=str(limit_state).upper()
     if state not in ("ULS","SLS"):raise ValueError("limit_state must be ULS/SLS")
     ratio=abs(drift)/h
-    limit=.025 if state=="ULS" else .006
+    limit=DRIFT_LIMITS[state]
     return {"pass":ratio<=limit,
             "ratio":ratio,"limit":limit,
             "basis":"DESIGN_DRIFT_INPUT_ONLY_NBC_3_4_STIFFNESS_MUST_BE_VERIFIED"}
@@ -348,6 +376,7 @@ def accidental_eccentricities_m(building_width_m):
     return (-e,e)
 
 __all__ += [
+    "DRIFT_LIMITS","drift_limit_ratio","drift_ratio_status",
     "table_5_2_system_factors","weak_story","soft_story","torsion_irregularity",
     "reentrant_corner_irregularity","interstory_drift_check",
     "uls_design_deflection","separation_gap_m","accidental_eccentricities_m",

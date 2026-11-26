@@ -41,7 +41,7 @@ VARIANTS = ('M0', 'M1', 'M2', 'M3', 'M4', 'M5', 'M6')
 ACCEPTED_GATE = 'FULL_DURATION_NUMERIC_SCREEN'
 # [REF R10 NBC105-2025 §5.5.3] drift screens; §9.3.3.1 cross-reference
 # discrepancy (cites 5.6) is retained as documented in docs/00_RESEARCH_REFERENCES.md.
-DRIFT_LIMIT = {'ULS': 0.025, 'SLS': 0.006}
+from components.nbc105.clause_05_dynamic_characteristics import DRIFT_LIMITS as DRIFT_LIMIT  # single source (clause 5.5.3)
 
 
 # ---------------------------------------------------------------- discovery

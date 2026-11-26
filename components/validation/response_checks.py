@@ -1,6 +1,7 @@
 """Common drift, deformation and NBC 5.4 review outputs. Units m, kN."""
 from pathlib import Path
 import json,csv,math
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio
 from OpenSees_Timing_V130 import timed_outputs
 
 
@@ -138,7 +139,7 @@ def export_history_checks(lines,stories,output,case,limit_state,model_script=Non
         axes[0].plot([max(abs(r[s['story_name']+'_U'+axis+'_m']) for r in lines) for s in stories],z,label=axis)
         axes[1].plot([max([r['design_drift_ratio'] for r in edge_rows if r['axis']==axis and r['story_number']==groups[i]['storey_number']] or [max(abs(r[s['story_name']+'_drift_'+axis]) for r in lines)]) for i,s in enumerate(stories)] if edge_rows else [max(abs(r[s['story_name']+'_drift_'+axis]) for r in lines) for s in stories],z,label=axis)
     axes[0].set(xlabel='Peak floor displacement (m)',ylabel='Height (m)',title='Independent floor maxima; not a simultaneous shape')
-    axes[1].axvline(.025 if limit_state=='ULS' else .006,color='r',ls='--');axes[1].set(xlabel='Drift ratio',title=limit_state+' drift screen')
+    axes[1].axvline(drift_limit_ratio(limit_state),color='r',ls='--');axes[1].set(xlabel='Drift ratio',title=limit_state+' drift screen')
     for ax in axes:ax.legend();ax.grid(alpha=.2)
     fig.savefig(Path(output)/('Drift_Profile_'+case+'_V132.png'),dpi=160);plt.close(fig)
     return edge_peaks

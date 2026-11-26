@@ -1,5 +1,6 @@
 """Model MRSM: mode-by-mode OpenSees RSA, CQC, NBC force scaling and drift."""
 from components.nbc105.constants import GRAVITY_M_S2
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio
 from pathlib import Path
 import csv,json,math,time
 import numpy as np
@@ -206,7 +207,7 @@ def run_model_spectrum(folder,config,output_dir):
     fig,ax=plt.subplots(1,2,figsize=(11,6),layout='constrained')
     for axis,res in results.items():
         z=[r['height_m'] for r in res['stories']];ax[0].plot([r['scaled_story_shear_kN'] for r in res['stories']],z,label=axis);ax[1].plot([r['design_drift_ratio'] for r in res['stories']],z,label=axis)
-    ax[0].set(xlabel='Force-scaled storey shear (kN)',ylabel='Height (m)');ax[1].set(xlabel='Unscaled design drift ratio');ax[1].axvline(.025 if state=='ULS' else .006,color='r',ls='--')
+    ax[0].set(xlabel='Force-scaled storey shear (kN)',ylabel='Height (m)');ax[1].set(xlabel='Unscaled design drift ratio');ax[1].axvline(drift_limit_ratio(state),color='r',ls='--')
     for a in ax:a.grid(alpha=.2);a.legend()
     fig.savefig(out/'MRSM_Profiles_V132.png',dpi=160);plt.close(fig)
     from OpenSees_MRSM_Reports_V134 import export_reports

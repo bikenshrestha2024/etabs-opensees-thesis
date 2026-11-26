@@ -1,6 +1,7 @@
 """Compare saved responses and expose combination/preload coverage without inventing runs."""
 from pathlib import Path
 import json,csv,os,math,tempfile
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio
 
 def collect(folder):
     from OpenSees_Design_Checks_V135 import scan_drift,combinations
@@ -198,7 +199,7 @@ def launch(parent,folder):
                     valid=[r for r in items if str(r['storey']).replace('.','',1).isdigit()]
                     valid.sort(key=lambda r:float(r['storey']))
                     if valid:axes[0,col].plot([r['demand'] for r in valid],[float(r['storey']) for r in valid],label=case)
-                axes[0,col].axvline(.025 if state=='ULS' else .006,color='red',ls='--');axes[0,col].set(title=state+' saved drift',xlabel='Design drift ratio',ylabel='Storey')
+                axes[0,col].axvline(drift_limit_ratio(state),color='red',ls='--');axes[0,col].set(title=state+' saved drift',xlabel='Design drift ratio',ylabel='Storey')
                 grouped={}
                 for row in result['deflection']:
                     if row['limit_state']==state:grouped.setdefault(row['case']+' '+row.get('axis',''),[]).append(row)

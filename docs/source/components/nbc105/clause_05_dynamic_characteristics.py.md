@@ -37,3 +37,4 @@ Tests: `tests/test_nbc105_source_numerical_integrity_v2.py`, `tests/test_nbc105_
 
 **Mass irregularity (added 2026-11-26):** `mass_irregularity(masses, exempt=None, reference="LIGHTER_STOREY")` implements printed 5.4.1.5 (p. 34): two consecutive storeys only, strict "more than 50 %", declared light-roof/penthouse/mezzanine exemption. Both percentage bases are returned because the print names no reference storey. Tests: `tests/test_nbc105_followup_mass_irregularity.py`.
 
+**Drift limits (added 2026-11-26):** `DRIFT_LIMITS = {"ULS": 0.025, "SLS": 0.006}` is the only definition of the printed 5.5.3 (p. 37) limits; use `drift_limit_ratio(state)`, `drift_ratio_status(ratio, state)` or `interstory_drift_check`. Printed 8.1.3.1 and 9.3.3.1 cite "clause 5.6", which is Accidental Eccentricity; the limits are in 5.5.3. Tests: `tests/test_nbc105_followup_drift_single_source.py`.

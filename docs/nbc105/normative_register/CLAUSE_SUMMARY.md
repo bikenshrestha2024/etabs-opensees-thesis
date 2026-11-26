@@ -12,13 +12,13 @@ Status: NOT CERTIFIED. Independent human sign-off is an external gate; a disposi
 | 5 | 140 | 68 | 0 | 22 | 3 | 47 | 0 | 0 | 0 |
 | 6 | 39 | 22 | 0 | 1 | 0 | 16 | 0 | 0 | 0 |
 | 7 | 27 | 10 | 2 | 2 | 2 | 11 | 0 | 0 | 0 |
-| 8 | 25 | 5 | 1 | 5 | 1 | 13 | 0 | 0 | 0 |
-| 9 | 71 | 11 | 0 | 17 | 14 | 29 | 0 | 0 | 0 |
+| 8 | 25 | 6 | 0 | 5 | 1 | 13 | 0 | 0 | 0 |
+| 9 | 71 | 12 | 0 | 16 | 14 | 29 | 0 | 0 | 0 |
 | 10 | 50 | 21 | 0 | 11 | 2 | 16 | 0 | 0 | 0 |
 | A | 373 | 25 | 0 | 184 | 1 | 163 | 0 | 0 | 0 |
 | B | 292 | 16 | 0 | 0 | 156 | 120 | 0 | 0 | 0 |
 | C | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
-| all | 1417 | 354 | 7 | 306 | 180 | 559 | 11 | 0 | 0 |
+| all | 1417 | 356 | 6 | 305 | 180 | 559 | 11 | 0 | 0 |
 
 ## Rows by kind
 
@@ -46,10 +46,10 @@ SHALL: 332, SHOULD: 36, MAY: 31, LIMIT: 21, STATEMENT: 302, CLAUSE: 229, TABLE: 
 - No missing-mass correction exists in the code base; production fails closed instead. (rows: N7-0018; 1 row(s))
 - Reference srss() does not implement direct summation of closely spaced modes; it is not used by active MRSM, so no code change. (rows: N7-0021; 1 row(s))
 - Printed text does not define exactly 7 records; code stays fail-closed on 7 (owner ruling 2026-11-26: keep as printed). Owner phrase "average for >=7" not adopted for 7 because the print does not say it. (rows: N8-0019, N9-0066; 2 row(s))
-- Printed 8.1.3.1 cites 'clause 5.6' for drift limits; the limits are in 5.5.3 (5.6 is accidental eccentricity). Editorial cross-reference error; code follows 5.5.3. (rows: N8-0023; 1 row(s))
+- Printed 8.1.3.1 cites clause 5.6 (Accidental Eccentricity); the limits are in 5.5.3 (see CROSS_REFERENCE_REGISTER). Code and docs cite 5.5.3. (rows: N8-0023; 1 row(s))
 - Printed text uses the symbol 'RP' for the ULS ductility factor (Rmu elsewhere); the helper takes an explicitly approved factor. (rows: N8-0025; 1 row(s))
 - Reference helpers for pushover exist only as pushover_signs() (+1/-1), untested and not wired; there is no capacity-curve, control-node, first-mode-pattern or N2 target-displacement code. (rows: N9-0005; 1 row(s))
-- Printed 9.3.3.1 cites 'clause 5.6' for drift limits; they are in 5.5.3 (5.6 is accidental eccentricity). DRIFT_LIMITS in nbc105_2025_audit.py is defined but never referenced. (rows: N9-0069; 1 row(s))
+- Printed 9.3.3.1 cites clause 5.6 (Accidental Eccentricity); the limits are in 5.5.3. The former duplicate constant is removed. (rows: N9-0069; 1 row(s))
 - component_design_force accepts any positive ap, mu_p and Ip; it does not enforce the printed ranges (ap 1 to 2.5, mu_p up to 3.5) because callers are expected to take them from the Table functions. (rows: N10-0013; 1 row(s))
 - Table 10-1 leaves |T1-Tp| = 0.5 s unassigned; the linear interpolation is continuous with the 1.0 row, so the ruling is ap = 1.0 (no ambiguity in value). (rows: N10-0021, N10-0022; 2 row(s))
 - Figure numbers in Annex A (Figure 4-1 to 4-12) repeat the numbering of main-text Clause 4 (Figure 4-3 is the zoning map there and the beam shear-demand diagram here); register rows are separated by clause code A. (rows: NA-0122, NA-0123, NA-0124, NA-0125, NA-0126, NA-0127 ...; 28 row(s))
