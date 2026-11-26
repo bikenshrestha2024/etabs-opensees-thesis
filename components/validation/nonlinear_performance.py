@@ -6,6 +6,7 @@
 """Explicit nonlinear performance criteria and complete-suite assessment (V151)."""
 from pathlib import Path
 import csv,json,math,datetime,webbrowser
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio
 NBC='https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf'
 NIST='https://nvlpubs.nist.gov/nistpubs/gcr/2017/NIST.GCR.17-917-46v3.pdf'
 FIELDS=['pair_id','orientation','status','model_sha256','metric','demand','unit','result_file']
@@ -14,7 +15,7 @@ def template(state='ULS'):
  if state not in ('ULS','SLS'):raise ValueError('Choose ULS or SLS')
  criteria=[]
  for axis in ('X','Y'):
-  criteria.append(dict(metric='peak_edge_drift_'+axis,limit=.025 if state=='ULS' else .006,unit='ratio',control='deformation',source=NBC,clause='5.5.3; 9.3.3.1 cross-reference discrepancy requires review',reviewed=False))
+  criteria.append(dict(metric='peak_edge_drift_'+axis,limit=drift_limit_ratio(state),unit='ratio',control='deformation',source=NBC,clause='5.5.3; 9.3.3.1 cross-reference discrepancy requires review',reviewed=False))
  for metric,unit,control in [('residual_drift','ratio','deformation'),('plastic_rotation','rad','deformation'),('concrete_compression_strain','strain','deformation'),('steel_strain','strain','deformation'),('wall_shear','kN','force'),('joint_shear','kN','force'),('BRB_ductility','ratio','deformation'),('FVD_stroke','m','deformation'),('FVD_force','kN','force')]:
   criteria.append(dict(metric=metric,limit=None,unit=unit,control=control,source='',clause='',reviewed=False))
  return dict(release='V151',performance_objective='PROJECT INPUT REQUIRED',limit_state=state,model_sha256='',expected_pair_ids=[],orientations=['XY','YX'],torsion_sensitive=True,criteria=criteria,notes='Each metric must identify its member/station/axis when needed. Supply component limits for actual detailing and axial load. No generic IO/LS/CP strains or rotations are assumed. Residual drift is not defined as the last sample of a truncated record. Drift limits are screens pending review of the 9.3.3.1 reference to 5.6, which is accidental eccentricity in this edition.')

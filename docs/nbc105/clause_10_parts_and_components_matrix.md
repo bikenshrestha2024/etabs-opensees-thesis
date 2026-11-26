@@ -19,3 +19,7 @@ This matrix must be extended with one row per subclause, exact table footnotes, 
 The uploaded 2025 code (printed p.51; PDF p.73 in the 137-page edition) requires safety cables fixed to the structure and fixture to resist a **lateral load equal to four times the hanging or swinging light's weight**. The canonical `light_safety_cable_design_capacity(component_weight_kN)` returns `4Wp` in kN and rejects zero, negative or nonfinite weights. Tested in `tests/test_nbc105_printed_table_verification_2025.py`. This checks the demand only; real cable/anchor capacity, connection detailing and installation remain engineering evidence requirements.
 
 The same test independently checks Tables 3-1, 4-1, all 21 rows of 5-2, 6-1 and 10-1/2/3 against source-transcribed values rather than importing implementation constants.
+
+## Owner ruling 5 (2026-11-26)
+
+Clause, table and page of ap, mu_p and Ip: [clause_10_component_factor_locations.md](clause_10_component_factor_locations.md). `component_design_force` enforces the printed ranges (ap 1 to 2.5, mu_p 1.5 to 2.5 or to 3.5 with declared research support, Ip 1.0/1.5); tests `tests/test_nbc105_followup_component_factors.py`.

@@ -9,7 +9,8 @@ import math
 from pathlib import Path
 
 NBC105_URL="https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf"
-DRIFT_LIMITS={"ULS":0.025,"SLS":0.006}
+# Drift limits live ONLY in components/nbc105/clause_05_dynamic_characteristics.py
+# (DRIFT_LIMITS, printed 5.5.3); the former dead copy was removed 2026-11-26.
 SCALING_TARGET="ULS_ELASTIC_SITE_C_OVER_OMEGA_U"
 
 def positive(value,name):
@@ -45,12 +46,39 @@ def scaling_period_range(tn90_s,t1_s,r_mu):
     from components.nbc105.clause_09_nonlinear_analysis import target_spectrum_period_range
     return list(target_spectrum_period_range(t1_s,tn90_s,r_mu))
 
+def history_drift_check(drift_ratio,limit_state,*,clause="9.3.3.1"):
+    """8.1.3.1 / 9.3.3.1 inter-story drift check, routed through Clause 5.
+
+    [REF NBC105-2025 §9.3.3.1 printed p.48; §8.1.3.1 printed p.43; limits §5.5.3 p.37]
+    Both history clauses print "clause 5.6" for the limits, but printed 5.6 is
+    Accidental Eccentricity; the limits are in 5.5.3 and are read only from
+    ``clause_05_dynamic_characteristics.interstory_drift_check``.
+    """
+    if clause not in ("8.1.3.1","9.3.3.1"):raise ValueError("clause must be 8.1.3.1 or 9.3.3.1")
+    from components.nbc105.clause_05_dynamic_characteristics import interstory_drift_check
+    out=dict(interstory_drift_check(drift_ratio,1.0,limit_state))
+    out.update(clause=clause,limit_source="NBC105_2025_5.5.3_via_clause_05")
+    return out
+
 def response_aggregation_rule(number_of_pairs):
     """§9.3.3: uses Clause 8's shared record aggregation boundary rule."""
     from components.nbc105.clause_08_elastic_time_history import record_response_rule
     if type(number_of_pairs) is not int:raise TypeError("Pair count must be integer")
     if number_of_pairs<3:raise ValueError("NBC 9.3.2.1: at least 3 orthogonal pairs")
     return record_response_rule(number_of_pairs)
+
+def project_response_aggregation(accepted_responses,*,declared_count=None):
+    """§8.1.3 / §9.3.3 over the ACCEPTED records of the declared 8-record set.
+
+    [REF NBC105-2025 §9.3.3 p.47] Delegates to Clause 8
+    ``project_record_set_evaluation``; failed or non-converged records must not
+    be passed in. Fewer than 7 accepted -> maximum; more than 7 -> average;
+    exactly 7 -> BLOCKED (printed text does not define it).
+    """
+    from components.nbc105.clause_08_elastic_time_history import (
+        project_record_set_evaluation, PROJECT_DECLARED_GROUND_MOTION_COUNT)
+    n=PROJECT_DECLARED_GROUND_MOTION_COUNT if declared_count is None else declared_count
+    return project_record_set_evaluation(accepted_responses,declared_count=n)
 
 
 def validate_nbc105_design_metadata(evidence,*,record_dt_s,integration_dt_s,

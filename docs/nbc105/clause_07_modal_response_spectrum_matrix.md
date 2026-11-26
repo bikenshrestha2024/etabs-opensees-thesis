@@ -19,3 +19,11 @@ This matrix must be extended with one row per subclause, exact table footnotes, 
 NBC §7.4 printed p.41 allows established CQC or SRSS modal combinations. The CQC *correlation equation itself* is **not tabulated in NBC**: the canonical helper `clause_07_modal_response_spectrum.cqc_correlation_matrix` preserves the previously active solver's equal-damping CQC ratio formula, adds finite positive frequency/damping validation, and is now the sole source for `components/response_spectrum/model_analysis.cqc_matrix`. This is a refactor of an accepted dynamics algorithm, not a claim that NBC explicitly prints its coefficients. Tests confirm diagonal unity, symmetry, near-degenerate modal frequencies, invalid input refusal and production numerical parity.
 
 Still not proven: native modal shape identity, cumulative 90% directional mass and 33 Hz cutoff/missing-mass correction, source-bound ETABS/OpenSees modal equivalence and appropriate damping for the model.
+
+## Owner ruling 6 (2026-11-26)
+
+7.3, p. 40: cumulative modal mass per direction to 100 percent with `reached_90_at_mode`, `reached_100_at_mode` and highlighted 90 percent region (`modal_mass_participation_profile`); compliance threshold remains 90 percent. Tests `tests/test_nbc105_followup_modal_mass.py`.
+
+## Owner ruling 9a: 33 Hz missing-mass correction (2026-11-26)
+
+7.3, p. 41: `components/nbc105/clause_07_missing_mass.py` (residual rigid mass x ZPA coefficient at T = 1/33 s, SRSS with the modal response, gate). Guide `docs/source/components/nbc105/clause_07_missing_mass.py.md`; tests `tests/test_nbc105_followup_missing_mass.py`. Open: passing storey mode shapes and the ZPA coefficient from the eigen solve into `run_model_spectrum` (the engine stays closed for modes at or above 33 Hz and lists the missing inputs).

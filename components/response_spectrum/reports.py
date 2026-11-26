@@ -1,7 +1,13 @@
 """Saved MRSM reports; generation requires no new model/eigen solve."""
 from pathlib import Path
 import json,math
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio
 from OpenSees_Timing_V130 import timed_outputs
+
+
+def _drift_basis_of(result):
+    """Drift-basis label of a saved MRSM case: design-scaled like ETABS (legacy JSON lacks the key)."""
+    return result.get('drift_basis','ETABS_COMPARISON')
 
 
 def saved_cases(folder):
@@ -68,7 +74,7 @@ def figures(cases):
         for key,r in rows:
             z=[v['height_m'] for v in r['stories']];label=r['axis']+' | '+('centered' if r.get('accidental_eccentricity_sign',0)==0 else 'e=+5% b' if r['accidental_eccentricity_sign']>0 else 'e=-5% b');style={0:'-',1:'--',-1:':'}[r.get('accidental_eccentricity_sign',0)]
             axes[0].plot([v['scaled_story_shear_kN'] for v in r['stories']],z,ls=style,label=label);axes[1].plot([v['design_drift_ratio'] for v in r['stories']],z,ls=style,label=label)
-        axes[0].set(xlabel='Scaled storey shear (kN)',ylabel='Height above base (m)',title=state+' MRSM actions');axes[1].set(xlabel='Design edge drift ratio',ylabel='Height above base (m)',title=state+' NBC §5.5 design drift; force scale excluded');axes[1].axvline(.006 if state=='SLS' else .025,color='black',ls='--',label='NBC drift limit')
+        axes[0].set(xlabel='Scaled storey shear (kN)',ylabel='Height above base (m)',title=state+' MRSM actions');axes[1].set(xlabel='Design edge drift ratio [ETABS_COMPARISON]',ylabel='Height above base (m)',title=state+' NBC §5.5 design drift; force scale excluded');axes[1].axvline(drift_limit_ratio(state),color='black',ls='--',label='NBC drift limit')
         for ax in axes:ax.grid(alpha=.25);ax.legend(fontsize=8)
         items.append((state+' MRSM: shear and drift',fig))
     comparison=Figure(figsize=(12,10),layout='constrained');grid=comparison.subplots(3,2,sharey='row',sharex='row')
@@ -88,7 +94,7 @@ def figures(cases):
         for row,title,unit in [(0,'Storey shear','kN'),(1,'Design edge drift','ratio'),(2,'Nodal deflection envelope','mm')]:
             grid[row,col].set(title=state+' '+title,xlabel=unit,ylabel='Elevation / height (m)');grid[row,col].grid(alpha=.25)
             if grid[row,col].lines:grid[row,col].legend(fontsize=7)
-        grid[1,col].axvline(.025 if state=='ULS' else .006,color='black',ls='--')
+        grid[1,col].axvline(drift_limit_ratio(state),color='black',ls='--')
     comparison.suptitle('ULS left / SLS right | Deflection: saved non-concurrent CQC envelopes; force-only scale excluded')
     items.append(('ULS-SLS comparison: shear drift deflection',comparison))
     return items
@@ -103,8 +109,8 @@ def export_reports(folder):
     from openpyxl.styles import Font,PatternFill,Alignment
     from openpyxl.chart import ScatterChart,Series,Reference
     wb=Workbook();summary=wb.active;summary.title='Case summary';summary.append(['MRSM saved analysis results — NBC 105:2025']);summary.append(['E0 = centered; Eplus/Eminus = signed 5% perpendicular breadth eccentric inertia. CQC envelopes are not concurrent physical states.']);summary.append(['Displacement/drift are not multiplied by the force-only section 7.5 base-shear scale.']);summary.append([])
-    headers=['State','Axis','Case','Eccentricity sign','Raw V (kN)','ESM reference V (kN)','Force scale','Scaled V (kN)','Max design drift','Drift limit','Modal mass (%)','Analysis status','Source JSON']
-    summary.append(headers);storey=wb.create_sheet('Storey response');storey.append(['State','Case','Storey','Height (m)','Scaled shear (kN)','Elastic master drift','Design edge drift','Design master drift','Drift limit','Drift status'])
+    headers=['State','Axis','Case','Eccentricity sign','Raw V (kN)','ESM reference V (kN)','Force scale','Scaled V (kN)','Max design drift','Drift limit','Modal mass (%)','Analysis status','Source JSON','Drift basis']
+    summary.append(headers);storey=wb.create_sheet('Storey response');storey.append(['State','Case','Storey','Height (m)','Scaled shear (kN)','Elastic master drift','Design edge drift','Design master drift','Drift limit','Drift status','Drift basis'])
     modal=wb.create_sheet('Modal response');modal.append(['State','Case','Mode','Period (s)','Frequency (Hz)','Signed modal base shear (kN)','UX mode (%)','UY mode (%)','RZ mode (%)','UX cumulative (%)','UY cumulative (%)'])
     nodes=wb.create_sheet('Nodal 6DOF');nodes.append(['State','Case','OpenSees node','X (m)','Y (m)','Z (m)','Ux (m)','Uy (m)','Uz (m)','Rx (rad)','Ry (rad)','Rz (rad)','Scope'])
     derivation=wb.create_sheet('NBC 5.5 Deflections')
@@ -114,16 +120,16 @@ def export_reports(folder):
     derivation.append(['State','Case','Floor','Elevation m','Elastic master U m',
                        'Design master U m','Observed design/elastic factor',
                        'Elastic drift ratio','Design edge drift ratio','Limit',
-                       'Numerical drift status','Code acceptance status'])
+                       'Numerical drift status','Code acceptance status','Drift basis'])
     chart_index=0
     for path,key,r in cases:
-        limit=.006 if r['limit_state']=='SLS' else .025;maxdrift=max(v['design_drift_ratio'] for v in r['stories']);summary.append([r['limit_state'],r['axis'],key,r.get('accidental_eccentricity_sign',0),r['unscaled_modal_base_shear_kN'],r['reference_ESM_base_shear_kN'],r['force_scale'],r['scaled_modal_base_shear_kN'],maxdrift,limit,r['mass_participation_percent'],r['status'],str(path)])
+        limit=drift_limit_ratio(r['limit_state']);maxdrift=max(v['design_drift_ratio'] for v in r['stories']);summary.append([r['limit_state'],r['axis'],key,r.get('accidental_eccentricity_sign',0),r['unscaled_modal_base_shear_kN'],r['reference_ESM_base_shear_kN'],r['force_scale'],r['scaled_modal_base_shear_kN'],maxdrift,limit,r['mass_participation_percent'],r['status'],str(path),_drift_basis_of(r)])
         first=storey.max_row+1
         for v in r['stories']:
             storey.append([r['limit_state'],key,v['story_number'],v['height_m'],
                           v['scaled_story_shear_kN'],v['elastic_drift_ratio'],
                           v['design_drift_ratio'],v.get('master_design_drift_ratio'),
-                          limit,'WITHIN NUMERICAL LIMIT' if v['design_drift_ratio']<=limit else 'EXCEEDS'])
+                          limit,'WITHIN NUMERICAL LIMIT' if v['design_drift_ratio']<=limit else 'EXCEEDS',_drift_basis_of(r)])
             elastic=v.get('elastic_displacement_m')
             design=v.get('design_displacement_m')
             factor=(float(design)/float(elastic)
@@ -132,7 +138,7 @@ def export_reports(folder):
                                elastic,design,factor,v['elastic_drift_ratio'],
                                v['design_drift_ratio'],limit,
                                'WITHIN NUMERICAL LIMIT' if v['design_drift_ratio']<=limit else 'EXCEEDS',
-                               'OPEN: effective stiffness, source native equivalence and site proof'])
+                               'OPEN: effective stiffness, source native equivalence and site proof',_drift_basis_of(r)])
         if len(r['stories'])>1 and not r.get('accidental_eccentricity_sign',0):
             chart=ScatterChart();chart.title=r['limit_state']+' '+key+' storey shear';chart.x_axis.title='kN';chart.y_axis.title='Height (m)';chart.width=16;chart.height=10;chart.series.append(Series(Reference(storey,min_col=4,min_row=first,max_row=storey.max_row),Reference(storey,min_col=5,min_row=first,max_row=storey.max_row),title=key));summary.add_chart(chart,'O'+str(5+chart_index*20));chart_index+=1
         for i,v in enumerate(r['modal_rows']):modal.append([r['limit_state'],key,v['mode'],v['period_s'],v.get('frequency_Hz'),r['modal_base_shears_kN'][i],v.get('UX_participation_percent'),v.get('UY_participation_percent'),v.get('RZ_participation_percent'),v.get('UX_cumulative_percent'),v.get('UY_cumulative_percent')])

@@ -1,5 +1,6 @@
 """Model MRSM: mode-by-mode OpenSees RSA, CQC, NBC force scaling and drift."""
 from components.nbc105.constants import GRAVITY_M_S2
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio
 from pathlib import Path
 import csv,json,math,time
 import numpy as np
@@ -98,7 +99,10 @@ def run_model_spectrum(folder,config,output_dir):
         cache_timer.finish('completed')
         rows=modal['rows'];props=ops.modalProperties('-return')
         if float(modal['cumulative_U'+axis+'_percent'] or 0)<90:raise ValueError(axis+' modal mass is below 90 percent; increase modes.')
-        if modal['modes_at_or_above_33_Hz']:raise ValueError('Returned modes at/above 33 Hz require a reviewed missing-mass correction, not implemented by this MRSM engine. No design result exported.')
+        # [REF NBC105-2025 §7.3, printed p. 41] production gate: modes at/above 33 Hz need the missing-mass correction (clause_07_missing_mass); its integration here (storey mode shapes + ZPA coefficient) is still open, so the gate stays closed with the exact missing inputs.
+        from components.nbc105.clause_07_missing_mass import missing_mass_gate
+        gate=missing_mass_gate([r['frequency_Hz'] for r in rows],[r['U'+axis+'_participation_percent'] for r in rows])
+        if gate['status'].startswith('BLOCKED'):raise ValueError('Returned modes at/above 33 Hz require the NBC 7.3 missing-mass correction, whose model-data integration is not wired in this MRSM engine (missing inputs: '+', '.join(gate['missing'])+'). No design result exported.')
         # Actual assembled supports, never the unfiltered exported 76-point
         # source map, determine MRSM reaction recorder node identities.
         # 32 real foundations remain primary; 76/97 are diagnostic only.
@@ -163,7 +167,7 @@ def run_model_spectrum(folder,config,output_dir):
             edge_d=combine(modal_edge,rho)*amp
             # NBC force scale is deliberately not applied to displacement/drift; ESM kd is not an MRSM factor.
             story_result=[dict(story_number=g['storey_number'],height_m=g['master_xyz'][2]-data['base_z_m'],elastic_displacement_m=float(u[display_ns.index(int(g['master_tag'])),dof-1]),design_displacement_m=float(u[display_ns.index(int(g['master_tag'])),dof-1]*amp),elastic_drift_ratio=float(d[i]),design_drift_ratio=float(max(edge_d[2*i:2*i+2])),master_design_drift_ratio=float(d[i]*amp),scaled_story_shear_kN=float(shear[i])) for i,g in enumerate(groups)]
-            write_csv(out/(state+'_'+case_axis+'_Drift_V132.csv'),drift_check(story_result,state))
+            write_csv(out/(state+'_'+case_axis+'_Drift_V132.csv'),drift_check(story_result,state,'ETABS_COMPARISON'))
             write_csv(out/(state+'_'+case_axis+'_Modal_Force_Equilibrium_V132.csv'),force_checks)
             support_envelope=combine(modal_reactions,rho)*scale
             write_csv(out/(state+'_'+case_axis+'_Support_Reactions_V132.csv'),[dict(node_tag=n,**{('F'+str(j+1)+'_kN' if j<3 else 'M'+str(j-2)+'_kNm'):float(v) for j,v in enumerate(support_envelope[i])}) for i,n in enumerate(support_tags)])
@@ -184,7 +188,7 @@ def run_model_spectrum(folder,config,output_dir):
             ])
             deformation=dict(nodes=display_nodes,limit_state=state,response_case=case_axis,dof_names=['Ux','Uy','Uz','Rx','Ry','Rz'],dof_availability=[True]*6,eccentricity_sign=ecc_sign,elements=[e['nodes'] for e in data['frames']+data['shells']],displacements={str(n):(u[j]*amp).tolist() for j,n in enumerate(display_ns)},note=state+' '+axis+' MRSM component-wise positive CQC envelope; not a simultaneous physical shape. Force base-shear scale is not applied.')
             (out/('Deformation_MRSM_'+state+'_'+case_axis+'_V132.json')).write_text(json.dumps(deformation),encoding='utf-8')
-            result=dict(model_sha256=model_signature,implementation_sha256=source_signature,modal_numeric_sha256=numeric_signature, support_case=selected_support, seismic_mass_policy=selected_mass, support_case_evidence=support_evidence, gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'),limit_state=state,axis=axis,accidental_eccentricity_sign=ecc_sign,unscaled_modal_base_shear_kN=raw_V,reference_ESM_base_shear_kN=reference['base_shear_kN'],force_scale=scale,scaled_modal_base_shear_kN=raw_V*scale,displacement_scale_from_7_5=1.,drift_amplification=amp,combination='CQC, equal modal damping',mass_participation_percent=modal['cumulative_U'+axis+'_percent'],stories=story_result,modal_base_shears_kN=modal_V,modal_rows=rows,units='kN m s; dimensionless Cd converted to m/s2 using 9.81',scope='Elastic model with inherent torsion plus signed 5 percent per-floor eccentric inertia torque; lumped floor influence vector on unchanged eigenmodes. Orthogonal member design combinations require review; member design not performed.',status='ANALYSIS COMPLETE / DESIGN COMBINATIONS REQUIRE REVIEW')
+            result=dict(model_sha256=model_signature,implementation_sha256=source_signature,modal_numeric_sha256=numeric_signature, support_case=selected_support, seismic_mass_policy=selected_mass, support_case_evidence=support_evidence, gravity_profile=__import__('os').environ.get('OPENSEES_GRAVITY_PROFILE','AS_CONFIGURED'),limit_state=state,axis=axis,accidental_eccentricity_sign=ecc_sign,unscaled_modal_base_shear_kN=raw_V,reference_ESM_base_shear_kN=reference['base_shear_kN'],force_scale=scale,scaled_modal_base_shear_kN=raw_V*scale,displacement_scale_from_7_5=1.,drift_amplification=amp,drift_basis='ETABS_COMPARISON',combination='CQC, equal modal damping',mass_participation_percent=modal['cumulative_U'+axis+'_percent'],stories=story_result,modal_base_shears_kN=modal_V,modal_rows=rows,units='kN m s; dimensionless Cd converted to m/s2 using 9.81',scope='Elastic model with inherent torsion plus signed 5 percent per-floor eccentric inertia torque; lumped floor influence vector on unchanged eigenmodes. Orthogonal member design combinations require review; member design not performed.',status='ANALYSIS COMPLETE / DESIGN COMBINATIONS REQUIRE REVIEW')
             relevant=[r['error_percent'] for r in force_checks if abs(r['modal_inertia_base_shear_kN'])>max(1.,max(abs(v) for v in modal_V)*1e-4)]
             result['stiffness_review']='Gross in-plane elastic wall stiffness: review NBC Table 3-1; no compliance certification.'
             result['modal_force_equilibrium_max_relevant_percent']=max(relevant or [0.])
@@ -219,7 +223,7 @@ def run_model_spectrum(folder,config,output_dir):
     fig,ax=plt.subplots(1,2,figsize=(11,6),layout='constrained')
     for axis,res in results.items():
         z=[r['height_m'] for r in res['stories']];ax[0].plot([r['scaled_story_shear_kN'] for r in res['stories']],z,label=axis);ax[1].plot([r['design_drift_ratio'] for r in res['stories']],z,label=axis)
-    ax[0].set(xlabel='Force-scaled storey shear (kN)',ylabel='Height (m)');ax[1].set(xlabel='Unscaled design drift ratio');ax[1].axvline(.025 if state=='ULS' else .006,color='r',ls='--')
+    ax[0].set(xlabel='Force-scaled storey shear (kN)',ylabel='Height (m)');ax[1].set(xlabel='Unscaled design drift ratio');ax[1].axvline(drift_limit_ratio(state),color='r',ls='--')
     for a in ax:a.grid(alpha=.2);a.legend()
     fig.savefig(out/'MRSM_Profiles_V132.png',dpi=160);plt.close(fig)
     from OpenSees_MRSM_Reports_V134 import export_reports

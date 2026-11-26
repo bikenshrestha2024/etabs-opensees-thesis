@@ -173,3 +173,88 @@ def modal_combination_readiness(*,mass_percent,highest_frequency_hz,
         missing.append("MISSING_MASS_CORRECTION_NOT_VERIFIED")
     return {"ready":not missing,"missing":missing,
             "close_mode_combination":"REQUIRES_FREQUENCY_SPACING_REVIEW"}
+
+
+MODAL_MASS_THRESHOLD_PERCENT = 90.0   # printed 7.3 p.40: compliance threshold (unchanged)
+
+
+def modal_mass_participation_profile(per_mode_percent, *, periods_s=None):
+    """Cumulative effective modal mass in ONE direction, out to 100 percent.
+
+    [REF NBC105-2025 §7.3, printed p. 40]
+    Printed 7.3: "A sufficient number of modes shall be included ... to include
+    at least 90% of the total seismic mass in the direction under
+    consideration." ``per_mode_percent`` is the effective modal mass of mode 1,
+    2, ... N in percent of the total seismic mass in that direction (not
+    cumulative). Returns the cumulative series, ``reached_90_at_mode`` (first
+    mode with cumulative >= 90, None if never), ``reached_100_at_mode`` (first
+    mode with cumulative >= 100 within 1e-4 percent, None if the supplied
+    modes do not cover the whole mass), the period at the 90 percent mode when
+    ``periods_s`` is given (Tn90 candidate, see 9.3.2.4), a per-mode ``regions``
+    list and ``compliant_90`` (the compliance test stays at 90 percent; the
+    100 percent figure is information). Region values: ``REQUIRED_FOR_90``
+    (modes 1 to the first 90 percent mode, ``highlight_90_region`` True),
+    ``BEYOND_90_TO_100`` and ``BEYOND_100`` (numerical tail after the whole mass
+    is reached). Source-to-code review of the arithmetic only.
+    """
+    pm = [float(v) for v in per_mode_percent]
+    if not pm or any((not math.isfinite(v)) or v < 0 for v in pm):
+        raise ValueError("per-mode participation must be non-empty, finite and nonnegative")
+    per = None
+    if periods_s is not None:
+        per = [float(v) for v in periods_s]
+        if len(per) != len(pm) or any((not math.isfinite(v)) or v <= 0 for v in per):
+            raise ValueError("periods_s must match the modes and be positive")
+    cum, run = [], 0.0
+    for v in pm:
+        run += v
+        cum.append(run)
+    total = cum[-1]
+    if total > 100.0 + 1e-6:
+        raise ValueError("modal mass ratios exceed 100%")
+    tol100 = 1e-4
+    r90 = next((i + 1 for i, c in enumerate(cum) if c >= MODAL_MASS_THRESHOLD_PERCENT - 1e-9), None)
+    r100 = next((i + 1 for i, c in enumerate(cum) if c >= 100.0 - tol100), None)
+    regions = []
+    for i, c in enumerate(cum):
+        mode = i + 1
+        if r90 is None or mode <= r90:
+            region = "REQUIRED_FOR_90"
+        elif r100 is None or mode <= r100:
+            region = "BEYOND_90_TO_100"
+        else:
+            region = "BEYOND_100"
+        regions.append({"mode": mode, "mode_percent": pm[i], "cumulative_percent": c, "region": region,
+                        "highlight_90_region": region == "REQUIRED_FOR_90",
+                        "first_mode_at_90": mode == r90, "first_mode_at_100": mode == r100})
+    return {
+        "threshold_percent": MODAL_MASS_THRESHOLD_PERCENT,
+        "mode_count": len(pm), "cumulative_percent": cum, "total_percent": total,
+        "reached_90_at_mode": r90, "reached_100_at_mode": r100,
+        "period_at_90_s": None if per is None or r90 is None else per[r90 - 1],
+        "compliant_90": r90 is not None,
+        "all_mass_covered_100": r100 is not None,
+        "shortfall_to_90_percent": max(0.0, MODAL_MASS_THRESHOLD_PERCENT - total),
+        "shortfall_to_100_percent": max(0.0, 100.0 - total),
+        "regions": regions,
+        "basis": "NBC105_2025_7.3_P40_CUMULATIVE_EFFECTIVE_MODAL_MASS_ARITHMETIC_ONLY",
+    }
+
+
+def modal_mass_participation_by_direction(per_mode_percent_by_direction, *, periods_s=None):
+    """Apply ``modal_mass_participation_profile`` to each direction (e.g. X and Y).
+
+    [REF NBC105-2025 §7.3, printed p. 40]
+    ``compliant_90`` of the result is True only if every direction reaches 90
+    percent; each direction keeps its own region flags and mode numbers.
+    """
+    if not per_mode_percent_by_direction:
+        raise ValueError("at least one direction is required")
+    out = {d: modal_mass_participation_profile(v, periods_s=periods_s)
+           for d, v in per_mode_percent_by_direction.items()}
+    return {"directions": out, "compliant_90": all(v["compliant_90"] for v in out.values()),
+            "threshold_percent": MODAL_MASS_THRESHOLD_PERCENT}
+
+__all__ += ["MODAL_MASS_THRESHOLD_PERCENT","modal_mass_participation_profile",
+            "modal_mass_participation_by_direction"]
+

@@ -277,11 +277,13 @@ def _wall_aw_from_lines(height_m, lines):
         for start,end in merged:
             length=end-start
             area=t*length
-            contribution=area*(.2+min(length/height,.9)**2)
+            # NBC 5.1.2 p.30: Lwi/H should not exceed 0.9. The numeric value is unchanged, but an exceedance is now flagged per segment (never silent).
+            ratio_lwi=length/height;contribution=area*(.2+min(ratio_lwi,.9)**2)
             aw[axis]+=contribution
             segments.append(dict(axis=axis,plane_m=plane,start_m=start,end_m=end,
                                  thickness_m=t,wall_length_m=length,
-                                 wall_area_m2=area,Aw_contribution_m2=contribution))
+                                 wall_area_m2=area,Aw_contribution_m2=contribution,
+                                 lwi_over_h=ratio_lwi,lwi_over_h_limit=.9,lwi_over_h_exceeds_limit=ratio_lwi>.9))
     return aw,segments
 
 

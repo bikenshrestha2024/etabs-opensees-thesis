@@ -3,6 +3,7 @@ No capacity is inferred from elastic stiffness or analysis convergence.
 """
 from pathlib import Path
 import csv,json,math,time,datetime,hashlib,itertools
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio
 SOURCE='https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf'
 COMPONENTS=('N_kN','Vy_kN','Vz_kN','T_kNm','My_kNm','Mz_kNm')
 REQUIRED=('axial_biaxial_interaction','shear','torsion','stability','detailing_capacity_design')
@@ -167,7 +168,7 @@ def scan_drift(folder):
             for r in read_rows(p):
                 state=r.get('limit_state','').upper()
                 if state not in ('ULS','SLS'):raise ValueError('Drift result lacks limit_state')
-                d=abs(number(r['design_drift_ratio']));limit=.025 if state=='ULS' else .006
+                d=abs(number(r['design_drift_ratio']));limit=drift_limit_ratio(state)
                 utilization=d/limit
                 if not math.isfinite(utilization):
                     raise ValueError('Nonfinite CSV drift utilization from finite demand')
@@ -184,7 +185,7 @@ def scan_drift(folder):
                 raise ValueError('MRSM case result must be a JSON object')
             parsed=[]
             for case,r in results.items():
-                state=r['limit_state'];limit={'ULS':.025,'SLS':.006}[state]
+                state=r['limit_state'];limit=drift_limit_ratio(state)
                 for s in r['stories']:
                     d=abs(number(s['design_drift_ratio']))
                     utilization=d/limit

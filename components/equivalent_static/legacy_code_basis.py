@@ -1,4 +1,5 @@
 import math
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio
 """NBC 105:2025 analysis settings V108 used by the ETABS/OpenSeesPy workflow.
 
 Values below are transcribed from NBC 105:2025 §§3.4, 3.6.1 and 3.6.2
@@ -370,7 +371,7 @@ def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
         "ductility_factor_R_mu":float(r_mu),"overstrength_factor_Omega_u":float(omega_u),
         "overstrength_factor_Omega_s":float(omega_s),
         "deflection_scale_factor_kd":({1:1.0,2:0.97,3:0.94,4:0.91,5:0.88}.get(len(normalized),0.85)),
-        "drift_limit_ratio":(0.025 if state=="ULS" else 0.006),
+        "drift_limit_ratio":drift_limit_ratio(state),
         "total_seismic_weight_kN":W,"base_shear_kN":V,
         "total_floor_force_kN":sum(r["lateral_force_kN"] for r in normalized),
         "height_m":H,"esm_eligibility":eligibility_note,

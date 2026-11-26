@@ -19,6 +19,7 @@ from components.nbc105.constants import GRAVITY_M_S2
 from components.nonlinear_time_history.thesis_quality import (
     DEFAULT_CONVERGENCE_TOLERANCE, STRICT_CONVERGENCE_TOLERANCE, validate_convergence_settings,
 )
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio, drift_ratio_status
 from OpenSees_Timing_V130 import timed_outputs
 from OpenSees_Transient_Runtime_V133 import CaseProfiler,save_workload,history_metadata,HistoryStream,acceleration_conversion
 
@@ -684,7 +685,7 @@ def _run_analysis(config):
                     filename="NBC105_NLTHA_"+case+"_Recorder_Index.json")
                 from OpenSees_Response_Checks_V132 import export_history_checks
                 edge_peaks=export_history_checks(lines,stories,out,case,config['limit_state'],config['model_script'])
-                drift_limit = 0.025 if config["limit_state"] == "ULS" else 0.006
+                drift_limit = drift_limit_ratio(config["limit_state"])
                 peak = {"case": case, "pair_id": motion["pair_id"], "field_type": motion.get("field_type", "Custom"), "orientation": orientation,
                     "status": case_status, "full_record_duration_s": full_record_duration,
                     "scale_factor": motion["scale"], "acceleration_units": motion["units"], "record_dt_min_s": dt_record,
@@ -701,7 +702,7 @@ def _run_analysis(config):
                     "maximum_story_drift_X": max(r[f"{s['story_name']}_drift_X"] for r in lines for s in stories),
                     "minimum_story_drift_Y": min(r[f"{s['story_name']}_drift_Y"] for r in lines for s in stories),
                     "maximum_story_drift_Y": max(r[f"{s['story_name']}_drift_Y"] for r in lines for s in stories),
-                    "drift_limit_ratio": drift_limit,
+                    "drift_limit_ratio": drift_limit, "drift_basis": "OPENSEES_ACTUAL",
                     "drift_screen_X": "PASS" if max(abs(r[f"{s['story_name']}_drift_X"]) for r in lines for s in stories) <= drift_limit else "REVIEW",
                     "drift_screen_Y": "PASS" if max(abs(r[f"{s['story_name']}_drift_Y"]) for r in lines for s in stories) <= drift_limit else "REVIEW",
                     "damping_model":damping_model,"damping_check_scope":"Initial eigenmodes; committed-stiffness Rayleigh ratios can change during yielding",
@@ -775,8 +776,7 @@ def _run_analysis(config):
         for axis in ("X", "Y"):
             key = f"peak_story_drift_{axis}"
             if aggregate.get(key) is not None:
-                limit = 0.025 if config["limit_state"] == "ULS" else 0.006
-                aggregate[f"drift_screen_{axis}"] = "PASS" if aggregate[key] <= limit else "REVIEW"
+                aggregate[f"drift_screen_{axis}"] = drift_ratio_status(aggregate[key], config["limit_state"])
         return {"set": label, "pair_count": n_pairs, "statistic": method, "response_demands": aggregate}
 
     aggregation = {"all_selected_pairs": _aggregate_pair_set(pair_demands, "all selected records")}
@@ -789,7 +789,7 @@ def _run_analysis(config):
         x_envelope = {"basis": "maximum across six individual X records per NBC §8.1.3 (<7 records)",
             "peak_roof_UX_m": max(r["peak_roof_UX_m"] for r in records),
             "peak_story_drift_X": max(r["peak_story_drift_X"] for r in records),
-            "drift_screen_X": "PASS" if max(r["peak_story_drift_X"] for r in records) <= (0.025 if config["limit_state"] == "ULS" else 0.006) else "REVIEW"}
+            "drift_screen_X": drift_ratio_status(max(r["peak_story_drift_X"] for r in records), config["limit_state"])}
     summary = {"standard": "NBC 105:2025", "analysis": "Nonlinear paired-component time history", "input_mode": config.get("motion_mode", "PAIRED_3D"),
         "directional_scope": "X-only screening; not a full NBC paired-component 3D verification" if config.get("motion_mode") == "X_ONLY_SCREENING" else f"{len(motions)} selected orthogonal 3D pairs; XY and YX orientations",
         "record_metadata": {"site_soil": "C", "period_range_s": [0.05, 6.0], "record_set": "User-selected X-only SeismoMatch/PEER screening records"} if config.get("motion_mode") == "X_ONLY_SCREENING" else LTH_MATCHING_METADATA,

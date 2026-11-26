@@ -13,3 +13,5 @@
 **Code clauses:** §9.3.2.1–9.3.2.4, §9.3.3 and §5.5.3; official source https://giwmscdnone.gov.np/media/files/NBC_105_2025_Seismic%20Design%20of%20Buildings%20in%20Nepal_lqqvx6a.pdf.
 
 [Research review](../../../00_NBC105_2025_NONLINEAR_RESEARCH_IMPLEMENTATION.md)
+
+**Follow-up 2026-11-26:** `DRIFT_LIMITS` (dead, never referenced) was removed; limits come from `components/nbc105/clause_05_dynamic_characteristics.py`. New `history_drift_check(drift_ratio, limit_state, clause="9.3.3.1")` routes 8.1.3.1 / 9.3.3.1 checks through `interstory_drift_check`; new `project_response_aggregation` applies the printed record-count rule to the declared 8-record set (see PROJECT_DECLARATIONS section 5).

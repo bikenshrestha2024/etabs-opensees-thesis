@@ -11,3 +11,5 @@
 **Example:** `verification_check(uls=True,sls=True,overturning=True,sliding=True,foundation=True,evacuation_components=True)`
 
 **Tests:** `tests/test_nbc105_clauses_02_03_06_10.py` includes numerical and rejection tests. Actual ETABS and OpenSees analyses are outside this reference-only run; full module-to-GUI call-site migration remains open.
+
+**Rigid-diaphragm criterion (added 2026-11-26):** `rigid_diaphragm_check(flexible_displacements_m, rigid_displacements_m)` implements printed 2.2.4 D (p. 14): flexible displacements nowhere more than 10 % above the rigid-diaphragm displacements. Arithmetic on supplied two-model results; no production caller yet. Tests: `tests/test_nbc105_followup_rigid_diaphragm.py`.

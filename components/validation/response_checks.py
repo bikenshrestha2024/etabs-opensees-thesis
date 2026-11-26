@@ -1,6 +1,7 @@
 """Common drift, deformation and NBC 5.4 review outputs. Units m, kN."""
 from pathlib import Path
 import json,csv,math
+from components.nbc105.clause_05_dynamic_characteristics import drift_limit_ratio
 from OpenSees_Timing_V130 import timed_outputs
 
 
@@ -9,19 +10,26 @@ def write_csv(path,rows):
         with Path(path).open('w',newline='',encoding='utf-8-sig') as stream:
             w=csv.DictWriter(stream,fieldnames=list(dict.fromkeys(k for row in rows for k in row)));w.writeheader();w.writerows(rows)
 
-def drift_check(rows,limit_state):
-    """Report §5.5.3 using one canonical Clause 5 limit, with unchanged schema."""
-    from components.nbc105.clause_05_dynamic_characteristics import interstory_drift_check
+def drift_check(rows,limit_state,drift_basis=None):
+    """Report §5.5.3 using one canonical Clause 5 limit.
+
+    ``drift_basis`` is ETABS_COMPARISON (design-scaled, ESM/MRSM, like ETABS) or
+    OPENSEES_ACTUAL (unscaled history response); it is written to every row.
+    None keeps the legacy schema and labels the row UNLABELLED_LEGACY.
+    """
+    from components.nbc105.clause_05_dynamic_characteristics import interstory_drift_check, drift_basis as _basis
+    label='UNLABELLED_LEGACY' if drift_basis is None else _basis(drift_basis)
     result=[]
     for row in rows:
         # Input is already a design drift RATIO; pass unit storey height.
         decision=interstory_drift_check(row["design_drift_ratio"],1.0,limit_state)
         result.append(dict(**row,limit_state=limit_state,limit_ratio=decision["limit"],
-                           clause='NBC 105:2025 5.5.3',
+                           clause='NBC 105:2025 5.5.3',drift_basis=label,
                            status='PASS' if decision["pass"] else 'EXCEEDS'))
     return result
 
-def irregularity(data,story_rows=None,capacity_rows=None):
+def irregularity(data,story_rows=None,capacity_rows=None,mass_exempt_storeys=(),plan_inputs=None):
+    mass_exempt=set(mass_exempt_storeys)
     groups=sorted(data.get('diaphragms',[]),key=lambda g:g['master_xyz'][2]);nodes=data['nodes'];checks=[]
     def add(clause,kind,level,value,threshold,status,note=''):
         checks.append(dict(clause=clause,check=kind,storey=level,value=value,threshold=threshold,status=status,note=note))
@@ -38,7 +46,11 @@ def irregularity(data,story_rows=None,capacity_rows=None):
         widths.append([max(v[a] for v in pts)-min(v[a] for v in pts) for a in (0,1)] if pts else [None,None])
     for i in range(len(groups)-1):
         level=groups[i]['storey_number'];ratio=max(masses[i],masses[i+1])/min(masses[i],masses[i+1]) if min(masses[i],masses[i+1])>0 else None
-        add('5.4.1.5','Mass irregularity',level,ratio,1.5,'IRREGULAR' if ratio and ratio>1.5 else 'PASS' if ratio else 'NOT EVALUATED','Review roof/penthouse/mezzanine exclusions explicitly; no automatic exemption.')
+        if ratio:
+            from components.nbc105.clause_05_dynamic_characteristics import mass_irregularity
+            mi=mass_irregularity([masses[i],masses[i+1]],exempt=[j for j in (0,1) if i+j in mass_exempt])[0]
+            add('5.4.1.5','Mass irregularity',level,ratio,1.5,mi['status'],'NBC 5.4.1.5 consecutive-storey screen (clause_05.mass_irregularity), lighter-storey basis; heavier-storey reading flags: '+str(mi['irregular_vs_heavier'])+'. Light roof/penthouse/mezzanine exempt only if declared via mass_exempt_storeys.')
+        else:add('5.4.1.5','Mass irregularity',level,None,1.5,'NOT EVALUATED','Zero storey mass; cannot compare.')
         for axis in (0,1):
             a,b=widths[i][axis],widths[i+1][axis];ratio=max(a,b)/min(a,b) if a and b else None
             add('5.4.1.3','LFRS extent '+('X','Y')[axis],level,ratio,1.3,'IRREGULAR' if ratio and ratio>1.3 else 'PASS' if ratio else 'NOT EVALUATED','Geometry extent screen; continuity/member roles require review.')
@@ -54,7 +66,24 @@ def irregularity(data,story_rows=None,capacity_rows=None):
         for a,b in zip(sorted(capacity_rows,key=lambda r:float(r['storey_number'])),sorted(capacity_rows,key=lambda r:float(r['storey_number']))[1:]):
             ratio=float(a['lateral_strength_kN'])/float(b['lateral_strength_kN']);add('5.4.1.1','Weak story',a['storey_number'],ratio,.8,'IRREGULAR' if ratio<.8 else 'PASS')
     else:add('5.4.1.1','Weak story','ALL',None,.8,'NOT EVALUATED','Requires reviewed lateral-strength capacities; elastic stiffness is not strength.')
-    for clause,kind in [('5.4.1.4','In-plane discontinuity'),('5.4.2.1','Torsion'),('5.4.2.2','Extreme torsion'),('5.4.2.3','Re-entrant corners'),('5.4.2.4','Diaphragm discontinuity'),('5.4.2.5','Out of plane offset')]:add(clause,kind,'ALL',None,None,'NOT EVALUATED','Requires floor-edge center-of-mass response or reviewed plan/vertical load-path geometry; not inferred from bounding box.')
+    plan=plan_inputs or {}
+    from components.nbc105 import clause_05_dynamic_characteristics as c5
+    def _result(status):return 'IRREGULAR' if status=='IRREGULAR' else 'NOT EVALUATED' if str(status).startswith('NOT_EVALUATED') else 'PASS'
+    def _missing(note):return 'Requires floor-edge center-of-mass response or reviewed plan/vertical load-path geometry; not inferred from bounding box. Missing input: '+note
+    for clause,kind in [('5.4.1.4','In-plane discontinuity'),('5.4.2.1','Torsion'),('5.4.2.2','Extreme torsion'),('5.4.2.3','Re-entrant corners'),('5.4.2.4','Diaphragm discontinuity'),('5.4.2.5','Out of plane offset')]:
+        if clause=='5.4.1.4' and 'in_plane_offsets' in plan:
+            r=c5.in_plane_discontinuity_irregularity(plan['in_plane_offsets']);add(clause,kind,'ALL',len(r['irregular_elements']),'offset>0 and overturning',r['status'],'Input-driven (clause_05.in_plane_discontinuity_irregularity); no printed numeric threshold.')
+        elif clause=='5.4.2.3' and any(k in plan for k in ('reentrant_projection_x_m','reentrant_projection_y_m')):
+            r=c5.reentrant_corner_check(plan.get('reentrant_projection_x_m'),plan.get('overall_x_m'),plan.get('reentrant_projection_y_m'),plan.get('overall_y_m'))
+            add(clause,kind,'ALL',max([v['ratio'] for v in (r['X'],r['Y']) if 'ratio' in v] or [None]) if any('ratio' in v for v in (r['X'],r['Y'])) else None,.15,_result(r['overall'].replace('PASS_EVALUATED_DIRECTIONS_ONLY','NOT_EVALUATED') if r['overall']=='PASS_EVALUATED_DIRECTIONS_ONLY' else r['overall']),'Input-driven (clause_05.reentrant_corner_check); a direction without projection and overall dimension is NOT EVALUATED.')
+        elif clause=='5.4.2.4' and any(k in plan for k in ('diaphragm_cutout_area_m2','diaphragm_stiffness_this_storey')):
+            r=c5.diaphragm_discontinuity_irregularity(plan.get('diaphragm_cutout_area_m2'),plan.get('diaphragm_gross_area_m2'),plan.get('diaphragm_stiffness_this_storey'),plan.get('diaphragm_stiffness_adjacent_storey'))
+            add(clause,kind,'ALL',None,.5,_result(r['overall'].replace('PASS_EVALUATED_TRIGGERS_ONLY','NOT_EVALUATED') if r['overall']=='PASS_EVALUATED_TRIGGERS_ONLY' else r['overall']),'Input-driven (clause_05.diaphragm_discontinuity_irregularity): cutout > 50 percent of gross area or stiffness change > 50 percent; a trigger without inputs is NOT EVALUATED.')
+        elif clause=='5.4.2.5' and 'out_of_plane_offsets_m' in plan:
+            r=c5.out_of_plane_offset_irregularity(plan['out_of_plane_offsets_m'],plan.get('out_of_plane_tolerance_m',0.0));add(clause,kind,'ALL',len(r['irregular_elements']),'offset > declared tolerance',r['status'],'Input-driven (clause_05.out_of_plane_offset_irregularity); no printed threshold.')
+        else:
+            need={'5.4.1.4':'plan_inputs[in_plane_offsets] = [(offset_m, causes_overturning_on_support)]','5.4.2.3':'plan_inputs[reentrant_projection_x_m, overall_x_m, reentrant_projection_y_m, overall_y_m]','5.4.2.4':'plan_inputs[diaphragm_cutout_area_m2, diaphragm_gross_area_m2, diaphragm_stiffness_this_storey, diaphragm_stiffness_adjacent_storey]','5.4.2.5':'plan_inputs[out_of_plane_offsets_m]'}.get(clause,'storey end displacements (floor-edge center-of-mass response)')
+            add(clause,kind,'ALL',None,None,'NOT EVALUATED',_missing(need))
     return dict(checks=checks,overall='IRREGULAR' if any(r['status']=='IRREGULAR' for r in checks) else 'INCOMPLETE' if any(r['status']=='NOT EVALUATED' for r in checks) else 'NO TRIGGER FOUND',note='A partial screen cannot certify regularity; missing checks remain explicit.')
 
 @timed_outputs('Static drift, deformation and irregularity export','output')
@@ -64,7 +93,7 @@ def export_static_response(ops,model_script,output,story_rows,limit_state,baseli
     data=json.loads(source.read_text(encoding='utf-8-sig'));tag=str(story_rows[0].get('limit_state',limit_state))+'_'+str(story_rows[0].get('direction','case'))
     # Unique generated runner output prefix is supplied in the row metadata.
     tag=story_rows[0].get('response_case',tag)
-    checks=drift_check(story_rows,limit_state);write_csv(output/('Drift_Check_'+tag+'_V132.csv'),checks)
+    checks=drift_check(story_rows,limit_state,'ETABS_COMPARISON');write_csv(output/('Drift_Check_'+tag+'_V132.csv'),checks)
     if baseline:
         groups=sorted(data['diaphragms'],key=lambda g:g['master_xyz'][2]);edge_rows=[]
         case_axis='Y' if '_Y' in tag else 'X';dof=1 if case_axis=='Y' else 0;perp=0 if case_axis=='Y' else 1;sign=1 if case_axis=='Y' else -1
@@ -76,7 +105,7 @@ def export_static_response(ops,model_script,output,story_rows,limit_state,baseli
             for end,position in enumerate((min(p[perp] for p in pts),max(p[perp] for p in pts))):
                 drift=abs(floor_u(g,position)-floor_u(below,position))/h
                 edge_rows.append(dict(story_number=g['storey_number'],axis=case_axis,edge=end+1,floor_displacement_m=floor_u(g,position),height_m=g['master_xyz'][2]-data['base_z_m'],elastic_drift_ratio=drift,design_drift_ratio=drift*design_factor))
-        write_csv(output/('Floor_Edge_Drift_'+tag+'_V132.csv'),drift_check(edge_rows,limit_state))
+        write_csv(output/('Floor_Edge_Drift_'+tag+'_V132.csv'),drift_check(edge_rows,limit_state,'ETABS_COMPARISON'))
     disp={str(n):list(ops.nodeDisp(int(n))) for n in data['nodes']}
     (output/('Deformation_'+tag+'_V132.json')).write_text(json.dumps(dict(nodes=data['nodes'],elements=[e['nodes'] for e in data['frames']+data['shells']],displacements=disp,note='Total converged displacement including gravity; use design drift CSV for seismic drift acceptance.')),encoding='utf-8')
     review=irregularity(data,story_rows)
@@ -99,7 +128,7 @@ def export_history_checks(lines,stories,output,case,limit_state,model_script=Non
             key=s['story_name']+'_drift_'+axis
             critical=max(lines,key=lambda r:abs(r[key]))
             rows.append(dict(story=s['story_name'],axis=axis,critical_time_s=critical['time_s'],design_drift_ratio=abs(critical[key]),height_m=s['height']))
-    write_csv(Path(output)/('Drift_Check_'+case+'_V132.csv'),drift_check(rows,limit_state))
+    write_csv(Path(output)/('Drift_Check_'+case+'_V132.csv'),drift_check(rows,limit_state,'OPENSEES_ACTUAL'))
     edge_peaks={};edge_rows=[]
     if model_script:
         path=Path(model_script).parent/'OpenSees_Complete_Model_Data_V118.json'
@@ -117,7 +146,7 @@ def export_history_checks(lines,stories,output,case,limit_state,model_script=Non
                             return abs(upper-lower)/h
                         critical_edge=max(lines,key=ratio);value=ratio(critical_edge);edge_peaks[axis]=max(value,edge_peaks.get(axis,0.))
                         edge_rows.append(dict(story_number=g['storey_number'],axis=axis,edge=end+1,critical_time_s=critical_edge['time_s'],design_drift_ratio=value))
-            write_csv(Path(output)/('Floor_Edge_Drift_'+case+'_V132.csv'),drift_check(edge_rows,limit_state))
+            write_csv(Path(output)/('Floor_Edge_Drift_'+case+'_V132.csv'),drift_check(edge_rows,limit_state,'OPENSEES_ACTUAL'))
             critical=max(lines,key=lambda r:max(abs(r[s['story_name']+'_drift_'+a]) for s in stories for a in ('X','Y')))
             from OpenSees_History_Inspection_V133 import floor_snapshot
             displacement=floor_snapshot(data,stories,critical)
@@ -133,7 +162,7 @@ def export_history_checks(lines,stories,output,case,limit_state,model_script=Non
         axes[0].plot([max(abs(r[s['story_name']+'_U'+axis+'_m']) for r in lines) for s in stories],z,label=axis)
         axes[1].plot([max([r['design_drift_ratio'] for r in edge_rows if r['axis']==axis and r['story_number']==groups[i]['storey_number']] or [max(abs(r[s['story_name']+'_drift_'+axis]) for r in lines)]) for i,s in enumerate(stories)] if edge_rows else [max(abs(r[s['story_name']+'_drift_'+axis]) for r in lines) for s in stories],z,label=axis)
     axes[0].set(xlabel='Peak floor displacement (m)',ylabel='Height (m)',title='Independent floor maxima; not a simultaneous shape')
-    axes[1].axvline(.025 if limit_state=='ULS' else .006,color='r',ls='--');axes[1].set(xlabel='Drift ratio',title=limit_state+' drift screen')
+    axes[1].axvline(drift_limit_ratio(limit_state),color='r',ls='--');axes[1].set(xlabel='Drift ratio',title=limit_state+' drift screen')
     for ax in axes:ax.legend();ax.grid(alpha=.2)
     fig.savefig(Path(output)/('Drift_Profile_'+case+'_V132.png'),dpi=160);plt.close(fig)
     return edge_peaks
