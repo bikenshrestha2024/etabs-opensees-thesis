@@ -215,7 +215,16 @@ class GravityAnalysisGUI:
             return
         folder = Path(self.model_var.get()).parent
         try:
-            staged = staged_gravity_workbooks(folder)
+            from components.inputs.output_layout import export_root_for
+            original = export_root_for(folder)
+            previous = getattr(self,"_registered_source_owner",None)
+            if previous is not None and previous != original:
+                self.etabs_full_table_var.set("")
+                self.etabs_native_assignment_var.set("")
+                self.etabs_beam_forces_paths=[]
+            self._registered_source_owner=original
+            # Rebuilds share the original export's private source evidence.
+            staged = staged_gravity_workbooks(original)
             for role, variable in (("etabs_full_table", self.etabs_full_table_var),
                                    ("etabs_assignment", self.etabs_native_assignment_var)):
                 if not variable.get():
@@ -641,7 +650,98 @@ class GravityAnalysisGUI:
         else:
             self.gravity_busy_bar.stop()
 
-    def _rebuild_verified_clear_beam(self, *, auto=False, elastic_comparison=False):
+    def _rebuild_elastic_settings(self, source, *, custom=False):
+        """Resolve the explicitly requested diagnostic settings for this model state."""
+        from components.inputs.project_workbooks import source_limit_state
+        from components.model.elastic_conversion_settings import read_comparison_settings
+        state, evidence = source_limit_state(source)
+        if state not in ("ULS", "SLS"):
+            raise ValueError("Identify the source ULS/SLS state before elastic rebuild: "+evidence)
+        staged = source/"02_MODEL"/"SETTINGS"/"ETABS_ELASTIC_COMPARISON"
+        candidate = staged/f"ETABS_Elastic_Comparison_{state}_Diagnostic.json"
+        reference = _runtime_repo_root()/"docs"/"validation"/"20261121_native_gravity_uls.json"
+        if not candidate.is_file() and state=="ULS":
+            candidate=reference
+        if not custom and candidate.is_file():
+            settings=read_comparison_settings(candidate)
+            if state in settings:
+                self._gravity_action_log("AUTO_ELASTIC_SETTINGS",
+                    f"{state} diagnostic settings (not native stiffness validation): {candidate}")
+                return str(candidate)
+        selected=filedialog.askopenfilename(
+            parent=self.win,title=f"Select {state} ETABS elastic comparison settings",
+            initialdir=str(candidate.parent if candidate.is_file() else source),
+            initialfile=candidate.name if candidate.is_file() else "",
+            filetypes=[("Elastic stiffness settings","*.json")])
+        if not selected:
+            return None
+        if state not in read_comparison_settings(selected):
+            raise ValueError("Selected elastic settings do not cover source state "+state)
+        return selected
+
+    def _rebuild_assignment_workbook(self, source):
+        """Use existing native sheets first; browse only if evidence is missing."""
+        from components.inputs.etabs_table_bundle import _REQUIRED_ASSIGNMENT_SHEETS
+        from components.inputs.gravity_evidence_stage import staged_gravity_workbooks
+        from components.inputs.project_workbooks import registered_project_source
+        from openpyxl import load_workbook
+
+        def checked(raw):
+            if not raw:
+                return None
+            path=Path(raw).expanduser()
+            if not path.is_file() or path.suffix.lower() not in (".xlsx",".xlsm"):
+                return None
+            try:
+                book=load_workbook(path,read_only=True,data_only=True)
+                try:
+                    return str(path.resolve()) if set(_REQUIRED_ASSIGNMENT_SHEETS).issubset(book.sheetnames) else None
+                finally:
+                    book.close()
+            except Exception as exc:
+                self._gravity_action_log("ASSIGNMENT_CANDIDATE_REJECTED",str(exc))
+                return None
+
+        # Explicitly selected assignment has precedence; registered/staged
+        # evidence is tied to the original export, not the rebuilt variant.
+        raw=self.etabs_native_assignment_var.get().strip()
+        selected=checked(raw)
+        if raw and not selected:
+            self._gravity_action_log("ASSIGNMENT_CANDIDATE_REJECTED",
+                "Selected assignment missing or lacks required native sheets")
+        if not selected:
+            staged=staged_gravity_workbooks(source)
+            for role in ("etabs_assignment","etabs_full_table"):
+                selected=checked(staged.get(role))
+                if not selected:
+                    selected=checked(registered_project_source(source,role,missing_lfs="skip"))
+                if selected:
+                    break
+        if not selected:
+            selected=checked(self.etabs_full_table_var.get().strip())
+        if selected:
+            self.etabs_native_assignment_var.set(selected)
+            self._gravity_action_log("AUTO_NATIVE_ASSIGNMENT_CANDIDATE",
+                "Reusing workbook with required native sheets; crosswalk still required: "+selected)
+            return selected
+
+        full=Path(self.etabs_full_table_var.get().strip()).expanduser()
+        edb=Path(self.etabs_edb_path.get().strip()).expanduser()
+        initial=full.parent if full.is_file() else edb.parent if edb.is_file() else source
+        selected=filedialog.askopenfilename(
+            parent=self.win,title="Original ETABS frame/material assignment workbook",
+            initialdir=str(initial),
+            filetypes=[("Original ETABS full assignment Excel","*.xlsx *.xlsm")])
+        if not selected:
+            return None
+        validated=checked(selected)
+        if not validated:
+            raise ValueError("Select a genuine ETABS workbook containing all eight required material, frame, offset and load assignment sheets.")
+        self.etabs_native_assignment_var.set(validated)
+        return validated
+
+    def _rebuild_verified_clear_beam(self, *, auto=False, elastic_comparison=False,
+                                     custom_elastic_settings=False):
         """Recreate model in a new folder; never change original EDB/export.
 
         Auto mode is for the primary Run button only when a source has an
@@ -664,51 +764,16 @@ class GravityAnalysisGUI:
             messagebox.showerror('Select a source export', str(exc), parent=self.win)
             return
         settings=None
-        if elastic_comparison:
-            reference = _runtime_repo_root() / 'docs' / 'validation'
-            staged = source/'02_MODEL'/'SETTINGS'/'ETABS_ELASTIC_COMPARISON'
-            suggested = staged/'ETABS_Elastic_Comparison_ULS_Diagnostic.json'
-            if not suggested.is_file():
-                suggested = reference/'20261121_native_gravity_uls.json'
-            settings=filedialog.askopenfilename(
-                parent=self.win,title="Select ETABS elastic comparison settings",
-                initialdir=str(suggested.parent if suggested.is_file() else source),
-                initialfile=suggested.name if suggested.is_file() else '',
-                filetypes=[("Elastic stiffness settings","*.json"), ("All files","*.*")])
-            if not settings:
+        try:
+            if elastic_comparison:
+                settings=self._rebuild_elastic_settings(source,custom=custom_elastic_settings)
+                if not settings:
+                    return
+            native=self._rebuild_assignment_workbook(source)
+            if not native:
                 return
-            try:
-                from components.model.elastic_conversion_settings import read_comparison_settings
-                read_comparison_settings(settings)
-            except (OSError, ValueError) as exc:
-                messagebox.showerror('Choose elastic comparison settings',str(exc),parent=self.win)
-                return
-        native=self.etabs_native_assignment_var.get().strip()
-        if not native:
-            # The completed ETABS full-table workbook may also contain the
-            # original native material/frame/offset assignment sheets. Prefer
-            # this previously selected candidate to another file dialog;
-            # the native rebuild script independently verifies every sheet.
-            candidate=self.etabs_full_table_var.get().strip()
-            if candidate and Path(candidate).is_file() and Path(candidate).suffix.lower() in (".xlsx",".xlsm"):
-                native=candidate
-                self.etabs_native_assignment_var.set(native)
-                self._gravity_action_log("AUTO_NATIVE_ASSIGNMENT_CANDIDATE",
-                    "Reusing user-selected full ETABS export; sheet-level proof still required: "+native)
-        if not native:
-            native=filedialog.askopenfilename(
-                parent=self.win,
-                title="Original ETABS frame/material assignment workbook",
-                filetypes=[("Original ETABS full assignment Excel","*.xlsx *.xlsm"),
-                           ("All files","*.*")])
-            if not native:return
-            self.etabs_native_assignment_var.set(native)
-        native_file=Path(native).expanduser()
-        if not native_file.is_file() or native_file.suffix.lower() not in (".xlsx",".xlsm"):
-            messagebox.showerror("Assignment workbook required",
-                "Select the ORIGINAL ETABS full assignment Excel workbook, "
-                "not NBC105_RS_Scaling or the gravity reactions summary.",
-                parent=self.win)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            messagebox.showerror("Rebuild inputs need review",str(exc),parent=self.win)
             return
         # Save a new immutable variant in this source export's 02_MODEL stage.
         # Do not create independent sibling exports which lose ownership of
@@ -1519,9 +1584,15 @@ class GravityAnalysisGUI:
         self.batch_run_button.pack(side="left",padx=5)
         ttk.Button(bar,text="REBUILD verified beam weight in NEW folder",
                    command=self._rebuild_verified_clear_beam).pack(side="left",padx=5)
-        ttk.Button(root,text="Rebuild with ETABS elastic settings",
+        elastic_actions=ttk.Frame(root)
+        elastic_actions.pack(anchor="w",pady=(0,7))
+        ttk.Button(elastic_actions,text="Rebuild with ETABS elastic settings (auto)",
                    command=lambda:self._rebuild_verified_clear_beam(elastic_comparison=True)
-                   ).pack(anchor="w",pady=(0,7))
+                   ).pack(side="left")
+        ttk.Button(elastic_actions,text="Custom elastic JSON...",
+                   command=lambda:self._rebuild_verified_clear_beam(
+                       elastic_comparison=True,custom_elastic_settings=True)
+                   ).pack(side="left",padx=5)
         ttk.Label(bar,text="Selected condition: ").pack(side="left",padx=(12,2))
         ttk.Label(bar,textvariable=self.gravity_profile_var).pack(side="left")
         ttk.Label(bar,textvariable=self.wall_support_strategy_var).pack(side="left",padx=8)
@@ -1779,23 +1850,9 @@ class GravityAnalysisGUI:
         if source_cfg.is_file():
             cfg=json.loads(source_cfg.read_text(encoding="utf-8-sig"))
             if cfg.get("etabs_beam_weight_policy")!="ETABS_BEAM_CLEAR_LENGTH":
-                if ((self.etabs_native_assignment_var.get().strip() and
-                    Path(self.etabs_native_assignment_var.get().strip()).is_file()) or
-                    (self.etabs_full_table_var.get().strip() and
-                    Path(self.etabs_full_table_var.get().strip()).is_file())):
-                    self._gravity_action_log("AUTO_REBUILD_REQUIRED",
-                        "Gross-beam source rejected; native assignment workbook supplied; "
-                        "starting immutable clear-beam rebuild before gravity.")
-                    self._rebuild_verified_clear_beam(auto=True)
-                    return
-                self._set_gravity_operation("BLOCKED",
-                    "OLD gross-beam model: ETABS mass/weight mismatch remains ~8652.444 kN")
-                messagebox.showerror("Old gross beam model cannot validate ETABS",
-                    "This exported model still uses GROSS_SECTION_LENGTH. "
-                    "A prior GitHub code change cannot retrofit its saved data.\n"
-                    "Click REBUILD verified beam weight in NEW folder and select "
-                    "the original ETABS material/assignment workbook.\n"
-                    "Then run primary 32-node gravity again.",parent=self.win)
+                self._gravity_action_log("AUTO_REBUILD_REQUIRED",
+                    "Gross-beam source rejected; resolving original native assignment workbook before gravity.")
+                self._rebuild_verified_clear_beam(auto=True)
                 return
             proof=model.parent/"ETABS_Native_Assignment_Gravity_Quantity_Audit.json"
             if not proof.is_file():
