@@ -31,6 +31,9 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [clause_10_parts_and_components.py](clause_10_parts_and_components.py)
 - [compliance_coverage.py](compliance_coverage.py)
 - [constants.py](constants.py)
+- [normative_register.py](normative_register.py)
+- [clause_07_missing_mass.py](clause_07_missing_mass.py)
+- [annex_c_zoning.py](annex_c_zoning.py)
 - [dispatch.py](dispatch.py)
 
 > This list reflects the current checked-in Python files. Do not delete, rename or relocate an active module until its importers, GUI callbacks, saved-case readers and native regression evidence have been verified together. Source-specific guides are under `docs/source/components/nbc105/` where available.

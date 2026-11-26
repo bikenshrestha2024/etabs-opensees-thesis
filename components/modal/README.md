@@ -20,6 +20,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [rayleigh.py](rayleigh.py)
 - [rayleigh_ledger_audit.py](rayleigh_ledger_audit.py)
 - [rayleigh_mass_audit.py](rayleigh_mass_audit.py)
+- [storey_mass_convention.py](storey_mass_convention.py)
 - [rayleigh_xy_evidence.py](rayleigh_xy_evidence.py)
 
 > This list reflects the current checked-in Python files. Do not delete, rename or relocate an active module until its importers, GUI callbacks, saved-case readers and native regression evidence have been verified together. Source-specific guides are under `docs/source/components/modal/` where available.

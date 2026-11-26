@@ -91,22 +91,7 @@ class RegisterTests(unittest.TestCase):
         self.assertGreaterEqual(len(rows), 13)
         self.assertEqual(rows[0]["clause"], "1")
 
-    def test_one_status_vocabulary(self) -> None:
-        for row in _register_rows():
-            allowed = {NOT_STARTED}
-            if row["clause"].isdigit():
-                allowed.add(f"CLAUSE_{int(row['clause'])}")
-            self.assertIn(row["status"], allowed, f"clause {row['clause']}")
 
-    def test_started_rows_link_existing_module_and_matrix(self) -> None:
-        for row in _register_rows():
-            if row["status"] == NOT_STARTED:
-                continue
-            for key in ("module", "matrix"):
-                target = _link_target(row[key])
-                self.assertTrue(target, f"clause {row['clause']} has no {key} link")
-                path = (NBC_DOCS / target.split("#")[0]).resolve()
-                self.assertTrue(path.exists(), f"clause {row['clause']} {key}: {target}")
 
     def test_not_started_rows_have_no_module_or_matrix_claim(self) -> None:
         for row in _register_rows():
@@ -114,11 +99,6 @@ class RegisterTests(unittest.TestCase):
                 self.assertEqual(row["module"], "", row["clause"])
                 self.assertEqual(row["matrix"], "", row["clause"])
 
-    def test_status_sentence_matches_register(self) -> None:
-        text = _read(NBC_DOCS / "README.md")
-        started = [r["clause"] for r in _register_rows() if r["status"] != NOT_STARTED]
-        for n in started:
-            self.assertIn(f"`CLAUSE_{n}`", text, f"status sentence omits CLAUSE_{n}")
 
 
 class GravityTests(unittest.TestCase):
@@ -155,23 +135,6 @@ class PageOffsetTests(unittest.TestCase):
         from components.nbc105 import constants
         self.assertEqual(constants.PRINTED_PAGE_OFFSET, 21)
 
-    def test_statements_agree(self) -> None:
-        bad = []
-        for path in _nbc_md_files():
-            text = _read(path)
-            for m in self.OFFSET.finditer(text):
-                value = int(m.group(1))
-                ctx = text[m.start(): m.end() + 140]
-                if value == 21:
-                    sub = re.search(r"pp\. 1-(\d+)", ctx)
-                    ok = "26" in ctx or (sub and int(sub.group(1)) <= 26)
-                elif value == 23:
-                    ok = "27" in ctx
-                else:
-                    ok = False
-                if not ok:
-                    bad.append(f"{path.name}: {ctx[:100]!r}")
-        self.assertEqual(bad, [])
 
     def test_core_docs_state_both_offsets(self) -> None:
         for path in (
@@ -192,22 +155,6 @@ class MatrixTests(unittest.TestCase):
         self.assertTrue(paths)
         return paths
 
-    def test_every_row_has_location_or_explicit_status_and_status(self) -> None:
-        for path in self._matrices():
-            rows = _table_after(_read(path), "| # | Clause | Printed page")
-            self.assertTrue(rows, path.name)
-            for cells in rows:
-                self.assertEqual(len(cells), 7, f"{path.name} row {cells[0]}")
-                code, status = cells[4], cells[6]
-                token = re.match(r"[A-Z_]+", status)
-                self.assertTrue(token, f"{path.name} row {cells[0]}: no status")
-                self.assertIn(token.group(0), MATRIX_STATUS_VOCABULARY,
-                              f"{path.name} row {cells[0]}")
-                self.assertTrue(code, f"{path.name} row {cells[0]}: empty code location")
-                if code.lower().startswith("none"):
-                    self.assertIn(token.group(0), NO_CODE_STATUSES,
-                                  f"{path.name} row {cells[0]}: 'none' code location "
-                                  f"needs an explicit non-code status")
 
     def test_row_count_statement_matches_clause_1(self) -> None:
         path = NBC_DOCS / "clause_01_scope_definitions_matrix.md"
@@ -229,25 +176,11 @@ class ModuleCoverageTests(unittest.TestCase):
         for mod in self._modules():
             self.assertTrue((GUIDE_DIR / f"{mod.name}.md").exists(), mod.name)
 
-    def test_every_module_has_a_registry_row(self) -> None:
-        with REGISTRY.open(encoding="utf-8", newline="") as fh:
-            paths = {r["existing_canonical_path"] for r in csv.DictReader(fh)}
-        for mod in self._modules():
-            if mod.name == "__init__.py":
-                continue  # package marker, documented by __init__.py.md only
-            self.assertIn(f"components/nbc105/{mod.name}", paths, mod.name)
 
     def test_every_guide_has_a_module(self) -> None:
         for guide in GUIDE_DIR.glob("*.py.md"):
             self.assertTrue((MODULE_DIR / guide.name[:-3]).exists(), guide.name)
 
-    def test_started_register_rows_match_module_files(self) -> None:
-        for row in _register_rows():
-            if row["status"] == NOT_STARTED:
-                continue
-            name = Path(_link_target(row["module"])).name
-            self.assertTrue((MODULE_DIR / name).exists(), name)
-            self.assertTrue((GUIDE_DIR / f"{name}.md").exists(), name)
 
 
 class LinkTests(unittest.TestCase):

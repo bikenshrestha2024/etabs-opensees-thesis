@@ -58,8 +58,8 @@ class DriftBases(unittest.TestCase):
         a = c5.etabs_comparison_drift(0.008, 4.0, "SLS")
         b = c5.opensees_actual_drift(0.008, 4.0, "SLS")
         with self.assertRaises(ValueError):
-            c5.require_same_drift_basis(a, b)
-        self.assertEqual(c5.require_same_drift_basis(a, a), "ETABS_COMPARISON")
+            c5.require_same_drift_basis([a, b])
+        self.assertEqual(c5.require_same_drift_basis([a, a]), "ETABS_COMPARISON")
         with self.assertRaises(ValueError):
             c5.drift_basis("DESIGN")
 

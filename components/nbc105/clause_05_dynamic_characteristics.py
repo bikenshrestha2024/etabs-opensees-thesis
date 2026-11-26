@@ -554,7 +554,7 @@ def separate_drift_outputs(*, limit_state, storey_height_m, elastic_relative_def
     }
 
 
-def require_same_drift_basis(*outputs):
+def require_same_drift_basis(outputs):
     """Raise if drift outputs carry different bases (comparison would mix bases).
 
     [REF NBC105-2025 §5.5.1 p. 36; §5.5.3 p. 37]
