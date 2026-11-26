@@ -6,7 +6,7 @@ Status: NOT CERTIFIED. Independent human sign-off is an external gate; a disposi
 | Clause | Rows | Implemented And Tested | Implemented Untested | Manual Project Check | Project Not Applicable | Definition Only | External Data Required | Unverified Gap | Deferred Design Phase | Unreviewed |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | 128 | 80 | 0 | 4 | 0 | 44 | 0 | 0 | 0 | 0 |
-| 2 | 88 | 0 | 2 | 37 | 0 | 42 | 7 | 0 | 0 | 0 |
+| 2 | 88 | 1 | 2 | 36 | 0 | 42 | 7 | 0 | 0 | 0 |
 | 3 | 83 | 38 | 2 | 13 | 0 | 30 | 0 | 0 | 0 | 0 |
 | 4 | 100 | 58 | 0 | 10 | 1 | 28 | 3 | 0 | 0 | 0 |
 | 5 | 140 | 69 | 0 | 21 | 3 | 47 | 0 | 0 | 0 | 0 |
@@ -18,7 +18,7 @@ Status: NOT CERTIFIED. Independent human sign-off is an external gate; a disposi
 | A | 373 | 25 | 0 | 184 | 1 | 163 | 0 | 0 | 0 | 0 |
 | B | 292 | 16 | 0 | 0 | 0 | 120 | 0 | 0 | 156 | 0 |
 | C | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
-| all | 1417 | 359 | 5 | 303 | 24 | 559 | 11 | 0 | 156 | 0 |
+| all | 1417 | 360 | 5 | 302 | 24 | 559 | 11 | 0 | 156 | 0 |
 
 ## Rows by kind
 
@@ -27,7 +27,7 @@ SHALL: 332, SHOULD: 36, MAY: 31, LIMIT: 21, STATEMENT: 302, CLAUSE: 229, TABLE: 
 ## Findings (code versus printed standard)
 
 - Project building uses structural control, so the NBC 105 provisions are applied to the bare/primary system and the damper behaviour is outside the standard. (rows: N1-0007; 1 row(s))
-- No code implements the 10 percent rigid-diaphragm criterion of 2.2.4 D. (rows: N2-0057; 1 row(s))
+- Resolved: the earlier finding that no code implements the 10 percent criterion is closed for the arithmetic; production integration (two model runs) is open. (rows: N2-0057; 1 row(s))
 - Printed 2.4.2 refers to displacements 'defined in section 5.6', but printed 5.6 is Accidental Eccentricity; the likely intended reference is the design deflection of 5.5.3 (cross-reference anomaly in the standard, no code consequence). (rows: N2-0076, N2-0078, N2-0079, N2-0081, N2-0083; 5 row(s))
 - Printed 3.2.1 iii cites irregularity 'as per 5.5' while irregularities are printed under 5.4; cross-reference anomaly in the standard, not silently corrected (module docstring). (rows: N3-0011, N3-0012, N3-0013, N3-0014, N3-0015; 5 row(s))
 - Printed 3.5 mandates the Limit State Method while 3.7 prints working-stress combinations; internal tension in the standard, no code consequence for an LSM design. (rows: N3-0049; 1 row(s))

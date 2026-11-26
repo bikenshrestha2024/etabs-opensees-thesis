@@ -31,3 +31,6 @@ New `components/nbc105/annex_c_zoning.py` (+ guide, registry row), `docs/nbc105/
 
 ## Ruling 9a: missing mass 33 Hz
 New `components/nbc105/clause_07_missing_mass.py` (+ guide, registry row), gate wired into `components/modal/analysis.py` (result `missing_mass_gate`) and `components/response_spectrum/model_analysis.py` (same fail-closed refusal, now with the exact missing-input list), `tests/test_nbc105_followup_missing_mass.py`, row N7-0018. Full-building residual-force integration is not done and is documented.
+
+## Ruling 9b: rigid diaphragm 10 percent
+`clause_02_general_principles.py::rigid_diaphragm_check`, `tests/test_nbc105_followup_rigid_diaphragm.py`, row N2-0057. No production caller (needs two model runs).

@@ -13,3 +13,7 @@ Source: user-uploaded official Second Revision, printed pp. 10–16. Scope: cano
 **Open / do not claim fully implemented:** Actual stability capacity, seismic detailing, SSI, performance evidence and capacity design cannot be inferred from booleans.
 
 This matrix must be extended with one row per subclause, exact table footnotes, ETABS native evidence, explicit test identifiers and source hash before the overall Clause 2 gate can pass.
+
+## Owner ruling 9b: 10 percent rigid-diaphragm criterion (2026-11-26)
+
+2.2.4 D, printed p. 14: `rigid_diaphragm_check` (excess |u_flex| - |u_rigid| must not be more than 0.10 |u_rigid| at any point; strict; zero rigid displacement handled). Tests `tests/test_nbc105_followup_rigid_diaphragm.py`. Production caller: none yet (needs displacements of two analyses: FLEXIBLE_DIAPHRAGM_MODEL_DISPLACEMENTS and RIGID_DIAPHRAGM_MODEL_DISPLACEMENTS).
