@@ -27,7 +27,10 @@ def sha256_file(path):
 
 
 def require_import_root(selected_output_root):
-    """Validate import destination without creating files or modifying rebuilds."""
+    """Validate import destination without creating files or modifying rebuilds.
+
+    [REF docs/source/components/inputs/project_output_layout.py.md]
+    """
     if not str(selected_output_root).strip():
         raise ValueError("Select an explicit ETABS export root.")
     candidate=Path(selected_output_root).expanduser()
