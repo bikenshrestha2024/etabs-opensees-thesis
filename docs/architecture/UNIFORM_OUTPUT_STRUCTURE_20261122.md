@@ -158,3 +158,6 @@ the absence of source identity and numerical parity checks.
 ## 2026-11-26 — complete local inventory and optional deep format audit
 
 `python tools/RUN_FULL_OUTPUT_MIGRATION_AUDIT.py --export-root <case> --hash-duplicates --validate-files` now records every enumerated file path in `05_ALL_OUTPUT_FILE_INVENTORY.json`, not just the largest 50. SHA duplicate groups are report-only. Optional format checks parse JSON/JSONL, read UTF-8 text/CSV/logs, check ZIP/Office container CRC and workbook XML presence, and PNG signatures. They do not validate Excel formulas or numerical data, render images, execute archive members, or evaluate engineering acceptance. Errors are counted in the summary and cause a review-required CLI exit. Run only when other writers are idle. Main GUI Results exposes the same local audit; originals remain untouched. The selected model folder resolves to its owning export root.
+
+
+The all-module file audit distinguishes archive CRC integrity, embedded evidence parse failures, workbook formula-cache availability, and engineering acceptance. Formula-only exports need Excel recalculation or independently sourced numerical evidence before cached-value readers can use them. Nothing is recalculated or overwritten by the audit; nested ZIPs and oversized embedded workbooks are explicit review items.

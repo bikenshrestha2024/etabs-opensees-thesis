@@ -68,6 +68,9 @@ def run_full_audit(export_root, *, repository=_REPO, hash_duplicates=False, vali
             "exact_duplicate_groups":len(disk["exact_duplicate_groups"]),
             "format_checks_requested":validate_files,
             "format_check_counts":disk["format_check_counts"],
+            "embedded_format_check_counts":disk["embedded_format_check_counts"],
+            "excel_formula_cache_inventory":disk["excel_formula_cache_inventory"],
+            "file_evidence_review_required_count":disk["file_evidence_review_required_count"],
             "disk_scan_error_count":len(disk["scan_errors"]),
             "producer_consumer_review_required":
                 source["producer_consumer_review_required"],
@@ -100,14 +103,14 @@ def main(argv=None):
     parser.add_argument("--export-root",type=Path,required=True)
     parser.add_argument("--repo",type=Path,default=_REPO)
     parser.add_argument("--hash-duplicates",action="store_true",help="SHA-check same-size duplicate candidates; never delete")
-    parser.add_argument("--validate-files",action="store_true",help="Read JSON/text and check archive CRC/PNG signatures; not numerical validation")
+    parser.add_argument("--validate-files",action="store_true",help="Read JSON/text, check archive members, Excel formula caches and PNG signatures; not numerical validation")
     args=parser.parse_args(argv)
     run,summary=run_full_audit(args.export_root,repository=args.repo,
                               hash_duplicates=args.hash_duplicates,validate_files=args.validate_files)
     print(json.dumps({"audit_run":str(run),**summary},indent=2))
     return 2 if summary["producer_consumer_review_required"] or (
         summary["layout_issue_count"] or summary["owner_guard_violation_count"] or
-        summary["disk_scan_error_count"]) else 0
+        summary["disk_scan_error_count"] or summary["file_evidence_review_required_count"]) else 0
 
 
 if __name__=="__main__":
