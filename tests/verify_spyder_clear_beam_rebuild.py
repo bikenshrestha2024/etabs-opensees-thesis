@@ -109,6 +109,64 @@ class RebuildEntryTests(unittest.TestCase):
                 build.rebuild_verified_clear_beam(self.source,self.book,self.destination)
         self.assertFalse(self.destination.exists())
 
+    def test_rebuild_with_project_context_reaches_assembly(self):
+        """Exercise actual rebuild orchestration through the reported failure point."""
+        import sys
+        from types import ModuleType
+        from unittest.mock import Mock
+        from components.inputs.project_output_layout import (
+            create_project_layout, require_import_root)
+        edb=self.root/"ULTIMATE.EDB"
+        edb.write_bytes(b"synthetic source")
+        (self.source/"OpenSees_Element_Connectivity.json").write_text(
+            json.dumps({"source_edb":str(edb)}),encoding="utf-8")
+        ctx=create_project_layout(edb,self.source)
+        manifest=self.source/"00_SOURCE_MANIFEST"/"PROJECT_CONTEXT.json"
+        before=manifest.read_bytes()
+        original_config=self.config.read_bytes()
+        assembly=ModuleType("components.model.assembly")
+        assembly.prepare_complete_export=Mock(side_effect=RuntimeError("assembly checkpoint"))
+        for target in (build.canonical_clear_beam_destination(self.source,stamp="RUN_001"),
+                       self.destination):
+            with self.subTest(target=target):
+                with patch("openpyxl.load_workbook",return_value=FakeBook(build.REQUIRED_SHEETS)):
+                    with patch.dict(sys.modules,{"components.model.assembly":assembly}):
+                        with self.assertRaisesRegex(RuntimeError,"assembly checkpoint"):
+                            build.rebuild_verified_clear_beam(self.source,self.book,target)
+                assembly.prepare_complete_export.assert_called_with(target,runtime_dir=build.ROOT)
+                rebuilt=json.loads((target/"00_SOURCE_MANIFEST"/"PROJECT_CONTEXT.json").read_text())
+                self.assertEqual(rebuilt["source_edb_sha256"],ctx["source_edb_sha256"])
+                self.assertEqual(rebuilt["output_root"],str(target))
+                self.assertEqual(rebuilt["original_export_root"],str(self.source))
+                self.assertEqual(rebuilt["layout_kind"],"CLEAR_BEAM_REBUILD")
+                status=json.loads((target/"CLEAR_BEAM_REBUILD_STATUS.json").read_text())
+                self.assertEqual(status["status"],"BLOCKED")
+                self.assertIn("assembly checkpoint",status["error"])
+                self.assertFalse((target/"02_GRAVITY").exists())
+                with self.assertRaises(ValueError):
+                    require_import_root(target)
+                with self.assertRaises(FileExistsError):
+                    build.rebuild_verified_clear_beam(self.source,self.book,target)
+                self.assertEqual(manifest.read_bytes(),before)
+                self.assertEqual(self.config.read_bytes(),original_config)
+                self.assertEqual(edb.read_bytes(),b"synthetic source")
+
+    def test_rebuild_rejects_other_project_stage_and_linked_destination(self):
+        other=self.root/"other"/"04_MODAL"/"RUNS"/"case"
+        with self.assertRaisesRegex(ValueError,"stage/run"):
+            build._verify_before_creating_output(self.source,self.book,other)
+        self.assertFalse(other.exists())
+        outside=self.root/"outside"
+        outside.mkdir()
+        link=self.root/"link"
+        try:
+            link.symlink_to(outside,target_is_directory=True)
+        except (OSError,NotImplementedError):
+            self.skipTest("Directory symlinks unavailable")
+        with self.assertRaisesRegex(ValueError,"linked"):
+            build._verify_before_creating_output(self.source,self.book,link/"new")
+        self.assertEqual(list(outside.iterdir()),[])
+
     def test_no_nested_or_existing_output(self):
         for bad in (self.source/"nested",self.source):
             with self.assertRaises((ValueError,FileExistsError)):
