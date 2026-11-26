@@ -54,3 +54,10 @@ New regression file: `tests/test_nbc105_clause5_remaining.py`. Conditions at 80%
 Source directly re-opened: user-provided `NBC105_2025_SeismicDesignofBuildingsinNepal.pdf` (137-page edition), printed p.28 (§5.1.1), printed p.30 (§5.2), printed pp.33–37 (§5.4–5.5). At the strict code thresholds, a tiny actual exceedance is an exceedance—not a passing value under an arbitrary software `isclose` tolerance. `weak_story`, `soft_story`, `torsion_irregularity`, `reentrant_corner_irregularity` and `interstory_drift_check` now apply the literal mathematical comparisons, with `math.nextafter` regression cases. Seismic load contributors must be finite nonnegative; Rayleigh weights finite positive; displacements/forces finite and the numerator/denominator finite positive. Signed lateral forces and displacements remain valid.
 
 This is **equation-level correctness**, not verification of the actual ETABS support/diaphragm boundary constraints, distributed mass integration, source Rayleigh load vectors, 12 m wall coupling or the period adopted in V10.7. Those gates remain open.
+
+## Owner rulings follow-up (2026-11-26)
+
+| Ruling | Clause, printed page | Code | Tests | Note |
+|---|---|---|---|---|
+| 2 Mass irregularity | 5.4.1.5, p. 34 | `mass_irregularity` (consecutive pairs; lighter- and heavier-storey readings reported; declared light-roof/penthouse/mezzanine exemption) routed from `components/validation/response_checks.py::irregularity` | `tests/test_nbc105_followup_mass_irregularity.py` | The print names no reference storey and no base for the percentage; the conservative lighter-storey reading (max/min > 1.5) stays the default and the heavier-storey reading (> 2) is always reported beside it. |
+

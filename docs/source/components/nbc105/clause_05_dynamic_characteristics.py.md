@@ -34,3 +34,6 @@ New regression file: `tests/test_nbc105_clause5_remaining.py`. Conditions at 80%
 Strict NBC §5.4 / §5.5 predicates are not tolerance-relaxed. `math.nextafter` threshold regressions prevent future accidental acceptance of slightly excess drift or torsion ratio. §5.1 Rayleigh summations reject nonfinite numerical inputs and negative seismic weights; §5.2 rejects nonfinite or negative load magnitudes before seismic live factors are applied. These are input-integrity controls, not a physical validation of displacement COM or ETABS mass models.
 
 Tests: `tests/test_nbc105_source_numerical_integrity_v2.py`, `tests/test_nbc105_clause5_remaining.py`.
+
+**Mass irregularity (added 2026-11-26):** `mass_irregularity(masses, exempt=None, reference="LIGHTER_STOREY")` implements printed 5.4.1.5 (p. 34): two consecutive storeys only, strict "more than 50 %", declared light-roof/penthouse/mezzanine exemption. Both percentage bases are returned because the print names no reference storey. Tests: `tests/test_nbc105_followup_mass_irregularity.py`.
+

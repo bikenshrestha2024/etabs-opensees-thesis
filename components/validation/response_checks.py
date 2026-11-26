@@ -21,7 +21,8 @@ def drift_check(rows,limit_state):
                            status='PASS' if decision["pass"] else 'EXCEEDS'))
     return result
 
-def irregularity(data,story_rows=None,capacity_rows=None):
+def irregularity(data,story_rows=None,capacity_rows=None,mass_exempt_storeys=()):
+    mass_exempt=set(mass_exempt_storeys)
     groups=sorted(data.get('diaphragms',[]),key=lambda g:g['master_xyz'][2]);nodes=data['nodes'];checks=[]
     def add(clause,kind,level,value,threshold,status,note=''):
         checks.append(dict(clause=clause,check=kind,storey=level,value=value,threshold=threshold,status=status,note=note))
@@ -38,7 +39,11 @@ def irregularity(data,story_rows=None,capacity_rows=None):
         widths.append([max(v[a] for v in pts)-min(v[a] for v in pts) for a in (0,1)] if pts else [None,None])
     for i in range(len(groups)-1):
         level=groups[i]['storey_number'];ratio=max(masses[i],masses[i+1])/min(masses[i],masses[i+1]) if min(masses[i],masses[i+1])>0 else None
-        add('5.4.1.5','Mass irregularity',level,ratio,1.5,'IRREGULAR' if ratio and ratio>1.5 else 'PASS' if ratio else 'NOT EVALUATED','Review roof/penthouse/mezzanine exclusions explicitly; no automatic exemption.')
+        if ratio:
+            from components.nbc105.clause_05_dynamic_characteristics import mass_irregularity
+            mi=mass_irregularity([masses[i],masses[i+1]],exempt=[j for j in (0,1) if i+j in mass_exempt])[0]
+            add('5.4.1.5','Mass irregularity',level,ratio,1.5,mi['status'],'NBC 5.4.1.5 consecutive-storey screen (clause_05.mass_irregularity), lighter-storey basis; heavier-storey reading flags: '+str(mi['irregular_vs_heavier'])+'. Light roof/penthouse/mezzanine exempt only if declared via mass_exempt_storeys.')
+        else:add('5.4.1.5','Mass irregularity',level,None,1.5,'NOT EVALUATED','Zero storey mass; cannot compare.')
         for axis in (0,1):
             a,b=widths[i][axis],widths[i+1][axis];ratio=max(a,b)/min(a,b) if a and b else None
             add('5.4.1.3','LFRS extent '+('X','Y')[axis],level,ratio,1.3,'IRREGULAR' if ratio and ratio>1.3 else 'PASS' if ratio else 'NOT EVALUATED','Geometry extent screen; continuity/member roles require review.')

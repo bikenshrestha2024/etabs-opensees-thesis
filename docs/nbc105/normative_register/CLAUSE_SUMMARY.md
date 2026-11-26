@@ -9,7 +9,7 @@ Status: NOT CERTIFIED. Independent human sign-off is an external gate; a disposi
 | 2 | 88 | 0 | 2 | 37 | 0 | 42 | 7 | 0 | 0 |
 | 3 | 83 | 38 | 2 | 13 | 0 | 30 | 0 | 0 | 0 |
 | 4 | 100 | 58 | 0 | 10 | 1 | 28 | 3 | 0 | 0 |
-| 5 | 140 | 67 | 0 | 23 | 3 | 47 | 0 | 0 | 0 |
+| 5 | 140 | 68 | 0 | 22 | 3 | 47 | 0 | 0 | 0 |
 | 6 | 39 | 22 | 0 | 1 | 0 | 16 | 0 | 0 | 0 |
 | 7 | 27 | 10 | 2 | 2 | 2 | 11 | 0 | 0 | 0 |
 | 8 | 25 | 5 | 1 | 5 | 1 | 13 | 0 | 0 | 0 |
@@ -18,7 +18,7 @@ Status: NOT CERTIFIED. Independent human sign-off is an external gate; a disposi
 | A | 373 | 25 | 0 | 184 | 1 | 163 | 0 | 0 | 0 |
 | B | 292 | 16 | 0 | 0 | 156 | 120 | 0 | 0 | 0 |
 | C | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
-| all | 1417 | 353 | 7 | 307 | 180 | 559 | 11 | 0 | 0 |
+| all | 1417 | 354 | 7 | 306 | 180 | 559 | 11 | 0 | 0 |
 
 ## Rows by kind
 
@@ -38,7 +38,7 @@ SHALL: 332, SHOULD: 36, MAY: 31, LIMIT: 21, STATEMENT: 302, CLAUSE: 229, TABLE: 
 - Possible class-II classification (more than 500 persons) for a 95 m building; the code takes I as a user input and does not enforce Table 4-4. (rows: N4-0085, N4-0086, N4-0087, N4-0088, N4-0089; 5 row(s))
 - Printed 'Lwi/H should not exceed 0.9' is advisory wording; the code clamps instead of rejecting (recorded interpretation). (rows: N5-0030; 1 row(s))
 - Printed 5.4 refers to 'clauses 5.5.1 to 5.5.2' for irregularity, but the irregularity clauses are numbered 5.4.1 and 5.4.2 (cross-reference anomaly in the standard; the same wrong number appears in 3.2.1 iii). (rows: N5-0094; 1 row(s))
-- Interpretation: 'difference of more than 50 percent' implemented as max/min > 1.5 (conservative reading); the printed text does not state the reference storey. (rows: N5-0106; 1 row(s))
+- Print does not state the base of the 50 percent; the default lighter-storey reading is a conservative interpretation (both readings are returned in every result). (rows: N5-0106; 1 row(s))
 - Interpretation: ULS drift ratio is checked on the design (Rmu-scaled) deflection per 5.5.1.1; the printed 5.5.3 text does not say so explicitly. (rows: N5-0137; 1 row(s))
 - Printed 6.4 refers to eccentricity 'as per 5.7'; accidental eccentricity is in 5.6 of the printed clause list (code comments cite 5.6). Cross-reference mismatch in the standard. (rows: N6-0029; 1 row(s))
 - Printed equation number 7.1(2) sits under clause 7.2; the 7.2 heading and equation numbering differ (7.1(2), 7.1(3) printed under 7.2). (rows: N7-0007; 1 row(s))

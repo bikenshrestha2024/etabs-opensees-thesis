@@ -352,3 +352,55 @@ __all__ += [
     "reentrant_corner_irregularity","interstory_drift_check",
     "uls_design_deflection","separation_gap_m","accidental_eccentricities_m",
 ]
+
+
+MASS_IRREGULARITY_FRACTION = 0.5
+
+
+def mass_irregularity(masses, *, exempt=None, reference="LIGHTER_STOREY"):
+    """Printed 5.4.1.5 mass irregularity over CONSECUTIVE storeys only.
+
+    [REF NBC105-2025 §5.4.1.5, printed p. 34] "A difference of more than 50%
+    between the effective masses of two consecutive stories is considered as
+    mass irregularity. Light roofs, penthouse, and mezzanine floors need not
+    be considered." ``masses`` run bottom to top (effective storey masses, any
+    consistent unit). The print compares two consecutive storeys; it states
+    no reference storey and no base for the percentage, so two readings are
+    returned for every pair: ``irregular_vs_lighter`` (|dm| > 0.5 min(m); same
+    as max/min > 1.5, conservative, the default basis) and
+    ``irregular_vs_heavier`` (|dm| > 0.5 max(m); same as max/min > 2).
+    ``reference`` selects which one sets ``irregular``. ``exempt`` is an
+    iterable of 0-based storey indices the user DECLARES to be a light roof,
+    penthouse or mezzanine: a pair with an exempt storey is reported
+    ``EXEMPT_DECLARED`` and never flagged. The clause says "need not", so no
+    storey is exempt automatically (the roof is exempt only if declared).
+    Strict inequality as printed. Returns one dict per consecutive pair.
+    """
+    if reference not in ("LIGHTER_STOREY", "HEAVIER_STOREY"):
+        raise ValueError("reference must be LIGHTER_STOREY or HEAVIER_STOREY")
+    m = [_positive(v, "storey mass") for v in masses]
+    if len(m) < 2:
+        raise ValueError("at least two storeys are required")
+    ex = set()
+    for i in (exempt or ()):
+        if isinstance(i, bool) or not isinstance(i, int) or not 0 <= i < len(m):
+            raise ValueError("exempt storey index out of range")
+        ex.add(i)
+    out = []
+    for i in range(len(m) - 1):
+        lo, hi = min(m[i], m[i + 1]), max(m[i], m[i + 1])
+        diff = hi - lo
+        vs_l = _strictly_above(diff, MASS_IRREGULARITY_FRACTION * lo)
+        vs_h = _strictly_above(diff, MASS_IRREGULARITY_FRACTION * hi)
+        skipped = i in ex or (i + 1) in ex
+        out.append({
+            "lower_storey_index": i, "upper_storey_index": i + 1,
+            "difference_over_lighter": diff / lo, "difference_over_heavier": diff / hi,
+            "irregular_vs_lighter": False if skipped else vs_l,
+            "irregular_vs_heavier": False if skipped else vs_h,
+            "irregular": False if skipped else (vs_l if reference == "LIGHTER_STOREY" else vs_h),
+            "status": "EXEMPT_DECLARED" if skipped else ("IRREGULAR" if (vs_l if reference == "LIGHTER_STOREY" else vs_h) else "PASS"),
+            "reference": reference})
+    return out
+
+__all__ += ["mass_irregularity", "MASS_IRREGULARITY_FRACTION"]
