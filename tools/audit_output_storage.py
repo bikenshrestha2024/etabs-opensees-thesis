@@ -15,6 +15,7 @@ import os
 import io
 import re
 import shutil
+import sys
 import tempfile
 from xml.etree import ElementTree as ET
 from collections import defaultdict
@@ -459,16 +460,18 @@ def main(argv=None):
             top.destroy()
     if not root:
         raise SystemExit("No output directory selected; nothing modified.")
-    report = scan_output(root, hash_duplicates=not args.no_hash,
-                         include_entries=args.validate_files,validate_files=args.validate_files)
     # Save local diagnostics in the selected case's canonical output stage.
     # The report describes the source snapshot BEFORE these new files are made;
     # previous saved audits are counted on subsequent disk inventories.
-    from components.inputs.output_layout import export_root_for
-    dest = Path(args.out) if args.out else (
-        export_root_for(root) / "09_SOFTWARE_DIAGNOSTICS" /
-        "DISK_AUDITS" / "RUNS" /
-        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ"))
+    if args.out:
+        dest = Path(args.out)
+    else:
+        from components.inputs.output_layout import export_root_for
+        dest = (export_root_for(root) / "09_SOFTWARE_DIAGNOSTICS" /
+                "DISK_AUDITS" / "RUNS" /
+                datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ"))
+    report = scan_output(root, hash_duplicates=not args.no_hash,
+                         include_entries=args.validate_files,validate_files=args.validate_files)
     result = write_report(report, dest)
     print("DISK AUDIT (NO FILES REMOVED):", result)
     print("Total bytes:", report["total_bytes"],
@@ -477,4 +480,6 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     raise SystemExit(main())
