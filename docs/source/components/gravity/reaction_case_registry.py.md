@@ -84,3 +84,6 @@ single-case and 76/97 batch indexes use the actual immutable run owner.
 This fixes misleading/mislocated case discovery, **not** the physical
 ETABS/OpenSees reaction-distribution difference. Any `SOLVED` result is
 still explicitly not approved for native ETABS pointwise equivalence.
+
+
+2026-11-26: new generated gravity solvers record model script and the same model data/config/source metadata/connectivity SHA256 mapping used by the reaction registry before executing and recheck that mapping before publishing success. The registry checks a supplied solver-recorded script SHA and full input mapping against the currently selected builder before indexing or redisplay. Legacy results remain readable with explicitly weaker `solver_input_provenance` (script-only or absent solver input hash); never infer solve-time input identity from registration-time hashing alone. This is an input-byte identity check, not complete runtime dependency closure or physical equivalence.
