@@ -110,6 +110,47 @@ class AutoSelectRefreshRegression(unittest.TestCase):
                     app,folder,role="nonlinear_model_script")
             sync.assert_called_once_with(app,folder)
 
+    def test_cross_project_failed_selection_clears_old_reference(self):
+        from components.inputs import analysis_autofill
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            old=folder/"old"
+            old.mkdir()
+            model=old/"model.py"
+            model.write_text("# synthetic")
+            selected=folder/"new"
+            selected.mkdir()
+            app=gui()
+            app.model=Field(str(model))
+            app.stories=Field(str(old/"story.csv"))
+            app.output.set(str(old/"output"))
+            app._output_is_automatic=True
+            app.p1.set("2.0")
+            app.modal_reference_status={"usage":"VERIFIED ELASTIC REFERENCE"}
+            with patch.dict(sys.modules,{"OpenSees_Complete_Export_V118":
+                    SimpleNamespace(autoselect_inputs=lambda *_:False)}), patch.object(
+                    analysis_autofill,"populate_linear") as sync:
+                analysis_autofill.populate_available(app,selected)
+            sync.assert_not_called()
+            self.assertEqual(app.model.get(),"")
+            self.assertEqual(app.stories.get(),"")
+            self.assertEqual(app.output.get(),"")
+            self.assertEqual(app.p1.get(),"")
+            self.assertEqual(app.modal_reference_status["usage"],"NOT_VERIFIED")
+
+    def test_missing_modal_clears_previous_verified_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app=gui()
+            app.modal_reference_status={"usage":"VERIFIED ELASTIC REFERENCE"}
+            app.p2.set("0.5")
+            with patch("OpenSees_Project_Inputs_V123.import_project_inputs",
+                       return_value={"values":{},"notes":[]}),patch(
+                       "components.response_spectrum.model_analysis.mrsm_period_defaults",
+                       return_value=({},"No reference")):
+                result=populate_linear(app,Path(tmp))
+            self.assertEqual(app.p2.get(),"")
+            self.assertEqual(result["modal_reference_status"]["usage"],"NOT_VERIFIED")
+
     def test_missing_model_does_not_invent_periods(self):
         from components.inputs import analysis_autofill
         with tempfile.TemporaryDirectory() as tmp:
