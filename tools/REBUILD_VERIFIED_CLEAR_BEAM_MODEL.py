@@ -67,12 +67,19 @@ def canonical_clear_beam_destination(source, *, stamp=None):
 
 def _verify_before_creating_output(source, workbook, target):
     """Fail closed before creating an output folder or changing source files."""
-    source=Path(source).expanduser().resolve()
+    source=Path(source).expanduser()
+    workbook=Path(workbook).expanduser()
+    target=Path(target).expanduser()
+    if any(part.is_symlink() for path in (source,workbook,target)
+           for part in (path,*path.parents)):
+        raise ValueError("Refusing linked source, workbook or rebuild destination")
+    source=source.resolve()
+    workbook=workbook.resolve()
     if source.name.casefold().startswith("verified_clear_beam_"):
         raise ValueError("Do not rebuild a historical Verified_Clear_Beam sibling recursively; "
                          "select original ETABS source export instead")
-    workbook=Path(workbook).expanduser().resolve()
-    target=Path(target).expanduser().resolve()
+    from components.inputs.project_output_layout import require_rebuild_root
+    target=require_rebuild_root(source,target)
     if not source.is_dir():
         raise FileNotFoundError(
             "Source must be the FOLDER containing the existing OpenSees "
@@ -83,17 +90,7 @@ def _verify_before_creating_output(source, workbook, target):
             "not the NBC calculation or gravity-results workbook: "+str(workbook))
     if target.exists():
         raise FileExistsError("Refusing to overwrite existing destination: "+str(target))
-    if target==source:
-        raise ValueError("Destination must not overwrite the original source export")
-    canonical_base=source/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"
-    nested=source in target.parents
-    if nested and target.parent!=canonical_base:
-        raise ValueError(
-            "Nested clear-beam output is allowed ONLY at "
-            "<export>/02_MODEL/REBUILDS/VERIFIED_CLEAR_BEAM/<unique-run>")
-    if any(x.is_symlink() for x in (source,workbook,target,*target.parents)):
-        raise ValueError("Refusing linked source, workbook or rebuild destination")
-    if not nested and not target.parent.is_dir():
+    if source not in target.parents and not target.parent.is_dir():
         raise FileNotFoundError("Selected output parent does not exist: "+str(target.parent))
     missing=[str(source/name) for name in SOURCE_REQUIRED_FILES
              if not (source/name).is_file()]
@@ -265,9 +262,10 @@ def rebuild_verified_clear_beam(source_dir, native_assignment_workbook, destinat
     write_status()
     try:
         if context is not None:
-            from components.inputs.project_output_layout import create_project_layout
-            rebuilt_context=create_project_layout(context["source_edb"],target,
-                                                  create_analysis_directories=False)
+            from components.inputs.project_output_layout import create_rebuild_layout
+            rebuilt_context=create_rebuild_layout(
+                context["source_edb"],source,target,
+                expected_source_sha256=context["source_edb_sha256"])
             if rebuilt_context["source_edb_sha256"]!=context["source_edb_sha256"]:
                 raise RuntimeError("Source EDB changed during rebuild setup.")
             audit["source_edb_sha256"]=rebuilt_context["source_edb_sha256"]

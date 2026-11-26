@@ -24,3 +24,7 @@ Project initialization checks existing `00_SOURCE_MANIFEST`, `PROJECT_CONTEXT.js
 
 
 2026-11-26: `require_import_root` is a read-only preflight used before GUI log writes and by the worker/layout owner. It rejects stage/run descendants and marked clear-beam variants so that a selected analysis model cannot become a new import target. It does not hash or approve engineering results.
+
+## 2026-11-26 — separate import and rebuild contexts
+
+The immutable clear-beam rebuild is not an import. The rebuild tool reserves a new directory under `02_MODEL/REBUILDS/VERIFIED_CLEAR_BEAM/<unique-run>` (or an explicit standalone CLI destination) and writes its running marker. `require_rebuild_root` checks the destination independently of the strict import guard; `create_rebuild_layout` only binds the freshly reserved variant, checks the original EDB SHA again, and writes a variant-local project context with `layout_kind` and `original_export_root`. It does not create analysis-stage directories or update the original manifest. Existing imports, arbitrary nested stages, links, and reused variants remain blocked. No physical model or load parameters change. Regression: `tests/verify_spyder_clear_beam_rebuild.py` exercises the real rebuild entry through the assembly call with synthetic source evidence and a mocked assembly boundary; this does not certify native gravity.

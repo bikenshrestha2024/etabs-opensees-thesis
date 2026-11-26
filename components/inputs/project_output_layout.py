@@ -43,6 +43,55 @@ def require_import_root(selected_output_root):
     return root
 
 
+def require_rebuild_root(original_export_root, selected_output_root):
+    """Validate a derived model destination, never a new ETABS import root.
+
+    The canonical child belongs to the original export; explicit standalone
+    destinations remain supported for the legacy CLI. No directories are made.
+    """
+    original = require_import_root(original_export_root)
+    candidate = Path(selected_output_root).expanduser()
+    if any(part.is_symlink() for part in (candidate, *candidate.parents)):
+        raise ValueError("Refusing linked rebuild destination")
+    root = candidate.resolve()
+    if root == original or root in original.parents:
+        raise ValueError("Rebuild destination must not overwrite the original export or its ancestors")
+    if original in root.parents:
+        canonical = original / "02_MODEL" / "REBUILDS" / "VERIFIED_CLEAR_BEAM"
+        if root.parent != canonical:
+            raise ValueError("Nested clear-beam output is allowed ONLY at "
+                             "<export>/02_MODEL/REBUILDS/VERIFIED_CLEAR_BEAM/<unique-run>")
+        from components.inputs.output_contract import safe_component
+        if safe_component(root.name) != root.name:
+            raise ValueError("Unsafe rebuild run name")
+    elif export_root_for(root) != root:
+        raise ValueError("Standalone rebuild destination cannot be an existing project stage/run")
+    return root
+
+
+def create_rebuild_layout(source_edb, original_export_root, selected_output_root, *,
+                          expected_source_sha256):
+    """Bind a newly reserved clear-beam variant to the original source EDB.
+
+    This is not an import. Only the fresh REBUILD_RUNNING directory reserved
+    by the rebuild tool is accepted; no previous manifest or result is replaced.
+    """
+    original = require_import_root(original_export_root)
+    root = require_rebuild_root(original, selected_output_root)
+    marker = root / "CLEAR_BEAM_REBUILD_STATUS.json"
+    if (not root.is_dir() or marker.is_symlink() or not marker.is_file()
+            or set(root.iterdir()) != {marker}):
+        raise ValueError("Rebuild layout requires a fresh reserved variant with only its status file")
+    status = json.loads(marker.read_text(encoding="utf-8-sig"))
+    if (not isinstance(status, dict) or status.get("status") != "REBUILD_RUNNING"
+            or status.get("original_source_dir") != str(original)
+            or status.get("new_export_directory") != str(root)):
+        raise ValueError("Rebuild reservation does not match original export and destination")
+    return _write_project_layout(source_edb, root, create_analysis_directories=False,
+                                 expected_source_sha256=expected_source_sha256,
+                                 original_export_root=original)
+
+
 def create_project_layout(source_edb, selected_output_root, *,
                           create_analysis_directories=True):
     """[REF docs/source/components/inputs/project_output_layout.py.md]
@@ -52,15 +101,24 @@ def create_project_layout(source_edb, selected_output_root, *,
     silently be rebound to a different EDB. An existing legacy result tree is
     left untouched. Caller owns Windows UI and any ETABS OAPI lifecycle.
     """
+    root = require_import_root(selected_output_root)
+    return _write_project_layout(source_edb, root,
+                                 create_analysis_directories=create_analysis_directories)
+
+
+def _write_project_layout(source_edb, root, *, create_analysis_directories,
+                          expected_source_sha256=None, original_export_root=None):
+    """Shared manifest writer for independently validated import/rebuild roots."""
     source = Path(source_edb).expanduser().resolve(strict=True)
     if source.suffix.lower() != ".edb":
         raise ValueError("The authoritative physical source must be a .EDB file.")
     if not source.is_file():
         raise FileNotFoundError(str(source))
-    root = require_import_root(selected_output_root)
     if root == source or root in source.parents:
         raise ValueError("Output root must not be an ancestor of the source EDB.")
     sha = sha256_file(source)
+    if original_export_root is not None and sha != expected_source_sha256:
+        raise ValueError("Source EDB changed during rebuild setup.")
     manifest_dir = root / "00_SOURCE_MANIFEST"
     manifest = manifest_dir / "PROJECT_CONTEXT.json"
     # Validate existing output destinations before any directory or manifest
@@ -105,6 +163,9 @@ def create_project_layout(source_edb, selected_output_root, *,
         "legacy_output": str(root / "OpenSees_Analysis_Results"),
         "note": "Legacy outputs remain at existing locations until all readers are migrated."
     }
+    if original_export_root is not None:
+        document["layout_kind"] = "CLEAR_BEAM_REBUILD"
+        document["original_export_root"] = str(original_export_root)
     # Unique same-directory temporary file and atomic replacement. Reusing a
     # fixed .tmp name risks clobbering an unrelated interrupted writer.
     from components.inputs.output_contract import atomic_json
