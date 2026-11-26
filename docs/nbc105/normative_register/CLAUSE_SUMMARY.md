@@ -8,7 +8,7 @@ Status: NOT CERTIFIED. Independent human sign-off is an external gate; a disposi
 | 1 | 128 | 80 | 0 | 4 | 0 | 44 | 0 | 0 | 0 | 0 |
 | 2 | 88 | 1 | 2 | 36 | 0 | 42 | 7 | 0 | 0 | 0 |
 | 3 | 83 | 38 | 2 | 13 | 0 | 30 | 0 | 0 | 0 | 0 |
-| 4 | 100 | 58 | 0 | 10 | 1 | 28 | 3 | 0 | 0 | 0 |
+| 4 | 100 | 63 | 0 | 5 | 1 | 28 | 3 | 0 | 0 | 0 |
 | 5 | 140 | 73 | 0 | 17 | 3 | 47 | 0 | 0 | 0 | 0 |
 | 6 | 39 | 22 | 0 | 1 | 0 | 16 | 0 | 0 | 0 | 0 |
 | 7 | 27 | 12 | 1 | 1 | 2 | 11 | 0 | 0 | 0 | 0 |
@@ -18,7 +18,7 @@ Status: NOT CERTIFIED. Independent human sign-off is an external gate; a disposi
 | A | 373 | 25 | 0 | 184 | 1 | 163 | 0 | 0 | 0 | 0 |
 | B | 292 | 16 | 0 | 0 | 0 | 120 | 0 | 0 | 156 | 0 |
 | C | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 |
-| all | 1417 | 364 | 5 | 298 | 24 | 559 | 11 | 0 | 156 | 0 |
+| all | 1417 | 369 | 5 | 293 | 24 | 559 | 11 | 0 | 156 | 0 |
 
 ## Rows by kind
 
@@ -34,7 +34,7 @@ SHALL: 332, SHOULD: 36, MAY: 31, LIMIT: 21, STATEMENT: 302, CLAUSE: 229, TABLE: 
 - Printed 4.1.2 cites 'Figure 4-1(a)/(b)' and 'Table 4.1' while the figures are numbered 4-1 and 4-2 and the table 4-1; cross-reference wording anomaly, no numeric effect. (rows: N4-0010, N4-0011, N4-0015, N4-0016; 4 row(s))
 - Declared project deviation from the printed 4.1.3.1 requirement (Vs,30 mandatory above 40 m); recorded, not accepted. (rows: N4-0033; 1 row(s))
 - Printed Table 4-3 lists Kathmandu Metropolitan City wards '...,30,32,32' (32 printed twice); code keeps ward 32 once, possible misprint (for 31 or 33) to confirm with DUDBC. (rows: N4-0052, N4-0053, N4-0054, N4-0055, N4-0056, N4-0057 ...; 22 row(s))
-- Possible class-II classification (more than 500 persons) for a 95 m building; the code takes I as a user input and does not enforce Table 4-4. (rows: N4-0085, N4-0086, N4-0087, N4-0088, N4-0089; 5 row(s))
+- Exactly 500 occupants is not printed for either class (class I "less than 500", class II "more than 500"); treated as class II (conservative). (rows: N4-0085; 1 row(s))
 - Resolved: the earlier clamp interpretation is withdrawn in clause 5. The workbook per-segment contribution still uses the 0.9-limited ratio numerically (unchanged number) but the exceedance is flagged, not silent. (rows: N5-0030; 1 row(s))
 - Printed 5.4 refers to 'clauses 5.5.1 to 5.5.2' for irregularity, but the irregularity clauses are numbered 5.4.1 and 5.4.2 (cross-reference anomaly in the standard; the same wrong number appears in 3.2.1 iii). (rows: N5-0094; 1 row(s))
 - No printed numeric threshold; offset plus declared overturning demand is the reading of the printed condition. (rows: N5-0103; 1 row(s))

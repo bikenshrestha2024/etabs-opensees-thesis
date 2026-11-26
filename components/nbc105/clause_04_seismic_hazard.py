@@ -366,3 +366,83 @@ def default_soil_type_d(district, municipality, ward=None):
     if ward is None:
         raise ValueError("ward is required for a partially listed municipality")
     return int(ward) in entry
+
+
+# --- Table 4-4 occupancy classification (owner ruling 9d) ---
+OCCUPANT_LIMIT_PERSONS = 500
+
+# Printed Table 4-4 structure names, keyed by a stable token (printed p. 26).
+OCCUPANCY_CLASS = {
+    # Class I (I = 1.0): ordinary structures not falling in classes II and III
+    "residence": 1, "apartments": 1, "offices": 1, "banks": 1, "financial_institutions": 1,
+    "commercial_buildings": 1, "hospitality_buildings": 1, "factory_buildings": 1,
+    # Class II (I = 1.25)
+    "schools": 2, "colleges": 2, "cinemas": 2, "assembly_buildings": 2, "shopping_malls": 2,
+    "convention_halls": 2, "temples": 2, "monumental_structures": 2, "police_stations": 2,
+    "emergency_vehicle_shelters": 2, "stadiums": 2, "airport_terminals": 2,
+    "food_storage_structures": 2, "emergency_relief_stores": 2, "water_works_and_towers": 2,
+    "radio_television_facilities": 2, "telephone_exchanges": 2, "transmission_facilities": 2,
+    "senior_rescue_relief_offices_and_quarters": 2,
+    # Class III (I = 1.5)
+    "hospitals": 3, "fire_stations": 3, "police_headquarters": 3, "air_traffic_control": 3,
+    "power_stations": 3, "gas_petroleum_distribution": 3, "dangerous_substance_structures": 3,
+}
+
+
+def classify_importance(categories, *, occupant_count=None, declared_class=None,
+                        disaster_shelter=False):
+    """Table 4-4 importance class and factor from occupancy categories.
+
+    [REF NBC105-2025 §4.1.5 Table 4-4, printed p. 26]
+    The governing class is the highest class among the listed ``categories``
+    (tokens of ``OCCUPANCY_CLASS``). Class I is limited to occupancy "less than
+    500 persons" and class II includes "any other buildings designed to
+    accommodate more than 500 persons": a class I category with more than 500
+    occupants is class II. Exactly 500 is not printed for either class; it is
+    treated as class II (conservative) and flagged. If ``occupant_count`` is
+    None for a class I category the result carries
+    CLASS_I_OCCUPANCY_UNVERIFIED. ``declared_class`` (the class the project
+    adopted) is cross-checked: below the table is DECLARED_BELOW_TABLE_4_4,
+    above it is DECLARED_ABOVE_TABLE_4_4 (allowed, more conservative).
+    ``disaster_shelter`` applies footnote 2 (I = 1.5) to class II facilities.
+    """
+    if isinstance(categories, str) or not categories:
+        raise ValueError("categories must be a non-empty list of Table 4-4 category tokens")
+    unknown = [c for c in categories if c not in OCCUPANCY_CLASS]
+    if unknown:
+        raise ValueError("unknown Table 4-4 category: " + ", ".join(map(str, unknown)))
+    flags = []
+    cls = max(OCCUPANCY_CLASS[c] for c in categories)
+    if occupant_count is not None:
+        n = _finite(occupant_count, "occupant_count")
+        if n < 0:
+            raise ValueError("occupant_count must be >= 0")
+        if cls == 1 and n >= OCCUPANT_LIMIT_PERSONS:
+            cls = 2
+            flags.append("OCCUPANCY_EXACTLY_500_NOT_PRINTED_TREATED_AS_CLASS_II" if n == OCCUPANT_LIMIT_PERSONS
+                         else "OCCUPANCY_ABOVE_500_CLASS_II")
+    elif cls == 1:
+        flags.append("CLASS_I_OCCUPANCY_UNVERIFIED")
+    shelter = bool(disaster_shelter)
+    if shelter and cls == 1:
+        raise ValueError("disaster_shelter footnote applies to class II facilities")
+    factor = importance_factor(cls, disaster_shelter=shelter and cls == 2)
+    status = "CLASSIFIED"
+    if declared_class is not None:
+        if isinstance(declared_class, bool) or declared_class not in (1, 2, 3):
+            raise ValueError("declared_class must be 1, 2 or 3")
+        if declared_class < cls:
+            status = "DECLARED_BELOW_TABLE_4_4"
+        elif declared_class > cls:
+            status = "DECLARED_ABOVE_TABLE_4_4"
+        else:
+            status = "DECLARED_MATCHES_TABLE_4_4"
+    if status != "DECLARED_BELOW_TABLE_4_4" and "CLASS_I_OCCUPANCY_UNVERIFIED" in flags:
+        status = "CLASSIFIED_OCCUPANCY_UNVERIFIED" if declared_class is None else status
+    return {"importance_class": cls, "importance_factor": factor, "declared_class": declared_class,
+            "status": status, "flags": flags, "categories": list(categories),
+            "occupant_count": occupant_count, "disaster_shelter": shelter and cls == 2,
+            "conforming": status != "DECLARED_BELOW_TABLE_4_4"}
+
+
+__all__ += ["OCCUPANT_LIMIT_PERSONS", "OCCUPANCY_CLASS", "classify_importance"]

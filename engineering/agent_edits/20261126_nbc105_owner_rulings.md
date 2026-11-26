@@ -37,3 +37,6 @@ New `components/nbc105/clause_07_missing_mass.py` (+ guide, registry row), gate 
 
 ## Ruling 9c: plan and vertical irregularities
 `clause_05_dynamic_characteristics.py` (in_plane_discontinuity_irregularity, reentrant_corner_check, diaphragm_discontinuity_irregularity, out_of_plane_offset_irregularity), `components/validation/response_checks.py::irregularity` (optional `plan_inputs`; NOT EVALUATED with the missing-input list when absent), `tests/test_nbc105_followup_plan_irregularities.py`, rows N5-0103/0116/0119/0122, clause_05 guide. No model-data extraction of the inputs yet.
+
+## Ruling 9d: Table 4-4 occupancy classification
+`clause_04_seismic_hazard.py` (OCCUPANCY_CLASS, OCCUPANT_LIMIT_PERSONS, classify_importance), `components/equivalent_static/code_basis.py::calculate_esm` (optional `occupancy_basis`, reports only), `tests/test_nbc105_followup_importance_class.py`, rows N4-0085..0089, clause_04 guide. Exactly 500 occupants is not printed; treated as class II and flagged.

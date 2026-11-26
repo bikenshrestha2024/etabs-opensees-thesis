@@ -20,4 +20,6 @@ NBC 105:2025 clause 4. See the [research reference register](../../../00_RESEARC
 ## Regression acceptance
 `python -m pytest tests/test_nbc105_clause04.py -q` (hand-computed expected values and a Table 4-3 transcription check) and `python tests/verify_ref_tags.py`. Unit tests only; no native ETABS/OpenSees run. See [thesis acceptance gates](../../../00_THESIS_ACCEPTANCE_GATES.md).
 
+**Table 4-4 classification (added 2026-11-26, owner ruling 9d):** `classify_importance(categories, occupant_count=None, declared_class=None, disaster_shelter=False)` maps printed Table 4-4 structure names (`OCCUPANCY_CLASS`) to class I/II/III (highest governs), applies the 500-person boundary (class I `less than 500`, class II `more than 500`; exactly 500 is not printed and is treated as class II and flagged), the footnote-2 shelter factor 1.5, and cross-checks the project-declared class (`DECLARED_BELOW_TABLE_4_4` is non-conforming, above is allowed). Missing occupant count for a class I category returns `CLASS_I_OCCUPANCY_UNVERIFIED`. `equivalent_static.code_basis.calculate_esm(..., occupancy_basis=None)` adds an `importance_classification` record and never changes the supplied I. Tests: `tests/test_nbc105_followup_importance_class.py`.
+
 [Module documentation index](../../00_SOURCE_GUIDE_INDEX.md)

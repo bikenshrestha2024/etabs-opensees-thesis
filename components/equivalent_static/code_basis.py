@@ -317,16 +317,36 @@ def esm_eligibility(height_m, period_s, limit_state, irregular=None):
         "Use MRSM or nonlinear analysis as applicable."
     )
 
+def _importance_record(occupancy_basis, importance_factor_i):
+    """Optional Table 4-4 cross-check of the supplied I (clause_04.classify_importance)."""
+    if not occupancy_basis:
+        return {}
+    from components.nbc105.clause_04_seismic_hazard import classify_importance
+    result = classify_importance(
+        occupancy_basis["categories"], occupant_count=occupancy_basis.get("occupant_count"),
+        declared_class=occupancy_basis.get("declared_class"),
+        disaster_shelter=bool(occupancy_basis.get("disaster_shelter", False)))
+    return {"importance_classification": result,
+            "importance_factor_matches_table_4_4": float(importance_factor_i) >= result["importance_factor"] - 1e-9}
+
+
 def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
                   importance_factor_i, limit_state="ULS", r_mu=4.0,
                   omega_u=1.5, omega_s=1.25, irregular=None,
                   location_name="", zoning_source="Annex C municipality table",
-                  vs30_m_s=None, n_spt_blow_30cm=None, diagnostic_reference=False):
+                  vs30_m_s=None, n_spt_blow_30cm=None, diagnostic_reference=False,
+                  occupancy_basis=None):
     """Calculate NBC 105 story seismic weights, base shear and floor forces.
 
     Each story record requires ``height_m``, ``dead_load_kN``,
     ``storage_live_load_kN`` and ``other_live_load_kN``. Roof live is forced
     to zero by Table 5-1. The returned records contain Wi and Fi in kN.
+
+    ``occupancy_basis`` (optional dict: ``categories`` plus optional
+    ``occupant_count``, ``declared_class``, ``disaster_shelter``) adds an
+    ``importance_classification`` record from NBC 105 Table 4-4. It never
+    changes the supplied I; ``importance_factor_matches_table_4_4`` is False when
+    the supplied I is below the table factor.
     """
     if not stories:
         raise ValueError("At least one story row is required.")
@@ -420,6 +440,7 @@ def calculate_esm(stories, *, period_s, soil_type, zoning_factor_z,
         "location_name":str(location_name).strip(),
         "zoning_factor_source":str(zoning_source).strip(),
         "zoning_factor_Z":Z,"importance_factor_I":I,"spectral_shape_Ch":Ch,
+        **_importance_record(occupancy_basis, I),
         "elastic_spectrum_C_k":elastic_spectrum,"design_coefficient_Cd":Cd,
         "coefficient_divisor":divisor,"period_exponent_k":k,
         "ductility_factor_R_mu":float(r_mu),"overstrength_factor_Omega_u":float(omega_u),
