@@ -9,7 +9,8 @@ import math
 __all__=["component_amplification_factor","component_design_force",
          "component_ductility_factor","component_importance_factor",
          "component_scope","friction_design_resistance",
-         "shutdown_threshold_g","light_safety_cable_design_capacity"]
+         "shutdown_threshold_g","light_safety_cable_design_capacity",
+         "AP_RANGE","MU_P_RANGE","MU_P_RESEARCH_MAX","IP_VALUES"]
 _TABLE_DUCTILITY={"low":1.5,"moderate":2.5}
 _TABLE_IMPORTANCE={"hazardous":1.5,"life safety":1.5,
   "public storage":1.5,"emergency":1.5,"other":1.0}
@@ -59,13 +60,37 @@ def component_scope(building_seismic_weight,component_weight):
     return {"allowed":p<=.25*w,"component_to_building_ratio":p/w,
             "basis":"SECTION_10_SCOPE_NOT_CONNECTION_DESIGN"}
 
-def component_design_force(*,z,hp,H,ap,mu_p,Ip,Wp):
+# Printed ranges and values (see docs/nbc105/clause_10_component_factor_locations.md).
+AP_RANGE=(1.0,2.5)              # 10.3.1 p.50: "Its value varies from 1 to 2.5"
+MU_P_RANGE=(1.5,2.5)            # 10.3.2 p.50: "Its value varies from 1.5 to 2.5"
+MU_P_RESEARCH_MAX=3.5           # 10.3.2 p.50: higher value, "not exceeding 3.5", if supported by research
+IP_VALUES=(1.0,1.5)             # Table 10-3 p.51: 1.5 for four classes, 1.0 for all other
+
+def component_design_force(*,z,hp,H,ap,mu_p,Ip,Wp,research_supported_mu_p=False):
     """§10.3 Eq.10.3(1) p.49: Z (1+hp/H) (ap/mu_p) Ip Wp.
-[REF NBC105-2025 §10, printed pp. 49–52]"""
+
+    [REF NBC105-2025 §10.3, printed pp. 49-51]
+    Printed ranges are enforced (ValueError outside): ap 1 to 2.5 (10.3.1,
+    Table 10-1, p.50), mu_p 1.5 to 2.5 (10.3.2, Table 10-2, p.50) and Ip equal
+    to 1.0 or 1.5 (10.3.3, Table 10-3, p.51). A mu_p above 2.5 and up to 3.5 is
+    accepted only for high-deformability components when the caller passes
+    ``research_supported_mu_p=True`` (printed: "if/as supported by research").
+    """
     h=_positive(H,"H"); attach=_nonnegative(hp,"hp")
     if attach>h:raise ValueError("component attachment above top of building")
-    return (_positive(z,"Z")*(1.+attach/h)*_positive(ap,"ap")/
-      _positive(mu_p,"mu_p")*_positive(Ip,"Ip")*_positive(Wp,"Wp"))
+    a=_positive(ap,"ap"); m=_positive(mu_p,"mu_p"); i=_positive(Ip,"Ip")
+    if not AP_RANGE[0]<=a<=AP_RANGE[1]:
+        raise ValueError("ap outside the printed range 1 to 2.5 (NBC 10.3.1, p.50)")
+    if type(research_supported_mu_p) is not bool:
+        raise ValueError("research_supported_mu_p must be bool")
+    if m>MU_P_RANGE[1]:
+        if not (research_supported_mu_p and m<=MU_P_RESEARCH_MAX):
+            raise ValueError("mu_p above 2.5 needs research support and may not exceed 3.5 (NBC 10.3.2, p.50)")
+    elif m<MU_P_RANGE[0]:
+        raise ValueError("mu_p below the printed minimum 1.5 (NBC 10.3.2, p.50)")
+    if i not in IP_VALUES:
+        raise ValueError("Ip must be 1.0 or 1.5 (NBC Table 10-3, p.51)")
+    return (_positive(z,"Z")*(1.+attach/h)*a/m*i*_positive(Wp,"Wp"))
 
 def friction_design_resistance(vertical_normal_force,coefficient_of_friction):
     """§10.1 p.49: half of gravity-friction resistance for seismic design.

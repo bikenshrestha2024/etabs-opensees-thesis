@@ -16,3 +16,6 @@ Editor Claude Code (model label UNKNOWN). Branch `feat/nbc105-normative-sentence
 
 ## Ruling 4: Lwi/H > 0.9
 `clause_05_dynamic_characteristics.py` (`effective_wall_area_result`, `LwiOverHExceeded`; `effective_wall_area_m2` no longer clamps), `components/inputs/project_workbooks.py::_wall_aw_from_lines` (CRLF preserved; per-segment flag, numeric value unchanged), `components/modal/analysis.py` docstring, `tests/test_nbc105_followup_lwi_over_h.py`, `tests/test_nbc105_clause5.py` (clamp test replaced), row N5-0030. Printed p.30 words it as a restriction on Lwi; the formula on p.29 has no cap, so no clamp.
+
+## Ruling 5: ap, mu_p, Ip
+`clause_10_parts_and_components.py::component_design_force` range enforcement (+`research_supported_mu_p`), `docs/nbc105/clause_10_component_factor_locations.md`, `tests/test_nbc105_followup_component_factors.py`, rows N10-0013/0019/0027/0029.
