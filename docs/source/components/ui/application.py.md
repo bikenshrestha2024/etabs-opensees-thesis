@@ -106,3 +106,6 @@ Use **Review selected export in Model** to continue from Import. Model shows the
 
 
 2026-11-26: the main import callback validates the original export-root boundary before writing conversion logs. Case-dependent specialist actions in Import, Linear/Results and Nonlinear use `_launch_selected_tool` and the existing `_model_review_folder` guard, rather than reading an unvalidated entry. Saved source-view actions prefer the selected export, not a previously completed worker from another case. Native solver behavior and model acceptance are unchanged.
+
+
+2026-11-26: the main Gravity launcher requires successful binding of the selected export manifest by default, avoiding its standalone idle fallback to an unrelated default project. Independent standalone Gravity remains available for explicit manual model selection.

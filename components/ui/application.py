@@ -2794,7 +2794,7 @@ class App:
         if gui is not None:
             gui._rebuild_verified_clear_beam(elastic_comparison=True)
 
-    def _open_gravity_analysis(self, *, require_manifest=False):
+    def _open_gravity_analysis(self, *, require_manifest=True):
         """Open the gravity-analysis runner and reporting GUI."""
         folder = self._model_review_folder()
         if folder is None:

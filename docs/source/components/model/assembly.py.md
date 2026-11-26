@@ -90,3 +90,6 @@ Before assembling a conforming shell grid, `_mesh_areas` now calls `components.m
 ## 2026-11-23 — stop the unbound V116 template overriding V134 draft
 
 The nonlinear model role of `autoselect_inputs` previously set the V134 draft but then unconditionally preferred the existence of `OpenSees_Model_Readiness_V116.json`, which for an uncompleted export is the placeholder template. The selection now calls `components.model.readiness.select_model_bound_readiness`, prefers a valid model-specific draft, falls back only to a current model/SHA-bound legacy manifest, and otherwise clears the GUI field. Other role discovery is unchanged. This does not change checklist approvals or run a solver. Tested by `tests/test_readiness_model_selection_20261123.py`.
+
+
+2026-11-26: `autoselect_inputs` validates manifest role paths and optional story/weight/readiness references as local relative files of the selected export before changing GUI fields. Missing story files clear old GUI references rather than retaining another case's paths. This is a selector-only change, not structural assembly or engineering acceptance. Tests cover external/traversal paths and missing auxiliary files.
