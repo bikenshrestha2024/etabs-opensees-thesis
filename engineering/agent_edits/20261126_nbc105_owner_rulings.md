@@ -19,3 +19,6 @@ Editor Claude Code (model label UNKNOWN). Branch `feat/nbc105-normative-sentence
 
 ## Ruling 5: ap, mu_p, Ip
 `clause_10_parts_and_components.py::component_design_force` range enforcement (+`research_supported_mu_p`), `docs/nbc105/clause_10_component_factor_locations.md`, `tests/test_nbc105_followup_component_factors.py`, rows N10-0013/0019/0027/0029.
+
+## Ruling 6: modal mass coverage
+`clause_07_modal_response_spectrum.py` (`modal_mass_participation_profile`, `modal_mass_participation_by_direction`, `MODAL_MASS_THRESHOLD_PERCENT`), `components/modal/analysis.py` (result fields `mass_coverage`, `reached_90_at_mode`, `reached_100_at_mode`, row region flags), `tests/test_nbc105_followup_modal_mass.py`, row N7-0016.

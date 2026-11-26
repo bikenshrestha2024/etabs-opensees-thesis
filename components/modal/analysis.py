@@ -287,6 +287,22 @@ def run_nbc105_modal_audit(ops, *, nmodes=30, output_dir=".",
             modal_t = period_check.get(f"reviewed_modal_period_{axis}_s", period_check.get(f"candidate_modal_period_{axis}_s"))
             adopted = period_check.get(f"adopted_design_period_{axis}_s")
             period_check[f"modal_to_adopted_period_ratio_{axis}"] = None if adopted is None or not adopted else modal_t / adopted
+    from components.nbc105.clause_07_modal_response_spectrum import modal_mass_participation_profile
+    mass_coverage = {}
+    for axis, seq in (("X", ux_pct), ("Y", uy_pct)):
+        # [REF NBC105-2025 §7.3, printed p. 40] cumulative to 100 percent with the 90 percent region highlighted
+        if all(v is not None for v in seq):
+            try:
+                profile = modal_mass_participation_profile(seq, periods_s=periods)
+            except ValueError as exc:
+                profile = {"status": "NOT_EVALUATED", "reason": str(exc)}
+            else:
+                for row, region in zip(rows, profile["regions"]):
+                    row["mass_region_" + axis] = region["region"]
+                    row["highlight_90_region_" + axis] = region["highlight_90_region"]
+        else:
+            profile = {"status": "NOT_EVALUATED", "reason": "missing per-mode participation values"}
+        mass_coverage[axis] = profile
     result = {
         "standard": "NBC 105:2025",
         "clauses": ["7.3 Number of Modes to be Considered", "7.4 Combination of Modal Effects", "7.5 Scale Factor for Design Values of the Combined Response"],
@@ -300,6 +316,9 @@ def run_nbc105_modal_audit(ops, *, nmodes=30, output_dir=".",
         "UX_90_percent_reached": bool(ux_ok),
         "UY_90_percent_reached": bool(uy_ok),
         "first_mode_reaching_target": first90,
+        "mass_coverage": mass_coverage,
+        "reached_90_at_mode": {k: v.get("reached_90_at_mode") for k, v in mass_coverage.items()},
+        "reached_100_at_mode": {k: v.get("reached_100_at_mode") for k, v in mass_coverage.items()},
         "NBC_5_1_period_check": period_check,
         "increase_requested_modes_if_target_not_reached": not (ux_ok and uy_ok),
         "modes_at_or_above_33_Hz": high_modes,

@@ -11,14 +11,14 @@ Status: NOT CERTIFIED. Independent human sign-off is an external gate; a disposi
 | 4 | 100 | 58 | 0 | 10 | 1 | 28 | 3 | 0 | 0 |
 | 5 | 140 | 69 | 0 | 21 | 3 | 47 | 0 | 0 | 0 |
 | 6 | 39 | 22 | 0 | 1 | 0 | 16 | 0 | 0 | 0 |
-| 7 | 27 | 10 | 2 | 2 | 2 | 11 | 0 | 0 | 0 |
+| 7 | 27 | 11 | 1 | 2 | 2 | 11 | 0 | 0 | 0 |
 | 8 | 25 | 6 | 0 | 5 | 1 | 13 | 0 | 0 | 0 |
 | 9 | 71 | 12 | 0 | 16 | 14 | 29 | 0 | 0 | 0 |
 | 10 | 50 | 21 | 0 | 11 | 2 | 16 | 0 | 0 | 0 |
 | A | 373 | 25 | 0 | 184 | 1 | 163 | 0 | 0 | 0 |
 | B | 292 | 16 | 0 | 0 | 156 | 120 | 0 | 0 | 0 |
 | C | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
-| all | 1417 | 357 | 6 | 304 | 180 | 559 | 11 | 0 | 0 |
+| all | 1417 | 358 | 5 | 304 | 180 | 559 | 11 | 0 | 0 |
 
 ## Rows by kind
 
@@ -42,7 +42,7 @@ SHALL: 332, SHOULD: 36, MAY: 31, LIMIT: 21, STATEMENT: 302, CLAUSE: 229, TABLE: 
 - Resolved 2026-11-26: the design (Rmu-scaled) basis is stated in 5.5.1.1, not in 5.5.3; 5.5.3 itself only gives the ratio and the 3.4 stiffness requirement. Code cites 5.5.1.1 for the scaling and 5.5.3 for the limit. (rows: N5-0137; 1 row(s))
 - Printed 6.4 refers to eccentricity 'as per 5.7'; accidental eccentricity is in 5.6 of the printed clause list (code comments cite 5.6). Cross-reference mismatch in the standard. (rows: N6-0029; 1 row(s))
 - Printed equation number 7.1(2) sits under clause 7.2; the 7.2 heading and equation numbering differ (7.1(2), 7.1(3) printed under 7.2). (rows: N7-0007; 1 row(s))
-- modal_mass_coverage() does not itself compare with 90 percent; the comparison is only in run_model_spectrum. (rows: N7-0016; 1 row(s))
+- Resolved 2026-11-26: the earlier gap that modal_mass_coverage() did not compare with 90 percent is closed by modal_mass_participation_profile (compliant_90). (rows: N7-0016; 1 row(s))
 - No missing-mass correction exists in the code base; production fails closed instead. (rows: N7-0018; 1 row(s))
 - Reference srss() does not implement direct summation of closely spaced modes; it is not used by active MRSM, so no code change. (rows: N7-0021; 1 row(s))
 - Printed text does not define exactly 7 records; code stays fail-closed on 7 (owner ruling 2026-11-26: keep as printed). Owner phrase "average for >=7" not adopted for 7 because the print does not say it. (rows: N8-0019, N9-0066; 2 row(s))
