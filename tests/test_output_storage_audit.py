@@ -2,12 +2,37 @@
 import tempfile
 import unittest
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 from tools.audit_output_storage import scan_output, write_report
 
 
 class OutputStorageAuditTests(unittest.TestCase):
+    def test_direct_script_writes_report_without_pythonpath(self):
+        script = Path(__file__).resolve().parents[1] / "tools" / "audit_output_storage.py"
+        with tempfile.TemporaryDirectory() as td:
+            folder = Path(td)
+            root = folder / "case"
+            root.mkdir()
+            (root / "Gravity_Result.json").write_text("{}", encoding="utf-8")
+            destination = folder / "audit"
+            result = subprocess.run(
+                [sys.executable, "-E", str(script), "--root", str(root),
+                 "--out", str(destination), "--no-hash", "--validate-files"],
+                cwd=folder, capture_output=True, text=True, timeout=15,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((destination / "JSON" / "DISK_AUDIT.json").is_file())
+            result = subprocess.run(
+                [sys.executable, "-E", str(script), "--root", str(root), "--no-hash"],
+                cwd=folder, capture_output=True, text=True, timeout=15,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            runs = root / "09_SOFTWARE_DIAGNOSTICS" / "DISK_AUDITS" / "RUNS"
+            self.assertEqual(len(list(runs.glob("*/JSON/DISK_AUDIT.json"))), 1)
+
     def test_exact_bytes_only_and_never_change_sources(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "project"

@@ -14,7 +14,7 @@ From a command prompt:
 python tools\audit_output_storage.py --root "D:\Thesis Opensees\ETABS 11-12-2026\1"
 ```
 
-From Spyder: run the source file without arguments; select the current output folder in the chooser. The tool writes a NEW sibling `Disk_Audit_YYYYMMDD_HHMMSS` folder by default and prints the exact path. Optional `--out "D:\...\Audit_01"` selects a NEW empty destination. Use `--no-hash` for a quicker size-only inventory.
+Run the script directly by absolute path from any working directory, or run `python -m tools.audit_output_storage` from the repository. In Spyder, run the script without arguments and select the project output folder. The tool prints the new report path under the project's `09_SOFTWARE_DIAGNOSTICS/DISK_AUDITS/RUNS` folder. Use `--out` to name a different report destination or `--no-hash` to skip duplicate hashing.
 
 ## Inputs, outputs and safety
 

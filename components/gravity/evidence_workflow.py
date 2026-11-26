@@ -102,10 +102,13 @@ def latest_single_run(gravity_root, *, model_script=None):
             if model_script is not None:
                 if not source or Path(source).expanduser().resolve()!=Path(model_script).expanduser().resolve():
                     continue
-            eligible.append((path.stat().st_mtime_ns,str(path),directory))
+            # Copies and fast writes can share a filesystem timestamp. In
+            # that case, keep the result with an explicit canonical case path.
+            eligible.append((path.stat().st_mtime_ns,directory.is_relative_to(cases),
+                             str(path),directory))
         except (OSError,ValueError,TypeError):
             continue
-    return max(eligible)[2] if eligible else None
+    return max(eligible)[3] if eligible else None
 
 
 def package_gravity_review(model_script, gravity_root, *,
