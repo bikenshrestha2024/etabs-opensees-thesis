@@ -1660,8 +1660,34 @@ def autoselect_inputs(gui, export_dir, role):
     """Populate only files named by the current export manifest."""
     folder=Path(export_dir).expanduser().resolve(); path=folder/MANIFEST
     if not path.is_file(): return False
-    manifest=_read(path); model=folder/manifest[role]
-    if not model.is_file(): return False
+    if path.is_symlink():
+        raise ValueError('Export manifest must not be a linked file: '+str(path))
+    manifest=_read(path)
+    if not isinstance(manifest,dict):
+        raise ValueError('Export manifest must be a JSON object')
+
+    def local_file(name, *, suffix):
+        # Generated manifest entries are local, relative file paths.
+        if name in (None,''):
+            return None
+        if not isinstance(name,str):
+            raise ValueError('Invalid manifest file reference: '+repr(name))
+        from pathlib import PureWindowsPath
+        relative=Path(name)
+        windows=PureWindowsPath(name)
+        if relative.is_absolute() or windows.drive or windows.root or '..' in relative.parts or '..' in windows.parts:
+            raise ValueError('Manifest file reference escapes selected export: '+name)
+        target=(folder/relative).resolve()
+        if folder not in target.parents or target.suffix.lower()!=suffix:
+            raise ValueError('Invalid manifest file reference for selected export: '+name)
+        return target if target.is_file() else None
+
+    # Validate all manifest-controlled paths before mutating GUI fields.
+    model=local_file(manifest.get(role),suffix='.py')
+    if model is None: return False
+    story_target=local_file(manifest.get('story_master_csv'),suffix='.csv')
+    story_weights=local_file(manifest.get('esm_story_weight_csv'),suffix='.csv')
+    readiness_target=local_file(manifest.get('readiness_manifest'),suffix='.json')
     variable=getattr(gui,'model_var',None) or getattr(gui,'model',None) or getattr(gui,'model_script',None)
     if getattr(variable,'get',lambda:None)()!=str(model):variable.set(str(model))
     state='ULS'
@@ -1688,23 +1714,18 @@ def autoselect_inputs(gui, export_dir, role):
             # draft. Also clear a previous model's readiness selection.
             from components.model.readiness import select_model_bound_readiness
             draft=folder/('OpenSees_Model_Readiness_Draft_'+model.stem+'_V134.json')
-            manifest_name=manifest.get(key)
-            from_manifest=folder/manifest_name if manifest_name else None
             candidate=select_model_bound_readiness(model,(
-                draft,from_manifest,folder/'OpenSees_Model_Readiness_V116.json'))
+                draft,readiness_target,folder/'OpenSees_Model_Readiness_V116.json'))
             var.set(str(candidate) if candidate else '')
         else:
-            name=manifest.get(key)
-            target=folder/name if name else None
-            if target is not None and target.is_file():
-                var.set(str(target))
+            var.set(str(story_target) if story_target else '')
     unit_var=getattr(gui,'model_length_unit',None)
     if unit_var is not None:unit_var.set('m')  # These manifest entries are generated in kN-m-s.
     path_var=getattr(gui,'path',None)
-    story_weights=folder/manifest.get('esm_story_weight_csv','')
-    if path_var is not None and story_weights.is_file():
-        path_var.set(str(story_weights))
-        if hasattr(gui,'_load_story_metadata'): gui._load_story_metadata(str(story_weights))
+    if path_var is not None:
+        path_var.set(str(story_weights) if story_weights else '')
+        if story_weights and hasattr(gui,'_load_story_metadata'):
+            gui._load_story_metadata(str(story_weights))
     if hasattr(gui,'_read_code_inputs'): gui._read_code_inputs(show_error=False)
     height=getattr(gui,'height',None)
     data_file=folder/'OpenSees_Complete_Model_Data_V118.json'

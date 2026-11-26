@@ -30,10 +30,17 @@ def file_sha256(path):
     return h.hexdigest()
 
 
+def _refuse_links(path):
+    candidate=Path(path).expanduser()
+    if any(p.is_symlink() for p in (candidate,*candidate.parents)):
+        raise ValueError("Refusing linked gravity evidence path: "+str(candidate))
+    return candidate
+
+
 def _validate_excel(path):
     """Validate the ZIP container without changing Excel formulas or layout."""
     from zipfile import ZipFile, BadZipFile
-    path = Path(path)
+    path = _refuse_links(path)
     if path.suffix.lower() not in VALID_EXTENSIONS or not path.is_file():
         raise ValueError("Provide a real .xlsx/.xlsm ETABS workbook for each role")
     with path.open("rb") as stream:
@@ -66,41 +73,46 @@ def stage_gravity_workbooks(export_dir, *, assignment, full_table, source_edb=No
     expected native ETABS tables. A staged workbook may not equal its source
     EDB or contain solved joint reactions; separate gates remain mandatory.
     """
-    folder = Path(export_dir).resolve()
+    folder = _refuse_links(export_dir).resolve()
     if not folder.is_dir():
         raise FileNotFoundError(folder)
     selected = {"etabs_assignment": _validate_excel(assignment),
                 "etabs_full_table": _validate_excel(full_table)}
-    destination = manifest_path(folder).parent
-    destination.mkdir(parents=True, exist_ok=True)
+    destination = _refuse_links(manifest_path(folder).parent)
+    _refuse_links(manifest_path(folder))
+    edb = _refuse_links(source_edb).resolve() if source_edb else None
+    edb_sha = file_sha256(edb) if edb and edb.is_file() else None
     prepared = {}
     for role, source in selected.items():
         digest = file_sha256(source)
-        # A published manifest keeps referring to the same bytes while another
-        # pair is staged. Only the manifest switches after both copies verify.
-        target = destination / "SHA256" / digest / (role + source.suffix.lower())
-        if not target.is_file() or file_sha256(target) != digest:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            # Copy into temporary filename first to avoid partial accepted files.
-            with tempfile.NamedTemporaryFile(dir=target.parent, prefix=role+"_",
+        # Stable content-addressed private objects retain past run references
+        # without copying identical workbook bytes for a different role.
+        target = _refuse_links(destination/"OBJECTS"/digest/("workbook"+source.suffix.lower()))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            with tempfile.NamedTemporaryFile(dir=target.parent, prefix="workbook_",
                                              suffix=".partial", delete=False) as tmp:
                 partial = Path(tmp.name)
             try:
                 shutil.copyfile(source, partial)
-                if file_sha256(partial) != digest:
+                if file_sha256(partial) != digest or file_sha256(source) != digest:
                     raise IOError("Source/staged workbook hash mismatch: "+role)
-                os.replace(partial, target)
+                if not target.exists():
+                    os.replace(partial, target)
             finally:
                 partial.unlink(missing_ok=True)
+        if file_sha256(target)!=digest or file_sha256(source)!=digest:
+            raise ValueError("Existing staged object or original workbook changed: "+role)
         prepared[role] = {"path": str(target), "sha256": digest,
                           "source_name": source.name, "bytes": target.stat().st_size}
-    edb = Path(source_edb).resolve() if source_edb else None
+    if edb_sha and file_sha256(edb)!=edb_sha:
+        raise ValueError("Source EDB changed during workbook staging")
     doc = {"schema": 1,
            "status": "STAGED_NOT_ETABS_VALIDATED",
            "created_utc": datetime.now(timezone.utc).isoformat(),
            "export_dir": str(folder),
            "source_edb": str(edb) if edb else None,
-           "source_edb_sha256": file_sha256(edb) if edb and edb.is_file() else None,
+           "source_edb_sha256": edb_sha,
            "workbooks": prepared,
            "validation_needed": ["ETABS model identity", "native assignment sheet presence",
                                  "matching ULS load case and joint reactions",
@@ -113,11 +125,12 @@ def staged_gravity_workbooks(export_dir):
 
     [REF docs/source/components/inputs/gravity_evidence_stage.py.md]
     """
-    path = manifest_path(export_dir)
+    folder = _refuse_links(export_dir).resolve()
+    path = _refuse_links(manifest_path(folder))
     if not path.is_file():
         return {}
     doc = json.loads(path.read_text(encoding="utf-8"))
-    if Path(doc.get("export_dir", "")).resolve() != Path(export_dir).resolve():
+    if Path(doc.get("export_dir", "")).resolve() != folder:
         raise ValueError("Staged workbook manifest belongs to another export")
     if doc.get("source_edb_sha256"):
         edb = Path(doc["source_edb"])
@@ -127,7 +140,9 @@ def staged_gravity_workbooks(export_dir):
     for role in ROLES:
         record = doc["workbooks"][role]
         candidate = _validate_excel(record["path"])
-        if file_sha256(candidate) != record["sha256"]:
+        if path.parent.resolve() not in candidate.parents:
+            raise ValueError("Staged workbook reference outside private export: "+role)
+        if file_sha256(candidate) != record["sha256"] or candidate.stat().st_size != record["bytes"]:
             raise ValueError("Staged ETABS workbook changed: "+role)
         result[role] = str(candidate)
     return result

@@ -100,3 +100,12 @@ Lowest-elevation six-DOF fixities in the topology/load-only preview are explicit
 ## Import to Model handoff
 
 Use **Review selected export in Model** to continue from Import. Model shows the current export folder and passes it to the mapping, slab mesh and area integration tools. These actions wait for the active Import worker to finish. The completed worker's saved load view stays associated with the folder used for that worker, even if the folder field changes before completion. Read the worker's report separately for assembly errors and engineering readiness.
+
+
+2026-11-26: Gravity/NBC exposes the existing elastic comparison rebuild through a manifest-bound shortcut. Results exposes the existing full migration audit using the selected export root, explicit confirmation, SHA duplicate and format checks, and a child process; logs and reports remain local. Nonlinear displays the selected folder, without altering the newer native launchers or engineering gates.
+
+
+2026-11-26: the main import callback validates the original export-root boundary before writing conversion logs. Case-dependent specialist actions in Import, Linear/Results and Nonlinear use `_launch_selected_tool` and the existing `_model_review_folder` guard, rather than reading an unvalidated entry. Saved source-view actions prefer the selected export, not a previously completed worker from another case. Native solver behavior and model acceptance are unchanged.
+
+
+2026-11-26: the main Gravity launcher requires successful binding of the selected export manifest by default, avoiding its standalone idle fallback to an unrelated default project. Independent standalone Gravity remains available for explicit manual model selection.

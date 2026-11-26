@@ -59,3 +59,5 @@ The optional clear-beam rebuild GUI previously inferred its Python script search
 The launcher shows the selected export for Gravity and NBC. Gravity chooses the workspace from the selected model and preserves verified saved cases from the earlier shared layout. Rebuild actions can use the original export recorded by a saved canonical rebuild. The elastic comparison picker opens at the repository's available review JSON folder or the selected export and still requires explicitly reviewed settings.
 
 The saved comparison plots use the minimum nodal vertical displacement at each storey, with separate markers. Legacy exports without storey metadata show mesh levels. This plot represents an elevation envelope, so adjacent points can come from different nodes.
+
+2026-11-26: generated gravity runner snapshots the registry's model-input fingerprint list before model build and rechecks after reaction recovery; any detected input change during the solve blocks success publication. The shared registry validates the recorded digest(s) for both single and dual support-case runs. No load, restraint, solver or stiffness equations changed.

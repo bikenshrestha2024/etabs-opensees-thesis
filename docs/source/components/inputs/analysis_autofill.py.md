@@ -57,3 +57,6 @@ Regression: tests/test_site_spectrum_period_autofill_20261123.py.
 ## 2026-11-23 — policy-bound modal evidence for transient analysis
 
 Saved modal eigenperiods imported by Linear TH must match source model JSON SHA, ULS/SLS, runtime selected support profile (32/76/97), seismic mass policy, and numerical implementation. Missing policy evidence is not trusted. The Linear TH GUI refreshes on support/mass changes; unrelated source periods remain empty. This is software provenance, not native ETABS equivalence. Synthetic regression: `tests/test_modal_history_policy_handoff.py`.
+
+
+2026-11-26: shared history autofill resets automatic periods and modal-reference provenance at the start of each refresh. A missing or different-folder builder cannot retain old references or route automatic output into an unrelated case. Manual output paths are restored even if autofill raises; successful automatic paths use the canonical linear/nonlinear stage. This does not change numerical period calculations, damping ratios, solver tolerances or acceptance gates.

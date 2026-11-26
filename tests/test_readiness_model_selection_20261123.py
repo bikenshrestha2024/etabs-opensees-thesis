@@ -130,3 +130,31 @@ def test_explicit_unbound_template_is_not_silently_replaced(tmp_path):
     codes=[x["code"] for x in diagnose_nonlinear_readiness({
         "model_script":str(model),"model_readiness_json":str(template)})["blockers"]]
     assert "template_unbound" in codes
+
+
+def test_manifest_rejects_external_model_or_story_before_selection(tmp_path):
+    import pytest
+    selected=tmp_path/"selected"
+    model,_=project(selected)
+    external=tmp_path/"outside.py"
+    external.write_text("# external")
+    manifest=selected/"OpenSees_Export_Manifest_V118.json"
+    gui=SimpleNamespace(model=Variable("old-model"),stories=Variable("old-story"))
+    for bad in (str(external),"../outside.py","C:\\other\\model.py"):
+        manifest.write_text(json.dumps({"nonlinear_model_script":bad}))
+        with pytest.raises(ValueError,match="Manifest file reference"):
+            autoselect_inputs(gui,selected,"nonlinear_model_script")
+        assert gui.model.get()=="old-model"
+    manifest.write_text(json.dumps({"nonlinear_model_script":model.name,"story_master_csv":"../other.csv"}))
+    with pytest.raises(ValueError,match="Manifest file reference"):
+        autoselect_inputs(gui,selected,"nonlinear_model_script")
+    assert gui.model.get()=="old-model" and gui.stories.get()=="old-story"
+
+
+def test_missing_optional_story_inputs_clear_previous_case(tmp_path):
+    model,_=project(tmp_path)
+    gui=SimpleNamespace(model=Variable("old-model"),stories=Variable("old-story"),
+                        path=Variable("old-weight"),readiness=Variable("old-readiness"))
+    assert autoselect_inputs(gui,tmp_path,"nonlinear_model_script")
+    assert gui.model.get()==str(model)
+    assert gui.stories.get()==gui.path.get()==gui.readiness.get()==""

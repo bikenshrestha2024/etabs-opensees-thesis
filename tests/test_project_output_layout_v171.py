@@ -8,6 +8,25 @@ from components.inputs.project_output_layout import (
 
 
 class ProjectOutputLayoutTests(unittest.TestCase):
+    def test_import_cannot_overwrite_stage_or_rebuilt_model(self):
+        from components.inputs.project_output_layout import require_import_root
+        with tempfile.TemporaryDirectory() as d:
+            base=Path(d)
+            source=base/"model.EDB"
+            source.write_bytes(b"source")
+            root=base/"export"
+            for candidate in (root/"02_MODEL"/"REBUILDS"/"VERIFIED_CLEAR_BEAM"/"r1",root/"04_MODAL"/"RUNS"/"case",root/"OpenSees_Analysis_Results"/"x"):
+                with self.assertRaisesRegex(ValueError,"original project export root"):
+                    create_project_layout(source,candidate)
+                self.assertFalse(candidate.exists())
+            variant=base/"legacy_variant"
+            variant.mkdir()
+            status=variant/"CLEAR_BEAM_REBUILD_STATUS.json"
+            status.write_text("{}")
+            with self.assertRaises(ValueError):
+                require_import_root(variant)
+            self.assertEqual(list(variant.iterdir()),[status])
+
     def test_source_binding_and_case_folders(self):
         with tempfile.TemporaryDirectory() as d:
             base = Path(d)

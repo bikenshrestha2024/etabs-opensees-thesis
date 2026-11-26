@@ -32,12 +32,21 @@ class FullLocalOutputAuditTests(unittest.TestCase):
                        return_value=mock_owners),patch(
                        "tools.RUN_FULL_OUTPUT_MIGRATION_AUDIT.audit_stage_migration",
                        return_value=mock_stage):
-                run,status=run_full_audit(root)
+                run,status=run_full_audit(root,hash_duplicates=True,validate_files=True)
             self.assertTrue(run.is_dir())
             self.assertIn("09_SOFTWARE_DIAGNOSTICS",run.parts)
             self.assertEqual(status["sources_inspected"],1)
             self.assertEqual(status["project_output_files_inspected"],1)
             self.assertFalse(status["source_archive_moved"])
+            self.assertEqual(status["duplicate_hash_check"],"REQUESTED")
+            self.assertEqual(status["format_check_counts"],{"JSON_PARSED":1})
+            self.assertEqual(status["disk_scan_error_count"],0)
+            self.assertEqual(status["file_evidence_review_required_count"],0)
+            self.assertEqual(status["excel_formula_cache_inventory"]["workbook_instances"],0)
+            import json
+            disk=json.loads((run/"02_RESULTS"/"05_ALL_OUTPUT_FILE_INVENTORY.json").read_text())
+            self.assertEqual(len(disk["files"]),1)
+            self.assertEqual(disk["files"][0]["relative_path"],"OpenSees_Analysis_Results/old.json")
             result=run/"02_RESULTS"
             for name in (
                 "00_SUMMARY.json","01_ALL_ACTIVE_WRITERS_READERS.json",

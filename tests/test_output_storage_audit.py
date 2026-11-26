@@ -88,6 +88,83 @@ class OutputStorageAuditTests(unittest.TestCase):
                 write_report({},alias/"08_AUDIT")
             self.assertEqual(list(outside.iterdir()),[])
 
+    def test_full_inventory_and_format_checks_are_read_only(self):
+        from zipfile import ZipFile
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            for i in range(55):
+                (root/f"{i}.json").write_text('{"ok":true}',encoding="utf-8")
+            (root/"broken.json").write_text("{",encoding="utf-8")
+            (root/"bad.png").write_bytes(b"not a png")
+            with ZipFile(root/"valid.zip","w") as archive:
+                archive.writestr("report.txt","test")
+            before={p.name:p.read_bytes() for p in root.iterdir()}
+            result=scan_output(root,include_entries=True,validate_files=True)
+            self.assertEqual(len(result["files"]),58)
+            self.assertEqual(len(result["largest_files"]),50)
+            self.assertEqual(result["format_check_counts"]["JSON_PARSED"],55)
+            self.assertEqual(result["format_check_counts"]["FORMAT_CHECK_FAILED"],2)
+            self.assertEqual(result["format_check_counts"]["ZIP_CRC_CHECKED"],1)
+            self.assertEqual(len(result["exact_duplicate_groups"]),1)
+            self.assertEqual(before,{p.name:p.read_bytes() for p in root.iterdir()})
+
+    def test_archive_and_workbook_caches_are_inspected_without_recalculation(self):
+        from io import BytesIO
+        from zipfile import ZipFile
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/"source"
+            root.mkdir()
+            book=BytesIO()
+            ns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+            with ZipFile(book,"w") as z:
+                z.writestr("xl/workbook.xml",f'<workbook xmlns="{ns}"/>')
+                z.writestr("xl/worksheets/sheet1.xml",
+                           f'<worksheet xmlns="{ns}"><sheetData><row>'
+                           '<c r="A1"><f>1+1</f><v/></c>'
+                           '<c r="B1"><f>0</f><v>0</v></c>'
+                           '<c r="C1" t="e"><f>1/0</f><v>#DIV/0!</v></c>'
+                           '</row></sheetData></worksheet>')
+            (root/"source.xlsx").write_bytes(book.getvalue())
+            with ZipFile(root/"evidence.zip","w") as z:
+                z.writestr("report.xlsx",book.getvalue())
+                z.writestr("bad.json","{")
+                z.writestr("nested.zip",b"not inspected")
+            before={p.name:p.read_bytes() for p in root.iterdir()}
+            result=scan_output(root,include_entries=True,validate_files=True)
+            self.assertEqual(result["excel_formula_cache_inventory"],{
+                "workbook_instances":2,"formula_cells":6,
+                "missing_cached_formula_values":2,"cached_formula_errors":2})
+            self.assertEqual(result["file_evidence_review_required_count"],3)
+            self.assertEqual(result["embedded_format_check_counts"]["FORMAT_CHECK_FAILED"],1)
+            self.assertEqual(len(result["scan_errors"]),1)
+            self.assertEqual(before,{p.name:p.read_bytes() for p in root.iterdir()})
+            write_report(result,Path(td)/"report")
+
+    def test_known_archive_manifests_verify_actual_members_and_aliases(self):
+        import hashlib
+        from zipfile import ZipFile
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            digest=hashlib.sha256(b"{}").hexdigest()
+            with ZipFile(root/"mesh.zip","w") as z:
+                z.writestr("MESH_04/result.json","{}")
+                z.writestr("MESH_04/ZIP_SHA256_MANIFEST.json",json.dumps({
+                    "files":{"result.json":digest,"missing.json":digest}}))
+            with ZipFile(root/"review.zip","w") as z:
+                z.writestr("result.json","{}")
+                z.writestr("REVIEW_MANIFEST.json",json.dumps({
+                    "collected":[{"path":"result.json","bytes":2,"sha256":digest}],
+                    "duplicates":[{"path":"alias.json","same_content_as":"result.json","bytes":2,"sha256":digest}]}))
+            for name,key in (("EVIDENCE_MANIFEST.json","archive_path"),
+                             ("ESM_Export_Manifest.json","snapshot_path")):
+                with ZipFile(root/(name+".zip"),"w") as z:
+                    z.writestr("result.json","{}")
+                    z.writestr(name,json.dumps({"files":[{key:"result.json","sha256":digest,"bytes":2}]}))
+            audit=scan_output(root,include_entries=True,validate_files=True)
+            self.assertEqual(audit["archive_manifest_inventory"],{
+                "manifests":4,"matched":4,"alias_matched":1,"failed":1})
+            self.assertEqual(audit["file_evidence_review_required_count"],1)
+
     def test_no_hash_does_not_infer_duplicate_from_equal_size(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

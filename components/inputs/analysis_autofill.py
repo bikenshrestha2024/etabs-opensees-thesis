@@ -86,11 +86,27 @@ def matching_modal_reference(folder, state, model_sha, *,
             if eligible else None)
 
 
+def clear_history_reference(gui, reason):
+    """Clear obsolete automatic history periods and provenance.
+
+    [REF docs/source/components/inputs/analysis_autofill.py.md]
+    This resets GUI state only, not source data or a numerical model.
+    """
+    for attr in ('t1x','t1y','p1','p2','tnx','tny'):
+        variable=getattr(gui,attr,None)
+        if variable is not None:
+            variable.set('')
+    gui.modal_reference_status=dict(usage='NOT_VERIFIED',reason=str(reason))
+    gui.project_input_audit=dict(values={},notes=[str(reason)],
+                                 modal_reference_status=gui.modal_reference_status)
+
+
 def populate_linear(gui, folder):
     from OpenSees_Project_Inputs_V123 import import_project_inputs
     folder=Path(folder)
-    for attr in ('t1x','t1y','p1','p2','tnx','tny'):getattr(gui,attr).set('')
+    clear_history_reference(gui,'No matching current modal reference loaded.')
     inputs=import_project_inputs(_runtime_repo_root(),folder,gui.ls.get())
+    inputs['modal_reference_status']=gui.modal_reference_status
     gui.project_input_audit=inputs;v=inputs['values']
     for axis in ('x','y'):
         value=v.get('workbook_adopted_t'+axis)
@@ -211,12 +227,9 @@ def populate_spectrum(app, gui):
 def populate_available(gui,folder=None,role='linear_model_script'):
     from OpenSees_Complete_Export_V118 import autoselect_inputs
     folder=Path(folder or (Path(gui.model.get()).parent if hasattr(gui,'model') and gui.model.get() else r'D:/Thesis Opensees/Etabs Nodes Export'))
+    old_output=gui.output.get() if hasattr(gui,'output') else ''
+    output_is_automatic=bool(getattr(gui,'_output_is_automatic',False))
     try:
-        old_output=gui.output.get() if hasattr(gui,'output') else ''
-        output_is_automatic=bool(getattr(gui,'_output_is_automatic',False))
-        if output_is_automatic and hasattr(gui,'output'):
-            from components.inputs.project_workbooks import analysis_output_folder
-            gui.output.set(str(analysis_output_folder(folder,gui.ls.get())))
         # The auto-selector only locates files. It cannot be relied upon to
         # recompute NBC §5.1 directional T1 from the current export/state.
         # Always synchronize period fields after selecting the model, including
@@ -224,17 +237,29 @@ def populate_available(gui,folder=None,role='linear_model_script'):
         # calibration eigenperiods (p1/p2) with adopted design T1 X/Y.
         selected = bool(autoselect_inputs(gui,folder,role))
         model_path = Path(gui.model.get()) if hasattr(gui,'model') and gui.model.get() else None
-        if model_path is not None and model_path.is_file():
-            # The selected model owns the period source, not the initial
-            # project folder from which the chooser was launched.
+        if (model_path is not None and model_path.is_file()
+                and model_path.resolve().parent==folder.resolve()):
+            # A manually selected model in this exact folder remains usable.
+            if output_is_automatic and hasattr(gui,'output'):
+                from components.inputs.output_layout import export_root_for
+                stage='07_NONLINEAR_TIME_HISTORY' if role=='nonlinear_model_script' else '06_LINEAR_TIME_HISTORY'
+                gui.output.set(str(export_root_for(model_path.resolve().parent)/stage))
             populate_linear(gui,model_path.resolve().parent)
-        if old_output and hasattr(gui,'output') and not output_is_automatic:gui.output.set(old_output)
+        else:
+            clear_history_reference(gui,'No model builder in the selected export; choose a matching model.')
+            if hasattr(gui,'model'):gui.model.set('')
+            if hasattr(gui,'stories'):gui.stories.set('')
+            if output_is_automatic and hasattr(gui,'output'):gui.output.set('')
         if hasattr(gui,'log') and hasattr(gui.log,'insert'):
             notes=getattr(gui,'project_input_audit',{}).get('notes',[])
             if role=='nonlinear_model_script':notes=notes+['Imported modal values are elastic baseline references; validate nonlinear initial stiffness and retain the calibration/readiness gate.']
             gui.log.insert('end','[INPUT SOURCES] '+str(folder)+'\n'+'\n'.join(notes)+'\n')
     except Exception as exc:
+        clear_history_reference(gui,'History input selection failed: '+str(exc))
+        if output_is_automatic and hasattr(gui,'output'):gui.output.set('')
         if hasattr(gui,'log') and hasattr(gui.log,'insert'):gui.log.insert('end','[AUTOFILL] '+str(exc)+'\n')
+    finally:
+        if hasattr(gui,'output') and not output_is_automatic:gui.output.set(old_output)
 
 
 def populate_site(app,folder=None):

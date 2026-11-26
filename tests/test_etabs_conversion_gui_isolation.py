@@ -92,6 +92,23 @@ class TestConversionGuiIsolation(unittest.TestCase):
                 real_source.resolve(),
             )
 
+    def test_import_root_guard_precedes_first_output_write(self):
+        snippet=ast.get_source_segment(self.app_source,method(self.gui_cls,"_run"))
+        self.assertLess(snippet.index("require_import_root(output)"),snippet.index("output.mkdir"))
+        self.assertLess(self.worker_source.index("require_import_root(output)"),self.worker_source.index("output.mkdir"))
+
+    def test_selected_project_tools_use_shared_boundary(self):
+        from components.ui import application
+        gui=Mock()
+        gui._model_review_folder.return_value=None
+        with patch("importlib.import_module") as load:
+            self.assertIsNone(application.App._launch_selected_tool(gui,"example"))
+            load.assert_not_called()
+        gui._model_review_folder.return_value="selected"
+        with patch("importlib.import_module") as load:
+            application.App._launch_selected_tool(gui,"example","launch_response_viewer",path_arg=True)
+            load.return_value.launch_response_viewer.assert_called_once_with(gui.root,Path("selected"))
+
     def test_source_has_single_export_button_binding(self):
         self.assertEqual(self.app_source.count("command=self._run)"), 1)
         self.assertIn("command=self._cancel_conversion", self.app_source)

@@ -66,9 +66,10 @@ def test_failed_restage_preserves_the_published_workbook_pair(tmp_path, monkeypa
             archive.writestr("changed.txt", source.name)
 
     replace = os.replace
+    second_digest = file_sha256(b)
 
     def interrupt_second_copy(partial, target):
-        if Path(target).stem == "etabs_full_table":
+        if Path(target).parent.name == second_digest:
             raise PermissionError("simulated locked workbook")
         replace(partial, target)
 
@@ -96,4 +97,36 @@ def test_unchanged_edb_is_hash_bound(tmp_path):
     assert len(staged_gravity_workbooks(export)) == 2
     edb.write_bytes(b"changed source")
     with pytest.raises(ValueError, match="EDB hash"):
+        staged_gravity_workbooks(export)
+
+
+def test_restage_preserves_prior_run_workbook_and_deduplicates(tmp_path):
+    export=tmp_path/"export"
+    export.mkdir()
+    a=workbook(tmp_path/"a.xlsx")
+    b=workbook(tmp_path/"b.xlsx")
+    stage_gravity_workbooks(export,assignment=a,full_table=b)
+    previous=staged_gravity_workbooks(export)
+    before=Path(previous["etabs_assignment"]).read_bytes()
+    with ZipFile(a,"a") as z:
+        z.writestr("xl/new.xml","<updated/>")
+    stage_gravity_workbooks(export,assignment=a,full_table=b)
+    current=staged_gravity_workbooks(export)
+    assert previous["etabs_assignment"]!=current["etabs_assignment"]
+    assert Path(previous["etabs_assignment"]).read_bytes()==before
+    assert previous["etabs_full_table"]==current["etabs_full_table"]
+    stage_gravity_workbooks(export,assignment=a,full_table=b)
+    assert staged_gravity_workbooks(export)==current
+
+
+def test_manifest_cannot_reference_external_workbook(tmp_path):
+    export=tmp_path/"export"
+    export.mkdir()
+    a=workbook(tmp_path/"a.xlsx")
+    b=workbook(tmp_path/"b.xlsx")
+    manifest=stage_gravity_workbooks(export,assignment=a,full_table=b)
+    doc=json.loads(manifest.read_text())
+    doc["workbooks"]["etabs_assignment"]["path"]=str(a)
+    manifest.write_text(json.dumps(doc))
+    with pytest.raises(ValueError,match="outside private export"):
         staged_gravity_workbooks(export)

@@ -57,10 +57,14 @@ def validate_converter_report(report_file, *, old_signature=None):
 
 
 def run(edb: Path, output: Path, include_live: bool, categorize: bool) -> dict:
-    from components.inputs.project_output_layout import IMPORT_INCOMPLETE, create_project_layout
+    from components.inputs.project_output_layout import (
+        IMPORT_INCOMPLETE, create_project_layout, require_import_root,
+    )
     from components.inputs.output_contract import atomic_json
     from components.inputs.lfs_workbook_recovery import audit_optional_gui_workbooks
     from components.ui.application import convert_model
+
+    output = require_import_root(output)
 
     def log(line):
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {line}", flush=True)

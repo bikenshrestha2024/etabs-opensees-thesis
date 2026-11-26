@@ -18,6 +18,10 @@ SCENARIO_SUPPORTS = {
     "CONTINUOUS_WALL_BASE_FIXED": 97,
 }
 INDEX_NAME = "Gravity_Case_Reaction_Index.json"
+MODEL_INPUT_FILENAMES = ("OpenSees_Complete_Model_Data_V118.json",
+                         "OpenSees_Complete_Model_Config_V118.json",
+                         "OpenSees_Source_Model_Metadata_V118.json",
+                         "OpenSees_Element_Connectivity.json")
 
 
 def _sha256(path):
@@ -25,7 +29,8 @@ def _sha256(path):
 
     [REF docs/source/components/gravity/reaction_case_registry.py.md]
     """
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    with Path(path).open("rb") as stream:
+        return hashlib.file_digest(stream,"sha256").hexdigest()
 
 
 def _model_input_fingerprints(model_path):
@@ -34,10 +39,7 @@ def _model_input_fingerprints(model_path):
     [REF docs/source/components/gravity/reaction_case_registry.py.md]
     """
     model=Path(model_path).resolve()
-    names=(model.name,"OpenSees_Complete_Model_Data_V118.json",
-           "OpenSees_Complete_Model_Config_V118.json",
-           "OpenSees_Source_Model_Metadata_V118.json",
-           "OpenSees_Element_Connectivity.json")
+    names=(model.name,*MODEL_INPUT_FILENAMES)
     return {name:(_sha256(model.parent/name) if (model.parent/name).is_file() else None)
             for name in names}
 
@@ -60,6 +62,20 @@ def checked_reaction_result(payload, model_path, *, scenario, profile,
     current_model = Path(model_path).resolve()
     if reported_model != current_model:
         raise ValueError("Result belongs to a different model path")
+    fingerprints=_model_input_fingerprints(current_model)
+    script_sha=fingerprints[current_model.name]
+    if not script_sha:
+        raise ValueError("Current model script is missing")
+    if "model_sha256" in payload and payload["model_sha256"]!=script_sha:
+        raise ValueError("Solver-recorded model SHA256 differs from current model")
+    if "model_input_sha256" in payload:
+        if payload["model_input_sha256"]!=fingerprints:
+            raise ValueError("Solver-recorded model input SHA256 differs from current model inputs")
+        provenance="SOLVER_INPUT_BYTES_MATCH"
+    elif "model_sha256" in payload:
+        provenance="LEGACY_SOLVER_SCRIPT_SHA_MATCH_ONLY"
+    else:
+        provenance="LEGACY_NO_SOLVER_INPUT_SHA"
     tags = [int(t) for t in payload.get("support_node_tags",[])]
     if len(tags) != SCENARIO_SUPPORTS[scenario] or len(set(tags)) != len(tags):
         raise ValueError("Result does not contain the required unique support tags")
@@ -94,8 +110,9 @@ def checked_reaction_result(payload, model_path, *, scenario, profile,
     equilibrium=100*abs(sum_vertical-applied)/applied
     return dict(
         scenario=scenario,profile=profile,model_path=str(current_model),
-        model_sha256=_sha256(current_model),
-        input_sha256=_model_input_fingerprints(current_model),
+        model_sha256=script_sha,
+        input_sha256=fingerprints,
+        solver_input_provenance=provenance,
         support_count=len(tags),
         support_tags=sorted(tags),applied_load_kN=applied,
         summed_reaction_kN=sum_vertical,equilibrium_error_percent=equilibrium,
@@ -134,6 +151,7 @@ def publish_gravity_case_index(output_root, record):
         "summed_reaction_kN":record["summed_reaction_kN"],
         "equilibrium_error_percent":record["equilibrium_error_percent"],
         "case_result_sha256":record.get("result_sha256"),
+        "solver_input_provenance":record.get("solver_input_provenance","LEGACY_UNSPECIFIED"),
     }
     from components.inputs.output_contract import atomic_json
     pointer=case_dir/(digest+".json")
@@ -164,6 +182,8 @@ def register_case(output_root, run_result_path, model_path, *,
     record["result_sha256"]=hashlib.sha256(evidence_bytes).hexdigest()
     if _sha256(result_path)!=record["result_sha256"]:
         raise RuntimeError("Gravity solver result changed during case registration")
+    if _model_input_fingerprints(model_path)!=record["input_sha256"]:
+        raise RuntimeError("Model inputs changed during gravity case registration")
     record["indexed_at_utc"]=datetime.now(timezone.utc).isoformat()
     # Keep output index under selected output root; no claims about stale results.
     from components.gravity.output_ownership import index_path, existing_index
