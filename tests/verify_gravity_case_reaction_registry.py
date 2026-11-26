@@ -36,6 +36,35 @@ class ReactionCaseRegistryTests(unittest.TestCase):
         f.write_text(json.dumps(payload),encoding="utf-8")
         return f
 
+    def test_solver_recorded_script_and_input_sha_are_verified(self):
+        import hashlib
+        from components.gravity.reaction_case_registry import _model_input_fingerprints
+        mode="ETABS_NONZERO_REACTION_DIAGNOSTIC"
+        profile="GRAVITY_1.0D_1.0L"
+        data=self.payload(mode)
+        data["model_sha256"]=hashlib.sha256(self.model.read_bytes()).hexdigest()
+        data["model_input_sha256"]=_model_input_fingerprints(self.model)
+        result=checked_reaction_result(data,self.model,scenario=mode,profile=profile)
+        self.assertEqual(result["solver_input_provenance"],"SOLVER_INPUT_BYTES_MATCH")
+        config=self.root/"OpenSees_Complete_Model_Config_V118.json"
+        config.write_text("{}")
+        with self.assertRaisesRegex(ValueError,"Solver-recorded model input SHA256"):
+            register_case(self.output,self.write(data),self.model,scenario=mode,profile=profile)
+        self.model.write_text("# changed builder")
+        with self.assertRaisesRegex(ValueError,"Solver-recorded model SHA256"):
+            checked_reaction_result(data,self.model,scenario=mode,profile=profile)
+
+    def test_generated_runner_checks_same_model_input_fingerprints(self):
+        from components.gravity.gui_and_reports import _runner_source
+        from components.gravity.reaction_case_registry import MODEL_INPUT_FILENAMES
+        source=_runner_source(self.model,self.output/"result.json",range(1,33),1000.,20)
+        compile(source,"synthetic_runner","exec")
+        for name in MODEL_INPUT_FILENAMES:
+            self.assertIn(name,source)
+        self.assertIn("MODEL_INPUT_SHA256 = input_fingerprints()",source)
+        self.assertIn("if input_fingerprints() != MODEL_INPUT_SHA256",source)
+        self.assertIn("'model_input_sha256':MODEL_INPUT_SHA256",source)
+
     def test_same_applied_load_for_all_three_cases(self):
         for mode,n in SCENARIO_SUPPORTS.items():
             with self.subTest(mode=mode):
