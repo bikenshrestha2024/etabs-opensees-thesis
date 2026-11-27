@@ -130,3 +130,7 @@ The storey ledger keeps the §5.2 mid-height rule by default. When the key is ab
 - the model data records `storey_mass_allocation_convention`, so the Rayleigh mass audit uses the same rule.
 
 Nodal masses, gravity loads and the eigen mass matrix do not change.
+
+## 2026-11-27 — explicit layered-shell elastic comparison
+
+The native-patch-qualified layered elastic candidate is selected only through the state-specific elastic compiler. It is registered with six unique nD material tags per section in the fresh elastic domain and keeps the original physical shell thickness and independently assigned nodal mass. The report and runtime expose `ETABS_ELASTIC_LAYERED_SHELL_CANDIDATE`. This candidate is diagnostic and cannot enter the nonlinear constructor. See [elastic settings](elastic_conversion_settings.py.md).

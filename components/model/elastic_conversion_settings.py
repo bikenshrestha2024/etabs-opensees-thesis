@@ -4,7 +4,7 @@ import json
 import math
 from pathlib import Path
 
-from components.model.linear_shell_stiffness import FIELDS, positive, shell_section_parameters
+from components.model.linear_shell_stiffness import FIELDS, positive, shell_section_parameters, layered_elastic_candidate
 from components.model.physical_weight_modifiers import FRAME_LABELS
 
 
@@ -13,7 +13,7 @@ FRAME_PROPERTY = {"A": "A", "As2": "As2", "As3": "As3", "J": "J", "I22": "Iy", "
 OPTION_KEYS = {
     "frame_sections", "frame_objects", "shell_sections", "shell_objects", "end_offsets_m",
     "use_native_frame_modifiers", "use_native_shell_modifiers", "shear_flexible_sections",
-    "allow_shell_shear_approximation",
+    "allow_shell_shear_approximation", "layered_shell_sections",
 }
 
 
@@ -222,6 +222,15 @@ def compile_settings(config, frames, shells, metadata):
                      "allow_shell_shear_approximation"):
             if type(options.get(flag, False)) is not bool:
                 raise ValueError(f"{state} {flag} must be boolean")
+        layered = options.get("layered_shell_sections", {})
+        _check_keys(layered, shell_sections, f"{state} layered_shell_sections")
+        if layered and not options.get("use_native_shell_modifiers", False):
+            raise ValueError("Layered candidate requires source-native shell property and object modifiers")
+        for name, correction in layered.items():
+            if isinstance(correction,bool) or correction not in (1.,5./6.):
+                raise ValueError(f"{name}: layered shear convention must be 1 or 5/6")
+            if name in options.get("shell_sections", {}):
+                raise ValueError(f"{name}: layered candidate must use native modifiers without section overrides")
         shear = options.get("shear_flexible_sections", [])
         if not isinstance(shear, list) or any(not isinstance(k, str) or k not in frame_sections for k in shear):
             raise ValueError(f"{state} shear_flexible_sections must list assembled section names")
@@ -278,6 +287,13 @@ def compile_settings(config, frames, shells, metadata):
             if native:
                 factors.update(_native_factors(records, "area", obj, section, FIELDS[:8]))
             factors = _overrides(factors, by_section, by_object, section, obj)
+            if section in layered:
+                if element["category"] != "SHEAR WALL" or obj in by_object:
+                    raise ValueError(f"{obj}: layered candidate is wall-only with native modifiers, no object overrides")
+                shell_plan[obj] = layered_elastic_candidate(
+                    p["E"], p["nu"], p["thickness"], factors,
+                    property_name=section, shear_correction=layered[section])
+                continue
             approximate = options.get("allow_shell_shear_approximation", False)
             shell_plan[obj] = shell_section_parameters(
                 p["E"], p["nu"], p["thickness"], factors, property_name=section,
