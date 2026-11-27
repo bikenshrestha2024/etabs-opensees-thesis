@@ -47,3 +47,7 @@ file, use the multi-file dialog instead of the numbered-folder helper.
 ## Partial analysis lots — gravity picker guard (2026-11-27)
 
 The offline gravity reaction reader requires exactly one worksheet named Joint Reactions (case-insensitive, stripped). The gravity picker now checks the same condition before assigning an XLSX/XLSM source. A CSV remains subject to the downstream header/case checks. Analysis result and topology lots are valid local audit inputs, but their story-section forces are not joint reactions. Use the existing multi-lot audit command for these inputs; do not register them as an authoritative gravity reference. This does not change the single-workbook registration API, physical support mapping or solver inputs.
+
+## Multi-lot worksheet-owner catalog (2026-11-27)
+
+The new opt-in `build_analysis_table_catalog(paths)` indexes explicitly selected local workbook worksheet names and SHA-256 values. `resolve_analysis_table(catalog, name)` returns the unique original workbook and exact worksheet title, verifying its bytes and worksheet identity again. Repeated titles are ambiguous (not merged); identical workbook bytes, missing names and modified files fail closed. The existing full-table picker and registration API are unchanged. The catalog is a **reference routing index**, not a merged model, complete table-content scan or same-EDB certificate. Readers must still validate units, schema, case/step, and the source identity after streaming results. Keep the private index out of public commits.

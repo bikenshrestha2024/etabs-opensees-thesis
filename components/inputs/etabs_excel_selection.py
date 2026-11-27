@@ -126,3 +126,78 @@ def validate_full_table_selection(path):
             "Partial analysis lots may be inspected with the multi-lot audit, "
             "but cannot replace the joint-reaction source.")
     return source
+
+
+def _catalog_sha256(path):
+    import hashlib
+    with Path(path).open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def build_analysis_table_catalog(paths):
+    """Index exact worksheet owners in explicitly selected local analysis lots.
+
+    [REF docs/source/components/inputs/etabs_excel_selection.py.md]
+    This checks sheet names and file identity, not the engineering contents,
+    source EDB identity or permission to use partial data as solver inputs.
+    Duplicate names remain ambiguous; no table is silently merged or chosen.
+    """
+    from openpyxl import load_workbook
+    selected = [Path(p).expanduser().resolve(strict=True) for p in paths]
+    if not selected or len({str(p).casefold() for p in selected}) != len(selected):
+        raise ValueError("Select distinct analysis workbook lots")
+    files, tables, digests = [], {}, set()
+    for path in selected:
+        if not path.is_file() or path.suffix.lower() not in (".xlsx", ".xlsm"):
+            raise ValueError("Expected a local analysis workbook")
+        before = _catalog_sha256(path)
+        if before in digests:
+            raise ValueError("Analysis lots have identical bytes")
+        digests.add(before)
+        with path.open("rb") as stream:
+            book = load_workbook(stream, read_only=True, data_only=False, keep_links=False)
+            try:
+                names = [sheet.title for sheet in book.worksheets]
+            finally:
+                book.close()
+        if not names or _catalog_sha256(path) != before:
+            raise ValueError("Empty or modified analysis workbook")
+        files.append({"path": str(path), "sha256": before, "worksheets": names})
+        for name in names:
+            tables.setdefault(name.strip().casefold(), []).append(
+                {"file_index": len(files) - 1, "worksheet": name})
+    return {"schema": "ETABS_ANALYSIS_TABLE_CATALOG_V1",
+            "status": "REFERENCE_ROUTING_ONLY",
+            "source_model_identity": "UNVERIFIED", "engineering_acceptance": "NOT_VERIFIED",
+            "files": files, "tables": tables,
+            "ambiguous_tables": sorted(name for name, owners in tables.items() if len(owners) != 1)}
+
+
+def resolve_analysis_table(catalog, table_name):
+    """Return the unique original path and exact worksheet title, after hashing.
+
+    [REF docs/source/components/inputs/etabs_excel_selection.py.md]
+    Callers must still validate headers, units, exact case/step keys, and EDB
+    identity; a returned path is not a structural acceptance or a data merge.
+    """
+    if catalog.get("schema") != "ETABS_ANALYSIS_TABLE_CATALOG_V1":
+        raise ValueError("Unsupported analysis table catalog")
+    key = table_name.strip().casefold()
+    owners = catalog["tables"].get(key, [])
+    if len(owners) != 1:
+        raise ValueError(f"Expected one owner for {table_name!r}; found {len(owners)}")
+    owner = owners[0]
+    entry = catalog["files"][owner["file_index"]]
+    path = Path(entry["path"])
+    if _catalog_sha256(path) != entry["sha256"]:
+        raise ValueError("Analysis workbook bytes changed after indexing")
+    from openpyxl import load_workbook
+    with path.open("rb") as stream:
+        book = load_workbook(stream, read_only=True, data_only=False, keep_links=False)
+        try:
+            matches = [s.title for s in book.worksheets if s.title.strip().casefold() == key]
+        finally:
+            book.close()
+    if matches != [owner["worksheet"]] or _catalog_sha256(path) != entry["sha256"]:
+        raise ValueError("Indexed worksheet identity changed")
+    return path, owner["worksheet"]

@@ -7,7 +7,7 @@ from openpyxl import Workbook
 
 from components.inputs.etabs_excel_selection import (
     classify_etabs_excel_selection, validate_full_table_selection,
-    discover_beam_force_parts,
+    discover_beam_force_parts, build_analysis_table_catalog, resolve_analysis_table,
 )
 
 
@@ -87,6 +87,48 @@ class EtabsExcelRoleSelectionTests(unittest.TestCase):
                       ["Element Forces - Beams"])
         with self.assertRaisesRegex(ValueError,"Multiple beam force"):
             discover_beam_force_parts(self.root)
+
+    def test_split_table_index_unique_owners_and_missing_table(self):
+        first=self.workbook("First.xlsx",["Story Forces","Story Drifts"])
+        second=self.workbook("Second.xlsx",["Modal Periods And Frequencies"])
+        third=self.workbook("Third.xlsx",["Joint Reactions"])
+        catalog=build_analysis_table_catalog([first,second,third])
+        self.assertEqual(catalog["engineering_acceptance"],"NOT_VERIFIED")
+        self.assertEqual(resolve_analysis_table(catalog,"STORY FORCES"),(first,"Story Forces"))
+        self.assertEqual(resolve_analysis_table(catalog,"Joint Reactions"),(third,"Joint Reactions"))
+        self.assertEqual(resolve_analysis_table(catalog,"Modal Periods And Frequencies")[0],second)
+        with self.assertRaisesRegex(ValueError,"found 0"):
+            resolve_analysis_table(catalog,"Joint Restraint Assignments")
+
+    def test_split_table_index_ambiguity_and_source_changes(self):
+        first=self.workbook("First.xlsx",["Story Forces"])
+        second=self.workbook("Second.xlsx",["Story Forces","Joint Reactions"])
+        catalog=build_analysis_table_catalog([first,second])
+        self.assertEqual(catalog["ambiguous_tables"],["story forces"])
+        with self.assertRaisesRegex(ValueError,"found 2"):
+            resolve_analysis_table(catalog,"Story Forces")
+        self.workbook("Second.xlsx",["Changed"])
+        with self.assertRaisesRegex(ValueError,"bytes changed"):
+            resolve_analysis_table(catalog,"Joint Reactions")
+        second.write_bytes(first.read_bytes())
+        with self.assertRaisesRegex(ValueError,"identical bytes"):
+            build_analysis_table_catalog([first,second])
+
+    def test_index_command_is_private_and_does_not_register(self):
+        import json
+        from tools.REGISTER_CURRENT_ETABS_TABLES import main
+        first=self.workbook("First.xlsx",["Story Forces"])
+        second=self.workbook("Second.xlsx",["Joint Reactions"])
+        target=self.root/"catalog.private.json"
+        args=["--analysis-files",str(first),str(second),"--table-index-output",str(target)]
+        self.assertEqual(main(args),0)
+        catalog=json.loads(target.read_text(encoding="utf-8"))
+        self.assertEqual(resolve_analysis_table(catalog,"Joint Reactions")[0],second)
+        self.assertFalse((self.root/"01_ETABS_EXPORT").exists())
+        with self.assertRaises(SystemExit):
+            main(args)
+        with self.assertRaises(SystemExit):
+            main(args+["--audit-output",str(self.root/"audit.private.json")])
 
     def test_combined_selection_is_wired_into_gravity_gui(self):
         code=(Path(__file__).resolve().parents[1]/"components"/"gravity"/
