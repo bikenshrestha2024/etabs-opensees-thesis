@@ -481,6 +481,49 @@ def _reference_row_flags(sheet_name, record):
     return flags
 
 
+def _field_availability_columns(sheet_name):
+    if sheet_name == "Element Stresses - Area Shells":
+        prefix, direct = "S", ("S11", "S22", "S12")
+    elif sheet_name == "Element Strains - Area Shells":
+        prefix, direct = "E", ("E11", "E22", "G12")
+    elif sheet_name == "Element NL Energy By Group":
+        return ("Internal Viscous Damping", "Internal Hysteretic Damping",
+                "Support Viscous Damping", "Support Hysteretic Damping")
+    else:
+        return ()
+    return tuple(f"{c} {face}" for face in ("Top", "Bottom")
+                 for c in (*direct, prefix+"Max", prefix+"Min", prefix+"VM"))
+
+
+def _field_availability_add(counts, fields, record):
+    key = (record.get("Group"), record["Output Case"], record["Case Type"], record["Step Type"])
+    group = counts.get(key)
+    if group is None:
+        group = counts[key] = [[0, 0, 0] for _ in fields]
+    for column, count in zip(fields, group):
+        value = record[column]
+        count[0 if value is None else 1 if value == 0 else 2] += 1
+
+
+def _field_availability_report(fields, counts):
+    groups = []
+    for (group, case, case_type, step_type), values in counts.items():
+        flags = []
+        if len(fields) == 4:
+            if all(zero and not missing and not nonzero for missing, zero, nonzero in values):
+                flags.append("ALL_REPORTED_ENERGY_ZERO_UNRESOLVED")
+        else:
+            for offset, face in ((0, "TOP"), (6, "BOTTOM")):
+                direct, derived = values[offset:offset+3], values[offset+3:offset+6]
+                if any(v[2] for v in direct) and all(v[1] and not v[0] and not v[2] for v in derived):
+                    flags.append(f"{face}_ALL_REPORTED_DERIVED_ZERO_WITH_NONZERO_DIRECTIONAL_UNRESOLVED")
+        groups.append({"group": group, "case": case, "case_type": case_type, "step_type": step_type,
+                       "field_counts": {field: dict(zip(("missing", "zero", "nonzero"), value))
+                                        for field, value in zip(fields, values)}, "flags": flags})
+    return {"scope": "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER",
+            "status": "REFERENCE_ONLY_OUTPUT_AVAILABILITY_UNRESOLVED", "groups": groups}
+
+
 def _reference_table(sheet, store=None):
     name, headers, unit_row, rows = _reference_header(sheet)
     keys, measures = _REFERENCE_TABLES[sheet.title]
@@ -516,6 +559,8 @@ def _reference_table(sheet, store=None):
     display_flags = {}
     imported = []
     unique_row_count = 0
+    availability_fields = _field_availability_columns(sheet.title)
+    availability_counts = {}
     for row_number, row in enumerate(rows, start=4):
         if all(value is None for value in row):
             continue
@@ -566,6 +611,8 @@ def _reference_table(sheet, store=None):
             key_seen[key] = row_number
             imported.append([row_number, *values])
         unique_row_count += 1
+        if availability_fields:
+            _field_availability_add(availability_counts, availability_fields, record)
         for flag in _reference_row_flags(sheet.title, record):
             display_flags.setdefault(flag, []).append(row_number)
         if "Story" in record:
@@ -579,6 +626,8 @@ def _reference_table(sheet, store=None):
         "stories": sorted(story_names), "source_row_count": source_row_count,
         "unique_row_count": unique_row_count,
     }
+    if availability_fields:
+        result["source_field_availability"] = _field_availability_report(availability_fields, availability_counts)
     if sheet.title in ("Story Max Over Avg Drifts", "Story Max Over Avg Disp", "Story Drifts"):
         result["source_display_diagnostics"] = {
             "scope": "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER",

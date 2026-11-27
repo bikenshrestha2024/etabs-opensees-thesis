@@ -529,6 +529,12 @@ class FirstLotReferenceTests(unittest.TestCase):
         self.assertEqual(data["stored_row_count"], 1)
         self.assertEqual(data["case_row_counts"], {"EQX": 1, "Gravity": 1})
         self.assertEqual(data["units"]["S11 Top"], "kN/m²")
+        availability = data["source_field_availability"]
+        self.assertEqual(availability["scope"], "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER")
+        self.assertEqual({g["case"] for g in availability["groups"]}, {"EQX", "Gravity"})
+        for g in availability["groups"]:
+            self.assertEqual(g["field_counts"]["S11 Top"], {"missing": 0, "zero": 0, "nonzero": 1})
+            self.assertEqual(g["flags"], ["TOP_ALL_REPORTED_DERIVED_ZERO_WITH_NONZERO_DIRECTIONAL_UNRESOLVED"])
         with closing(sqlite3.connect(database)) as db:
             rows = db.execute("SELECT worksheet_row, values_json FROM reference_rows").fetchall()
             aliases = db.execute("SELECT worksheet_row, retained_row FROM source_row_aliases").fetchall()
@@ -537,6 +543,30 @@ class FirstLotReferenceTests(unittest.TestCase):
         self.assertEqual(json.loads(rows[0][1])[10], 1250)
         self.assertEqual(aliases, [(5, 4)])
         self.assertFalse(list(self.output.rglob("PROJECT_SOURCES.private.json")))
+
+    def test_group_energy_zero_is_not_missing_or_nonzero(self):
+        source = self.source.with_name("energy.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        self.add_table("Element NL Energy By Group",
+                       "Group|Output Case|Case Type|Step Type|Step Number|Internal Viscous Damping|Internal Hysteretic Damping|Support Viscous Damping|Support Hysteretic Damping",
+                       "|||||kN-m|kN-m|kN-m|kN-m",
+                       [("All", "EQX", "NonModHist", "Max", None, 0, 0, 0, 0),
+                        ("Wall", "EQX", "NonModHist", "Max", None, None, 0, 0, 0),
+                        ("Beam", "EQX", "NonModHist", "Max", None, 2, 0, 0, 0)],
+                       title="Element Nonlinear Energy By Group", book=book)
+        book.save(source)
+        book.close()
+        self.assertEqual(main(["--analysis-reference", str(source), "--reference-storage", "sqlite",
+                               "--reference-output", str(self.output)]), 0)
+        ref = json.loads((self.output / "ETABS_ANALYSIS_REFERENCE.private.json").read_text("utf-8"))
+        data = ref["tables"]["Element NL Energy By Group"]["source_field_availability"]
+        groups = {g["group"]: g for g in data["groups"]}
+        self.assertEqual(groups["All"]["flags"], ["ALL_REPORTED_ENERGY_ZERO_UNRESOLVED"])
+        self.assertEqual(groups["Wall"]["flags"], [])
+        self.assertEqual(groups["Wall"]["field_counts"]["Internal Viscous Damping"]["missing"], 1)
+        self.assertEqual(groups["Beam"]["flags"], [])
+        self.assertEqual(groups["Beam"]["field_counts"]["Internal Viscous Damping"]["nonzero"], 1)
 
     def test_later_lot_response_variants_stay_distinct_and_invalid_sqlite_import_is_cleaned_up(self):
         source = self.source.with_name("third.xlsx")

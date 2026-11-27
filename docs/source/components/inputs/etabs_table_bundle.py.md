@@ -139,3 +139,22 @@ reaction sets do not define physical supports. The user's 32 physical supports
 plus 44 mesh points and full 1D+1L gravity benchmark remain unchanged. A matching
 native model, load case and analysis state are still required before using the
 reference for solver acceptance. All data and row-level diagnostics stay private.
+
+
+### Shell and group-energy field availability (fourth lot)
+
+The existing reference importer reports `source_field_availability` for the
+shell stress, shell strain and nonlinear group-energy worksheets. Counts are
+of missing, reported zero and nonzero fields per exact case, case type and
+step type (and group name for energy). The scope is all unique retained
+source rows before case selection. Exact duplicate aliases are not counted
+twice. Both shell faces are checked separately; directional normal/shear
+fields and principal/equivalent quantities remain separate. If all three
+derived fields on a face are reported zero while any directional result is
+nonzero within the same group, output availability is flagged as unresolved.
+All four energy fields reported zero within a group are flagged separately;
+a missing energy field is not zero. No values are replaced, recalculated or
+summed. Envelope results cannot be combined into simultaneous principal
+responses. Overlapping energy group membership cannot be summed into a
+global balance. These are reference-output diagnostics, not material,
+device, solver or NBC acceptance tests.
