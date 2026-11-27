@@ -3,8 +3,17 @@ on:
   push:
     branches: [main]
     paths:
+      - components/model/linear_shell_stiffness.py
+      - tests/verify_linear_shell_stiffness.py
+      - tests/native_layered_shell_patch.py
       - tests/native_device_recorders.tcl
       - tests/audit_native_device_recorders.py
+      - .github/workflows/native-device-recorder.yml
+  pull_request:
+    paths:
+      - components/model/linear_shell_stiffness.py
+      - tests/verify_linear_shell_stiffness.py
+      - tests/native_layered_shell_patch.py
       - .github/workflows/native-device-recorder.yml
   workflow_dispatch:
 jobs:
@@ -32,4 +41,16 @@ jobs:
         with:
           name: native-device-test-evidence
           path: native_device_results/
+          if-no-files-found: warn
+      - name: Native independent shear elastic shell patches
+        shell: micromamba-shell {0}
+        run: |
+          python -m unittest tests.verify_linear_shell_stiffness
+          python -m tests.native_layered_shell_patch native_layered_shell_results
+      - name: Archive shell qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-layered-shell-evidence
+          path: native_layered_shell_results/
           if-no-files-found: warn

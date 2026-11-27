@@ -9,7 +9,8 @@ we never claim ETABS v13=v23=1.0 when bending m=0.1.
 import math
 import unittest
 from components.model.linear_shell_stiffness import (
-    shell_section_parameters,section_command)
+    shell_section_parameters,section_command,layered_elastic_candidate,
+    layered_elastic_candidate_command)
 
 
 class LinearShellStiffnessTests(unittest.TestCase):
@@ -78,6 +79,39 @@ class LinearShellStiffnessTests(unittest.TestCase):
         vals=dict(self.wall);vals["mass"]=float("nan")
         with self.assertRaisesRegex(ValueError,"Nonpositive/nonfinite"):
             shell_section_parameters(30e6,.2,.6,vals,property_name="Wall 600")
+    def test_layered_candidate_independent_midpoint_integration(self):
+        E,h=30e6,.6
+        c=layered_elastic_candidate(E,.2,h,self.wall,property_name="Wall",
+                                    shear_correction=1.)
+        self.assertEqual(c["engineering_acceptance"],"NOT_VERIFIED")
+        a=sum(e*h/3 for e in c["layer_E_kN_m2"])
+        d=sum(e*h/3*z*z for e,z in zip(c["layer_E_kN_m2"],(-h/3,0,h/3)))
+        b=sum(e*h/3*z for e,z in zip(c["layer_E_kN_m2"],(-h/3,0,h/3)))
+        self.assertAlmostEqual(a/(E*h),.5)
+        self.assertAlmostEqual(d/(E*h**3/12),.1)
+        self.assertAlmostEqual(b,0.)
+        self.assertAlmostEqual(c["Gout_kN_m2"],E/2.4)
+        self.assertAlmostEqual(c["transverse_shear_kN_m"],E/2.4*h)
+        class Ops:
+            def __init__(self): self.calls=[]
+            def nDMaterial(self,*args): self.calls.append(args)
+            def section(self,*args): self.calls.append(args)
+        ops=Ops()
+        layered_elastic_candidate_command(ops,1,range(1,7),c)
+        self.assertEqual(len(ops.calls),7)
+        self.assertEqual(ops.calls[-1][:3],("LayeredShell",1,3))
+        self.assertAlmostEqual(ops.calls[-1][4],h/3)
+
+    def test_layered_candidate_fails_closed(self):
+        for mods in (dict(self.wall,m11=1.,m22=1.,m12=1.),
+                     dict(self.wall,v23=.5),dict(self.wall,weight=.5)):
+            with self.assertRaises(ValueError):
+                layered_elastic_candidate(30e6,.2,.6,mods,property_name="Wall",
+                                          shear_correction=1.)
+        with self.assertRaises(ValueError):
+            layered_elastic_candidate(30e6,.2,.6,self.wall,property_name="Wall",
+                                      shear_correction=.9)
+
     def test_no_unintentional_mass_or_gravity_modification(self):
         x=shell_section_parameters(30e6,.2,.6,self.wall,
             property_name="Wall 600",transverse_shear_policy="ALLOW_REVIEWED_THIN_SHELL_APPROX")

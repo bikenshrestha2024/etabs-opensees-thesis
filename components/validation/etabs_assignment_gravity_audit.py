@@ -50,7 +50,9 @@ def _unit_scale(wb,name,fields):
 
 
 def audit_base_wall_edges(wb,*,tolerance_m=1e-6):
-    """Establish source-object edge candidates, NEVER impose native MPCs.
+    """[REF docs/source/components/validation/etabs_assignment_gravity_audit.py.md]
+
+    Establish source-object edge candidates, NEVER impose native MPCs.
 
     Rigid-body affine translation and moment balance follow from the
     geometric interpolation weights; native rotational/constraint DOFs
