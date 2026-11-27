@@ -7,6 +7,8 @@ on:
       - tests/verify_linear_shell_stiffness.py
       - tests/native_layered_shell_patch.py
       - tests/native_rigid_arm_patch.py
+      - components/validation/etabs_native_quantity_tables.py
+      - tests/verify_etabs_native_quantity_tables.py
       - components/gravity/load_path_formulas.py
       - tests/test_gravity_loadpath_evidence_integrity.py
       - components/model/elastic_conversion_settings.py
@@ -20,6 +22,8 @@ on:
       - tests/verify_linear_shell_stiffness.py
       - tests/native_layered_shell_patch.py
       - tests/native_rigid_arm_patch.py
+      - components/validation/etabs_native_quantity_tables.py
+      - tests/verify_etabs_native_quantity_tables.py
       - components/gravity/load_path_formulas.py
       - tests/test_gravity_loadpath_evidence_integrity.py
       - components/model/elastic_conversion_settings.py
@@ -68,7 +72,7 @@ jobs:
         if: always()
         shell: micromamba-shell {0}
         run: |
-          python -m unittest tests.test_gravity_loadpath_evidence_integrity
+          python -m unittest tests.test_gravity_loadpath_evidence_integrity tests.verify_etabs_native_quantity_tables
           python -m tests.native_rigid_arm_patch native_rigid_arm_results
       - name: Archive rigid-arm qualification evidence
         if: always()

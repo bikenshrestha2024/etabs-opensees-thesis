@@ -474,6 +474,17 @@ def compare_analytical_mesh(native, solved, domain, *, tolerance_m=1e-6):
         kind,parent,ns=nrows[key]; groups[kind,parent]["matched"]+=1
         if kind=="AREA_ELM" and tuple(pairs[n] for n in ns) not in cycles(mapping[tag][2]):
             reversed_cells.append(dict(native_id=key[1],opensees_tag=tag))
+    # Independently assess whether different refinements cover the same
+    # parent geometry. Never replace exact connectivity with area parity.
+    nby=defaultdict(list);oby=defaultdict(list)
+    for kind,parent,ns in nrows.values():
+        nby[kind,parent].append([nxyz[n] for n in ns])
+    for kind,parent,ns in mapping.values():
+        oby[kind,parent].append([oxyz[n] for n in ns])
+    coverage={key:_mesh_coverage(key[0],nby[key],oby[key],tolerance_m)
+              for key in groups}
+    coverage_counts=defaultdict(int)
+    for row in coverage.values():coverage_counts[row["status"]]+=1
     matched_tags=set(matches.values())
     matched_nodes=set(pairs.values())
     complete=(len(matches)==len(ne)==len(oe) and len(pairs)==len(nxyz)==len(oxyz))
@@ -491,8 +502,111 @@ def compare_analytical_mesh(native, solved, domain, *, tolerance_m=1e-6):
                 unmatched_native_elements=[dict(kind=k[0],id=k[1]) for k in ne if k not in matches],
                 unmatched_opensees_elements=sorted(set(oe)-matched_tags),
                 reversed_area_cycles=reversed_cells,
-                source_objects=[dict(kind=k[0],source_object=k[1],**v) for k,v in sorted(groups.items())],
+                element_pairs=[dict(kind=k[0],native_id=k[1],opensees_tag=t)
+                               for k,t in matches.items()],
+                geometry_coverage_counts=dict(coverage_counts),
+                source_objects=[dict(kind=k[0],source_object=k[1],**v,
+                                     geometric_coverage=coverage[k]) for k,v in sorted(groups.items())],
                 limitations=["Only geometry and connectivity; area reversal is reported, not accepted as local-axis equivalence.",
                              "Nonincident analytical points and diaphragm masters are not matched by this test.",
                              "Named constraints and internal MPC coefficients require separate verification.",
-                             "Different mesh density can be physically reasonable; mismatch is not automatic model rejection."])
+                             "Different mesh density can be physically reasonable; mismatch is not automatic model rejection.",
+                             "Coverage uses collinear intervals or convex coplanar cell intersections, not stiffness or MPC equivalence."])
+
+
+def _mesh_coverage(kind, native_cells, solved_cells, tol):
+    """[REF docs/source/components/validation/etabs_native_quantity_tables.py.md]
+
+    Separate geometric coverage from exact connectivity. Convex coplanar
+    triangle/quadrilateral patches and collinear line segments only. Pairwise
+    intersections are summed only after checking overlap within each mesh;
+    no union-area inference from total area alone. Pure Python, no remeshing.
+    """
+    import math
+    from itertools import combinations
+    if not native_cells or not solved_cells:
+        return dict(status="MISSING_SOURCE_OBJECT_ON_ONE_SIDE")
+    def sub(a,b):return tuple(x-y for x,y in zip(a,b))
+    def dot(a,b):return math.fsum(x*y for x,y in zip(a,b))
+    def cross(a,b):return (a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0])
+    def norm(a):return math.sqrt(dot(a,a))
+    def unit(a):
+        n=norm(a)
+        if n<=tol:raise ValueError("Degenerate geometric axis")
+        return tuple(x/n for x in a)
+    origin=native_cells[0][0]
+    try:
+        u=unit(sub(native_cells[0][1],origin))
+        span=max(norm(sub(p,origin)) for c in native_cells+solved_cells for p in c)
+        if kind=="LINE_ELM":
+            def interval(c):
+                if len(c)!=2:raise ValueError("Non-line cell")
+                vs=[sub(p,origin) for p in c]
+                if any(norm(cross(v,u))>tol for v in vs):raise ValueError("Noncollinear frame segments")
+                a,b=sorted(dot(v,u) for v in vs)
+                if b-a<=tol:raise ValueError("Degenerate line length")
+                return (a,b)
+            n=[interval(c) for c in native_cells];s=[interval(c) for c in solved_cells]
+            def measure(c):return c[1]-c[0]
+            def intersect(a,b):return max(0.,min(a[1],b[1])-max(a[0],b[0]))
+            threshold=tol
+            units="m"
+        else:
+            normal=unit(cross(u,sub(native_cells[0][2],origin)))
+            v=cross(normal,u)
+            def cross2(a,b):return a[0]*b[1]-a[1]*b[0]
+            def signed(poly):
+                return .5*math.fsum(cross2(a,b) for a,b in zip(poly,poly[1:]+poly[:1]))
+            threshold=8*tol*max(span,tol)
+            def polygon(c):
+                if len(c) not in (3,4):raise ValueError("Unsupported shell cell")
+                vs=[sub(p,origin) for p in c]
+                if any(abs(dot(p,normal))>tol for p in vs):raise ValueError("Noncoplanar shell cells")
+                poly=[(dot(p,u),dot(p,v)) for p in vs]
+                area=signed(poly)
+                if abs(area)<=tol*tol:raise ValueError("Degenerate shell area")
+                if area<0:poly.reverse()
+                edges=[sub(b,a) for a,b in zip(poly,poly[1:]+poly[:1])]
+                if any(norm(e)<=tol for e in edges) or any(
+                        cross2(a,b)<=0 for a,b in zip(edges,edges[1:]+edges[:1])):
+                    raise ValueError("Nonconvex or invalid shell boundary")
+                return poly
+            n=[polygon(c) for c in native_cells];s=[polygon(c) for c in solved_cells]
+            def measure(c):return abs(signed(c))
+            def intersect(a,b):
+                # Sutherland-Hodgman convex polygon clipping. Shared edges
+                # have zero area and are not treated as overlapping elements.
+                out=list(a)
+                for i,p in enumerate(b):
+                    q=b[(i+1)%len(b)]; edge=sub(q,p)
+                    prior=out;out=[]
+                    if not prior:break
+                    prev=prior[-1];dp=cross2(edge,sub(prev,p))
+                    for cur in prior:
+                        dc=cross2(edge,sub(cur,p))
+                        if (dc>=0)!=(dp>=0):
+                            t=dp/(dp-dc)
+                            out.append(tuple(x+t*(y-x) for x,y in zip(prev,cur)))
+                        if dc>=0:out.append(cur)
+                        prev,dp=cur,dc
+                return measure(out) if len(out)>=3 else 0.
+            units="m2"
+        total_n=math.fsum(map(measure,n));total_s=math.fsum(map(measure,s))
+        overlap_n=math.fsum(intersect(a,b) for a,b in combinations(n,2))
+        overlap_s=math.fsum(intersect(a,b) for a,b in combinations(s,2))
+        record=dict(units=units,native_measure=total_n,opensees_measure=total_s,
+                    native_internal_pair_overlap=overlap_n,opensees_internal_pair_overlap=overlap_s,
+                    measure_screen_tolerance=threshold)
+        if max(overlap_n,overlap_s)>threshold:
+            return dict(record,status="INTERNAL_CELL_OVERLAP_NO_COVERAGE_ACCEPTANCE")
+        common=math.fsum(intersect(a,b) for a in n for b in s)
+        # Small roundoff below the explicitly reported screen is clamped only
+        # for uncovered measure; raw overlap and totals remain available.
+        missing=max(0.,total_n-common);extra=max(0.,total_s-common)
+        return dict(record,status=("GEOMETRIC_COVERAGE_MATCHED_DIAGNOSTIC"
+            if max(missing,extra,abs(total_n-total_s))<=threshold
+            else "GEOMETRIC_COVERAGE_MISMATCH"),
+            pair_intersection_measure=common,native_uncovered_measure=missing,
+            opensees_extra_measure=extra)
+    except ValueError as exc:
+        return dict(status="UNSUPPORTED_OR_INVALID_GEOMETRY",reason=str(exc))

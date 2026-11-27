@@ -115,16 +115,16 @@ def mixed_frame_shell_cut(root, executable):
     from components.gravity.load_path_formulas import recovered_interface_resultants
     folder=root/"mixed_frame_shell_cut";folder.mkdir()
     xyz={1:(0,0,0),2:(2,0,0),3:(2,0,3),4:(0,0,3)}
-    elems={1:[1,2,3,4],2:[1,4],3:[2,3]}
+    elems={100001:[1,4],100002:[2,3],100003:[1,2,3,4]}
     loads={3:[2,3,-10,.1,.2,.3],4:[4,-1,-20,.4,.5,.6]}
     lines=["wipe","model BasicBuilder -ndm 3 -ndf 6"]
     for n,pos in xyz.items():lines.append("node "+ " ".join(map(str,(n,*pos))))
     lines+=["fix 1 1 1 1 1 1 1","fix 2 1 1 1 1 1 1",
             "section ElasticMembranePlateSection 1 30000000 0.2 0.3 0",
-            "element ShellMITC4 1 1 2 3 4 1",
+            "element ShellMITC4 100003 1 2 3 4 1",
             "geomTransf Linear 1 0 1 0",
-            "element elasticBeamColumn 2 1 4 .25 30000000 12500000 .01 .01 .01 1",
-            "element elasticBeamColumn 3 2 3 .25 30000000 12500000 .01 .01 .01 1",
+            "element elasticBeamColumn 100001 1 4 .25 30000000 12500000 .01 .01 .01 1",
+            "element elasticBeamColumn 100002 2 3 .25 30000000 12500000 .01 .01 .01 1",
             "timeSeries Linear 1","pattern Plain 1 1 {"]
     for n,v in loads.items():lines.append("load "+ " ".join(map(str,(n,*v))))
     lines+=["}","constraints Plain","numberer RCM","system FullGeneral",
@@ -133,22 +133,33 @@ def mixed_frame_shell_cut(root, executable):
             "reactions","set f [open response.txt w]"]
     for n in (1,2):lines.append(f"puts $f [nodeReaction {n}]")
     for e in elems:lines.append(f"puts $f [eleResponse {e} forces]")
-    lines+=["close $f","exit 0"]
+    lines+=["close $f","set mesh [open mesh.txt w]",
+            'foreach n [getNodeTags] {puts $mesh "node $n [nodeCoord $n]"}',
+            'foreach e [getEleTags] {puts $mesh "element $e [eleNodes $e]"}',
+            "close $mesh","exit 0"]
     script=folder/"case.tcl";script.write_text("\n".join(lines)+"\n")
     run=subprocess.run([executable,str(script.resolve())],cwd=folder,
                        capture_output=True,text=True,timeout=90)
     (folder/"solver.log").write_text(run.stdout+"\n"+run.stderr)
     if run.returncode:raise RuntimeError("Native mixed cut solve failed")
     rows=[list(map(float,l.split())) for l in (folder/"response.txt").read_text().splitlines()]
-    if [len(x) for x in rows]!=[6,6,24,12,12]:
+    if [len(x) for x in rows]!=[6,6,12,12,24]:
         raise ValueError("Unexpected native mixed response shape")
+    actual_nodes={}; actual_elements={}
+    for row in (folder/"mesh.txt").read_text().splitlines():
+        kind,tag,*values=row.split(); tag=int(tag)
+        target=actual_nodes if kind=="node" else actual_elements if kind=="element" else None
+        if target is None or tag in target:raise ValueError("Invalid native topology record")
+        target[tag]=tuple(map(float,values)) if kind=="node" else list(map(int,values))
+    if actual_nodes!=xyz or actual_elements!=elems:
+        raise ValueError("Native topology differs from the specified test model")
     keys=("rx_kN","ry_kN","rz_kN","mx_kNm","my_kNm","mz_kNm")
     payload=dict(ok=True, support_node_tags=[1,2],
-        nodes=[dict(tag=n,x_m=p[0],y_m=p[1],z_m=p[2]) for n,p in xyz.items()],
-        elements=[dict(tag=e,nodes=ns) for e,ns in elems.items()],
+        nodes=[dict(tag=n,x_m=p[0],y_m=p[1],z_m=p[2]) for n,p in actual_nodes.items()],
+        elements=[dict(tag=e,nodes=ns) for e,ns in actual_elements.items()],
         reactions=[dict(node_tag=n,**dict(zip(keys,v))) for n,v in zip((1,2),rows[:2])],
         global_end_forces=[dict(tag=e,nodes=ns,forces=v) for (e,ns),v in zip(elems.items(),rows[2:])])
-    labels=[dict(tag=e,nodes=ns,category="SHEAR WALL" if e==1 else "COLUMN",object=str(e))
+    labels=[dict(tag=e,nodes=ns,category="SHEAR WALL" if e==100003 else "COLUMN",object=str(e))
             for e,ns in elems.items()]
     report=recovered_interface_resultants(payload,[0,3],loads,source_elements=labels)
     cut=report["interfaces"][0]
@@ -156,6 +167,34 @@ def mixed_frame_shell_cut(root, executable):
     if error>1e-7:
         raise AssertionError(f"Native mixed cut equilibrium mismatch: {cut}")
     report["maximum_native_mixed_cut_component_residual"]=error
+    # The comparison source is a deliberately synthetic reference fixture,
+    # NOT a native CSI export. The other side is actual solved OpenSees
+    # connectivity queried above, through the production comparison helper.
+    from components.validation.etabs_native_quantity_tables import compare_analytical_mesh
+    reference=dict(schema="etabs-analytical-mesh-native-v1",units="kN,m,C",
+        points=[dict(id=str(n),xyz_m=p) for n,p in xyz.items()],
+        elements=[dict(kind="AREA_ELM" if e==100003 else "LINE_ELM",
+                       id=str(e),points=list(map(str,ns)),source_object=dict(name=str(e)))
+                  for e,ns in elems.items()])
+    domain=dict(frames=[dict(object=str(e),nodes=elems[e]) for e in (100001,100002)],
+                shells=[dict(object="100003",nodes=elems[100003])])
+    exact=compare_analytical_mesh(reference,payload,domain)
+    if exact["matched_elements"]!=3 or exact["matched_points"]!=4:
+        raise AssertionError("Actual native solved connectivity comparison failed")
+    reference["points"] += [dict(id="5",xyz_m=(1,0,0)),dict(id="6",xyz_m=(1,0,3))]
+    reference["elements"]=reference["elements"][:2]+[
+        dict(kind="AREA_ELM",id="a",points=["1","5","6","4"],source_object=dict(name="100003")),
+        dict(kind="AREA_ELM",id="b",points=["5","2","3","6"],source_object=dict(name="100003"))]
+    refined=compare_analytical_mesh(reference,payload,domain)
+    if (refined["matched_elements"]!=2 or
+        refined["geometry_coverage_counts"]!={"GEOMETRIC_COVERAGE_MATCHED_DIAGNOSTIC":3}):
+        raise AssertionError("Refined synthetic reference coverage mismatch")
+    report["mesh_comparison"]=dict(reference="SYNTHETIC_NOT_CSI_NATIVE",
+                                   exact=exact,refined=refined)
+    print(json.dumps(dict(native_mesh_exact_elements=exact["matched_elements"],
+                          native_mesh_exact_points=exact["matched_points"],
+                          refined_reference_exact_elements=refined["matched_elements"],
+                          refined_geometry_coverage=refined["geometry_coverage_counts"])),flush=True)
     (folder/"summary.json").write_text(json.dumps(report,indent=2))
     print(json.dumps(dict(native_mixed_cut_residual=error,cut=cut)),flush=True)
     return report

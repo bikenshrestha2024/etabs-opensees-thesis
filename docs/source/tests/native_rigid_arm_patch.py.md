@@ -21,3 +21,7 @@ The existing native workflow now also solves a generic two-column and one-shell 
 ### Observed native mixed-component result
 
 [Run 45949588899](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/45949588899) passed all eight load-path integrity regressions and the mixed frame/shell cut. Three crossing elements, zero off-interface elements, base resultant in kN and kNm = [-6, -2, 30, 5.5, -38.7, -6.9]; maximum component residual against independent nodal loads and supports = 1.865174681370263e-14. Raw Tcl, native response, solver log and summary are preserved in [artifact 15175639401](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/45949588899/artifacts/15175639401). This is a first-order synthetic mixed-component solve, not the current building or ETABS cut.
+
+## Native solved mesh comparison
+
+The mixed specimen additionally records actual OpenSees node/element tags, coordinates and ordered connectivity after its solve using getNodeTags, nodeCoord, getEleTags and eleNodes. The production comparison helper tests exact matching against a synthetic reference and a reference with two shell cells replacing one. Exact cell matching and coverage are separately tested; no ETABS solver is used. See the native quantity guide for the projection/intersection algorithm and limits.
