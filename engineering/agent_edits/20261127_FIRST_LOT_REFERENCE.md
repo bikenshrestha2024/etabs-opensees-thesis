@@ -67,3 +67,28 @@ unavailable for this lot. Numerical convergence, ETABS/OpenSees equivalence,
 experimental validation, NBC compliance and full NLTHA acceptance remain
 NOT_VERIFIED by this audit. Repository checkout and local repository regression
 execution were unavailable; no production source changes are represented here.
+
+
+## First-lot display-interpretation implementation follow-up
+
+Editor: OpenAI ChatGPT (GPT-6.2); base 263f193a7f54d5bc6d88745767a3ad27c01275ee. Extend existing owner
+`components/inputs/etabs_table_bundle.py` without changing source data,
+case routing, units, numerical analysis or approvals. The original workbook
+was reopened with openpyxl read_only and all three affected tables were
+streamed through the new row-flag function, with unchanged source SHA and
+no mutation of input records. Its zero-average and reciprocal-display
+flags reconciled to the previous audit; the subset of nonzero numeric drift
+with 1/0 text was checked independently. Private row numbers and numerical
+values were not published. Added a JSON/SQLite regression for unfiltered
+diagnostic scope, unchanged ratio/drift values, and exact case filtering.
+Local full repository execution is unavailable (GitHub DNS resolution).
+The local function check is not the full importer regression. CI must
+verify the branch before production acceptance.
+
+The current `components/validation/torsion_check.py` was inspected:
+its centered-load opposite-end max/min ratio is separate from ETABS
+max/average diagnostics. No change to that governing checker. No new
+physics, supports, loads, wall geometry, source model assumptions, or
+solver parameters. 32 physical + 44 mesh; full 1D+1L gravity; separate NBC
+Table 5-1 seismic weight all preserved. Native model linkage, convergence,
+ETABS/OpenSees equivalence and code acceptance remain NOT_VERIFIED.
