@@ -55,3 +55,11 @@ read-only. The reference mode is independent of the multi-lot audit and the
 full-table registration used by solver workflows.
 
 See the [reference data and unit contract](../components/inputs/etabs_table_bundle.py.md#import-first-lot-reference-results).
+
+## Index complementary analysis lots without merging
+
+```powershell
+python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-files "FIRST LOT.xlsx" "SECOND LOT.xlsx" "THIRD LOT.xlsx" --table-index-output "ETABS_Analysis_Catalog.private.json"
+```
+
+Use the exact actual local file paths. This mode inventories table ownership and fingerprints, and writes a new private index. Use the source-selection module's `resolve_analysis_table` with a requested exact worksheet name; ambiguity or missing tables is an error. This mode is mutually exclusive with full-cell audit, first-lot import and EDB registration. It does not combine tables, register solver inputs, or certify an EDB match. For full inspection continue using the audit mode.

@@ -21,6 +21,8 @@ def main(argv=None):
     parser.add_argument("--analysis",type=Path)
     parser.add_argument("--analysis-files",type=Path,nargs="+",
                         help="Read ALL worksheets of explicitly selected analysis lots (audit only)")
+    parser.add_argument("--table-index-output", type=Path,
+                        help="New private worksheet-owner index for the selected analysis lots")
     parser.add_argument("--audit-output",type=Path,
                         help="New private local JSON audit output; required with --analysis-files")
     parser.add_argument("--analysis-reference", type=Path,
@@ -37,6 +39,27 @@ def main(argv=None):
                         help="Open multi-select Excel file picker for all beam-force parts")
     parser.add_argument("--native-assignment",type=Path)
     args=parser.parse_args(argv)
+    if args.table_index_output:
+        if (not args.analysis_files or args.audit_output or args.analysis_reference
+                or args.reference_output or args.reference_case or args.analysis
+                or args.export_root or args.native_assignment or args.select_beams
+                or args.beam_files or any((args.beam_1, args.beam_2, args.beam_3))):
+            parser.error("Table index mode: use --analysis-files LOT1 LOT2 ... "
+                         "--table-index-output NEW.private.json only")
+        from components.inputs.etabs_excel_selection import build_analysis_table_catalog
+        from components.inputs.output_contract import _refuse_linked_output_target, atomic_json
+        target = args.table_index_output.expanduser().absolute()
+        try:
+            _refuse_linked_output_target(target)
+            if target.exists() or not target.name.endswith(".private.json"):
+                raise ValueError("Table index output must be a new .private.json file")
+            result = build_analysis_table_catalog(args.analysis_files)
+            atomic_json(target, result)
+        except (OSError, ValueError, BadZipFile, ParseError) as exc:
+            parser.error(str(exc))
+        print(f"{result['status']}: {len(result['tables'])} distinct worksheet names")
+        print("Private table index:", target)
+        return 0
     if args.analysis_reference or args.reference_output or args.reference_case:
         if (not args.analysis_reference or not args.reference_output or args.analysis_files
                 or args.audit_output or args.analysis or args.export_root or args.native_assignment
