@@ -18,17 +18,22 @@ The existing registration tool has a separate read-only audit mode for any numbe
 schema. The first-lot tables contain story, member, energy and response-spectrum
 results. The second-lot tables contain joint coordinates, object and element
 connectivity, modal periods and frequencies, participation factors, mass and
-load participation ratios, and direction factors. Program Control metadata is
-recorded only for the workbook that provides it. The numeric parser uses the
-units declared in each table.
+load participation ratios, and direction factors. The third lot adds joint
+reactions, drifts, displacements, velocities and accelerations. The fourth lot
+adds integrated wall reactions, shell stresses and strains, group nonlinear
+energy, frame and shell joint forces, and column and brace station forces.
+Program Control metadata is recorded for the workbook that provides it.
+The numeric parser uses the units declared in each table.
 
 `ETABS_ANALYSIS_REFERENCE_V1` uses the worksheet-owner index's file identities.
 A table's `file_index` is the zero-based position in `files`. The table has ordered
 `columns` and matching row arrays that start with the original 1-based
 worksheet row number. `source_units` and `units` describe numeric fields.
-The importer converts mm and mm/sec² to m and m/s² and percentage values
-to dimensionless fractions. Reported forces, moments, energies, participation
-factors, and modal mass/stiffness retain their declared kN-based units.
+The importer converts mm, mm/sec and mm/sec² to m, m/s and m/s²,
+and MPa to kN/m². Percentages become dimensionless fractions, and mm/mm
+strains keep their values as dimensionless ratios. Reported forces, moments,
+energies, participation factors, and modal mass/stiffness retain their
+declared kN-based units.
 Mode numbers are integers and ETABS joint IDs are preserved as strings.
 
 The importer detects repeated workbook paths and hashes, overlapping supported
@@ -38,7 +43,32 @@ worksheet share one retained row, with every repeat listed in
 ordered endpoints or other fields retain their own rows. `source_row_count`
 counts all populated rows, and `unique_row_count` counts distinct rows
 before filtering. Cases, steps, signs, directions and force locations are
-preserved. Formulas are never evaluated.
+preserved. Relative and absolute responses, joint and design reactions, and
+distinct shell faces or element stations keep their worksheet identities even
+when values match. Formulas are never evaluated.
+
+### SQLite storage for larger imports
+
+Supply `row_database` to `read_analysis_reference()` or select SQLite from the
+CLI. The manifest has schema `ETABS_ANALYSIS_SQLITE_REFERENCE_V1`.
+Each table has a `table_id` that refers to `reference_tables`.
+`reference_rows` has `worksheet_row`, `case_name` and `values_json`.
+The value array follows the manifest's `columns` after its first
+`worksheet_row` entry. `source_row_aliases` points each repeated worksheet row
+to its retained position. Exact repeated records within an individual
+third- or fourth-lot worksheet share one stored row. Identity uses the
+source cell values before scaling. Distinct records retain their own
+positions. Blank numeric cells in these worksheets remain null and
+are counted per column in `blank_measure_counts`. The manifest records the
+stored count after filtering and the database SHA-256.
+
+```sql
+SELECT r.worksheet_row, r.values_json
+FROM reference_rows AS r
+JOIN reference_tables AS t USING (table_id)
+WHERE t.worksheet = 'Joint Reactions' AND r.case_name = ?
+ORDER BY r.worksheet_row;
+```
 
 Checks use all loaded rows before any case filter. Reported periods are
 compared using exact modal case names and mode numbers. Disagreement stops
