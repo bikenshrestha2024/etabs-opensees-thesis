@@ -14,3 +14,35 @@ Editor: OpenAI ChatGPT (GPT-6.2); base 8c73e7530313a21adcccae4417c7c2ada5526cae.
 Ordinary and internal-mesh displacement rows and joint/design reaction rows were identical by exact keys and payloads in this supplied export; preserve their separate worksheet ownership. The relative/absolute time-history responses differ, and absolute displacement coverage is a subset of ordinary displacements. All available joint-drift displacement records agree with ordinary displacements; the first-lot controlling-joint drift records match exactly. Linear static adjacent-floor drift ratios checked using the verified 3.8 m coordinate spacing agree within displayed rounding. Do not compute time-history envelope drift by subtracting nonconcurrent maxima or sum response-spectrum or history envelopes as a base reaction. No change to native source case selection, solver physics, adopted periods, wall geometry, support assignment or loading.
 
 Extend the canonical reference importer with prefilter joint identity diagnostics and guarded linear-static reaction group summaries. Preserve unknown and inconsistent source rows as diagnostic exceptions; do not sum incomplete or ambiguous groups. Explicitly exclude envelopes and combination cases from generic force sums; no summed joint moments without a common origin. Added a SQLite regression fixture for the new checks; it supplements rather than substitutes for the actual private workbook audit. Local full repository clone unavailable due to DNS; CI must verify the patch before merge. The 32 physical supports and 44 mesh points, full 1D+1L gravity and separate NBC 105 Table 5-1 seismic weight, and the adopted 12 m X-wall reference remain preserved. Native EDB binding, exact constraints, current matching OpenSees solution, full histories and NLTHA and NBC acceptance remain NOT_VERIFIED. Raw results, local file hashes and row references stay private.
+
+
+## Post-merge cumulative diagnostic replay
+
+PR #233 passed all nine triggered workflows and merged into main at
+`8bcda6a618731a22fab4aa98194e880c65a2e7c8`. PRs #231 and #232 remain in its ancestry.
+The merged reference diagnostic functions were fetched from that exact
+commit, copied locally, and checked against the connector source length and
+64-bit FNV fingerprint before execution. All three original workbook
+SHA-256 values were rechecked against the previous private full-cell audits.
+The small modal, connectivity, story-drift, story-force and reaction tables
+were reread directly using openpyxl read_only; other large joint-response
+tables were streamed from the prior actual-workbook CSV extractions. The
+replay exercised the merged cross-lot diagnostic dispatcher with an
+evidence-store adapter, not the complete production importer or SQLite
+write path. All worksheet names have unique ownership; modal matches,
+drift-to-joint coordinate matches, endpoint references, and all joint
+response identities passed. The static reaction diagnostics reconciled to
+FIRST LOT bottom section-cut force magnitudes at the source rounding
+precision. Noneligible reaction rows were excluded from static summation,
+not discarded from the source reference. Both prior audits and the explicit
+full-gravity superposition check remain preserved.
+
+For an actual complete local production import, use
+`python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-reference FIRST.xlsx SECOND.xlsx THIRD.xlsx --reference-storage sqlite --reference-output NEW_PRIVATE_DIRECTORY`
+with the actual file paths and a new output directory. Source EDB identity,
+native restraints/constraints, matching OpenSees results, NLTHA convergence,
+and NBC compliance remain NOT_VERIFIED. Native solver and approval rules,
+32/44 support contract, 1D+1L benchmark, NBC seismic weight and 12 m wall
+policy unchanged. No private workbook data, raw numerical results or source
+file hashes were committed. The post-merge replay evidence is retained
+locally.
