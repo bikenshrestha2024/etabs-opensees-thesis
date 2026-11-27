@@ -622,6 +622,77 @@ def _read_reference_workbook(book, entry, schemas, progress, store):
     }, tables
 
 
+def _modal_mass_reference_diagnostics(records):
+    """Report source modal mass, not a native mass or code acceptance check."""
+    grouped = {}
+    for record in records:
+        grouped.setdefault(record["Case"], []).append(record)
+    result = {}
+    for case, source in grouped.items():
+        ordered = sorted(source, key=lambda record: record["Mode"])
+        modes = [record["Mode"] for record in ordered]
+        axes = {}
+        for axis in ("UX", "UY", "UZ", "RX", "RY", "RZ"):
+            cumulative = 0.0
+            previous = 0.0
+            residual = 0.0
+            decreases = []
+            invalid = []
+            first_90 = None
+            for record in ordered:
+                value = record[axis]
+                reported = record["Sum" + axis]
+                cumulative += value
+                residual = max(residual, abs(cumulative - reported))
+                if reported < previous:
+                    decreases.append(record["worksheet_row"])
+                if not (0 <= value <= 1 and 0 <= reported <= 1):
+                    invalid.append(record["worksheet_row"])
+                if first_90 is None and reported >= 0.9:
+                    first_90 = {"mode": record["Mode"], "period_s": record["Period"],
+                                "worksheet_row": record["worksheet_row"]}
+                previous = reported
+            axes[axis] = {"reported_final_fraction": previous,
+                          "sum_of_displayed_fractions": cumulative,
+                          "max_cumulative_absolute_residual": residual,
+                          "decreasing_cumulative_rows": decreases,
+                          "out_of_range_rows": invalid,
+                          "first_reported_90_percent": first_90}
+        result[case] = {"modes": modes, "contiguous_from_one": modes == list(range(1, len(modes) + 1)),
+                        "axes": axes}
+    return {"status": "REFERENCE_ONLY_NOT_NATIVE_MASS_OR_CODE_ACCEPTANCE", "cases": result}
+
+
+def _story_drift_joint_reference_diagnostics(joints, drifts):
+    """Match source story and object label, then coordinates in metres."""
+    from collections import defaultdict
+    index = defaultdict(list)
+    for joint in joints:
+        index[(joint["Story"], joint["Object Label"])].append(
+            tuple(joint["Global " + axis] for axis in "XYZ"))
+    counts = Counter()
+    exceptions = {}
+    tolerance_m = 0.001
+    for drift in drifts:
+        candidates = index.get((drift["Story"], drift["Label"]), ())
+        matches = sum(all(abs(drift[axis] - value) <= tolerance_m
+                          for axis, value in zip("XYZ", point)) for point in candidates)
+        if not candidates:
+            status = "NO_STORY_LABEL_MATCH"
+        elif matches == 0:
+            status = "COORDINATE_MISMATCH"
+        elif matches > 1:
+            status = "AMBIGUOUS_COORDINATE_MATCH"
+        else:
+            status = "UNIQUE_COORDINATE_MATCH"
+        counts[status] += 1
+        if status != "UNIQUE_COORDINATE_MATCH":
+            exceptions.setdefault(status, []).append(drift["worksheet_row"])
+    return {"status": "REFERENCE_ONLY_NOT_NATIVE_TOPOLOGY_ACCEPTANCE",
+            "coordinate_tolerance_m": tolerance_m, "counts": dict(counts),
+            "exception_worksheet_rows": exceptions}
+
+
 def _reference_checks(tables, store=None):
     def rows(name):
         return store.rows(name) if store else tables[name]["rows"]
@@ -658,7 +729,19 @@ def _reference_checks(tables, store=None):
             endpoints = [i for i, c in enumerate(table["columns"]) if c.startswith("Elm Jt")]
             missing = {row[i] for row in rows(name) for i in endpoints} - joint_ids
             connectivity[name] = {"checked_rows": table["unique_row_count"], "unresolved_joint_ids": sorted(missing)}
-    return {"modal_periods": modal, "connectivity": connectivity}
+    checks = {"modal_periods": modal, "connectivity": connectivity}
+
+    def records(name):
+        columns = tables[name]["columns"]
+        return (dict(zip(columns, row)) for row in rows(name))
+
+    if "Modal Participating Mass Ratios" in tables:
+        checks["modal_mass_reference"] = _modal_mass_reference_diagnostics(
+            records("Modal Participating Mass Ratios"))
+    if _JOINTS in tables and "Story Drifts" in tables:
+        checks["story_drift_joint_reference"] = _story_drift_joint_reference_diagnostics(
+            records(_JOINTS), records("Story Drifts"))
+    return checks
 
 
 def _read_analysis_reference(paths, cases, progress, schemas, legacy_first_lot, store=None):

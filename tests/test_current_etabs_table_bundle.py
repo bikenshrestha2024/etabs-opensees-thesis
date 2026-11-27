@@ -382,6 +382,46 @@ class FirstLotReferenceTests(unittest.TestCase):
         self.assertEqual(tables["Modal Participation Factors"]["units"]["ModalMass"], "kN-m-s²")
         self.assertEqual(tables["Modal Participating Mass Ratios"]["rows"][0][5], 0.5)
 
+    def test_cumulative_reference_diagnostics_before_case_filter(self):
+        from components.inputs.etabs_table_bundle import read_analysis_reference
+        second = self.second_lot()
+        book = load_workbook(second)
+        book["Objects and Elements - Joints"].append(
+            ["Story25", "05", "Joint", "A", "05", 0, 0, 1000])
+        book["Modal Periods And Frequencies"].append(
+            ["Modal Ritz", "2", 0.2, 5, 31.4159, 986.96])
+        book["Modal Participating Mass Ratios"].append(
+            ["Modal Ritz", "2", 0.2, 0.91, 0.45, 0, 0.91, 0.95, 0, 0, 0, 0, 0, 0, 0])
+        book.save(second)
+        book.close()
+        self.add_table(
+            "Story Drifts",
+            "Story|Output Case|Case Type|Step Type|Step Number|Direction|Drift|Drift/|Label|X|Y|Z",
+            "|||||||||m|m|m", [
+                ("Story25", "EQX", "LinStatic", None, None, "X", 0.001, "1/1000", "C", 2, 3, 1),
+                ("Story25", "EQX", "LinStatic", None, None, "Y", 0.001, "1/1000", "B", 5, 0, 1),
+                ("Story25", "OTHER", "LinStatic", None, None, "X", 0.001, "1/1000", "MISSING", 0, 0, 1),
+                ("Story25", "OTHER", "LinStatic", None, None, "Y", 0.001, "1/1000", "A", 0, 0, 1),
+            ])
+        self.book.save(self.source)
+        for database in (None, self.source.with_suffix(".sqlite3")):
+            with self.subTest(database=database):
+                report = read_analysis_reference([self.source, second], cases=["EQX"],
+                                                 row_database=database)
+                checks = report["checks"]
+                modal = checks["modal_mass_reference"]["cases"]["Modal Ritz"]
+                self.assertTrue(modal["contiguous_from_one"])
+                self.assertAlmostEqual(modal["axes"]["UY"]["reported_final_fraction"], 0.95)
+                self.assertEqual(modal["axes"]["UY"]["first_reported_90_percent"]["mode"], 2)
+                self.assertIsNone(modal["axes"]["UZ"]["first_reported_90_percent"])
+                self.assertEqual(modal["axes"]["UX"]["out_of_range_rows"], [])
+                drift = checks["story_drift_joint_reference"]
+                self.assertEqual(drift["counts"], {
+                    "UNIQUE_COORDINATE_MATCH": 1, "COORDINATE_MISMATCH": 1,
+                    "NO_STORY_LABEL_MATCH": 1, "AMBIGUOUS_COORDINATE_MATCH": 1})
+                self.assertEqual(drift["exception_worksheet_rows"]["NO_STORY_LABEL_MATCH"], [6])
+                self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
+
     def test_second_lot_can_be_read_alone_and_reports_unresolved_joint_ids(self):
         second = self.second_lot(include_missing_joint=True)
         self.assertEqual(main(["--analysis-reference", str(second), "--reference-output", str(self.output)]), 0)

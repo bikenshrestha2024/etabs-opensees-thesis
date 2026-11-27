@@ -97,3 +97,25 @@ are not a pass/fail result for NBC torsion. The governing floor-end check
 remains [the torsion checker](../validation/torsion_check.py.md), requiring
 compatible opposite-end displacement results under centered loading; the
 ETABS maximum/average tables are not that maximum/minimum criterion.
+
+### Cumulative modal and drift-coordinate reference diagnostics
+
+For split-lot imports, `checks.modal_mass_reference` summarizes the reported
+modal mass fractions by exact modal case and each of the six DOFs. The mode
+list, continuity from mode one, source cumulative final fraction, sum of
+rounded contributions, maximum cumulative residual, decreasing and out-of-range
+source rows, and first reported crossing of 90% are preserved. These are
+reported source diagnostics, not a new NBC requirement for every DOF, a
+verified native modal mass matrix, or a selected time-history scaling period.
+No rounding of the source fractions or approval flags occurs.
+
+When both joint and story-drift tables exist, `checks.story_drift_joint_reference`
+checks each drift controlling point by the exact story and object label,
+then by all three coordinates (absolute per-axis tolerance 0.001 m). Distinct
+outcomes are unique, ambiguous, missing label and coordinate mismatch; all
+exception source worksheet rows are retained. The tolerance is a reference
+comparison choice, not a native mesh-merging tolerance. Neither matching
+coordinates nor modal mass can establish native restraints or ETABS/OpenSees
+physical equivalence. Both checks execute before exact case filtering for JSON
+and SQLite; original values, earlier FIRST LOT display diagnostics and
+engineering acceptance boundaries are unchanged.
