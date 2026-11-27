@@ -61,6 +61,37 @@ class NativeBeamQuantityTests(unittest.TestCase):
             "selected_beam_weight_kN":125.,
         }),encoding="utf-8")
 
+    def test_geometric_edge_candidate_is_not_native_mpc(self):
+        from components.validation.etabs_assignment_gravity_audit import audit_base_wall_edges
+        book=Workbook();book.remove(book.active)
+        tables={
+            "Point Object Connectivity":(["UniqueName","X","Y","Z"],
+                ["","m","m","m"],[["A",0,0,0],["B",4,0,0],["C",4,0,3],
+                ["D",0,0,3],["P",1,0,0]]),
+            "Wall Object Connectivity":(["UniqueName","UniquePt1","UniquePt2","UniquePt3","UniquePt4"],
+                [""]*5,[["W","A","B","C","D"]]),
+            "Joint Assigns - Restraints":(["UniqueName","UX","UY","UZ","RX","RY","RZ"],
+                [""]*7,[[k]+["Yes"]*6 for k in ("A","B","P")]),
+            "Area Assigns - Edge Constraints":(["UniqueName","Constraint"],["",""],[["W","Yes"]]),
+        }
+        for name in ("Beam","Column","Brace","Null Line"):
+            tables[name+" Object Connectivity"]=(["Unique Name","UniquePtI","UniquePtJ"],
+                [""]*3,[["L1","A","P"],["L2","P","B"]] if name=="Null Line" else [])
+        for name,(fields,units,rows) in tables.items():
+            ws=book.create_sheet(name);ws.append([name]);ws.append(fields);ws.append(units)
+            for row in rows:ws.append(row)
+        result=audit_base_wall_edges(book)
+        self.assertEqual(result["role_counts"],{"PHYSICAL_LOCATION_CANDIDATE":2,
+                         "UNIQUE_WALL_EDGE_GEOMETRIC_CANDIDATE":1})
+        point=next(r for r in result["rows"] if r["point_id"]=="P")
+        candidate=point["edge_candidates"][0]
+        self.assertEqual(candidate["weight_i"],.75)
+        self.assertEqual(candidate["weight_j"],.25)
+        self.assertEqual(result["engineering_acceptance"],"NOT_VERIFIED")
+        book["Area Assigns - Edge Constraints"]["B4"]="No"
+        result=audit_base_wall_edges(book)
+        self.assertEqual(result["role_counts"]["UNRESOLVED_BASE_POINT"],1)
+
     def test_exact_native_beam_match_without_weight_change(self):
         r=audit_native_assignment_workbook(
             self.path,self.root/"out",self.beam)

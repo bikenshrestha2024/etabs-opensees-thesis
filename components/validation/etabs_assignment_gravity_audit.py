@@ -21,6 +21,121 @@ def _rows(wb, name):
             if any(v is not None and v!="" for v in values)]
 
 
+EDGE_TABLES=("Point Object Connectivity","Beam Object Connectivity",
+             "Column Object Connectivity","Brace Object Connectivity",
+             "Null Line Object Connectivity","Wall Object Connectivity",
+             "Joint Assigns - Restraints","Area Assigns - Edge Constraints")
+
+
+def _unique_rows(rows, field):
+    result={}
+    for row in rows:
+        key=str(row.get(field) or "").strip()
+        if not key or key in result:
+            raise ValueError("Missing/duplicate source ID in "+field)
+        result[key]=row
+    return result
+
+
+def _unit_scale(wb,name,fields):
+    rows=wb[name].iter_rows(min_row=2,max_row=3,values_only=True)
+    names=list(next(rows)); units=list(next(rows))
+    scales={"m":1.0,"mm":0.001}
+    result={}
+    for field in fields:
+        if names.count(field)!=1 or units[names.index(field)] not in scales:
+            raise ValueError("Missing or unsupported length unit: "+name+" "+field)
+        result[field]=scales[units[names.index(field)]]
+    return result
+
+
+def audit_base_wall_edges(wb,*,tolerance_m=1e-6):
+    """Establish source-object edge candidates, NEVER impose native MPCs.
+
+    Rigid-body affine translation and moment balance follow from the
+    geometric interpolation weights; native rotational/constraint DOFs
+    and analytical-element force recovery remain independent evidence.
+    """
+    missing=[name for name in EDGE_TABLES if name not in wb.sheetnames]
+    if missing:
+        return dict(status="MISSING_SOURCE_TABLES",missing_tables=missing,
+                    engineering_acceptance="NOT_VERIFIED")
+    if not math.isfinite(tolerance_m) or not 0<tolerance_m<=1e-3:
+        raise ValueError("Invalid edge coordinate tolerance")
+    coords=_unique_rows(_rows(wb,EDGE_TABLES[0]),"UniqueName")
+    scale=_unit_scale(wb,EDGE_TABLES[0],("X","Y","Z"))
+    xyz={k:tuple(float(row[d])*scale[d] for d in ("X","Y","Z"))
+         for k,row in coords.items()}
+    if not xyz or not all(math.isfinite(v) for p in xyz.values() for v in p):
+        raise ValueError("Invalid native point coordinates")
+    base_z=min(p[2] for p in xyz.values())
+    base={k for k,p in xyz.items() if abs(p[2]-base_z)<=tolerance_m}
+    physical=set()
+    null_count=Counter()
+    for name in EDGE_TABLES[1:5]:
+        rows=_unique_rows(_rows(wb,name),"Unique Name")
+        for row in rows.values():
+            ends=[str(row[d]) for d in ("UniquePtI","UniquePtJ")]
+            if not all(k in xyz for k in ends) or len(set(ends))!=2:
+                raise ValueError("Invalid native line connectivity")
+            if name==EDGE_TABLES[4]:
+                null_count.update(ends)
+            else:
+                physical.update(ends)
+    wall_corners=set()
+    edges=[]
+    walls=_unique_rows(_rows(wb,EDGE_TABLES[5]),"UniqueName")
+    assignments=_unique_rows(_rows(wb,EDGE_TABLES[7]),"UniqueName")
+    for wall,row in walls.items():
+        corners=[str(row["UniquePt"+str(i)]) for i in range(1,5)]
+        if not all(k in xyz for k in corners) or len(set(corners))!=4:
+            raise ValueError("Unsupported wall polygon "+wall)
+        wall_corners.update(corners)
+        for i,a in enumerate(corners):
+            b=corners[(i+1)%4]
+            if a in base and b in base:
+                edges.append((wall,a,b))
+    restraints=_unique_rows(_rows(wb,EDGE_TABLES[6]),"UniqueName")
+    candidates=base & (physical|wall_corners)
+    rows=[]
+    for k in sorted(base):
+        p=xyz[k]
+        flags=restraints.get(k)
+        if flags is not None:
+            dofs=[str(flags[d]) for d in ("UX","UY","UZ","RX","RY","RZ")]
+            if any(v not in ("Yes","No") for v in dofs):
+                raise ValueError("Invalid native restraint flags "+k)
+        else:
+            dofs=None
+        matches=[]
+        if k not in candidates:
+            for wall,a,b in edges:
+                u=xyz[a];v=xyz[b]
+                d=[v[i]-u[i] for i in range(3)]
+                length2=sum(x*x for x in d)
+                if length2<=tolerance_m**2:
+                    raise ValueError("Degenerate native wall edge "+wall)
+                t=sum((p[i]-u[i])*d[i] for i in range(3))/length2
+                error=math.dist(p,tuple(u[i]+t*d[i] for i in range(3)))
+                if error<=tolerance_m and tolerance_m/math.sqrt(length2)<t<1-tolerance_m/math.sqrt(length2):
+                    matches.append(dict(wall_object=wall,endpoint_i=a,endpoint_j=b,
+                        weight_i=1-t,weight_j=t,coordinate_residual_m=error,
+                        auto_edge_constraint=assignments.get(wall,{}).get("Constraint")))
+        valid=(len(matches)==1 and null_count[k]==2
+               and matches[0]["auto_edge_constraint"]=="Yes")
+        role=("PHYSICAL_LOCATION_CANDIDATE" if k in candidates else
+              "UNIQUE_WALL_EDGE_GEOMETRIC_CANDIDATE" if valid else
+              "UNRESOLVED_BASE_POINT")
+        rows.append(dict(point_id=k,xyz_m=p,role=role,source_restraint=dofs,
+                         incident_null_lines=null_count[k],edge_candidates=matches))
+    counts=Counter(row["role"] for row in rows)
+    return dict(status="SOURCE_GEOMETRY_ONLY_NOT_NATIVE_MPC",
+                engineering_acceptance="NOT_VERIFIED",base_elevation_m=base_z,
+                base_points=len(base),role_counts=dict(counts),
+                all_base_points_have_authored_restraint=all(r["source_restraint"] is not None for r in rows),
+                rows=rows)
+
+
 def audit_native_assignment_workbook(workbook_path, output_folder,
                                      beam_audit_path=None):
     """Record material weights, section lists, source-ID/offset consistency.
@@ -93,6 +208,14 @@ def audit_native_assignment_workbook(workbook_path, output_folder,
             opensees_beam_crosswalk_status="NOT_ATTEMPTED",
             physical_correction_activated=False,
             warning="ETABS Auto self-weight selection is not proven from offsets alone; native total is authoritative for this exact source workbook.")
+        # Optional independent geometric evidence; existing quantity-only
+        # workbooks remain compatible. Malformed geometry is explicitly blocked.
+        try:
+            result["base_wall_edge_geometry"]=audit_base_wall_edges(wb)
+        except (ValueError,KeyError,TypeError) as exc:
+            result["base_wall_edge_geometry"]=dict(
+                status="INVALID_SOURCE_GEOMETRY",reason=str(exc),
+                engineering_acceptance="NOT_VERIFIED")
         if beam_audit_path is not None:
             beam=json.loads(Path(beam_audit_path).read_text(encoding="utf-8-sig"))
             if beam.get("schema")!="beam-self-weight-end-offset-v1":
@@ -101,6 +224,18 @@ def audit_native_assignment_workbook(workbook_path, output_folder,
             by_id={str(r["etabs_object"]):r for r in rows}
             if len(by_id)!=len(rows) or set(by_id)!=set(beams):
                 raise ValueError("OpenSees source-beam IDs fail original native ETABS crosswalk")
+            # Native exports may use metres or millimetres. Legacy test
+            # fixtures with blank units preserve the historical mm convention;
+            # reject unknown nonblank source units.
+            unit_rows=wb["Frame Assigns - End Len Offsets"].iter_rows(
+                min_row=2,max_row=3,values_only=True)
+            headers=list(next(unit_rows)); units=list(next(unit_rows))
+            offset_scale={}
+            for field in ("Offset I","Offset J"):
+                unit=units[headers.index(field)]
+                if unit not in (None,"","mm","m"):
+                    raise ValueError("Unsupported native beam offset unit: "+str(unit))
+                offset_scale[field]=1.0 if unit=="m" else 0.001
             for key in beams:
                 # Validate original beam length as well as both offsets.
                 # An unrelated EDB can reuse IDs but use different geometry.
@@ -111,7 +246,7 @@ def audit_native_assignment_workbook(workbook_path, output_folder,
                 a=offset_by_id[key];b=by_id[key]
                 for native_field,field in (("Offset I","end_i_m"),
                                            ("Offset J","end_j_m")):
-                    if abs(float(a[native_field])/1000-float(b[field]))>0.001:
+                    if abs(float(a[native_field])*offset_scale[native_field]-float(b[field]))>0.001:
                         raise ValueError("Beam end offset disagrees for "+key+" "+native_field)
             gross=float(beam["gross_beam_weight_kN"])
             potential=float(beam["potential_offset_reduction_kN"])
