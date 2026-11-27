@@ -104,7 +104,7 @@ def discover_beam_force_parts(directory):
 
 def validate_full_table_selection(path):
     """[REF docs/source/components/inputs/etabs_excel_selection.py.md]
-    Reject a beam-only export as the source for ETABS joint reactions.
+    Require the worksheet consumed by the offline gravity reaction reader.
     """
     source=Path(path).expanduser().resolve()
     if not source.is_file():
@@ -113,11 +113,16 @@ def validate_full_table_selection(path):
         raise ValueError("Expected analyzed ETABS Excel or Joint Reactions CSV")
     if source.suffix.lower()==".csv":
         return source
-    names=tuple(n.casefold() for n in _sheetnames(source))
+    names=tuple(n.strip().casefold() for n in _sheetnames(source))
     if names and all("beam" in n and "force" in n for n in names):
         raise ValueError(
             "This is a BEAM-FORCE-ONLY workbook, not an analyzed ETABS "
             "Joint Reactions/full-table export. Select Analysis Export "
             "ULS 3 storey latest_compressed.xlsx in the full-table field, "
             "and select all Beam Forces Element parts separately.")
+    if names.count("joint reactions") != 1:
+        raise ValueError(
+            "ETABS gravity comparison requires exactly one Joint Reactions worksheet. "
+            "Partial analysis lots may be inspected with the multi-lot audit, "
+            "but cannot replace the joint-reaction source.")
     return source
