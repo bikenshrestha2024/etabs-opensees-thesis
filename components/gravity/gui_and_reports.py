@@ -2416,6 +2416,38 @@ class GravityAnalysisGUI:
                 joint_sheet.append(list(joint_rows[0]))
                 for row in joint_rows:joint_sheet.append(list(row.values()))
                 (out/'Gravity_Joint_Vertical_Balance.json').write_text(json.dumps(joint_rows,indent=2),encoding='utf-8')
+                # Use the same fully factored source ledger and native
+                # solved element vectors; the legacy Fz sheet is unchanged.
+                from components.gravity.load_path_formulas import recovered_interface_resultants
+                full={}
+                for pattern in domain['gravity'].values():
+                    for raw,vec in pattern.items():
+                        n=int(raw)
+                        if len(vec)!=6:
+                            raise ValueError('Expected six applied nodal components')
+                        full[n]=[a+float(b) for a,b in zip(full.get(n,[0.]*6),vec)]
+                mapping=[dict(tag=i,nodes=e['nodes'],category=e['category'],object=e['object'])
+                         for i,e in enumerate(domain['frames']+domain['shells'],100001)]
+                cut_report=recovered_interface_resultants(payload,elevations,full,
+                                                         source_elements=mapping)
+                from components.inputs.output_contract import atomic_json
+                atomic_json(out/'Gravity_Recovered_Interface_Resultants.json',cut_report)
+                cut=wb.create_sheet('Six DOF interface resultants')
+                order=cut_report['component_order']
+                cut.append(['Elevation m','Crossing elements','Off-interface elements','Basis']+
+                           [f'{kind} {c}' for kind in ('Cut','Below load','Above load','Below reaction',
+                               'Above reaction','Lower residual','Upper residual') for c in order])
+                for row in cut_report['interfaces']:
+                    cut.append([row['elevation_m'],row['crossing_elements'],row['off_interface_elements'],
+                                row['basis']]+[v for key in ('cut_resultant','applied_at_or_below',
+                                'applied_above','reactions_at_or_below','reactions_above',
+                                'lower_free_body_residual','upper_free_body_residual') for v in row[key]])
+                parts=wb.create_sheet('Interface source objects')
+                parts.append(['Elevation m','Category','ETABS object','Crossing elements']+order)
+                for row in cut_report['source_object_contributions']:
+                    parts.append([row['elevation_m'],row['category'],row['source_object'],
+                                  row['crossing_elements'],*row['resultant']])
+                cut.freeze_panes='E2';parts.freeze_panes='E2'
             except (ValueError,OSError,KeyError) as exc:
                 transfer_sheet.append(['NOT_RECORDED',str(exc)])
             names={str(n['opensees_node_tag']):n['etabs_point_name'] for n in topo['node_map']}

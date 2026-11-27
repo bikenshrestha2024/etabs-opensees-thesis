@@ -4,7 +4,7 @@ import math
 import unittest
 
 from components.gravity.load_path_formulas import (
-    recovered_vertical_transfers, vertical_joint_balance,
+    recovered_vertical_transfers, vertical_joint_balance, recovered_interface_resultants,
 )
 
 
@@ -28,6 +28,28 @@ class GravityLoadPathIntegrityTests(unittest.TestCase):
         self.assertEqual(cuts[1]["crossing_elements"], 0)
         rows = vertical_joint_balance(payload, {2: -10})
         self.assertTrue(all(r["residual_Fz_kN"] == 0 for r in rows))
+
+    def test_six_dof_cut_and_source_components(self):
+        p=valid_payload()
+        p.update(ok=True,support_node_tags=[1])
+        for n in p["nodes"]:
+            n.update(x_m=2.,y_m=3.)
+        p["reactions"][0].update(rx_kN=0.,ry_kN=0.,mx_kNm=0.,my_kNm=0.,mz_kNm=0.)
+        labels=[dict(tag=101,nodes=[1,2],category="COLUMN",object="C1")]
+        result=recovered_interface_resultants(p,[0,1,3],{2:[0,0,-10,0,0,0]},
+                                              source_elements=labels)
+        cut=result["interfaces"][0]
+        self.assertEqual(cut["cut_resultant"],[0,0,10,30,-20,0])
+        self.assertEqual(cut["lower_free_body_residual"],[0]*6)
+        self.assertEqual(cut["upper_free_body_residual"],[0]*6)
+        self.assertEqual(result["interfaces"][1]["off_interface_elements"],1)
+        self.assertEqual(result["source_object_contributions"][0]["source_object"],"C1")
+        self.assertEqual(result["interfaces"][-1]["cut_resultant"],[0]*6)
+        with self.assertRaisesRegex(ValueError,"crosswalk"):
+            recovered_interface_resultants(p,[0],{},source_elements=[])
+        p["reactions"][0]["mx_kNm"]=float("nan")
+        with self.assertRaisesRegex(ValueError,"Nonfinite support"):
+            recovered_interface_resultants(p,[0],{})
 
     def test_duplicate_nodes_cannot_silently_replace_geometry(self):
         p = valid_payload()

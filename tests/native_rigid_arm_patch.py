@@ -110,6 +110,57 @@ def run_case(root, executable, name, L, a, b, action, compression=0.,force_based
                 compression_kN=compression,status="GEOMETRIC_NONLINEAR_SENSITIVITY_ONLY")
 
 
+def mixed_frame_shell_cut(root, executable):
+    """Actual first-order mixed shell/frame solve, all six cut components."""
+    from components.gravity.load_path_formulas import recovered_interface_resultants
+    folder=root/"mixed_frame_shell_cut";folder.mkdir()
+    xyz={1:(0,0,0),2:(2,0,0),3:(2,0,3),4:(0,0,3)}
+    elems={1:[1,2,3,4],2:[1,4],3:[2,3]}
+    loads={3:[2,3,-10,.1,.2,.3],4:[4,-1,-20,.4,.5,.6]}
+    lines=["wipe","model BasicBuilder -ndm 3 -ndf 6"]
+    for n,pos in xyz.items():lines.append("node "+ " ".join(map(str,(n,*pos))))
+    lines+=["fix 1 1 1 1 1 1 1","fix 2 1 1 1 1 1 1",
+            "section ElasticMembranePlateSection 1 30000000 0.2 0.3 0",
+            "element ShellMITC4 1 1 2 3 4 1",
+            "geomTransf Linear 1 0 1 0",
+            "element elasticBeamColumn 2 1 4 .25 30000000 12500000 .01 .01 .01 1",
+            "element elasticBeamColumn 3 2 3 .25 30000000 12500000 .01 .01 .01 1",
+            "timeSeries Linear 1","pattern Plain 1 1 {"]
+    for n,v in loads.items():lines.append("load "+ " ".join(map(str,(n,*v))))
+    lines+=["}","constraints Plain","numberer RCM","system FullGeneral",
+            "test NormDispIncr 1e-10 20","algorithm Linear","integrator LoadControl 1",
+            "analysis Static","if {[analyze 1] != 0} {error {mixed cut solve failed}}",
+            "reactions","set f [open response.txt w]"]
+    for n in (1,2):lines.append(f"puts $f [nodeReaction {n}]")
+    for e in elems:lines.append(f"puts $f [eleResponse {e} forces]")
+    lines+=["close $f","exit 0"]
+    script=folder/"case.tcl";script.write_text("\n".join(lines)+"\n")
+    run=subprocess.run([executable,str(script.resolve())],cwd=folder,
+                       capture_output=True,text=True,timeout=90)
+    (folder/"solver.log").write_text(run.stdout+"\n"+run.stderr)
+    if run.returncode:raise RuntimeError("Native mixed cut solve failed")
+    rows=[list(map(float,l.split())) for l in (folder/"response.txt").read_text().splitlines()]
+    if [len(x) for x in rows]!=[6,6,24,12,12]:
+        raise ValueError("Unexpected native mixed response shape")
+    keys=("rx_kN","ry_kN","rz_kN","mx_kNm","my_kNm","mz_kNm")
+    payload=dict(ok=True, support_node_tags=[1,2],
+        nodes=[dict(tag=n,x_m=p[0],y_m=p[1],z_m=p[2]) for n,p in xyz.items()],
+        elements=[dict(tag=e,nodes=ns) for e,ns in elems.items()],
+        reactions=[dict(node_tag=n,**dict(zip(keys,v))) for n,v in zip((1,2),rows[:2])],
+        global_end_forces=[dict(tag=e,nodes=ns,forces=v) for (e,ns),v in zip(elems.items(),rows[2:])])
+    labels=[dict(tag=e,nodes=ns,category="SHEAR WALL" if e==1 else "COLUMN",object=str(e))
+            for e,ns in elems.items()]
+    report=recovered_interface_resultants(payload,[0,3],loads,source_elements=labels)
+    cut=report["interfaces"][0]
+    error=max(map(abs,cut["lower_free_body_residual"]+cut["upper_free_body_residual"]))
+    if error>1e-7:
+        raise AssertionError(f"Native mixed cut equilibrium mismatch: {cut}")
+    report["maximum_native_mixed_cut_component_residual"]=error
+    (folder/"summary.json").write_text(json.dumps(report,indent=2))
+    print(json.dumps(dict(native_mixed_cut_residual=error,cut=cut)),flush=True)
+    return report
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("output",type=Path)
@@ -142,10 +193,12 @@ def main():
     nonlinear=run_case(args.output,args.opensees,"compressed_column_probe",6.,.55,.625,[0,10,0,0,0,0],1000.)
     nonlinear["lateral_displacement_ratio_to_linear"]=nonlinear["displacements"][1]/base
     print(json.dumps(nonlinear),flush=True)
+    mixed=mixed_frame_shell_cut(args.output,args.opensees)
     (args.output/"summary.json").write_text(json.dumps(dict(
         status="NATIVE_FIRST_ORDER_COMPLIANCE_PASSED_NOT_ETABS_EQUIVALENCE",
         checks=rows,compression_probe=nonlinear,
         force_based_checks=force_rows,force_based_compression_probe=force_probe,
+        mixed_frame_shell_cut=mixed,
         limitation="RigidLink small-displacement kinematics; compression probe is diagnostic, no native ETABS section-cut or P-Delta benchmark."),
         indent=2))
 

@@ -7,6 +7,8 @@ on:
       - tests/verify_linear_shell_stiffness.py
       - tests/native_layered_shell_patch.py
       - tests/native_rigid_arm_patch.py
+      - components/gravity/load_path_formulas.py
+      - tests/test_gravity_loadpath_evidence_integrity.py
       - components/model/elastic_conversion_settings.py
       - components/model/assembly.py
       - tests/native_device_recorders.tcl
@@ -18,6 +20,8 @@ on:
       - tests/verify_linear_shell_stiffness.py
       - tests/native_layered_shell_patch.py
       - tests/native_rigid_arm_patch.py
+      - components/gravity/load_path_formulas.py
+      - tests/test_gravity_loadpath_evidence_integrity.py
       - components/model/elastic_conversion_settings.py
       - components/model/assembly.py
       - .github/workflows/native-device-recorder.yml
@@ -63,7 +67,9 @@ jobs:
       - name: Native rigid-arm shear-flexible frame qualification
         if: always()
         shell: micromamba-shell {0}
-        run: python -m tests.native_rigid_arm_patch native_rigid_arm_results
+        run: |
+          python -m unittest tests.test_gravity_loadpath_evidence_integrity
+          python -m tests.native_rigid_arm_patch native_rigid_arm_results
       - name: Archive rigid-arm qualification evidence
         if: always()
         uses: actions/upload-artifact@v4
