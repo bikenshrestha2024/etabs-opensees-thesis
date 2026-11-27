@@ -467,6 +467,20 @@ def _program_control(sheet):
     return {field: record[field] for field in fields}
 
 
+def _reference_row_flags(sheet_name, record):
+    """Source-display diagnostics only; never alter a reported result."""
+    flags = []
+    average = {"Story Max Over Avg Drifts": "Avg Drift",
+               "Story Max Over Avg Disp": "Average"}.get(sheet_name)
+    if average is not None and record[average] == 0:
+        flags.append("ZERO_REPORTED_AVERAGE_RATIO_UNRESOLVED")
+    if sheet_name == "Story Drifts" and record["Drift/"] == "1/0":
+        flags.append("RECIPROCAL_DISPLAY_ONE_OVER_ZERO")
+        if record["Drift"] != 0:
+            flags.append("RECIPROCAL_DISPLAY_ONE_OVER_ZERO_NONZERO_DRIFT")
+    return flags
+
+
 def _reference_table(sheet, store=None):
     name, headers, unit_row, rows = _reference_header(sheet)
     keys, measures = _REFERENCE_TABLES[sheet.title]
@@ -499,6 +513,7 @@ def _reference_table(sheet, store=None):
     story_names = set()
     case_counts = Counter()
     blank_measures = Counter()
+    display_flags = {}
     imported = []
     unique_row_count = 0
     for row_number, row in enumerate(rows, start=4):
@@ -551,6 +566,8 @@ def _reference_table(sheet, store=None):
             key_seen[key] = row_number
             imported.append([row_number, *values])
         unique_row_count += 1
+        for flag in _reference_row_flags(sheet.title, record):
+            display_flags.setdefault(flag, []).append(row_number)
         if "Story" in record:
             story_names.add(record["Story"])
         if case is not None:
@@ -562,6 +579,13 @@ def _reference_table(sheet, store=None):
         "stories": sorted(story_names), "source_row_count": source_row_count,
         "unique_row_count": unique_row_count,
     }
+    if sheet.title in ("Story Max Over Avg Drifts", "Story Max Over Avg Disp", "Story Drifts"):
+        result["source_display_diagnostics"] = {
+            "scope": "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER",
+            "status": "REFERENCE_ONLY_NOT_NBC_TORSION_EVALUATION",
+            "flag_counts": {flag: len(positions) for flag, positions in display_flags.items()},
+            "worksheet_rows": display_flags,
+        }
     if store:
         result["table_id"] = table_id
         result["duplicate_row_count"] = source_row_count - unique_row_count
