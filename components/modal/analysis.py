@@ -60,9 +60,12 @@ def modal_model_basis_report(model_data, config, limit_state, period_inputs=None
         source_status="UNAVAILABLE"
     elastic=cfg.get("elastic_etabs_comparison") or {}
     if isinstance(elastic,dict) and state in elastic:
-        stiffness=("ETABS_ELASTIC_LAYERED_SHELL_CANDIDATE"
-                   if elastic[state].get("layered_shell_sections") else
-                   "ETABS_ELASTIC_COMPARISON")
+        layered=bool(elastic[state].get("layered_shell_sections"))
+        rigid=bool(elastic[state].get("force_based_rigid_zone_sections"))
+        stiffness=("ETABS_ELASTIC_LAYERED_SHELL_AND_RIGID_ZONE_CANDIDATE" if layered and rigid
+                   else "ETABS_ELASTIC_FORCE_BASED_RIGID_ZONE_CANDIDATE" if rigid
+                   else "ETABS_ELASTIC_LAYERED_SHELL_CANDIDATE" if layered
+                   else "ETABS_ELASTIC_COMPARISON")
     else:
         stiffness=str(cfg.get("linear_shell_stiffness_policy") or "LEGACY_GROSS_SHELL")
     inputs=period_inputs if isinstance(period_inputs,dict) else {}

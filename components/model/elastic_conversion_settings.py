@@ -14,6 +14,7 @@ OPTION_KEYS = {
     "frame_sections", "frame_objects", "shell_sections", "shell_objects", "end_offsets_m",
     "use_native_frame_modifiers", "use_native_shell_modifiers", "shear_flexible_sections",
     "allow_shell_shear_approximation", "layered_shell_sections",
+    "force_based_rigid_zone_sections",
 }
 
 
@@ -234,6 +235,32 @@ def compile_settings(config, frames, shells, metadata):
         shear = options.get("shear_flexible_sections", [])
         if not isinstance(shear, list) or any(not isinstance(k, str) or k not in frame_sections for k in shear):
             raise ValueError(f"{state} shear_flexible_sections must list assembled section names")
+        # Explicit opt-in uses the native EDB metadata, not a guessed clear
+        # length or a new chain of rigidLink/diaphragm constraints.
+        force_sections=options.get("force_based_rigid_zone_sections", [])
+        if not isinstance(force_sections,list) or any(
+                not isinstance(k,str) or k not in shear for k in force_sections):
+            raise ValueError(f"{state} force_based_rigid_zone_sections must be selected shear-flexible sections")
+        if force_sections:
+            if not options.get("use_native_frame_modifiers",False):
+                raise ValueError("Force-based rigid zones require native frame modifiers")
+            from components.model.rigid_end_zones import read_end_offsets_metadata
+            native_offsets=read_end_offsets_metadata(metadata)
+            supplied=dict(options.get("end_offsets_m",{}))
+            for frame in frames:
+                obj=str(frame["object"])
+                if frame["properties"]["section"] not in force_sections:
+                    continue
+                if frame.get("hinged_brace"):
+                    raise ValueError(f"{obj}: force-based rigid-zone candidate cannot use released braces")
+                row=native_offsets.get(obj)
+                if row is None:
+                    raise ValueError(f"{obj}: missing native end offset source")
+                expected=dict(i=row["i_m"],j=row["j_m"],rigid_fraction=row["rigid_factor"])
+                if obj in supplied and supplied[obj]!=expected:
+                    raise ValueError(f"{obj}: explicit offset differs from native source")
+                supplied[obj]=expected
+            options=dict(options,end_offsets_m=supplied)
         offset_coverage = audit_native_end_offset_coverage(options, frames, metadata)
         offsets = _offsets(options.get("end_offsets_m", {}), frames)
         segments = []
@@ -247,7 +274,8 @@ def compile_settings(config, frames, shells, metadata):
             use_shear = section in shear and not frame.get("hinged_brace")
             if use_shear and (frame.get("release_i") or frame.get("release_j")):
                 raise ValueError(f"frame {obj}: the shear-flexible element cannot preserve end releases")
-            if use_shear and retained < 1.:
+            force_based=use_shear and section in force_sections
+            if use_shear and retained < 1. and not force_based:
                 raise ValueError(f"frame {obj}: combined Timoshenko and joint offsets require qualification")
             native = options.get("use_native_frame_modifiers", False)
             factors = (_native_factors(records, "frame", obj, section, FRAME_FIELDS) if native
@@ -269,9 +297,12 @@ def compile_settings(config, frames, shells, metadata):
             properties["A"] *= retained
             properties["J"] *= retained
             axis = frame["basis"][0]
-            segments.append(dict(properties=properties, modifiers=factors, shear_flexible=use_shear,
-                                 joint_offsets_m=[*(rigid_i*v for v in axis),
-                                                  *(-rigid_j*v for v in axis)]))
+            segment=dict(properties=properties, modifiers=factors, shear_flexible=use_shear,
+                         joint_offsets_m=[*(rigid_i*v for v in axis),
+                                          *(-rigid_j*v for v in axis)])
+            if force_based:
+                segment["frame_formulation"]="ELASTIC_FORCE_BASED_RIGID_ZONE_CANDIDATE"
+            segments.append(segment)
         shell_plan = {}
         native = options.get("use_native_shell_modifiers", False)
         for element in shells:
@@ -303,3 +334,24 @@ def compile_settings(config, frames, shells, metadata):
         result[state] = dict(frame_segments=segments, shell_objects=shell_plan,
                              native_end_offset_coverage=offset_coverage)
     return result
+
+
+def elastic_offset_force_beam(ops,tag,nodes,E,G,q,transf_tag):
+    """Register the elastic force-based shear candidate on ORIGINAL nodes.
+
+    [REF docs/source/components/model/elastic_conversion_settings.py.md]
+    The compiler has already scaled A,J by flexible/full length. Shear
+    factors are As2/A and As3/A using that adjusted A so GA_s is unchanged.
+    Three-point Lobatto exactly integrates quadratic first-order bending
+    flexibility for a prismatic elastic member under end actions.
+    Caller supplies a PDelta transform with source global joint offsets.
+    No element mass; source nodal mass and loads remain independent.
+    """
+    for key in ("A","J","Iy","Iz","As2","As3"):
+        positive(q[key],key)
+    positive(E,"E"); positive(G,"G")
+    sec=2000000+int(tag)
+    ops.section("Elastic",sec,E,q["A"],q["Iz"],q["Iy"],G,q["J"],
+                q["As2"]/q["A"],q["As3"]/q["A"])
+    ops.beamIntegration("Lobatto",sec,sec,3)
+    ops.element("forceBeamColumn",int(tag),*nodes,transf_tag,sec,"-iter",30,1e-10)

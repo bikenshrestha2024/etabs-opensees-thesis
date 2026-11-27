@@ -134,3 +134,7 @@ Nodal masses, gravity loads and the eigen mass matrix do not change.
 ## 2026-11-27 — explicit layered-shell elastic comparison
 
 The native-patch-qualified layered elastic candidate is selected only through the state-specific elastic compiler. It is registered with six unique nD material tags per section in the fresh elastic domain and keeps the original physical shell thickness and independently assigned nodal mass. The report and runtime expose `ETABS_ELASTIC_LAYERED_SHELL_CANDIDATE`. This candidate is diagnostic and cannot enter the nonlinear constructor. See [elastic settings](elastic_conversion_settings.py.md).
+
+## 2026-11-27 — force-based elastic rigid-zone candidate
+
+The opt-in compiler selects a forceBeamColumn with elastic shear section, source PDelta joint offsets and unchanged physical joint topology. No additional MPC nodes or loads/masses. The shared registration helper is exercised by a native Tcl adapter; the historic Timoshenko joint-offset guard remains unchanged. See [elastic comparison settings](elastic_conversion_settings.py.md). Distinct model/modal stiffness basis, including combined layered-shell and rigid-zone variant. Full building and CSI PDelta equivalence require matching source evidence.
