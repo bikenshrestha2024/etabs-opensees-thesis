@@ -83,3 +83,17 @@ conventions, and the corresponding OpenSees run.
 keep the `ETABS_FIRST_LOT_REFERENCE_V1` layout.
 
 [Command-line usage](../../tools/REGISTER_CURRENT_ETABS_TABLES.py.md#import-etabs-analysis-reference-results)
+
+### Source display diagnostics
+
+The three story drift/displacement tables now include additive
+`source_display_diagnostics` metadata with counts and original worksheet row
+numbers, computed over all unique source rows **before** case filtering in
+both JSON and SQLite storage. A zero reported average is flagged as unresolved
+at the reported precision, not a physical zero or a code finding. The `1/0`
+reciprocal text is flagged separately, including the subset with nonzero
+numeric drift. Raw ratio, drift, text, case and step are unchanged. The flags
+are not a pass/fail result for NBC torsion. The governing floor-end check
+remains [the torsion checker](../validation/torsion_check.py.md), requiring
+compatible opposite-end displacement results under centered loading; the
+ETABS maximum/average tables are not that maximum/minimum criterion.
