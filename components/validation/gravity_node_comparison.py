@@ -28,6 +28,80 @@ def _distance(a,b):
     return math.sqrt(sum((x-y)**2 for x,y in zip(a,b)))
 
 
+REACTION_COMPONENTS=("Fx_kN","Fy_kN","Fz_kN","Mx_kNm","My_kNm","Mz_kNm")
+ETABS_COMPONENTS=("F1","F2","F3","M1","M2","M3")
+OPENSEES_COMPONENTS=("rx_kN","ry_kN","rz_kN","mx_kNm","my_kNm","mz_kNm")
+
+
+def _six_values(row, keys):
+    """Missing or invalid components are not zero-valued reactions."""
+    values=[]
+    for key in keys:
+        value=row.get(key)
+        if value is None or isinstance(value,bool):
+            return None
+        try:
+            value=float(value)
+        except (TypeError,ValueError,OverflowError):
+            return None
+        if not math.isfinite(value):
+            return None
+        values.append(value)
+    return values
+
+
+def _about_origin(values, xyz):
+    """Translate global nodal moment to the common global (0,0,0) origin."""
+    fx,fy,fz,mx,my,mz=values
+    x,y,z=xyz
+    return [fx,fy,fz,mx+y*fz-z*fy,my+z*fx-x*fz,mz+x*fy-y*fx]
+
+
+def _six_dof_audit(etabs,opensees,details):
+    """Only uniquely matched, default-axis pairs; no inferred mesh transfer."""
+    es={str(r["point"]):r for r in etabs["joint_reactions"]}
+    os={str(r["node_tag"]):r for r in opensees["reactions"]}
+    coords={str(r["tag"]):_xyz(r) for r in opensees["nodes"]}
+    e_sum=[0.]*6
+    o_sum=[0.]*6
+    count=0
+    for row in details:
+        row["six_dof_status"]="UNMATCHED_OR_AXES_UNVERIFIED"
+        if row["status"]!="MATCHED_GLOBAL_Z":
+            continue
+        e=es[row["etabs_point"]]
+        o=os[row["opensees_node"]]
+        ev=_six_values(e,ETABS_COMPONENTS)
+        ov=_six_values(o,OPENSEES_COMPONENTS)
+        if ev is None or ov is None:
+            row["six_dof_status"]="MISSING_OR_INVALID_COMPONENTS"
+            continue
+        # F3 and explicitly verified global RZ must describe the same record.
+        if not math.isclose(ev[2],float(row["etabs_global_rz_kN"]),rel_tol=0,abs_tol=1e-8):
+            row["six_dof_status"]="INCONSISTENT_ETABS_F3"
+            continue
+        row["six_dof_status"]="MATCHED_GLOBAL_SIX_DOF_DIAGNOSTIC"
+        for key,x,y in zip(REACTION_COMPONENTS,ev,ov):
+            row["etabs_"+key]=x
+            row["opensees_"+key]=y
+            row["delta_"+key]=x-y
+        for i,(x,y) in enumerate(zip(_about_origin(ev,_xyz(e)),
+                                      _about_origin(ov,coords[row["opensees_node"]]))):
+            e_sum[i]+=x
+            o_sum[i]+=y
+        count+=1
+    complete=count==len(es)==len(os) and count>0
+    return dict(status=("MATCHED_ALL_EXPORTED_SUPPORTS_DIAGNOSTIC" if complete else
+                        "MATCHED_SUBSET_ONLY" if count else "MISSING_SIX_DOF_EVIDENCE"),
+                matched_count=count,etabs_count=len(es),opensees_count=len(os),
+                origin_m=[0.,0.,0.],component_order=list(REACTION_COMPONENTS),
+                etabs_resultant=e_sum if count else None,
+                opensees_resultant=o_sum if count else None,
+                etabs_minus_opensees=[x-y for x,y in zip(e_sum,o_sum)] if count else None,
+                interpretation="Matched support reaction resultant only; NOT a native section cut or mesh-transfer verification",
+                engineering_acceptance="NOT_CERTIFIED")
+
+
 def compare_support_nodes(etabs,opensees,*,tolerance_m=0.01):
     """Match supports one-to-one with coordinate, axis and ambiguity gates.
 
@@ -159,7 +233,9 @@ def compare_support_nodes(etabs,opensees,*,tolerance_m=0.01):
         else "INCOMPLETE_POINTWISE_COVERAGE_NOT_ENGINEERING_ACCEPTANCE"
              if not complete
         else "POINTWISE_NUMERICAL_SCREEN_ONLY_NOT_ENGINEERING_ACCEPTANCE")
+    six_dof=_six_dof_audit(etabs,opensees,details)
     return dict(schema="gravity-node-comparison-v1",
+        six_dof_reaction_audit=six_dof,
         interpretation="Support reaction differences only; not nodal applied load",
         acceptance="DIAGNOSTIC_NOT_ENGINEERING_ACCEPTANCE",
         match_tolerance_m=tol,etabs_support_reactions=len(eitems),
@@ -465,7 +541,9 @@ def write_node_comparison(folder,report,*,etabs=None,opensees=None,topology=None
     fields=["status","etabs_point","opensees_node","x_m","y_m","z_m",
             "separation_m","etabs_global_rz_kN","opensees_rz_kN",
             "delta_etabs_minus_opensees_kN","abs_delta_kN",
-            "difference_percent","etabs_axis_basis","candidates"]
+            "difference_percent","etabs_axis_basis","candidates","six_dof_status"]
+    fields.extend(prefix+key for key in REACTION_COMPONENTS
+                  for prefix in ("etabs_","opensees_","delta_"))
     inventory=(all_model_node_rows(opensees,topology,etabs,report)
                if opensees is not None else [])
     for filename,rows in (("Gravity_All_Support_Nodes.csv",report["rows"]),
@@ -495,6 +573,17 @@ def write_node_comparison(folder,report,*,etabs=None,opensees=None,topology=None
             for cell in sh[1]:
                 cell.font=Font(bold=True,color="FFFFFF")
                 cell.fill=PatternFill("solid",fgColor="24415F")
+        six=report.get("six_dof_reaction_audit")
+        if six:
+            sh=workbook.create_sheet("Six DOF resultant")
+            sh.append(["Status",six["status"]])
+            sh.append(["Matched count",six["matched_count"]])
+            sh.append(["Origin (m)",str(six["origin_m"])])
+            sh.append(["Interpretation",six["interpretation"]])
+            sh.append(["Component","ETABS","OpenSees","ETABS minus OpenSees"])
+            for i,key in enumerate(REACTION_COMPONENTS):
+                sh.append([key,*[(six[k][i] if six[k] is not None else None)
+                                 for k in ("etabs_resultant","opensees_resultant","etabs_minus_opensees")]])
         if inventory:
             sh=workbook.create_sheet("All OpenSees nodes")
             cols=list(inventory[0]);sh.append(cols)

@@ -87,7 +87,7 @@ def _runner_source(model_script, result_path, support_nodes, applied_kN, nsteps,
         "    for n in node_tags:",
         "        xyz = list(ops.nodeCoord(n)); disp = list(ops.nodeDisp(n))",
         "        nodes.append({'tag':n, 'x_m':float(xyz[0]), 'y_m':float(xyz[1]), 'z_m':float(xyz[2]), 'ux_m':float(disp[0]), 'uy_m':float(disp[1]), 'uz_m':float(disp[2]), 'rx_rad':float(disp[3]), 'ry_rad':float(disp[4]), 'rz_rad':float(disp[5])})",
-        "    reactions = [{'node_tag':n, 'rx_kN':float(ops.nodeReaction(n,1)), 'ry_kN':float(ops.nodeReaction(n,2)), 'rz_kN':float(ops.nodeReaction(n,3))} for n in SUPPORT_NODES]",
+        "    reactions = [{'node_tag':n, 'rx_kN':float(ops.nodeReaction(n,1)), 'ry_kN':float(ops.nodeReaction(n,2)), 'rz_kN':float(ops.nodeReaction(n,3)), 'mx_kNm':float(ops.nodeReaction(n,4)), 'my_kNm':float(ops.nodeReaction(n,5)), 'mz_kNm':float(ops.nodeReaction(n,6))} for n in SUPPORT_NODES]",
         "    elements = []",
         "    for e in element_tags:",
         "        try: en = [int(n) for n in ops.eleNodes(e)]",
@@ -2375,8 +2375,8 @@ class GravityAnalysisGUI:
         for row in rows: ws.append(row)
         nd = wb.create_sheet("Node Displacements"); nd.append(["OpenSees node", "X (m)", "Y (m)", "Z (m)", "Ux (m)", "Uy (m)", "Uz (m)", "Rx (rad)", "Ry (rad)", "Rz (rad)"])
         for n in nodes: nd.append([n.get(k) for k in ("tag", "x_m", "y_m", "z_m", "ux_m", "uy_m", "uz_m", "rx_rad", "ry_rad", "rz_rad")])
-        rr = wb.create_sheet("Support Reactions"); rr.append(["OpenSees support node", "Rx (kN)", "Ry (kN)", "Rz (kN)"])
-        for r in reactions: rr.append([r["node_tag"], r["rx_kN"], r["ry_kN"], r["rz_kN"]])
+        rr = wb.create_sheet("Support Reactions"); rr.append(["OpenSees support node", "Fx (kN)", "Fy (kN)", "Fz (kN)", "Mx (kNm)", "My (kNm)", "Mz (kNm)"])
+        for r in reactions: rr.append([r.get(k) for k in ("node_tag","rx_kN","ry_kN","rz_kN","mx_kNm","my_kNm","mz_kNm")])
         ledger_path=Path(payload['model_script']).parent/'Gravity_Storey_Load_Breakdown_V131.json'
         if ledger_path.is_file():
             ledger=json.loads(ledger_path.read_text(encoding='utf-8-sig'))

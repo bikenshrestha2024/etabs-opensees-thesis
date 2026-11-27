@@ -44,6 +44,43 @@ class GravityNodeAuditTests(unittest.TestCase):
         self.assertEqual(result["pointwise_screening_status"],
                          "POINTWISE_RESIDUAL_EXCEEDS_NUMERICAL_SCREEN")
 
+    def test_six_dof_common_origin_and_missing_moments(self):
+        from openpyxl import load_workbook
+        e={"joint_reactions":[dict(point="A",x_m=2,y_m=3,z_m=0,
+            F1=4,F2=5,F3=100,M1=10,M2=20,M3=30,rz_global_kN=100,
+            global_z_basis="GLOBAL_Z_VERIFIED_DEFAULT_AXES")]}
+        o={"nodes":[dict(tag=1,x_m=2,y_m=3,z_m=0)],
+           "reactions":[dict(node_tag=1,rx_kN=4,ry_kN=5,rz_kN=100,
+                             mx_kNm=9,my_kNm=20,mz_kNm=30)]}
+        report=compare_support_nodes(e,o)
+        six=report["six_dof_reaction_audit"]
+        self.assertEqual(six["etabs_resultant"],[4,5,100,310,-180,28])
+        self.assertEqual(six["etabs_minus_opensees"],[0,0,0,1,0,0])
+        self.assertEqual(six["engineering_acceptance"],"NOT_CERTIFIED")
+        self.assertEqual(report["rows"][0]["delta_Mx_kNm"],1.)
+        with tempfile.TemporaryDirectory() as root:
+            write_node_comparison(root,report)
+            book=load_workbook(Path(root)/"Gravity_Node_Reaction_Comparison.xlsx")
+            self.assertIn("Six DOF resultant",book.sheetnames)
+            book.close()
+        del o["reactions"][0]["mx_kNm"]
+        missing=compare_support_nodes(e,o)["six_dof_reaction_audit"]
+        self.assertEqual(missing["status"],"MISSING_SIX_DOF_EVIDENCE")
+        self.assertIsNone(missing["opensees_resultant"])
+
+    def test_six_dof_unmatched_native_support_is_not_complete(self):
+        e={"joint_reactions":[dict(point="A",x_m=0,y_m=0,z_m=0,
+            F1=0,F2=0,F3=100,M1=0,M2=0,M3=0,rz_global_kN=100,
+            global_z_basis="GLOBAL_Z_VERIFIED_DEFAULT_AXES"),
+            dict(point="B",x_m=6,y_m=0,z_m=0,rz_global_kN=0,
+                 global_z_basis="GLOBAL_Z_VERIFIED_DEFAULT_AXES")]}
+        o={"nodes":[dict(tag=1,x_m=0,y_m=0,z_m=0)],
+           "reactions":[dict(node_tag=1,rx_kN=0,ry_kN=0,rz_kN=100,
+                             mx_kNm=0,my_kNm=0,mz_kNm=0)]}
+        six=compare_support_nodes(e,o)["six_dof_reaction_audit"]
+        self.assertEqual(six["matched_count"],1)
+        self.assertEqual(six["status"],"MATCHED_SUBSET_ONLY")
+
     def test_numeric_etabs_reaction_without_verified_axis_remains_unverified(self):
         for basis in ("POINT_LOCAL_ROTATED", "POINT_LOCAL_AXES_UNAVAILABLE",
                       "UNVERIFIED", None):
