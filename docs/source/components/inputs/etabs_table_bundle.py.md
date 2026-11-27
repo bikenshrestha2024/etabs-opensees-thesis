@@ -45,4 +45,4 @@ compatible result steps, locations and response conventions, and the matching
 OpenSees run. The workbook contains reported ETABS results and supplies no
 model or solver input through this import.
 
-[Command-line usage](../tools/REGISTER_CURRENT_ETABS_TABLES.py.md#import-first-lot-reference-results)
+[Command-line usage](../../tools/REGISTER_CURRENT_ETABS_TABLES.py.md#import-first-lot-reference-results)
