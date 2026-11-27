@@ -1,0 +1,3 @@
+# Native independent shear elastic shell patch qualification
+
+Runs synthetic ShellMITC4 specimens with the existing candidate-registration helper. All prescribed fields and actual native section response are archived. The element resisting-force query refreshes the section trial response before strain/stress retrieval; the initial run (45937825317) returned zero strains and failed the excitation gate. This is not a material failure diagnosis or an ETABS equivalence claim. See [linear shell stiffness guide](../components/model/linear_shell_stiffness.py.md) for sources, derivation and limits. Run from repository root with conda-forge OpenSees on PATH: `python -m tests.native_layered_shell_patch native_layered_shell_results`. No source model or private data is used.

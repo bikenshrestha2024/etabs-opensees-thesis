@@ -67,7 +67,8 @@ def patch(root, executable, candidate, mode, mesh):
                   "if {[analyze 1] != 0} {error {patch failed}}",
                   "set f [open response.txt w]"])
     for e in elements:
-        lines.extend([f'puts $f [eleResponse {e} strains]',
+        lines.extend([f'set resisting [eleResponse {e} forces]',
+                      f'puts $f [eleResponse {e} strains]',
                       f'puts $f [eleResponse {e} stresses]'])
     lines.extend(["close $f","puts [version]","exit 0"])
     folder=root/f"{mode}_{mesh}"
