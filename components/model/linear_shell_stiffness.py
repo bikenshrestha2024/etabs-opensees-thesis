@@ -134,7 +134,9 @@ def section_command(ops,tag,result):
 
 def layered_elastic_candidate(E, nu, thickness, source_modifiers, *,
                               property_name, shear_correction):
-    """Derive a symmetric, positive three-layer ELASTIC diagnostic section.
+    """[REF docs/source/components/model/linear_shell_stiffness.py.md]
+
+    Derive a symmetric, positive three-layer ELASTIC diagnostic section.
 
     Lu et al. (2015), doi:10.1016/j.finel.2015.01.006 supports the
     multilayer method, not these equivalent elastic factors. The midpoint
@@ -181,7 +183,9 @@ def layered_elastic_candidate(E, nu, thickness, source_modifiers, *,
 
 
 def layered_elastic_candidate_command(ops, section_tag, material_tags, candidate):
-    """Register only in an isolated qualification model; caller owns tags.
+    """[REF docs/source/components/model/linear_shell_stiffness.py.md]
+
+    Register only in an isolated qualification model; caller owns tags.
 
     ElasticIsotropic -> PlateFromPlaneStress -> LayeredShell. No thickness,
     mass or nonlinear material substitution in the production converter.

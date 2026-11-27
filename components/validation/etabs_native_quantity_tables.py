@@ -41,7 +41,9 @@ EVIDENCE_FAMILIES={
 
 
 def evidence_families(table):
-    """Match native catalog names/keys, allowing CSI naming variations."""
+    """[REF docs/source/components/validation/etabs_native_quantity_tables.py.md]
+
+    Match native catalog names/keys, allowing CSI naming variations."""
     name=(table["name"]+" "+table["key"]).casefold().replace("-"," ").replace("_"," ")
     name=" ".join(name.split())
     return [family for family,terms in EVIDENCE_FAMILIES.items()
@@ -111,7 +113,9 @@ def _get_native_table(sap,key):
 
 
 def export_native_quantity_tables(sap,output_dir,*,log=None,gravity_combo=None):
-    """Pin and restore native database display selection when requested.
+    """[REF docs/source/components/validation/etabs_native_quantity_tables.py.md]
+
+    Pin and restore native database display selection when requested.
 
     The existing EQ/PDelta adapter owns CSI selection snapshot/restore.
     If the API does not expose the combo selection, do not pretend a

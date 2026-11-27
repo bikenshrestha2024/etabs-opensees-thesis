@@ -44,7 +44,9 @@ def require_import_root(selected_output_root):
 
 
 def require_rebuild_root(original_export_root, selected_output_root):
-    """Validate a derived model destination, never a new ETABS import root.
+    """[REF docs/source/components/inputs/project_output_layout.py.md]
+
+    Validate a derived model destination, never a new ETABS import root.
 
     The canonical child belongs to the original export; explicit standalone
     destinations remain supported for the legacy CLI. No directories are made.
@@ -71,7 +73,9 @@ def require_rebuild_root(original_export_root, selected_output_root):
 
 def create_rebuild_layout(source_edb, original_export_root, selected_output_root, *,
                           expected_source_sha256):
-    """Bind a newly reserved clear-beam variant to the original source EDB.
+    """[REF docs/source/components/inputs/project_output_layout.py.md]
+
+    Bind a newly reserved clear-beam variant to the original source EDB.
 
     This is not an import. Only the fresh REBUILD_RUNNING directory reserved
     by the rebuild tool is accepted; no previous manifest or result is replaced.
