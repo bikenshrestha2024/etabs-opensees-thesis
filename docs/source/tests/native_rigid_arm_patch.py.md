@@ -17,3 +17,7 @@ Native conda-forge OpenSees [run 45941276267](https://github.com/bikenshrestha20
 ## Mixed frame/shell discrete interface benchmark
 
 The existing native workflow now also solves a generic two-column and one-shell four-joint specimen under mixed six-component nodal loads. It reads native shell and frame global end-force vectors and support reactions, and runs the same six-DOF interface recovery helper used by the gravity GUI. First-order lower and upper free-body residuals must both be below 1e-7 in the relevant component units. No project model or private data is used. The test does not prove the actual building's foundation or ETABS cut equivalence.
+
+### Observed native mixed-component result
+
+[Run 45949588899](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/45949588899) passed all eight load-path integrity regressions and the mixed frame/shell cut. Three crossing elements, zero off-interface elements, base resultant in kN and kNm = [-6, -2, 30, 5.5, -38.7, -6.9]; maximum component residual against independent nodal loads and supports = 1.865174681370263e-14. Raw Tcl, native response, solver log and summary are preserved in [artifact 15175639401](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/45949588899/artifacts/15175639401). This is a first-order synthetic mixed-component solve, not the current building or ETABS cut.

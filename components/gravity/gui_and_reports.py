@@ -2428,8 +2428,17 @@ class GravityAnalysisGUI:
                         full[n]=[a+float(b) for a,b in zip(full.get(n,[0.]*6),vec)]
                 mapping=[dict(tag=i,nodes=e['nodes'],category=e['category'],object=e['object'])
                          for i,e in enumerate(domain['frames']+domain['shells'],100001)]
+                # Do not combine an old result with a regenerated source
+                # ledger or element-label crosswalk, even if Fz totals agree.
+                from components.inputs.project_output_layout import sha256_file
+                expected_hashes=payload.get('model_input_sha256') or {}
+                for path in (data_path,model_dir/'OpenSees_Complete_Model_Config_V118.json',
+                             model_dir/'OpenSees_Source_Model_Metadata_V118.json'):
+                    if expected_hashes.get(path.name)!=sha256_file(path):
+                        raise ValueError('Six-DOF interface source identity missing or changed: '+path.name)
                 cut_report=recovered_interface_resultants(payload,elevations,full,
                                                          source_elements=mapping)
+                cut_report['source_result_sha256']=sha256_file(out/'Gravity_Result_V110.json')
                 from components.inputs.output_contract import atomic_json
                 atomic_json(out/'Gravity_Recovered_Interface_Resultants.json',cut_report)
                 cut=wb.create_sheet('Six DOF interface resultants')

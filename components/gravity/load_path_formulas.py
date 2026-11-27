@@ -96,7 +96,9 @@ def recovered_interface_resultants(payload, elevations_m, applied_vectors, *,
     if not xyz or not payload["elements"]:
         raise ValueError("No solved mesh evidence")
     tags={int(e["tag"]):tuple(map(int,e["nodes"])) for e in payload["elements"]}
-    forces={int(e["tag"]):e["forces"] for e in payload["global_end_forces"]}
+    forces={int(e["tag"]):vector(e["forces"],6*len(e["nodes"]),
+                                 "global element vector")
+            for e in payload["global_end_forces"]}
     applied={}
     for raw,values in applied_vectors.items():
         tag=int(raw)
