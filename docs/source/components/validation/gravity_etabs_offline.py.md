@@ -47,3 +47,11 @@ explain the 8680.475-kN gravity weight difference. No acceptance claim
 may be made from successful nodal matching alone.
 
 Tests: `python tests/verify_gravity_etabs_offline.py`.
+
+## Split third-lot result evidence (2026-11-27)
+
+An explicitly selected analysis lot that contains the exact Joint Reactions worksheet can be used in the existing offline gravity picker. A source lot without that worksheet is rejected by the shared selection guard. For this purpose the original third lot or its unmodified Joint Reactions CSV is sufficient; it is not a complete assignment/model/analysis export. Do not register an incomplete lot as a replacement for all native evidence or assert same-EDB provenance from matching case names alone. Keep the original workbook, EDB fingerprint and actual case selection local.
+
+The source review confirms the distinction between 76 exported base point records and the project-confirmed 32 physical foundation supports plus 44 mesh points. Match ETABS Unique Name through the actual conversion node map, not an equal integer or display label. Compare the exact 1.0D+1.0L combination. Zero FZ does not prove free native DOFs; a missing OpenSees result is not zero. Existing report wording that requires 76 matched support reactions needs strategy-specific review; it must not be interpreted as a physical acceptance criterion for the primary 32-support strategy.
+
+Source section-cut forces can be checked against summed reactions only for compatible simultaneous/static groups; never sum independent Max/Min envelopes or RSA modal-combined nodal peaks to infer global base shear. Keep relative and absolute dynamic responses separate. Joint Drift Disp X/Y are total displacements; compare adjacent-level displacements at the same exact case/step and coordinates, not total displacement divided by storey height. Equal ordinary and internal-mesh displacement records in one export do not prove internal constraint topology. Do not silently combine duplicate tables or infer missing mode vectors.
