@@ -1,0 +1,14 @@
+{
+  "editor": "OpenAI ChatGPT",
+  "model": "GPT-6.2",
+  "base_sha": "69f068684ee09968f7aa3bd7519370a669b8d7ad",
+  "branch": "fix/native-analytical-mesh-evidence-20261127",
+  "changed_files": [
+    "components/validation/etabs_native_quantity_tables.py",
+    "tests/verify_etabs_native_quantity_tables.py",
+    "docs/source/components/validation/etabs_native_quantity_tables.py.md"
+  ],
+  "scope": "Extend existing native gravity evidence export; no physics changes",
+  "tests": "Pending CI on branch",
+  "deferred": "Actual Windows ETABS v23 and full-building comparison; source EDB unavailable"
+}

@@ -145,6 +145,135 @@ def export_native_quantity_tables(sap,output_dir,*,log=None,gravity_combo=None):
         _db_restore(sap,before)
 
 
+def extract_analytical_mesh(sap, *, log=None):
+    """[REF docs/source/components/validation/etabs_native_quantity_tables.py.md]
+
+    Read generated analysis elements, NOT PointObj/FrameObj/AreaObj topology.
+    Caller has an analyzed ETABS model and verified kN-m-C present units.
+    CSI public API returns named constraints, not necessarily the solver's
+    internally condensed edge equations. No fixity or MPC is synthesized.
+    """
+    import math
+    def get(raw, n, label):
+        if (not isinstance(raw,(list,tuple)) or len(raw)!=n+1
+                or raw[-1]!=0):
+            raise ValueError(label+": unexpected native return "+repr(raw)[:200])
+        return raw[:-1]
+    def names(api,label):
+        count,values=get(api.GetNameList(),2,label+".GetNameList")
+        vals=[str(v) for v in (values or [])]
+        if int(count)!=len(vals) or len(set(vals))!=len(vals) or any(not n for n in vals):
+            raise ValueError(label+": invalid analytical names")
+        return vals
+    if int(sap.GetPresentUnits())!=6:
+        raise ValueError("Analytical mesh extraction requires verified kN-m-C units")
+    point_api=sap.PointElm
+    points={}; errors=[]
+    def capture(row,key,fn):
+        try:
+            row[key]=fn()
+        except Exception as exc:
+            row[key]=None
+            errors.append(dict(kind=row["kind"],id=row["id"],field=key,
+                               error=type(exc).__name__+": "+str(exc)))
+    def point_xyz(n):
+        vals=list(map(float,get(point_api.GetCoordCartesian(n),3,"PointElm.GetCoordCartesian")))
+        if not all(math.isfinite(v) for v in vals):
+            raise ValueError("Nonfinite analytical coordinates")
+        return vals
+    def restraint(n):
+        flags,=get(point_api.GetRestraint(n),1,"PointElm.GetRestraint")
+        if len(flags)!=6 or any(x not in (0,1,False,True) for x in flags):
+            raise ValueError("Expected six analytical restraint flags")
+        return [bool(x) for x in flags]
+    def constraints(n):
+        count,point_names,labels=get(point_api.GetConstraint(n),3,"PointElm.GetConstraint")
+        point_names=list(point_names or []); labels=list(labels or [])
+        if int(count)!=len(point_names) or len(labels)!=len(point_names):
+            raise ValueError("Analytical constraint array length mismatch")
+        if any(str(p)!=n for p in point_names) or any(not str(c) for c in labels):
+            raise ValueError("Unexpected analytical constraint point or name")
+        return [str(c) for c in labels]
+    def point_object(n):
+        obj,kind=get(point_api.GetObj(n),2,"PointElm.GetObj")
+        return dict(name=str(obj),object_type=int(kind))
+    def axes(n):
+        raw,=get(point_api.GetTransformationMatrix(n),1,"PointElm.GetTransformationMatrix")
+        vals=list(map(float,raw))
+        if len(vals)!=9 or not all(math.isfinite(v) for v in vals):
+            raise ValueError("Invalid analytical point transformation matrix")
+        return vals
+
+    for i,n in enumerate(names(point_api,"PointElm"),1):
+        row=dict(kind="POINT_ELM",id=n)
+        for key,fn in (("xyz_m",point_xyz),("restraints_local",restraint),
+                       ("constraint_names",constraints),("source_object",point_object),
+                       ("transformation_matrix_raw",axes)):
+            capture(row,key,lambda fn=fn:fn(n))
+        points[n]=row
+        if log and i%1000==0:
+            log("ETABS_ANALYTICAL_MESH_PROGRESS","Read analytical point elements",count=i)
+    if not points:
+        raise ValueError("No generated analytical point elements; analyze source first")
+
+    def area_nodes(api,n):
+        count,raw=get(api.GetPoints(n),2,"AreaElm.GetPoints")
+        ns=list(map(str,raw or []))
+        if int(count)!=len(ns) or len(ns) not in (3,4):
+            raise ValueError("Unsupported analytical area connectivity")
+        return ns
+    def line_nodes(api,n):
+        return list(map(str,get(api.GetPoints(n),2,"LineElm.GetPoints")))
+    def checked_nodes(ns):
+        if len(set(ns))!=len(ns) or any(n not in points for n in ns):
+            raise ValueError("Missing or duplicate analytical endpoint")
+        return ns
+    def area_parent(api,n):
+        obj,=get(api.GetObj(n),1,"AreaElm.GetObj")
+        if not str(obj):raise ValueError("Missing analytical area parent")
+        return dict(name=str(obj))
+    def line_parent(api,n):
+        obj,kind,i,j=get(api.GetObj(n),4,"LineElm.GetObj")
+        i,j=float(i),float(j)
+        if not str(obj) or not all(math.isfinite(x) for x in (i,j)):
+            raise ValueError("Invalid analytical line parent")
+        return dict(name=str(obj),object_type=int(kind),relative_distances_raw=[i,j])
+    elements=[]
+    for kind,api,nodes_fn,parent_fn in (
+        ("AREA_ELM",sap.AreaElm,area_nodes,area_parent),
+        ("LINE_ELM",sap.LineElm,line_nodes,line_parent)):
+        for i,n in enumerate(names(api,kind),1):
+            row=dict(kind=kind,id=n)
+            capture(row,"points",lambda:checked_nodes(nodes_fn(api,n)))
+            capture(row,"source_object",lambda:parent_fn(api,n))
+            elements.append(row)
+            if log and i%1000==0:
+                log("ETABS_ANALYTICAL_MESH_PROGRESS","Read "+kind,count=i)
+    if not elements:
+        raise ValueError("No generated analytical line/area elements")
+    groups={}
+    for row in points.values():
+        for c in row["constraint_names"] or []:
+            groups.setdefault(c,[]).append(row["id"])
+    base=min((p["xyz_m"][2] for p in points.values() if p["xyz_m"] is not None),default=None)
+    base_points=[p["id"] for p in points.values() if p["xyz_m"] is not None and
+                 abs(p["xyz_m"][2]-base)<=1e-6] if base is not None else []
+    return dict(schema="etabs-analytical-mesh-native-v1",
+                status=("PARTIAL_NATIVE_API_EVIDENCE" if errors else
+                        "NATIVE_ANALYTICAL_CONNECTIVITY_CAPTURED_NOT_EQUIVALENCE"),
+                units="kN,m,C",engineering_acceptance="NOT_VERIFIED",
+                points=list(points.values()),elements=elements,
+                point_count=len(points),area_element_count=sum(e["kind"]=="AREA_ELM" for e in elements),
+                line_element_count=sum(e["kind"]=="LINE_ELM" for e in elements),
+                base_elevation_m=base,base_analytical_point_ids=base_points,
+                named_constraint_membership=groups,errors=errors,
+                internal_mpc_coefficients="NOT_RECOVERED_BY_NAMED_CONSTRAINT_QUERY",
+                limitations=["Native point restraints are local-axis assignments, not physical foundation classification.",
+                             "Generated point objects may share coordinates; do not merge by XYZ.",
+                             "Named constraints do not establish internal automatic shell-edge MPC coefficients.",
+                             "Public CSI 2016 signatures require native ETABS v23 COM qualification."])
+
+
 def _export_tables(sap,output_dir,*,log=None,selection=None):
     """Capture selected native table records, no geometry/weight assumptions.
 
@@ -204,8 +333,27 @@ def _export_tables(sap,output_dir,*,log=None,selection=None):
             catalog_candidates=[row["table_key"] for row in entries],
             nonempty_tables=nonempty,
             engineering_acceptance="NOT_VERIFIED")
+    analytical=dict(status="NOT_REQUESTED_UNSCOPED_EXPORT",engineering_acceptance="NOT_VERIFIED")
+    if selection is not None:
+        path=out/"ETABS_NATIVE_ANALYTICAL_MESH.json"
+        try:
+            mesh=extract_analytical_mesh(sap,log=log)
+        except Exception as exc:
+            mesh=dict(status="NATIVE_ANALYTICAL_MESH_UNAVAILABLE",
+                      engineering_acceptance="NOT_VERIFIED",
+                      error=type(exc).__name__+": "+str(exc))
+        from components.inputs.output_contract import atomic_json
+        atomic_json(path,mesh)
+        analytical={k:v for k,v in mesh.items() if k not in
+                    ("points","elements","named_constraint_membership","base_analytical_point_ids","errors")}
+        analytical.update(file=path.name,sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                          error_count=len(mesh.get("errors",[])))
+        if log:
+            log("ETABS_ANALYTICAL_MESH",analytical["status"],
+                point_count=mesh.get("point_count"),error_count=analytical["error_count"])
     manifest={
         "schema":"etabs-native-quantity-raw-v1",
+        "analytical_mesh_api":analytical,
         "display_selection":selection,
         "display_selection_status":("GRAVITY_COMBO_READBACK_VERIFIED" if selection is not None
                                     else "NOT_PINNED_RAW_TABLES_ONLY"),

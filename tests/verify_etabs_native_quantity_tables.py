@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from components.validation.etabs_native_quantity_tables import (
-    export_native_quantity_tables)
+    export_native_quantity_tables, extract_analytical_mesh)
 
 
 class FakeDatabase:
@@ -29,6 +29,45 @@ class FakeSap:
 
 
 class EtabsNativeQuantityTests(unittest.TestCase):
+    def test_native_analytical_points_elements_and_named_constraints(self):
+        class Points:
+            def GetNameList(self):return (4,["p1","p2","p3","p4"],0)
+            def GetCoordCartesian(self,n):
+                return (*{"p1":(0,0,0),"p2":(2,0,0),"p3":(2,0,3),"p4":(0,0,3)}[n],0)
+            def GetRestraint(self,n):return ([n in ("p1","p2")]*6,0)
+            def GetConstraint(self,n):
+                return (1,[n],["edge1"],0) if n in ("p1","p2") else (0,[],[],0)
+            def GetObj(self,n):return (n,1,0)
+            def GetTransformationMatrix(self,n):return ([1,0,0,0,1,0,0,0,1],0)
+        class Areas:
+            def GetNameList(self):return (1,["a1"],0)
+            def GetPoints(self,n):return (4,["p1","p2","p3","p4"],0)
+            def GetObj(self,n):return ("Wall-A",0)
+        class Lines:
+            def GetNameList(self):return (1,["l1"],0)
+            def GetPoints(self,n):return ("p1","p4",0)
+            def GetObj(self,n):return ("Column-A",2,0.,1.,0)
+        sap=FakeSap()
+        sap.GetPresentUnits=lambda:6
+        sap.PointElm=Points();sap.AreaElm=Areas();sap.LineElm=Lines()
+        report=extract_analytical_mesh(sap)
+        self.assertEqual(report["point_count"],4)
+        self.assertEqual(report["base_analytical_point_ids"],["p1","p2"])
+        self.assertEqual(report["named_constraint_membership"],{"edge1":["p1","p2"]})
+        self.assertEqual(report["elements"][0]["source_object"]["name"],"Wall-A")
+        self.assertEqual(report["engineering_acceptance"],"NOT_VERIFIED")
+        self.assertEqual(report["internal_mpc_coefficients"],"NOT_RECOVERED_BY_NAMED_CONSTRAINT_QUERY")
+        self.assertFalse(report["errors"])
+        sap.LineElm.GetPoints=lambda n:("p1","absent",0)
+        sap.PointElm.GetConstraint=lambda n:(1,[],[],0)
+        report=extract_analytical_mesh(sap)
+        self.assertEqual(report["status"],"PARTIAL_NATIVE_API_EVIDENCE")
+        self.assertEqual(len(report["errors"]),5)
+        self.assertIsNone(report["elements"][1]["points"])
+        sap.GetPresentUnits=lambda:5
+        with self.assertRaisesRegex(ValueError,"kN-m-C"):
+            extract_analytical_mesh(sap)
+
     def test_capture_actual_fields_and_data(self):
         with tempfile.TemporaryDirectory() as root:
             result=export_native_quantity_tables(FakeSap(),root)
@@ -70,6 +109,8 @@ class EtabsNativeQuantityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             result=export_native_quantity_tables(sap,root,gravity_combo="1. DL + LL")
             self.assertEqual(result["selected_table_count"],5)
+            self.assertEqual(result["analytical_mesh_api"]["status"],"NATIVE_ANALYTICAL_MESH_UNAVAILABLE")
+            self.assertTrue((Path(root)/"ETABS_NATIVE_ANALYTICAL_MESH.json").is_file())
             self.assertEqual(result["display_selection_status"],"GRAVITY_COMBO_READBACK_VERIFIED")
             self.assertEqual(result["engineering_evidence_coverage"]["analytical_mesh"]["status"],
                              "RAW_NONEMPTY_CANDIDATES_REQUIRE_REVIEW")
