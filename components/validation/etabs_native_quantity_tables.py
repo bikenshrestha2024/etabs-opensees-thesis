@@ -379,3 +379,120 @@ def _export_tables(sap,output_dir,*,log=None,selection=None):
     (out/"ETABS_NATIVE_QUANTITY_MANIFEST.json").write_text(
         json.dumps(manifest,indent=2),encoding="utf-8")
     return manifest
+
+
+def compare_analytical_mesh(native, solved, domain, *, tolerance_m=1e-6):
+    """[REF docs/source/components/validation/etabs_native_quantity_tables.py.md]
+
+    Compare actual generated cells and shared point connectivity without
+    remeshing or merging duplicate locations. Caller must verify source EDB
+    and solver input hashes. Matching is mutual-unique within a Euclidean
+    tolerance, restricted to nodes incident on captured structural elements.
+    Exact cyclic boundary ordering is checked (reversal separately counted).
+    No constraint, constitutive, or force equivalence is inferred.
+    """
+    import math
+    from collections import defaultdict
+    from itertools import product
+    if not math.isfinite(tolerance_m) or tolerance_m<=0:
+        raise ValueError("Positive finite coordinate tolerance required")
+    if native.get("schema")!="etabs-analytical-mesh-native-v1" or native.get("units")!="kN,m,C":
+        raise ValueError("Native analytical mesh unavailable or incompatible")
+    if solved.get("ok") is not True:
+        raise ValueError("Successful OpenSees solve required")
+    def unique(rows,key):
+        out={}
+        for row in rows:
+            k=key(row)
+            if k in out:raise ValueError("Duplicate mesh identity: "+str(k))
+            out[k]=row
+        return out
+    def xyz(v):
+        if v is None or len(v)!=3:raise ValueError("Missing mesh coordinates")
+        v=tuple(map(float,v))
+        if not all(math.isfinite(x) for x in v):raise ValueError("Nonfinite mesh coordinates")
+        return v
+    np=unique(native["points"],lambda row:str(row["id"]))
+    op=unique(solved["nodes"],lambda row:int(row["tag"]))
+    ne=unique(native["elements"],lambda row:(row["kind"],str(row["id"])))
+    oe=unique(solved["elements"],lambda row:int(row["tag"]))
+    mapping={}
+    for kind,items in (("LINE_ELM",domain["frames"]),("AREA_ELM",domain["shells"])):
+        for row in items:
+            tag=100001+len(mapping)
+            ns=tuple(map(int,row["nodes"]))
+            if tag not in oe or ns!=tuple(map(int,oe[tag]["nodes"])):
+                raise ValueError("Source-to-solved element crosswalk mismatch")
+            mapping[tag]=(kind,str(row["object"]),ns)
+    if not mapping or set(mapping)!=set(oe) or not ne:
+        raise ValueError("Incomplete structural element crosswalk")
+    nrows={}
+    for key,row in ne.items():
+        ns=tuple(map(str,row["points"] or []))
+        parent=row.get("source_object") or {}
+        if (key[0] not in ("LINE_ELM","AREA_ELM") or not parent.get("name")
+            or len(ns) not in ((2,) if key[0]=="LINE_ELM" else (3,4))
+            or len(set(ns))!=len(ns) or any(n not in np for n in ns)):
+            raise ValueError("Incomplete native element geometry: "+str(key))
+        nrows[key]=(key[0],str(parent["name"]),ns)
+    nxyz={n:xyz(np[n]["xyz_m"]) for _,_,ns in nrows.values() for n in ns}
+    oxyz={n:xyz([op[n][k] for k in ("x_m","y_m","z_m")])
+          for _,_,ns in mapping.values() for n in ns}
+    def cell(p):return tuple(math.floor(x/tolerance_m) for x in p)
+    buckets=defaultdict(list)
+    for n,p in oxyz.items():buckets[cell(p)].append(n)
+    shifts=list(product((-1,0,1),repeat=3))
+    candidates={}; reverse=defaultdict(list)
+    for n,p in nxyz.items():
+        c=cell(p)
+        matches=[m for shift in shifts
+                 for m in buckets.get(tuple(x+y for x,y in zip(c,shift)),[])
+                 if math.dist(p,oxyz[m])<=tolerance_m]
+        candidates[n]=matches
+        for m in matches:reverse[m].append(n)
+    pairs={n:ms[0] for n,ms in candidates.items()
+           if len(ms)==1 and len(reverse[ms[0]])==1}
+    def cycles(ns):
+        return [ns[i:]+ns[:i] for i in range(len(ns))]
+    def signature(kind,parent,ns):
+        return (kind,parent,min(cycles(ns)+cycles(ns[::-1])))
+    index=defaultdict(list)
+    for tag,(kind,parent,ns) in mapping.items():
+        index[signature(kind,parent,ns)].append(tag)
+    matches={}; attempted=defaultdict(list)
+    for key,(kind,parent,ns) in nrows.items():
+        if all(n in pairs for n in ns):
+            match=index.get(signature(kind,parent,tuple(pairs[n] for n in ns)),[])
+            if len(match)==1:attempted[match[0]].append(key)
+    for tag,keys in attempted.items():
+        if len(keys)==1:matches[keys[0]]=tag
+    groups=defaultdict(lambda:dict(etabs_count=0,opensees_count=0,matched=0))
+    for kind,parent,ns in nrows.values():groups[kind,parent]["etabs_count"]+=1
+    for kind,parent,ns in mapping.values():groups[kind,parent]["opensees_count"]+=1
+    reversed_cells=[]
+    for key,tag in matches.items():
+        kind,parent,ns=nrows[key]; groups[kind,parent]["matched"]+=1
+        if kind=="AREA_ELM" and tuple(pairs[n] for n in ns) not in cycles(mapping[tag][2]):
+            reversed_cells.append(dict(native_id=key[1],opensees_tag=tag))
+    matched_tags=set(matches.values())
+    matched_nodes=set(pairs.values())
+    complete=(len(matches)==len(ne)==len(oe) and len(pairs)==len(nxyz)==len(oxyz))
+    return dict(status="CONNECTIVITY_MATCHED_DIAGNOSTIC" if complete else "CONNECTIVITY_MISMATCH_OR_AMBIGUITY",
+                engineering_acceptance="NOT_VERIFIED",tolerance_m=tolerance_m,
+                native_elements=len(ne),opensees_elements=len(oe),matched_elements=len(matches),
+                native_incident_points=len(nxyz),opensees_incident_points=len(oxyz),
+                matched_points=len(pairs),maximum_coordinate_residual_m=max(
+                    (math.dist(nxyz[n],oxyz[m]) for n,m in pairs.items()),default=None),
+                point_pairs=[dict(native_id=n,opensees_tag=m) for n,m in pairs.items()],
+                ambiguous_native_points=[dict(native_id=n,candidates=ms) for n,ms in candidates.items()
+                    if ms and n not in pairs],
+                unmatched_native_points=[n for n,ms in candidates.items() if not ms],
+                unmatched_opensees_points=sorted(set(oxyz)-matched_nodes),
+                unmatched_native_elements=[dict(kind=k[0],id=k[1]) for k in ne if k not in matches],
+                unmatched_opensees_elements=sorted(set(oe)-matched_tags),
+                reversed_area_cycles=reversed_cells,
+                source_objects=[dict(kind=k[0],source_object=k[1],**v) for k,v in sorted(groups.items())],
+                limitations=["Only geometry and connectivity; area reversal is reported, not accepted as local-axis equivalence.",
+                             "Nonincident analytical points and diaphragm masters are not matched by this test.",
+                             "Named constraints and internal MPC coefficients require separate verification.",
+                             "Different mesh density can be physically reasonable; mismatch is not automatic model rejection."])

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from components.validation.etabs_native_quantity_tables import (
-    export_native_quantity_tables, extract_analytical_mesh)
+    export_native_quantity_tables, extract_analytical_mesh, compare_analytical_mesh)
 
 
 class FakeDatabase:
@@ -67,6 +67,33 @@ class EtabsNativeQuantityTests(unittest.TestCase):
         sap.GetPresentUnits=lambda:5
         with self.assertRaisesRegex(ValueError,"kN-m-C"):
             extract_analytical_mesh(sap)
+
+    def test_mesh_comparison_connectivity_and_ambiguity(self):
+        coords=[(0,0,0),(2,0,0),(2,0,3),(0,0,3)]
+        native=dict(schema="etabs-analytical-mesh-native-v1",units="kN,m,C",
+            points=[dict(id=str(i),xyz_m=p) for i,p in enumerate(coords,1)],
+            elements=[dict(kind="AREA_ELM",id="a",points=["3","4","1","2"],
+                           source_object=dict(name="W"))])
+        solved=dict(ok=True,nodes=[dict(tag=i,x_m=p[0],y_m=p[1],z_m=p[2])
+                                  for i,p in enumerate(coords,1)],
+                    elements=[dict(tag=100001,nodes=[1,2,3,4])])
+        domain=dict(frames=[],shells=[dict(object="W",nodes=[1,2,3,4])])
+        report=compare_analytical_mesh(native,solved,domain)
+        self.assertEqual(report["status"],"CONNECTIVITY_MATCHED_DIAGNOSTIC")
+        self.assertEqual(report["matched_points"],4)
+        self.assertEqual(report["engineering_acceptance"],"NOT_VERIFIED")
+        native["elements"][0]["points"]=["4","3","2","1"]
+        self.assertEqual(len(compare_analytical_mesh(native,solved,domain)["reversed_area_cycles"]),1)
+        native["elements"][0]["points"]=["1","3","2","4"]
+        self.assertEqual(compare_analytical_mesh(native,solved,domain)["matched_elements"],0)
+        native["elements"][0]["points"]=["1","2","3","4"]
+        solved["nodes"][1].update(x_m=0.)
+        report=compare_analytical_mesh(native,solved,domain)
+        self.assertEqual(report["matched_elements"],0)
+        self.assertEqual(len(report["ambiguous_native_points"]),1)
+        domain["shells"][0]["nodes"]=[1,3,2,4]
+        with self.assertRaisesRegex(ValueError,"crosswalk"):
+            compare_analytical_mesh(native,solved,domain)
 
     def test_capture_actual_fields_and_data(self):
         with tempfile.TemporaryDirectory() as root:
