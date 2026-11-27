@@ -142,8 +142,8 @@ def layered_elastic_candidate(E, nu, thickness, source_modifiers, *,
     multilayer method, not these equivalent elastic factors. The midpoint
     quadrature of OpenSees LayeredShellFiberSection is the derivation basis.
     shear_correction is an explicit target convention (1 or 5/6), NOT an
-    inference of ETABS Shell-Thin transverse shear behavior. This helper
-    deliberately has no production assembly caller.
+    inference of ETABS Shell-Thin transverse shear behavior. Explicit
+    opt-in state-specific elastic comparison only; never nonlinear.
     """
     E=positive(E,property_name+" E")
     h=positive(thickness,property_name+" thickness")
@@ -179,16 +179,18 @@ def layered_elastic_candidate(E, nu, thickness, source_modifiers, *,
                 A=[[q*f*h for q in row] for row in Q],
                 D=[[q*m*h**3/12 for q in row] for row in Q],
                 transverse_shear_kN_m=Gout*h,
-                density=0.,engineering_acceptance="NOT_VERIFIED")
+                density=0.,transverse_shear_exact=False,
+                target_transverse_shear_modifiers=[v["v13"],v["v23"]],
+                engineering_acceptance="NOT_VERIFIED")
 
 
 def layered_elastic_candidate_command(ops, section_tag, material_tags, candidate):
     """[REF docs/source/components/model/linear_shell_stiffness.py.md]
 
-    Register only in an isolated qualification model; caller owns tags.
+    Register in an isolated qualification or explicit elastic comparison model.
 
-    ElasticIsotropic -> PlateFromPlaneStress -> LayeredShell. No thickness,
-    mass or nonlinear material substitution in the production converter.
+    ElasticIsotropic -> PlateFromPlaneStress -> LayeredShell. Caller owns
+    distinct material tags. No thickness, mass or nonlinear substitution.
     """
     tags=list(map(int,material_tags))
     if len(tags)!=6 or len(set(tags))!=6 or min(tags)<=0:

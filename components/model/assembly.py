@@ -1172,6 +1172,9 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
                            shell_objects=len(plan['shell_objects']),
                            shells_with_transverse_shear_approximation=sum(
                                not shell['transverse_shear_exact'] for shell in plan['shell_objects'].values()),
+                           layered_shell_candidate_objects=sum(
+                               shell.get('status')=='ELASTIC_COMPONENT_CANDIDATE_NOT_ETABS_EQUIVALENCE'
+                               for shell in plan['shell_objects'].values()),
                            segments_with_offsets=sum(bool(any(r['joint_offsets_m'])) for r in plan['frame_segments']),
                            shear_flexible_segments=sum(r['shear_flexible'] for r in plan['frame_segments']),
                            native_end_offset_coverage=plan.get('native_end_offset_coverage', {}))
@@ -1534,6 +1537,10 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
         raise ValueError('Use an elastic model for the configured ETABS comparison state.')
     stiffness_basis=('ETABS_ELASTIC_COMPARISON' if comparison is not None
                      else cfg.get('linear_shell_stiffness_policy','LEGACY_GROSS_SHELL'))
+    if comparison is not None and any(
+            p.get('status')=='ELASTIC_COMPONENT_CANDIDATE_NOT_ETABS_EQUIVALENCE'
+            for p in comparison['shell_objects'].values()):
+        stiffness_basis='ETABS_ELASTIC_LAYERED_SHELL_CANDIDATE'
     print('[ELASTIC STIFFNESS BASIS]',limit_state,stiffness_basis,flush=True)
     if comparison is not None:
         coverage=comparison.get('native_end_offset_coverage',{})
@@ -1669,8 +1676,17 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             if section_key not in used_sections:
                 sec=500000+len(used_sections); used_sections[section_key]=sec
                 if shell_override:
-                    from components.model.linear_shell_stiffness import section_command
-                    section_command(ops,sec,shell_override)
+                    from components.model.linear_shell_stiffness import (
+                        section_command, layered_elastic_candidate_command)
+                    if shell_override.get('status')=='ELASTIC_COMPONENT_CANDIDATE_NOT_ETABS_EQUIVALENCE':
+                        # Elastic domain is freshly wiped; no nonlinear nD materials
+                        # exist. Reserve six tags per uniquely registered section.
+                        first_material=1000000+6*(sec-500000)
+                        layered_elastic_candidate_command(
+                            ops,sec,range(first_material,first_material+6),shell_override)
+                        print('[ELASTIC_LAYERED_SHELL_CANDIDATE]',json.dumps(shell_override),flush=True)
+                    else:
+                        section_command(ops,sec,shell_override)
                 elif linear_shell_policy=="TABULATED_REVIEWED_THIN_SHELL":
                     from components.model.linear_shell_stiffness import (
                         shell_section_parameters,section_command)

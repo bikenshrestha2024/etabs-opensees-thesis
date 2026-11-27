@@ -69,3 +69,29 @@ def test_read_comparison_settings_rejects_timing_and_empty_states(tmp_path):
         read_comparison_settings(settings)
     settings.write_text('{"ULS":{"use_native_frame_modifiers":true}}',encoding='utf-8')
     assert read_comparison_settings(settings) == {'ULS':{'use_native_frame_modifiers':True}}
+
+
+def test_layered_wall_candidate_is_explicit_and_native_only():
+    p={"property":"W","E":25e6,"nu":.2,"thickness":.6}
+    wall=dict(object="1",category="SHEAR WALL",properties=p)
+    values=dict(f11=.5,f22=.5,f12=.5,m11=.1,m22=.1,m12=.1,
+                v13=1.,v23=1.,mass=1.,weight=1.)
+    metadata={"etabs_property_modifiers":{"records":[{
+        "kind":"area","object":"1","section":"W",
+        "section_modifiers":values,"object_modifiers":dict.fromkeys(values,1.)}]}}
+    options={"use_native_shell_modifiers":True,"layered_shell_sections":{"W":1.}}
+    plan=compile_settings({"ULS":options},[],[wall],metadata)["ULS"]["shell_objects"]["1"]
+    assert plan["status"]=="ELASTIC_COMPONENT_CANDIDATE_NOT_ETABS_EQUIVALENCE"
+    assert plan["physical_thickness_m"]==.6
+    assert not plan["transverse_shear_exact"]
+    assert plan["layer_factors"]==pytest.approx([.1125,1.275,.1125])
+    for bad in ({**options,"use_native_shell_modifiers":False},
+                {**options,"layered_shell_sections":{"W":True}},
+                {**options,"shell_objects":{"1":{"f11":.8}}},
+                {**options,"shell_sections":{"W":{"f11":.8}}}):
+        with pytest.raises(ValueError):
+            compile_settings({"ULS":bad},[],[wall],metadata)
+    with pytest.raises(ValueError,match="wall-only"):
+        compile_settings({"ULS":options},[],[{**wall,"category":"FLOOR"}],metadata)
+    with pytest.raises(ValueError,match="Incomplete native"):
+        compile_settings({"ULS":options},[],[wall],{})
