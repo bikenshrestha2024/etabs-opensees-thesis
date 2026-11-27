@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 from openpyxl import Workbook
 
-from components.inputs.etabs_table_bundle import register_current_etabs_tables
+from components.inputs.etabs_table_bundle import register_current_etabs_tables, audit_analysis_workbooks
 from components.inputs.project_workbooks import registered_project_source
 
 
@@ -95,6 +95,41 @@ class CurrentEtabsBundleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"ORIGINAL export"):
                 register_current_etabs_tables(nested,self.books[0],self.books[1:])
         self.assertFalse((nested/"01_ETABS_EXPORT").exists())
+
+    def test_multi_lot_all_sheets_and_duplicate_evidence(self):
+        a,b=self.books[:2]
+        for p in (a,b):
+            w=Workbook();w.active.title="Joint Reactions"
+            w.active.append(["Joint","OutputCase","F3"])
+            w.active.append(["1","Dead",100])
+            s=w.create_sheet("Element Connectivity - Shells")
+            s.append(["Object","Elm","Joint1","Joint2","Joint3","Joint4"])
+            s.append(["W","E","1","2","3","4"])
+            s.sheet_state="hidden"
+            w.create_sheet("Empty")
+            w.save(p)
+        before=[hashlib.sha256(p.read_bytes()).hexdigest() for p in (a,b)]
+        report=audit_analysis_workbooks([a,b])
+        self.assertEqual(report["status"],"ALL_WORKSHEETS_SCANNED_NOT_ENGINEERING_VALIDATION")
+        self.assertEqual(report["fully_scanned_worksheets"],6)
+        self.assertEqual(report["nonempty_rows"],8)
+        self.assertEqual(report["populated_cells"],36)
+        self.assertEqual(len(report["repeated_sheet_names"]),3)
+        self.assertEqual(len(report["identical_populated_cell_content"]),3)
+        self.assertEqual(report["files"][0]["worksheets"][1]["state"],"hidden")
+        self.assertIn("analytical_mesh",report["candidate_evidence_families"])
+        self.assertEqual(before,[hashlib.sha256(p.read_bytes()).hexdigest() for p in (a,b)])
+        self.assertEqual(report["engineering_acceptance"],"NOT_VERIFIED")
+
+    def test_bad_lot_does_not_hide_readable_lot(self):
+        bad=self.root.parent/"broken.xlsx";bad.write_bytes(b"not a workbook")
+        report=audit_analysis_workbooks([self.books[0],bad])
+        self.assertEqual(report["status"],"INCOMPLETE_SCAN")
+        self.assertEqual(report["fully_scanned_worksheets"],1)
+        self.assertEqual(report["files"][1]["status"],"WORKBOOK_SCAN_FAILED")
+        self.assertEqual(len(report["errors"]),1)
+        with self.assertRaisesRegex(ValueError,"distinct"):
+            audit_analysis_workbooks([self.books[0],self.books[0]])
 
     def test_missing_native_source_blocks_creation(self):
         with patch("components.inputs.project_workbooks._source_edb_path",

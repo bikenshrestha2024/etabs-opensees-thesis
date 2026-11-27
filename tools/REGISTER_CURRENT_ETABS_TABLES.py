@@ -14,8 +14,12 @@ def main(argv=None):
     Record exact SHA256 source identity, not approval of analytical results.
     """
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--export-root",type=Path,required=True)
-    parser.add_argument("--analysis",type=Path,required=True)
+    parser.add_argument("--export-root",type=Path)
+    parser.add_argument("--analysis",type=Path)
+    parser.add_argument("--analysis-files",type=Path,nargs="+",
+                        help="Read ALL worksheets of explicitly selected analysis lots (audit only)")
+    parser.add_argument("--audit-output",type=Path,
+                        help="New private local JSON audit output; required with --analysis-files")
     for i in (1,2,3):
         parser.add_argument(f"--beam-{i}",type=Path)
     parser.add_argument("--beam-files",type=Path,nargs="+",
@@ -24,6 +28,22 @@ def main(argv=None):
                         help="Open multi-select Excel file picker for all beam-force parts")
     parser.add_argument("--native-assignment",type=Path)
     args=parser.parse_args(argv)
+    if args.analysis_files:
+        if (not args.audit_output or args.analysis or args.export_root or args.native_assignment
+                or args.select_beams or args.beam_files or any((args.beam_1,args.beam_2,args.beam_3))):
+            parser.error("Audit mode: use --analysis-files LOT1 LOT2 ... --audit-output NEW.private.json only")
+        target=args.audit_output.expanduser().resolve()
+        if target.exists() or not target.name.endswith(".private.json"):
+            parser.error("Audit output must be a new .private.json file")
+        from components.inputs.etabs_table_bundle import audit_analysis_workbooks
+        from components.inputs.output_contract import atomic_json
+        result=audit_analysis_workbooks(args.analysis_files,progress=lambda s:print(s,flush=True))
+        atomic_json(target,result)
+        print(result["status"],result["fully_scanned_worksheets"],"/",result["worksheet_count"],"worksheets")
+        print("Private audit:",target)
+        return 0 if result["status"]=="ALL_WORKSHEETS_SCANNED_NOT_ENGINEERING_VALIDATION" else 2
+    if not args.export_root or not args.analysis or args.audit_output:
+        parser.error("Registration requires --export-root and --analysis; audit mode uses --analysis-files")
     explicit=[p for p in (args.beam_1,args.beam_2,args.beam_3) if p is not None]
     if args.beam_files and explicit:
         parser.error("Use --beam-files OR --beam-1/2/3, not both")
