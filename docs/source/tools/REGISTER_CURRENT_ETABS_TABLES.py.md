@@ -60,9 +60,26 @@ stops before publication if it detects a duplicate workbook, an overlapping
 supported table, malformed data, or conflicting modal periods. Exit 2
 means the import could not publish a reference.
 
-The command opens the workbooks read-only. It produces a local reference for
-comparison. The multi-lot audit and full-table solver registration are separate
-commands with their own requirements.
+For all four lots, use the same command with SQLite storage so worksheet rows
+are streamed to a private database.
+
+```powershell
+$thirdLot = "D:\ETABS\Analysis Export ULS 3 storey latest_compressed THIRD LOT.xlsx"
+$fourthLot = "D:\ETABS\Analysis Export ULS 3 storey latest_compressed FOURTH LOT.xlsx"
+python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-reference $firstLot $secondLot $thirdLot $fourthLot --reference-storage sqlite --reference-output "..\etabs_four_lot_reference"
+```
+
+Three or more input files select SQLite by default. For a shorter selection that
+contains the third or fourth lot, specify `--reference-storage sqlite`. The
+output contains `ETABS_ANALYSIS_REFERENCE.private.json` and
+`ETABS_ANALYSIS_ROWS.private.sqlite3`. Keep both files local. The JSON records
+the database hash, the original workbook hashes, table units, and coverage
+before exact-case filtering. The database contains the retained values and
+the original worksheet row numbers for any exact repeats.
+
+The command opens the workbooks read-only and produces a local reference for
+comparison. The multi-lot audit and full-table solver registration use their
+own commands.
 
 [Reference data and unit contract](../components/inputs/etabs_table_bundle.py.md#import-etabs-analysis-reference-results)
 

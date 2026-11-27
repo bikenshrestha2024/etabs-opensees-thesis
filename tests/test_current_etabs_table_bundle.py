@@ -1,6 +1,8 @@
 """ETABS table registration: one canonical current-source registry, no file copies."""
 import hashlib
 import json
+import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -377,6 +379,82 @@ class FirstLotReferenceTests(unittest.TestCase):
                 self.assertEqual(reason.exception.code, 2)
                 self.assertIn(message, "".join(call.args[0] for call in errors.write.call_args_list))
                 self.assertFalse(self.output.exists())
+
+    def test_sqlite_reference_validates_large_lot_rows_and_retains_duplicate_positions(self):
+        source = self.source.with_name("fourth.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        headers = ("Story|Shell Object|Unique Name|Design Type|Shell Element|Joint|Output Case|Case Type|"
+                   "Step Type|Step Number|S11 Top|S22 Top|S12 Top|SMax Top|SMin Top|SVM Top|"
+                   "S11 Bottom|S22 Bottom|S12 Bottom|SMax Bottom|SMin Bottom|SVM Bottom|"
+                   "S13 Average|S23 Average|SMaxV Average")
+        row = ("Story25", "F1", "004", "Floor", "5", "01", "EQX", "LinStatic", "Max", None, 1.25, *([0] * 14))
+        excluded = (*row[:6], "Gravity", *row[7:])
+        self.add_table("Element Stresses - Area Shells", headers, "||||||||||" + "|".join(["MPa"] * 15),
+                       [row, row, excluded, excluded], book=book)
+        book.save(source)
+        args = ["--analysis-reference", str(source), "--reference-case", "EQX",
+                "--reference-output", str(self.output)]
+        self.assertEqual(main([*args, "--reference-storage", "sqlite"]), 0)
+        reference = json.loads((self.output / "ETABS_ANALYSIS_REFERENCE.private.json").read_text("utf-8"))
+        self.assertEqual(reference["schema"], "ETABS_ANALYSIS_SQLITE_REFERENCE_V1")
+        storage = reference["row_storage"]
+        database = self.output / storage["file"]
+        self.assertEqual(storage["sha256"], hashlib.sha256(database.read_bytes()).hexdigest())
+        data = reference["tables"]["Element Stresses - Area Shells"]
+        self.assertEqual(data["source_row_count"], 4)
+        self.assertEqual(data["unique_row_count"], 2)
+        self.assertEqual(data["stored_row_count"], 1)
+        self.assertEqual(data["case_row_counts"], {"EQX": 1, "Gravity": 1})
+        self.assertEqual(data["units"]["S11 Top"], "kN/m²")
+        with closing(sqlite3.connect(database)) as db:
+            rows = db.execute("SELECT worksheet_row, values_json FROM reference_rows").fetchall()
+            aliases = db.execute("SELECT worksheet_row, retained_row FROM source_row_aliases").fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], 4)
+        self.assertEqual(json.loads(rows[0][1])[10], 1250)
+        self.assertEqual(aliases, [(5, 4)])
+        self.assertFalse(list(self.output.rglob("PROJECT_SOURCES.private.json")))
+
+    def test_later_lot_response_variants_stay_distinct_and_invalid_sqlite_import_is_cleaned_up(self):
+        source = self.source.with_name("third.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        for suffix in ("Relative", "Absolute"):
+            self.add_table(
+                f"Joint Velocities - {suffix}",
+                "Story|Label|Unique Name|Output Case|Case Type|Step Type|Step Number|UX|UY|UZ|RX|RY|RZ",
+                "|||||||mm/sec|mm/sec|mm/sec|rad/sec|rad/sec|rad/sec",
+                [("Story1", "A", "001", "EQX", "LinStatic", "Max", None, value, 0, None, 0, 0, 0)
+                 for value in (0.4892, 0.4892000000000001)],
+                book=book)
+        book.save(source)
+        destination = self.output.with_name("bad_reference")
+        cases = ["--analysis-reference", str(source), "--reference-storage", "sqlite"]
+        book["Joint Velocities - Absolute"]["H4"] = "=20"
+        book.save(source)
+        with patch("sys.stderr") as errors, self.assertRaises(SystemExit) as reason:
+            main([*cases, "--reference-output", str(destination)])
+        self.assertEqual(reason.exception.code, 2)
+        self.assertIn("finite numeric value", "".join(call.args[0] for call in errors.write.call_args_list))
+        self.assertFalse(destination.exists())
+        self.assertFalse(list(source.parent.glob(".etabs-reference-*")))
+        book["Joint Velocities - Absolute"]["H4"] = 0.4892
+        book.save(source)
+        self.assertEqual(main([*cases, "--reference-output", str(self.output)]), 0)
+        report = json.loads((self.output / "ETABS_ANALYSIS_REFERENCE.private.json").read_text("utf-8"))
+        for table in report["tables"].values():
+            self.assertEqual(table["stored_row_count"], 2)
+            self.assertEqual(table["blank_measure_counts"], {"UZ": 2})
+            self.assertEqual(table["units"]["UX"], "m/s")
+        self.assertEqual(len(report["tables"]), 2)
+
+    def test_interrupted_manifest_write_does_not_publish_database(self):
+        with patch("components.inputs.output_contract.atomic_json", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                self.run_import("--reference-storage", "sqlite")
+        self.assertFalse(self.output.exists())
+        self.assertFalse(list(self.source.parent.glob(".etabs-reference-*")))
 
 
 if __name__=="__main__":

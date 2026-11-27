@@ -3,9 +3,10 @@ Register current ULS ETABS workbook evidence locally without moving files.
 """
 from __future__ import annotations
 import argparse
+import sqlite3
 import sys
-from contextlib import suppress
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from xml.etree.ElementTree import ParseError
 from zipfile import BadZipFile
 ROOT=Path(__file__).resolve().parents[1]
@@ -26,11 +27,13 @@ def main(argv=None):
     parser.add_argument("--audit-output",type=Path,
                         help="New private local JSON audit output; required with --analysis-files")
     parser.add_argument("--analysis-reference", type=Path, nargs="+", action="extend",
-                        help="Import explicitly selected first- and second-lot ETABS reference workbooks")
+                        help="Import explicitly selected ETABS analysis reference workbooks")
     parser.add_argument("--reference-output", type=Path,
                         help="New directory for the private analysis reference JSON")
     parser.add_argument("--reference-case", action="append", default=[],
                         help="Keep rows for an exact ETABS case name; repeat to select more than one")
+    parser.add_argument("--reference-storage", choices=("json", "sqlite"),
+                        help="Use SQLite for large tables; selected by default for three or more lots")
     for i in (1,2,3):
         parser.add_argument(f"--beam-{i}",type=Path)
     parser.add_argument("--beam-files",type=Path,nargs="+",
@@ -41,7 +44,7 @@ def main(argv=None):
     args=parser.parse_args(argv)
     if args.table_index_output:
         if (not args.analysis_files or args.audit_output or args.analysis_reference
-                or args.reference_output or args.reference_case or args.analysis
+                or args.reference_output or args.reference_case or args.reference_storage or args.analysis
                 or args.export_root or args.native_assignment or args.select_beams
                 or args.beam_files or any((args.beam_1, args.beam_2, args.beam_3))):
             parser.error("Table index mode: use --analysis-files LOT1 LOT2 ... "
@@ -60,37 +63,42 @@ def main(argv=None):
         print(f"{result['status']}: {len(result['tables'])} distinct worksheet names")
         print("Private table index:", target)
         return 0
-    if args.analysis_reference or args.reference_output or args.reference_case:
+    if args.analysis_reference or args.reference_output or args.reference_case or args.reference_storage:
         if (not args.analysis_reference or not args.reference_output or args.analysis_files
                 or args.audit_output or args.analysis or args.export_root or args.native_assignment
                 or args.select_beams or args.beam_files or any((args.beam_1, args.beam_2, args.beam_3))):
             parser.error("Reference mode requires --analysis-reference and --reference-output; "
-                         "only --reference-case may be added")
+                         "optional settings are --reference-case and --reference-storage")
         from openpyxl.utils.exceptions import InvalidFileException
         from components.inputs.etabs_table_bundle import read_analysis_reference
         from components.inputs.output_contract import _refuse_linked_output_target, atomic_json
 
         directory = args.reference_output.expanduser().absolute()
+        storage = args.reference_storage or ("sqlite" if len(args.analysis_reference) > 2 else "json")
         try:
             _refuse_linked_output_target(directory)
             if directory.exists():
                 raise FileExistsError(f"Reference output directory already exists: {directory}")
-            result = read_analysis_reference(
-                args.analysis_reference, cases=args.reference_case,
-                progress=lambda s: print(s, flush=True), legacy_first_lot=True)
-            name = ("FIRST_LOT_REFERENCE.private.json" if result["schema"] == "ETABS_FIRST_LOT_REFERENCE_V1"
-                    else "ETABS_ANALYSIS_REFERENCE.private.json")
-            target = directory / name
-            directory.mkdir(parents=True)
-            try:
-                atomic_json(target, result)
-            except (OSError, ValueError):
-                with suppress(OSError):
-                    directory.rmdir()
-                raise
-        except (OSError, ValueError, BadZipFile, InvalidFileException, ParseError, KeyError) as exc:
+            directory.parent.mkdir(parents=True, exist_ok=True)
+            with TemporaryDirectory(prefix=".etabs-reference-", dir=directory.parent) as work:
+                stage = Path(work) / "reference"
+                stage.mkdir()
+                database = stage / "ETABS_ANALYSIS_ROWS.private.sqlite3" if storage == "sqlite" else None
+                result = read_analysis_reference(
+                    args.analysis_reference, cases=args.reference_case,
+                    progress=lambda s: print(s, flush=True), legacy_first_lot=True, row_database=database)
+                name = ("FIRST_LOT_REFERENCE.private.json" if result["schema"] == "ETABS_FIRST_LOT_REFERENCE_V1"
+                        else "ETABS_ANALYSIS_REFERENCE.private.json")
+                atomic_json(stage / name, result)
+                _refuse_linked_output_target(directory)
+                if directory.exists():
+                    raise FileExistsError(f"Reference output directory already exists: {directory}")
+                stage.rename(directory)
+                target = directory / name
+        except (OSError, ValueError, BadZipFile, InvalidFileException, ParseError, KeyError, sqlite3.Error) as exc:
             parser.error(str(exc))
-        row_count = sum(len(table["rows"]) for table in result["tables"].values())
+        row_count = sum(table["stored_row_count"] if storage == "sqlite" else len(table["rows"])
+                        for table in result["tables"].values())
         print(f"{result['status']}: {row_count} rows from {len(result['tables'])} result tables")
         print("Private reference:", target)
         return 0
