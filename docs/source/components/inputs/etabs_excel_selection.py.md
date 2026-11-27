@@ -43,3 +43,7 @@ the exact filenames. It does not inspect or modify the source workbook
 contents until the explicit Validate + register + consolidate operation.
 For workbook exports containing three beam-force worksheets inside a single
 file, use the multi-file dialog instead of the numbered-folder helper.
+
+## Partial analysis lots — gravity picker guard (2026-11-27)
+
+The offline gravity reaction reader requires exactly one worksheet named Joint Reactions (case-insensitive, stripped). The gravity picker now checks the same condition before assigning an XLSX/XLSM source. A CSV remains subject to the downstream header/case checks. Analysis result and topology lots are valid local audit inputs, but their story-section forces are not joint reactions. Use the existing multi-lot audit command for these inputs; do not register them as an authoritative gravity reference. This does not change the single-workbook registration API, physical support mapping or solver inputs.

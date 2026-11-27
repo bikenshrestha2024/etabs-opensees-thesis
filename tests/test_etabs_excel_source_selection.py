@@ -48,6 +48,19 @@ class EtabsExcelRoleSelectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"BEAM-FORCE-ONLY"):
             validate_full_table_selection(wrong)
 
+    def test_partial_analysis_lots_cannot_replace_joint_reactions(self):
+        first=self.workbook("Analysis Export FIRST LOT.xlsx",
+                            ["Story Forces","Story Drifts"])
+        second=self.workbook("Analysis Export SECOND LOT.xlsx",
+                             ["Objects and Elements - Joints","Modal Periods And Frequencies"])
+        for path in (first,second):
+            with self.subTest(path=path.name):
+                with self.assertRaisesRegex(ValueError,"requires exactly one Joint Reactions"):
+                    validate_full_table_selection(path)
+        complete=self.workbook("Analysis Export complete.xlsx",
+                               ["Joint Reactions","Story Forces"])
+        self.assertEqual(validate_full_table_selection(complete),complete)
+
     def test_multiple_analysis_candidates_are_not_silently_replaced(self):
         first=self.workbook("Analysis Export ULS 3 storey latest.xlsx",
                             ["Joint Reactions"])
