@@ -1175,6 +1175,9 @@ def prepare_complete_export(folder, *, runtime_dir=None, frame_mapping=None, pro
                            layered_shell_candidate_objects=sum(
                                shell.get('status')=='ELASTIC_COMPONENT_CANDIDATE_NOT_ETABS_EQUIVALENCE'
                                for shell in plan['shell_objects'].values()),
+                           force_based_rigid_zone_segments=sum(
+                               r.get('frame_formulation')=='ELASTIC_FORCE_BASED_RIGID_ZONE_CANDIDATE'
+                               for r in plan['frame_segments']),
                            segments_with_offsets=sum(bool(any(r['joint_offsets_m'])) for r in plan['frame_segments']),
                            shear_flexible_segments=sum(r['shear_flexible'] for r in plan['frame_segments']),
                            native_end_offset_coverage=plan.get('native_end_offset_coverage', {}))
@@ -1541,6 +1544,12 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             p.get('status')=='ELASTIC_COMPONENT_CANDIDATE_NOT_ETABS_EQUIVALENCE'
             for p in comparison['shell_objects'].values()):
         stiffness_basis='ETABS_ELASTIC_LAYERED_SHELL_CANDIDATE'
+    if comparison is not None and any(
+            p.get('frame_formulation')=='ELASTIC_FORCE_BASED_RIGID_ZONE_CANDIDATE'
+            for p in comparison['frame_segments']):
+        stiffness_basis=('ETABS_ELASTIC_LAYERED_SHELL_AND_RIGID_ZONE_CANDIDATE'
+                         if stiffness_basis=='ETABS_ELASTIC_LAYERED_SHELL_CANDIDATE'
+                         else 'ETABS_ELASTIC_FORCE_BASED_RIGID_ZONE_CANDIDATE')
     print('[ELASTIC STIFFNESS BASIS]',limit_state,stiffness_basis,flush=True)
     if comparison is not None:
         coverage=comparison.get('native_end_offset_coverage',{})
@@ -1640,8 +1649,12 @@ def build_complete_model(folder, *, mode='elastic', preload=False, limit_state='
             rel=int(e.get('release_i',False))+2*int(e.get('release_j',False))
             if override and override['shear_flexible']:
                 q=override['properties']
-                ops.element('ElasticTimoshenkoBeam',tag,*e['nodes'],p['E'],p['G'],
-                            q['A'],q['J'],q['Iy'],q['Iz'],q['As2'],q['As3'],tag,'-geomNonlinear')
+                if override.get('frame_formulation')=='ELASTIC_FORCE_BASED_RIGID_ZONE_CANDIDATE':
+                    from components.model.elastic_conversion_settings import elastic_offset_force_beam
+                    elastic_offset_force_beam(ops,tag,e['nodes'],p['E'],p['G'],q,tag)
+                else:
+                    ops.element('ElasticTimoshenkoBeam',tag,*e['nodes'],p['E'],p['G'],
+                                q['A'],q['J'],q['Iy'],q['Iz'],q['As2'],q['As3'],tag,'-geomNonlinear')
             else:
                 q=override['properties'] if override else {**p,'Iy':p['Iy']*factor,'Iz':p['Iz']*factor}
                 ops.element('elasticBeamColumn',tag,*e['nodes'],q['A'],p['E'],p['G'],

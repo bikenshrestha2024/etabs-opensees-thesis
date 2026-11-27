@@ -95,3 +95,39 @@ def test_layered_wall_candidate_is_explicit_and_native_only():
         compile_settings({"ULS":options},[],[{**wall,"category":"FLOOR"}],metadata)
     with pytest.raises(ValueError,match="Incomplete native"):
         compile_settings({"ULS":options},[],[wall],{})
+
+
+def test_force_based_rigid_zone_uses_source_offsets_and_keeps_shear_area():
+    from components.model.elastic_conversion_settings import elastic_offset_force_beam
+    vals=dict(A=1.,J=1.,I22=.35,I33=.35,As2=1.,As3=1.,mass=1.,weight=1.)
+    native={"frames":{"7":{"GetEndLengthOffset":[True,.5,.3,1.,0]}},
+            "etabs_property_modifiers":{"records":[dict(kind="frame",object="7",section="B",
+                section_modifiers=vals,object_modifiers=dict.fromkeys(vals,1.))]}}
+    options=dict(use_native_frame_modifiers=True,shear_flexible_sections=["B"],
+                 force_based_rigid_zone_sections=["B"])
+    f=_frame()
+    plan=compile_settings({"ULS":options},[f],[],native)["ULS"]
+    row=plan["frame_segments"][0]
+    assert row["frame_formulation"]=="ELASTIC_FORCE_BASED_RIGID_ZONE_CANDIDATE"
+    assert row["joint_offsets_m"]==pytest.approx([.5,0,0,-.3,0,0])
+    assert row["properties"]["A"]==pytest.approx(.3*2.2/3)
+    assert row["properties"]["As2"]==.23
+    assert plan["native_end_offset_coverage"]["native_offsets_configured_exact_count"]==1
+    assert "end_offsets_m" not in options
+    class Ops:
+        def __init__(self): self.calls=[]
+        def section(self,*a): self.calls.append(a)
+        def beamIntegration(self,*a): self.calls.append(a)
+        def element(self,*a): self.calls.append(a)
+    ops=Ops(); q=row["properties"]
+    elastic_offset_force_beam(ops,1,[1,2],25e6,10e6,q,1)
+    assert ops.calls[0][-2:]==pytest.approx([.23/q["A"],.25/q["A"]])
+    assert ops.calls[1]==("Lobatto",2000001,2000001,3)
+    assert ops.calls[2][:6]==("forceBeamColumn",1,1,2,1,2000001)
+    for bad in ({**options,"use_native_frame_modifiers":False},
+                {**options,"shear_flexible_sections":[]},
+                {**options,"end_offsets_m":{"7":{"i":0.,"j":.3,"rigid_fraction":1.}}}):
+        with pytest.raises(ValueError):
+            compile_settings({"ULS":bad},[f],[],native)
+    with pytest.raises(ValueError,match="missing native end offset"):
+        compile_settings({"ULS":options},[f],[],{**native,"frames":{}})

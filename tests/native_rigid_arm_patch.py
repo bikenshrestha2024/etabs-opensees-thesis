@@ -12,7 +12,7 @@ from pathlib import Path
 import subprocess
 
 
-def run_case(root, executable, name, L, a, b, action, compression=0.):
+def run_case(root, executable, name, L, a, b, action, compression=0.,force_based=False):
     E,G,A,J,Iy,Iz,Ay,Az=30e6,12.5e6,.48,.03,.02,.01,.4,.35
     ell=L-a-b
     # Rigid arms preserve full-length axial and torsional compliance.
@@ -24,12 +24,28 @@ def run_case(root, executable, name, L, a, b, action, compression=0.):
     kind="PDelta" if compression else "Linear"
     geom=" -geomNonlinear" if compression else ""
     lines=["wipe","model BasicBuilder -ndm 3 -ndf 6",
-           "node 1 0 0 0",f"node 2 {a} 0 0",
-           f"node 3 {L-b} 0 0",f"node 4 {L} 0 0",
-           "fix 1 1 1 1 1 1 1","rigidLink beam 1 2","rigidLink beam 4 3",
-           f"geomTransf {kind} 1 0 0 1",
-           f"element ElasticTimoshenkoBeam 1 2 3 {E} {G} {A*scale} {J*scale} {Iy} {Iz} {Ay} {Az} 1{geom}",
-           "timeSeries Linear 1","pattern Plain 1 1 {",
+           "node 1 0 0 0",f"node 4 {L} 0 0","fix 1 1 1 1 1 1 1"]
+    if force_based:
+        from components.model.elastic_conversion_settings import elastic_offset_force_beam
+        # Tcl expresses the same Lobatto integration inline rather than
+        # through the separate Python beamIntegration command.
+        class Tcl:
+            def section(self,*args):
+                lines.append("section "+" ".join(map(str,args)))
+            def beamIntegration(self,*args):
+                self.integration=args
+            def element(self,*args):
+                lines.append("element "+" ".join(map(str,(*args[:5],self.integration[0],
+                              *self.integration[2:],*args[6:]))))
+        lines.append(f"geomTransf PDelta 1 0 0 1 -jntOffset {a} 0 0 {-b} 0 0")
+        elastic_offset_force_beam(Tcl(),1,[1,4],E,G,
+            dict(A=A*scale,J=J*scale,Iy=Iy,Iz=Iz,As2=Ay,As3=Az),1)
+    else:
+        lines.extend([f"node 2 {a} 0 0",f"node 3 {L-b} 0 0",
+                      "rigidLink beam 1 2","rigidLink beam 4 3",
+                      f"geomTransf {kind} 1 0 0 1",
+                      f"element ElasticTimoshenkoBeam 1 2 3 {E} {G} {A*scale} {J*scale} {Iy} {Iz} {Ay} {Az} 1{geom}"])
+    lines.extend(["timeSeries Linear 1","pattern Plain 1 1 {",
            "load 4 "+" ".join(map(str,load)),"}",
            "constraints Transformation","numberer RCM","system FullGeneral",
            "test NormDispIncr 1e-11 50","algorithm Newton",
@@ -37,8 +53,9 @@ def run_case(root, executable, name, L, a, b, action, compression=0.):
            "if {[analyze 10] != 0} {error {native analysis failed}}",
            "reactions","set f [open response.txt w]",
            "puts $f [nodeDisp 4]","puts $f [nodeReaction 1]",
-           "puts $f [nodeReaction 2]","puts $f [eleResponse 1 forces]",
-           "close $f","puts [version]","exit 0"]
+           "puts $f {0 0 0 0 0 0}" if force_based else "puts $f [nodeReaction 2]",
+           "puts $f [eleResponse 1 forces]",
+           "close $f","puts [version]","exit 0"])
     script=folder/"case.tcl"
     script.write_text("\n".join(lines)+"\n")
     run=subprocess.run([executable,str(script.resolve())],cwd=folder,
@@ -58,7 +75,7 @@ def run_case(root, executable, name, L, a, b, action, compression=0.):
         fx,fy,fz,mx,my,mz=v
         return [fx,fy,fz,mx,my-a*fz,mz+a*fy]
     recovered=[x+y for x,y in zip(reaction,to_origin(slave))]
-    element_cut=to_origin(ends[:6])
+    element_cut=ends[:6] if force_based else to_origin(ends[:6])
     if not compression:
         fx,fy,fz,mx,my,mz=action
         # Local x along the member, z axis from the transform.
@@ -109,6 +126,18 @@ def main():
             row=run_case(args.output,args.opensees,f"L{L}_dof{i+1}",L,a,b,load)
             rows.append(row)
             print(json.dumps(row),flush=True)
+    force_rows=[]
+    for L,a,b in ((6.,.55,.625),(3.8,0.,.8)):
+        for i in range(6):
+            load=[0.]*6;load[i]=10.
+            row=run_case(args.output,args.opensees,f"force_L{L}_dof{i+1}",
+                         L,a,b,load,force_based=True)
+            force_rows.append(row)
+            print(json.dumps(row),flush=True)
+    force_probe=run_case(args.output,args.opensees,"force_compressed_probe",
+                         6.,.55,.625,[0,10,0,0,0,0],1000.,force_based=True)
+    force_probe["lateral_displacement_ratio_to_linear"]=force_probe["displacements"][1]/force_rows[1]["displacements"][1]
+    print(json.dumps(force_probe),flush=True)
     base=rows[1]["displacements"][1]
     nonlinear=run_case(args.output,args.opensees,"compressed_column_probe",6.,.55,.625,[0,10,0,0,0,0],1000.)
     nonlinear["lateral_displacement_ratio_to_linear"]=nonlinear["displacements"][1]/base
@@ -116,6 +145,7 @@ def main():
     (args.output/"summary.json").write_text(json.dumps(dict(
         status="NATIVE_FIRST_ORDER_COMPLIANCE_PASSED_NOT_ETABS_EQUIVALENCE",
         checks=rows,compression_probe=nonlinear,
+        force_based_checks=force_rows,force_based_compression_probe=force_probe,
         limitation="RigidLink small-displacement kinematics; compression probe is diagnostic, no native ETABS section-cut or P-Delta benchmark."),
         indent=2))
 

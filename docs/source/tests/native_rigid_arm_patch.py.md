@@ -5,3 +5,7 @@
 ## Native evidence follow-up
 
 Initial native CI run [45939728975](https://github.com/bikenshrestha2024/etabs-opensees-thesis/actions/runs/45939728975) passed 12 displacement/compliance checks (max relative residual 1.5535168e-15) and the compression probe (lateral displacement ratio 1.0323900). Raw retained support reactions did not recover transferred MPC force; the new test additionally records slave reactions and independent element-end forces, translated to the physical support origin. It compares each separately with the first-order analytical resultant; never add a member cut to the nodal recovery. This is isolated component evidence, not the actual building's 44 native edge constraints or 32 supports.
+
+## Force-based original-node alternative
+
+The same test now exercises the actual elastic assembly registration helper through a Tcl command adapter: elastic section with shear factors, forceBeamColumn with three-point Lobatto, and PDelta -jntOffset at the original nodes. Unlike explicit rigidLink face nodes, this avoids chained diaphragm constraints. Twelve end-action compliance, support reaction and element-cut checks plus a compression sensitivity probe are run separately. This is a generic synthetic component, not the full ETABS building. Source mechanics and formulas are in [elastic conversion settings](../components/model/elastic_conversion_settings.py.md).
