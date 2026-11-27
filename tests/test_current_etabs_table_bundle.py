@@ -1,5 +1,6 @@
 """ETABS table registration: one canonical current-source registry, no file copies."""
 import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +9,7 @@ from openpyxl import Workbook
 
 from components.inputs.etabs_table_bundle import register_current_etabs_tables, audit_analysis_workbooks
 from components.inputs.project_workbooks import registered_project_source
+from tools.REGISTER_CURRENT_ETABS_TABLES import main
 
 
 class CurrentEtabsBundleTests(unittest.TestCase):
@@ -137,6 +139,122 @@ class CurrentEtabsBundleTests(unittest.TestCase):
             with self.assertRaisesRegex(FileNotFoundError,"source EDB"):
                 register_current_etabs_tables(self.root,self.books[0],self.books[1:])
         self.assertFalse((self.root/"01_ETABS_EXPORT").exists())
+
+
+class FirstLotReferenceTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.source = Path(tmp.name) / "first.xlsx"
+        self.output = Path(tmp.name) / "reference"
+        self.book = Workbook()
+        self.book.remove(self.book.active)
+        self.add_table("Program Control", "ProgramName|Version|CurrUnits", "||",
+                       [("ETABS", "23.2.0", "kip, in, F")])
+        self.add_table(
+            "Story Forces", "Story|Output Case|Case Type|Step Type|Step Number|Location|P|VX|VY|T|MX|MY",
+            "||||||kN|kN|kN|kN-m|kN-m|kN-m", [
+                ("Story25", "EQX", "LinStatic", "Step By Step", 1, "Bottom", 0, -12, 0, 0, 0, 0),
+                ("Story25", "EQX", "LinStatic", "Step By Step", 2, "Bottom", 0, 3, 0, 0, 0, 0),
+                ("Story25", "EQX+ P-Delta", "LinStatic", "Step By Step", 1, "Top", 0, 8, 0, 0, 0, 0),
+            ])
+        self.add_table(
+            "Story Max Over Avg Disp",
+            "Story|Output Case|Case Type|Step Type|Step Number|Direction|Maximum|Average|Ratio",
+            "||||||mm|mm|", [("Story25", "EQX", "LinStatic", None, None, "X", 250, 125, 2)],
+            title="Story Max Over Avg Displacements")
+        self.add_table(
+            "Response Spectrum Modal Info",
+            "SpecCase|ModalCase|Mode|Period|DampRatio|U1Acc|U2Acc|U3Acc|U1Amp|U2Amp|U3Amp",
+            "|||sec||mm/sec²|mm/sec²|mm/sec²|mm|mm|mm",
+            [("RS X", "Modal Ritz", "1", 2.4, 0.05, 800, 0, 0, 0.5, 0, 0)])
+
+    def add_table(self, sheet, columns, units, rows, *, title=None):
+        ws = self.book.create_sheet(sheet)
+        ws.append(["TABLE:  " + (title or sheet)])
+        ws.append(columns.split("|"))
+        ws.append(units.split("|"))
+        for row in rows:
+            ws.append(row)
+
+    def run_import(self, *args):
+        self.book.save(self.source)
+        return main(["--analysis-reference", str(self.source),
+                     "--reference-output", str(self.output), *args])
+
+    def test_export_reference_with_exact_cases_steps_units_and_provenance(self):
+        self.assertEqual(self.run_import("--reference-case", "EQX", "--reference-case", "RS X"), 0)
+        report = json.loads((self.output / "FIRST_LOT_REFERENCE.private.json").read_text("utf-8"))
+        self.assertEqual(report["source"]["workbook_sha256"], hashlib.sha256(self.source.read_bytes()).hexdigest())
+        self.assertEqual(report["source"]["reported_current_units"], "kip, in, F")
+        self.assertIsNone(report["source"]["edb_sha256"])
+        self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
+        self.assertIn("Pier Forces", report["missing_tables"])
+        forces = report["tables"]["Story Forces"]
+        self.assertEqual(forces["case_row_counts"], {"EQX": 2, "EQX+ P-Delta": 1})
+        self.assertEqual(forces["stories"], ["Story25"])
+        self.assertEqual([row[0] for row in forces["rows"]], [4, 5])
+        self.assertEqual([row[forces["columns"].index("VX")] for row in forces["rows"]], [-12, 3])
+        self.assertEqual(forces["units"]["VX"], "kN")
+        disp = report["tables"]["Story Max Over Avg Disp"]
+        self.assertEqual(disp["units"]["Maximum"], "m")
+        self.assertEqual(disp["rows"][0][disp["columns"].index("Maximum")], 0.25)
+        modal = report["tables"]["Response Spectrum Modal Info"]
+        self.assertEqual(modal["units"]["U1Acc"], "m/s²")
+        self.assertEqual(modal["rows"][0][modal["columns"].index("U1Acc")], 0.8)
+        self.assertEqual(modal["rows"][0][modal["columns"].index("Mode")], 1)
+        self.assertFalse(list(self.output.rglob("PROJECT_SOURCES.private.json")))
+
+    def test_invalid_workbook_or_selection_never_publishes(self):
+        for extra, bad_cell, value, message in [
+            (("--reference-case", "EQ"), None, None, "case"),
+            (("--analysis-files", str(self.source)), None, None, "mode"),
+            ((), "H3", "kip", "unit"),
+            (("--reference-case", "EQX"), "H6", "=8", "numeric"),
+        ]:
+            with self.subTest(extra=extra, bad_cell=bad_cell):
+                cell = self.book["Story Forces"][bad_cell] if bad_cell else None
+                old = cell.value if cell else None
+                if cell:
+                    cell.value = value
+                with patch("sys.stderr") as errors, self.assertRaises(SystemExit) as reason:
+                    self.run_import(*extra)
+                self.assertEqual(reason.exception.code, 2)
+                self.assertIn(message, "".join(call.args[0] for call in errors.write.call_args_list))
+                self.assertFalse(self.output.exists())
+                if cell:
+                    cell.value = old
+
+    def test_duplicate_result_key_rejected(self):
+        table = self.book["Story Forces"]
+        table.append([cell.value for cell in table[4]])
+        with patch("sys.stderr") as errors, self.assertRaises(SystemExit) as reason:
+            self.run_import()
+        self.assertEqual(reason.exception.code, 2)
+        self.assertIn("duplicate result key", "".join(call.args[0] for call in errors.write.call_args_list))
+        self.assertFalse(self.output.exists())
+
+    def test_program_metadata_must_be_literal_and_inside_its_columns(self):
+        for address, invalid in [("B4", '= "23.2.0"'), ("C4", "#REF!"), ("D4", "overflow")]:
+            with self.subTest(address=address):
+                cell = self.book["Program Control"][address]
+                original = cell.value
+                cell.value = invalid
+                with patch("sys.stderr") as errors, self.assertRaises(SystemExit) as reason:
+                    self.run_import()
+                self.assertEqual(reason.exception.code, 2)
+                self.assertIn("Program Control", "".join(call.args[0] for call in errors.write.call_args_list))
+                self.assertFalse(self.output.exists())
+                cell.value = original
+
+    def test_existing_output_is_rejected(self):
+        self.output.mkdir()
+        existing = self.output / "FIRST_LOT_REFERENCE.private.json"
+        existing.write_text("existing", encoding="utf-8")
+        with self.assertRaises(SystemExit) as reason:
+            self.run_import()
+        self.assertEqual(reason.exception.code, 2)
+        self.assertEqual(existing.read_text("utf-8"), "existing")
 
 
 if __name__=="__main__":

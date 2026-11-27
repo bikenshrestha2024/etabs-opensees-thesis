@@ -38,3 +38,20 @@ python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-files "Analysis Export 
 ```
 
 Use the full local input paths if the files are not in the current directory. Use a new private JSON filename each run. Progress prints before each sheet. The report contains per-sheet row/cell counts, candidate families, header previews, duplicate titles/content and read failures. Exit 0 means the selected worksheets were scanned, not validated; exit 2 means incomplete scanning. Keep the report private (it may contain project data). This mode does not register or combine lots into solver inputs; existing registration flags remain unchanged.
+
+## Import first-lot reference results
+
+```powershell
+python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-reference "D:\ETABS\Analysis Export ULS 3 storey latest_compressed FIRST LOT.xlsx" --reference-output "..\first_lot_reference"
+```
+
+Use a new local output directory outside the Git checkout. The command writes
+`FIRST_LOT_REFERENCE.private.json` with normalized rows and workbook provenance.
+To export rows for specific cases, repeat the exact ETABS name with
+`--reference-case "EQX" --reference-case "RSX P Delta"`. Case filtering preserves
+the workbook-wide case counts and leaves tables without a case column available.
+Exit 2 means the import could not publish a reference. The source workbook is
+read-only. The reference mode is independent of the multi-lot audit and the
+full-table registration used by solver workflows.
+
+See the [reference data and unit contract](../components/inputs/etabs_table_bundle.py.md#import-first-lot-reference-results).

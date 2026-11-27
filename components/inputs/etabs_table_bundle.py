@@ -7,6 +7,8 @@ numerical ETABS/OpenSees equivalence comparison.
 from __future__ import annotations
 import hashlib
 import json
+import math
+from collections import Counter
 from pathlib import Path
 
 _REQUIRED_ASSIGNMENT_SHEETS=(
@@ -19,6 +21,44 @@ _REQUIRED_ASSIGNMENT_SHEETS=(
     "Load Pattern Definitions",
     "Shell Uniform Load Sets",
 )
+
+# ETABS table-specific headers and units observed in the first analysis lot.
+# Each entry has text/step keys and the units required for its numeric fields.
+_CASE_COLUMNS = ("Output Case", "Case Type", "Step Type", "Step Number")
+_STORY_CASE = ("Story", *_CASE_COLUMNS)
+_WALL_FORCES = dict.fromkeys(("P", "V2", "V3"), "kN") | dict.fromkeys(("T", "M2", "M3"), "kN-m")
+_FIRST_LOT_TABLES = {
+    "Tributary Area and LLRF": (
+        ("Story", "Label", "Unique Name", "Type"), {"Tributary Area": "m²", "LLRF": ""}),
+    "Total Energy Components": (_CASE_COLUMNS, dict.fromkeys((
+        "Input Energy", "Kinetic Energy", "Potential Energy", "Global Damping Energy",
+        "Link Damper Energy", "Link Hysteresis Energy", "Energy Error"), "kN-m")),
+    "Story Stiffness": (_STORY_CASE, {
+        "Shear X": "kN", "Drift X": "mm", "Stiff X": "kN/m",
+        "Shear Y": "kN", "Drift Y": "mm", "Stiff Y": "kN/m"}),
+    "Story Max Over Avg Drifts": (
+        (*_STORY_CASE, "Direction"), {"Max Drift": "mm", "Avg Drift": "mm", "Ratio": ""}),
+    "Story Max Over Avg Disp": (
+        (*_STORY_CASE, "Direction"), {"Maximum": "mm", "Average": "mm", "Ratio": ""}),
+    "Story Forces": ((*_STORY_CASE, "Location"),
+                      dict.fromkeys(("P", "VX", "VY"), "kN") | dict.fromkeys(("T", "MX", "MY"), "kN-m")),
+    "Story Drifts": ((*_STORY_CASE, "Direction", "Drift/", "Label"),
+                      {"Drift": "", **dict.fromkeys(("X", "Y", "Z"), "m")}),
+    "Story Accelerations": (_STORY_CASE, dict.fromkeys(("UX", "UY", "UZ"), "mm/sec²") |
+                            dict.fromkeys(("RX", "RY", "RZ"), "rad/sec²")),
+    "Spandrel Forces": ((*_STORY_CASE, "Spandrel", "Location"), _WALL_FORCES),
+    "Response Spectrum Modal Info": (("SpecCase", "ModalCase", "Mode"), {
+        "Period": "sec", "DampRatio": "", **dict.fromkeys(("U1Acc", "U2Acc", "U3Acc"), "mm/sec²"),
+        **dict.fromkeys(("U1Amp", "U2Amp", "U3Amp"), "mm")}),
+    "Pier Forces": ((*_STORY_CASE, "Pier", "Location"), _WALL_FORCES),
+}
+_REFERENCE_UNITS = {
+    "mm": ("m", 1000),
+    "mm/sec²": ("m/s²", 1000),
+    "rad/sec²": ("rad/s²", 1),
+    "sec": ("s", 1),
+    "": ("1", 1),
+}
 
 
 def _sha(path):
@@ -239,3 +279,162 @@ def audit_analysis_workbooks(paths, *, progress=None):
                      "Row counts include header and unit rows; formula caches not evaluated.",
                      "Repeated names or identical populated cells require source review before combining.",
                      "Not proof of same EDB, complete analysis cases, native analytical mesh or engineering equivalence."])
+
+
+def _reference_header(sheet):
+    sheet.reset_dimensions()
+    rows = iter(sheet.values)
+    title = next(rows, ())
+    table_name = ("Story Max Over Avg Displacements"
+                  if sheet.title == "Story Max Over Avg Disp" else sheet.title)
+    if not title or not isinstance(title[0], str) or title[0].split(":", 1)[0] != "TABLE" \
+            or title[0].partition(":")[2].strip() != table_name or any(title[1:]):
+        raise ValueError(f"{sheet.title}: expected ETABS table title in row 1")
+    headers = next(rows, ())
+    if not headers or any(not isinstance(h, str) or not h.strip() for h in headers) \
+            or len(set(headers)) != len(headers):
+        raise ValueError(f"{sheet.title}: missing or repeated column headers in row 2")
+    units = next(rows, ())
+    return table_name, headers, units, rows
+
+
+def _program_control(sheet):
+    _, headers, _, rows = _reference_header(sheet)
+    records = (row for row in rows if any(value is not None for value in row))
+    row = next(records, ())
+    record = dict(zip(headers, row))
+    fields = ("ProgramName", "Version", "CurrUnits")
+    if (next(records, None) is not None or any(value is not None for value in row[len(headers):])
+            or not all(isinstance(record.get(field), str) and record[field].strip()
+                       and not record[field].startswith(("=", "#")) for field in fields)
+            or record["ProgramName"] != "ETABS"):
+        raise ValueError("Program Control: expected one ETABS record with version and displayed units")
+    return {field: record[field] for field in fields}
+
+
+def _reference_table(sheet, selected_cases):
+    name, headers, unit_row, rows = _reference_header(sheet)
+    keys, measures = _FIRST_LOT_TABLES[sheet.title]
+    if set(headers) != set(keys) | measures.keys():
+        raise ValueError(f"{sheet.title}: column headers do not match the first-lot schema")
+    source_units = dict(zip(headers, unit_row))
+    for column in headers:
+        expected = measures.get(column, "")
+        observed = source_units.get(column)
+        if ("" if observed is None else observed) != expected:
+            raise ValueError(f"{sheet.title}: unexpected unit for {column}; expected {expected or 'blank'}")
+    if any(unit_row[len(headers):]):
+        raise ValueError(f"{sheet.title}: unexpected unit outside the table")
+    normalized_units = {column: _REFERENCE_UNITS.get(unit, (unit, 1)) for column, unit in measures.items()}
+    case_column = next((c for c in ("Output Case", "SpecCase") if c in keys), None)
+    # The drift table identifies one result per story, direction, case and step.
+    # Its controlling point label and formatted reciprocal drift are attributes.
+    identity_columns = tuple(column for column in keys if column not in ("Drift/", "Label")) \
+        if sheet.title == "Story Drifts" else keys
+    key_seen = set()
+    story_names = set()
+    case_counts = Counter()
+    imported = []
+    for row_number, row in enumerate(rows, start=4):
+        if all(value is None for value in row):
+            continue
+        context = f"{sheet.title} row {row_number}"
+        if len(row) > len(headers) and any(value is not None for value in row[len(headers):]):
+            raise ValueError(f"{context}: data outside the table columns")
+        record = dict.fromkeys(headers)
+        record.update(zip(headers, row))
+        for column, (_, divisor) in normalized_units.items():
+            value = record[column]
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise ValueError(f"{context}: {column} requires a finite numeric value")
+            if divisor != 1:
+                record[column] = value / divisor
+        for column in keys:
+            value = record[column]
+            if column == "Mode":
+                if isinstance(value, str) and value.isascii() and value.isdecimal():
+                    value = int(value)
+                if type(value) is not int or value < 1:
+                    raise ValueError(f"{context}: invalid mode number")
+                record[column] = value
+            elif column == "Step Number":
+                if value is not None and (type(value) not in (int, float) or not math.isfinite(value)):
+                    raise ValueError(f"{context}: invalid step number")
+            elif (column, value) != ("Step Type", None) and (
+                    not isinstance(value, str) or not value.strip() or value.startswith(("=", "#"))):
+                raise ValueError(f"{context}: invalid {column}")
+        key = tuple(record[column] for column in identity_columns)
+        if key in key_seen:
+            raise ValueError(f"{context}: duplicate result key")
+        key_seen.add(key)
+        if "Story" in record:
+            story_names.add(record["Story"])
+        case = record[case_column] if case_column else None
+        if case is not None:
+            case_counts[case] += 1
+        if not selected_cases or case_column is None or case in selected_cases:
+            imported.append([row_number, *(record[column] for column in headers)])
+    return {
+        "table_title": name, "columns": ["worksheet_row", *headers],
+        "source_units": measures, "units": {c: scale[0] for c, scale in normalized_units.items()},
+        "case_column": case_column, "case_row_counts": dict(case_counts),
+        "stories": sorted(story_names), "source_row_count": len(key_seen), "rows": imported,
+    }
+
+
+def read_first_lot_reference(path, *, cases=(), progress=None):
+    """[REF docs/source/components/inputs/etabs_table_bundle.py.md]
+
+    Read a single ETABS analysis lot as reference data in kN, m and s.
+    Preserve exact case names, source rows, components and result step identity.
+    Coverage counts describe the workbook only; model identity is unverified.
+    """
+    from openpyxl import load_workbook
+
+    source = Path(path).expanduser().resolve()
+    if not source.is_file() or source.suffix.lower() not in (".xlsx", ".xlsm"):
+        raise ValueError("Select one local ETABS .xlsx or .xlsm analysis workbook")
+    requested = tuple(cases)
+    selected = set(requested)
+    if len(selected) != len(requested) or any(not isinstance(c, str) or not c.strip() for c in selected):
+        raise ValueError("Specify distinct, nonblank exact ETABS case names")
+    tables = {}
+    # Own the file stream so a failed streaming parse also releases the
+    # Windows file handle when openpyxl's worksheet iterator is interrupted.
+    with source.open("rb") as stream:
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        stream.seek(0)
+        book = load_workbook(stream, read_only=True, data_only=False, keep_links=False)
+        try:
+            sheet_names = {sheet.title for sheet in book.worksheets}
+            if "Program Control" not in sheet_names:
+                raise ValueError("ETABS Program Control worksheet is required")
+            program = _program_control(book["Program Control"])
+            for sheet in book.worksheets:
+                if sheet.title in _FIRST_LOT_TABLES:
+                    if progress:
+                        progress(f"Reading {sheet.title}")
+                    tables[sheet.title] = _reference_table(sheet, selected)
+        finally:
+            book.close()
+    if _sha(source) != digest:
+        raise ValueError("Workbook bytes changed while reading the reference")
+    missing_cases = selected - {name for table in tables.values() for name in table["case_row_counts"]}
+    if missing_cases:
+        raise ValueError("Requested ETABS case absent: " + ", ".join(sorted(missing_cases)))
+    if not any(table["rows"] for table in tables.values()):
+        raise ValueError("The workbook has no first-lot reference rows")
+    return {
+        "schema": "ETABS_FIRST_LOT_REFERENCE_V1",
+        "status": "WORKBOOK_REFERENCE_ONLY",
+        "engineering_acceptance": "NOT_VERIFIED",
+        "source": {
+            "workbook_path": str(source), "workbook_sha256": digest, "edb_sha256": None,
+            "source_model_identity": "UNVERIFIED", "etabs_version": program["Version"],
+            "reported_current_units": program["CurrUnits"],
+        },
+        "selected_cases": list(requested),
+        "missing_tables": sorted(_FIRST_LOT_TABLES.keys() - tables.keys()),
+        "unrecognized_sheets": sorted(sheet_names - _FIRST_LOT_TABLES.keys() - {"Program Control"}),
+        "tables": tables,
+    }
