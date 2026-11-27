@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from components.validation.etabs_native_quantity_tables import (
-    export_native_quantity_tables, extract_analytical_mesh, compare_analytical_mesh)
+    export_native_quantity_tables, extract_analytical_mesh, compare_analytical_mesh, _mesh_coverage)
 
 
 class FakeDatabase:
@@ -94,6 +94,41 @@ class EtabsNativeQuantityTests(unittest.TestCase):
         domain["shells"][0]["nodes"]=[1,3,2,4]
         with self.assertRaisesRegex(ValueError,"crosswalk"):
             compare_analytical_mesh(native,solved,domain)
+
+    def test_refinement_coverage_and_missing_wall_area(self):
+        def quad(a,b):
+            return [(a,0,0),(b,0,0),(b,0,3),(a,0,3)]
+        base=[quad(0,2)]
+        refined=[quad(0,1),quad(1,2)]
+        report=_mesh_coverage("AREA_ELM",base,refined,1e-6)
+        self.assertEqual(report["status"],"GEOMETRIC_COVERAGE_MATCHED_DIAGNOSTIC")
+        self.assertAlmostEqual(report["native_measure"],6.)
+        self.assertAlmostEqual(report["pair_intersection_measure"],6.)
+        shifted=_mesh_coverage("AREA_ELM",base,[quad(.5,2.5)],1e-6)
+        self.assertEqual(shifted["status"],"GEOMETRIC_COVERAGE_MISMATCH")
+        self.assertAlmostEqual(shifted["native_uncovered_measure"],1.5)
+        self.assertAlmostEqual(shifted["opensees_extra_measure"],1.5)
+        overlap=_mesh_coverage("AREA_ELM",base,[quad(0,1.5),quad(.5,2)],1e-6)
+        self.assertEqual(overlap["status"],"INTERNAL_CELL_OVERLAP_NO_COVERAGE_ACCEPTANCE")
+        self.assertAlmostEqual(overlap["opensees_internal_pair_overlap"],3.)
+        self.assertEqual(_mesh_coverage("AREA_ELM",base,
+            [[(x,y+1,z) for x,y,z in base[0]]],1e-6)["status"],
+            "UNSUPPORTED_OR_INVALID_GEOMETRY")
+        self.assertEqual(_mesh_coverage("AREA_ELM",base,
+            [[base[0][i] for i in (0,2,1,3)]],1e-6)["status"],
+            "UNSUPPORTED_OR_INVALID_GEOMETRY")
+
+    def test_line_refinement_coverage(self):
+        def line(a,b):return [(a,0,0),(b,0,0)]
+        report=_mesh_coverage("LINE_ELM",[line(0,6)],[line(0,3),line(3,6)],1e-6)
+        self.assertEqual(report["status"],"GEOMETRIC_COVERAGE_MATCHED_DIAGNOSTIC")
+        self.assertAlmostEqual(report["pair_intersection_measure"],6.)
+        gap=_mesh_coverage("LINE_ELM",[line(0,6)],[line(0,2),line(3,7)],1e-6)
+        self.assertEqual(gap["status"],"GEOMETRIC_COVERAGE_MISMATCH")
+        self.assertAlmostEqual(gap["native_uncovered_measure"],1.)
+        self.assertAlmostEqual(gap["opensees_extra_measure"],1.)
+        self.assertEqual(_mesh_coverage("LINE_ELM",[line(0,6)],[line(0,4),line(2,6)],1e-6)["status"],
+                         "INTERNAL_CELL_OVERLAP_NO_COVERAGE_ACCEPTANCE")
 
     def test_capture_actual_fields_and_data(self):
         with tempfile.TemporaryDirectory() as root:
