@@ -119,3 +119,23 @@ coordinates nor modal mass can establish native restraints or ETABS/OpenSees
 physical equivalence. Both checks execute before exact case filtering for JSON
 and SQLite; original values, earlier FIRST LOT display diagnostics and
 engineering acceptance boundaries are unchanged.
+
+### Joint response and static reaction reference diagnostics
+
+When joint topology and joint-level response tables coexist, the importer checks
+all unique source rows before case filtering against the exact exported element
+ID, story and object label. Missing labels, unknown IDs and mismatches are counted
+separately; unresolved IDs and up to 100 example worksheet rows per exception type
+are retained. These checks do not infer restraints or diaphragm constraints.
+
+The Joint Reactions table also produces per-case/type/step reference summaries
+for linear static unstepped cases and explicit step-by-step cases only. Modal,
+response-spectrum, combination and time-history envelopes are excluded from
+force summation. Repeated joint IDs within a group and incomplete six-component
+vectors block its sums and zero/nonzero classification; no row is silently
+corrected or removed. Only the three global forces are summed; joint moments
+require a common origin and compatible force transformation. Source zero/nonzero
+reaction sets do not define physical supports. The user's 32 physical supports
+plus 44 mesh points and full 1D+1L gravity benchmark remain unchanged. A matching
+native model, load case and analysis state are still required before using the
+reference for solver acceptance. All data and row-level diagnostics stay private.
