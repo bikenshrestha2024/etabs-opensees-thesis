@@ -209,6 +209,44 @@ class FirstLotReferenceTests(unittest.TestCase):
         self.assertEqual(modal["rows"][0][modal["columns"].index("Mode")], 1)
         self.assertFalse(list(self.output.rglob("PROJECT_SOURCES.private.json")))
 
+    def test_display_diagnostics_keep_original_values_and_prefilter_scope(self):
+        self.book["Story Max Over Avg Disp"].append(
+            ["Story25", "OTHER", "LinStatic", None, None, "Y", 1, 0, 999])
+        self.add_table(
+            "Story Max Over Avg Drifts",
+            "Story|Output Case|Case Type|Step Type|Step Number|Direction|Max Drift|Avg Drift|Ratio",
+            "||||||mm|mm|", [("Story25", "EQX", "LinStatic", None, None, "X", 1, 0, 999)])
+        self.add_table(
+            "Story Drifts",
+            "Story|Output Case|Case Type|Step Type|Step Number|Direction|Drift|Drift/|Label|X|Y|Z",
+            "|||||||||m|m|m", [
+                ("Story25", "EQX", "LinStatic", None, None, "X", 0.000001, "1/0", "A", 0, 0, 95),
+                ("Story25", "EQX", "LinStatic", None, None, "Y", 0, "1/0", "B", 0, 0, 95),
+            ])
+        self.book.save(self.source)
+        from components.inputs.etabs_table_bundle import read_analysis_reference
+        zero_flag = "ZERO_REPORTED_AVERAGE_RATIO_UNRESOLVED"
+        for storage in (None, self.source.with_suffix(".sqlite3")):
+            with self.subTest(storage=storage):
+                report = read_analysis_reference([self.source], cases=["EQX"], row_database=storage)
+                tables = report["tables"]
+                for name, position in [("Story Max Over Avg Drifts", 4), ("Story Max Over Avg Disp", 5)]:
+                    flags = tables[name]["source_display_diagnostics"]
+                    self.assertEqual(flags["scope"], "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER")
+                    self.assertEqual(flags["status"], "REFERENCE_ONLY_NOT_NBC_TORSION_EVALUATION")
+                    self.assertEqual(flags["worksheet_rows"][zero_flag], [position])
+                    self.assertEqual(flags["flag_counts"][zero_flag], 1)
+                drift = tables["Story Drifts"]
+                flags = drift["source_display_diagnostics"]["worksheet_rows"]
+                self.assertEqual(flags["RECIPROCAL_DISPLAY_ONE_OVER_ZERO"], [4, 5])
+                self.assertEqual(flags["RECIPROCAL_DISPLAY_ONE_OVER_ZERO_NONZERO_DRIFT"], [4])
+                if storage is None:
+                    self.assertEqual(drift["rows"][0][drift["columns"].index("Drift")], 0.000001)
+                    table = tables["Story Max Over Avg Drifts"]
+                    self.assertEqual(table["rows"][0][table["columns"].index("Ratio")], 999)
+                    self.assertEqual(len(tables["Story Max Over Avg Disp"]["rows"]), 1)
+                self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
+
     def test_invalid_workbook_or_selection_never_publishes(self):
         for extra, bad_cell, value, message in [
             (("--reference-case", "EQ"), None, None, "case"),
