@@ -49,3 +49,7 @@ connection stiffness remain separate checks. The module has synthetic unit
 tests but still needs a native ETABS v23 test.
 
 Tests: `python tests/verify_gravity_etabs_direct.py`.
+
+## Generated mesh crosswalk
+
+The current direct gravity extraction writes the native analytical mesh comparison JSON in the existing native table directory, binding source EDB, mesh, solved result and assembly hashes. Reports geometry/connectivity only, and blocks absent or incompatible evidence; it never changes support or mesh topology. See [native quantity guide](etabs_native_quantity_tables.py.md).

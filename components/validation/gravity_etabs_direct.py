@@ -692,6 +692,7 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
             data['original_source_edb_sha256_after']=_file_hash(selected)
             report('ETABS_PROVENANCE','Verified original EDB unchanged; comparison used isolated copy',
                    original_sha256=original_hash,copy=str(working_copy))
+        native_tables=None
         # Extract native element/material quantity tables from the SAME active
         # ETABS model used for the direct base reaction. Preserve all returned
         # fields and a manifest; optional API failures must be visible.
@@ -756,6 +757,40 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
         for key in ('selected_etabs_edb','selected_etabs_edb_sha256','export_context_verified'):
             comp[key]=data[key]
         comp['opensees_gravity_result']=str(gravity.resolve())
+        # Compare only the native mesh captured in THIS extraction with the
+        # exact assembly data used by the successful saved solver run.
+        try:
+            if not native_tables or not context_file.is_file() or selected!=source:
+                raise ValueError("Matching source context and current native extraction required")
+            mesh_dir=out/"ETABS_Native_Quantity_Tables"
+            native_info=native_tables["analytical_mesh_api"]
+            mesh_path=mesh_dir/native_info["file"]
+            domain_path=folder/"OpenSees_Complete_Model_Data_V118.json"
+            if _file_hash(mesh_path)!=native_info["sha256"]:
+                raise ValueError("Native analytical mesh SHA mismatch")
+            if result.get("model_input_sha256",{}).get(domain_path.name)!=_file_hash(domain_path):
+                raise ValueError("Solved assembly data SHA mismatch")
+            from components.validation.etabs_native_quantity_tables import compare_analytical_mesh
+            from components.inputs.output_contract import atomic_json
+            comparison=compare_analytical_mesh(
+                json.loads(mesh_path.read_text(encoding="utf-8-sig")),result,
+                json.loads(domain_path.read_text(encoding="utf-8-sig")))
+            comparison.update(source_edb_sha256=source_hash,
+                              native_mesh_sha256=native_info["sha256"],
+                              solved_result_sha256=_file_hash(gravity),
+                              assembled_data_sha256=_file_hash(domain_path))
+            atomic_json(mesh_dir/"ETABS_OpenSees_Analytical_Mesh_Comparison.json",comparison)
+            comp["analytical_mesh_comparison"]={k:comparison[k] for k in
+                ("status","engineering_acceptance","matched_elements","native_elements","opensees_elements",
+                 "matched_points","native_incident_points","opensees_incident_points")}
+        except (OSError,ValueError,TypeError,KeyError) as mesh_error:
+            from components.inputs.output_contract import atomic_json
+            comp["analytical_mesh_comparison"]=dict(status="BLOCKED_MISSING_OR_INCOMPATIBLE_EVIDENCE",
+                engineering_acceptance="NOT_VERIFIED",reason=str(mesh_error))
+            atomic_json(out/"ETABS_Native_Quantity_Tables"/"ETABS_OpenSees_Analytical_Mesh_Comparison.json",
+                        comp["analytical_mesh_comparison"])
+        report("ANALYTICAL_MESH_COMPARISON","Compared generated native connectivity to solved OpenSees mesh",
+               **comp["analytical_mesh_comparison"])
         from components.validation.gravity_node_comparison import compare_support_nodes,write_node_comparison
         try:
             node_audit=compare_support_nodes(data,result,tolerance_m=0.01)
