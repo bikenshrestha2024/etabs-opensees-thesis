@@ -693,6 +693,89 @@ def _story_drift_joint_reference_diagnostics(joints, drifts):
             "exception_worksheet_rows": exceptions}
 
 
+def _joint_response_identity_diagnostics(joints, responses):
+    """Check unique source joint ID, story and object label; not restraint identity."""
+    index = {r["Element Name"]: (r["Story"], r["Object Label"]) for r in joints}
+    result = {}
+    for name, records in responses.items():
+        counts = Counter()
+        exceptions = {}
+        unresolved = set()
+        for record in records:
+            joint = record["Unique Name"]
+            expected = index.get(joint)
+            if expected is None:
+                status = "UNKNOWN_JOINT_ID"
+                unresolved.add(joint)
+            elif record["Story"] != expected[0]:
+                status = "STORY_MISMATCH"
+            elif record["Label"] is None:
+                status = "MISSING_RESPONSE_LABEL"
+            elif record["Label"] != expected[1]:
+                status = "LABEL_MISMATCH"
+            else:
+                status = "MATCHED"
+            counts[status] += 1
+            if status != "MATCHED":
+                sample = exceptions.setdefault(status, [])
+                if len(sample) < 100:
+                    sample.append(record["worksheet_row"])
+        result[name] = {"counts": dict(counts),
+                        "unresolved_joint_ids": sorted(unresolved),
+                        "exception_worksheet_row_samples": exceptions,
+                        "exception_sample_limit_per_status": 100}
+    return {"status": "REFERENCE_ONLY_NOT_NATIVE_CONSTRAINT_ACCEPTANCE",
+            "scope": "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER",
+            "tables": result}
+
+
+def _static_reaction_reference_diagnostics(records):
+    """Summarize compatible reported force groups; never sum envelopes or moments."""
+    components = ("FX", "FY", "FZ", "MX", "MY", "MZ")
+    groups = {}
+    excluded = Counter()
+    for record in records:
+        key = tuple(record[c] for c in _CASE_COLUMNS)
+        static = key[1] == "LinStatic" and (
+            (key[2] is None and key[3] is None) or
+            (key[2] == "Step By Step" and key[3] is not None))
+        if not static:
+            excluded[str(key[1]) + " | " + str(key[2])] += 1
+            continue
+        group = groups.setdefault(key, {"values": {}, "ambiguous": set(), "blank": set(),
+                                         "row_count": 0})
+        group["row_count"] += 1
+        uid = record["Unique Name"]
+        vector = tuple(record[c] for c in components)
+        if uid in group["values"]:
+            group["ambiguous"].add(uid)
+        group["values"][uid] = vector
+        if any(v is None for v in vector):
+            group["blank"].add(uid)
+    result = []
+    for key, group in groups.items():
+        values = group["values"]
+        valid = not group["ambiguous"] and not group["blank"]
+        entry = dict(zip(_CASE_COLUMNS, key))
+        entry.update(row_count=group["row_count"], joint_count=len(values),
+                     ambiguous_joint_ids=sorted(group["ambiguous"]),
+                     incomplete_joint_ids=sorted(group["blank"]),
+                     reported_force_sum_kN=None, nonzero_reaction_joint_ids=None,
+                     zero_reaction_joint_ids=None)
+        if valid:
+            entry["reported_force_sum_kN"] = {
+                c: math.fsum(vector[i] for vector in values.values())
+                for i, c in enumerate(components[:3])}
+            entry["nonzero_reaction_joint_ids"] = sorted(
+                uid for uid, vector in values.items() if any(v != 0 for v in vector))
+            entry["zero_reaction_joint_ids"] = sorted(
+                uid for uid, vector in values.items() if all(v == 0 for v in vector))
+        result.append(entry)
+    return {"status": "REFERENCE_ONLY_NOT_PHYSICAL_SUPPORT_OR_EQUILIBRIUM_ACCEPTANCE",
+            "scope": "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER",
+            "groups": result, "excluded_row_counts_by_case_step_type": dict(excluded)}
+
+
 def _reference_checks(tables, store=None):
     def rows(name):
         return store.rows(name) if store else tables[name]["rows"]
@@ -741,6 +824,14 @@ def _reference_checks(tables, store=None):
     if _JOINTS in tables and "Story Drifts" in tables:
         checks["story_drift_joint_reference"] = _story_drift_joint_reference_diagnostics(
             records(_JOINTS), records("Story Drifts"))
+    joint_response_names = [name for name in tables
+                            if name.startswith("Joint ") and "Unique Name" in tables[name]["columns"]]
+    if _JOINTS in tables and joint_response_names:
+        checks["joint_response_identity"] = _joint_response_identity_diagnostics(
+            records(_JOINTS), {name: records(name) for name in joint_response_names})
+    if "Joint Reactions" in tables:
+        checks["static_reaction_reference"] = _static_reaction_reference_diagnostics(
+            records("Joint Reactions"))
     return checks
 
 

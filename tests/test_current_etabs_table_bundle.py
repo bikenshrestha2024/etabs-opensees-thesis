@@ -422,6 +422,50 @@ class FirstLotReferenceTests(unittest.TestCase):
                 self.assertEqual(drift["exception_worksheet_rows"]["NO_STORY_LABEL_MATCH"], [6])
                 self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
 
+    def test_joint_identity_and_static_reaction_reference_before_filter(self):
+        from components.inputs.etabs_table_bundle import read_analysis_reference
+        second = self.second_lot()
+        third = self.source.with_name("third.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        self.add_table(
+            "Joint Reactions",
+            "Story|Label|Unique Name|Output Case|Case Type|Step Type|Step Number|FX|FY|FZ|MX|MY|MZ",
+            "|||||||kN|kN|kN|kN-m|kN-m|kN-m", [
+                ("Story25", "A", "01", "Dead", "LinStatic", None, None, 0, 0, 10, 0, 0, 0),
+                ("Story25", "B", "02", "Dead", "LinStatic", None, None, 0, 0, 0, 0, 0, 0),
+                ("Story25", "C", "03", "EQX", "LinStatic", "Step By Step", 1, -5, 0, 0, 0, 0, 0),
+                ("Story25", "C", "03", "EQX", "LinStatic", "Step By Step", 1, -6, 0, 0, 0, 0, 0),
+                ("Story25", "D", "04", "Live", "LinStatic", None, None, 0, 0, None, 0, 0, 0),
+                ("Story25", "A", "01", "RS", "LinRespSpec", "Max", None, 3, 0, 0, 0, 0, 0),
+                ("Story25", "X", "99", "RS", "LinRespSpec", "Max", None, 4, 0, 0, 0, 0, 0),
+                ("WrongStory", "A", "01", "RS", "LinRespSpec", "Max", None, 2, 0, 0, 0, 0, 0),
+                ("Story25", "WrongLabel", "02", "RS", "LinRespSpec", "Max", None, 1, 0, 0, 0, 0, 0),
+                ("Story25", None, "04", "RS", "LinRespSpec", "Max", None, 1, 0, 0, 0, 0, 0),
+            ], book=book)
+        book.save(third)
+        book.close()
+        report = read_analysis_reference([second, third], cases=["EQX"],
+                                         row_database=self.source.with_suffix(".sqlite3"))
+        identity = report["checks"]["joint_response_identity"]["tables"]["Joint Reactions"]
+        self.assertEqual(identity["counts"], {"MATCHED": 6, "UNKNOWN_JOINT_ID": 1,
+                         "STORY_MISMATCH": 1, "LABEL_MISMATCH": 1, "MISSING_RESPONSE_LABEL": 1})
+        self.assertEqual(identity["unresolved_joint_ids"], ["99"])
+        self.assertEqual(identity["exception_worksheet_row_samples"]["UNKNOWN_JOINT_ID"], [10])
+        reactions = report["checks"]["static_reaction_reference"]
+        groups = {group["Output Case"]: group for group in reactions["groups"]}
+        self.assertEqual(set(groups), {"Dead", "EQX", "Live"})
+        self.assertEqual(groups["Dead"]["reported_force_sum_kN"], {"FX": 0, "FY": 0, "FZ": 10})
+        self.assertEqual(groups["Dead"]["nonzero_reaction_joint_ids"], ["01"])
+        self.assertEqual(groups["Dead"]["zero_reaction_joint_ids"], ["02"])
+        self.assertEqual(groups["EQX"]["ambiguous_joint_ids"], ["03"])
+        self.assertIsNone(groups["EQX"]["reported_force_sum_kN"])
+        self.assertEqual(groups["Live"]["incomplete_joint_ids"], ["04"])
+        self.assertIsNone(groups["Live"]["reported_force_sum_kN"])
+        self.assertEqual(reactions["excluded_row_counts_by_case_step_type"], {"LinRespSpec | Max": 5})
+        self.assertEqual(report["tables"]["Joint Reactions"]["stored_row_count"], 2)
+        self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
+
     def test_second_lot_can_be_read_alone_and_reports_unresolved_joint_ids(self):
         second = self.second_lot(include_missing_joint=True)
         self.assertEqual(main(["--analysis-reference", str(second), "--reference-output", str(self.output)]), 0)
