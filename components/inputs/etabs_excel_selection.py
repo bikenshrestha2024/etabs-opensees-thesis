@@ -6,6 +6,7 @@ part(s) are different roles even when stored in the same local folder.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -129,18 +130,19 @@ def validate_full_table_selection(path):
 
 
 def _catalog_sha256(path):
-    import hashlib
     with Path(path).open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def build_analysis_table_catalog(paths):
+def build_analysis_table_catalog(paths, *, inspect_workbook=None):
     """Index exact worksheet owners in explicitly selected local analysis lots.
 
     [REF docs/source/components/inputs/etabs_excel_selection.py.md]
     This checks sheet names and file identity, not the engineering contents,
     source EDB identity or permission to use partial data as solver inputs.
     Duplicate names remain ambiguous; no table is silently merged or chosen.
+    An optional reader receives the open workbook, file entry, and its
+    zero-based index during the same read-only scan.
     """
     from openpyxl import load_workbook
     selected = [Path(p).expanduser().resolve(strict=True) for p in paths]
@@ -150,19 +152,23 @@ def build_analysis_table_catalog(paths):
     for path in selected:
         if not path.is_file() or path.suffix.lower() not in (".xlsx", ".xlsm"):
             raise ValueError("Expected a local analysis workbook")
-        before = _catalog_sha256(path)
-        if before in digests:
-            raise ValueError("Analysis lots have identical bytes")
-        digests.add(before)
         with path.open("rb") as stream:
+            before = hashlib.file_digest(stream, "sha256").hexdigest()
+            if before in digests:
+                raise ValueError("Analysis lots have identical bytes")
+            digests.add(before)
+            stream.seek(0)
             book = load_workbook(stream, read_only=True, data_only=False, keep_links=False)
             try:
                 names = [sheet.title for sheet in book.worksheets]
+                entry = {"path": str(path), "sha256": before, "worksheets": names}
+                if inspect_workbook is not None and names:
+                    inspect_workbook(book, entry, len(files))
             finally:
                 book.close()
         if not names or _catalog_sha256(path) != before:
             raise ValueError("Empty or modified analysis workbook")
-        files.append({"path": str(path), "sha256": before, "worksheets": names})
+        files.append(entry)
         for name in names:
             tables.setdefault(name.strip().casefold(), []).append(
                 {"file_index": len(files) - 1, "worksheet": name})

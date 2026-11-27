@@ -10,39 +10,46 @@ The role `etabs_full_table` is available through the existing `registered_projec
 
 ## Split analysis-export all-sheet audit
 
-The existing registration tool has a separate read-only audit mode for any number of explicitly selected analysis lots. It uses openpyxl read_only, resets advertised worksheet dimensions, scans every populated cell including hidden sheets, counts nonempty rows and typed cells, records formula/error counts, hashes typed contents with cell coordinates and verifies the input ZIP hash before and after the scan. The first three populated rows (up to 40 cells each) help identify headers and units; evidence-family names are discovery hints only. Repeated sheet titles and identical cell-content fingerprints are reported without deleting or merging rows. A failed lot or sheet remains an explicit incomplete result; remaining files are still scanned. Nonworksheet tabs are reported separately. Private JSON output stays local. The audit does not replace the source-bound single-workbook registration or silently feed partial data to gravity, MRSM, ESM or NLTHA. Source EDB/case identity, native analytical connectivity, result schemas, units, completeness and engineering equivalence require separate evidence. The uploaded actual workbooks could not be read in the assistant environment; test evidence is synthetic only.
+The existing registration tool has a separate read-only audit mode for any number of explicitly selected analysis lots. It uses openpyxl read_only, resets advertised worksheet dimensions, scans every populated cell including hidden sheets, counts nonempty rows and typed cells, records formula/error counts, hashes typed contents with cell coordinates and verifies the input ZIP hash before and after the scan. The first three populated rows (up to 40 cells each) help identify headers and units; evidence-family names are discovery hints only. Repeated sheet titles and identical cell-content fingerprints are reported without deleting or merging rows. A failed lot or sheet remains an explicit incomplete result; remaining files are still scanned. Nonworksheet tabs are reported separately. Private JSON output stays local. The audit does not replace the source-bound single-workbook registration or silently feed partial data to gravity, MRSM, ESM or NLTHA. Source EDB/case identity, native analytical connectivity, result schemas, units, completeness and engineering equivalence require separate evidence.
 
-## Import first-lot reference results
+## Import ETABS analysis reference results
 
-`read_first_lot_reference()` reads one explicitly selected workbook. The schema
-covers Program Control metadata, tributary area and live-load reduction,
-energy components, story stiffness, max/average drift and displacement, story
-forces, drifts and accelerations, spandrel and pier forces, and response
-spectrum modal information. It validates the ETABS table titles, column names,
-and source units in the third worksheet row. Program Control's displayed units
-are provenance metadata. ETABS may display different units there.
+`read_analysis_reference()` reads explicitly selected workbooks with a common
+schema. The first-lot tables contain story, member, energy and response-spectrum
+results. The second-lot tables contain joint coordinates, object and element
+connectivity, modal periods and frequencies, participation factors, mass and
+load participation ratios, and direction factors. Program Control metadata is
+recorded only for the workbook that provides it. The numeric parser uses the
+units declared in each table.
 
-The `ETABS_FIRST_LOT_REFERENCE_V1` JSON includes the workbook SHA-256, ETABS
-version, encountered stories and cases, per-case counts, and missing or
-unrecognized worksheet names. Each result table has ordered `columns` and
-matching row arrays starting with the original 1-based worksheet row number.
-`source_units` and `units` describe numeric measure columns. Length and
-translational acceleration in mm and mm/sec² are divided by 1000. Forces
-remain in kN, moments and reported energies in kN-m, periods in seconds, and
-ratios are dimensionless. Rotational accelerations remain in rad/s².
+`ETABS_ANALYSIS_REFERENCE_V1` uses the worksheet-owner index's file identities.
+A table's `file_index` is the zero-based position in `files`. The table has ordered
+`columns` and matching row arrays that start with the original 1-based
+worksheet row number. `source_units` and `units` describe numeric fields.
+The importer converts mm and mm/sec² to m and m/s² and percentage values
+to dimensionless fractions. Reported forces, moments, energies, participation
+factors, and modal mass/stiffness retain their declared kN-based units.
+Mode numbers are integers and ETABS joint IDs are preserved as strings.
 
-Cases, envelope types, numbered steps, signs, directions, force components, and
-top/bottom or left/right locations retain their source meaning. Rows with
-duplicate result keys, unrecognized units in supported columns, or malformed
-values stop publication. The workbook digest must remain stable across the
-read. Formula content is never evaluated. Case counts and story lists cover
-the source table even when the export filters rows to particular cases.
+The importer detects repeated workbook paths and hashes, overlapping supported
+tables, and duplicate keys in results. Exact repeated records in the frame
+worksheet share one retained row, with every repeat listed in
+`duplicate_worksheet_rows`. Edges that reuse an element name and differ in
+ordered endpoints or other fields retain their own rows. `source_row_count`
+counts all populated rows, and `unique_row_count` counts distinct rows
+before filtering. Cases, steps, signs, directions and force locations are
+preserved. Formulas are never evaluated.
 
-Workbook coverage does not establish the complete native ETABS result set.
-The reference carries an unset EDB hash and unverified engineering status.
-A numerical comparison still requires matching EDB and case definitions,
-compatible result steps, locations and response conventions, and the matching
-OpenSees run. The workbook contains reported ETABS results and supplies no
-model or solver input through this import.
+Checks use all loaded rows before any case filter. Reported periods are
+compared using exact modal case names and mode numbers. Disagreement stops
+publication. Missing modal keys and unresolved joint references appear in
+`checks` when the corresponding baseline table is available. These checks
+are confined to the available workbook tables. The source EDB hash remains
+unset and the engineering status is unverified. A numerical comparison still
+requires matching native EDB and case definitions, compatible response
+conventions, and the corresponding OpenSees run.
 
-[Command-line usage](../../tools/REGISTER_CURRENT_ETABS_TABLES.py.md#import-first-lot-reference-results)
+`read_first_lot_reference()` and the original single-first-lot CLI usage
+keep the `ETABS_FIRST_LOT_REFERENCE_V1` layout.
+
+[Command-line usage](../../tools/REGISTER_CURRENT_ETABS_TABLES.py.md#import-etabs-analysis-reference-results)

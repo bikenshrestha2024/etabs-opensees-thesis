@@ -25,10 +25,10 @@ def main(argv=None):
                         help="New private worksheet-owner index for the selected analysis lots")
     parser.add_argument("--audit-output",type=Path,
                         help="New private local JSON audit output; required with --analysis-files")
-    parser.add_argument("--analysis-reference", type=Path,
-                        help="Import one first-lot workbook as local ETABS result reference data")
+    parser.add_argument("--analysis-reference", type=Path, nargs="+", action="extend",
+                        help="Import explicitly selected first- and second-lot ETABS reference workbooks")
     parser.add_argument("--reference-output", type=Path,
-                        help="New directory for the private first-lot reference JSON")
+                        help="New directory for the private analysis reference JSON")
     parser.add_argument("--reference-case", action="append", default=[],
                         help="Keep rows for an exact ETABS case name; repeat to select more than one")
     for i in (1,2,3):
@@ -67,17 +67,20 @@ def main(argv=None):
             parser.error("Reference mode requires --analysis-reference and --reference-output; "
                          "only --reference-case may be added")
         from openpyxl.utils.exceptions import InvalidFileException
-        from components.inputs.etabs_table_bundle import read_first_lot_reference
+        from components.inputs.etabs_table_bundle import read_analysis_reference
         from components.inputs.output_contract import _refuse_linked_output_target, atomic_json
 
         directory = args.reference_output.expanduser().absolute()
-        target = directory / "FIRST_LOT_REFERENCE.private.json"
         try:
             _refuse_linked_output_target(directory)
             if directory.exists():
                 raise FileExistsError(f"Reference output directory already exists: {directory}")
-            result = read_first_lot_reference(
-                args.analysis_reference, cases=args.reference_case, progress=lambda s: print(s, flush=True))
+            result = read_analysis_reference(
+                args.analysis_reference, cases=args.reference_case,
+                progress=lambda s: print(s, flush=True), legacy_first_lot=True)
+            name = ("FIRST_LOT_REFERENCE.private.json" if result["schema"] == "ETABS_FIRST_LOT_REFERENCE_V1"
+                    else "ETABS_ANALYSIS_REFERENCE.private.json")
+            target = directory / name
             directory.mkdir(parents=True)
             try:
                 atomic_json(target, result)

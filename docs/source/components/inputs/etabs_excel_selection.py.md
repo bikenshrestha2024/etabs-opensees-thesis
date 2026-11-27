@@ -51,3 +51,7 @@ The offline gravity reaction reader requires exactly one worksheet named Joint R
 ## Multi-lot worksheet-owner catalog (2026-11-27)
 
 The new opt-in `build_analysis_table_catalog(paths)` indexes explicitly selected local workbook worksheet names and SHA-256 values. `resolve_analysis_table(catalog, name)` returns the unique original workbook and exact worksheet title, verifying its bytes and worksheet identity again. Repeated titles are ambiguous (not merged); identical workbook bytes, missing names and modified files fail closed. The existing full-table picker and registration API are unchanged. The catalog is a **reference routing index**, not a merged model, complete table-content scan or same-EDB certificate. Readers must still validate units, schema, case/step, and the source identity after streaming results. Keep the private index out of public commits.
+
+The first- and second-lot reference parser supplies an `inspect_workbook`
+callback to the catalog. This lets it read the known worksheet rows from the
+same open, read-only workbook before the catalog verifies the source hash again.

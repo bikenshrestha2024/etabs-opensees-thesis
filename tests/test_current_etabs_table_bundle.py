@@ -5,9 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
-from components.inputs.etabs_table_bundle import register_current_etabs_tables, audit_analysis_workbooks
+from components.inputs.etabs_table_bundle import (
+    audit_analysis_workbooks, read_first_lot_reference, register_current_etabs_tables,
+)
 from components.inputs.project_workbooks import registered_project_source
 from tools.REGISTER_CURRENT_ETABS_TABLES import main
 
@@ -169,8 +171,8 @@ class FirstLotReferenceTests(unittest.TestCase):
             "|||sec||mm/sec²|mm/sec²|mm/sec²|mm|mm|mm",
             [("RS X", "Modal Ritz", "1", 2.4, 0.05, 800, 0, 0, 0.5, 0, 0)])
 
-    def add_table(self, sheet, columns, units, rows, *, title=None):
-        ws = self.book.create_sheet(sheet)
+    def add_table(self, sheet, columns, units, rows, *, title=None, book=None):
+        ws = (self.book if book is None else book).create_sheet(sheet)
         ws.append(["TABLE:  " + (title or sheet)])
         ws.append(columns.split("|"))
         ws.append(units.split("|"))
@@ -255,6 +257,126 @@ class FirstLotReferenceTests(unittest.TestCase):
             self.run_import()
         self.assertEqual(reason.exception.code, 2)
         self.assertEqual(existing.read_text("utf-8"), "existing")
+
+    def test_single_first_lot_preserves_exact_title_and_missing_input_error(self):
+        with self.assertRaisesRegex(ValueError, "Select one local ETABS"):
+            read_first_lot_reference(self.source)
+        self.book.create_sheet("Story Forces ").append(["Unrecognized extra sheet"])
+        self.book.save(self.source)
+        report = read_first_lot_reference(self.source)
+        self.assertIn("Story Forces", report["tables"])
+        self.assertEqual(report["unrecognized_sheets"], ["Story Forces "])
+
+    def second_lot(self, *, period=2.4, include_missing_joint=False):
+        source = self.source.with_name("second.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        self.add_table(
+            "Objects and Elements - Joints",
+            "Story|Element Name|Object Type|Object Label|Object Name|Global X|Global Y|Global Z",
+            "|||||mm|mm|mm", [
+                ("Story25", "01", "Joint", "A", "01", 0, 0, 1000),
+                ("Story25", "02", "Joint", "B", "02", 2000, 0, 1000),
+                ("Story25", "03", "Joint", "C", "03", 2000, 3000, 1000),
+                ("Story25", "04", "Joint", "D", "04", 0, 3000, 1000),
+            ], book=book)
+        edge = ("Story25", "4", "Shell", "F1", "1", "01", "02")
+        self.add_table(
+            "Objects and Elements - Frames",
+            "Story|Element Name|Object Type|Object Label|Object Name|Elm JtI|Elm JtJ",
+            "||||||", [edge, edge, (*edge[:5], "02", "99" if include_missing_joint else "03")], book=book)
+        self.add_table(
+            "Objects and Elements - Areas",
+            "Story|Element Name|Object Type|Object Label|Object Name|Elm Jt1|Elm Jt2|Elm Jt3|Elm Jt4",
+            "||||||||", [("Story25", "4", "Floor", "F1", "1", "01", "02", "03", "04")], book=book)
+        self.add_table(
+            "Modal Periods And Frequencies", "Case|Mode|Period|Frequency|CircFreq|Eigenvalue",
+            "||sec|cyc/sec|rad/sec|rad²/sec²", [("Modal Ritz", "1", period, 0.4, 2.6, 6.7)], book=book)
+        self.add_table(
+            "Modal Participation Factors", "Case|Mode|Period|UX|UY|UZ|RX|RY|RZ|ModalMass|ModalStiff",
+            "||sec|kN-m|kN-m|kN-m|kN-m|kN-m|kN-m|kN-m-s²|kN-m",
+            [("Modal Ritz", "1", period, 0, 1, -2, 0, 0, 0, 0.1, 0.6)], book=book)
+        self.add_table(
+            "Modal Participating Mass Ratios", "Case|Mode|Period|UX|UY|UZ|SumUX|SumUY|SumUZ|RX|RY|RZ|SumRX|SumRY|SumRZ",
+            "||sec||||||||||||", [("Modal Ritz", "1", period, 0, 0.5, 0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0)],
+            book=book)
+        self.add_table(
+            "Modal Direction Factors", "Case|Mode|Period|UX|UY|UZ|RZ", "||sec||||",
+            [("Modal Ritz", "1", period, 0, 1, 0, 0)], book=book)
+        self.add_table(
+            "Modal Load Participation Ratios", "Case|ItemType|Item|Static|Dynamic",
+            "|||%|%", [("Modal Ritz", "Acceleration", "UX", 100, 98.78)], book=book)
+        book.save(source)
+        return source
+
+    def test_integrated_reference_keeps_source_keys_and_collapses_only_identical_frame_rows(self):
+        second = self.second_lot()
+        self.assertEqual(self.run_import("--analysis-reference", str(second),
+                                         "--reference-case", "EQX", "--reference-case", "Modal Ritz"), 0)
+        report = json.loads((self.output / "ETABS_ANALYSIS_REFERENCE.private.json").read_text("utf-8"))
+        self.assertEqual(report["schema"], "ETABS_ANALYSIS_REFERENCE_V1")
+        self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
+        self.assertEqual([s["edb_sha256"] for s in report["files"]], [None, None])
+        self.assertIsNone(report["files"][1]["etabs_version"])
+        self.assertEqual(report["files"][1]["sha256"], hashlib.sha256(second.read_bytes()).hexdigest())
+        tables = report["tables"]
+        self.assertEqual(tables["Story Forces"]["file_index"], 0)
+        frames = tables["Objects and Elements - Frames"]
+        self.assertEqual(frames["file_index"], 1)
+        self.assertEqual(frames["source_row_count"], 3)
+        self.assertEqual([row[0] for row in frames["rows"]], [4, 6])
+        self.assertEqual(frames["duplicate_worksheet_rows"], [{"worksheet_row": 4, "also_at": [5]}])
+        self.assertEqual(frames["rows"][1][-2:], ["02", "03"])
+        joints = tables["Objects and Elements - Joints"]
+        self.assertEqual(joints["units"]["Global Z"], "m")
+        self.assertEqual(joints["rows"][0][-1], 1)
+        modal = tables["Modal Load Participation Ratios"]
+        self.assertEqual(modal["units"]["Dynamic"], "1")
+        self.assertAlmostEqual(modal["rows"][0][-1], 0.9878)
+        self.assertEqual(report["checks"]["modal_periods"]["Response Spectrum Modal Info"],
+                         {"matched_rows": 1, "unmatched_rows": 0})
+        self.assertEqual(report["checks"]["modal_periods"]["Modal Participation Factors"],
+                         {"matched_rows": 1, "unmatched_rows": 0})
+        self.assertEqual(report["checks"]["connectivity"]["Objects and Elements - Frames"]["unresolved_joint_ids"], [])
+        self.assertEqual(report["checks"]["connectivity"]["Objects and Elements - Areas"]["checked_rows"], 1)
+        self.assertEqual(tables["Modal Participation Factors"]["units"]["ModalMass"], "kN-m-s²")
+        self.assertEqual(tables["Modal Participating Mass Ratios"]["rows"][0][5], 0.5)
+
+    def test_second_lot_can_be_read_alone_and_reports_unresolved_joint_ids(self):
+        second = self.second_lot(include_missing_joint=True)
+        self.assertEqual(main(["--analysis-reference", str(second), "--reference-output", str(self.output)]), 0)
+        report = json.loads((self.output / "ETABS_ANALYSIS_REFERENCE.private.json").read_text("utf-8"))
+        self.assertEqual(report["checks"]["connectivity"]["Objects and Elements - Frames"]["unresolved_joint_ids"], ["99"])
+        self.assertIn("Story Forces", report["missing_tables"])
+        self.assertIsNone(report["files"][0]["reported_current_units"])
+
+    def test_modal_conflict_in_a_filtered_out_case_blocks_publication(self):
+        second = self.second_lot(period=2.5)
+        with patch("sys.stderr") as errors, self.assertRaises(SystemExit) as reason:
+            self.run_import("--analysis-reference", str(second), "--reference-case", "EQX")
+        self.assertEqual(reason.exception.code, 2)
+        self.assertIn("conflicting modal period", "".join(call.args[0] for call in errors.write.call_args_list))
+        self.assertFalse(self.output.exists())
+
+    def test_repeated_workbooks_and_overlapping_tables_fail_without_output(self):
+        second = self.second_lot()
+        copy = self.source.with_name("copy.xlsx")
+        copy.write_bytes(second.read_bytes())
+        overlap = self.source.with_name("overlap.xlsx")
+        with second.open("rb") as original:
+            book = load_workbook(original)
+        book["Modal Periods And Frequencies"]["D4"] = 0.45
+        book.save(overlap)
+        book.close()
+        for other, message in [(second, "distinct analysis workbook lots"), (copy, "identical bytes"),
+                               (overlap, "more than one workbook")]:
+            with self.subTest(other=other):
+                with patch("sys.stderr") as errors, self.assertRaises(SystemExit) as reason:
+                    main(["--analysis-reference", str(second), str(other),
+                          "--reference-output", str(self.output)])
+                self.assertEqual(reason.exception.code, 2)
+                self.assertIn(message, "".join(call.args[0] for call in errors.write.call_args_list))
+                self.assertFalse(self.output.exists())
 
 
 if __name__=="__main__":
