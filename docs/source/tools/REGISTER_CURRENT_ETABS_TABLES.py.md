@@ -39,22 +39,32 @@ python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-files "Analysis Export 
 
 Use the full local input paths if the files are not in the current directory. Use a new private JSON filename each run. Progress prints before each sheet. The report contains per-sheet row/cell counts, candidate families, header previews, duplicate titles/content and read failures. Exit 0 means the selected worksheets were scanned, not validated; exit 2 means incomplete scanning. Keep the report private (it may contain project data). This mode does not register or combine lots into solver inputs; existing registration flags remain unchanged.
 
-## Import first-lot reference results
+## Import ETABS analysis reference results
 
 ```powershell
-python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-reference "D:\ETABS\Analysis Export ULS 3 storey latest_compressed FIRST LOT.xlsx" --reference-output "..\first_lot_reference"
+$firstLot = "D:\ETABS\Analysis Export ULS 3 storey latest_compressed FIRST LOT.xlsx"
+$secondLot = "D:\ETABS\Analysis Export ULS 3 storey latest_compressed SECOND LOT.xlsx"
+python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-reference $firstLot $secondLot --reference-output "..\etabs_analysis_reference"
 ```
 
 Use a new local output directory outside the Git checkout. The command writes
-`FIRST_LOT_REFERENCE.private.json` with normalized rows and workbook provenance.
-To export rows for specific cases, repeat the exact ETABS name with
-`--reference-case "EQX" --reference-case "RSX P Delta"`. Case filtering preserves
-the workbook-wide case counts and leaves tables without a case column available.
-Exit 2 means the import could not publish a reference. The source workbook is
-read-only. The reference mode is independent of the multi-lot audit and the
-full-table registration used by solver workflows.
+`ETABS_ANALYSIS_REFERENCE.private.json` with normalized rows and separate provenance
+for each workbook. Either workbook can also be selected on its own. A single
+first-lot selection continues to write `FIRST_LOT_REFERENCE.private.json`
+with its original schema.
 
-See the [reference data and unit contract](../components/inputs/etabs_table_bundle.py.md#import-first-lot-reference-results).
+To export rows for specific cases, repeat the exact ETABS name with
+`--reference-case "EQX" --reference-case "Modal Ritz"`. Case filtering preserves
+source coverage counts and keeps tables without a case column. The import
+stops before publication if it detects a duplicate workbook, an overlapping
+supported table, malformed data, or conflicting modal periods. Exit 2
+means the import could not publish a reference.
+
+The command opens the workbooks read-only. It produces a local reference for
+comparison. The multi-lot audit and full-table solver registration are separate
+commands with their own requirements.
+
+[Reference data and unit contract](../components/inputs/etabs_table_bundle.py.md#import-etabs-analysis-reference-results)
 
 ## Index complementary analysis lots without merging
 
@@ -62,4 +72,9 @@ See the [reference data and unit contract](../components/inputs/etabs_table_bund
 python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-files "FIRST LOT.xlsx" "SECOND LOT.xlsx" "THIRD LOT.xlsx" --table-index-output "ETABS_Analysis_Catalog.private.json"
 ```
 
-Use the exact actual local file paths. This mode inventories table ownership and fingerprints, and writes a new private index. Use the source-selection module's `resolve_analysis_table` with a requested exact worksheet name; ambiguity or missing tables is an error. This mode is mutually exclusive with full-cell audit, first-lot import and EDB registration. It does not combine tables, register solver inputs, or certify an EDB match. For full inspection continue using the audit mode.
+Use the exact local file paths. This mode writes the worksheet owners and workbook
+hashes. The source-selection module's `resolve_analysis_table` requires one
+unambiguous owner. Reference import shares this index scan and also validates
+the known first- and second-lot worksheet values. Use each mode in its own
+invocation. The index reports source files for review and leaves solver
+registration to the EDB-bound workflow.

@@ -52,11 +52,39 @@ _FIRST_LOT_TABLES = {
         **dict.fromkeys(("U1Amp", "U2Amp", "U3Amp"), "mm")}),
     "Pier Forces": ((*_STORY_CASE, "Pier", "Location"), _WALL_FORCES),
 }
+_OBJECT_COLUMNS = ("Story", "Element Name", "Object Type", "Object Label", "Object Name")
+_JOINTS = "Objects and Elements - Joints"
+_FRAMES = "Objects and Elements - Frames"
+_AREAS = "Objects and Elements - Areas"
+_PERIODS = "Modal Periods And Frequencies"
+_MODE_COLUMNS = ("Case", "Mode")
+_MODAL_DOF = ("UX", "UY", "UZ", "RX", "RY", "RZ")
+_PERIOD_TABLES = (
+    "Modal Participation Factors", "Modal Participating Mass Ratios", "Modal Direction Factors",
+    "Response Spectrum Modal Info",
+)
+_REFERENCE_TABLES = _FIRST_LOT_TABLES | {
+    _JOINTS: (_OBJECT_COLUMNS, dict.fromkeys(("Global X", "Global Y", "Global Z"), "mm")),
+    _FRAMES: ((*_OBJECT_COLUMNS, "Elm JtI", "Elm JtJ"), {}),
+    _AREAS: ((*_OBJECT_COLUMNS, "Elm Jt1", "Elm Jt2", "Elm Jt3", "Elm Jt4"), {}),
+    _PERIODS: (_MODE_COLUMNS, {
+        "Period": "sec", "Frequency": "cyc/sec", "CircFreq": "rad/sec", "Eigenvalue": "rad²/sec²"}),
+    "Modal Participation Factors": (_MODE_COLUMNS, {
+        "Period": "sec", **dict.fromkeys(_MODAL_DOF, "kN-m"), "ModalMass": "kN-m-s²", "ModalStiff": "kN-m"}),
+    "Modal Participating Mass Ratios": (_MODE_COLUMNS, {
+        "Period": "sec", **dict.fromkeys((*_MODAL_DOF, *("Sum" + dof for dof in _MODAL_DOF)), "")}),
+    "Modal Load Participation Ratios": (("Case", "ItemType", "Item"), {"Static": "%", "Dynamic": "%"}),
+    "Modal Direction Factors": (_MODE_COLUMNS, {"Period": "sec", **dict.fromkeys(("UX", "UY", "UZ", "RZ"), "")}),
+}
 _REFERENCE_UNITS = {
     "mm": ("m", 1000),
     "mm/sec²": ("m/s²", 1000),
     "rad/sec²": ("rad/s²", 1),
+    "cyc/sec": ("Hz", 1),
+    "rad/sec": ("rad/s", 1),
+    "rad²/sec²": ("rad²/s²", 1),
     "sec": ("s", 1),
+    "%": ("1", 100),
     "": ("1", 1),
 }
 
@@ -312,11 +340,11 @@ def _program_control(sheet):
     return {field: record[field] for field in fields}
 
 
-def _reference_table(sheet, selected_cases):
+def _reference_table(sheet):
     name, headers, unit_row, rows = _reference_header(sheet)
-    keys, measures = _FIRST_LOT_TABLES[sheet.title]
+    keys, measures = _REFERENCE_TABLES[sheet.title]
     if set(headers) != set(keys) | measures.keys():
-        raise ValueError(f"{sheet.title}: column headers do not match the first-lot schema")
+        raise ValueError(f"{sheet.title}: column headers do not match the ETABS reference schema")
     source_units = dict(zip(headers, unit_row))
     for column in headers:
         expected = measures.get(column, "")
@@ -326,18 +354,25 @@ def _reference_table(sheet, selected_cases):
     if any(unit_row[len(headers):]):
         raise ValueError(f"{sheet.title}: unexpected unit outside the table")
     normalized_units = {column: _REFERENCE_UNITS.get(unit, (unit, 1)) for column, unit in measures.items()}
-    case_column = next((c for c in ("Output Case", "SpecCase") if c in keys), None)
+    case_column = next((c for c in ("Output Case", "SpecCase", "Case") if c in keys), None)
     # The drift table identifies one result per story, direction, case and step.
     # Its controlling point label and formatted reciprocal drift are attributes.
-    identity_columns = tuple(column for column in keys if column not in ("Drift/", "Label")) \
-        if sheet.title == "Story Drifts" else keys
-    key_seen = set()
+    identity_columns = {
+        "Story Drifts": tuple(column for column in keys if column not in ("Drift/", "Label")),
+        _JOINTS: ("Element Name",),
+        _FRAMES: headers,
+        _AREAS: ("Object Type", "Element Name"),
+    }.get(sheet.title, keys)
+    key_seen = {}
+    duplicates = {}
+    source_row_count = 0
     story_names = set()
     case_counts = Counter()
     imported = []
     for row_number, row in enumerate(rows, start=4):
         if all(value is None for value in row):
             continue
+        source_row_count += 1
         context = f"{sheet.title} row {row_number}"
         if len(row) > len(headers) and any(value is not None for value in row[len(headers):]):
             raise ValueError(f"{context}: data outside the table columns")
@@ -365,76 +400,163 @@ def _reference_table(sheet, selected_cases):
                 raise ValueError(f"{context}: invalid {column}")
         key = tuple(record[column] for column in identity_columns)
         if key in key_seen:
+            # Shell edges can share an element name and have distinct ordered
+            # connectivity. Group only identical records from the frame sheet.
+            if sheet.title == _FRAMES:
+                duplicates.setdefault(key_seen[key], []).append(row_number)
+                continue
             raise ValueError(f"{context}: duplicate result key")
-        key_seen.add(key)
+        key_seen[key] = row_number
         if "Story" in record:
             story_names.add(record["Story"])
         case = record[case_column] if case_column else None
         if case is not None:
             case_counts[case] += 1
-        if not selected_cases or case_column is None or case in selected_cases:
-            imported.append([row_number, *(record[column] for column in headers)])
-    return {
+        imported.append([row_number, *(record[column] for column in headers)])
+    result = {
         "table_title": name, "columns": ["worksheet_row", *headers],
         "source_units": measures, "units": {c: scale[0] for c, scale in normalized_units.items()},
         "case_column": case_column, "case_row_counts": dict(case_counts),
-        "stories": sorted(story_names), "source_row_count": len(key_seen), "rows": imported,
+        "stories": sorted(story_names), "source_row_count": source_row_count,
+        "unique_row_count": len(imported), "rows": imported,
     }
+    if sheet.title == _FRAMES:
+        result["duplicate_worksheet_rows"] = [
+            {"worksheet_row": original, "also_at": duplicates[original]} for original in sorted(duplicates)]
+    return result
+
+
+def _read_reference_workbook(book, entry, schemas, progress):
+    sheet_names = set(entry["worksheets"])
+    program = {}
+    if "Program Control" in sheet_names:
+        program = _program_control(book["Program Control"])
+    elif not (sheet_names & (schemas.keys() - _FIRST_LOT_TABLES.keys())):
+        raise ValueError("ETABS Program Control worksheet is required")
+    tables = {}
+    for sheet in book.worksheets:
+        if sheet.title in schemas:
+            if progress:
+                progress(f"Reading {sheet.title}")
+            tables[sheet.title] = _reference_table(sheet)
+    if not any(table["rows"] for table in tables.values()):
+        raise ValueError(f"The workbook has no supported reference rows: {Path(entry['path']).name}")
+    return {
+        "edb_sha256": None, "source_model_identity": "UNVERIFIED", "etabs_version": program.get("Version"),
+        "reported_current_units": program.get("CurrUnits"),
+        "unrecognized_sheets": sorted(sheet_names - schemas.keys() - {"Program Control"}),
+    }, tables
+
+
+def _reference_checks(tables):
+    modal = {}
+    if _PERIODS in tables:
+        baseline = tables[_PERIODS]
+        case, mode, period = (baseline["columns"].index(c) for c in ("Case", "Mode", "Period"))
+        periods = {(row[case], row[mode]): row[period] for row in baseline["rows"]}
+        for name in _PERIOD_TABLES:
+            if name not in tables:
+                continue
+            table = tables[name]
+            case_name = "ModalCase" if name == "Response Spectrum Modal Info" else "Case"
+            case, mode, period = (table["columns"].index(c) for c in (case_name, "Mode", "Period"))
+            matched = 0
+            for row in table["rows"]:
+                key = (row[case], row[mode])
+                if key in periods:
+                    if row[period] != periods[key]:
+                        raise ValueError(f"{name} row {row[0]}: conflicting modal period for {key}")
+                    matched += 1
+            modal[name] = {"matched_rows": matched, "unmatched_rows": len(table["rows"]) - matched}
+
+    connectivity = {}
+    if _JOINTS in tables:
+        joints = tables[_JOINTS]
+        index = joints["columns"].index("Element Name")
+        joint_ids = {row[index] for row in joints["rows"]}
+        for name in (_FRAMES, _AREAS):
+            if name not in tables:
+                continue
+            table = tables[name]
+            endpoints = [i for i, c in enumerate(table["columns"]) if c.startswith("Elm Jt")]
+            missing = {row[i] for row in table["rows"] for i in endpoints} - joint_ids
+            connectivity[name] = {"checked_rows": len(table["rows"]), "unresolved_joint_ids": sorted(missing)}
+    return {"modal_periods": modal, "connectivity": connectivity}
+
+
+def _read_analysis_reference(paths, cases, progress, schemas, legacy_first_lot):
+    from components.inputs.etabs_excel_selection import build_analysis_table_catalog
+
+    paths = tuple(paths)
+    requested = tuple(cases)
+    if any(not isinstance(c, str) or not c.strip() for c in requested) or len(set(requested)) != len(requested):
+        raise ValueError("Specify distinct, nonblank exact ETABS case names")
+    selected = set(requested)
+    metadata = []
+    tables = {}
+
+    def inspect(book, entry, file_index):
+        if progress and len(paths) > 1:
+            progress(f"Workbook {file_index + 1}: {Path(entry['path']).name}")
+        source, imported = _read_reference_workbook(book, entry, schemas, progress)
+        metadata.append(source)
+        for name, table in imported.items():
+            table["file_index"] = file_index
+            tables.setdefault(name, table)
+
+    catalog = build_analysis_table_catalog(paths, inspect_workbook=inspect)
+    owners = catalog["tables"]
+    shared = [name for name in schemas
+              if len({owner["file_index"] for owner in owners.get(name.casefold(), ())}) > 1]
+    if shared:
+        raise ValueError("Reference table occurs in more than one workbook: " + ", ".join(sorted(shared)))
+    files = [{**entry, **source} for entry, source in zip(catalog["files"], metadata)]
+    checks = _reference_checks(tables)
+    missing_cases = selected - {name for table in tables.values() for name in table["case_row_counts"]}
+    if missing_cases:
+        raise ValueError("Requested ETABS case absent: " + ", ".join(sorted(missing_cases)))
+    if selected:
+        for table in tables.values():
+            if table["case_column"]:
+                i = table["columns"].index(table["case_column"])
+                table["rows"] = [row for row in table["rows"] if row[i] in selected]
+    common = {
+        "status": "WORKBOOK_REFERENCE_ONLY", "engineering_acceptance": "NOT_VERIFIED",
+        "selected_cases": list(requested), "tables": tables,
+    }
+    if legacy_first_lot and len(files) == 1 and tables.keys() <= _FIRST_LOT_TABLES.keys():
+        source = metadata[0]
+        unknown = source.pop("unrecognized_sheets")
+        source["workbook_path"] = files[0]["path"]
+        source["workbook_sha256"] = files[0]["sha256"]
+        for table in tables.values():
+            table.pop("file_index")
+            table.pop("unique_row_count")
+        return {
+            **common, "schema": "ETABS_FIRST_LOT_REFERENCE_V1", "source": source,
+            "missing_tables": sorted(_FIRST_LOT_TABLES.keys() - tables.keys()), "unrecognized_sheets": unknown,
+        }
+    return {
+        **common, "schema": "ETABS_ANALYSIS_REFERENCE_V1", "files": files,
+        "missing_tables": sorted(schemas.keys() - tables.keys()), "checks": checks,
+    }
+
+
+def read_analysis_reference(paths, *, cases=(), progress=None, legacy_first_lot=False):
+    """[REF docs/source/components/inputs/etabs_table_bundle.py.md]
+
+    Read first- and second-lot tables as ETABS reference evidence.
+    Cross-check reported modal periods and endpoint IDs before filtering exact cases.
+    """
+    return _read_analysis_reference(paths, cases, progress, _REFERENCE_TABLES, legacy_first_lot)
 
 
 def read_first_lot_reference(path, *, cases=(), progress=None):
     """[REF docs/source/components/inputs/etabs_table_bundle.py.md]
 
-    Read a single ETABS analysis lot as reference data in kN, m and s.
-    Preserve exact case names, source rows, components and result step identity.
-    Coverage counts describe the workbook only; model identity is unverified.
+    Read one first-lot workbook with the original single-workbook schema.
     """
-    from openpyxl import load_workbook
-
     source = Path(path).expanduser().resolve()
     if not source.is_file() or source.suffix.lower() not in (".xlsx", ".xlsm"):
         raise ValueError("Select one local ETABS .xlsx or .xlsm analysis workbook")
-    requested = tuple(cases)
-    selected = set(requested)
-    if len(selected) != len(requested) or any(not isinstance(c, str) or not c.strip() for c in selected):
-        raise ValueError("Specify distinct, nonblank exact ETABS case names")
-    tables = {}
-    # Own the file stream so a failed streaming parse also releases the
-    # Windows file handle when openpyxl's worksheet iterator is interrupted.
-    with source.open("rb") as stream:
-        digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        stream.seek(0)
-        book = load_workbook(stream, read_only=True, data_only=False, keep_links=False)
-        try:
-            sheet_names = {sheet.title for sheet in book.worksheets}
-            if "Program Control" not in sheet_names:
-                raise ValueError("ETABS Program Control worksheet is required")
-            program = _program_control(book["Program Control"])
-            for sheet in book.worksheets:
-                if sheet.title in _FIRST_LOT_TABLES:
-                    if progress:
-                        progress(f"Reading {sheet.title}")
-                    tables[sheet.title] = _reference_table(sheet, selected)
-        finally:
-            book.close()
-    if _sha(source) != digest:
-        raise ValueError("Workbook bytes changed while reading the reference")
-    missing_cases = selected - {name for table in tables.values() for name in table["case_row_counts"]}
-    if missing_cases:
-        raise ValueError("Requested ETABS case absent: " + ", ".join(sorted(missing_cases)))
-    if not any(table["rows"] for table in tables.values()):
-        raise ValueError("The workbook has no first-lot reference rows")
-    return {
-        "schema": "ETABS_FIRST_LOT_REFERENCE_V1",
-        "status": "WORKBOOK_REFERENCE_ONLY",
-        "engineering_acceptance": "NOT_VERIFIED",
-        "source": {
-            "workbook_path": str(source), "workbook_sha256": digest, "edb_sha256": None,
-            "source_model_identity": "UNVERIFIED", "etabs_version": program["Version"],
-            "reported_current_units": program["CurrUnits"],
-        },
-        "selected_cases": list(requested),
-        "missing_tables": sorted(_FIRST_LOT_TABLES.keys() - tables.keys()),
-        "unrecognized_sheets": sorted(sheet_names - _FIRST_LOT_TABLES.keys() - {"Program Control"}),
-        "tables": tables,
-    }
+    return _read_analysis_reference([source], cases, progress, _FIRST_LOT_TABLES, True)
