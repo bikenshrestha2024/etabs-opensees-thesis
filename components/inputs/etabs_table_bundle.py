@@ -116,3 +116,126 @@ def register_current_etabs_tables(export_dir, analysis, beam_forces, *,
     }
     atomic_json(destination,manifest)
     return destination,manifest
+
+
+def audit_analysis_workbooks(paths, *, progress=None):
+    """[REF docs/source/components/inputs/etabs_table_bundle.py.md]
+
+    Read every populated worksheet cell in all explicitly selected lots.
+    Inventory only: no source data merges, solver input adoption or approval.
+    Formula text is read, not evaluated; cached formula results are not checked.
+    Report local sheet identity, row/cell counts and overlapping table names.
+    """
+    import math
+    from collections import defaultdict
+    from openpyxl import load_workbook
+    from components.validation.etabs_native_quantity_tables import evidence_families
+    selected=[Path(p).expanduser().resolve() for p in paths]
+    if not selected or len({str(p).casefold() for p in selected})!=len(selected):
+        raise ValueError("Select distinct analysis workbook lots")
+    files=[]; errors=[]; names=defaultdict(list); contents=defaultdict(list)
+    for index,path in enumerate(selected,1):
+        record=dict(lot=index,source_path=str(path),worksheets=[],status="NOT_READ")
+        files.append(record)
+        try:
+            if not path.is_file() or path.suffix.lower() not in (".xlsx",".xlsm"):
+                raise ValueError("Missing or unsupported workbook")
+            before=_sha(path)
+            record.update(sha256=before,size_bytes=path.stat().st_size)
+            book=load_workbook(path,read_only=True,data_only=False)
+            try:
+                record["sheet_names"]=list(book.sheetnames)
+                record["worksheet_count"]=len(book.worksheets)
+                record["nonworksheet_names"]=[n for n in book.sheetnames
+                                             if n not in {s.title for s in book.worksheets}]
+                for sheet in book.worksheets:
+                    rowinfo=dict(sheet=sheet.title,state=sheet.sheet_state,
+                        status="NOT_READ",nonempty_rows=0,populated_cells=0,
+                        numeric_cells=0,formula_cells=0,error_cells=0,
+                        nonfinite_numeric_cells=0,last_populated_row=0,
+                        last_populated_column=0,
+                        candidate_evidence_families=evidence_families(
+                            {"key":sheet.title,"name":sheet.title}),
+                        first_three_populated_rows=[])
+                    record["worksheets"].append(rowinfo)
+                    if progress:progress(f"Lot {index}: reading {sheet.title}")
+                    try:
+                        # Exported dimensions can be wrong. Stream actual row
+                        # XML rather than trusting the advertised used range.
+                        sheet.reset_dimensions()
+                        digest=hashlib.sha256()
+                        for rn,row in enumerate(sheet.iter_rows(),1):
+                            cells=[]
+                            for cn,cell in enumerate(row,1):
+                                val=cell.value
+                                if val is None:continue
+                                typ=cell.data_type
+                                rowinfo["populated_cells"]+=1
+                                rowinfo["last_populated_column"]=max(
+                                    rowinfo["last_populated_column"],cn)
+                                if typ=="f":rowinfo["formula_cells"]+=1
+                                elif typ=="e":rowinfo["error_cells"]+=1
+                                elif isinstance(val,(int,float)) and not isinstance(val,bool):
+                                    rowinfo["numeric_cells"]+=1
+                                    if isinstance(val,float) and not math.isfinite(val):
+                                        rowinfo["nonfinite_numeric_cells"]+=1
+                                        val=str(val)
+                                # Include actual typed cell content, coordinates
+                                # and formula text. Non-primitive values (dates,
+                                # array formulas) retain a stable representation.
+                                if not isinstance(val,(str,int,float,bool)):
+                                    if hasattr(val,"isoformat"):val=val.isoformat()
+                                    elif hasattr(val,"__dict__"):val=vars(val)
+                                    else:raise ValueError("Unsupported cell value type: "+type(val).__name__)
+                                cells.append((cn,typ,val))
+                            if cells:
+                                rowinfo["nonempty_rows"]+=1
+                                rowinfo["last_populated_row"]=rn
+                                line=json.dumps([rn,cells],ensure_ascii=False,
+                                                sort_keys=True,default=str)
+                                digest.update(line.encode("utf-8")+b"\\n")
+                                if len(rowinfo["first_three_populated_rows"])<3:
+                                    rowinfo["first_three_populated_rows"].append(
+                                        dict(row=rn,cells=cells[:40]))
+                        rowinfo.update(status="ALL_POPULATED_CELLS_SCANNED",
+                                       content_sha256=digest.hexdigest())
+                        identity=dict(lot=index,sheet=sheet.title)
+                        names[sheet.title.strip().casefold()].append(identity)
+                        contents[digest.hexdigest()].append(identity)
+                    except Exception as exc:
+                        rowinfo.update(status="SHEET_SCAN_FAILED",error=type(exc).__name__+": "+str(exc))
+                        errors.append(dict(lot=index,sheet=sheet.title,error=rowinfo["error"]))
+            finally:
+                book.close()
+            if _sha(path)!=before:
+                raise ValueError("Workbook bytes changed during scan")
+            record["status"]=("ALL_WORKSHEETS_SCANNED" if record["worksheets"] and
+                all(s["status"]=="ALL_POPULATED_CELLS_SCANNED" for s in record["worksheets"])
+                else "INCOMPLETE_WORKSHEET_SCAN")
+        except Exception as exc:
+            record.update(status="WORKBOOK_SCAN_FAILED",error=type(exc).__name__+": "+str(exc))
+            errors.append(dict(lot=index,error=record["error"]))
+    sheets=[s for f in files for s in f["worksheets"]]
+    families=defaultdict(list)
+    for f in files:
+        for s in f["worksheets"]:
+            if s["status"]=="ALL_POPULATED_CELLS_SCANNED":
+                for family in s["candidate_evidence_families"]:
+                    families[family].append(dict(lot=f["lot"],sheet=s["sheet"],
+                                                 nonempty_rows=s["nonempty_rows"]))
+    complete=all(f["status"]=="ALL_WORKSHEETS_SCANNED" for f in files)
+    return dict(schema="ETABS_MULTI_LOT_ALL_SHEET_AUDIT_V1",
+        status="ALL_WORKSHEETS_SCANNED_NOT_ENGINEERING_VALIDATION" if complete else "INCOMPLETE_SCAN",
+        engineering_acceptance="NOT_VERIFIED",source_model_identity="NOT_ESTABLISHED_BY_SCAN",
+        files=files,worksheet_count=len(sheets),
+        fully_scanned_worksheets=sum(s["status"]=="ALL_POPULATED_CELLS_SCANNED" for s in sheets),
+        nonempty_rows=sum(s["nonempty_rows"] for s in sheets),
+        populated_cells=sum(s["populated_cells"] for s in sheets),
+        repeated_sheet_names=[v for v in names.values() if len(v)>1],
+        identical_populated_cell_content=[v for v in contents.values() if len(v)>1],
+        candidate_evidence_families=dict(families),errors=errors,
+        limitations=["Private local diagnostic; no table rows are combined or deduplicated.",
+                     "Names are discovery hints, not validated result schemas or units.",
+                     "Row counts include header and unit rows; formula caches not evaluated.",
+                     "Repeated names or identical populated cells require source review before combining.",
+                     "Not proof of same EDB, complete analysis cases, native analytical mesh or engineering equivalence."])

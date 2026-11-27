@@ -28,3 +28,13 @@ and its SHA-256 is stored in the private canonical source registry. Replacing
 the selection removes stale earlier beam-part roles. This is inventory only;
 combine and verify stations with `components.validation.etabs_split_beam_forces`.
 Never interpret selected beam parts as a passed gravity-reaction comparison.
+
+## Audit multiple analysis lots without registration
+
+For split analysis exports, scan every worksheet locally without needing ETABS or selecting beam files:
+
+```powershell
+python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-files "Analysis Export ULS 3 storey latest_compressed FIRST LOT.xlsx" "Analysis Export ULS 3 storey latest_compressed SECOND LOT.xlsx" --audit-output "ETABS_Analysis_Lots_Audit.private.json"
+```
+
+Use the full local input paths if the files are not in the current directory. Use a new private JSON filename each run. Progress prints before each sheet. The report contains per-sheet row/cell counts, candidate families, header previews, duplicate titles/content and read failures. Exit 0 means the selected worksheets were scanned, not validated; exit 2 means incomplete scanning. Keep the report private (it may contain project data). This mode does not register or combine lots into solver inputs; existing registration flags remain unchanged.
