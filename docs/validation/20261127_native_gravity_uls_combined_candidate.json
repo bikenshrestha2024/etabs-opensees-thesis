@@ -1,0 +1,20 @@
+{
+  "ULS": {
+    "use_native_frame_modifiers": true,
+    "use_native_shell_modifiers": true,
+    "allow_shell_shear_approximation": true,
+    "shear_flexible_sections": [
+      "Beam 600*800",
+      "Col 1100*1100",
+      "Col 1250*1250"
+    ],
+    "force_based_rigid_zone_sections": [
+      "Beam 600*800",
+      "Col 1100*1100",
+      "Col 1250*1250"
+    ],
+    "layered_shell_sections": {
+      "Wall 600": 1
+    }
+  }
+}
