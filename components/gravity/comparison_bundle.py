@@ -62,6 +62,7 @@ EXTRA = ("ETABS_Nonzero_Reaction_Support_Audit.json",
          "Gravity_Joint_Weight_Scenarios.csv",
          "Gravity_Joint_Weight_By_Solid.csv",
          "Gravity_Original_ETABS_Object_Quantities.csv",
+         "Gravity_Recovered_Interface_Resultants.json",
          "Gravity_Result_V110.json", "Gravity_Run_V110.log",
          "Gravity_Results_V110.xlsx", "Gravity_GUI_Actions.log",
          "Gravity_Run_V110.py")

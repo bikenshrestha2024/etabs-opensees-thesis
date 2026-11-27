@@ -65,6 +65,130 @@ def recovered_vertical_transfers(payload, elevations_m):
     return rows
 
 
+def recovered_interface_resultants(payload, elevations_m, applied_vectors, *,
+                                  source_elements=None):
+    """Six global components from solved frame/shell ends at discrete interfaces.
+
+    [REF docs/source/components/gravity/load_path_formulas.py.md]
+    Each moment is translated to (0,0,elevation) in ORIGINAL model axes.
+    Lower-side element resisting forces have the support-positive sign.
+    Applied loads are signed, fully factored nodal six-vectors, not mass.
+    A cut through an unsplit element is flagged, not claimed to be a
+    planar native section cut. Upper free-body and lower free-body
+    residuals are separate diagnostics (no fitted force redistribution).
+    """
+    import math
+    from collections import defaultdict
+    if payload.get("ok") is not True:
+        raise ValueError("Successful solved gravity result required")
+    recovered_vertical_transfers(payload, [])  # full force-vector identity gate
+
+    def vector(raw, size, label):
+        if len(raw)!=size or any(isinstance(x,bool) for x in raw):
+            raise ValueError("Invalid "+label)
+        v=tuple(float(x) for x in raw)
+        if not all(math.isfinite(x) for x in v):
+            raise ValueError("Nonfinite "+label)
+        return v
+
+    xyz={int(n["tag"]):vector([n[k] for k in ("x_m","y_m","z_m")],3,
+                              "node coordinates") for n in payload["nodes"]}
+    if not xyz or not payload["elements"]:
+        raise ValueError("No solved mesh evidence")
+    tags={int(e["tag"]):tuple(map(int,e["nodes"])) for e in payload["elements"]}
+    forces={int(e["tag"]):vector(e["forces"],6*len(e["nodes"]),
+                                 "global element vector")
+            for e in payload["global_end_forces"]}
+    applied={}
+    for raw,values in applied_vectors.items():
+        tag=int(raw)
+        if tag not in xyz or tag in applied:
+            raise ValueError("Unknown or duplicate applied load node")
+        applied[tag]=vector(values,6,"applied nodal vector")
+    reactions={}
+    for row in payload["reactions"]:
+        tag=int(row["node_tag"])
+        if tag not in xyz or tag in reactions:
+            raise ValueError("Unknown or duplicate support reaction")
+        reactions[tag]=vector([row[k] for k in
+            ("rx_kN","ry_kN","rz_kN","mx_kNm","my_kNm","mz_kNm")],6,"support vector")
+    declared=payload.get("support_node_tags")
+    if declared is None or len(declared)!=len(set(map(int,declared))) or set(map(int,declared))!=set(reactions):
+        raise ValueError("Complete declared support set and six reaction components required")
+
+    labels={}
+    if source_elements is not None:
+        for e in source_elements:
+            tag=int(e["tag"])
+            if tag in labels or tag not in tags or tuple(map(int,e["nodes"]))!=tags[tag]:
+                raise ValueError("Source element crosswalk differs from solved connectivity")
+            labels[tag]=(str(e["category"]),str(e["object"]))
+        if set(labels)!=set(tags):
+            raise ValueError("Incomplete source element crosswalk")
+
+    def translate(tag,v,level):
+        x,y,z=xyz[tag]
+        z-=level
+        fx,fy,fz,mx,my,mz=v
+        return (fx,fy,fz,mx+y*fz-z*fy,my+z*fx-x*fz,mz+x*fy-y*fx)
+
+    def total(rows):
+        return [math.fsum(v[i] for v in rows) for i in range(6)]
+
+    levels=sorted(set(map(float,elevations_m)))
+    if not levels or not all(math.isfinite(z) for z in levels):
+        raise ValueError("Finite interface elevations required")
+    tol=1e-7
+    result=[]; components=[]
+    for level in levels:
+        lower=lambda n: xyz[n][2]<=level+tol
+        groups=defaultdict(list)
+        counts=defaultdict(int)
+        cut=[]; crossings=0; off=0
+        for tag,ns in tags.items():
+            low=[i for i,n in enumerate(ns) if lower(n)]
+            if not low or len(low)==len(ns):
+                continue
+            crossings+=1
+            if any(abs(xyz[ns[i]][2]-level)>tol for i in low):
+                off+=1
+            member=total([translate(ns[i],forces[tag][6*i:6*i+6],level) for i in low])
+            cut.append(member)
+            if labels:
+                groups[labels[tag]].append(member);counts[labels[tag]]+=1
+        actual=total(cut)
+        low_applied=total([translate(n,v,level) for n,v in applied.items() if lower(n)])
+        high_applied=total([translate(n,v,level) for n,v in applied.items() if not lower(n)])
+        low_reaction=total([translate(n,v,level) for n,v in reactions.items() if lower(n)])
+        high_reaction=total([translate(n,v,level) for n,v in reactions.items() if not lower(n)])
+        lower_res=[c-a-r for c,a,r in zip(actual,low_applied,low_reaction)]
+        upper_res=[c+a+r for c,a,r in zip(actual,high_applied,high_reaction)]
+        result.append(dict(elevation_m=level,origin_m=[0.,0.,level],
+            crossing_elements=crossings,off_interface_elements=off,
+            basis=("DISCRETE_MESH_INTERFACE" if off==0 else
+                   "LOWER_NODE_RESULTANT_NOT_PLANAR_SECTION_CUT"),
+            cut_resultant=actual,applied_at_or_below=low_applied,
+            applied_above=high_applied,reactions_at_or_below=low_reaction,
+            reactions_above=high_reaction,lower_free_body_residual=lower_res,
+            upper_free_body_residual=upper_res))
+        for (category,obj),members in sorted(groups.items()):
+            components.append(dict(elevation_m=level,category=category,
+                source_object=obj,crossing_elements=counts[(category,obj)],
+                resultant=total(members)))
+    return dict(status="SOLVED_OPENSEES_INTERFACE_DIAGNOSTIC_NOT_ETABS_EQUIVALENCE",
+        component_order=["Fx_kN","Fy_kN","Fz_kN","Mx_kNm","My_kNm","Mz_kNm"],
+        reference_geometry="ORIGINAL_GLOBAL_COORDINATES",
+        gravity_profile=payload.get("gravity_profile"),
+        model_sha256=payload.get("model_sha256"),
+        model_input_sha256=payload.get("model_input_sha256"),
+        wall_support_strategy=payload.get("wall_support_strategy"),
+        source_crosswalk_verified=bool(labels),
+        interfaces=result,source_object_contributions=components,
+        limitations=["Discrete end-force interface, not arbitrary within-element stress integration.",
+            "Crossing constraint forces, internal lower-domain element couples and geometric-stiffness effects can affect residuals; do not infer a native ETABS section cut or alter reactions.",
+            "No acceptance tolerance or ETABS match is inferred."])
+
+
 def vertical_joint_balance(payload, applied_fz_kN):
     """Signed static joint balance: element Fz minus applied Fz minus reaction.
 
