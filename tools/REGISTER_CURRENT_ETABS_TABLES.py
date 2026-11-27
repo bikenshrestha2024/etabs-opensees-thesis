@@ -4,7 +4,10 @@ Register current ULS ETABS workbook evidence locally without moving files.
 from __future__ import annotations
 import argparse
 import sys
+from contextlib import suppress
 from pathlib import Path
+from xml.etree.ElementTree import ParseError
+from zipfile import BadZipFile
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
 
@@ -20,6 +23,12 @@ def main(argv=None):
                         help="Read ALL worksheets of explicitly selected analysis lots (audit only)")
     parser.add_argument("--audit-output",type=Path,
                         help="New private local JSON audit output; required with --analysis-files")
+    parser.add_argument("--analysis-reference", type=Path,
+                        help="Import one first-lot workbook as local ETABS result reference data")
+    parser.add_argument("--reference-output", type=Path,
+                        help="New directory for the private first-lot reference JSON")
+    parser.add_argument("--reference-case", action="append", default=[],
+                        help="Keep rows for an exact ETABS case name; repeat to select more than one")
     for i in (1,2,3):
         parser.add_argument(f"--beam-{i}",type=Path)
     parser.add_argument("--beam-files",type=Path,nargs="+",
@@ -28,6 +37,37 @@ def main(argv=None):
                         help="Open multi-select Excel file picker for all beam-force parts")
     parser.add_argument("--native-assignment",type=Path)
     args=parser.parse_args(argv)
+    if args.analysis_reference or args.reference_output or args.reference_case:
+        if (not args.analysis_reference or not args.reference_output or args.analysis_files
+                or args.audit_output or args.analysis or args.export_root or args.native_assignment
+                or args.select_beams or args.beam_files or any((args.beam_1, args.beam_2, args.beam_3))):
+            parser.error("Reference mode requires --analysis-reference and --reference-output; "
+                         "only --reference-case may be added")
+        from openpyxl.utils.exceptions import InvalidFileException
+        from components.inputs.etabs_table_bundle import read_first_lot_reference
+        from components.inputs.output_contract import _refuse_linked_output_target, atomic_json
+
+        directory = args.reference_output.expanduser().absolute()
+        target = directory / "FIRST_LOT_REFERENCE.private.json"
+        try:
+            _refuse_linked_output_target(directory)
+            if directory.exists():
+                raise FileExistsError(f"Reference output directory already exists: {directory}")
+            result = read_first_lot_reference(
+                args.analysis_reference, cases=args.reference_case, progress=lambda s: print(s, flush=True))
+            directory.mkdir(parents=True)
+            try:
+                atomic_json(target, result)
+            except (OSError, ValueError):
+                with suppress(OSError):
+                    directory.rmdir()
+                raise
+        except (OSError, ValueError, BadZipFile, InvalidFileException, ParseError, KeyError) as exc:
+            parser.error(str(exc))
+        row_count = sum(len(table["rows"]) for table in result["tables"].values())
+        print(f"{result['status']}: {row_count} rows from {len(result['tables'])} result tables")
+        print("Private reference:", target)
+        return 0
     if args.analysis_files:
         if (not args.audit_output or args.analysis or args.export_root or args.native_assignment
                 or args.select_beams or args.beam_files or any((args.beam_1,args.beam_2,args.beam_3))):
