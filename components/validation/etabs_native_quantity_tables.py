@@ -26,6 +26,28 @@ KEYWORDS=("material list","material quantities","material quantity",
           "story forces","diaphragm center","modal participating mass")
 
 
+# Catalog families are discovery hints, not proof of table semantics.
+# Do not substitute object connectivity for native analytical connectivity.
+EVIDENCE_FAMILIES={
+    "beam_end_offsets":("end length offset","end len offset","material list","self weight option"),
+    "wall_stiffness":("area property modifiers","area assign","shell assign","wall property","area section property"),
+    "analytical_mesh":("element connectivity","analysis model","analytical model","analysis element","auto mesh","automesh"),
+    "mesh_edge_constraints":("edge constraint","joint constraint","point constraint","constraint definition","constraint assignment","constraint force","joint assign"),
+    "physical_supports":("joint reaction","joint restraint","point restraint","base reaction"),
+    "rigid_end_zones":("end length offset","end len offset","insertion point","frame release","frame assign"),
+    "outrigger_belt_transfer":("element joint force","element forces","frame forces","pier forces","spandrel forces","group assign","group definition"),
+    "foundation_section_cuts":("section cut","sectioncut","element joint force","joint reaction"),
+}
+
+
+def evidence_families(table):
+    """Match native catalog names/keys, allowing CSI naming variations."""
+    name=(table["name"]+" "+table["key"]).casefold().replace("-"," ").replace("_"," ")
+    name=" ".join(name.split())
+    return [family for family,terms in EVIDENCE_FAMILIES.items()
+            if any(term in name for term in terms)]
+
+
 def _tuple_success(raw, minimum, label):
     if not isinstance(raw,(tuple,list)) or len(raw)<minimum or raw[-1] not in (0,None):
         raise RuntimeError(f"{label}: unexpected CSI return contract/status {repr(raw)[:250]}")
@@ -88,7 +110,38 @@ def _get_native_table(sap,key):
     return fields,[flat[i*len(fields):(i+1)*len(fields)] for i in range(count)]
 
 
-def export_native_quantity_tables(sap,output_dir,*,log=None):
+def export_native_quantity_tables(sap,output_dir,*,log=None,gravity_combo=None):
+    """Pin and restore native database display selection when requested.
+
+    The existing EQ/PDelta adapter owns CSI selection snapshot/restore.
+    If the API does not expose the combo selection, do not pretend a
+    case-scoped extraction was performed.
+    """
+    if gravity_combo is None:
+        return _export_tables(sap,output_dir,log=log,selection=None)
+    from components.validation.etabs_eq_pdelta_native_extract import (
+        _db_display_snapshot,_db_restore)
+    before=_db_display_snapshot(sap)
+    if not before["combos_available"]:
+        raise RuntimeError("Native database combination display selection unavailable")
+    db=sap.DatabaseTables
+    try:
+        for method,values in ((db.SetLoadCasesSelectedForDisplay,[]),
+                              (db.SetLoadCombinationsSelectedForDisplay,[gravity_combo])):
+            code=method(values)
+            if isinstance(code,(tuple,list)):
+                code=code[-1]
+            if code not in (0,None):
+                raise RuntimeError("Native database gravity selection failed: "+str(code))
+        selected=_db_display_snapshot(sap)
+        if selected["cases"] or selected["combos"]!=[gravity_combo]:
+            raise RuntimeError("Native database display selection differs from requested gravity combination")
+        return _export_tables(sap,output_dir,log=log,selection=selected)
+    finally:
+        _db_restore(sap,before)
+
+
+def _export_tables(sap,output_dir,*,log=None,selection=None):
     """Capture selected native table records, no geometry/weight assumptions.
 
     This is diagnostic extraction, not a material list solver and does not
@@ -106,13 +159,14 @@ def export_native_quantity_tables(sap,output_dir,*,log=None):
     for table in catalog:
         name=table["name"].lower()
         key=table["key"].lower()
-        if not any(word in name or word in key for word in KEYWORDS):
+        families=evidence_families(table)
+        if not families and not any(word in name or word in key for word in KEYWORDS):
             continue
         source_key=table["key"]
         if source_key in used:continue
         used.add(source_key)
         entry={"table_key":source_key,"display_name":table["name"],
-               "status":"NOT_EXTRACTED"}
+               "status":"NOT_EXTRACTED","evidence_families":families}
         try:
             fields,records=_get_native_table(sap,source_key)
             # Stable filename from source key hash; never allow path traversal
@@ -135,8 +189,23 @@ def export_native_quantity_tables(sap,output_dir,*,log=None):
             log("ETABS_NATIVE_QUANTITY_TABLE",
                 source_key,status=entry["status"],
                 records=entry.get("records"),error=entry.get("error"))
+    coverage={}
+    for family in EVIDENCE_FAMILIES:
+        entries=[row for row in status if family in row["evidence_families"]]
+        nonempty=[row["table_key"] for row in entries
+                  if row.get("status")=="EXPORTED_RAW_NOT_NORMALIZED" and row.get("records",0)>0]
+        coverage[family]=dict(
+            status=("RAW_NONEMPTY_CANDIDATES_REQUIRE_REVIEW" if nonempty else
+                    "CATALOG_PRESENT_NO_NONEMPTY_EVIDENCE" if entries else "NO_CATALOG_CANDIDATES"),
+            catalog_candidates=[row["table_key"] for row in entries],
+            nonempty_tables=nonempty,
+            engineering_acceptance="NOT_VERIFIED")
     manifest={
         "schema":"etabs-native-quantity-raw-v1",
+        "display_selection":selection,
+        "display_selection_status":("GRAVITY_COMBO_READBACK_VERIFIED" if selection is not None
+                                    else "NOT_PINNED_RAW_TABLES_ONLY"),
+        "engineering_evidence_coverage":coverage,
         "status":"RAW_NATIVE_TABLES_NO_AUTOMATIC_SELF_WEIGHT_ACCEPTANCE",
         "units":"As displayed in ETABS at time of extraction; inspect fields",
         "model_identity":"See matching direct ETABS gravity JSON and log",

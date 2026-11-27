@@ -43,6 +43,50 @@ class EtabsNativeQuantityTests(unittest.TestCase):
                              [["Object","Weight"],["B1","50.0"],["S1","30.0"]])
             self.assertTrue((Path(root)/"ETABS_NATIVE_QUANTITY_MANIFEST.json").is_file())
 
+    def test_gravity_selection_and_all_evidence_families(self):
+        class Native(FakeDatabase):
+            cases=["EQX"]
+            combos=["Old"]
+            def GetLoadCasesSelectedForDisplay(self):
+                return (len(self.cases),self.cases,0)
+            def GetLoadCombinationsSelectedForDisplay(self):
+                return (len(self.combos),self.combos,0)
+            def SetLoadCasesSelectedForDisplay(self,values):
+                self.cases=list(values);return 0
+            def SetLoadCombinationsSelectedForDisplay(self,values):
+                self.combos=list(values);return 0
+            def GetAvailableTables(self):
+                names=["Element Connectivity - Shells","Joint Assignments - Constraints",
+                       "Section Cut Forces","Element Joint Forces - Frames",
+                       "Joint Reactions","Other"]
+                return (len(names),names,names,[0]*len(names),0)
+            def GetTableForDisplayArray(self,key,*args):
+                if self.cases or self.combos!=["1. DL + LL"]:
+                    raise AssertionError("wrong display selection")
+                if key=="Section Cut Forces":
+                    return ((),1,("OutputCase",),0,(),0)
+                return ((),1,("OutputCase",),1,("1. DL + LL",),0)
+        sap=FakeSap();sap.DatabaseTables=Native()
+        with tempfile.TemporaryDirectory() as root:
+            result=export_native_quantity_tables(sap,root,gravity_combo="1. DL + LL")
+            self.assertEqual(result["selected_table_count"],5)
+            self.assertEqual(result["display_selection_status"],"GRAVITY_COMBO_READBACK_VERIFIED")
+            self.assertEqual(result["engineering_evidence_coverage"]["analytical_mesh"]["status"],
+                             "RAW_NONEMPTY_CANDIDATES_REQUIRE_REVIEW")
+            self.assertEqual(result["engineering_evidence_coverage"]["beam_end_offsets"]["status"],
+                             "NO_CATALOG_CANDIDATES")
+            cut=next(row for row in result["table_exports"] if row["table_key"]=="Section Cut Forces")
+            self.assertEqual(cut["records"],0)
+            self.assertNotIn("Section Cut Forces",result["engineering_evidence_coverage"]["foundation_section_cuts"]["nonempty_tables"])
+            self.assertEqual(sap.DatabaseTables.cases,["EQX"])
+            self.assertEqual(sap.DatabaseTables.combos,["Old"])
+
+    def test_gravity_selection_unavailable_does_not_claim_scope(self):
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaises(AttributeError):
+                export_native_quantity_tables(FakeSap(),root,gravity_combo="1. DL + LL")
+            self.assertFalse((Path(root)/"ETABS_NATIVE_QUANTITY_MANIFEST.json").exists())
+
     def test_rejects_nonzero_native_return(self):
         class Failed(FakeDatabase):
             def GetTableForDisplayArray(self,*args):

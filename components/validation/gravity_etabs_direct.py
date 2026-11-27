@@ -703,7 +703,7 @@ def connect_and_compare(export_dir,gravity_result_path,case='1. DL + LL',output_
                 _out((app.SapModel.SetPresentUnits(UNITS_KN_M_C),),
                      0,"Set ETABS quantity display units")
                 native_tables=export_native_quantity_tables(
-                    app.SapModel,out/"ETABS_Native_Quantity_Tables",log=report)
+                    app.SapModel,out/"ETABS_Native_Quantity_Tables",log=report,gravity_combo=case)
             finally:
                 _out((app.SapModel.SetPresentUnits(previous_units),),
                      0,"Restore native quantity display units")
