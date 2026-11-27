@@ -37,6 +37,7 @@ def run_case(root, executable, name, L, a, b, action, compression=0.):
            "if {[analyze 10] != 0} {error {native analysis failed}}",
            "reactions","set f [open response.txt w]",
            "puts $f [nodeDisp 4]","puts $f [nodeReaction 1]",
+           "puts $f [nodeReaction 2]","puts $f [eleResponse 1 forces]",
            "close $f","puts [version]","exit 0"]
     script=folder/"case.tcl"
     script.write_text("\n".join(lines)+"\n")
@@ -47,10 +48,17 @@ def run_case(root, executable, name, L, a, b, action, compression=0.):
         raise RuntimeError(f"Native solver failed: {name}")
     data=[list(map(float,row.split())) for row in
           (folder/"response.txt").read_text().splitlines()]
-    if len(data)!=2 or any(len(row)!=6 for row in data) or not all(
+    if [len(row) for row in data]!=[6,6,6,12] or not all(
             math.isfinite(x) for row in data for x in row):
         raise ValueError("Invalid native response")
-    u,reaction=data
+    u,reaction,slave,ends=data
+    # Both the slave reaction and member-end force are at x=a.
+    # M_origin = M_node + r cross F; never add the two representations.
+    def to_origin(v):
+        fx,fy,fz,mx,my,mz=v
+        return [fx,fy,fz,mx,my-a*fz,mz+a*fy]
+    recovered=[x+y for x,y in zip(reaction,to_origin(slave))]
+    element_cut=to_origin(ends[:6])
     if not compression:
         fx,fy,fz,mx,my,mz=action
         # Local x along the member, z axis from the transform.
@@ -63,17 +71,25 @@ def run_case(root, executable, name, L, a, b, action, compression=0.):
                   mz*ell/(E*Iz)+fy*dy]
         expected_r=[-fx,-fy,-fz,-mx,-my+L*fz,-mz-L*fy]
         error=max(abs(v-w) for v,w in zip(u,expected))/max(1e-15,max(map(abs,expected)))
-        # A constrained node's nodeReaction may omit force transferred from
-        # its MP slave in some solver implementations; preserve raw results.
-        # The displacement/compliance comparison is the acceptance test here.
+        # The native element cut is independent of nodeReaction recovery.
+        # Compare both with equilibrium; retain raw master/slave records.
         reaction_residual=max(abs(v-w) for v,w in zip(reaction,expected_r))
+        recovered_residual=max(abs(v-w) for v,w in zip(recovered,expected_r))
+        cut_residual=max(abs(v-w) for v,w in zip(element_cut,expected_r))
+        if max(recovered_residual,cut_residual)>1e-7:
+            raise AssertionError(f"{name}: MPC/cut resultant mismatch: {recovered}, {element_cut}, {expected_r}")
         if error>1e-7:
             raise AssertionError(f"{name}: relative compliance mismatch {error}; actual={u}; expected={expected}")
         return dict(case=name,displacements=u,expected_displacements=expected,
                     max_relative_compliance_residual=error,
-                    raw_support_reaction=reaction,expected_resultant=expected_r,
-                    raw_support_reaction_residual=reaction_residual)
+                    raw_support_reaction=reaction,raw_slave_reaction=slave,
+                    expected_resultant=expected_r,
+                    raw_support_reaction_residual=reaction_residual,
+                    recovered_support_resultant=recovered,independent_element_cut=element_cut,
+                    recovered_support_residual=recovered_residual,element_cut_residual=cut_residual)
     return dict(case=name,displacements=u,raw_support_reaction=reaction,
+                raw_slave_reaction=slave,recovered_support_resultant=recovered,
+                independent_element_cut=element_cut,
                 compression_kN=compression,status="GEOMETRIC_NONLINEAR_SENSITIVITY_ONLY")
 
 
