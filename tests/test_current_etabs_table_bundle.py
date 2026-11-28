@@ -637,6 +637,57 @@ class FirstLotReferenceTests(unittest.TestCase):
             self.assertEqual(report["tables"][name]["stored_row_count"], 1)
         self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
 
+    def test_fifth_lot_reference_preserves_units_and_diaphragm_metadata(self):
+        fifth = self.source.with_name("fifth.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        self.add_table("Centers Of Mass And Rigidity",
+                       "Story|Diaphragm|Mass X|Mass Y|XCM|YCM|Cum Mass X|Cum Mass Y|XCCM|YCCM|XCR|YCR",
+                       "||kg|kg|m|m|kg|kg|m|m|m|m",
+                       [("Story25", "D1", 1000, 1000, 12, 9, 1000, 1000, 12, 9, 12, 9)], book=book)
+        self.add_table("Diaphragm CM Displacements",
+                       "Story|Diaphragm|Output Case|Case Type|Step Type|Step Number|UX|UY|RZ|Point|X|Y|Z|Diaphragm Mass X|Diaphragm Mass Y|Diaphragm MMI RZ",
+                       "||||||mm|mm|rad||m|m|m|kg|kg|ton-m²",
+                       [("Story25", "D1", "EQX", "LinStatic", None, None, 10, 0, 0, "A", 12, 9, 95, 1000, 1000, 3),
+                        ("Story25", "D1", "EQY", "LinStatic", None, None, 0, 20, 0, "A", 12, 9, 95, 999, 1000, 3)], title="Diaphragm Center Of Mass Displacements", book=book)
+        self.add_table("Diaphragm Max Over Avg Drifts",
+                       "Story|Output Case|Case Type|Step Type|Step Number|Item|Max Drift|Avg Drift|Ratio|Label|Max Loc X|Max Loc Y|Max Loc Z",
+                       "||||||||||m|m|m",
+                       [("Story25", "EQX", "LinStatic", None, None, "Diaph D1 X", 0.001, 0, 999, "A", 12, 9, 95)], book=book)
+        self.add_table("Diaphragm Accelerations",
+                       "Story|Diaphragm|Output Case|Case Type|Step Type|Step Number|Max UX|Max UY|Max UZ|Max RX|Max RY|Max RZ|Min UX|Min UY|Min UZ|Min RX|Min RY|Min RZ",
+                       "||||||mm/sec²|mm/sec²|mm/sec²|rad/sec²|rad/sec²|rad/sec²|mm/sec²|mm/sec²|mm/sec²|rad/sec²|rad/sec²|rad/sec²",
+                       [("Story25", "D1", "RS X", "LinRespSpec", "Max", None, 1000, 0, 0, 0, 0, 0, None, None, None, None, None, None)], book=book)
+        self.add_table("Diaphragm Forces",
+                       "Story|Label|Unique Name|X-Coor|Y-Coor|Z-Coor|Output Case|Case Type|Step Type|Step Number|Applied Load FX|Applied Load FY|Reactive Force FX|Reactive Force FY|Diaphragm Force FX|Diaphragm Force FY",
+                       "|||mm|mm|mm|||||kN|kN|kN|kN|kN|kN",
+                       [("Story25", "A", "01", 12000, 9000, 95000, "EQX", "LinStatic", None, None, 5, 0, -3, 0, 2, 0)], book=book)
+        self.add_table("Element Forces - Area Shells",
+                       "Story|Shell Object|Unique Name|Design Type|Shell Element|Joint|Output Case|Case Type|Step Type|Step Number|F11|F22|F12|FMax|FMin|FVM|M11|M22|M12|MMax|MMin|V13|V23|VMax",
+                       "||||||||||kN/m|kN/m|kN/m|kN/m|kN/m|kN/m|kN-m/m|kN-m/m|kN-m/m|kN-m/m|kN-m/m|kN/m|kN/m|kN/m",
+                       [("Story25", "F1", "1", "Floor", "4", "01", "EQX", "LinStatic", None, None, 5, 0, 0, 5, 0, 5, 2, 0, 0, 2, 0, 0, 0, 0)], book=book)
+        book.save(fifth)
+        book.close()
+        from components.inputs.etabs_table_bundle import read_analysis_reference
+        database = self.source.with_name("fifth.sqlite3")
+        report = read_analysis_reference([fifth], cases=["EQX"], row_database=database)
+        tables = report["tables"]
+        self.assertEqual(len(tables), 6)
+        self.assertEqual(tables["Element Forces - Area Shells"]["units"]["F11"], "kN/m")
+        self.assertEqual(tables["Element Forces - Area Shells"]["units"]["M11"], "kN-m/m")
+        self.assertEqual(tables["Diaphragm Forces"]["units"]["X-Coor"], "m")
+        self.assertEqual(tables["Diaphragm CM Displacements"]["units"]["Diaphragm MMI RZ"], "ton-m²")
+        self.assertEqual(tables["Centers Of Mass And Rigidity"]["stored_row_count"], 1)
+        self.assertEqual(tables["Diaphragm Accelerations"]["blank_measure_counts"]["Min UX"], 1)
+        self.assertEqual(tables["Diaphragm Max Over Avg Drifts"]["source_display_diagnostics"]["flag_counts"],
+                         {"ZERO_REPORTED_AVERAGE_RATIO_UNRESOLVED": 1})
+        check = report["checks"]["diaphragm_cm_reference"]
+        self.assertEqual(check["checked_rows"], 2)
+        self.assertEqual(check["matching_rows"], 1)
+        self.assertEqual(check["mismatched_rows"], 1)
+        self.assertEqual(check["missing_reference_rows"], 0)
+        self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
+
     def test_full_gravity_reference_exact_case_and_topology_guard(self):
         from components.inputs.etabs_table_bundle import _full_gravity_source_diagnostics
         case = {"Output Case": "1. DL + LL", "Case Type": "Combination",

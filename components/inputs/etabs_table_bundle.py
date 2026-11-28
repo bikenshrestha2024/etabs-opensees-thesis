@@ -125,11 +125,33 @@ _LARGE_TABLES.update({
         for family in ("Column", "Brace")
     },
 })
+_LARGE_TABLES.update({
+    "Element Forces - Area Shells": (_SHELL_RESPONSE_KEYS,
+        dict.fromkeys(("F11", "F22", "F12", "FMax", "FMin", "FVM", "V13", "V23", "VMax"), "kN/m")
+        | dict.fromkeys(("M11", "M22", "M12", "MMax", "MMin"), "kN-m/m")),
+    "Diaphragm Max Over Avg Drifts": ((*_STORY_CASE, "Item", "Label"),
+        dict.fromkeys(("Max Drift", "Avg Drift", "Ratio"), "")
+        | dict.fromkeys(("Max Loc X", "Max Loc Y", "Max Loc Z"), "m")),
+    "Diaphragm Forces": (_JOINT_RESPONSE_KEYS,
+        dict.fromkeys(("X-Coor", "Y-Coor", "Z-Coor"), "mm")
+        | dict.fromkeys(("Applied Load FX", "Applied Load FY", "Reactive Force FX",
+                         "Reactive Force FY", "Diaphragm Force FX", "Diaphragm Force FY"), "kN")),
+    "Diaphragm CM Displacements": (("Story", "Diaphragm", *_CASE_COLUMNS, "Point"),
+        {"UX": "mm", "UY": "mm", "RZ": "rad", **dict.fromkeys(("X", "Y", "Z"), "m"),
+         "Diaphragm Mass X": "kg", "Diaphragm Mass Y": "kg", "Diaphragm MMI RZ": "ton-m²"}),
+    "Diaphragm Accelerations": (("Story", "Diaphragm", *_CASE_COLUMNS),
+        {f"{side} {axis}": unit for side in ("Max", "Min")
+         for axis, unit in _ACCELERATIONS.items()}),
+    "Centers Of Mass And Rigidity": (("Story", "Diaphragm"),
+        dict.fromkeys(("Mass X", "Mass Y", "Cum Mass X", "Cum Mass Y"), "kg")
+        | dict.fromkeys(("XCM", "YCM", "XCCM", "YCCM", "XCR", "YCR"), "m")),
+})
 _REFERENCE_TABLES.update(_LARGE_TABLES)
 _REFERENCE_TITLES = {
     "Story Max Over Avg Disp": "Story Max Over Avg Displacements",
     "Joint Displ Incl Int Mesh Jts": "Joint Displacements (Including Internal Mesh Joints)",
     "Element NL Energy By Group": "Element Nonlinear Energy By Group",
+    "Diaphragm CM Displacements": "Diaphragm Center Of Mass Displacements",
 }
 _REFERENCE_UNITS = {
     "mm": ("m", 1000),
@@ -470,7 +492,8 @@ def _program_control(sheet):
 def _reference_row_flags(sheet_name, record):
     """Source-display diagnostics only; never alter a reported result."""
     flags = []
-    average = {"Story Max Over Avg Drifts": "Avg Drift",
+    average = {"Diaphragm Max Over Avg Drifts": "Avg Drift",
+               "Story Max Over Avg Drifts": "Avg Drift",
                "Story Max Over Avg Disp": "Average"}.get(sheet_name)
     if average is not None and record[average] == 0:
         flags.append("ZERO_REPORTED_AVERAGE_RATIO_UNRESOLVED")
@@ -628,7 +651,8 @@ def _reference_table(sheet, store=None):
     }
     if availability_fields:
         result["source_field_availability"] = _field_availability_report(availability_fields, availability_counts)
-    if sheet.title in ("Story Max Over Avg Drifts", "Story Max Over Avg Disp", "Story Drifts"):
+    if sheet.title in ("Story Max Over Avg Drifts", "Story Max Over Avg Disp", "Story Drifts",
+                       "Diaphragm Max Over Avg Drifts"):
         result["source_display_diagnostics"] = {
             "scope": "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER",
             "status": "REFERENCE_ONLY_NOT_NBC_TORSION_EVALUATION",
@@ -937,6 +961,39 @@ def _full_gravity_source_diagnostics(joints, reactions, story_forces):
             'physical_support_mapping': 'NOT_VERIFIED', 'engineering_acceptance': 'NOT_VERIFIED'}
 
 
+def _diaphragm_cm_reference_diagnostics(centers, displacements):
+    """Match repeated floor mass/CM fields without summing response rows."""
+    index, ambiguous = {}, set()
+    for row in centers:
+        key = (row["Story"], row["Diaphragm"])
+        if key in index:
+            ambiguous.add(key)
+        index[key] = row
+    pairs = (("X", "XCM"), ("Y", "YCM"),
+             ("Diaphragm Mass X", "Mass X"), ("Diaphragm Mass Y", "Mass Y"))
+    checked = matching = mismatched = missing = 0
+    samples = []
+    for row in displacements:
+        checked += 1
+        key = (row["Story"], row["Diaphragm"])
+        baseline = index.get(key)
+        if baseline is None or key in ambiguous:
+            missing += 1
+        elif all(row[a] is not None and baseline[b] is not None
+                 and row[a] == baseline[b] for a, b in pairs):
+            matching += 1
+            continue
+        else:
+            mismatched += 1
+        if len(samples) < 100:
+            samples.append(row["worksheet_row"])
+    return {"scope": "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER",
+            "status": "REFERENCE_ONLY_NOT_NATIVE_MASS_OR_TORSION_ACCEPTANCE",
+            "checked_rows": checked, "matching_rows": matching,
+            "mismatched_rows": mismatched, "missing_reference_rows": missing,
+            "ambiguous_center_keys": len(ambiguous), "exception_row_samples": samples}
+
+
 def _reference_checks(tables, store=None):
     def rows(name):
         return store.rows(name) if store else tables[name]["rows"]
@@ -1003,9 +1060,13 @@ def _reference_checks(tables, store=None):
             station_checks[name] = _frame_station_reference_diagnostics(records(name), family)
     if station_checks:
         checks["frame_station_reference"] = station_checks
+    if all(name in tables for name in ("Centers Of Mass And Rigidity", "Diaphragm CM Displacements")):
+        checks["diaphragm_cm_reference"] = _diaphragm_cm_reference_diagnostics(
+            records("Centers Of Mass And Rigidity"), records("Diaphragm CM Displacements"))
     element_joint_checks = {}
     for family, topology_name, result_name in (
             ("Shell", _AREAS, "Element Joint Forces - Shells"),
+            ("Shell", _AREAS, "Element Forces - Area Shells"),
             ("Frame", _FRAMES, "Element Joint Forces - Frame")):
         if topology_name in tables and result_name in tables:
             element_joint_checks[result_name] = _element_joint_force_reference_diagnostics(
