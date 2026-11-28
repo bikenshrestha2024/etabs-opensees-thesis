@@ -124,3 +124,8 @@ Append `--assembled-mass-model PATH_TO_ASSEMBLED_MODEL_JSON` to `--inspect-combi
 ### Original-object reference mass diagnostic
 
 With `--inspect-combined-reference` and `--assembled-mass-model`, add all three of `--mass-source-connectivity`, `--mass-source-config` and `--etabs-reference-g`. Select the actual original connectivity and exact configuration associated with the assembled model. The configuration hash must match the model; the inspector records the connectivity and model hashes and checks original identities/coordinates and refined source mass replay. Reference gravity is an explicit comparison assumption, not an NBC constant change. The report is private and does not install new solver masses.
+
+
+### Saved modal shape comparison
+
+Use `--inspect-combined-reference INDEX --modal-shapes-csv CSV --etabs-modal-case "Modal Ritz" --audit-output NEW.private.json`. The inspector checks normalized units and hashes the selected saved shape CSV. Complete reference floor identity and common master coordinates are mandatory; saved shape and reference model identity remains unverified. The reference metric is not a native mass matrix.

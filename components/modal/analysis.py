@@ -472,3 +472,133 @@ def run_nbc105_modal_audit(ops, *, nmodes=30, output_dir=".",
           f"UY={uy_final if uy_final is not None else 'NA'}% | "
           f">=33Hz modes={len(high_modes)} | elapsed={elapsed:.3f}s")
     return result
+
+
+def compare_reference_mode_shapes(reference_shapes, reference_periods, centers, native_shapes, *, case):
+    """Mass-weighted horizontal diaphragm MAC; diagnostic, not model acceptance.
+
+    [REF docs/source/components/modal/analysis.py.md]
+    Use exact source case, story/diaphragm and common master coordinates.
+    Mass weights are the ETABS reference metric, NOT the native mass matrix.
+    Ritz vectors need not be independent eigenvectors. Report ambiguous,
+    missing and zero-norm shapes; never assign unique modes by ordinal alone.
+    """
+    import numpy as np
+    from collections import Counter
+    from components.shared.eigen_solver import validated_mode_count
+
+    def number(value):
+        if isinstance(value, bool) or not math.isfinite(float(value)):
+            raise ValueError("Nonfinite or boolean mode-shape quantity")
+        return float(value)
+
+    def story_number(value, prefix):
+        if not isinstance(value, str) or not value.startswith(prefix):
+            raise ValueError("Unexpected storey identity: " + str(value))
+        n = validated_mode_count(value[len(prefix):], name="storey")
+        if value != prefix + str(n):
+            raise ValueError("Noncanonical storey identity: " + value)
+        return n
+
+    if not isinstance(case, str) or not case.strip():
+        raise ValueError("Exact ETABS modal case required")
+    floors = {}
+    for r in centers:
+        s = story_number(r["Story"], "Story")
+        if s in floors:
+            raise ValueError("Expected one diaphragm reference per storey")
+        mx, my = number(r["Mass X"]), number(r["Mass Y"])
+        if min(mx, my) <= 0:
+            raise ValueError("Nonpositive reference floor mass")
+        floors[s] = (r["Diaphragm"], mx, my, number(r["XCM"]), number(r["YCM"]))
+    if not floors:
+        raise ValueError("Missing diaphragm centers")
+    periods = {}
+    for r in reference_periods:
+        m = validated_mode_count(r["Mode"], name="reference mode")
+        p = number(r["Period"])
+        if r["Case"] != case or m in periods or p <= 0:
+            raise ValueError("Unexpected reference mode period identity")
+        periods[m] = p
+    ref, native, coords, inertia, native_periods, masters = {}, {}, {}, {}, {}, {}
+    for r in reference_shapes:
+        if r["Output Case"] != case or r["Step Type"] != "Mode":
+            raise ValueError("Expected exact reference modal shape rows")
+        m = validated_mode_count(r["Step Number"], name="reference shape mode")
+        s = story_number(r["Story"], "Story")
+        if m not in periods or s not in floors or s in ref.setdefault(m, {}):
+            raise ValueError("Duplicate or unknown reference modal shape identity")
+        d,mx,my,x,y = floors[s]
+        q = tuple(number(r[k]) for k in ("X", "Y", "Z"))
+        j = number(r["Diaphragm MMI RZ"])
+        if (r["Diaphragm"] != d or r["Diaphragm Mass X"] != mx or r["Diaphragm Mass Y"] != my
+                or math.dist(q[:2], (x,y)) > 1e-6 or j <= 0
+                or (s in coords and math.dist(coords[s], q) > 1e-6)
+                or (s in inertia and inertia[s] != j)):
+            raise ValueError("Reference diaphragm geometry or metric changed across modes")
+        coords[s], inertia[s] = q, j
+        ref[m][s] = tuple(number(r[k]) for k in ("UX", "UY", "RZ"))
+    if not ref or any(set(rows) != set(floors) for rows in ref.values()):
+        raise ValueError("Incomplete reference mode-shape floor coverage")
+    for r in native_shapes:
+        if r["node_role"] != "master":
+            continue
+        m = validated_mode_count(r["mode"], name="native mode")
+        s = story_number(r["story_name"], "Storey_")
+        p = number(r["period_s"])
+        tag = validated_mode_count(r["node_tag"], name="native master node")
+        q = tuple(number(r[k]) for k in ("x_m", "y_m", "z_m"))
+        if (s not in floors or s in native.setdefault(m,{}) or p <= 0
+                or math.dist(q, coords[s]) > 1e-6
+                or (s in masters and masters[s] != tag)
+                or (m in native_periods and native_periods[m] != p)):
+            raise ValueError("Native master identity, geometry or period mismatch")
+        masters[s], native_periods[m] = tag,p
+        native[m][s] = tuple(number(r[k]) for k in ("ux_raw", "uy_raw", "rz_raw"))
+    if (not native or len(set(masters.values())) != len(floors)
+            or any(set(rows) != set(floors) for rows in native.values())):
+        raise ValueError("Incomplete or ambiguous native mode-shape floor coverage")
+    order = sorted(floors)
+    weights = np.sqrt([v for s in order for v in (floors[s][1]/1000, floors[s][2]/1000, inertia[s])])
+
+    def normalized(rows):
+        # Scaling before weighting avoids overflow from arbitrary normalization.
+        vector = np.array([v for s in order for v in rows[s]], dtype=float)
+        scale = float(np.max(np.abs(vector)))
+        if scale == 0:
+            return None
+        vector = (vector / scale) * weights
+        norm = float(np.linalg.norm(vector))
+        if not math.isfinite(norm) or norm == 0:
+            raise ValueError("Invalid weighted shape norm")
+        return vector / norm
+
+    nr = {m: normalized(rows) for m, rows in native.items()}
+    results = []
+    for m, p in sorted(periods.items()):
+        item = {"reference_mode":m, "reference_period_s":p, "best_native_mode":None,
+                "mac":None, "runner_up_mac":None, "runner_up_native_mode":None}
+        v = normalized(ref[m]) if m in ref else None
+        if v is None:
+            item["status"] = "ZERO_REFERENCE_HORIZONTAL_NORM" if m in ref else "REFERENCE_SHAPE_NOT_EXPORTED"
+        else:
+            scores = sorted(((min(1., max(0., float(np.dot(v,w))**2)), n)
+                             for n,w in nr.items() if w is not None), key=lambda pair:(-pair[0],pair[1]))
+            if not scores:
+                item["status"] = "NO_NONZERO_NATIVE_HORIZONTAL_SHAPE"
+            else:
+                mac,n = scores[0]
+                item.update(status="BEST_SHAPE_CANDIDATE_NOT_ACCEPTED",best_native_mode=n,mac=mac,
+                            native_period_s=native_periods[n],period_difference_percent=100*(native_periods[n]-p)/p)
+                if len(scores)>1:
+                    item["runner_up_mac"],item["runner_up_native_mode"] = scores[1]
+        results.append(item)
+    counts = Counter(r["best_native_mode"] for r in results if r["best_native_mode"] is not None)
+    for row in results:
+        row["shared_best_candidate"] = counts[row["best_native_mode"]] > 1
+    return {"status":"ARCHIVED_MODE_SHAPE_DIAGNOSTIC_ONLY", "native_etabs_opensees_equivalence":"NOT_VERIFIED",
+            "source_model_identity":"UNVERIFIED", "reference_case":case, "floor_count":len(floors),
+            "reference_period_modes":len(periods), "reference_shape_modes":len(ref), "native_shape_modes":len(native),
+            "native_zero_horizontal_modes":[m for m,w in sorted(nr.items()) if w is None],
+            "metric":"ETABS floor UX/UY mass (tonne) and RZ inertia (tonne-m2); not native mass matrix",
+            "rows":results}
