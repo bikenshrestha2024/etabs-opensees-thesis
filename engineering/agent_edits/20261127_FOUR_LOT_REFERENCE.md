@@ -192,3 +192,31 @@ private. Combined source-bound production import and native EDB / axis / case
 identity, force-equilibrium and ETABS/OpenSees comparison, NLTHA and NBC
 acceptance NOT_VERIFIED. 32 physical + 44 mesh points, 1D+1L gravity, separate
 NBC Table 5-1 seismic weight and 12 m X-wall policy preserved.
+
+
+## Beam Element 2 additive source audit (2026-11-28)
+
+Editor: OpenAI ChatGPT GPT-6.2. Baseline `8d8f19be89e461861ab73c022343884bafa94eef`.
+PR #237 merged after ten successful CI workflow runs. Earlier FIRST, SECOND,
+THIRD, FOURTH LOT parts 1–3 and Beam Element 1 audit history is retained.
+The new Beam Element 2 workbook was fully streamed with Python/openpyxl
+read_only=True and data_only=False; original worksheet positions and raw
+values extracted privately. Source SHA stable, SQLite integrity passed,
+no repeated candidate keys or missing/nonfinite numeric result fields.
+The source has the native row-limit split and includes multiple case types.
+Strict case gate reproduced on the actual first record; the exact-case
+selection helper was independently replayed on all extracted Beam Element 1
+and 2 records and reconciled with SQLite counts, without relabeling any case.
+Opt-in CLI case projection extends the canonical beam importer; the strict
+gravity GUI and default case behavior remain unchanged. Selected vs scanned
+counts, excluded case names/counts and row-cap indicators are recorded,
+including sheets with no selected rows. Added importer regression for
+explicit selection, strict failure and zero-selection publication guard.
+Actual workbook audit and helper replay are distinct from full integration
+tests. Full repository checkout unavailable due to GitHub DNS; CI required.
+Beam Element 3 remains a separate unverified source in this turn.
+Combined native EDB identity, axis/offset equivalence, load transfer, solver
+convergence and NBC acceptance remain NOT_VERIFIED. No source rows, model
+fingerprints, extrema or local paths published.
+32 physical + 44 mesh points, full 1D+1L gravity, separate NBC Table 5-1
+seismic weight and two 12 m X wall policy PRESERVED.

@@ -71,3 +71,26 @@ gravity case. The separate beam/slab load-path diagnostic may select exact
 cases explicitly; the all-sheet audit mode preserves every exported case.
 Neither a source row-limit boundary nor a partial import establishes complete
 station coverage or native equivalence.
+
+
+## Explicit case projection for all-case beam split sources
+
+The strict default still rejects any other case. For a native all-case
+export, an explicit CLI selection is available:
+
+```powershell
+python -m components.validation.etabs_split_beam_forces NEW_PRIVATE_OUTPUT "Beam Forces Element 1.xlsx" "Beam Forces Element 2.xlsx" "Beam Forces Element 3.xlsx" --select-exact-case "1. DL + LL"
+```
+
+The corresponding API is `consolidate(paths, destination, case="1. DL + LL",
+select_exact_case=True)`. Exact literal equality (not case folding) determines
+selection. Source bytes are checked before and after reading. The manifest
+distinguishes selected `source_rows` / `rows_read` from all streamed
+`scanned_source_rows` / `rows_scanned`, reports excluded cases per source,
+keeps sheets with zero selected rows and flags sheets reaching the native
+Excel data-row limit. No selected rows means no publication. The original
+gravity GUI remains strict; the CLI projection is an opt-in source-only
+diagnostic, not a native solve. Excluded cases are not lost from their source
+workbooks; use the all-sheet private audit for all-case evidence. The
+station-overlap tolerance and legacy CSV identity are unchanged, and the
+complete multi-file selection still requires separate coverage validation.
