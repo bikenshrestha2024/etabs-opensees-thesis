@@ -637,6 +637,52 @@ class FirstLotReferenceTests(unittest.TestCase):
             self.assertEqual(report["tables"][name]["stored_row_count"], 1)
         self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
 
+    def test_full_gravity_reference_exact_case_and_topology_guard(self):
+        from components.inputs.etabs_table_bundle import _full_gravity_source_diagnostics
+        case = {"Output Case": "1. DL + LL", "Case Type": "Combination",
+                "Step Type": None, "Step Number": None}
+        joint = {"Element Name": "native-1", "Story": "Base", "Object Label": "B1"}
+        reaction = {**case, "Story": "Base", "Unique Name": "native-1", "Label": "B1",
+                    "FX": 0, "FY": 0, "FZ": 10, "MX": 0, "MY": 0, "MZ": 0}
+        cut = {**case, "Story": "Story1", "Location": "Bottom", "P": 10.1}
+        check = _full_gravity_source_diagnostics
+        self.assertAlmostEqual(check([joint], [reaction], [cut])["signed_vertical_difference_kN"], -0.1)
+        for reactions, cuts in (([reaction, reaction], [cut]),
+                                ([{**reaction, "Label": "bad"}], [cut]),
+                                ([reaction], [cut, cut]),
+                                ([{**reaction, "Step Type": "Max"}], [cut]),
+                                ([{**reaction, "FZ": None}], [cut])):
+            self.assertIsNone(check([joint], reactions, cuts)["reported_vertical_reaction_kN"])
+
+    def test_combined_reference_keeps_beams_separate_and_fails_closed(self):
+        beam = self.source.with_name("beam.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        self.add_table("Element Forces - Beams",
+                       "Story|Beam|Unique Name|Output Case|Case Type|Step Type|Step Number|Station|P|V2|V3|T|M2|M3|Element|Elem Station|Location",
+                       "|||||||m|kN|kN|kN|kN-m|kN-m|kN-m||m|",
+                       [("Story25", "B1", "123", "EQX", "LinStatic", None, None, 0, 0, 5, 0, 0, 0, 0, "123", 0, None)],
+                       book=book)
+        book.save(beam)
+        book.close()
+        self.book.save(self.source)
+        with self.assertRaises(SystemExit):
+            main(["--analysis-reference", str(self.source), "--reference-beams", str(self.source),
+                  "--reference-output", str(self.output)])
+        self.assertFalse(self.output.exists())
+        self.assertEqual(main(["--analysis-reference", str(self.source), "--reference-beams", str(beam),
+                               "--reference-output", str(self.output)]), 0)
+        combined = json.loads((self.output / "ETABS_COMBINED_REFERENCE.private.json").read_text("utf-8"))
+        self.assertEqual(combined["beam_unique_rows"], 1)
+        self.assertEqual(combined["engineering_acceptance"], "NOT_VERIFIED")
+        manifest = self.output / combined["beam_manifest"]
+        self.assertEqual(hashlib.sha256(manifest.read_bytes()).hexdigest(), combined["beam_manifest_sha256"])
+        beam_report = json.loads(manifest.read_text("utf-8"))
+        self.assertTrue(Path(beam_report["output"]).is_file())
+        self.assertEqual(hashlib.sha256(Path(beam_report["output"]).read_bytes()).hexdigest(),
+                         beam_report["output_sha256"])
+        self.assertFalse(list(self.output.rglob("ETABS_Beam_Forces_Consolidated.csv")))
+
     def test_frame_station_coverage_before_case_filter(self):
         source = self.source.with_name("stations.xlsx")
         book = Workbook()

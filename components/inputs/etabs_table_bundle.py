@@ -892,6 +892,51 @@ def _element_joint_force_reference_diagnostics(topology, responses, *, family):
             'unmatched_worksheet_row_samples': samples}
 
 
+def _full_gravity_source_diagnostics(joints, reactions, story_forces):
+    """Exact case/source identity and vertical cut check; not solver acceptance."""
+    case = ('1. DL + LL', 'Combination', None, None)
+    fields = ('Output Case', 'Case Type', 'Step Type', 'Step Number')
+    components = ('FX', 'FY', 'FZ', 'MX', 'MY', 'MZ')
+    def selected(row):
+        return tuple(row[c] for c in fields) == case
+    topology = {}
+    ambiguous = set()
+    for row in joints:
+        uid = row['Element Name']
+        if uid in topology:
+            ambiguous.add(uid)
+        topology[uid] = row
+    source = [row for row in reactions if selected(row)]
+    cuts = [row for row in story_forces if selected(row) and row['Story'] == 'Story1' and row['Location'] == 'Bottom']
+    seen, unmatched, duplicates, invalid = set(), set(), set(), set()
+    nonzero, zero = [], []
+    for row in source:
+        uid = row['Unique Name']
+        if uid in seen:
+            duplicates.add(uid)
+        seen.add(uid)
+        joint = topology.get(uid)
+        if (uid in ambiguous or joint is None or row['Story'] != 'Base'
+                or joint['Story'] != row['Story'] or joint['Object Label'] != row['Label']):
+            unmatched.add(uid)
+        vector = tuple(row[c] for c in components)
+        if any(v is None or not math.isfinite(v) for v in vector):
+            invalid.add(uid)
+            continue
+        (nonzero if any(v != 0 for v in vector) else zero).append(uid)
+    cut = cuts[0]['P'] if len(cuts) == 1 else None
+    valid = bool(source) and not (unmatched or duplicates or invalid) and cut is not None and math.isfinite(cut)
+    total = math.fsum(row['FZ'] for row in source) if valid else None
+    return {'status': 'REFERENCE_ONLY_NOT_NATIVE_SUPPORT_OR_SOLVER_ACCEPTANCE',
+            'case': dict(zip(fields, case)), 'reaction_rows': len(source),
+            'bottom_cut_rows': len(cuts), 'unmatched_joint_ids': sorted(unmatched),
+            'duplicate_joint_ids': sorted(duplicates), 'invalid_joint_ids': sorted(invalid),
+            'nonzero_reaction_joint_ids': sorted(nonzero), 'zero_reaction_joint_ids': sorted(zero),
+            'reported_vertical_reaction_kN': total, 'reported_story1_bottom_P_kN': cut,
+            'signed_vertical_difference_kN': total - cut if valid else None,
+            'physical_support_mapping': 'NOT_VERIFIED', 'engineering_acceptance': 'NOT_VERIFIED'}
+
+
 def _reference_checks(tables, store=None):
     def rows(name):
         return store.rows(name) if store else tables[name]["rows"]
@@ -948,6 +993,9 @@ def _reference_checks(tables, store=None):
     if "Joint Reactions" in tables:
         checks["static_reaction_reference"] = _static_reaction_reference_diagnostics(
             records("Joint Reactions"))
+    if all(name in tables for name in (_JOINTS, "Joint Reactions", "Story Forces")):
+        checks["full_gravity_source"] = _full_gravity_source_diagnostics(
+            records(_JOINTS), records("Joint Reactions"), records("Story Forces"))
     station_checks = {}
     for family in ("Column", "Brace"):
         name = f"Element Forces - {family}s"
