@@ -9,3 +9,7 @@ Actual workbook inspection: all nine supplied workbooks streamed with openpyxl r
 Not changed: model, solver, supports, gravity (1.0D+1.0L), NBC Table 5-1 ledger, `GRAVITY_M_S2` (9.81 vs export 9.80665 reported for a decision). Not verified: native ETABS/OpenSees equivalence, 768.045 kN residual, rigid end zones, NLTHA M0-M6, NBC certification. Beam workbooks 1/2/3 were not supplied.
 
 Tests: `tests/test_etabs_lot_consistency.py` (21 passed), `tests/test_current_etabs_table_bundle.py`, `tests/test_documentation_coverage.py` (48 passed, 7 skipped before the evidence file existed); component README and documentation coverage gates clean.
+
+## Follow-up: gravity constant decision (2026-11-28)
+
+User decided to keep project g = 9.81 and asked to commit to main. No code or constant changed; the decision and its expected 0.034% mass offset are recorded in `docs/validation/20261128_ETABS_LOT_CONSISTENCY_AUDIT.md`. Model label: Claude Sonnet 5.5 (self-reported).

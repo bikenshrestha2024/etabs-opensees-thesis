@@ -15,7 +15,7 @@ Ingested as one reference: lots 1, 2, 3, 4, 5, 6 (46 reference tables, none of t
 | FOURTH combined lot duplicates its three parts | 8 sheets (Element Forces Braces/Columns, Element Joint Forces Frame/Shells, Element NL Energy By Group, Element Strains/Stresses Area Shells, Integrated Wall Reactions) are byte-identical in lot 4 and parts 1-3 | Load combined OR parts, never both; the reader already rejects double ingest |
 | `Joint Reactions` = `Joint Design Reactions` | 21,356 identical rows each | Keep separate ownership; do not count twice |
 | 32 supports + 44 inert mesh points | 76 Base joints; derived tags equal `PROJECT_PRIMARY_32`; 44 rows zero in all six components | Preserved; the 44 are not restraints |
-| Export g is 9.80665, project g is 9.81 | Σ(vertical mass)·9.80665 = 277,767.306 kN vs Dead+0.3·Live (residual -0.0076 kN); with 9.81 the residual is +94.9 kN, implied live fraction 0.30198 | **Needs your decision.** Not changed. Masses rebuilt as weight/9.81 are 0.034% lighter than ETABS masses |
+| Export g is 9.80665, project g is 9.81 | Σ(vertical mass)·9.80665 = 277,767.306 kN vs Dead+0.3·Live (residual -0.0076 kN); with 9.81 the residual is +94.9 kN, implied live fraction 0.30198 | **Decision (user, 2026-11-28): keep project g = 9.81.** Constant unchanged. Masses rebuilt as weight/9.81 are 0.034% lighter than ETABS masses; this is an accepted, documented difference when comparing against ETABS mass/period tables |
 | Seismic mass source | Dead + 0.3·Live; non-Base horizontal mass × 9.80665 = 275,628.40 kN | Reference for NBC 105 Table 5-1 ledger comparison; not certification |
 | Base reactions equal summed joint reactions | 55 additive rows, 0 unmatched; max force residual 0.0008 kN, max moment residual 0.363 kN·m (moment transfer M = Mj + r×F) | Six-component equilibrium holds for every additive row |
 | Time-history is envelope-only | 226 Max/Min rows, no step series | Cannot drive or step-compare NLTHA; envelopes are targets only and are never summed |
@@ -23,6 +23,10 @@ Ingested as one reference: lots 1, 2, 3, 4, 5, 6 (46 reference tables, none of t
 | Mixed `P-Delta` / `P Delta` case names | in the export | Match names normalised |
 | No RZ mass participation | Ritz modes (15), RZ sum 0.0; UX/UY reach 90% at mode 6/8 (sums 0.988/0.985) | Torsion is not captured by this modal set; RX 0.930, RY 0.899 |
 | Periods rounded to the millisecond | up to 0.43% relative error vs circular frequency | Use CircFreq, not Period |
+
+## Decision record
+
+* g: the project keeps `GRAVITY_M_S2 = 9.81` (`SUPERSEDED_GRAVITY_M_S2 = 9.80665` stays as the ETABS-export value used only for identification). Any ETABS-vs-OpenSees mass, period or base-shear comparison must state that a 0.034% mass offset (≈ 0.017% in period) is expected from this choice and is not an error.
 
 ## Acceptance register (honest status)
 
