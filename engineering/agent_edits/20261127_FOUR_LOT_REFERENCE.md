@@ -268,3 +268,25 @@ gravity, distinct NBC Table 5-1 seismic weight, two 12 m X walls PRESERVED.
 Earlier separately named fourth part 4 still not located; do not silently
 alias the fifth lot or unsplit fourth lot. Raw rows and source hashes remain
 private. Full combined source invocation and native acceptance NOT_VERIFIED.
+
+
+## Sixth LOT additive native reference import (2026-11-28)
+
+Editor: OpenAI ChatGPT GPT-6.2. Baseline `86acccf7be7af82923168f7998ef3df285878215`. Prior lots and PRs
+#231–241 retained. Actual Sixth LOT all worksheets and every populated cell
+streamed read-only without formula evaluation; private SQLite row replay,
+source fingerprint and integrity verified. Base reactions match the exact
+joint-reaction case-step set. The full-gravity six-component joint resultant
+was independently reconstructed at the reported origin; displayed residuals
+remain private. Assembled joint mass identities/coordinates match topology;
+omitted base topology and repeated floor mass/inertia fields reconcile with
+earlier exports. This is not an inference of native restraints or accepted
+mass matrix. Analysis messages only report informational elapsed times; do
+not infer convergence. Extend existing SQLite importer for three native
+schemas and prefilter diagnostics, reusing common-origin resultant math.
+Supplemental regression authored, full CI required. Local full checkout
+blocked by DNS; source replay is actual data, not full combined production
+CLI invocation. 32 physical supports + 44 mesh, 1D+1L full gravity, separate
+NBC Table 5-1 mass and two 12 m X walls PRESERVED. No source rows, model
+fingerprints or machine identifiers published. Native EDB binding,
+pointwise reaction equivalence, M0–M6 NLTHA and NBC acceptance NOT_VERIFIED.
