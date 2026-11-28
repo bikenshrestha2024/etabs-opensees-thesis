@@ -34,3 +34,8 @@ The new modal_model_basis_report(model_data, config, limit_state, period_inputs)
 The solver response now includes mass_coverage_only_status and native_etabs_opensees_equivalence=NOT_VERIFIED. The console message uses MASS_COVERAGE_PASS_NATIVE_MODEL_UNVERIFIED when X and Y exceed 90%, rather than claiming structural equivalence. NBC 105:2025 §7.3 coverage is not §7.4 modal combination, §7.5 force scaling, or actual ETABS/OpenSees physical acceptance.
 
 The modal GUI and generated runner attach modal_model_basis_audit to JSON and Excel and mark Rayleigh input origin as EXTERNAL_GUI_INPUT_NOT_COMPUTED_BY_MODAL_SOLVER. Historical source outputs are not rewritten. Synthetic regression: tests/test_modal_model_basis_reporting.py. The native thesis EDB and solver were not run by this change.
+
+
+### Reference mode-shape comparison
+
+`compare_reference_mode_shapes` calculates mass-weighted horizontal diaphragm MAC using verified ETABS translational floor masses and polar inertias as the reference metric. Coordinates, exact modal case, complete floor sets, unique master IDs and positive finite periods are required. It preserves missing and zero-horizontal-norm shapes, records the best and competing candidate and signed period difference, and flags shared best candidates. Ritz vectors need not be independent eigenvectors. High MAC alone cannot establish mode equivalence; no native mass matrix, stiffness or code acceptance inferred.

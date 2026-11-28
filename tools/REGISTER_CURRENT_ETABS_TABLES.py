@@ -21,6 +21,9 @@ def main(argv=None):
     parser.add_argument("--export-root",type=Path)
     parser.add_argument("--inspect-combined-reference", type=Path,
                         help="Verify a combined private index and display module reference coverage")
+    parser.add_argument("--modal-shapes-csv", type=Path,
+                        help="Saved native Modal_Story_Mode_Shapes.csv for diagnostic shape comparison")
+    parser.add_argument("--etabs-modal-case", help="Exact ETABS modal case for shape comparison")
     parser.add_argument("--assembled-mass-model", type=Path,
                         help="Optional assembled model JSON for read-only floor mass comparison with inspected reference")
     parser.add_argument("--mass-source-connectivity", type=Path,
@@ -54,6 +57,9 @@ def main(argv=None):
                         help="Open multi-select Excel file picker for all beam-force parts")
     parser.add_argument("--native-assignment",type=Path)
     args=parser.parse_args(argv)
+    if (args.modal_shapes_csv is not None or args.etabs_modal_case is not None) and (
+            not args.inspect_combined_reference or not args.modal_shapes_csv or not args.etabs_modal_case):
+        parser.error("Mode shape comparison requires --inspect-combined-reference, --modal-shapes-csv and --etabs-modal-case together")
     object_mass = (args.mass_source_connectivity, args.mass_source_config, args.etabs_reference_g)
     if any(v is not None for v in object_mass) and (
             not all(v is not None for v in object_mass) or not args.assembled_mass_model):
@@ -72,6 +78,22 @@ def main(argv=None):
         try:
             reference = CombinedReference(args.inspect_combined_reference, beam_paths=args.beam_files)
             report = reference.coverage()
+            if args.modal_shapes_csv:
+                import csv, hashlib, io
+                from components.modal.analysis import compare_reference_mode_shapes
+                path = args.modal_shapes_csv.expanduser().absolute()
+                _refuse_linked_output_target(path)
+                raw_shapes = path.read_bytes()
+                units = reference.analysis["tables"]["Diaphragm CM Displacements"]["units"]
+                if any(units.get(k) != v for k,v in {"UX":"m", "UY":"m", "RZ":"rad", "X":"m", "Y":"m", "Z":"m", "Diaphragm Mass X":"kg", "Diaphragm Mass Y":"kg", "Diaphragm MMI RZ":"ton-m²"}.items()):
+                    raise ValueError("Unexpected normalized diaphragm shape units")
+                shapes = compare_reference_mode_shapes(
+                    reference.rows("Diaphragm CM Displacements", case=args.etabs_modal_case),
+                    reference.rows("Modal Periods And Frequencies", case=args.etabs_modal_case),
+                    reference.rows("Centers Of Mass And Rigidity"),
+                    csv.DictReader(io.StringIO(raw_shapes.decode("utf-8-sig"))), case=args.etabs_modal_case)
+                shapes["native_shapes_csv_sha256"] = hashlib.sha256(raw_shapes).hexdigest()
+                report["mode_shape_reference_comparison"] = shapes
             if args.assembled_mass_model:
                 import hashlib
                 from components.model.story_mass_operator import compare_etabs_story_mass

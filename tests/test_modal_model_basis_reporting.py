@@ -68,5 +68,32 @@ class ModalPhysicalBasisEvidenceTests(unittest.TestCase):
         self.assertIn("GUI_INPUT",code)
 
 
+class ModalReferenceShapeTests(unittest.TestCase):
+    def test_scale_sign_invariance_and_missing_shape_reporting(self):
+        from components.modal.analysis import compare_reference_mode_shapes
+        centers=[{"Story":"Story1","Diaphragm":"D1","Mass X":1000,"Mass Y":1000,"XCM":0,"YCM":0}]
+        shape={"Story":"Story1","Diaphragm":"D1","Diaphragm Mass X":1000,"Diaphragm Mass Y":1000,
+               "Diaphragm MMI RZ":2,"X":0,"Y":0,"Z":3,"Output Case":"Modal Ritz","Step Type":"Mode",
+               "Step Number":1,"UX":1,"UY":0,"RZ":0}
+        periods=[{"Case":"Modal Ritz","Mode":m,"Period":float(m)} for m in (1,2,3,4)]
+        master={"node_role":"master","story_name":"Storey_1","node_tag":"9","x_m":"0","y_m":"0","z_m":"3",
+                "period_s":"1.1","mode":"1","ux_raw":"-4","uy_raw":"0","rz_raw":"0"}
+        ref=[shape,dict(shape,**{"Step Number":2,"UX":0}),dict(shape,**{"Step Number":3,"UX":2})]
+        native=[master,dict(master,mode="2",ux_raw="0",uy_raw="2")]
+        result=compare_reference_mode_shapes(ref,periods,centers,native,case="Modal Ritz")
+        rows=result["rows"]
+        self.assertAlmostEqual(rows[0]["mac"],1.)
+        self.assertTrue(rows[0]["shared_best_candidate"])
+        self.assertEqual(rows[1]["status"],"ZERO_REFERENCE_HORIZONTAL_NORM")
+        self.assertEqual(rows[3]["status"],"REFERENCE_SHAPE_NOT_EXPORTED")
+        self.assertEqual(rows[0]["runner_up_mac"],0.)
+        self.assertEqual(result["native_etabs_opensees_equivalence"],"NOT_VERIFIED")
+        for bad in ([dict(master,z_m="4")],native+[master],[dict(master,ux_raw="nan")]):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                compare_reference_mode_shapes(ref,periods,centers,bad,case="Modal Ritz")
+        with self.assertRaises(ValueError):
+            compare_reference_mode_shapes(ref+[shape],periods,centers,native,case="Modal Ritz")
+
+
 if __name__=="__main__":
     unittest.main()
