@@ -113,3 +113,38 @@ NBC Table 5-1 seismic weight: PRESERVED; two 12 m X-wall policy: PRESERVED.
 Source workbook scan is evidence, not EDB binding. Numerical convergence,
 ETABS/OpenSees agreement, experiment validation and NBC acceptance remain
 NOT_VERIFIED.
+
+
+## Actual fourth-lot part 3 source review (2026-11-28)
+
+Editor: OpenAI ChatGPT GPT-6.2; base `26eb7b85500712e12604b99eeeccc54e361239b8`.
+Read-first root AGENTS, physical model contract, dedicated skill, core rules,
+engineering gates, migration/program index, canonical reader, guide and test
+inspected. Preserve first/second/third-lot PRs #231–233 and part-1 PR #234.
+Part 2 remains unverified in the earlier split handoff. Only part 3 was freshly
+streamed with openpyxl read_only=True, data_only=False, reset dimensions. Both
+column and brace station force sheets were fully extracted into private SQLite
+with original worksheet positions, typed counts, per-case extrema and source
+fingerprints. Independent replay of row digests, database integrity, source
+hash stability, candidate keys, exact case/step identity, object/position
+coverage and numeric completeness passed for observed rows. Trailing optional
+Location was blank, not an invalid force field. Part 1's existing inventory was
+compared for case-name coverage. No fresh combined six-file scan performed.
+Raw numerical values, hashes, object IDs and records remain private.
+
+Extend the canonical importer with prefilter frame station coverage diagnostics;
+the same helper passed on every actual extracted data row. Added importer
+regression fixture for missing coverage, repeat positions with distinct
+payloads, null Location and separate station coordinates. Full suite cannot
+run locally because GitHub DNS failed; CI required. No change to source data,
+physical parameters, factors, solver, acceptance or ownership.
+32 physical + 44 mesh points: PRESERVED; gravity 1D+1L: PRESERVED; NBC Table
+5-1 seismic weight: PRESERVED; 12 m X-wall policy: PRESERVED. Native EDB binding,
+axes/end-zone equivalence, ETABS/OpenSees matching, NLTHA convergence and NBC
+acceptance NOT_VERIFIED.
+
+Candidate split selection now comprises six files: FIRST LOT, SECOND LOT,
+THIRD LOT, FOURTH LOT parts 1, 2 and 3. Add part 3 to the prior explicit
+PowerShell array and choose NEW private audit, catalog and SQLite destinations.
+Never also select the unsplit fourth lot. Verify worksheet ownership; overlapping
+row-sharded tables require source reconciliation rather than arbitrary renaming.

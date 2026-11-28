@@ -158,3 +158,18 @@ summed. Envelope results cannot be combined into simultaneous principal
 responses. Overlapping energy group membership cannot be summed into a
 global balance. These are reference-output diagnostics, not material,
 device, solver or NBC acceptance tests.
+
+
+### Frame station coverage (fourth-lot part 3)
+
+The existing SQLite reference importer reports `checks.frame_station_reference`
+for column and brace station-force tables before case filtering over unique
+retained source rows. Position identity preserves both object and element
+stations, analytical element identity and optional Location. Case-step identity
+keeps case, type, step type and numeric step together. Counts cover missing
+object/case groups relative to the observed union, position-set differences,
+repeat positions (possibly distinct payloads), blank Location, missing/negative
+stations and differing station coordinates. These are review indicators, not
+grounds to delete results; they may be legitimate for meshed elements or
+case-specific output selections. No forces are transformed or summed. Native
+axes, end offsets and model/case identity remain separate validation gates.

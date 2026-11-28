@@ -601,6 +601,39 @@ class FirstLotReferenceTests(unittest.TestCase):
             self.assertEqual(table["units"]["UX"], "m/s")
         self.assertEqual(len(report["tables"]), 2)
 
+    def test_frame_station_coverage_before_case_filter(self):
+        source = self.source.with_name("stations.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        headers = "Story|Column|Unique Name|Output Case|Case Type|Step Type|Step Number|Station|P|V2|V3|T|M2|M3|Element|Elem Station|Location"
+        units = "|||||||m|kN|kN|kN|kN-m|kN-m|kN-m||m|"
+        rows = [
+            ("Story1", "C1", "1", "Dead", "LinStatic", None, None, 0, 1, 0, 0, 0, 0, 0, "1", 0, None),
+            ("Story1", "C1", "1", "Dead", "LinStatic", None, None, 2, 1, 0, 0, 0, 0, 0, "1", 1, None),
+            ("Story1", "C1", "1", "Live", "LinStatic", None, None, 0, 2, 0, 0, 0, 0, 0, "1", 0, None),
+            ("Story1", "C1", "1", "Live", "LinStatic", None, None, 0, 3, 0, 0, 0, 0, 0, "1", 0, None),
+            ("Story1", "C2", "2", "Dead", "LinStatic", None, None, None, 1, 0, 0, 0, 0, 0, "2", -1, None),
+        ]
+        self.add_table("Element Forces - Columns", headers, units, rows, book=book)
+        book.save(source)
+        book.close()
+        self.assertEqual(main(["--analysis-reference", str(source), "--reference-storage", "sqlite",
+                               "--reference-case", "Dead", "--reference-output", str(self.output)]), 0)
+        ref = json.loads((self.output / "ETABS_ANALYSIS_REFERENCE.private.json").read_text("utf-8"))
+        data = ref["checks"]["frame_station_reference"]["Element Forces - Columns"]
+        self.assertEqual(data["scope"], "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER")
+        self.assertEqual(data["checked_rows"], 5)
+        self.assertEqual(data["objects"], 2)
+        self.assertEqual(data["case_step_identities"], 2)
+        self.assertEqual(data["missing_object_case_groups"], 1)
+        self.assertEqual(data["position_coverage_difference_groups"], 1)
+        self.assertEqual(data["repeated_position_rows"], 1)
+        self.assertEqual(data["blank_location_rows"], 5)
+        self.assertEqual(data["missing_station_rows"], 1)
+        self.assertEqual(data["negative_station_rows"], 1)
+        self.assertEqual(data["different_station_coordinate_rows"], 1)
+        self.assertEqual(ref["tables"]["Element Forces - Columns"]["stored_row_count"], 3)
+
     def test_interrupted_manifest_write_does_not_publish_database(self):
         with patch("components.inputs.output_contract.atomic_json", side_effect=KeyboardInterrupt):
             with self.assertRaises(KeyboardInterrupt):
