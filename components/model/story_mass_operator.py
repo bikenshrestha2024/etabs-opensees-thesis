@@ -93,6 +93,7 @@ def story_lumped_mass_plan(model, *, center_tolerance_m=0.001):
 def compare_etabs_story_mass(model, reference_rows, *, coordinate_tolerance_m=1e-6):
     """Compare assembled INPUT floor mass and polar inertia, never a solved matrix.
 
+    [REF docs/source/components/model/story_mass_operator.py.md]
     Expects verified Assembled Joint Masses rows (kg, ton-m², m), with one
     concentrated horizontal mass/inertia record per StoryN and base excluded.
     Source-distributed mass and geometry remain unchanged.
