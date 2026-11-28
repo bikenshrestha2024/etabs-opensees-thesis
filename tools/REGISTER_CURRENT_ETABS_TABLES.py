@@ -21,6 +21,8 @@ def main(argv=None):
     parser.add_argument("--export-root",type=Path)
     parser.add_argument("--inspect-combined-reference", type=Path,
                         help="Verify a combined private index and display module reference coverage")
+    parser.add_argument("--edge-constraint-assignment", type=Path,
+                        help="Original Assignment Export for generated shell edge geometry cross-check")
     parser.add_argument("--modal-shapes-csv", type=Path,
                         help="Saved native Modal_Story_Mode_Shapes.csv for diagnostic shape comparison")
     parser.add_argument("--etabs-modal-case", help="Exact ETABS modal case for shape comparison")
@@ -57,6 +59,8 @@ def main(argv=None):
                         help="Open multi-select Excel file picker for all beam-force parts")
     parser.add_argument("--native-assignment",type=Path)
     args=parser.parse_args(argv)
+    if args.edge_constraint_assignment and not args.inspect_combined_reference:
+        parser.error("--edge-constraint-assignment requires --inspect-combined-reference")
     if (args.modal_shapes_csv is not None or args.etabs_modal_case is not None) and (
             not args.inspect_combined_reference or not args.modal_shapes_csv or not args.etabs_modal_case):
         parser.error("Mode shape comparison requires --inspect-combined-reference, --modal-shapes-csv and --etabs-modal-case together")
@@ -78,6 +82,28 @@ def main(argv=None):
         try:
             reference = CombinedReference(args.inspect_combined_reference, beam_paths=args.beam_files)
             report = reference.coverage()
+            if args.edge_constraint_assignment:
+                import hashlib
+                from openpyxl import load_workbook
+                from components.validation.etabs_assignment_gravity_audit import audit_analysis_edge_constraints
+                path = args.edge_constraint_assignment.expanduser().absolute()
+                _refuse_linked_output_target(path)
+                def digest():
+                    with path.open("rb") as stream:
+                        return hashlib.file_digest(stream,"sha256").hexdigest()
+                sha = digest()
+                book = load_workbook(path, read_only=True, data_only=False)
+                try:
+                    edge = audit_analysis_edge_constraints(book,
+                        reference.rows("Objects and Elements - Joints"),
+                        reference.rows("Objects and Elements - Frames"),
+                        reference.rows("Objects and Elements - Areas"))
+                finally:
+                    book.close()
+                if digest()!=sha:
+                    raise ValueError("Assignment workbook changed during geometry check")
+                edge["assignment_workbook_sha256"] = sha
+                report["generated_edge_constraint_reference"] = edge
             if args.modal_shapes_csv:
                 import csv, hashlib, io
                 from components.modal.analysis import compare_reference_mode_shapes

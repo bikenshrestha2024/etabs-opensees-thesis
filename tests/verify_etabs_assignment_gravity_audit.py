@@ -88,6 +88,23 @@ class NativeBeamQuantityTests(unittest.TestCase):
         self.assertEqual(candidate["weight_i"],.75)
         self.assertEqual(candidate["weight_j"],.25)
         self.assertEqual(result["engineering_acceptance"],"NOT_VERIFIED")
+        from components.validation.etabs_assignment_gravity_audit import audit_analysis_edge_constraints
+        joints=[{"Element Name":k,"Story":"Base" if z==0 else "Story1",
+                 "Global X":x,"Global Y":y,"Global Z":z} for k,x,y,z in
+                (("A",0,0,0),("B",4,0,0),("C",4,0,3),("D",0,0,3),("P",1,0,0))]
+        area={"Story":"Story1","Element Name":"99","Object Name":"W","Object Type":"Wall",
+              "Object Label":"W1",**{f"Elm Jt{i}":k for i,k in enumerate("ABCD",1)}}
+        frames=[{"Story":"Story1","Object Name":"W","Object Type":"Shell","Object Label":"W1",
+                 "Element Name":f"@LC-12-1-{role}","Elm JtI":a,"Elm JtJ":b}
+                for role,a,b in ((1,"A","P"),(2,"P","B"),(3,"A","B"))]
+        result=audit_analysis_edge_constraints(book,joints,frames,[area])
+        self.assertEqual(result["base_mesh_points_matched"],1)
+        self.assertEqual(result["base_mesh_points_unmatched"],[])
+        self.assertEqual(result["groups"][0]["intermediate"][0]["weight_j"],.25)
+        self.assertEqual(result["native_mpc_equivalence"],"NOT_VERIFIED")
+        for bad in (frames[:2],frames+frames[:1], [dict(frames[0],**{"Elm JtJ":"D"}),*frames[1:]]):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                audit_analysis_edge_constraints(book,joints,bad,[area])
         book["Area Assigns - Edge Constraints"]["B4"]="No"
         result=audit_base_wall_edges(book)
         self.assertEqual(result["role_counts"]["UNRESOLVED_BASE_POINT"],1)
