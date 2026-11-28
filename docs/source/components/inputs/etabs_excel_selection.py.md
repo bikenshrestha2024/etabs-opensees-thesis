@@ -55,3 +55,8 @@ The new opt-in `build_analysis_table_catalog(paths)` indexes explicitly selected
 The first- and second-lot reference parser supplies an `inspect_workbook`
 callback to the catalog. This lets it read the known worksheet rows from the
 same open, read-only workbook before the catalog verifies the source hash again.
+
+
+### Complementary split selection
+
+The default single-analysis classifier remains strict. Gravity opts into `split_analysis=True`: distinct worksheet owners are allowed, overlap except Program Control is rejected, and the unique Joint Reactions owner is routed to the existing gravity field. The full `analysis_files` selection remains available for the combined importer. Selection alone cannot establish EDB identity.

@@ -69,3 +69,8 @@ The saved comparison plots use the minimum nodal vertical displacement at each s
 ## 2026-11-27 — independent six-DOF solved interface resultants
 
 After the existing full-gravity load ledger reconciliation, the export recovers all six interface components from saved global element end forces using the canonical load-path module. Two Excel tabs show cuts and original source object contributions, and the separate JSON is included in the existing gravity evidence bundle. Requires complete source connectivity and all six support reaction components; old incomplete results must be rerun. No source EDB or solver inputs are changed. See [load path formulas](load_path_formulas.py.md) for signs, axes, coordinate origin and limitations.
+
+
+### Combined reference workflow
+
+Multi-select retains complementary analysis and separate beam files. Build combined reference invokes the canonical importer in a worker and writes a private SOURCE_ONLY run with log and verified index. Case status remains INCOMPLETE for native acceptance. The independent beam consolidation action confirms the exact selected gravity case and reports excluded rows. No native solver is invoked.

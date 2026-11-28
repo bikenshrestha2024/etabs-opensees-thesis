@@ -38,7 +38,7 @@ def _role(path):
     return "unclassified"
 
 
-def classify_etabs_excel_selection(paths):
+def classify_etabs_excel_selection(paths, *, split_analysis=False):
     """[REF docs/source/components/inputs/etabs_excel_selection.py.md]
     Assign all chosen files, preserving beam part ordering and ambiguity.
     """
@@ -60,12 +60,20 @@ def classify_etabs_excel_selection(paths):
     # Full vs compressed analysis exports may coexist. Only one current
     # analyzed workbook can own the case, and users must choose it explicitly
     # when two distinct analysis files are present.
-    if len(groups["analysis"])>1:
+    if len(groups["analysis"])>1 and not split_analysis:
         raise ValueError(
             "Multiple analyzed exports selected. Choose ONE authoritative "
             "Analysis Export (usually *_compressed.xlsx), plus ALL beam parts.")
+    analysis_owner = groups["analysis"][0] if groups["analysis"] else None
+    if split_analysis and groups["analysis"]:
+        catalog = build_analysis_table_catalog(groups["analysis"])
+        conflicts = [name for name in catalog["ambiguous_tables"] if name != "program control"]
+        if conflicts:
+            raise ValueError("Overlapping analysis worksheet owners: " + ", ".join(conflicts))
+        analysis_owner, _ = resolve_analysis_table(catalog, "Joint Reactions")
     return {
-        "analysis":groups["analysis"][0] if groups["analysis"] else None,
+        **({"analysis_files": groups["analysis"]} if split_analysis else {}),
+        "analysis":analysis_owner,
         "assignment":groups["assignment"][0] if groups["assignment"] else None,
         "beam":sorted(groups["beam"],key=lambda p:p.name.casefold()),
     }

@@ -71,6 +71,17 @@ class EtabsExcelRoleSelectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"Multiple analyzed exports"):
             classify_etabs_excel_selection([first,second,beam])
 
+    def test_split_selection_routes_only_unique_joint_reaction_owner(self):
+        first=self.workbook("Analysis Export FIRST LOT.xlsx", ["Story Forces"])
+        third=self.workbook("Analysis Export THIRD LOT.xlsx", ["Joint Reactions"])
+        beam=self.workbook("Beam Forces Element 1 latest.xlsx", ["Element Forces - Beams"])
+        selected=classify_etabs_excel_selection([first, third, beam], split_analysis=True)
+        self.assertEqual(selected["analysis"], third)
+        self.assertEqual(selected["analysis_files"], [first, third])
+        duplicate=self.workbook("Analysis Export duplicate.xlsx", ["Story Forces"])
+        with self.assertRaises(ValueError):
+            classify_etabs_excel_selection([first, third, duplicate, beam], split_analysis=True)
+
     def test_folder_autodiscovery_requires_all_numbered_parts(self):
         parts=[self.workbook(f"Beam Forces Element {i} latest.xlsx",
                               ["Element Forces - Beams"]) for i in (2,1,3)]
@@ -135,7 +146,7 @@ class EtabsExcelRoleSelectionTests(unittest.TestCase):
               "gui_and_reports.py").read_text(encoding="utf-8-sig")
         self.assertIn("def _choose_all_etabs_excel_sources(self):",code)
         self.assertIn("filedialog.askopenfilenames(",code)
-        self.assertIn("classify_etabs_excel_selection(selected)",code)
+        self.assertIn("classify_etabs_excel_selection(selected, split_analysis=True)",code)
         self.assertIn("self.etabs_beam_forces_paths=list(grouped",code)
         self.assertIn("self._choose_etabs_full_table",code)
         self.assertIn("self._discover_etabs_beam_parts_folder",code)

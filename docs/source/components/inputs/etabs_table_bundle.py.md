@@ -251,3 +251,8 @@ mapping and native solver agreement require independent evidence.
 
 Add the Sixth LOT to the analysis array of the combined reference CLI. It
 does not replace or change the gravity load ledger or NBC 105 seismic mass.
+
+
+### Combined reference consumer and stage coverage
+
+`CombinedReference(index, beam_paths=None)` verifies the private index, canonical relative manifest paths, manifest hashes, original workbook hashes, SQLite and CSV hashes, table IDs and stored row counts. New indexes record original beam paths; for older indexes pass explicit original beam paths. `source_owner(table)` returns the exact worksheet owner. `rows(table, case=...)` streams normalized analysis rows with original worksheet row numbers or string-valued beam CSV rows. Case-bearing tables require an exact existing case; steps and envelope distinctions are preserved. `coverage()` reports availability for MODEL, GRAVITY, MODAL, ESM, MRSM, LTHA, NLTHA and NBC105. This does not install masses, change loads or establish native equivalence.

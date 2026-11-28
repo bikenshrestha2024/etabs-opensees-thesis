@@ -103,11 +103,21 @@ def launch(parent, folder):
     detail.insert("end", "Select a workstream to inspect source paths and fingerprints.\n")
     detail.configure(state="disabled")
     state = {"report": None}
+    reference_var = tk.StringVar(value="")
+
+    def choose_reference():
+        path = filedialog.askopenfilename(parent=win, title="Select combined ETABS workbook reference index",
+                                          filetypes=[("Combined private reference", "*.private.json")])
+        if path:
+            reference_var.set(path)
+            refresh()
+
 
     def choose_project():
         path = filedialog.askdirectory(parent=win, title="Select ETABS export project folder")
         if path:
             project_var.set(path)
+            reference_var.set("")
             discovered, _ = discover_project_model(path)
             model_var.set(str(discovered) if discovered else "")
             model_selection_status.set(
@@ -149,7 +159,7 @@ def launch(parent, folder):
                 if candidate is None:
                     return
                 job = candidate
-            request_id, folder_name, model_name = job
+            request_id, folder_name, model_name, reference_index = job
             try:
                 if not folder_name:
                     raise ValueError("Select a project export folder")
@@ -158,7 +168,8 @@ def launch(parent, folder):
                     raise FileNotFoundError(folder_path)
                 if model_name and not Path(model_name).is_file():
                     raise FileNotFoundError(model_name)
-                result_queue.put((request_id, audit(folder_path, model_name or None), None))
+                result_queue.put((request_id, audit(folder_path, model_name or None,
+                    reference_index=reference_index or None), None))
             except Exception as exc:
                 result_queue.put((request_id, None, str(exc)))
 
@@ -173,7 +184,7 @@ def launch(parent, folder):
         state["report"] = None
         state["busy"] = True
         overview.set("Checking model and evidence in background — controls remain responsive.")
-        requests_queue.put((state["request_id"], folder_name, model_name))
+        requests_queue.put((state["request_id"], folder_name, model_name, reference_var.get().strip()))
 
     def poll_results():
         try:
@@ -218,6 +229,11 @@ def launch(parent, folder):
                         "SHA256: " + str(result["model_sha256"]) + "\n\n" +
                         "A sign-off claim is not a verified physical model.\n\n" +
                         "Choose a workstream for file paths and next actions.")
+                    if "etabs_workbook_reference" in result:
+                        coverage = result["etabs_workbook_reference"]
+                        detail.insert("end", "\n\nETABS workbook reference — native equivalence UNVERIFIED\n" +
+                            "\n".join(f"{module}: {len(item['available'])} available / {len(item['missing'])} missing"
+                                      for module, item in coverage["modules"].items()))
                     detail.configure(state="disabled")
             win.after(100, poll_results)
         except tk.TclError:
@@ -426,7 +442,8 @@ def launch(parent, folder):
     buttons.pack(fill="x", pady=(10, 0))
     for caption, callback in (
         ("Select project", choose_project), ("Choose model", choose_model),
-        ("Refresh evidence", refresh), ("Model-bound review", open_model_review),
+        ("Refresh evidence", refresh), ("Select ETABS reference", choose_reference),
+        ("Model-bound review", open_model_review),
         ("Dependency details", open_preflight), ("Export JSON + Markdown", export),
         ("Open project", open_project)
     ):

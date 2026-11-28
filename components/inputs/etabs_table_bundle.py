@@ -1291,3 +1291,177 @@ def read_first_lot_reference(path, *, cases=(), progress=None):
     if not source.is_file() or source.suffix.lower() not in (".xlsx", ".xlsm"):
         raise ValueError("Select one local ETABS .xlsx or .xlsm analysis workbook")
     return _read_analysis_reference([source], cases, progress, _FIRST_LOT_TABLES, True)
+# A reference table may inform several analyses. This is a coverage map, not
+# an authorization to substitute ETABS values for independently solved values.
+_MODULE_REFERENCE_TABLES = {
+    "MODEL": (_JOINTS, _FRAMES, _AREAS, "Assembled Joint Masses", "Centers Of Mass And Rigidity"),
+    "GRAVITY": ("Joint Reactions", "Base Reactions", "Story Forces", "Tributary Area and LLRF",
+                "Element Forces - Beams", "Element Forces - Columns", "Element Forces - Braces",
+                "Element Joint Forces - Frame", "Element Joint Forces - Shells",
+                "Element Forces - Area Shells", "Integrated Wall Reactions", "Pier Forces", "Spandrel Forces"),
+    "MODAL": (_PERIODS, "Modal Participation Factors", "Modal Participating Mass Ratios",
+              "Modal Load Participation Ratios", "Modal Direction Factors", "Assembled Joint Masses",
+              "Centers Of Mass And Rigidity", "Diaphragm CM Displacements"),
+    "ESM": ("Base Reactions", "Story Forces", "Story Stiffness", "Story Drifts", "Joint Reactions",
+            "Diaphragm Forces", "Assembled Joint Masses", "Centers Of Mass And Rigidity"),
+    "MRSM": ("Response Spectrum Modal Info", "Modal Participating Mass Ratios", "Base Reactions",
+             "Story Forces", "Story Drifts", "Story Max Over Avg Disp", "Diaphragm Accelerations",
+             "Diaphragm CM Displacements", "Joint Design Reactions"),
+    "LTHA": ("Base Reactions", "Joint Displacements", "Joint Displacements - Absolute",
+             "Joint Displ Incl Int Mesh Jts", "Joint Velocities - Relative", "Joint Velocities - Absolute",
+             "Joint Accelerations - Relative", "Joint Accelerations - Absolute", "Joint Drifts",
+             "Story Accelerations", "Diaphragm Accelerations", "Diaphragm CM Displacements"),
+    "NLTHA": ("Element NL Energy By Group", "Total Energy Components", "Element Stresses - Area Shells",
+              "Element Strains - Area Shells", "Element Forces - Area Shells", "Element Forces - Beams",
+              "Element Forces - Columns", "Element Forces - Braces", "Joint Reactions", "Base Reactions",
+              "Joint Displacements", "Story Drifts", "Diaphragm Max Over Avg Drifts", "Analysis Messages"),
+    "NBC105": ("Story Drifts", "Story Max Over Avg Drifts", "Story Max Over Avg Disp",
+               "Diaphragm Max Over Avg Drifts", "Centers Of Mass And Rigidity", "Assembled Joint Masses",
+               "Modal Participating Mass Ratios", "Base Reactions", "Story Forces"),
+}
+
+
+class CombinedReference:
+    """Read-only, fingerprint-checked combined reference session.
+
+    [REF docs/source/components/inputs/etabs_table_bundle.py.md]
+    Source model identity remains UNVERIFIED. The caller still needs a native
+    EDB, case/step, axes, stiffness and solver comparison gate. Old combined
+    indexes require explicit original beam paths; no filename search occurs.
+    """
+
+    def __init__(self, index, *, beam_paths=None):
+        from components.inputs.output_contract import _refuse_linked_output_target
+        index = Path(index).expanduser().absolute()
+        _refuse_linked_output_target(index)
+        self.root = index.parent
+        self._index = json.loads(index.read_text(encoding="utf-8-sig"))
+        if (self._index.get("schema") != "ETABS_COMBINED_REFERENCE_V1"
+                or self._index.get("status") != "REFERENCE_ONLY_NOT_SOLVER_INPUT"
+                or self._index.get("engineering_acceptance") != "NOT_VERIFIED"
+                or self._index.get("source_model_identity") != "UNVERIFIED"):
+            raise ValueError("Not an unapproved combined reference index")
+
+        def checked(path, digest):
+            path = Path(path)
+            _refuse_linked_output_target(path)
+            if not path.is_file() or _sha(path) != digest:
+                raise ValueError("Reference file missing or changed: " + str(path))
+            return path
+
+        # Use only canonical relative output names, including when a complete
+        # reference directory is relocated. Never follow arbitrary JSON paths.
+        analysis_name = "ETABS_ANALYSIS_REFERENCE.private.json"
+        beam_name = "BEAM_REFERENCE/ETABS_Beam_Forces_All_Cases_Manifest.json"
+        if (self._index.get("analysis_manifest") != analysis_name
+                or str(self._index.get("beam_manifest", "")).replace("\\", "/") != beam_name):
+            raise ValueError("Unexpected combined reference manifest paths")
+        self.analysis = json.loads(checked(self.root / analysis_name,
+            self._index["analysis_manifest_sha256"]).read_text(encoding="utf-8-sig"))
+        self.beam = json.loads(checked(self.root / beam_name,
+            self._index["beam_manifest_sha256"]).read_text(encoding="utf-8-sig"))
+        if (self.analysis.get("schema") != "ETABS_ANALYSIS_SQLITE_REFERENCE_V1"
+                or self.analysis.get("engineering_acceptance") != "NOT_VERIFIED"
+                or self.analysis.get("selected_cases") != []
+                or self.beam.get("case_selection_policy") != "ALL_NATIVE_CASES_EXACT"
+                or self.beam.get("overlap_policy") != "EXACT_NATIVE_PAYLOAD"):
+            raise ValueError("Expected complete, unfiltered native reference manifests")
+        storage = self.analysis["row_storage"]
+        if storage.get("format") != "sqlite-v1" or storage.get("file") != "ETABS_ANALYSIS_ROWS.private.sqlite3":
+            raise ValueError("Unexpected analysis row storage")
+        self.database = checked(self.root / storage["file"], storage["sha256"])
+        self.beam_csv = checked(self.root / "BEAM_REFERENCE/ETABS_Beam_Forces_All_Cases.csv",
+                                self.beam["output_sha256"])
+        if (len(self.analysis["files"]) != self._index["analysis_workbooks"]
+                or len(self.beam["input_files"]) != self._index["beam_workbooks"]
+                or self.beam["unique_rows"] != self._index["beam_unique_rows"]
+                or self.beam["exact_or_tolerance_matched_overlaps"] != self._index["beam_exact_overlaps"]):
+            raise ValueError("Combined reference manifest counts disagree")
+        for entry in self.analysis["files"]:
+            checked(entry["path"], entry["sha256"])
+        if beam_paths is None:
+            beam_paths = self._index.get("beam_sources")
+        if not beam_paths or len(beam_paths) != len(self.beam["input_files"]):
+            raise ValueError("Select all exact original beam workbooks for this reference")
+        expected = {row["source_sha256"] for row in self.beam["input_files"]}
+        actual = set()
+        for source in beam_paths:
+            path = Path(source).expanduser().absolute()
+            _refuse_linked_output_target(path)
+            digest = _sha(path)
+            if digest in actual or digest not in expected:
+                raise ValueError("Original beam workbook changed or duplicated: " + str(path))
+            actual.add(digest)
+        if actual != expected:
+            raise ValueError("Original beam source set mismatch")
+        # SQLite is opened read-only. The manifest is not allowed to invent a
+        # table ID or claim rows that are absent from the verified database.
+        with closing(sqlite3.connect(self.database.as_uri() + "?mode=ro", uri=True)) as db:
+            table_ids = dict(db.execute("SELECT worksheet, table_id FROM reference_tables"))
+            manifest_ids = {name: table["table_id"] for name, table in self.analysis["tables"].items()}
+            if table_ids != manifest_ids:
+                raise ValueError("Reference table ownership mismatch")
+            counts = dict(db.execute("SELECT table_id, COUNT(*) FROM reference_rows GROUP BY table_id"))
+            if any(counts.get(table["table_id"], 0) != table["stored_row_count"]
+                   for table in self.analysis["tables"].values()):
+                raise ValueError("Reference database row counts disagree")
+
+    def source_owner(self, table):
+        """Return the verified original analysis worksheet owner, never a beam shard."""
+        from components.inputs.output_contract import _refuse_linked_output_target
+        meta = self.analysis["tables"].get(table)
+        if meta is None:
+            raise ValueError("No unique analysis worksheet owner: " + str(table))
+        entry = self.analysis["files"][meta["file_index"]]
+        path = Path(entry["path"])
+        _refuse_linked_output_target(path)
+        if table not in entry["worksheets"] or _sha(path) != entry["sha256"]:
+            raise ValueError("Analysis worksheet owner changed")
+        return path, table
+
+    def coverage(self):
+        """Return per-stage table availability, never native acceptance."""
+        available = set(self.analysis["tables"]) | {"Element Forces - Beams"}
+        return {"status": "REFERENCE_BYTES_VERIFIED_NOT_SOLVER_INPUT",
+                "engineering_acceptance": "NOT_VERIFIED", "source_model_identity": "UNVERIFIED",
+                "analysis_tables": len(self.analysis["tables"]), "beam_unique_rows": self.beam["unique_rows"],
+                "modules": {name: {"available": sorted(set(tables) & available),
+                                   "missing": sorted(set(tables) - available)}
+                            for name, tables in _MODULE_REFERENCE_TABLES.items()}}
+
+    def rows(self, table, *, case=None):
+        """Stream exact source-case rows; preserve step and original row identity.
+
+        Case-bearing tables require an explicit literal case. Beam rows are
+        original CSV strings; normalized SQLite rows retain typed values.
+        The verified session rechecks selected derived bytes before reading.
+        """
+        if table == "Element Forces - Beams":
+            import csv
+            if not isinstance(case, str) or not case.strip():
+                raise ValueError("Specify exact beam output case")
+            if not any(case in row["selected_case_row_counts"] for row in self.beam["input_files"]):
+                raise ValueError("Exact beam output case absent")
+            if _sha(self.beam_csv) != self.beam["output_sha256"]:
+                raise ValueError("Beam reference changed after verification")
+            with self.beam_csv.open(encoding="utf-8-sig", newline="") as fp:
+                yield from (row for row in csv.DictReader(fp) if row["Output Case"] == case)
+            return
+        meta = self.analysis["tables"].get(table)
+        if meta is None:
+            raise ValueError("Reference table absent: " + str(table))
+        if meta["case_column"]:
+            if not isinstance(case, str) or case not in meta["case_row_counts"]:
+                raise ValueError("Specify an existing exact reference output case")
+        elif case is not None:
+            raise ValueError("Case filter not applicable to this reference table")
+        if _sha(self.database) != self.analysis["row_storage"]["sha256"]:
+            raise ValueError("Analysis reference changed after verification")
+        with closing(sqlite3.connect(self.database.as_uri() + "?mode=ro", uri=True)) as db:
+            sql = "SELECT worksheet_row, values_json FROM reference_rows WHERE table_id=?"
+            params = (meta["table_id"],)
+            if case is not None:
+                sql += " AND case_name=?"
+                params += (case,)
+            for row_number, values in db.execute(sql + " ORDER BY worksheet_row", params):
+                yield dict(zip(meta["columns"], [row_number, *json.loads(values)]))
