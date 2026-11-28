@@ -295,3 +295,8 @@ pointwise reaction equivalence, M0–M6 NLTHA and NBC acceptance NOT_VERIFIED.
 ## Combined reference consumer and split GUI routing (2026-11-28)
 
 Editor: OpenAI ChatGPT GPT-6.2. Baseline `fe604158faca7f3ce13d40f74c58dd2bfbb91671`. Read-first contracts checked: 32 physical + 44 mesh points, full 1D+1L gravity separate from NBC Table 5-1 seismic mass, two 12 m X walls preserved. Exact active source recovered from GitHub CI artifact. All eleven source fingerprints reverified. Actual production CLI completed on original SECOND LOT, SIXTH LOT and Beam Element 3; proposed reader verified actual reference bytes and exact mass/base/gravity/modal projections. Actual full split selection resolved the unique Joint Reactions worksheet. Full eleven-source CLI invocation tracked independently. Red/green focused regression: 73 tests and 16 subtests passed. Full CI required. Native ETABS/OpenSeesPy/XARA unavailable; no numerical, physical or code acceptance inferred. No private workbook records or hashes published.
+
+
+## Assembled input mass comparison consumer (2026-11-28)
+
+Read-first physical constraints retained. Compared archived actual assembled model input against verified Sixth LOT Assembled Joint Masses using canonical story mass plan. Actual CLI verification on original workbook subset passed, along with focused 36 tests and 23 subtests (red regression reproduced missing function first). Source and model hashes are private; no mass values published. Archived comparison is not a current model identity or solved mass matrix check. No changes to gravity, supports, mass assignment or stiffness.

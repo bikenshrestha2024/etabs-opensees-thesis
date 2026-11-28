@@ -114,3 +114,8 @@ python tools/REGISTER_CURRENT_ETABS_TABLES.py --inspect-combined-reference "path
 ```
 
 For legacy indexes without beam paths, also supply `--beam-files` with the exact original beam files. Source and derived bytes, ownership and row counts are checked. Output coverage is reference-only, not native acceptance.
+
+
+### Optional assembled-input mass comparison
+
+Append `--assembled-mass-model PATH_TO_ASSEMBLED_MODEL_JSON` to `--inspect-combined-reference`. The inspector checks reference units and hashes the exact model JSON, then uses the canonical mass operator for the floor comparison. It writes residuals only; source identity, native mass matrix and code acceptance remain unverified.

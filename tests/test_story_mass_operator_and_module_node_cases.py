@@ -35,6 +35,23 @@ class StoryMassOperatorTests(unittest.TestCase):
         self.assertEqual(plan["plan_status"],"STORY_LUMPING_NUMERICALLY_RECONCILED_NOT_NATIVE_ACCEPTED")
         self.assertEqual(plan["unassigned_horizontal_mass"],0.)
 
+    def test_etabs_floor_mass_comparison_preserves_direction_and_inertia(self):
+        from components.model.story_mass_operator import compare_etabs_story_mass
+        model={"base_z_m":0., "nodes":{"1":[-1.,0.,3.],"2":[1.,0.,3.]},
+               "nodal_mass":{"1":2.,"2":2.}, "supports":{},
+               "diaphragms":[{"master_tag":100,"master_xyz":[0.,0.,3.],
+                              "storey_number":1,"slave_node_tags":[1,2]}]}
+        rows=[{"Story":"Story1","UX":3900.,"UY":3800.,"RZ":3.,"X":0.,"Y":0.,"Z":3.}]
+        report=compare_etabs_story_mass(model,rows)
+        self.assertEqual(report["native_mass_matrix_equivalence"],"NOT_VERIFIED")
+        self.assertAlmostEqual(report["floors"][0]["UX_difference_t"],.1)
+        self.assertAlmostEqual(report["floors"][0]["UY_difference_t"],.2)
+        self.assertAlmostEqual(report["floors"][0]["RZ_difference_t_m2"],1.)
+        self.assertEqual(model["nodal_mass"],{"1":2.,"2":2.})
+        for bad in ([dict(rows[0],Z=3.01)], rows+rows, [dict(rows[0],RZ=-1.)], []):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                compare_etabs_story_mass(model,bad)
+
     def test_mass_centroid_not_matching_master_fails_closed(self):
         model={
             "base_z_m":0.,
