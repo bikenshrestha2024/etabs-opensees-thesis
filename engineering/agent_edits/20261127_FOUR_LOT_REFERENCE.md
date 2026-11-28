@@ -290,3 +290,8 @@ CLI invocation. 32 physical supports + 44 mesh, 1D+1L full gravity, separate
 NBC Table 5-1 mass and two 12 m X walls PRESERVED. No source rows, model
 fingerprints or machine identifiers published. Native EDB binding,
 pointwise reaction equivalence, M0–M6 NLTHA and NBC acceptance NOT_VERIFIED.
+
+
+## Combined reference consumer and split GUI routing (2026-11-28)
+
+Editor: OpenAI ChatGPT GPT-6.2. Baseline `fe604158faca7f3ce13d40f74c58dd2bfbb91671`. Read-first contracts checked: 32 physical + 44 mesh points, full 1D+1L gravity separate from NBC Table 5-1 seismic mass, two 12 m X walls preserved. Exact active source recovered from GitHub CI artifact. All eleven source fingerprints reverified. Actual production CLI completed on original SECOND LOT, SIXTH LOT and Beam Element 3; proposed reader verified actual reference bytes and exact mass/base/gravity/modal projections. Actual full split selection resolved the unique Joint Reactions worksheet. Full eleven-source CLI invocation tracked independently. Red/green focused regression: 73 tests and 16 subtests passed. Full CI required. Native ETABS/OpenSeesPy/XARA unavailable; no numerical, physical or code acceptance inferred. No private workbook records or hashes published.

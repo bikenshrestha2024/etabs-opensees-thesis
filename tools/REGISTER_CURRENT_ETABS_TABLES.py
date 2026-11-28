@@ -19,6 +19,8 @@ def main(argv=None):
     """
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--export-root",type=Path)
+    parser.add_argument("--inspect-combined-reference", type=Path,
+                        help="Verify a combined private index and display module reference coverage")
     parser.add_argument("--analysis",type=Path)
     parser.add_argument("--analysis-files",type=Path,nargs="+",
                         help="Read ALL worksheets of explicitly selected analysis lots (audit only)")
@@ -44,6 +46,27 @@ def main(argv=None):
                         help="Open multi-select Excel file picker for all beam-force parts")
     parser.add_argument("--native-assignment",type=Path)
     args=parser.parse_args(argv)
+    if args.inspect_combined_reference:
+        if (args.analysis or args.analysis_files or args.analysis_reference or args.reference_beams
+                or args.reference_output or args.reference_case or args.reference_storage
+                or args.export_root or args.table_index_output or args.native_assignment
+                or args.select_beams or any((args.beam_1, args.beam_2, args.beam_3))):
+            parser.error("Inspection requires --inspect-combined-reference; optional --beam-files for legacy index and --audit-output")
+        import json
+        from components.inputs.etabs_table_bundle import CombinedReference
+        from components.inputs.output_contract import _refuse_linked_output_target, atomic_json
+        try:
+            report = CombinedReference(args.inspect_combined_reference, beam_paths=args.beam_files).coverage()
+            if args.audit_output:
+                target = args.audit_output.expanduser().absolute()
+                _refuse_linked_output_target(target)
+                if target.exists() or not target.name.endswith(".private.json"):
+                    raise ValueError("Coverage output must be a new .private.json file")
+                atomic_json(target, report)
+            print(json.dumps(report, indent=2))
+        except (OSError, ValueError, KeyError, TypeError, sqlite3.Error) as exc:
+            parser.error(str(exc))
+        return 0
     if args.table_index_output:
         if (not args.analysis_files or args.audit_output or args.analysis_reference
                 or args.reference_output or args.reference_case or args.reference_storage or args.reference_beams or args.analysis
@@ -138,6 +161,7 @@ def main(argv=None):
                         "beam_manifest_sha256": _sha(beam_manifest),
                         "analysis_workbooks": len(args.analysis_reference),
                         "beam_workbooks": len(args.reference_beams),
+                        "beam_sources": [str(path.expanduser().resolve()) for path in args.reference_beams],
                         "beam_unique_rows": beam["unique_rows"],
                         "beam_exact_overlaps": beam["exact_or_tolerance_matched_overlaps"],
                         "source_model_identity": "UNVERIFIED",

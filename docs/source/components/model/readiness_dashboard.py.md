@@ -74,3 +74,8 @@ failure. Final green status is conditional on latest PR head CI.
 approval, native ETABS/OpenSees equivalence, material calibration,
 convergence, or NBC clause certification. The separate production run
 gate remains authoritative.
+
+
+### Combined workbook evidence
+
+`audit(..., reference_index=..., reference_beam_paths=...)` inspects an explicit combined private index and reports per-stage table coverage separately from model-bound sign-off. JSON/Markdown retain this separation. Workbook coverage cannot approve NLTHA or replace native checks.

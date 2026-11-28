@@ -129,6 +129,7 @@ class GravityAnalysisGUI:
         self.etabs_full_table_var=tk.StringVar(value="")
         self.etabs_native_assignment_var=tk.StringVar(value="")
         self.etabs_beam_forces_paths=[]
+        self.etabs_analysis_paths=[]
         self.etabs_case_var = tk.StringVar(value="1. DL + LL")
         self.allow_alternate_edb = tk.BooleanVar(value=False)
         self.launch_etabs_for_gravity = tk.BooleanVar(value=True)
@@ -222,6 +223,7 @@ class GravityAnalysisGUI:
                 self.etabs_full_table_var.set("")
                 self.etabs_native_assignment_var.set("")
                 self.etabs_beam_forces_paths=[]
+                self.etabs_analysis_paths=[]
             self._registered_source_owner=original
             # Rebuilds share the original export's private source evidence.
             staged = staged_gravity_workbooks(original)
@@ -248,6 +250,7 @@ class GravityAnalysisGUI:
             if selected:
                 source=validate_full_table_selection(selected)
                 self.etabs_full_table_var.set(str(source))
+                self.etabs_analysis_paths=[source] if source.suffix.lower() in (".xlsx", ".xlsm") else []
         except Exception as exc:
             messagebox.showerror("Wrong ETABS source role",str(exc),parent=self.win)
 
@@ -258,12 +261,12 @@ class GravityAnalysisGUI:
                 classify_etabs_excel_selection)
             selected=filedialog.askopenfilenames(
                 parent=self.win,
-                title="Ctrl/Shift select ONE Analysis Export + Assignment Export "
+                title="Ctrl/Shift select analysis lot(s) + Assignment Export "
                       "+ ALL Beam Forces Element 1/2/3",
                 filetypes=[("ETABS Excel exports","*.xlsx *.xlsm")])
             if not selected:
                 return
-            grouped=classify_etabs_excel_selection(selected)
+            grouped=classify_etabs_excel_selection(selected, split_analysis=True)
             if grouped["analysis"] is None:
                 raise ValueError(
                     "No analyzed Analysis Export selected; Ctrl+click it and "
@@ -277,20 +280,21 @@ class GravityAnalysisGUI:
             if grouped["assignment"] is not None:
                 self.etabs_native_assignment_var.set(str(grouped["assignment"]))
             self.etabs_beam_forces_paths=list(grouped["beam"])
+            self.etabs_analysis_paths=list(grouped["analysis_files"])
             names=", ".join(path.name for path in grouped["beam"])
             self.status_var.set(
-                f"Sources selected: 1 analyzed Excel + "
+                f"Sources selected: {len(grouped['analysis_files'])} analysis Excel files + "
                 f"{int(grouped['assignment'] is not None)} assignment + "
                 f"{len(grouped['beam'])} beam-force files: {names}. "
                 "Each file may contain multiple sheets.")
             messagebox.showinfo(
                 "ETABS Excel sources selected",
-                f"Analysis: {grouped['analysis'].name}\\n"
+                f"Joint Reactions owner: {grouped['analysis'].name}\\n"
+                f"Analysis lots selected: {len(grouped['analysis_files'])}\\n"
                 f"Assignment: {grouped['assignment'].name if grouped['assignment'] else 'not selected'}\\n"
                 f"Beam parts ({len(grouped['beam'])}):\\n"+
                 "\\n".join(path.name for path in grouped["beam"])+
-                "\\n\\nAll parts will be read; rows are saved as CSV "
-                "without Excel worksheet row limits.",
+                "\\n\\nUse Build combined reference to import every selected analysis and beam lot.",
                 parent=self.win)
         except Exception as exc:
             messagebox.showerror("ETABS multi-file selection",str(exc),parent=self.win)
@@ -369,6 +373,14 @@ class GravityAnalysisGUI:
             if not edb_path or not Path(edb_path).is_file():
                 raise FileNotFoundError(
                     "Exact source ETABS EDB is unavailable; rebuild source export first")
+            case = self.etabs_case_var.get().strip()
+            if not case:
+                raise ValueError("Select the exact ETABS gravity output case")
+            if not messagebox.askyesno("Select exact gravity case",
+                    f"Extract only the literal case {case!r} from all selected beam exports?\n"
+                    "Other cases stay in the original files and all-case reference. No reactions are changed.",
+                    parent=self.win):
+                return
             edb_digest=_sha(edb_path)
             stage=create_case_run(source_root,"ETABS_EXPORT","BEAM_FORCES",
                                   state="SOURCE_ONLY",units="kN-m-s",
@@ -376,7 +388,7 @@ class GravityAnalysisGUI:
             try:
                 summary=consolidate(self.etabs_beam_forces_paths,
                                     stage/"02_RESULTS",
-                                    case=self.etabs_case_var.get().strip())
+                                    case=case, select_exact_case=True)
                 native=self.etabs_native_assignment_var.get().strip()
                 manifest,registry=register_current_etabs_tables(
                     source_root,full,self.etabs_beam_forces_paths,
@@ -393,6 +405,7 @@ class GravityAnalysisGUI:
             self._gravity_action_log(
                 "ETABS_BEAM_FORCE_PARTS_AUDITED",
                 f"Parts={len(self.etabs_beam_forces_paths)}; rows={summary['unique_rows']}; "
+                f"excluded_rows={summary['scanned_source_rows']-summary['source_rows']}; "
                 f"CSV={summary['output']}; source_manifest={manifest}; "
                 "reaction equivalence NOT VERIFIED")
             self.status_var.set(
@@ -406,6 +419,75 @@ class GravityAnalysisGUI:
                 parent=self.win)
         except Exception as exc:
             messagebox.showerror("ETABS beam-force audit",str(exc),parent=self.win)
+
+    def _build_combined_reference(self):
+        """Run the existing combined importer in a private source-only stage."""
+        from components.inputs.output_layout import export_root_for
+        from components.inputs.output_contract import create_case_run, record_case_status
+        if getattr(self, "_combined_reference_busy", False):
+            messagebox.showerror("Combined ETABS reference", "A combined reference import is already running", parent=self.win)
+            return
+        try:
+            if not self.model_var.get() or not self.etabs_analysis_paths or not self.etabs_beam_forces_paths:
+                raise ValueError("Select current model and all analysis/beam Excel files together first")
+            root = export_root_for(Path(self.model_var.get()).resolve().parent)
+            if not messagebox.askyesno("Build private combined reference",
+                    f"Read {len(self.etabs_analysis_paths)} analysis files and {len(self.etabs_beam_forces_paths)} beam files?\n"
+                    "This creates reference-only evidence, not EDB or solver acceptance.", parent=self.win):
+                return
+            stage = create_case_run(root, "ETABS_EXPORT", "COMBINED_REFERENCE", state="SOURCE_ONLY")
+            destination = stage / "02_RESULTS" / "ETABS_REFERENCE"
+            log_path = stage / "01_LOGS" / "combined_reference.log"
+            runner = _runtime_repo_root() / "tools" / "REGISTER_CURRENT_ETABS_TABLES.py"
+            command = [sys.executable, str(runner), "--analysis-reference",
+                       *map(str, self.etabs_analysis_paths), "--reference-beams",
+                       *map(str, self.etabs_beam_forces_paths), "--reference-storage", "sqlite",
+                       "--reference-output", str(destination)]
+            import queue
+            results = queue.SimpleQueue()
+            self._combined_reference_busy = True
+            self.status_var.set("Building private all-case reference. Progress log: " + str(log_path))
+            record_case_status(stage, "RUNNING", message="Reading original workbook sources")
+
+            def worker():
+                try:
+                    with log_path.open("w", encoding="utf-8") as stream:
+                        result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT, check=False)
+                    if result.returncode != 0:
+                        raise RuntimeError("Combined importer failed; see " + str(log_path))
+                    from components.inputs.etabs_table_bundle import CombinedReference
+                    index = destination / "ETABS_COMBINED_REFERENCE.private.json"
+                    coverage = CombinedReference(index).coverage()
+                    record_case_status(stage, "INCOMPLETE", message="Reference bytes checked; native acceptance pending")
+                    results.put((index, coverage, None))
+                except Exception as exc:
+                    try:
+                        record_case_status(stage, "FAILED", message="Combined reference import failed")
+                    finally:
+                        results.put((None, None, str(exc)))
+
+            def poll():
+                try:
+                    index, coverage, error = results.get_nowait()
+                except queue.Empty:
+                    self.win.after(250, poll)
+                    return
+                self._combined_reference_busy = False
+                if error:
+                    self.status_var.set("Combined reference failed; see " + str(log_path))
+                    messagebox.showerror("Combined ETABS reference", error, parent=self.win)
+                else:
+                    self.status_var.set("Reference bytes verified; native acceptance pending: " + str(index))
+                    messagebox.showinfo("Combined ETABS reference",
+                        f"{coverage['analysis_tables']} analysis tables and {coverage['beam_unique_rows']} unique beam rows.\n"
+                        f"Select this index in the readiness dashboard:\n{index}\nNative solver acceptance remains unverified.",
+                        parent=self.win)
+
+            threading.Thread(target=worker, daemon=True).start()
+            self.win.after(250, poll)
+        except Exception as exc:
+            self._combined_reference_busy = False
+            messagebox.showerror("Combined ETABS reference", str(exc), parent=self.win)
 
     def _stage_selected_etabs_workbooks(self):
         """Copy both user-chosen native Excel inputs into this selected export."""
@@ -1522,6 +1604,8 @@ class GravityAnalysisGUI:
         ttk.Button(form,
                    text="Select ALL ETABS Excel files together (Ctrl/Shift multi-select: Analysis + Assignment + Beam 1/2/3)",
                    command=self._choose_all_etabs_excel_sources).pack(anchor="w",pady=(2,5))
+        ttk.Button(form, text="Build combined reference (all selected analysis + beam lots)",
+                   command=self._build_combined_reference).pack(anchor="w", pady=(2,5))
         beam_row=ttk.Frame(form); beam_row.pack(fill="x",pady=(2,5))
         ttk.Button(beam_row,
                    text="Select ALL ETABS Element Forces - Beams Excel parts",
@@ -1534,7 +1618,7 @@ class GravityAnalysisGUI:
                    command=self._audit_all_etabs_beam_force_workbooks).pack(side="left")
         ttk.Label(form,
                   text="Use Ctrl/Shift-click for multiple workbooks, or the combined source selector above. "
-                       "All selected beam-force worksheets are read-only sources. "
+                       "All selected beam-force worksheets are read-only sources; this action projects the exact chosen gravity case. "
                        "Output: 01_ETABS_EXPORT/RUNS/SOURCE_ONLY/BEAM_FORCES/<run-id>/02_RESULTS. "
                        "Consolidation verifies exported station rows, NOT OpenSees reaction equivalence.",
                   wraplength=1050,anchor="w",justify="left").pack(anchor="w")

@@ -806,6 +806,34 @@ class FirstLotReferenceTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(Path(beam_report["output"]).read_bytes()).hexdigest(),
                          beam_report["output_sha256"])
         self.assertFalse(list(self.output.rglob("ETABS_Beam_Forces_Consolidated.csv")))
+        from components.inputs.etabs_table_bundle import CombinedReference
+        index = self.output / "ETABS_COMBINED_REFERENCE.private.json"
+        ref = CombinedReference(index)
+        report = ref.coverage()
+        self.assertEqual(ref.source_owner("Story Forces"), (self.source, "Story Forces"))
+        self.assertEqual(main(["--inspect-combined-reference", str(index)]), 0)
+        from components.model.readiness_dashboard import audit, export_report
+        readiness = audit(self.output, reference_index=index)
+        self.assertEqual(readiness["etabs_workbook_reference"]["status"],
+                         "REFERENCE_BYTES_VERIFIED_NOT_SOLVER_INPUT")
+        self.assertFalse(readiness["approved_for_nltha"])
+        _, md = export_report(readiness, self.output / "review")
+        self.assertIn("ETABS workbook reference coverage", md.read_text(encoding="utf-8"))
+        self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
+        self.assertIn("Story Forces", report["modules"]["ESM"]["available"])
+        self.assertIn("Element Forces - Beams", report["modules"]["GRAVITY"]["available"])
+        self.assertIn("Assembled Joint Masses", report["modules"]["MODAL"]["missing"])
+        rows = list(ref.rows("Story Forces", case="EQX"))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([row["Step Number"] for row in rows], [1, 2])
+        self.assertEqual(list(ref.rows("Element Forces - Beams", case="EQX"))[0]["Unique Name"], "123")
+        with self.assertRaises(ValueError):
+            list(ref.rows("Story Forces"))
+        with self.assertRaises(ValueError):
+            list(ref.rows("Story Forces", case="eqx"))
+        beam.write_bytes(b"changed original source")
+        with self.assertRaises(ValueError):
+            CombinedReference(index)
 
     def test_frame_station_coverage_before_case_filter(self):
         source = self.source.with_name("stations.xlsx")

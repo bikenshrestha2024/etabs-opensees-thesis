@@ -182,7 +182,7 @@ def _load_draft(model):
         return None, "INVALID_DRAFT"
 
 
-def audit(folder, model_script=None):
+def audit(folder, model_script=None, *, reference_index=None, reference_beam_paths=None):
     root = Path(folder).expanduser().resolve()
     model = Path(model_script).expanduser().resolve() if model_script else None
     draft, draft_state = _load_draft(model)
@@ -222,6 +222,10 @@ def audit(folder, model_script=None):
             "The X-only first-step instability remains unresolved until native solver evidence confirms a fix."
         ],
     }
+    if reference_index is not None:
+        from components.inputs.etabs_table_bundle import CombinedReference
+        reference = CombinedReference(reference_index, beam_paths=reference_beam_paths)
+        report["etabs_workbook_reference"] = reference.coverage()
     required_keys = {
         key for group_keys in REVIEW_KEYS.values() for key in group_keys
     }
@@ -313,6 +317,14 @@ def export_report(report, output_folder):
                   for e in group["evidence"]]
         if not group["evidence"]:
             lines.append("- No matching source evidence found")
+        lines.append("")
+    if "etabs_workbook_reference" in report:
+        lines += ["## ETABS workbook reference coverage", "",
+                  "Reference bytes checked; no native EDB or solver equivalence inferred.", "",
+                  "| Module | Available tables | Missing tables |", "|---|---|---|"]
+        for module, item in report["etabs_workbook_reference"]["modules"].items():
+            lines.append("| " + module + " | " + ", ".join(item["available"]) +
+                         " | " + ", ".join(item["missing"]) + " |")
         lines.append("")
     lines += ["## Important limitations", ""]
     lines += ["- " + item for item in report["limitations"]]

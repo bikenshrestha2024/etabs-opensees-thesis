@@ -105,3 +105,12 @@ python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-reference $lots --refer
 ```
 
 The combined mode preserves the existing analysis-table owner checks and uses the existing exact native all-case beam consolidator, rather than pretending that beam shards are disjoint analysis worksheets. No case filtering is permitted in this mode. Repeated source bytes and mixed source roles are rejected. Source hashes are rechecked before publishing the staged directory. The combined private index links and hashes the analysis manifest and beam manifest; the latter contains the CSV digest and final output path. Outputs are reference-only and do not register as a source EDB or solver input. A failure before publication leaves no new reference directory. Keep all generated reference data local. Native model and engineering acceptance remain separate.
+
+
+### Verify a combined reference
+
+```powershell
+python tools/REGISTER_CURRENT_ETABS_TABLES.py --inspect-combined-reference "path\to\ETABS_COMBINED_REFERENCE.private.json" --audit-output "coverage.private.json"
+```
+
+For legacy indexes without beam paths, also supply `--beam-files` with the exact original beam files. Source and derived bytes, ownership and row counts are checked. Output coverage is reference-only, not native acceptance.
