@@ -116,3 +116,5 @@ and separate private row-level audit preserve source positions; consolidated
 CSV is not a replacement for the originals. Matching case and topology
 coverage does not establish native model identity or full time-history
 record recovery.
+
+All-case mode writes `ETABS_Beam_Forces_All_Cases.csv` and `ETABS_Beam_Forces_All_Cases_Manifest.json` rather than the legacy gravity filenames, preventing accidental lookup by legacy gravity consumers.

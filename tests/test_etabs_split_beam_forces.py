@@ -201,6 +201,9 @@ class SplitBeamForceTests(unittest.TestCase):
         self.assertEqual(result["exact_or_tolerance_matched_overlaps"], 1)
         self.assertIsNone(result["case"])
         self.assertEqual(result["case_selection_policy"], "ALL_NATIVE_CASES_EXACT")
+        self.assertEqual(Path(result["output"]).name, "ETABS_Beam_Forces_All_Cases.csv")
+        self.assertTrue((self.root / "all" / "ETABS_Beam_Forces_All_Cases_Manifest.json").is_file())
+        self.assertFalse((self.root / "all" / "ETABS_Beam_Forces_Consolidated.csv").exists())
         self.assertEqual(result["input_files"][0]["selected_case_row_counts"], {"Modal Ritz": 3})
         self.assertEqual(result["input_files"][1]["selected_case_row_counts"], {"Modal Ritz": 1, "1. DL + LL": 1})
         bad = a.copy(); bad[9] += 1e-8

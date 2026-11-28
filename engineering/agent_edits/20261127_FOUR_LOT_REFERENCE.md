@@ -243,3 +243,5 @@ Raw workbooks, fingerprints, row payloads and extrema remain private.
 Table 5-1 seismic weight and two 12 m X walls PRESERVED. Native EDB binding,
 axis/offset compatibility, OpenSees comparison, solver convergence and NBC
 acceptance remain NOT_VERIFIED.
+
+Actual three-file extraction replay subsequently completed: all observed beam/case-step station sets reconcile, all beam-labeled SECOND LOT frame element positions are represented, and every observed position matches that topology. Exact native overlap payloads agree, gravity projection reconciles and no distinct native gravity keys collide under the legacy gravity key on these observed rows. Original source positions and overlap aliases retained in private SQLite. The actual-data replay is independent of the repository CLI; the new CLI is not claimed executed against the workbooks. Distinct all-case output filenames protect legacy gravity lookup. Full combined native model import and solver equivalence remain NOT_VERIFIED.

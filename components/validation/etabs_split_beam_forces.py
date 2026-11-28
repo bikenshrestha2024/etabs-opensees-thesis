@@ -264,7 +264,8 @@ def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9,
             unique = db.execute("SELECT COUNT(*) FROM stations").fetchone()[0]
             # The CSV is emitted only after every source row is validated.
             target.mkdir(parents=True, exist_ok=True)
-            output = target / "ETABS_Beam_Forces_Consolidated.csv"
+            output = target / ("ETABS_Beam_Forces_All_Cases.csv" if all_cases else
+                               "ETABS_Beam_Forces_Consolidated.csv")
             with output.open("w", newline="", encoding="utf-8-sig") as fp:
                 writer = csv.DictWriter(fp, fieldnames=columns, extrasaction="raise")
                 writer.writeheader()
@@ -295,7 +296,8 @@ def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9,
             "Source table aggregation does not prove ETABS/OpenSees equivalence",
         ],
     }
-    (target / "ETABS_Beam_Forces_Manifest.json").write_text(
+    (target / ("ETABS_Beam_Forces_All_Cases_Manifest.json" if all_cases else
+               "ETABS_Beam_Forces_Manifest.json")).write_text(
         json.dumps(summary, indent=2, allow_nan=False), encoding="utf-8")
     return summary
 
