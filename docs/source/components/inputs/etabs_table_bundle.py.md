@@ -187,3 +187,7 @@ topology positions without results and missing observed position/case-step
 groups. Missing coverage may reflect selected output, not a failed solve.
 No force summation, local-to-global transform, restraint inference or numerical
 acceptance occurs. The check retains exact source identity and is additive.
+
+### Exact full-gravity source cut diagnostic
+
+When the joint topology, Joint Reactions and Story Forces coexist, the importer reports `checks.full_gravity_source` before case filtering. It selects only the literal unstepped combination `1. DL + LL`, compares the sum of reported vertical joint reactions with the unique Story1 Bottom P, and blocks the sum for ambiguous, incomplete or unmatched joint identities. Zero/nonzero six-component vectors are reported as source evidence, not support assignments. No moment equilibrium or solver equality is inferred. This targeted check does not generalize to other Combination or envelope records and does not replace independent verification of native combination definitions.

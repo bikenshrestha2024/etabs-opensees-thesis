@@ -95,3 +95,13 @@ unambiguous owner. Reference import shares this index scan and also validates
 the known first- and second-lot worksheet values. Use each mode in its own
 invocation. The index reports source files for review and leaves solver
 registration to the EDB-bound workflow.
+
+## Combined analysis and beam reference publication
+
+Use the six complementary analysis files and three native beam workbooks in explicit, separate arrays:
+
+```powershell
+python tools/REGISTER_CURRENT_ETABS_TABLES.py --analysis-reference $lots --reference-beams $beams --reference-storage sqlite --reference-output "..\\NINE_SOURCE_REFERENCE"
+```
+
+The combined mode preserves the existing analysis-table owner checks and uses the existing exact native all-case beam consolidator, rather than pretending that beam shards are disjoint analysis worksheets. No case filtering is permitted in this mode. Repeated source bytes and mixed source roles are rejected. Source hashes are rechecked before publishing the staged directory. The combined private index links and hashes the analysis manifest and beam manifest; the latter contains the CSV digest and final output path. Outputs are reference-only and do not register as a source EDB or solver input. A failure before publication leaves no new reference directory. Keep all generated reference data local. Native model and engineering acceptance remain separate.

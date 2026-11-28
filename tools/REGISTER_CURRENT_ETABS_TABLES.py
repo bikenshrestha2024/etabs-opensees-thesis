@@ -28,6 +28,8 @@ def main(argv=None):
                         help="New private local JSON audit output; required with --analysis-files")
     parser.add_argument("--analysis-reference", type=Path, nargs="+", action="extend",
                         help="Import explicitly selected ETABS analysis reference workbooks")
+    parser.add_argument("--reference-beams", type=Path, nargs="+",
+                        help="Optional separate native all-case beam shards, with analysis reference SQLite mode")
     parser.add_argument("--reference-output", type=Path,
                         help="New directory for the private analysis reference JSON")
     parser.add_argument("--reference-case", action="append", default=[],
@@ -44,7 +46,7 @@ def main(argv=None):
     args=parser.parse_args(argv)
     if args.table_index_output:
         if (not args.analysis_files or args.audit_output or args.analysis_reference
-                or args.reference_output or args.reference_case or args.reference_storage or args.analysis
+                or args.reference_output or args.reference_case or args.reference_storage or args.reference_beams or args.analysis
                 or args.export_root or args.native_assignment or args.select_beams
                 or args.beam_files or any((args.beam_1, args.beam_2, args.beam_3))):
             parser.error("Table index mode: use --analysis-files LOT1 LOT2 ... "
@@ -63,7 +65,7 @@ def main(argv=None):
         print(f"{result['status']}: {len(result['tables'])} distinct worksheet names")
         print("Private table index:", target)
         return 0
-    if args.analysis_reference or args.reference_output or args.reference_case or args.reference_storage:
+    if args.analysis_reference or args.reference_output or args.reference_case or args.reference_storage or args.reference_beams:
         if (not args.analysis_reference or not args.reference_output or args.analysis_files
                 or args.audit_output or args.analysis or args.export_root or args.native_assignment
                 or args.select_beams or args.beam_files or any((args.beam_1, args.beam_2, args.beam_3))):
@@ -74,11 +76,34 @@ def main(argv=None):
         from components.inputs.output_contract import _refuse_linked_output_target, atomic_json
 
         directory = args.reference_output.expanduser().absolute()
-        storage = args.reference_storage or ("sqlite" if len(args.analysis_reference) > 2 else "json")
+        storage = args.reference_storage or ("sqlite" if args.reference_beams or len(args.analysis_reference) > 2 else "json")
+        if args.reference_beams and (storage != "sqlite" or args.reference_case):
+            parser.error("Combined analysis/beam reference requires SQLite and all cases")
         try:
             _refuse_linked_output_target(directory)
             if directory.exists():
                 raise FileExistsError(f"Reference output directory already exists: {directory}")
+            source_digests = {}
+            if args.reference_beams:
+                from components.inputs.etabs_table_bundle import _sha
+                from openpyxl import load_workbook
+                for role, paths in (("analysis", args.analysis_reference), ("beam", args.reference_beams)):
+                    for path in paths:
+                        source = path.expanduser().resolve()
+                        digest = _sha(source)
+                        if digest in source_digests:
+                            raise ValueError("Repeated workbook bytes across combined reference inputs")
+                        source_digests[digest] = source
+                        book = load_workbook(source, read_only=True, data_only=False)
+                        try:
+                            beam_sheet = "Element Forces - Beams" in book.sheetnames
+                            if role == "beam" and (not beam_sheet or
+                                    set(book.sheetnames) - {"Program Control", "Element Forces - Beams"}):
+                                raise ValueError("Combined reference beam inputs must be separate native beam workbooks")
+                            if role == "analysis" and beam_sheet:
+                                raise ValueError("Combined reference analysis inputs must exclude beam shards")
+                        finally:
+                            book.close()
             directory.parent.mkdir(parents=True, exist_ok=True)
             with TemporaryDirectory(prefix=".etabs-reference-", dir=directory.parent) as work:
                 stage = Path(work) / "reference"
@@ -90,6 +115,33 @@ def main(argv=None):
                 name = ("FIRST_LOT_REFERENCE.private.json" if result["schema"] == "ETABS_FIRST_LOT_REFERENCE_V1"
                         else "ETABS_ANALYSIS_REFERENCE.private.json")
                 atomic_json(stage / name, result)
+                if args.reference_beams:
+                    from components.validation.etabs_split_beam_forces import consolidate
+                    print("Consolidating all native beam cases", flush=True)
+                    beam_dir = stage / "BEAM_REFERENCE"
+                    beam = consolidate(args.reference_beams, beam_dir, all_cases=True)
+                    beam_csv = Path(beam["output"])
+                    beam["output"] = str(directory / "BEAM_REFERENCE" / beam_csv.name)
+                    beam["output_sha256"] = _sha(beam_csv)
+                    beam_manifest = beam_dir / "ETABS_Beam_Forces_All_Cases_Manifest.json"
+                    atomic_json(beam_manifest, beam)
+                    for digest, source in source_digests.items():
+                        if _sha(source) != digest:
+                            raise ValueError("Combined reference source changed during import")
+                    atomic_json(stage / "ETABS_COMBINED_REFERENCE.private.json", {
+                        "schema": "ETABS_COMBINED_REFERENCE_V1",
+                        "status": "REFERENCE_ONLY_NOT_SOLVER_INPUT",
+                        "engineering_acceptance": "NOT_VERIFIED",
+                        "analysis_manifest": name,
+                        "analysis_manifest_sha256": _sha(stage / name),
+                        "beam_manifest": str(beam_manifest.relative_to(stage)),
+                        "beam_manifest_sha256": _sha(beam_manifest),
+                        "analysis_workbooks": len(args.analysis_reference),
+                        "beam_workbooks": len(args.reference_beams),
+                        "beam_unique_rows": beam["unique_rows"],
+                        "beam_exact_overlaps": beam["exact_or_tolerance_matched_overlaps"],
+                        "source_model_identity": "UNVERIFIED",
+                    })
                 _refuse_linked_output_target(directory)
                 if directory.exists():
                     raise FileExistsError(f"Reference output directory already exists: {directory}")
