@@ -84,6 +84,15 @@ def _headers(path):
         wb.close()
 
 
+_NATIVE_UNITS = {'Station': 'm', 'Elem Station': 'm', 'P': 'kN', 'V2': 'kN', 'V3': 'kN', 'T': 'kN-m', 'M2': 'kN-m', 'M3': 'kN-m'}
+
+
+def _native_units_row(row):
+    return (set(_NATIVE_UNITS).issubset(row)
+            and all(row.get(name) == value for name, value in _NATIVE_UNITS.items())
+            and all(value in (None, '') for name, value in row.items() if name not in _NATIVE_UNITS))
+
+
 def _stream_tables(path):
     """Yield (sheet-name, row) from every matching Excel worksheet."""
     from openpyxl import load_workbook
@@ -91,13 +100,17 @@ def _stream_tables(path):
     wb = load_workbook(path, read_only=True, data_only=True)
     try:
         for sheet_name, heading, columns in candidates:
-            for record in wb[sheet_name].iter_rows(
-                    min_row=heading + 2, values_only=True):
+            for source_row, record in enumerate(wb[sheet_name].iter_rows(
+                    min_row=heading + 2, values_only=True), start=heading + 2):
                 if not any(v is not None and str(v).strip() for v in record):
                     continue
                 row = {column: record[i] if i < len(record) else None
                        for i, column in enumerate(columns) if column}
-                if any(row.get(col) is None for col in IDENTITY):
+                # Native ETABS exports carry a unit row immediately after
+                # the headers. Skip only the exact kN-m table unit signature.
+                if source_row == heading + 2 and _native_units_row(row):
+                    continue
+                if any(row.get(col) in (None, "") for col in IDENTITY):
                     raise ValueError(
                         f"{path} / {sheet_name}: incomplete beam-force identity")
                 yield sheet_name, row

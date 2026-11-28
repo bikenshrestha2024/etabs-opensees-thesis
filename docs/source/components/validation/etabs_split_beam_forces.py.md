@@ -56,3 +56,18 @@ The analyzed full-table input remains a **single authoritative analyzed
 export**, e.g. `Analysis Export ULS 3 storey latest_compressed.xlsx`.
 The assignment workbook and beam parts are separate input roles. A beam-only
 workbook cannot be used as the analyzed joint-reaction source.
+
+
+## Native ETABS unit row (2026-11-28)
+
+Native station-force exports have a third row with explicit table units.
+The shared streaming reader now skips only the exact native station and
+force-unit signature immediately following the headers (m, kN, kN-m).
+This is not a result and must not trip the case gate. Blank identity fields
+on other rows remain invalid. Other or incomplete unit signatures are not
+silently converted. The strict `1. DL + LL` single-case consolidator remains
+strict: an all-case export must not be passed to it as an already-selected
+gravity case. The separate beam/slab load-path diagnostic may select exact
+cases explicitly; the all-sheet audit mode preserves every exported case.
+Neither a source row-limit boundary nor a partial import establishes complete
+station coverage or native equivalence.
