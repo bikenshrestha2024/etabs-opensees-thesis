@@ -55,7 +55,9 @@ class ShardLogicTests(unittest.TestCase):
     def test_missing_force_value_and_frame_table_mismatch(self):
         bad = rows("1")
         bad[0]["V2"] = None
-        self.assertIn("NONFINITE_FORCE_VALUES", [f["id"] for f in audit_beam_force_shards([("s", bad)])["findings"]])
+        got = audit_beam_force_shards([("s", bad)])
+        self.assertIn("NONFINITE_FORCE_VALUES", [f["id"] for f in got["findings"]])
+        self.assertEqual(got["nonfinite_values"], 1)  # one row, counted once
         doc = audit_beam_force_shards([("s", rows("1") + rows("2"))], frame_elements={"1": "Story9"})
         self.assertEqual(doc["frame_table_match"], {"beam_elements_missing_from_frame_table": 1, "story_disagreements": 1})
         self.assertEqual(doc["union_status"], "UNION_HAS_ERRORS")

@@ -64,11 +64,10 @@ def audit_beam_force_shards(shards, *, frame_elements=None, excel_row_limit=EXCE
                 try:
                     v = float(row.get(c))
                 except (TypeError, ValueError):
-                    nonfinite += 1
                     v = float("nan")
                 vals.append(v)
             if any(v != v or v in (float("inf"), float("-inf")) for v in vals):
-                nonfinite += 1
+                nonfinite += 1  # rows with a missing or nonfinite value, counted once
             kh = _digest(key_parts)
             vh = _digest([repr(v) for v in vals])
             elem = key_parts[0]

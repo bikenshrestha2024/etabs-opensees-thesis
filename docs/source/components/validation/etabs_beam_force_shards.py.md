@@ -1,7 +1,7 @@
 # ETABS beam-force shard audit
 
 **Canonical source:** [`components/validation/etabs_beam_force_shards.py`](../../../../components/validation/etabs_beam_force_shards.py)
-**Run it with:** [`tools/audit_etabs_beam_force_shards.py`](../../tools/audit_beam_force_shards.py.md) (`tools/audit_beam_force_shards.py`)
+**Run it with:** [`tools/audit_beam_force_shards.py`](../../tools/audit_beam_force_shards.py.md)
 **Evidence:** [`docs/validation/20261128_ETABS_BEAM_FORCE_SHARDS_AUDIT.md`](../../../validation/20261128_ETABS_BEAM_FORCE_SHARDS_AUDIT.md)
 
 Excel holds at most 1,048,576 rows, so the `Element Forces - Beams` table arrives as several workbooks. `audit_beam_force_shards(shards, frame_elements=None)` takes ordered `(name, rows)` shards of dict rows and reports:
