@@ -143,6 +143,33 @@ class SplitBeamForceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unexpected Output Case"):
             consolidate([a], self.root / "out")
 
+    def test_explicit_exact_case_projection_preserves_exclusion_counts(self):
+        selected = self.row()
+        other = self.row(unique="124")
+        other[3] = "Modal Ritz"
+        similar = self.row(unique="125")
+        similar[3] = "1. dl + ll"
+        a = self.part("one.xlsx", [other, selected])
+        b = self.part("two.xlsx", [similar])
+        with self.assertRaisesRegex(ValueError, "unexpected Output Case"):
+            consolidate([a, b], self.root / "strict")
+        report = consolidate([a, b], self.root / "selected", select_exact_case=True)
+        self.assertEqual(report["source_rows"], 1)
+        self.assertEqual(report["scanned_source_rows"], 3)
+        self.assertEqual(report["case_selection_policy"], "EXACT_EXPLICIT_PROJECTION")
+        self.assertEqual(report["input_files"][0]["excluded_case_row_counts"], {"Modal Ritz": 1})
+        self.assertEqual(report["input_files"][1]["excluded_case_row_counts"], {"1. dl + ll": 1})
+        self.assertEqual(report["input_files"][1]["rows_read"], 0)
+        self.assertEqual(report["input_files"][1]["rows_scanned"], 1)
+        self.assertEqual(report["input_files"][1]["sheets"][0]["rows_scanned"], 1)
+        with (self.root / "selected" / "ETABS_Beam_Forces_Consolidated.csv").open(
+                encoding="utf-8-sig", newline="") as fp:
+            rows = list(csv.DictReader(fp))
+        self.assertEqual([row["Output Case"] for row in rows], ["1. DL + LL"])
+        with self.assertRaisesRegex(ValueError, "No beam-force rows"):
+            consolidate([b], self.root / "missing", select_exact_case=True)
+        self.assertFalse((self.root / "missing").exists())
+
     def test_nonempty_output_is_never_overwritten(self):
         a = self.part("one.xlsx", [self.row()])
         out = self.root / "out"

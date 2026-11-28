@@ -128,11 +128,23 @@ def _same_value(lhs, rhs, *, atol, rtol):
     return _normalized(lhs) == _normalized(rhs)
 
 
-def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9):
+def _case_is_selected(row, case, *, select_exact_case=False):
+    """Strict legacy mode or explicitly requested literal case projection."""
+    if select_exact_case:
+        return row["Output Case"] == case
+    if _normalized(row["Output Case"]) != _normalized(case):
+        raise ValueError(f"unexpected Output Case {row['Output Case']!r} (expected {case!r})")
+    return True
+
+
+def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9,
+                select_exact_case=False):
     """[REF docs/source/components/validation/etabs_split_beam_forces.py.md]
     Merge any positive number of workbooks and all their beam-force sheets.
     No partial CSV/manifest is published on input validation failure.
     """
+    if not isinstance(case, str) or not case.strip():
+        raise ValueError("Specify a nonblank ETABS output case")
     if not inputs:
         raise ValueError("At least one ETABS beam-force workbook required")
     paths = [Path(p).expanduser().resolve() for p in inputs]
@@ -149,6 +161,7 @@ def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9):
     columns = None
     manifest = []
     source_rows = 0
+    scanned_source_rows = 0
     duplicate_count = 0
     with tempfile.TemporaryDirectory(prefix="etabs_beam_sqlite_") as scratch:
         database = Path(scratch) / "stations.sqlite"
@@ -156,12 +169,11 @@ def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9):
         try:
             db.execute("CREATE TABLE stations (k TEXT PRIMARY KEY, row_json TEXT NOT NULL)")
             for path in paths:
-                counts = {}
+                counts, scanned, excluded = {}, {}, {}
+                digest_before = _digest(path)
                 for sheet_name, row in _stream_tables(path):
-                    if _normalized(row["Output Case"]) != _normalized(case):
-                        raise ValueError(
-                            f"{path} / {sheet_name}: unexpected Output Case "
-                            f"{row['Output Case']!r} (expected {case!r})")
+                    scanned[sheet_name] = scanned.get(sheet_name, 0) + 1
+                    scanned_source_rows += 1
                     keys = list(row)
                     if columns is None:
                         columns = keys
@@ -169,6 +181,14 @@ def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9):
                         raise ValueError(
                             f"{path} / {sheet_name}: beam-force column schema "
                             "differs between parts")
+                    try:
+                        selected = _case_is_selected(row, case, select_exact_case=select_exact_case)
+                    except ValueError as exc:
+                        raise ValueError(f"{path} / {sheet_name}: {exc}") from exc
+                    if not selected:
+                        name = str(row["Output Case"])
+                        excluded[name] = excluded.get(name, 0) + 1
+                        continue
                     # Preserve local identity, load case, output station, and
                     # response step. Do not collapse unlike histories.
                     identity = [_normalized(row[n]) for n in IDENTITY]
@@ -194,11 +214,16 @@ def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9):
                                              ensure_ascii=False, default=str)))
                     counts[sheet_name] = counts.get(sheet_name, 0) + 1
                     source_rows += 1
+                if _digest(path) != digest_before:
+                    raise ValueError(f"{path}: source workbook changed during scan")
                 manifest.append({
-                    "filename": path.name, "source_sha256": _digest(path),
+                    "filename": path.name, "source_sha256": digest_before,
                     "rows_read": sum(counts.values()),
-                    "sheets": [{"name": name, "rows_read": n}
-                               for name, n in counts.items()],
+                    "rows_scanned": sum(scanned.values()),
+                    "excluded_case_row_counts": excluded,
+                    "sheets": [{"name": name, "rows_read": counts.get(name, 0),
+                                "rows_scanned": n, "reached_excel_data_row_limit": n >= 1048573}
+                               for name, n in scanned.items()],
                 })
             if not source_rows:
                 raise ValueError("No beam-force rows recovered from selected sources")
@@ -221,6 +246,9 @@ def consolidate(inputs, output_dir, *, case=CASE_NAME, atol=1e-6, rtol=1e-9):
         "case": case,
         "input_files": manifest,
         "source_rows": source_rows,
+        "scanned_source_rows": scanned_source_rows,
+        "case_selection_policy": ("EXACT_EXPLICIT_PROJECTION" if select_exact_case
+                                  else "STRICT_SINGLE_CASE"),
         "exact_or_tolerance_matched_overlaps": duplicate_count,
         "unique_rows": unique,
         "output": str(output),
@@ -242,8 +270,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output_dir")
     parser.add_argument("inputs", nargs="+")
+    parser.add_argument("--select-exact-case", metavar="CASE",
+                        help="Explicitly select one literal case from all-case exports; "
+                             "report excluded rows without claiming complete coverage")
     args = parser.parse_args(argv)
-    print(json.dumps(consolidate(args.inputs, args.output_dir), indent=2))
+    print(json.dumps(consolidate(args.inputs, args.output_dir,
+                                case=CASE_NAME if args.select_exact_case is None else args.select_exact_case,
+                                select_exact_case=args.select_exact_case is not None), indent=2))
 
 
 if __name__ == "__main__":
