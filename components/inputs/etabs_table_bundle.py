@@ -825,6 +825,38 @@ def _static_reaction_reference_diagnostics(records):
             "groups": result, "excluded_row_counts_by_case_step_type": dict(excluded)}
 
 
+def _frame_station_reference_diagnostics(records, family):
+    """Describe reported station coverage; not native geometry or force acceptance."""
+    cases, positions, groups = set(), {}, {}
+    checked = blank_location = missing = negative = different = repeated = 0
+    for record in records:
+        checked += 1
+        obj = (record['Story'], record[family], record['Unique Name'])
+        case = tuple(record[c] for c in ('Output Case', 'Case Type', 'Step Type', 'Step Number'))
+        station, elem_station = record['Station'], record['Elem Station']
+        location = record['Location']
+        blank_location += location is None
+        missing += station is None or elem_station is None
+        negative += any(v is not None and v < 0 for v in (station, elem_station))
+        different += station is not None and elem_station is not None and station != elem_station
+        pos = (record['Element'], station, elem_station, location)
+        cases.add(case)
+        positions.setdefault(obj, set()).add(pos)
+        group = groups.setdefault((obj, case), set())
+        repeated += pos in group
+        group.add(pos)
+    return {
+        'scope': 'ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER',
+        'status': 'REFERENCE_ONLY_STATION_COVERAGE_NOT_NATIVE_VALIDATION',
+        'checked_rows': checked, 'objects': len(positions), 'case_step_identities': len(cases),
+        'missing_object_case_groups': len(positions)*len(cases)-len(groups),
+        'position_coverage_difference_groups': sum(v != positions[obj] for (obj, _), v in groups.items()),
+        'repeated_position_rows': repeated, 'blank_location_rows': blank_location,
+        'missing_station_rows': missing, 'negative_station_rows': negative,
+        'different_station_coordinate_rows': different,
+    }
+
+
 def _reference_checks(tables, store=None):
     def rows(name):
         return store.rows(name) if store else tables[name]["rows"]
@@ -881,6 +913,13 @@ def _reference_checks(tables, store=None):
     if "Joint Reactions" in tables:
         checks["static_reaction_reference"] = _static_reaction_reference_diagnostics(
             records("Joint Reactions"))
+    station_checks = {}
+    for family in ("Column", "Brace"):
+        name = f"Element Forces - {family}s"
+        if name in tables:
+            station_checks[name] = _frame_station_reference_diagnostics(records(name), family)
+    if station_checks:
+        checks["frame_station_reference"] = station_checks
     return checks
 
 
