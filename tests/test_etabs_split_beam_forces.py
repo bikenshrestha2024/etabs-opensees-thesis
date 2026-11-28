@@ -112,6 +112,30 @@ class SplitBeamForceTests(unittest.TestCase):
             consolidate([a, b], out)
         self.assertFalse(out.exists())
 
+    def test_native_unit_row_is_not_a_result(self):
+        from openpyxl import Workbook
+        path = self.root / "native.xlsx"
+        book = Workbook()
+        sheet = book.active
+        sheet.title = "Element Forces - Beams"
+        sheet.append(["TABLE: Element Forces - Beams"])
+        sheet.append(["Story", "Beam", "Unique Name", "Output Case", "Case Type",
+                      "Step Type", "Step Number", "Station", "P", "V2", "V3",
+                      "T", "M2", "M3", "Element", "Elem Station", "Location"])
+        sheet.append(["", "", "", "", "", "", None, "m", "kN", "kN",
+                      "kN", "kN-m", "kN-m", "kN-m", "", "m", ""])
+        sheet.append(["Story1", "B1", "123", "1. DL + LL", "Combination",
+                      None, None, 0.55, 0, 5, 0, 0, 0, 1, "123", 0.55, None])
+        book.save(path)
+        report = consolidate([path], self.root / "native")
+        self.assertEqual(report["source_rows"], 1)
+        sheet["H3"] = "mm"
+        book.save(path)
+        with self.assertRaisesRegex(ValueError, "incomplete beam-force identity"):
+            consolidate([path], self.root / "bad_units")
+        self.assertFalse((self.root / "bad_units").exists())
+        book.close()
+
     def test_wrong_case_fails_closed(self):
         row = self.row()
         row[3] = "1.5(DL+LL)"
