@@ -270,3 +270,118 @@ def audit_native_assignment_workbook(workbook_path, output_folder,
     (out/"ETABS_Native_Assignment_Gravity_Quantity_Audit.json").write_text(
         json.dumps(result,indent=2,allow_nan=False),encoding="utf-8")
     return result
+
+
+def audit_analysis_edge_constraints(wb, joints, frames, areas, *, tolerance_m=1e-6):
+    """Cross-check generated @LC topology against assignment geometry.
+
+    [REF docs/source/components/validation/etabs_assignment_gravity_audit.py.md]
+    Repeated generated names are not unique: retain full directed endpoints.
+    Geometric weights are not native constraint DOFs or force coefficients.
+    """
+    import re
+    from collections import defaultdict
+    baseline = audit_base_wall_edges(wb, tolerance_m=tolerance_m)
+    if baseline['status'] != 'SOURCE_GEOMETRY_ONLY_NOT_NATIVE_MPC':
+        raise ValueError('Complete native assignment geometry is required')
+    point_rows = _unique_rows(joints, 'Element Name')
+    original = _unique_rows(_rows(wb, EDGE_TABLES[0]), 'UniqueName')
+    scale = _unit_scale(wb, EDGE_TABLES[0], ('X','Y','Z'))
+    assignments = _unique_rows(_rows(wb, EDGE_TABLES[7]), 'UniqueName')
+    def coordinate(uid):
+        if uid not in point_rows or uid not in original:
+            raise ValueError('Missing generated edge point identity: '+uid)
+        p = tuple(float(point_rows[uid]['Global '+d]) for d in 'XYZ')
+        q = tuple(float(original[uid][d])*scale[d] for d in 'XYZ')
+        if not all(math.isfinite(v) for v in (*p,*q)) or math.dist(p,q)>tolerance_m:
+            raise ValueError('Generated edge point coordinate mismatch: '+uid)
+        return p
+    shell_index = defaultdict(list)
+    for row in areas:
+        shell_index[(row['Story'], row['Object Name'], row['Object Label'])].append(row)
+    grouped = defaultdict(list)
+    seen = set()
+    for row in frames:
+        name = row['Element Name']
+        if not name.startswith('@LC-'):
+            continue
+        match = re.fullmatch(r'@LC-(\d+)-([1-4])-([123])',name)
+        if row['Object Type']!='Shell' or match is None:
+            raise ValueError('Unrecognized generated line-constraint record: '+name)
+        key = (row['Story'],row['Object Name'],row['Object Label'],match[1],int(match[2]))
+        role = int(match[3]); i,j = row['Elm JtI'],row['Elm JtJ']
+        signature = (key,role,i,j)
+        if i==j or signature in seen:
+            raise ValueError('Duplicate or degenerate generated edge record: '+name)
+        seen.add(signature)
+        grouped[key].append((role,i,j))
+    base = {row['point_id']:row for row in baseline['rows']}
+    physical = {uid for uid,row in base.items() if row['role']=='PHYSICAL_LOCATION_CANDIDATE'}
+    mesh = {uid for uid,row in base.items() if row['role']=='UNIQUE_WALL_EDGE_GEOMETRIC_CANDIDATE'}
+    for uid in base:
+        if point_rows.get(uid,{}).get('Story')!='Base':
+            raise ValueError('Assignment base point absent from analysis base: '+uid)
+        coordinate(uid)
+    if set(base)!={uid for uid,row in point_rows.items() if row['Story']=='Base'}:
+        raise ValueError('Assignment and analysis base identity sets differ')
+    results=[]; matched=set(); intermediate=Counter(); max_error=0.; base_count=0
+    for key,rows in sorted(grouped.items()):
+        story,owner,label,generated,edge=key
+        if assignments.get(owner,{}).get('Constraint')!='Yes':
+            raise ValueError('Generated parent lacks enabled edge assignment: '+owner)
+        parents=[(i,j) for role,i,j in rows if role==3]
+        if len(parents)!=1:
+            raise ValueError('Expected one generated parent edge: '+str(key))
+        i,j=parents[0]
+        candidates=[]
+        for shell in shell_index.get((story,owner,label),[]):
+            corners=[shell['Elm Jt'+str(n)] for n in range(1,5)]
+            if len(set(corners))==4 and {i,j}=={corners[edge-1],corners[edge%4]}:
+                candidates.append(shell)
+        if len(candidates)!=1:
+            raise ValueError('Missing or ambiguous parent shell edge: '+str(key))
+        first=[(a,b) for role,a,b in rows if role==1]
+        second=[(a,b) for role,a,b in rows if role==2]
+        mids={b for a,b in first}
+        if (not mids or len(first)!=len(mids) or len(second)!=len(mids)
+                or any(a!=i for a,b in first) or any(b!=j for a,b in second)
+                or mids!={a for a,b in second}):
+            raise ValueError('Incomplete or conflicting generated edge endpoint pairs: '+str(key))
+        a,b=coordinate(i),coordinate(j); d=tuple(y-x for x,y in zip(a,b)); L2=math.fsum(v*v for v in d)
+        if L2<=tolerance_m**2:
+            raise ValueError('Degenerate parent edge geometry: '+str(key))
+        on_base=i in base and j in base
+        if on_base:
+            base_count+=1
+            if not {i,j}<=physical:
+                raise ValueError('Base parent endpoints not physical location candidates')
+        group_rows=[]
+        for uid in sorted(mids):
+            p=coordinate(uid); t=math.fsum((x-y)*v for x,y,v in zip(p,a,d))/L2
+            error=math.dist(p,tuple(x+t*v for x,v in zip(a,d)))
+            if error>tolerance_m or not 0<t<1:
+                raise ValueError('Intermediate point lies outside parent edge: '+uid)
+            max_error=max(max_error,error); intermediate[uid]+=1
+            if on_base:
+                if uid not in mesh or uid in matched:
+                    raise ValueError('Base intermediate point is ambiguous or not a mesh candidate: '+uid)
+                candidate=base[uid]['edge_candidates'][0]
+                if (candidate['wall_object']!=owner or {candidate['endpoint_i'],candidate['endpoint_j']}!={i,j}
+                        or not math.isclose(t,candidate['weight_j'] if candidate['endpoint_i']==i else candidate['weight_i'],abs_tol=1e-9)):
+                    raise ValueError('Assignment and generated base edge geometry disagree: '+uid)
+                matched.add(uid)
+            group_rows.append(dict(point_id=uid,weight_i=1-t,weight_j=t,coordinate_residual_m=error))
+        results.append(dict(story=story,owner=owner,label=label,generated_parent_id=generated,
+                            analysis_shell_element=candidates[0]['Element Name'],edge=edge,
+                            endpoint_i=i,endpoint_j=j,base_edge=on_base,intermediate=group_rows))
+    return dict(status='SOURCE_EDGE_GEOMETRY_ONLY',engineering_acceptance='NOT_VERIFIED',
+                native_mpc_equivalence='NOT_VERIFIED',native_constraint_forces='NOT_VERIFIED',
+                source_model_identity='UNVERIFIED',generated_rows=len(seen),parent_edge_groups=len(results),
+                parent_shell_objects=len({(r['story'],r['owner']) for r in results}),
+                intermediate_occurrences=sum(intermediate.values()),distinct_intermediate_points=len(intermediate),
+                max_coordinate_residual_m=max_error,base_edge_groups=base_count,
+                physical_location_candidates=len(physical),base_mesh_points_expected=len(mesh),
+                base_mesh_points_matched=len(matched),base_mesh_points_unmatched=sorted(mesh-matched),
+                unresolved_assignment_base_points=sorted(set(base)-physical-mesh),groups=results,
+                limitations=['Geometric interpolation only; no native MPC coefficients or DOFs inferred.',
+                             'No constraint forces, solver restraints, stiffness or mass modified.'])

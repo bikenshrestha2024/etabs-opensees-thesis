@@ -129,3 +129,8 @@ With `--inspect-combined-reference` and `--assembled-mass-model`, add all three 
 ### Saved modal shape comparison
 
 Use `--inspect-combined-reference INDEX --modal-shapes-csv CSV --etabs-modal-case "Modal Ritz" --audit-output NEW.private.json`. The inspector checks normalized units and hashes the selected saved shape CSV. Complete reference floor identity and common master coordinates are mandatory; saved shape and reference model identity remains unverified. The reference metric is not a native mass matrix.
+
+
+### Generated edge topology audit
+
+Use `--inspect-combined-reference INDEX --edge-constraint-assignment ASSIGNMENT.xlsx --audit-output NEW.private.json`. For legacy indexes provide explicit original `--beam-files`. The original workbook is opened read-only and rehashed after inspection. Generated edge groups are reconstructed by directed endpoint identity and checked against analytical shell connectivity and independent assignment geometry. The output is private and does not establish same-EDB, MPC, reaction or native solver equivalence.
