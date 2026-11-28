@@ -191,3 +191,27 @@ acceptance occurs. The check retains exact source identity and is additive.
 ### Exact full-gravity source cut diagnostic
 
 When the joint topology, Joint Reactions and Story Forces coexist, the importer reports `checks.full_gravity_source` before case filtering. It selects only the literal unstepped combination `1. DL + LL`, compares the sum of reported vertical joint reactions with the unique Story1 Bottom P, and blocks the sum for ambiguous, incomplete or unmatched joint identities. Zero/nonzero six-component vectors are reported as source evidence, not support assignments. No moment equilibrium or solver equality is inferred. This targeted check does not generalize to other Combination or envelope records and does not replace independent verification of native combination definitions.
+
+
+### Fifth-lot shell resultant and diaphragm reference tables
+
+The SQLite analysis reference importer accepts six additional native table
+schemas: Element Forces - Area Shells, Diaphragm Max Over Avg Drifts,
+Diaphragm Forces, Diaphragm CM Displacements (native caption Diaphragm Center
+Of Mass Displacements), Diaphragm Accelerations, and Centers Of Mass And
+Rigidity. Shell forces remain distributed resultants in kN/m and kN-m/m;
+they are not point forces, stresses or integrated section cuts. Diaphragm
+force coordinates and CM displacements convert mm to m; acceleration
+converts mm/sec² to m/s²; drifts are dimensionless. Mass remains kg and MMI
+remains ton-m² as exported, not kN or seismic weight. Blank envelope-side
+acceleration values remain null. CM and rigidity rows have no case column.
+The importer checks shell positions against SECOND LOT area topology using
+the existing reference check; compares repeated X/Y center and X/Y mass
+fields to the unique matching story/diaphragm record before case filtering;
+and flags zero-average diaphragm drift ratios without changing them.
+Neither repeated floor mass across cases nor cumulative floor masses may
+be added as independent masses. No physical center-of-rigidity, accidental
+eccentricity, local-axis transformation, equilibrium, or NBC acceptance is
+inferred from these exports. Keep the original exact source files private.
+Add the Fifth LOT to the analysis array in the existing combined CLI,
+not to the separate three-beam array.

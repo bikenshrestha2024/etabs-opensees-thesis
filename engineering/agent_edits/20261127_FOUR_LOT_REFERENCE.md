@@ -249,3 +249,22 @@ Actual three-file extraction replay subsequently completed: all observed beam/ca
 ## Combined source reference and gravity cut check (2026-11-28)
 
 Editor: OpenAI ChatGPT GPT-6.2. Baseline `00a800aaae0f76d86deb70caf75370198627b63e`. PR #239 merged after five successful CI runs. All nine original sources reopened for worksheet inventory and SHA-256; previous full-cell audits preserved. Actual FIRST LOT Story Forces, SECOND LOT joint topology and THIRD LOT Joint Reactions streamed read-only; exact full-gravity unstepped combination and source joint identities reconciled to the base cut at displayed precision. Observed zero/nonzero reaction counts agree with the declared support/mesh counts, but they do not themselves identify OpenSees supports. The exact new gravity helper was executed on these actual rows and six focused assertions (valid residual, duplicate, mismatched label, repeated cut, envelope, missing component). Private coordinates, IDs, force values and hashes are excluded from Git. Extend the existing reference CLI to orchestrate separate analysis and beam owners in a staged publication; supplemental regression fixtures authored, full CI required. Full production combined invocation not yet executed locally: full checkout blocked by GitHub DNS. Native OpenSeesPy/XARA unavailable; no native solve, force equivalence, NLTHA or NBC acceptance claim. 32 physical + 44 mesh points, 1D+1L, NBC Table 5-1 and 12 m X walls preserved.
+
+
+## Fifth LOT additive reference import (2026-11-28)
+
+Editor: OpenAI ChatGPT GPT-6.2. Baseline `e8f0eb22c3bcd6e3f1bdcf3a6dd11ee61f48cac2`. Existing PRs #231–240
+and prior private audit history retained. The new native workbook introduces
+six shell/diaphragm schemas. Actual smaller diaphragm CM/center and drift
+tables inspected read-only; repeated floor mass and center fields agree
+at exported precision, and zero-average drift records are retained.
+Extend the canonical SQLite importer without introducing a new reader,
+preserve declared distributed shell units and mass/inertia units, retain
+blank acceleration envelope sides and reference-only status. Reuse the
+shell topology diagnostic and add a prefilter CM/center consistency check.
+Supplemental importer regression authored; CI required. No native EDB
+binding or solver equivalence asserted. 32 physical + 44 mesh, full 1D+1L
+gravity, distinct NBC Table 5-1 seismic weight, two 12 m X walls PRESERVED.
+Earlier separately named fourth part 4 still not located; do not silently
+alias the fifth lot or unsplit fourth lot. Raw rows and source hashes remain
+private. Full combined source invocation and native acceptance NOT_VERIFIED.
