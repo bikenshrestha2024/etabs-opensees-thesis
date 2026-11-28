@@ -1,0 +1,88 @@
+{
+  "engineering_acceptance": "NOT_VERIFIED",
+  "findings": [
+    {
+      "id": "SHARD_AT_EXCEL_ROW_LIMIT",
+      "severity": "INFO",
+      "text": "beam_1, beam_2 stop at the Excel limit; the cut falls inside an element, so a later shard must supply the remainder"
+    },
+    {
+      "id": "SHARD_ROWS_REPEATED",
+      "severity": "INFO",
+      "text": "rows exported in more than one shard; keep one copy of each key"
+    }
+  ],
+  "frame_table_match": {
+    "beam_elements_missing_from_frame_table": 0,
+    "story_disagreements": 0
+  },
+  "frame_table_source": {
+    "file_name": "fcdc4b9e-Analysis_Export_ULS_3_storey_latest_compressed_SECOND_LOT.xlsx",
+    "sha256": "7b198d0a1745ad85fd2a8ef56b3fae1c198485faf6e3694d26980572729d4c45"
+  },
+  "ingested_files": [
+    {
+      "file_name": "Beam_Forces_Element_1_latest.xlsx",
+      "sha256": "03167f4a7155e3b0c3e6c76c907ce0b16efeddc04bca704470acdbcf4b5cd2c0",
+      "shard": "beam_1",
+      "size_bytes": 76193874
+    },
+    {
+      "file_name": "Beam_Forces_Element_2_latest.xlsx",
+      "sha256": "c0bfbb5ef681413cc523470677b16be44e91de394bc1ab55adf35775a1e321a4",
+      "shard": "beam_2",
+      "size_bytes": 76446338
+    },
+    {
+      "file_name": "Beam_Forces_Element_3_latest.xlsx",
+      "sha256": "0e28780546ea2a9e07837820cd21aad64282965a3a976f37eb9799b985514e9b",
+      "shard": "beam_3",
+      "size_bytes": 34627145
+    }
+  ],
+  "nonfinite_values": 0,
+  "repeated_rows_with_different_values": 0,
+  "rows_repeated_in_later_shard": 186346,
+  "schema": "ETABS_BEAM_FORCE_SHARDS_V1",
+  "shards": [
+    {
+      "at_excel_row_limit": true,
+      "data_rows": 1048573,
+      "duplicate_key_rows_inside_shard": 0,
+      "elements": 330,
+      "shard": "beam_1"
+    },
+    {
+      "at_excel_row_limit": true,
+      "data_rows": 1048573,
+      "duplicate_key_rows_inside_shard": 0,
+      "elements": 330,
+      "shard": "beam_2"
+    },
+    {
+      "at_excel_row_limit": false,
+      "data_rows": 477700,
+      "duplicate_key_rows_inside_shard": 0,
+      "elements": 150,
+      "shard": "beam_3"
+    }
+  ],
+  "shared_elements_between_shards": {
+    "beam_1&beam_2": 30,
+    "beam_1&beam_3": 0,
+    "beam_2&beam_3": 30
+  },
+  "status": "REFERENCE_ONLY_NOT_ENGINEERING_ACCEPTANCE",
+  "union": {
+    "case_step_keys": 281,
+    "elements": 750,
+    "elements_with_incomplete_case_station_grid": 0,
+    "incomplete_element_sample": [],
+    "stations_per_element": {
+      "11": 500,
+      "12": 250
+    },
+    "unique_rows": 2388500
+  },
+  "union_status": "UNION_COMPLETE_AND_CONSISTENT"
+}
