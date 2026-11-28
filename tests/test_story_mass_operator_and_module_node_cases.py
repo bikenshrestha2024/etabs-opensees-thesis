@@ -52,6 +52,35 @@ class StoryMassOperatorTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 compare_etabs_story_mass(model,bad)
 
+    def test_original_object_mass_reference_includes_base_and_polar_inertia(self):
+        from components.model.story_mass_operator import compare_etabs_object_lumped_mass
+        from components.nbc105.constants import GRAVITY_M_S2 as g
+        model={"base_z_m":0.,"nodes":{"1":[-1.,0.,0.],"2":[-1.,0.,3.],"3":[1.,0.,3.],"4":[0.,0.,3.]},
+               "nodal_mass":{"1":1.,"2":0.,"3":0.,"4":4.},"supports":{"1":[1]*6},
+               "diaphragms":[{"master_tag":100,"master_xyz":[0.,0.,3.],"storey_number":1}],
+               "load_provenance":[{"source":"FRAME:b","pattern":"Dead","node":4,"downward_kN":4*g},
+                                  {"source":"FRAME:c","pattern":"Dead","node":1,"downward_kN":g}]}
+        conn={"node_map":[{"etabs_point_name":str(n),"opensees_node_tag":n,"coordinates_m":model["nodes"][str(n)]} for n in (1,2,3)],
+              "elements":[{"dimension":"line_2_node","etabs_object":"b","node_names":["2","3"],"node_tags":[2,3]},
+                          {"dimension":"line_2_node","etabs_object":"c","node_names":["1","2"],"node_tags":[1,2]}]}
+        ref=[{"Story":"Base","UX":500.,"UY":500.,"RZ":0.,"X":-1.,"Y":0.,"Z":0.},
+             {"Story":"Story1","UX":4500.,"UY":4500.,"RZ":4.5,"X":0.,"Y":0.,"Z":3.}]
+        import copy
+        original=copy.deepcopy(model)
+        out=compare_etabs_object_lumped_mass(model,conn,{"Dead":1.},ref,reference_g_m_s2=g)
+        self.assertAlmostEqual(out["base_mass_t"],.5)
+        self.assertAlmostEqual(out["floors"][0]["mass_residual_X_t"],0.)
+        self.assertAlmostEqual(out["floors"][0]["RZ_residual_t_m2"],0.)
+        self.assertAlmostEqual(out["floors"][0]["horizontal_reference_matrix"][1][2],-.5)
+        self.assertEqual(out["native_mass_matrix_equivalence"],"NOT_VERIFIED")
+        self.assertEqual(model,original)
+        bad=copy.deepcopy(model);bad["nodal_mass"]["4"]=5.
+        with self.assertRaisesRegex(ValueError,"ledger"):
+            compare_etabs_object_lumped_mass(bad,conn,{"Dead":1.},ref,reference_g_m_s2=g)
+        bad=copy.deepcopy(conn);bad["elements"][0]["node_names"][0]="1"
+        with self.assertRaisesRegex(ValueError,"identity"):
+            compare_etabs_object_lumped_mass(model,bad,{"Dead":1.},ref,reference_g_m_s2=g)
+
     def test_mass_centroid_not_matching_master_fails_closed(self):
         model={
             "base_z_m":0.,

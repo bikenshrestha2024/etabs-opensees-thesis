@@ -18,3 +18,8 @@ NBC 105:2025 §5.2 Table 5-1 defines directional seismic weight by floor tributa
 ### ETABS assembled mass reference comparison
 
 `compare_etabs_story_mass` uses the canonical input story mass plan and verified Assembled Joint Masses rows in kg, ton-m² and metres. The current one-horizontal-mass-record-per-StoryN export convention is required. Base is excluded; matching master coordinates, complete floor coverage, and finite nonnegative values are checked. UX/UY and polar inertia residuals are separately reported. No solver mass is overwritten and native mass-matrix equivalence remains unverified.
+
+
+### Original-object mass reference reconstruction
+
+`compare_etabs_object_lumped_mass` is diagnostic only. Replays the refined nodal mass ledger using the existing NBC gravity constant and configured pattern factors. Validates original point identities, coordinates and frame/quad connectivity. Reallocates each original object's weighted source load equally among its original endpoints/corners, separates base mass and uses the existing ETABS linear-split reference convention. An explicitly chosen reference gravity is separate from the project constant. Reports floor UX/UY mass, polar inertia and the reconstructed 3x3 in-plane reference matrix including translation-rotation coupling. Equal sharing is an inferred source convention, not a replacement for solver mass or first-moment-preserving load transfer. No native mass-matrix equivalence, EDB identity or code approval is implied.
