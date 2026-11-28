@@ -173,3 +173,17 @@ stations and differing station coordinates. These are review indicators, not
 grounds to delete results; they may be legitimate for meshed elements or
 case-specific output selections. No forces are transformed or summed. Native
 axes, end offsets and model/case identity remain separate validation gates.
+
+
+### Element-joint force position diagnostics (fourth lot part 2)
+
+When matching topology and force-result worksheets coexist, the importer
+checks exact story, object label/name, analytical element name and joint
+position before case filtering. The area topology supplies the four shell
+corner positions; only Object Type Frame supplies the two frame endpoints,
+not the shell edges in the frame topology table. It reports observed and
+expected positions, unmatched rows and bounded original worksheet-row samples,
+topology positions without results and missing observed position/case-step
+groups. Missing coverage may reflect selected output, not a failed solve.
+No force summation, local-to-global transform, restraint inference or numerical
+acceptance occurs. The check retains exact source identity and is additive.
