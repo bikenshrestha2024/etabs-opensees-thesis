@@ -220,3 +220,28 @@ convergence and NBC acceptance remain NOT_VERIFIED. No source rows, model
 fingerprints, extrema or local paths published.
 32 physical + 44 mesh points, full 1D+1L gravity, separate NBC Table 5-1
 seismic weight and two 12 m X wall policy PRESERVED.
+
+
+## Beam Element 3 additive source audit (2026-11-28)
+
+Editor: OpenAI ChatGPT GPT-6.2. Baseline `1364f80e28efb38d4a1c97fdf9c024f3488f0253`.
+PR #238 merged after five successful CI runs. All earlier lot and beam
+audits retained. Actual Element 3 workbook was opened and fully streamed
+using Python/openpyxl read_only=True, data_only=False. Original row positions,
+values, per-case extrema and fingerprint retained privately. All worksheets
+scanned; unchanged source hash and SQLite integrity verified, no internal
+duplicate native keys, missing numeric response values or observed
+object/case-step gaps. This is a source audit, not native solver acceptance.
+Extend the existing beam consolidator with opt-in all-case exact native
+identity and payload checks. Preserve strict gravity and explicit case
+projection modes, source hashing and case counts. Added regression fixtures
+for distinct case types and analytical elements, exact overlap, conflict
+within legacy tolerance, native units and mutually exclusive flags. Full
+repository checkout is blocked by DNS in the local runtime; CI required.
+Raw workbooks, fingerprints, row payloads and extrema remain private.
+32 physical supports + 44 wall mesh points, 1D+1L gravity, separate NBC
+Table 5-1 seismic weight and two 12 m X walls PRESERVED. Native EDB binding,
+axis/offset compatibility, OpenSees comparison, solver convergence and NBC
+acceptance remain NOT_VERIFIED.
+
+Actual three-file extraction replay subsequently completed: all observed beam/case-step station sets reconcile, all beam-labeled SECOND LOT frame element positions are represented, and every observed position matches that topology. Exact native overlap payloads agree, gravity projection reconciles and no distinct native gravity keys collide under the legacy gravity key on these observed rows. Original source positions and overlap aliases retained in private SQLite. The actual-data replay is independent of the repository CLI; the new CLI is not claimed executed against the workbooks. Distinct all-case output filenames protect legacy gravity lookup. Full combined native model import and solver equivalence remain NOT_VERIFIED.
