@@ -857,6 +857,41 @@ def _frame_station_reference_diagnostics(records, family):
     }
 
 
+def _element_joint_force_reference_diagnostics(topology, responses, *, family):
+    """Check exported positions only, not local axes or force equilibrium."""
+    endpoints = ('Elm JtI', 'Elm JtJ') if family == 'Frame' else tuple(f'Elm Jt{i}' for i in range(1, 5))
+    expected = set()
+    for row in topology:
+        if family == 'Frame' and row['Object Type'] != 'Frame':
+            continue
+        prefix = tuple(row[c] for c in ('Story', 'Object Label', 'Object Name', 'Element Name'))
+        expected.update((*prefix, row[c]) for c in endpoints if row[c] is not None)
+    observed, cases, groups = set(), set(), set()
+    unmatched_rows = checked = 0
+    samples = []
+    for row in responses:
+        position = tuple(row[c] for c in ('Story', 'Frame' if family == 'Frame' else 'Shell Object',
+                                          'Unique Name', f'{family} Element', 'Joint'))
+        case = tuple(row[c] for c in ('Output Case', 'Case Type', 'Step Type', 'Step Number'))
+        checked += 1
+        observed.add(position)
+        cases.add(case)
+        groups.add((position, case))
+        if position not in expected:
+            unmatched_rows += 1
+            if len(samples) < 100:
+                samples.append(row['worksheet_row'])
+    return {'scope': 'ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER',
+            'status': 'REFERENCE_ONLY_POSITION_IDENTITY_NOT_FORCE_EQUILIBRIUM',
+            'checked_rows': checked, 'expected_positions': len(expected),
+            'observed_positions': len(observed), 'unmatched_response_rows': unmatched_rows,
+            'unmatched_response_positions': len(observed - expected),
+            'topology_positions_without_results': len(expected - observed),
+            'case_step_identities': len(cases),
+            'missing_observed_position_case_groups': len(observed) * len(cases) - len(groups),
+            'unmatched_worksheet_row_samples': samples}
+
+
 def _reference_checks(tables, store=None):
     def rows(name):
         return store.rows(name) if store else tables[name]["rows"]
@@ -920,6 +955,15 @@ def _reference_checks(tables, store=None):
             station_checks[name] = _frame_station_reference_diagnostics(records(name), family)
     if station_checks:
         checks["frame_station_reference"] = station_checks
+    element_joint_checks = {}
+    for family, topology_name, result_name in (
+            ("Shell", _AREAS, "Element Joint Forces - Shells"),
+            ("Frame", _FRAMES, "Element Joint Forces - Frame")):
+        if topology_name in tables and result_name in tables:
+            element_joint_checks[result_name] = _element_joint_force_reference_diagnostics(
+                records(topology_name), records(result_name), family=family)
+    if element_joint_checks:
+        checks["element_joint_force_reference"] = element_joint_checks
     return checks
 
 

@@ -601,6 +601,42 @@ class FirstLotReferenceTests(unittest.TestCase):
             self.assertEqual(table["units"]["UX"], "m/s")
         self.assertEqual(len(report["tables"]), 2)
 
+    def test_element_joint_force_topology_before_case_filter(self):
+        from components.inputs.etabs_table_bundle import read_analysis_reference
+        second = self.second_lot()
+        book = load_workbook(second)
+        book["Objects and Elements - Frames"].append(
+            ["Story25", "5", "Frame", "B1", "5", "01", "02"])
+        book.save(second)
+        book.close()
+        source = self.source.with_name("element_joint_forces.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        for family, label, obj, element in (("Shell", "F1", "1", "4"), ("Frame", "B1", "5", "5")):
+            name = "Element Joint Forces - Shells" if family == "Shell" else "Element Joint Forces - Frame"
+            member = "Shell Object" if family == "Shell" else "Frame"
+            headers = f"Story|{member}|Unique Name|{family} Element|Joint|Output Case|Case Type|Step Type|Step Number|F1|F2|F3|M1|M2|M3"
+            self.add_table(name, headers, "|||||||||kN|kN|kN|kN-m|kN-m|kN-m",
+                           [("Story25", label, obj, element, "01", "Dead", "LinStatic", None, None, 0, 0, 0, 0, 0, 0),
+                            ("Story25", label, obj, element, "99", "Live", "LinStatic", None, None, 1, 0, 0, 0, 0, 0)],
+                           book=book)
+        book.save(source)
+        book.close()
+        report = read_analysis_reference([second, source], cases=["Dead"],
+                                         row_database=self.source.with_suffix(".sqlite3"))
+        checks = report["checks"]["element_joint_force_reference"]
+        for name, expected in (("Element Joint Forces - Shells", 4), ("Element Joint Forces - Frame", 2)):
+            item = checks[name]
+            self.assertEqual(item["checked_rows"], 2)
+            self.assertEqual(item["expected_positions"], expected)
+            self.assertEqual(item["observed_positions"], 2)
+            self.assertEqual(item["unmatched_response_rows"], 1)
+            self.assertEqual(item["topology_positions_without_results"], expected - 1)
+            self.assertEqual(item["missing_observed_position_case_groups"], 2)
+            self.assertEqual(item["unmatched_worksheet_row_samples"], [5])
+            self.assertEqual(report["tables"][name]["stored_row_count"], 1)
+        self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
+
     def test_frame_station_coverage_before_case_filter(self):
         source = self.source.with_name("stations.xlsx")
         book = Workbook()

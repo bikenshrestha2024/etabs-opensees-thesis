@@ -148,3 +148,47 @@ THIRD LOT, FOURTH LOT parts 1, 2 and 3. Add part 3 to the prior explicit
 PowerShell array and choose NEW private audit, catalog and SQLite destinations.
 Never also select the unsplit fourth lot. Verify worksheet ownership; overlapping
 row-sharded tables require source reconciliation rather than arbitrary renaming.
+
+
+## Cumulative source status and beam / part 2 audit (2026-11-28)
+
+Editor: OpenAI ChatGPT GPT-6.2. Base `f6261ff635c00e2180ebc5ac501ce26c1ecac506`. Retain all previous audit
+records without replacing any private result dataset. Read-first model
+contract, canonical reference/beam readers, source guides and tests reviewed.
+PR #235 (part 3 station diagnostics) merged after ten successful CI runs;
+PR #236 (beam native unit-row recognition) merged after five successful CI
+runs. Neither changed the solver, support, load or geometry contracts.
+
+- FIRST / SECOND / THIRD LOT: prior actual full-cell audits and PRs #231–233
+  retained; worksheet dimensions reopened, not claimed as fresh full-cell scans.
+- FOURTH LOT part 1: previous actual full scan, PR #234.
+- FOURTH LOT part 2: recovered from private file library, all worksheets and
+  populated values streamed with openpyxl read_only=True/data_only=False.
+  Both shell and frame joint force tables extracted and independently replayed
+  from private SQLite. Source hash stable; no repeated candidate keys or
+  invalid force components. Their exact case-step sets match. All shell
+  position/step keys match the earlier shell stress keys in source order
+  after excluding its Design Type attribute. Both sets of force positions
+  reconcile exactly to the corresponding actual SECOND LOT topology
+  endpoints/corners. The new helper was executed on every extracted force
+  row with that reopened topology, with no unresolved source positions.
+  Added an importer regression fixture to exercise mismatches, shell-edge
+  exclusion and prefilter scope. CI required for repository verification.
+- FOURTH LOT part 3: earlier actual full scan retained; PR #235 merged.
+- FOURTH LOT part 4: no separately named source located in current attachments
+  or the inspected recent library listing. Do not infer its content or alias
+  Beam Element 1 to part 4.
+- Beam Forces Element 1 latest: actual complete cell scan and private
+  SQLite replay passed; the beam worksheet reaches Excel row cap and ends
+  mid-member. No full multi-part beam consolidation demonstrated. Native
+  table-specific kN/m units supersede Program Control display units.
+  PR #236 recognizes the exact native units row; the gravity-only importer
+  remains strict, not an all-case reader. The all-case audit is kept separate.
+- Beam Element 2 / 3 latest: listed in prior library; not freshly scanned
+  or reconciled with the new part 1 in this turn.
+
+All proprietary rows, actual source hashes, local paths and extrema remain
+private. Combined source-bound production import and native EDB / axis / case
+identity, force-equilibrium and ETABS/OpenSees comparison, NLTHA and NBC
+acceptance NOT_VERIFIED. 32 physical + 44 mesh points, 1D+1L gravity, separate
+NBC Table 5-1 seismic weight and 12 m X-wall policy preserved.
