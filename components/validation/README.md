@@ -25,6 +25,7 @@ All modules follow [the active integration and latest-source policy](../../docs/
 - [etabs_eq_pdelta_native_extract.py](etabs_eq_pdelta_native_extract.py)
 - [etabs_equivalence_report.py](etabs_equivalence_report.py)
 - [etabs_floor_end_api.py](etabs_floor_end_api.py)
+- [etabs_lot_consistency.py](etabs_lot_consistency.py)
 - [etabs_native_quantity_tables.py](etabs_native_quantity_tables.py)
 - [etabs_split_beam_forces.py](etabs_split_beam_forces.py)
 - [expanded_workbench_tabs.py](expanded_workbench_tabs.py)
