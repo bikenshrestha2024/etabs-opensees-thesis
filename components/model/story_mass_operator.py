@@ -143,3 +143,147 @@ def compare_etabs_story_mass(model, reference_rows, *, coordinate_tolerance_m=1e
                 etabs_UX_t=math.fsum(r['etabs_UX_t'] for r in floors),
                 etabs_UY_t=math.fsum(r['etabs_UY_t'] for r in floors),
                 intermediate_mass_t=plan['intermediate_mass'])
+
+
+def compare_etabs_object_lumped_mass(model, connectivity, mass_factors, reference_rows, *,
+                                    reference_g_m_s2):
+    """Reconstruct the exported ETABS mass ledger on original object joints.
+
+    [REF docs/source/components/model/story_mass_operator.py.md]
+    Equal endpoint/corner sharing is an explicit comparison hypothesis, not a
+    force-transfer or native solver mass law. Keep all base mass separate and
+    use the existing ETABS reference linear-split convention. Replay the
+    archived refined nodal mass from its source ledger first. No masses,
+    fixities or project gravity constants are changed.
+    """
+    from collections import defaultdict
+    from components.modal.storey_mass_convention import (
+        BASE, ETABS_BASE_ROW_LINEAR_SPLIT, storey_shares)
+    from components.nbc105.constants import GRAVITY_M_S2
+
+    def finite(value):
+        if isinstance(value, bool) or not math.isfinite(float(value)):
+            raise ValueError("Nonfinite or boolean reference quantity")
+        return float(value)
+
+    def xyz(values):
+        if len(values) != 3:
+            raise ValueError("Expected three coordinates")
+        return tuple(finite(v) for v in values)
+
+    g = finite(reference_g_m_s2)
+    if g <= 0:
+        raise ValueError("Positive explicit reference gravity required")
+    nodes = {str(k): xyz(v) for k, v in model["nodes"].items()}
+    original = {}
+    tags = set()
+    for row in connectivity["node_map"]:
+        uid, tag = str(row["etabs_point_name"]), str(row["opensees_node_tag"])
+        if (not uid or uid in original or tag in tags or tag not in nodes
+                or math.dist(nodes[tag], xyz(row["coordinates_m"])) > 1e-7):
+            raise ValueError("Original point identity/coordinate mismatch")
+        original[uid] = tag
+        tags.add(tag)
+    owners = {}
+    for row in connectivity["elements"]:
+        dim = row["dimension"]
+        if dim not in ("line_2_node", "area_polygon"):
+            raise ValueError("Unsupported original source object geometry")
+        kind, count = ("FRAME:", 2) if dim == "line_2_node" else ("AREA:", 4)
+        key = kind + str(row["etabs_object"])
+        ns = tuple(map(str, row["node_tags"]))
+        if (key in owners or len(ns) != count or len(set(ns)) != count
+                or tuple(original.get(str(n)) for n in row["node_names"]) != ns):
+            raise ValueError("Original source object identity mismatch: " + key)
+        owners[key] = ns
+    object_weights, nodal_weights = defaultdict(float), defaultdict(float)
+    for row in model["load_provenance"]:
+        owner, node, pattern = row["source"], str(row["node"]), row["pattern"]
+        if owner not in owners or node not in nodes or pattern not in mass_factors:
+            raise ValueError("Source load ledger owner/node/pattern missing")
+        factor, weight = finite(mass_factors[pattern]), finite(row["downward_kN"])
+        if factor not in (0., .3, .6, 1.) or weight < 0:
+            raise ValueError("Unsupported source load ledger weight/factor")
+        object_weights[owner] += weight * factor
+        nodal_weights[node] += weight * factor
+    masses = {str(k): finite(v) for k, v in model["nodal_mass"].items()}
+    if (not masses or not object_weights or set(masses) != set(nodes)
+            or set(nodal_weights) - set(masses)
+            or any(m < 0 or not math.isclose(nodal_weights[n] / GRAVITY_M_S2, m,
+                       rel_tol=1e-9, abs_tol=1e-8) for n, m in masses.items())):
+        raise ValueError("Refined nodal mass differs from source load ledger")
+    coarse = defaultdict(float)
+    for owner, weight in object_weights.items():
+        for n in owners[owner]:
+            coarse[n] += weight / (g * len(owners[owner]))
+    groups = sorted(model["diaphragms"], key=lambda row: xyz(row["master_xyz"])[2])
+    heights = [xyz(row["master_xyz"])[2] for row in groups]
+    base = finite(model["base_z_m"])
+    if (not groups or heights[0] <= base or any(a >= b for a,b in zip(heights, heights[1:]))
+            or len({row["storey_number"] for row in groups}) != len(groups)):
+        raise ValueError("Invalid original floor geometry")
+    expected = {f"Story{row['storey_number']}": i for i, row in enumerate(groups)}
+    reference = {}
+    base_ref = [0., 0.]
+    base_rows = 0
+    for row in reference_rows:
+        story = row["Story"]
+        mx, my, jz = (finite(row[k]) for k in ("UX", "UY", "RZ"))
+        p = xyz([row[k] for k in "XYZ"])
+        if min(mx, my, jz) < 0:
+            raise ValueError("Negative reference mass or inertia")
+        if story == "Base":
+            if abs(p[2] - base) > 1e-7:
+                raise ValueError("Base mass coordinate differs from source base")
+            base_rows += 1
+            base_ref[0] += mx / 1000
+            base_ref[1] += my / 1000
+        elif story not in expected:
+            raise ValueError("Unmatched reference story: " + story)
+        elif mx or my or jz:
+            if (story in reference or min(mx, my) <= 0 or
+                    math.dist(p, xyz(groups[expected[story]]["master_xyz"])) > 1e-6):
+                raise ValueError("Reference mass concentration/coordinate mismatch: " + story)
+            reference[story] = (mx/1000, my/1000, jz)
+    if not base_rows or set(reference) != set(expected):
+        raise ValueError("Missing base or floor mass reference")
+    # Generalized in-plane rigid-diaphragm kinetic energy matrix, about the
+    # reported master: [[M,0,-sum(m dy)],[0,M,sum(m dx)],[...,Jz]].
+    terms = defaultdict(lambda: [0., 0., 0., 0.])
+    for n, mass in coarse.items():
+        x,y,z = nodes[n]
+        if z < base - 1e-7 or z > heights[-1] + 1e-7:
+            raise ValueError("Source mass lies outside floor elevations")
+        for i, fraction in storey_shares(z, heights, base, ETABS_BASE_ROW_LINEAR_SPLIT):
+            value = mass * fraction
+            terms[i][0] += value
+            if i != BASE:
+                cx,cy,_ = xyz(groups[i]["master_xyz"])
+                dx,dy = x-cx,y-cy
+                terms[i][1] -= value * dy
+                terms[i][2] += value * dx
+                terms[i][3] += value * (dx*dx + dy*dy)
+    rows = []
+    for story, i in expected.items():
+        mass, xr, yr, jz = terms[i]
+        mx,my,jref = reference[story]
+        rows.append({"story":story,"reference_UX_t":mx,"reference_UY_t":my,
+                     "reference_RZ_t_m2":jref,"mass_t":mass,"Jz_t_m2":jz,
+                     "mass_residual_X_t":mass-mx,"mass_residual_Y_t":mass-my,
+                     "RZ_residual_t_m2":jz-jref,
+                     "horizontal_reference_matrix":[[mass,0.,xr],[0.,mass,yr],[xr,yr,jz]]})
+    base_mass = terms[BASE][0]
+    total = math.fsum(object_weights.values()) / g
+    if not math.isclose(base_mass + math.fsum(row["mass_t"] for row in rows), total,
+                        rel_tol=1e-10, abs_tol=1e-8):
+        raise ValueError("Original-object reference mass is not conserved")
+    return {"status":"OBJECT_LUMPED_REFERENCE_DIAGNOSTIC_ONLY",
+            "native_mass_matrix_equivalence":"NOT_VERIFIED", "source_model_identity":"UNVERIFIED",
+            "reference_g_m_s2":g,"project_g_m_s2":GRAVITY_M_S2,
+            "original_weighted_objects":len(object_weights),"base_mass_t":base_mass,
+            "reference_base_UX_t":base_ref[0],"reference_base_UY_t":base_ref[1],
+            "base_residual_X_t":base_mass-base_ref[0],"base_residual_Y_t":base_mass-base_ref[1],
+            "total_reference_basis_mass_t":total,"floors":rows,
+            "limitations":["Equal object sharing can change first moments of individual loads; diagnostic only.",
+                           "Generalized reference matrix is reconstructed, not a native OpenSees matrix.",
+                           "No solver masses, restraints or NBC load factors are replaced."]}

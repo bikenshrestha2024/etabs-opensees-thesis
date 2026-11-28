@@ -119,3 +119,8 @@ For legacy indexes without beam paths, also supply `--beam-files` with the exact
 ### Optional assembled-input mass comparison
 
 Append `--assembled-mass-model PATH_TO_ASSEMBLED_MODEL_JSON` to `--inspect-combined-reference`. The inspector checks reference units and hashes the exact model JSON, then uses the canonical mass operator for the floor comparison. It writes residuals only; source identity, native mass matrix and code acceptance remain unverified.
+
+
+### Original-object reference mass diagnostic
+
+With `--inspect-combined-reference` and `--assembled-mass-model`, add all three of `--mass-source-connectivity`, `--mass-source-config` and `--etabs-reference-g`. Select the actual original connectivity and exact configuration associated with the assembled model. The configuration hash must match the model; the inspector records the connectivity and model hashes and checks original identities/coordinates and refined source mass replay. Reference gravity is an explicit comparison assumption, not an NBC constant change. The report is private and does not install new solver masses.

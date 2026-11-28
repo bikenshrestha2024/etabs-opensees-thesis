@@ -300,3 +300,8 @@ Editor: OpenAI ChatGPT GPT-6.2. Baseline `fe604158faca7f3ce13d40f74c58dd2bfbb916
 ## Assembled input mass comparison consumer (2026-11-28)
 
 Read-first physical constraints retained. Compared archived actual assembled model input against verified Sixth LOT Assembled Joint Masses using canonical story mass plan. Actual CLI verification on original workbook subset passed, along with focused 36 tests and 23 subtests (red regression reproduced missing function first). Source and model hashes are private; no mass values published. Archived comparison is not a current model identity or solved mass matrix check. No changes to gravity, supports, mass assignment or stiffness.
+
+
+## Original-object mass reference investigation (2026-11-28)
+
+Editor: OpenAI ChatGPT GPT-6.2. Baseline `4c9b2262d880cf131bd77340e16ff763b2e123df`. Actual Assignment Export mass-source and diaphragm tables, archived connectivity, source load ledger, combined Sixth LOT mass reference and archived assembled-model configuration examined. Inferred equal original-object sharing and explicit reference gravity reconstruct floor mass and inertia at exported precision; all raw quantities and fingerprints retained privately. 48 focused tests and 23 subtests passed, actual combined CLI executed with exit 0. New three Python blobs match locally tested bytes. No native solve, mass policy change, restraint modification or NBC acceptance; full 1D+1L, NBC Table 5-1, 32 physical + 44 mesh and two 12 m X walls preserved. Rigid-zone input compilation and archived six-component equilibrium replay are separate offline diagnostics, not current native reaction equivalence.

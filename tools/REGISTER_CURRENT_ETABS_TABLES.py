@@ -23,6 +23,12 @@ def main(argv=None):
                         help="Verify a combined private index and display module reference coverage")
     parser.add_argument("--assembled-mass-model", type=Path,
                         help="Optional assembled model JSON for read-only floor mass comparison with inspected reference")
+    parser.add_argument("--mass-source-connectivity", type=Path,
+                        help="Original ETABS object connectivity JSON for reference mass reconstruction")
+    parser.add_argument("--mass-source-config", type=Path,
+                        help="Exact assembled-model configuration JSON containing mass factors")
+    parser.add_argument("--etabs-reference-g", type=float,
+                        help="Explicit native reference weight-to-mass gravity basis, not NBC solver g")
     parser.add_argument("--analysis",type=Path)
     parser.add_argument("--analysis-files",type=Path,nargs="+",
                         help="Read ALL worksheets of explicitly selected analysis lots (audit only)")
@@ -48,6 +54,10 @@ def main(argv=None):
                         help="Open multi-select Excel file picker for all beam-force parts")
     parser.add_argument("--native-assignment",type=Path)
     args=parser.parse_args(argv)
+    object_mass = (args.mass_source_connectivity, args.mass_source_config, args.etabs_reference_g)
+    if any(v is not None for v in object_mass) and (
+            not all(v is not None for v in object_mass) or not args.assembled_mass_model):
+        parser.error("Original-object reference mass requires --assembled-mass-model, --mass-source-connectivity, --mass-source-config and --etabs-reference-g together")
     if args.assembled_mass_model and not args.inspect_combined_reference:
         parser.error("--assembled-mass-model requires --inspect-combined-reference")
     if args.inspect_combined_reference:
@@ -74,6 +84,23 @@ def main(argv=None):
                 mass = compare_etabs_story_mass(json.loads(raw), reference.rows("Assembled Joint Masses"))
                 mass["assembled_model_sha256"] = hashlib.sha256(raw).hexdigest()
                 report["assembled_mass_input_comparison"] = mass
+                if all(v is not None for v in object_mass):
+                    from components.model.story_mass_operator import compare_etabs_object_lumped_mass
+                    config_path = args.mass_source_config.expanduser().absolute()
+                    conn_path = args.mass_source_connectivity.expanduser().absolute()
+                    _refuse_linked_output_target(config_path)
+                    _refuse_linked_output_target(conn_path)
+                    config_raw, conn_raw = config_path.read_bytes(), conn_path.read_bytes()
+                    model = json.loads(raw)
+                    config_sha = hashlib.sha256(config_raw).hexdigest()
+                    if config_sha != model.get("config_sha256"):
+                        raise ValueError("Mass-source configuration differs from assembled model")
+                    reconstructed = compare_etabs_object_lumped_mass(
+                        model, json.loads(conn_raw), json.loads(config_raw)["mass_factors"],
+                        reference.rows("Assembled Joint Masses"), reference_g_m_s2=args.etabs_reference_g)
+                    reconstructed.update(assembled_model_sha256=mass["assembled_model_sha256"],
+                        source_config_sha256=config_sha, source_connectivity_sha256=hashlib.sha256(conn_raw).hexdigest())
+                    report["original_object_mass_reference"] = reconstructed
             if args.audit_output:
                 target = args.audit_output.expanduser().absolute()
                 _refuse_linked_output_target(target)
