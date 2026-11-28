@@ -12,6 +12,12 @@ import ast
 
 from components.inputs.analysis_autofill import populate_linear
 
+try:  # components.response_spectrum imports tkinter; headless Python builds may lack it
+    import tkinter  # noqa: F401
+    HAVE_TKINTER = True
+except ImportError:
+    HAVE_TKINTER = False
+
 
 class Field:
     def __init__(self, value=""):
@@ -138,6 +144,7 @@ class AutoSelectRefreshRegression(unittest.TestCase):
             self.assertEqual(app.p1.get(),"")
             self.assertEqual(app.modal_reference_status["usage"],"NOT_VERIFIED")
 
+    @unittest.skipUnless(HAVE_TKINTER, "tkinter is not installed; the patched response_spectrum module imports it")
     def test_missing_modal_clears_previous_verified_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
             app=gui()

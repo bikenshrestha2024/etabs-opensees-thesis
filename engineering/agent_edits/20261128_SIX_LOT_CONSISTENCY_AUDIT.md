@@ -13,3 +13,11 @@ Tests: `tests/test_etabs_lot_consistency.py` (21 passed), `tests/test_current_et
 ## Follow-up: gravity constant decision (2026-11-28)
 
 User decided to keep project g = 9.81 and asked to commit to main. No code or constant changed; the decision and its expected 0.034% mass offset are recorded in `docs/validation/20261128_ETABS_LOT_CONSISTENCY_AUDIT.md`. Model label: Claude Sonnet 5.5 (self-reported).
+
+## Verification follow-up (2026-11-28)
+
+* Row-count and double-count errors in the beam audit record/code fixed; CLI behaviour tests added (`tests/test_etabs_audit_cli.py`); beam evidence re-run on the three real workbooks reproduced the committed JSON exactly.
+* `tests/test_linear_th_directional_autofill.py::test_missing_modal_clears_previous_verified_metadata` failed only where `tkinter` is absent (the patched `components.response_spectrum` imports it); it now skips there, unchanged elsewhere.
+* `tests/verify_review_ledger.py::test_baseline_complete` failed only in a shallow clone (a required commit was absent); it passes with full history (`git fetch --unshallow`). No code change.
+* `tools/build_json_documentation.py` regenerated: 34 missing per-JSON docs added and the stale `ref_tag_baseline.json` entry refreshed; `--check` now passes (540 files, no issues).
+* Full suite: 2058 passed, 86 skipped, 0 failed. Public-model disclosure gate: 0 forbidden paths; 8 older OpenSees model JSON files (`Saved_Project_V156/`, `Worked_Example_V138/`) still need the owner's manual content/history review — not touched.

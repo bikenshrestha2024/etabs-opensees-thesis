@@ -2,8 +2,8 @@
 
 **Source:** [tests/data/ref_tag_baseline.json](../../../../../tests/data/ref_tag_baseline.json)
 **Classification:** PROJECT_DATA_OR_REPORT
-**SHA-256 (source bytes):** f5f15e09105f651a2a9468b4a3e1e3f3b90cc23d4f756b3279091dd48b747b1e
-**Size:** 28576 bytes
+**SHA-256 (source bytes):** e739a1bc3ebd89cb7ac184d01f8e45ebc942c269ff726374225709dad02f4cab
+**Size:** 27820 bytes
 **Root JSON type:** object
 **Content inspection:** Directly parsed from checkout; value units and validation status are NOT inferred.
 
