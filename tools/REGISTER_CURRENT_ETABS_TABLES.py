@@ -21,6 +21,8 @@ def main(argv=None):
     parser.add_argument("--export-root",type=Path)
     parser.add_argument("--inspect-combined-reference", type=Path,
                         help="Verify a combined private index and display module reference coverage")
+    parser.add_argument("--assembled-mass-model", type=Path,
+                        help="Optional assembled model JSON for read-only floor mass comparison with inspected reference")
     parser.add_argument("--analysis",type=Path)
     parser.add_argument("--analysis-files",type=Path,nargs="+",
                         help="Read ALL worksheets of explicitly selected analysis lots (audit only)")
@@ -46,6 +48,8 @@ def main(argv=None):
                         help="Open multi-select Excel file picker for all beam-force parts")
     parser.add_argument("--native-assignment",type=Path)
     args=parser.parse_args(argv)
+    if args.assembled_mass_model and not args.inspect_combined_reference:
+        parser.error("--assembled-mass-model requires --inspect-combined-reference")
     if args.inspect_combined_reference:
         if (args.analysis or args.analysis_files or args.analysis_reference or args.reference_beams
                 or args.reference_output or args.reference_case or args.reference_storage
@@ -56,7 +60,20 @@ def main(argv=None):
         from components.inputs.etabs_table_bundle import CombinedReference
         from components.inputs.output_contract import _refuse_linked_output_target, atomic_json
         try:
-            report = CombinedReference(args.inspect_combined_reference, beam_paths=args.beam_files).coverage()
+            reference = CombinedReference(args.inspect_combined_reference, beam_paths=args.beam_files)
+            report = reference.coverage()
+            if args.assembled_mass_model:
+                import hashlib
+                from components.model.story_mass_operator import compare_etabs_story_mass
+                model_path = args.assembled_mass_model.expanduser().absolute()
+                _refuse_linked_output_target(model_path)
+                raw = model_path.read_bytes()
+                units = reference.analysis["tables"]["Assembled Joint Masses"]["units"]
+                if any(units.get(k) != v for k, v in {"UX":"kg", "UY":"kg", "RZ":"ton-m²", "X":"m", "Y":"m", "Z":"m"}.items()):
+                    raise ValueError("Unexpected assembled mass reference units")
+                mass = compare_etabs_story_mass(json.loads(raw), reference.rows("Assembled Joint Masses"))
+                mass["assembled_model_sha256"] = hashlib.sha256(raw).hexdigest()
+                report["assembled_mass_input_comparison"] = mass
             if args.audit_output:
                 target = args.audit_output.expanduser().absolute()
                 _refuse_linked_output_target(target)

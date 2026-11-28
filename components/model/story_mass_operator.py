@@ -88,3 +88,57 @@ def story_lumped_mass_plan(model, *, center_tolerance_m=0.001):
                 intermediate_mass=intermediate,active_source_node_count=active_nodes,
                 unassigned_horizontal_mass=active-sum(rec["mass"] for rec in plan.values()),
                 native_etabs_dynamic_mass_equivalence="NOT_VERIFIED")
+
+
+def compare_etabs_story_mass(model, reference_rows, *, coordinate_tolerance_m=1e-6):
+    """Compare assembled INPUT floor mass and polar inertia, never a solved matrix.
+
+    Expects verified Assembled Joint Masses rows (kg, ton-m², m), with one
+    concentrated horizontal mass/inertia record per StoryN and base excluded.
+    Source-distributed mass and geometry remain unchanged.
+    """
+    plan=story_lumped_mass_plan(model)
+    tol=float(coordinate_tolerance_m)
+    if not math.isfinite(tol) or tol<0:
+        raise ValueError("Invalid coordinate tolerance")
+    groups={int(g['storey_number']):g for g in model['diaphragms']}
+    if len(groups)!=len(model['diaphragms']):
+        raise ValueError("Duplicate diaphragm storey numbers")
+    expected={f'Story{i}':i for i in groups}
+    by_story={}
+    for row in reference_rows:
+        if row['Story']=='Base':
+            continue
+        story=row['Story']
+        if story not in expected:
+            raise ValueError("Unmatched reference story: "+str(story))
+        mx,my,jz,x,y,z=(float(row[k]) for k in ('UX','UY','RZ','X','Y','Z'))
+        if not all(math.isfinite(v) for v in (mx,my,jz,x,y,z)) or min(mx,my,jz)<0:
+            raise ValueError("Invalid ETABS mass or coordinate")
+        if mx==my==jz==0:
+            continue
+        if min(mx,my)<=0 or story in by_story:
+            raise ValueError("Expected one concentrated horizontal mass row per story: "+story)
+        i=expected[story]
+        distance=math.dist((x,y,z),groups[i]['master_xyz'])
+        if distance>tol:
+            raise ValueError("ETABS mass location differs from diaphragm master: "+story)
+        by_story[story]=(mx/1000,my/1000,jz,distance)
+    if set(by_story)!=set(expected):
+        raise ValueError("Missing reference horizontal floor masses")
+    floors=[]
+    for rec in sorted(plan['horizontal_mass_by_master'].values(),key=lambda r:r['storey_number']):
+        story=f"Story{rec['storey_number']}"
+        mx,my,jz,distance=by_story[story]
+        m=rec['mass'];j=rec['Jz']
+        floors.append(dict(story=story,etabs_UX_t=mx,etabs_UY_t=my,etabs_RZ_t_m2=jz,
+            assembled_mass_t=m,assembled_polar_inertia_t_m2=j,
+            UX_difference_t=m-mx,UY_difference_t=m-my,RZ_difference_t_m2=j-jz,
+            UX_difference_percent=100*(m-mx)/mx,UY_difference_percent=100*(m-my)/my,
+            RZ_difference_percent=(100*(j-jz)/jz if jz else None),master_coordinate_distance_m=distance))
+    return dict(status='ASSEMBLED_INPUT_COMPARISON_NOT_NATIVE_MASS_MATRIX',
+                native_mass_matrix_equivalence='NOT_VERIFIED',source_model_identity='UNVERIFIED',
+                floors=floors,active_assembled_mass_t=plan['active_source_horizontal_mass'],
+                etabs_UX_t=math.fsum(r['etabs_UX_t'] for r in floors),
+                etabs_UY_t=math.fsum(r['etabs_UY_t'] for r in floors),
+                intermediate_mass_t=plan['intermediate_mass'])

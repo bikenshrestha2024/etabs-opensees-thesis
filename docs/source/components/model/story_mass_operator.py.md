@@ -13,3 +13,8 @@ NBC 105:2025 §5.2 Table 5-1 defines directional seismic weight by floor tributa
 - All mass policies retain full gravity-comparison load vs seismic preload/weight isolation. Source floor weights are required to match the assembled `NBC105_ESM_Story_Weights_Assembled_V118.csv` story-by-story within 0.01 kN for condensed cases; no missing data or mismatch may be silently accepted.
 
 **Caution:** Translational centroid agreement and conserved polar inertia in a lumped diaphragm are necessary bookkeeping, not sufficient evidence of unchanged dynamic response, vertical mode shapes, physical wall constraints, seismic drift or natural periods. In particular, the intended 32 foundations + 44 shear-wall mesh points require correct native wall auto-edge/MPC load transfer, and full building ETABS equivalence remains NOT_VERIFIED. Do not report Rayleigh periods of the previous 76-restraint gross-shell model for a new mass policy without actual reanalysis.
+
+
+### ETABS assembled mass reference comparison
+
+`compare_etabs_story_mass` uses the canonical input story mass plan and verified Assembled Joint Masses rows in kg, ton-m² and metres. The current one-horizontal-mass-record-per-StoryN export convention is required. Base is excluded; matching master coordinates, complete floor coverage, and finite nonnegative values are checked. UX/UY and polar inertia residuals are separately reported. No solver mass is overwritten and native mass-matrix equivalence remains unverified.
