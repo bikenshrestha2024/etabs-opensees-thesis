@@ -215,3 +215,39 @@ eccentricity, local-axis transformation, equilibrium, or NBC acceptance is
 inferred from these exports. Keep the original exact source files private.
 Add the Fifth LOT to the analysis array in the existing combined CLI,
 not to the separate three-beam array.
+
+
+### Sixth-lot assembled mass, base reactions and analysis-message reference
+
+The same SQLite importer accepts Base Reactions, Assembled Joint Masses and
+Analysis Messages. Base force/moment units are kN/kN-m with the exported
+reference origin in metres; exact case/type/step identity is retained.
+Assembled Joint Masses preserves the point element ID, story/label, kg for
+translational mass, ton-m² for rotational inertia and coordinates in metres.
+Base and mass identities must be unique, and their numeric fields complete.
+Analysis Messages is private run metadata (including computer field), not a
+solver convergence certificate or output-case result, and is retained through
+case filtering. Do not publish message rows.
+
+Before filtering, the assembled mass diagnostic matches point identity,
+label, story and exact normalized coordinates to SECOND LOT topology.
+It reports omitted topology by story without inferring restraints or zero
+mass. It sums the six reported mass columns by story (not across DOFs),
+reports negative-mass records and nonzero horizontal mass row counts, and
+compares story totals with the unique diaphragm center record when present.
+Rotational inertia is compared only with a single distinct nonblank CM
+inertia value for the same story/diaphragm, not summed across output cases.
+Base masses remain separate. Neither source mass ledger nor rotational
+inertia is automatically applied to a solver; doing so can double-count mass.
+
+The base reaction check compares the exact exported case-step identity sets.
+It reconstructs the six-component resultant only for the literal unstepped
+`1. DL + LL` combination, using the existing common-origin resultant helper
+and joint coordinates. Missing/duplicate/mismatched joint records block
+recovery; other case types and envelopes are not summed. Report raw signed
+residuals without imposing an acceptance tolerance. Global coordinate and
+axis conventions, EDB identity, combination definitions, physical support
+mapping and native solver agreement require independent evidence.
+
+Add the Sixth LOT to the analysis array of the combined reference CLI. It
+does not replace or change the gravity load ledger or NBC 105 seismic mass.

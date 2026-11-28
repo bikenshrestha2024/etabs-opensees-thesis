@@ -637,6 +637,79 @@ class FirstLotReferenceTests(unittest.TestCase):
             self.assertEqual(report["tables"][name]["stored_row_count"], 1)
         self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
 
+    def test_sixth_lot_native_schema_and_exact_source_diagnostics(self):
+        from components.inputs.etabs_table_bundle import read_analysis_reference
+        sixth = self.source.with_name("sixth.xlsx")
+        book = Workbook()
+        book.remove(book.active)
+        self.add_table("Base Reactions",
+                       "Output Case|Case Type|Step Type|Step Number|FX|FY|FZ|MX|MY|MZ|X|Y|Z",
+                       "||||kN|kN|kN|kN-m|kN-m|kN-m|m|m|m",
+                       [("1. DL + LL", "Combination", None, None, 0, 0, 10, 0, -20, 0, 0, 0, 0),
+                        ("EQX", "LinStatic", None, None, 1, 0, 0, 0, 0, 0, 0, 0, 0)], book=book)
+        self.add_table("Assembled Joint Masses",
+                       "Story|Label|Point Element|UX|UY|UZ|RX|RY|RZ|X|Y|Z",
+                       "|||kg|kg|kg|ton-m²|ton-m²|ton-m²|m|m|m",
+                       [("Base", "A", "01", 2, 2, 2, 0, 0, 0, 2, 0, 0),
+                        ("Story1", "B", "02", 10, 10, 0, 0, 0, 3, 2, 0, 4)], book=book)
+        self.add_table("Analysis Messages",
+                       "Date Time|Type|Message|Load Case|Operation|Element Type|Element Name|Run Tag|Run Serial Number|Computer",
+                       "|||||||||", [("date", "Information", "elapsed", "N/A", "run", "N.A.", "N.A.", 0, 1, "fixture")],
+                       book=book)
+        self.add_table("Objects and Elements - Joints",
+                       "Story|Element Name|Object Type|Object Label|Object Name|Global X|Global Y|Global Z",
+                       "|||||mm|mm|mm", [("Base", "01", "Joint", "A", "01", 2000, 0, 0),
+                                       ("Story1", "02", "Joint", "B", "02", 2000, 0, 4000),
+                                       ("Base", "03", "Joint", "C", "03", 4000, 0, 0)], book=book)
+        self.add_table("Joint Reactions",
+                       "Story|Label|Unique Name|Output Case|Case Type|Step Type|Step Number|FX|FY|FZ|MX|MY|MZ",
+                       "|||||||kN|kN|kN|kN-m|kN-m|kN-m",
+                       [("Base", "A", "01", "1. DL + LL", "Combination", None, None, 0, 0, 10, 0, 0, 0),
+                        ("Base", "C", "03", "1. DL + LL", "Combination", None, None, 0, 0, 0, 0, 0, 0)], book=book)
+        self.add_table("Centers Of Mass And Rigidity",
+                       "Story|Diaphragm|Mass X|Mass Y|XCM|YCM|Cum Mass X|Cum Mass Y|XCCM|YCCM|XCR|YCR",
+                       "||kg|kg|m|m|kg|kg|m|m|m|m",
+                       [("Story1", "D1", 10, 10, 2, 0, 10, 10, 2, 0, 2, 0)], book=book)
+        self.add_table("Diaphragm CM Displacements",
+                       "Story|Diaphragm|Output Case|Case Type|Step Type|Step Number|UX|UY|RZ|Point|X|Y|Z|Diaphragm Mass X|Diaphragm Mass Y|Diaphragm MMI RZ",
+                       "||||||mm|mm|rad||m|m|m|kg|kg|ton-m²",
+                       [("Story1", "D1", "EQX", "LinStatic", None, None, 0, 0, 0, "B", 2, 0, 4, 10, 10, 3)],
+                       title="Diaphragm Center Of Mass Displacements", book=book)
+        book.save(sixth)
+        book.close()
+        report = read_analysis_reference([sixth], cases=["EQX"], row_database=sixth.with_suffix(".sqlite3"))
+        self.assertEqual(report["tables"]["Assembled Joint Masses"]["units"]["UX"], "kg")
+        self.assertEqual(report["tables"]["Assembled Joint Masses"]["units"]["RZ"], "ton-m²")
+        self.assertEqual(report["tables"]["Analysis Messages"]["stored_row_count"], 1)
+        mass = report["checks"]["assembled_mass_reference"]
+        self.assertEqual(mass["matched_topology_rows"], 2)
+        self.assertEqual(mass["topology_without_mass_rows_by_story"], {"Base": 1})
+        self.assertEqual(mass["stories"]["Story1"]["mass_residual_kg"], {"UX": 0, "UY": 0})
+        self.assertEqual(mass["stories"]["Story1"]["RZ_residual_ton_m2"], 0)
+        self.assertEqual(mass["stories"]["Base"]["assembled"]["UX"], 2)
+        base = report["checks"]["base_reaction_reference"]
+        self.assertEqual(base["base_only_case_steps"], 1)
+        self.assertEqual(base["full_gravity"]["recovered"], [0, 0, 10, 0, -20, 0])
+        self.assertEqual(base["full_gravity"]["residual"], [0]*6)
+        self.assertEqual(report["engineering_acceptance"], "NOT_VERIFIED")
+
+    def test_sixth_lot_source_guards_do_not_infer_missing_or_enveloped_results(self):
+        from components.inputs.etabs_table_bundle import (_base_reaction_reference_diagnostics,
+                                                         _assembled_mass_reference_diagnostics)
+        case = dict(zip(("Output Case", "Case Type", "Step Type", "Step Number"),
+                        ("1. DL + LL", "Combination", None, None)))
+        vec = dict(zip(("FX", "FY", "FZ", "MX", "MY", "MZ"), (0, 0, 10, 0, 0, 0)))
+        b = {**case, **vec, "X": 0, "Y": 0, "Z": 0}
+        j = {"Element Name": "1", "Story": "Base", "Object Label": "A",
+             "Global X": 0, "Global Y": 0, "Global Z": 0}
+        reaction = {**case, **vec, "Unique Name": "1", "Story": "Base", "Label": "A"}
+        for bad in ([reaction, reaction], [{**reaction, "Label": "wrong"}],
+                    [{**reaction, "Step Type": "Max"}], [{**reaction, "FZ": None}]):
+            self.assertIsNone(_base_reaction_reference_diagnostics([b], bad, [j])["full_gravity"]["recovered"])
+        m = {"Point Element": "1", "Story": "Base", "Label": "A", "X": 1, "Y": 0, "Z": 0,
+             "UX": 2, "UY": 2, "UZ": 2, "RX": 0, "RY": 0, "RZ": 0}
+        self.assertEqual(_assembled_mass_reference_diagnostics([m], [j], [], [])["unmatched_topology_rows"], 1)
+
     def test_fifth_lot_reference_preserves_units_and_diaphragm_metadata(self):
         fifth = self.source.with_name("fifth.xlsx")
         book = Workbook()

@@ -146,6 +146,16 @@ _LARGE_TABLES.update({
         dict.fromkeys(("Mass X", "Mass Y", "Cum Mass X", "Cum Mass Y"), "kg")
         | dict.fromkeys(("XCM", "YCM", "XCCM", "YCCM", "XCR", "YCR"), "m")),
 })
+_LARGE_TABLES.update({
+    "Base Reactions": (_CASE_COLUMNS,
+        _GLOBAL_REACTIONS | dict.fromkeys(("X", "Y", "Z"), "m")),
+    "Assembled Joint Masses": (("Story", "Label", "Point Element"),
+        dict.fromkeys(("UX", "UY", "UZ"), "kg")
+        | dict.fromkeys(("RX", "RY", "RZ"), "ton-m²")
+        | dict.fromkeys(("X", "Y", "Z"), "m")),
+    "Analysis Messages": (("Date Time", "Type", "Message", "Load Case", "Operation",
+        "Element Type", "Element Name", "Computer"), {"Run Tag": "", "Run Serial Number": ""}),
+})
 _REFERENCE_TABLES.update(_LARGE_TABLES)
 _REFERENCE_TITLES = {
     "Story Max Over Avg Disp": "Story Max Over Avg Displacements",
@@ -563,7 +573,8 @@ def _reference_table(sheet, store=None):
     normalized_units = {column: _REFERENCE_UNITS.get(unit, (unit, 1)) for column, unit in measures.items()}
     case_column = next((c for c in ("Output Case", "SpecCase", "Case") if c in keys), None)
     large_table = sheet.title in _LARGE_TABLES
-    repeatable = large_table or sheet.title == _FRAMES
+    strict_identity = sheet.title in ("Base Reactions", "Assembled Joint Masses")
+    repeatable = (large_table and not strict_identity) or sheet.title == _FRAMES
     table_id = store.start(sheet.title) if store else None
     # The drift table identifies one result per story, direction, case and step.
     # Its controlling point label and formatted reciprocal drift are attributes.
@@ -572,6 +583,7 @@ def _reference_table(sheet, store=None):
         _JOINTS: ("Element Name",),
         _FRAMES: headers,
         _AREAS: ("Object Type", "Element Name"),
+        "Assembled Joint Masses": ("Point Element",),
     }.get(sheet.title, keys)
     key_seen = {}
     duplicates = {}
@@ -596,7 +608,7 @@ def _reference_table(sheet, store=None):
         source_key = tuple(record.values()) if repeatable and store else None
         for column, (_, divisor) in normalized_units.items():
             value = record[column]
-            if value is None and large_table:
+            if value is None and large_table and not strict_identity:
                 blank_measures[column] += 1
                 continue
             if type(value) not in (int, float) or not math.isfinite(value):
@@ -994,6 +1006,99 @@ def _diaphragm_cm_reference_diagnostics(centers, displacements):
             "ambiguous_center_keys": len(ambiguous), "exception_row_samples": samples}
 
 
+def _assembled_mass_reference_diagnostics(masses, joints, centers, displacements):
+    """Keep base and floor mass distinct; never install masses in a model."""
+    dofs = ("UX", "UY", "UZ", "RX", "RY", "RZ")
+    topology = {row["Element Name"]: row for row in joints}
+    observed, unmatched, groups = set(), 0, {}
+    for row in masses:
+        uid = row["Point Element"]
+        ref = topology.get(uid)
+        if (uid in observed or ref is None or row["Story"] != ref["Story"]
+                or row["Label"] != ref["Object Label"]
+                or any(row[a] != ref["Global " + a] for a in "XYZ")):
+            unmatched += 1
+        observed.add(uid)
+        groups.setdefault(row["Story"], []).append(row)
+    center_index, inertia = {}, {}
+    for row in centers:
+        center_index.setdefault(row["Story"], []).append(row)
+    for row in displacements:
+        inertia.setdefault((row["Story"], row["Diaphragm"]), set()).add(row["Diaphragm MMI RZ"])
+    stories = {}
+    for story, rows in groups.items():
+        totals = {d: math.fsum(row[d] for row in rows) for d in dofs}
+        entry = {"joint_rows": len(rows), "assembled": totals,
+                 "nonzero_horizontal_rows": sum(row["UX"] != 0 or row["UY"] != 0 for row in rows),
+                 "negative_mass_rows": sum(any(row[d] < 0 for d in dofs) for row in rows),
+                 "mass_residual_kg": None, "RZ_residual_ton_m2": None}
+        refs = center_index.get(story, [])
+        if len(refs) == 1 and not unmatched and not entry["negative_mass_rows"]:
+            ref = refs[0]
+            if ref["Mass X"] is not None and ref["Mass Y"] is not None:
+                entry["mass_residual_kg"] = {"UX": totals["UX"] - ref["Mass X"],
+                                             "UY": totals["UY"] - ref["Mass Y"]}
+            values = inertia.get((story, ref["Diaphragm"]), set())
+            if len(values) == 1 and None not in values:
+                entry["RZ_residual_ton_m2"] = totals["RZ"] - next(iter(values))
+        stories[story] = entry
+    return {"status": "REFERENCE_ONLY_NOT_NATIVE_MASS_MATRIX_OR_NBC_ACCEPTANCE",
+            "scope": "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER",
+            "matched_topology_rows": sum(len(rows) for rows in groups.values()) - unmatched,
+            "unmatched_topology_rows": unmatched,
+            "topology_without_mass_rows_by_story": dict(Counter(
+                row["Story"] for uid, row in topology.items() if uid not in observed)),
+            "stories": stories}
+
+
+def _base_reaction_reference_diagnostics(base, reactions, joints):
+    """Compare exact source case identities and one unstepped gravity resultant."""
+    from components.validation.reaction_common_cut import _resultant, _sum
+
+    fields = ("FX", "FY", "FZ", "MX", "MY", "MZ")
+    def identity(row):
+        return tuple(row[c] for c in _CASE_COLUMNS)
+    case = ("1. DL + LL", "Combination", None, None)
+    base_rows = list(base)
+    joint_rows = list(reactions)
+    base_keys = {identity(row) for row in base_rows}
+    joint_keys = {identity(row) for row in joint_rows}
+    candidates = [row for row in base_rows if identity(row) == case]
+    source = [row for row in joint_rows if identity(row) == case]
+    topology = {row["Element Name"]: row for row in joints}
+    seen, vectors, invalid = set(), [], 0
+    gravity = {"case": dict(zip(_CASE_COLUMNS, case)), "joint_rows": len(source),
+               "reported": None, "origin_m": None, "recovered": None, "residual": None}
+    if len(candidates) == 1:
+        ref = candidates[0]
+        origin = [ref[a] for a in "XYZ"]
+        reported = [ref[c] for c in fields]
+        gravity.update(reported=reported, origin_m=origin)
+        for row in source:
+            uid = row["Unique Name"]
+            joint = topology.get(uid)
+            values = [row[c] for c in fields]
+            if (uid in seen or joint is None or row["Story"] != "Base"
+                    or joint["Story"] != row["Story"] or joint["Object Label"] != row["Label"]
+                    or any(v is None or not math.isfinite(v) for v in values)):
+                invalid += 1
+            else:
+                vectors.append(_resultant({"xyz": [joint["Global " + a] for a in "XYZ"],
+                                           "reaction": values}, origin))
+            seen.add(uid)
+        # A partial base table must not appear to balance the whole base.
+        expected = {uid for uid, row in topology.items() if row["Story"] == "Base"}
+        if source and not invalid and seen == expected:
+            recovered = _sum(vectors)
+            gravity.update(recovered=recovered, residual=[a-b for a, b in zip(recovered, reported)])
+    gravity["invalid_joint_rows"] = invalid
+    return {"status": "REFERENCE_ONLY_NOT_NATIVE_SUPPORT_OR_SOLVER_ACCEPTANCE",
+            "scope": "ALL_UNIQUE_SOURCE_ROWS_BEFORE_CASE_FILTER",
+            "base_case_steps": len(base_keys), "joint_case_steps": len(joint_keys),
+            "base_only_case_steps": len(base_keys - joint_keys),
+            "joint_only_case_steps": len(joint_keys - base_keys), "full_gravity": gravity}
+
+
 def _reference_checks(tables, store=None):
     def rows(name):
         return store.rows(name) if store else tables[name]["rows"]
@@ -1063,6 +1168,14 @@ def _reference_checks(tables, store=None):
     if all(name in tables for name in ("Centers Of Mass And Rigidity", "Diaphragm CM Displacements")):
         checks["diaphragm_cm_reference"] = _diaphragm_cm_reference_diagnostics(
             records("Centers Of Mass And Rigidity"), records("Diaphragm CM Displacements"))
+    if all(name in tables for name in ("Assembled Joint Masses", _JOINTS)):
+        checks["assembled_mass_reference"] = _assembled_mass_reference_diagnostics(
+            records("Assembled Joint Masses"), records(_JOINTS),
+            records("Centers Of Mass And Rigidity") if "Centers Of Mass And Rigidity" in tables else (),
+            records("Diaphragm CM Displacements") if "Diaphragm CM Displacements" in tables else ())
+    if all(name in tables for name in ("Base Reactions", "Joint Reactions", _JOINTS)):
+        checks["base_reaction_reference"] = _base_reaction_reference_diagnostics(
+            records("Base Reactions"), records("Joint Reactions"), records(_JOINTS))
     element_joint_checks = {}
     for family, topology_name, result_name in (
             ("Shell", _AREAS, "Element Joint Forces - Shells"),
