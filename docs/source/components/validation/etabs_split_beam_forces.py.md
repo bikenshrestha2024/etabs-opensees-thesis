@@ -94,3 +94,25 @@ diagnostic, not a native solve. Excluded cases are not lost from their source
 workbooks; use the all-sheet private audit for all-case evidence. The
 station-overlap tolerance and legacy CSV identity are unchanged, and the
 complete multi-file selection still requires separate coverage validation.
+
+
+## All-case native station reference consolidation
+
+```powershell
+python -m components.validation.etabs_split_beam_forces NEW_PRIVATE_OUTPUT "Beam Forces Element 1.xlsx" "Beam Forces Element 2.xlsx" "Beam Forces Element 3.xlsx" --all-cases
+```
+
+This opt-in mode requires the explicit native m/kN/kN-m units row and full
+native beam schema, reads formulas as formulas rather than cached results,
+and keeps all cases. Its exact identity includes story, beam label, object
+unique name, case name/type, step type/number, object station, analytical
+element, element station and optional Location. A repeat is collapsed only
+when the serialized payload matches exactly; differing payloads fail before
+publication, even within legacy gravity tolerance. Per-file case counts and
+row-limit indicators remain in the manifest. The strict default and explicit
+single-case projection retain their existing behavior. All-case CSV is
+reference-only, never a gravity input by filename fallback. Original XLSX
+and separate private row-level audit preserve source positions; consolidated
+CSV is not a replacement for the originals. Matching case and topology
+coverage does not establish native model identity or full time-history
+record recovery.

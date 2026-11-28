@@ -170,6 +170,50 @@ class SplitBeamForceTests(unittest.TestCase):
             consolidate([b], self.root / "missing", select_exact_case=True)
         self.assertFalse((self.root / "missing").exists())
 
+    def test_native_all_case_keys_keep_element_and_case_type_and_reject_conflict(self):
+        from openpyxl import Workbook
+        def native(name, records):
+            path = self.root / name
+            book = Workbook()
+            ws = book.active
+            ws.title = "Element Forces - Beams"
+            ws.append(["TABLE: Element Forces - Beams"])
+            ws.append(["Story", "Beam", "Unique Name", "Output Case", "Case Type",
+                       "Step Type", "Step Number", "Station", "P", "V2", "V3",
+                       "T", "M2", "M3", "Element", "Elem Station", "Location"])
+            ws.append(["", "", "", "", "", "", None, "m", "kN", "kN",
+                       "kN", "kN-m", "kN-m", "kN-m", "", "m", ""])
+            for row in records:
+                ws.append(row)
+            book.save(path)
+            book.close()
+            return path
+        a = ["Story1", "B1", "123", "Modal Ritz", "LinModRitz", "Mode",
+             1, 0.55, 0, 5, 0, 0, 0, 1, "123", 0.55, None]
+        b = a.copy(); b[14] = "124"; b[15] = 0.25
+        c = a.copy(); c[4] = "OtherType"
+        d = a.copy(); d[3] = "1. DL + LL"; d[4] = "Combination"; d[5] = None; d[6] = None
+        first = native("first.xlsx", [a, b, c])
+        second = native("second.xlsx", [a, d])
+        result = consolidate([first, second], self.root / "all", all_cases=True)
+        self.assertEqual(result["source_rows"], 5)
+        self.assertEqual(result["unique_rows"], 4)
+        self.assertEqual(result["exact_or_tolerance_matched_overlaps"], 1)
+        self.assertIsNone(result["case"])
+        self.assertEqual(result["case_selection_policy"], "ALL_NATIVE_CASES_EXACT")
+        self.assertEqual(result["input_files"][0]["selected_case_row_counts"], {"Modal Ritz": 3})
+        self.assertEqual(result["input_files"][1]["selected_case_row_counts"], {"Modal Ritz": 1, "1. DL + LL": 1})
+        bad = a.copy(); bad[9] += 1e-8
+        conflict = native("conflict.xlsx", [bad])
+        with self.assertRaisesRegex(ValueError, "Conflicting duplicate"):
+            consolidate([first, conflict], self.root / "conflict", all_cases=True)
+        self.assertFalse((self.root / "conflict").exists())
+        with self.assertRaisesRegex(ValueError, "native.*units"):
+            consolidate([self.part("legacy.xlsx", [self.row()])], self.root / "legacy", all_cases=True)
+        self.assertFalse((self.root / "legacy").exists())
+        with self.assertRaisesRegex(ValueError, "mutually exclusive"):
+            consolidate([first], self.root / "both", all_cases=True, select_exact_case=True)
+
     def test_nonempty_output_is_never_overwritten(self):
         a = self.part("one.xlsx", [self.row()])
         out = self.root / "out"
